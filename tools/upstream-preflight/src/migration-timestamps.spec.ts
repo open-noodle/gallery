@@ -24,7 +24,14 @@ import { describe, expect, it } from 'vitest';
 //   - 1778800000000: ReconcileFaceIdentityIndexOverrides + TrimSpacePersonNameIndex
 //       (the LOW#2/#15 pair — benign; per the remediation decision it is kept + guarded
 //        rather than renamed, because renaming risks bricking already-deployed staging/RC DBs)
-// The baseline must NOT grow: no future PR may add a new collision or widen this set.
+// The baseline must NOT grow. Every entry above predates this guard; nothing has been added
+// since, and the bar for ever adding one is a collision that is ALREADY DEPLOYED, where a
+// rename would strand a migration name recorded in a live database. A collision caught before
+// either side has shipped is renumbered, not grandfathered — the fix is cheap then and only
+// then. Worked example: the space-album-folder migrations were cut from the same main as the
+// pet-search migration and both independently took 1785000000000; the clash surfaced when the
+// two branches met. Because no release had gone out carrying either folder migration, the
+// folder pair was re-stamped to 1793100000000/1793200000000 and this set stayed at three.
 const PRE_EXISTING_TIMESTAMP_COLLISIONS = new Set([
   '1775100000000',
   '1777000000000',

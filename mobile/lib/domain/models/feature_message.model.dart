@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
+// The batch itself is fork-owned; this file keeps only the type and the two symbol names
+// upstream's consumers read. See feature_message_gallery.model.dart.
+import 'package:immich_mobile/domain/models/feature_message_gallery.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/utils/semver.dart';
 
 enum FeatureHighlight {
   shareQuality(image: 'assets/feature_message/share_quality.webp'),
@@ -8,7 +10,10 @@ enum FeatureHighlight {
   recentlyAdded(image: 'assets/feature_message/recently_added.webp'),
   ocr(image: 'assets/feature_message/ocr.webp'),
   openInImmich(image: 'assets/feature_message/open_in_immich.webp', platform: [.android]),
-  uploadToAlbum();
+  uploadToAlbum(),
+  // gallery-fork (#931): the Spaces-in-nav card. Upstream's members above are kept as the
+  // catalogue/type; the BATCH that actually renders is galleryFeatureMessageHighlights.
+  spacesInNav(image: 'assets/feature_message/spaces_in_nav.webp');
 
   /// Asset path of the feature screenshot, or null to show a placeholder.
   final String? image;
@@ -25,6 +30,7 @@ enum FeatureHighlight {
     FeatureHighlight.ocr => t.ocr_title,
     FeatureHighlight.openInImmich => t.open_in_immich_title,
     FeatureHighlight.uploadToAlbum => t.upload_to_album_title,
+    FeatureHighlight.spacesInNav => t.spaces_in_nav_title,
   };
 
   String body(Translations t) => switch (this) {
@@ -34,13 +40,16 @@ enum FeatureHighlight {
     FeatureHighlight.ocr => t.ocr_body,
     FeatureHighlight.openInImmich => t.open_in_immich_body,
     FeatureHighlight.uploadToAlbum => t.upload_to_album_body,
+    FeatureHighlight.spacesInNav => t.spaces_in_nav_body,
   };
 }
 
-/// The release this batch of highlights was authored for. Content-defined:
-/// bump it only when publishing a new batch, never from the running app version.
-const featureMessageRelease = SemVer(major: 3, minor: 0, patch: 0);
+/// The release this batch of highlights was authored for.
+///
+/// Delegated to the fork-owned batch — see `feature_message_gallery.model.dart` for why the
+/// content and the version live there and not here.
+const featureMessageRelease = galleryFeatureMessageRelease;
 
 /// Highlights relevant to the current platform.
 List<FeatureHighlight> get visibleFeatureMessageHighlights =>
-    FeatureHighlight.values.where((h) => h.isVisibleOnCurrentPlatform).toList();
+    galleryFeatureMessageHighlights.where((h) => h.isVisibleOnCurrentPlatform).toList();

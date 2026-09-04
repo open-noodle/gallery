@@ -1,4 +1,5 @@
 import {
+  SharedSpaceAlbumLinkQueryDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceLibraryParamDto,
@@ -79,6 +80,28 @@ describe('shared-space param DTOs (security-9)', () => {
   it('SharedSpaceLibraryParamDto rejects a non-UUID libraryId', () => {
     expect(SharedSpaceLibraryParamDto.schema.safeParse({ id: uuid, libraryId: 'nope' }).success).toBe(false);
     expect(SharedSpaceLibraryParamDto.schema.safeParse({ id: uuid, libraryId: uuid }).success).toBe(true);
+  });
+});
+
+// A QUERY param, not a path param, but the same uuidv4 validation shape as the security-9 DTOs
+// above — a non-UUID folderId must be rejected here rather than reaching the repository as a raw
+// string and 500ing on Postgres 22P02.
+describe('SharedSpaceAlbumLinkQueryDto', () => {
+  const uuid = '11111111-1111-4111-8111-111111111111';
+
+  it('accepts a valid folderId', () => {
+    const result = SharedSpaceAlbumLinkQueryDto.schema.safeParse({ folderId: uuid });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a non-UUID folderId', () => {
+    const result = SharedSpaceAlbumLinkQueryDto.schema.safeParse({ folderId: 'not-a-uuid' });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts an omitted folderId, since linking to the space root needs no folder', () => {
+    const result = SharedSpaceAlbumLinkQueryDto.schema.safeParse({});
+    expect(result.success).toBe(true);
   });
 });
 

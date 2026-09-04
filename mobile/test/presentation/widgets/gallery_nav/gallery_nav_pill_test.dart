@@ -15,15 +15,20 @@ class _HarnessState extends State<_Harness> {
   GalleryTabEnum active = GalleryTabEnum.photos;
   void switchTo(GalleryTabEnum t) => setState(() => active = t);
   @override
-  Widget build(BuildContext context) => GalleryNavPill(activeTab: active, onTabTap: (t) => setState(() => active = t));
+  Widget build(BuildContext context) =>
+      GalleryNavPill(slots: _slots, activeTab: active, onTabTap: (t) => setState(() => active = t));
 }
+
+/// The pill no longer derives its own slots — its parent passes them. These
+/// tests pin the Albums configuration, which is what their assertions read.
+final _slots = galleryNavSlots(showSpaces: false);
 
 void main() {
   testWidgets('renders 3 segments in canonical order', (tester) async {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -37,7 +42,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (t) => tapped = t),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (t) => tapped = t),
       ),
     );
     await tester.pumpAndSettle();
@@ -49,7 +54,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.albums, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.albums, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -62,7 +67,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -79,12 +84,36 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
     final segmentRect = tester.getRect(find.byKey(const Key('gallery-nav-segment-photos')));
     final underlayRect = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
+    expect((underlayRect.left - segmentRect.left).abs(), lessThan(0.5));
+    expect((underlayRect.width - segmentRect.width).abs(), lessThan(0.5));
+  });
+
+  testWidgets('Spaces configuration: the underlay sits under the Spaces segment', (tester) async {
+    // The one test in this file that is NOT pinned to the Albums slots. If
+    // `_measure` ever iterates or gates on a hardcoded slot list again instead
+    // of `widget.slots`, no rect is measured for `spaces`, the length guard
+    // never passes, `_segmentRects` stays empty and the underlay renders at
+    // zero width — silently, with every Albums-pinned test still green.
+    await tester.pumpConsumerWidget(
+      SizedBox(
+        width: 360,
+        child: GalleryNavPill(
+          slots: galleryNavSlots(showSpaces: true),
+          activeTab: GalleryTabEnum.spaces,
+          onTabTap: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final segmentRect = tester.getRect(find.byKey(const Key('gallery-nav-segment-spaces')));
+    final underlayRect = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
+    expect(underlayRect.width, greaterThan(0), reason: 'a zero-width underlay means _segmentRects never populated');
     expect((underlayRect.left - segmentRect.left).abs(), lessThan(0.5));
     expect((underlayRect.width - segmentRect.width).abs(), lessThan(0.5));
   });
@@ -135,7 +164,7 @@ void main() {
     return Center(
       child: SizedBox(
         width: width,
-        child: GalleryNavPill(activeTab: active, onTabTap: onTap ?? (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: active, onTabTap: onTap ?? (_) {}),
       ),
     );
   }
@@ -145,7 +174,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final pill = tester.getRect(find.byType(GalleryNavPill));
-    for (final tab in GalleryTabEnum.values) {
+    for (final tab in galleryNavSlots(showSpaces: false)) {
       final segment = tester.getRect(find.byKey(Key('gallery-nav-segment-${tab.name}')));
       expect(segment.left, greaterThanOrEqualTo(pill.left - 0.5), reason: '${tab.name} overflows the pill on the left');
       expect(
@@ -161,12 +190,12 @@ void main() {
     await tester.pumpConsumerWidget(constrained(300, onTap: tapped.add));
     await tester.pumpAndSettle();
 
-    for (final tab in GalleryTabEnum.values) {
+    for (final tab in galleryNavSlots(showSpaces: false)) {
       await tester.tap(find.byKey(Key('gallery-nav-segment-${tab.name}')));
       await tester.pumpAndSettle();
     }
 
-    expect(tapped, GalleryTabEnum.values);
+    expect(tapped, galleryNavSlots(showSpaces: false));
   });
 
   testWidgets('constrained width: underlay still lines up with the active segment (#909)', (tester) async {
@@ -185,6 +214,7 @@ void main() {
       SizedBox(
         width: 360,
         child: GalleryNavPill(
+          slots: _slots,
           activeTab: GalleryTabEnum.photos,
           disabledTabs: const {GalleryTabEnum.albums, GalleryTabEnum.library},
           onTabTap: (t) => tapped = t.index,
@@ -216,7 +246,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -231,7 +261,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();

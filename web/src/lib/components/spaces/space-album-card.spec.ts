@@ -1,5 +1,6 @@
-import { screen } from '@testing-library/svelte';
+import { fireEvent, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { getActiveDragPayload, readDragPayload, setActiveDragPayload } from '$lib/utils/space-album-folder-dnd';
 import { renderWithTooltips } from '$tests/helpers';
 import SpaceAlbumCard from './space-album-card.svelte';
 
@@ -8,6 +9,12 @@ describe('SpaceAlbumCard', () => {
     register('en-US', () => import('$i18n/en.json'));
     await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
     await waitLocale('en-US');
+  });
+
+  beforeEach(() => {
+    // getActiveDragPayload is bare module state — reset so a payload set by one test can't leak
+    // into a later one.
+    setActiveDragPayload(null);
   });
 
   const album = {
@@ -115,5 +122,103 @@ describe('SpaceAlbumCard', () => {
       canManage: false,
     });
     expect(screen.getByAltText('Trip')).toBeInTheDocument();
+  });
+
+  it('offers "Move to folder…" alongside unlink and toggle when canManage=true', () => {
+    renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album,
+      canManage: true,
+      onUnlink: vi.fn(),
+      onToggleTimeline: vi.fn(),
+      onMove: vi.fn(),
+    });
+    expect(screen.getByText('Move to folder…')).toBeInTheDocument();
+  });
+
+  it('clicking "Move to folder…" calls onMove with the album', async () => {
+    const onMove = vi.fn();
+    renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album,
+      canManage: true,
+      onUnlink: vi.fn(),
+      onToggleTimeline: vi.fn(),
+      onMove,
+    });
+
+    await fireEvent.click(screen.getByText('Move to folder…'));
+
+    expect(onMove).toHaveBeenCalledWith(album);
+  });
+
+  it('viewer sees no "Move to folder…" option either', () => {
+    renderWithTooltips(SpaceAlbumCard, { spaceId: 's-1', album, canManage: false });
+    expect(screen.queryByText('Move to folder…')).not.toBeInTheDocument();
+  });
+
+  // W-11's album-card equivalent: viewers get no drag affordance.
+  it('is draggable for an editor and not for a viewer', () => {
+    const { container: editorContainer } = renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album,
+      canManage: true,
+    });
+    expect(editorContainer.querySelector('[data-testid="space-album-card"]')).toHaveAttribute('draggable', 'true');
+
+    const { container: viewerContainer } = renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album,
+      canManage: false,
+    });
+    expect(viewerContainer.querySelector('[data-testid="space-album-card"]')).toHaveAttribute('draggable', 'false');
+  });
+
+  it('dragstart writes the album payload onto the DataTransfer and the active-drag slot', async () => {
+    const { container } = renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album: { ...album, id: 'a-9' },
+      canManage: true,
+    });
+    const card = container.querySelector('[data-testid="space-album-card"]')!;
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      setData: (type: string, value: string) => store.set(type, value),
+      getData: (type: string) => store.get(type) ?? '',
+      types: [...store.keys()],
+    } as unknown as DataTransfer;
+
+    expect(getActiveDragPayload()).toBeNull();
+
+    await fireEvent.dragStart(card, { dataTransfer });
+
+    expect(readDragPayload(dataTransfer)).toEqual({ kind: 'album', id: 'a-9' });
+    expect(getActiveDragPayload()).toEqual({ kind: 'album', id: 'a-9' });
+
+    await fireEvent.dragEnd(card);
+
+    expect(getActiveDragPayload()).toBeNull();
+  });
+
+  // draggable="false" on the outer div does not stop the inner <a>/cover image from being
+  // natively draggable in a real browser (dragstart bubbles up regardless), so the handler
+  // itself has to gate on canManage rather than relying solely on the draggable attribute.
+  it('dragstart writes nothing when canManage is false, even if a dragstart is fired', async () => {
+    const { container } = renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album: { ...album, id: 'a-9' },
+      canManage: false,
+    });
+    const card = container.querySelector('[data-testid="space-album-card"]')!;
+    const dataTransfer = {
+      setData: vi.fn(),
+      getData: () => '',
+      types: [] as string[],
+    } as unknown as DataTransfer;
+
+    await fireEvent.dragStart(card, { dataTransfer });
+
+    expect(dataTransfer.setData).not.toHaveBeenCalled();
+    expect(getActiveDragPayload()).toBeNull();
   });
 });

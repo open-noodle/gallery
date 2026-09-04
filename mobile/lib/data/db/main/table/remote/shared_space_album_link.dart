@@ -20,6 +20,11 @@ class SharedSpaceAlbumLinkEntity extends Table with DriftDefaultsMixin {
   TextColumn get albumId => text()();
 
   BoolColumn get showInTimeline => boolean().withDefault(const Constant(true))();
+
+  // Which folder this album sits in within the space; null = the space root. No FK — the folder
+  // row may not be synced yet.
+  TextColumn get folderId => text().nullable()();
+
   TextColumn get addedById => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
