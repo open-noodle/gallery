@@ -428,6 +428,8 @@ features:
         - server/src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId.ts
         - server/src/schema/migrations-gallery/1784000000000-FixFaceRepairScanInFlightIndexOverride.ts
         - server/src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift.ts
+        - server/src/schema/migrations-gallery/1785000000000-CreatePetSearchTable.ts
+        - server/src/schema/migrations-gallery/1785200000000-AddSpeciesToPetSearch.ts
         - server/src/schema/migrations-gallery/1787000000000-AddFacePersonVerdict.ts
         - server/src/schema/migrations-gallery/1787100000000-DropPersonFksBeforeClusterGroups.ts
         - server/src/schema/migrations-gallery/1788000000000-ReconcileFacePersonVerdictConstraints.ts
