@@ -33,6 +33,7 @@
   import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
   import StackAction from '$lib/components/timeline/actions/StackAction.svelte';
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
+  import OnEvents from '$lib/components/OnEvents.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import { AssetAction } from '$lib/constants';
@@ -136,6 +137,16 @@
   let searchResults = $state<AssetResponseDto[]>([]);
   // Bumped to force a re-run of the search (undo-delete restores the removed assets).
   let searchReloadToken = $state(0);
+  // #1041: same trick for the timeline. Adding photos to a space the caller has hidden from their
+  // own timeline changes what the server returns, but the mounted TimelineManager has already
+  // cached its buckets and `updateOptions` no-ops on unchanged options — so the assets sit there
+  // until the page remounts. Bumping this key remounts Timeline, which builds a fresh manager.
+  //
+  // Deliberately a remount rather than `timelineManager.removeAssets(assetIds)`: an asset that ALSO
+  // reaches a space the caller still shows must stay (§3, "another visible path wins"), and
+  // deciding that client-side is exactly the in-memory simulation the preview endpoint had to
+  // abandon for disagreeing with reality (§8.1 of the hide-from-timeline design doc).
+  let timelineReloadToken = $state(0);
   const options = $derived({
     ...buildPhotosTimelineOptions(filters, authManager.user.id),
     grouping: timelineGrouping,
@@ -445,6 +456,15 @@
     timelineManager.update(ids, (asset) => (asset.visibility = visibility));
   };
 
+  // Only fires for a space the emitter knows the caller has hidden; a normal add leaves the
+  // timeline alone, so the common path costs nothing. While search results are showing the
+  // Timeline is unmounted (#908) and will build a fresh manager when it comes back anyway.
+  const handleSpaceAddAssets = ({ hiddenFromMyTimeline }: { hiddenFromMyTimeline?: boolean }) => {
+    if (hiddenFromMyTimeline && !showSearchResults) {
+      timelineReloadToken++;
+    }
+  };
+
   const handleAssetDelete = (assetIds: string[]) => {
     if (showSearchResults) {
       removeSearchResults(searchResults, assetIds);
@@ -652,46 +672,52 @@
           total={smartFacetTotal}
         />
       {:else}
-        <Timeline
-          enableRouting={true}
-          bind:timelineManager
-          {options}
-          assetInteraction={assetMultiSelectManager}
-          removeAction={AssetAction.ARCHIVE}
-          onEscape={handleEscape}
-          onTimelineBucketActivate={handleTimelineBucketActivate}
-          {temporalAnchor}
-          onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-          grouping={timelineGrouping}
-          onGroupingChange={handleTimelineGroupingChange}
-          withStacked
-        >
-          {#if authManager.preferences.memories.enabled && !hasActiveFilters}
-            <!-- In month/year grouping the timeline renders large representative cards; add breathing
+        <!-- #1041: keyed so handleSpaceAddAssets can force a fresh TimelineManager — see the
+             timelineReloadToken comment above for why a remount and not removeAssets. -->
+        {#key timelineReloadToken}
+          <Timeline
+            enableRouting={true}
+            bind:timelineManager
+            {options}
+            assetInteraction={assetMultiSelectManager}
+            removeAction={AssetAction.ARCHIVE}
+            onEscape={handleEscape}
+            onTimelineBucketActivate={handleTimelineBucketActivate}
+            {temporalAnchor}
+            onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+            grouping={timelineGrouping}
+            onGroupingChange={handleTimelineGroupingChange}
+            withStacked
+          >
+            {#if authManager.preferences.memories.enabled && !hasActiveFilters}
+              <!-- In month/year grouping the timeline renders large representative cards; add breathing
                  room below the memories strip so those cards don't hug it. The wrapper's height feeds
                  the timeline's measured topSectionHeight, so this shifts the cards down cleanly. -->
-            <div class={{ 'pb-8': timelineGrouping !== 'day' }}>
-              <!-- ImageCarousel carries its own mt-3, from when the strip was the first thing in the
+              <div class={{ 'pb-8': timelineGrouping !== 'day' }}>
+                <!-- ImageCarousel carries its own mt-3, from when the strip was the first thing in the
                    timeline and needed to stand off the top. The route grouping bar sits above it now
                    and already ends in 8px of padding and an 8px margin, so the strip's own margin was
                    a third helping - 28px between the Years/Months/All pill and the strip, against the
                    16px the timeline gets when memories are off. `class` reaches the section through
                    twMerge, so mt-0 replaces it rather than fighting it. -->
-              <ImageCarousel {items} class="mt-0" />
-            </div>
-          {/if}
-          {#snippet empty()}
-            <EmptyPlaceholder
-              text={$t('no_assets_message')}
-              onClick={() => openFileUploadDialog()}
-              class="mx-auto mt-10"
-            />
-          {/snippet}
-        </Timeline>
+                <ImageCarousel {items} class="mt-0" />
+              </div>
+            {/if}
+            {#snippet empty()}
+              <EmptyPlaceholder
+                text={$t('no_assets_message')}
+                onClick={() => openFileUploadDialog()}
+                class="mx-auto mt-10"
+              />
+            {/snippet}
+          </Timeline>
+        {/key}
       {/if}
     </div>
   </div>
 </UserPageLayout>
+
+<OnEvents onSpaceAddAssets={handleSpaceAddAssets} />
 
 {#if assetMultiSelectManager.selectionActive}
   <AssetSelectControlBar>

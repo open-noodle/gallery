@@ -1153,6 +1153,7 @@ export class SearchRepository {
                       correlateAssetId: 'asset.id',
                       correlateLibraryId: 'asset.libraryId',
                       scope: { spaceId: spaceId! },
+                      albumTimelineGate: 'none',
                     }),
                   ),
                 )
@@ -1281,7 +1282,7 @@ export class SearchRepository {
               correlateAssetId: 'asset.id',
               correlateLibraryId: 'asset.libraryId',
               scope: { spaceIds: timelineSpaceIds },
-              requireShowInTimeline: true,
+              albumTimelineGate: 'space-tab',
             })
           : []),
       ]);
@@ -1543,7 +1544,7 @@ export class SearchRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceId: options!.spaceId! },
-                requireShowInTimeline: true,
+                albumTimelineGate: 'space-tab',
               }),
             ),
             // M3: caller's own assets bypass space-visibility gate; others must be Archive/Timeline.
@@ -1562,7 +1563,7 @@ export class SearchRepository {
                   correlateAssetId: 'asset.id',
                   correlateLibraryId: 'asset.libraryId',
                   scope: { spaceIds: options!.timelineSpaceIds! },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               ),
             ]),
@@ -1686,6 +1687,7 @@ export class SearchRepository {
                             correlateAssetId: 'asset.id',
                             correlateLibraryId: 'asset.libraryId',
                             scope: { spaceIds: options.timelineSpaceIds },
+                            albumTimelineGate: 'none',
                           }),
                         ),
                       ]),
@@ -1706,7 +1708,7 @@ export class SearchRepository {
                   correlateAssetId: 'asset.id',
                   correlateLibraryId: 'asset.libraryId',
                   scope: { spaceId: options!.spaceId! },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               ),
               // M3: the caller's own assets bypass the space-visibility gate (own-M3);
@@ -1728,7 +1730,7 @@ export class SearchRepository {
                     correlateAssetId: 'asset.id',
                     correlateLibraryId: 'asset.libraryId',
                     scope: { spaceIds: options!.timelineSpaceIds! },
-                    requireShowInTimeline: true,
+                    albumTimelineGate: 'space-tab',
                   }),
                 ),
               ]),

@@ -468,7 +468,9 @@ export class MemoryService extends BaseService {
   }
 
   async search(auth: AuthDto, dto: MemorySearchDto) {
-    const memories = await this.memoryRepository.searchAccessible(auth.user.id, dto);
+    // #1041 §6.2: resolved once per request, same as timeline.service.ts / view.service.ts.
+    const [hiddenScope, visibleSpaceIds] = await this.resolveHiddenScopeAndVisibleSpaces(auth.user.id);
+    const memories = await this.memoryRepository.searchAccessible(auth.user.id, dto, hiddenScope, visibleSpaceIds);
     const assetIds = memories.flatMap((memory) => memory.assets.map((asset) => asset.id));
     const allowedAssetIds = await this.checkAccess({ auth, permission: Permission.AssetView, ids: assetIds });
 
@@ -512,7 +514,7 @@ export class MemoryService extends BaseService {
 
   async get(auth: AuthDto, id: string): Promise<MemoryResponseDto> {
     await this.requireAccess({ auth, permission: Permission.MemoryRead, ids: [id] });
-    const memory = await this.findOrFail(id);
+    const memory = await this.findOrFail(id, auth.user.id);
     return mapMemory(memory, auth);
   }
 
@@ -600,7 +602,21 @@ export class MemoryService extends BaseService {
     return results;
   }
 
-  private findOrFail(id: string) {
-    return findOrFail(() => this.memoryRepository.get(id), 'Memory');
+  // #1041 §3: `visibleSpaceIds` is what lets the subtraction honour "another visible path re-admits
+  // this photo". Memories have no sibling visible-path arm of their own (unlike the timeline and
+  // folder view), so without it the subtraction over-removes — see TimelineRescue.
+  private async resolveHiddenScopeAndVisibleSpaces(userId: string) {
+    const [hiddenScope, spaceRows] = await Promise.all([
+      this.sharedSpaceRepository.getTimelineHiddenScope(userId),
+      this.sharedSpaceRepository.getSpaceIdsForTimeline(userId),
+    ]);
+    return [hiddenScope, spaceRows.map((row) => row.spaceId)] as const;
+  }
+
+  private async findOrFail(id: string, viewerId?: string) {
+    // #1041 §4: leave the memory's assets hidden from a viewer's own timeline immediately, not just
+    // after the next generation pass — see the repository doc comment.
+    const resolved = viewerId ? await this.resolveHiddenScopeAndVisibleSpaces(viewerId) : undefined;
+    return findOrFail(() => this.memoryRepository.get(id, viewerId, resolved?.[0], resolved?.[1]), 'Memory');
   }
 }

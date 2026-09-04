@@ -34,6 +34,7 @@ import 'package:immich_mobile/data/db/main/table/remote/library.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_asset.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_hidden.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_link.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_library.dart';
@@ -93,6 +94,7 @@ import 'package:sqlite_async/sqlite_async.dart';
     SharedSpaceAlbumEntity,
     SharedSpaceAlbumLinkEntity,
     SharedSpaceAlbumAssetEntity,
+    SharedSpaceAlbumHiddenEntity,
     MemoryEntity,
     MemoryAssetEntity,
     StackEntity,
@@ -180,7 +182,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 37;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -420,6 +422,11 @@ class Drift extends $Drift {
                 await m.createIndex(v36.idxSharedSpaceAlbumLinkAlbumSpace);
                 await m.createIndex(v36.idxSharedSpaceAlbumAssetAlbum);
                 await m.createIndex(v36.idxSharedSpaceAlbumAssetAssetAlbum);
+              },
+              // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+              from36To37: (m, v37) async {
+                await m.createTable(v37.sharedSpaceAlbumHiddenEntity);
+                await m.createIndex(v37.idxSharedSpaceAlbumHiddenAlbumSpace);
               },
             ),
           ),

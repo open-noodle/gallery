@@ -85,6 +85,7 @@ export class SyncRepository {
   sharedSpaceLibrary: SharedSpaceLibrarySync;
   sharedSpaceAlbum: SharedSpaceAlbumSync;
   sharedSpaceAlbumLink: SharedSpaceAlbumLinkSync;
+  sharedSpaceAlbumHidden: SharedSpaceAlbumHiddenSync;
   sharedSpaceAlbumToAsset: SharedSpaceAlbumToAssetSync;
   sharedSpaceAlbumAsset: SharedSpaceAlbumAssetSync;
   sharedSpaceAlbumAssetExif: SharedSpaceAlbumAssetExifSync;
@@ -124,6 +125,7 @@ export class SyncRepository {
     this.sharedSpaceLibrary = new SharedSpaceLibrarySync(this.db);
     this.sharedSpaceAlbum = new SharedSpaceAlbumSync(this.db);
     this.sharedSpaceAlbumLink = new SharedSpaceAlbumLinkSync(this.db);
+    this.sharedSpaceAlbumHidden = new SharedSpaceAlbumHiddenSync(this.db);
     this.sharedSpaceAlbumToAsset = new SharedSpaceAlbumToAssetSync(this.db);
     this.sharedSpaceAlbumAsset = new SharedSpaceAlbumAssetSync(this.db);
     this.sharedSpaceAlbumAssetExif = new SharedSpaceAlbumAssetExifSync(this.db);
@@ -1645,6 +1647,57 @@ export class SharedSpaceAlbumLinkSync extends BaseSync {
         .where('album.deletedAt', 'is', null)
         .stream()
     );
+  }
+}
+
+// Columns emitted for each personal hidden-album row. Mirrors SHARED_SPACE_ALBUM_SYNC_COLUMNS —
+// updateId must be selected because the service handler destructures it off the row to key the
+// sync event's `ids`.
+const SHARED_SPACE_ALBUM_HIDDEN_SYNC_COLUMNS = [
+  'shared_space_album_hidden.spaceId',
+  'shared_space_album_hidden.albumId',
+  'shared_space_album_hidden.userId',
+  'shared_space_album_hidden.updateId',
+] as const;
+
+// gallery-fork (#1041): the per-member "album hidden from MY timeline" rows.
+//
+// Scoped by userId equality, NOT by accessibleSpaces — unlike every sibling stream in this file.
+// These rows are a personal viewing preference, so a member must never receive a peer's. The audit
+// table has no scoping of its own (spaceId/albumId/userId, no membership relation baked in), so
+// getDeletes must filter it by userId too.
+export class SharedSpaceAlbumHiddenSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string, userId: string) {
+    return this.backfillQuery('shared_space_album_hidden', options)
+      .innerJoin('album', 'album.id', 'shared_space_album_hidden.albumId')
+      .select(SHARED_SPACE_ALBUM_HIDDEN_SYNC_COLUMNS)
+      .where('shared_space_album_hidden.spaceId', '=', spaceId)
+      .where('shared_space_album_hidden.userId', '=', asUuid(userId))
+      .where('album.deletedAt', 'is', null)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_album_hidden_audit', options)
+      .select(['id', 'spaceId', 'albumId', 'userId'])
+      .where('userId', '=', asUuid(options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_album_hidden_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_album_hidden', options)
+      .innerJoin('album', 'album.id', 'shared_space_album_hidden.albumId')
+      .select(SHARED_SPACE_ALBUM_HIDDEN_SYNC_COLUMNS)
+      .where('shared_space_album_hidden.userId', '=', asUuid(options.userId))
+      .where('album.deletedAt', 'is', null)
+      .stream();
   }
 }
 

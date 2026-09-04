@@ -1185,6 +1185,9 @@ export enum SyncRequestType {
   SharedSpaceAlbumToAssetsV1 = 'SharedSpaceAlbumToAssetsV1',
   SharedSpaceAlbumAssetsV1 = 'SharedSpaceAlbumAssetsV1',
   SharedSpaceAlbumAssetExifsV1 = 'SharedSpaceAlbumAssetExifsV1',
+
+  // #1041: per-member "album hidden from MY timeline" rows.
+  SharedSpaceAlbumHiddensV1 = 'SharedSpaceAlbumHiddensV1',
 }
 
 export const SyncRequestTypeSchema = z
@@ -1320,6 +1323,12 @@ export enum SyncEntityType {
   SharedSpaceAlbumLinkV1 = 'SharedSpaceAlbumLinkV1',
   SharedSpaceAlbumLinkDeleteV1 = 'SharedSpaceAlbumLinkDeleteV1',
   SharedSpaceAlbumLinkBackfillV1 = 'SharedSpaceAlbumLinkBackfillV1',
+
+  // #1041: per-member "album hidden from MY timeline" rows. Scoped by userId equality, not
+  // accessibleSpaces — these are a personal preference, not a shared link row.
+  SharedSpaceAlbumHiddenV1 = 'SharedSpaceAlbumHiddenV1',
+  SharedSpaceAlbumHiddenDeleteV1 = 'SharedSpaceAlbumHiddenDeleteV1',
+  SharedSpaceAlbumHiddenBackfillV1 = 'SharedSpaceAlbumHiddenBackfillV1',
 
   // membership ← clone AlbumToAssetSync
   SharedSpaceAlbumToAssetV1 = 'SharedSpaceAlbumToAssetV1',
