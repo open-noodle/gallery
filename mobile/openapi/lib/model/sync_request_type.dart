@@ -50,6 +50,7 @@ enum SyncRequestType {
   sharedSpaceLibrariesV1._(r'SharedSpaceLibrariesV1'),
   sharedSpaceAlbumsV1._(r'SharedSpaceAlbumsV1'),
   sharedSpaceAlbumLinksV1._(r'SharedSpaceAlbumLinksV1'),
+  sharedSpaceAlbumFoldersV1._(r'SharedSpaceAlbumFoldersV1'),
   sharedSpaceAlbumToAssetsV1._(r'SharedSpaceAlbumToAssetsV1'),
   sharedSpaceAlbumAssetsV1._(r'SharedSpaceAlbumAssetsV1'),
   sharedSpaceAlbumAssetExifsV1._(r'SharedSpaceAlbumAssetExifsV1'),
@@ -151,6 +152,7 @@ class SyncRequestTypeTypeTransformer {
         case r'SharedSpaceLibrariesV1': return SyncRequestType.sharedSpaceLibrariesV1;
         case r'SharedSpaceAlbumsV1': return SyncRequestType.sharedSpaceAlbumsV1;
         case r'SharedSpaceAlbumLinksV1': return SyncRequestType.sharedSpaceAlbumLinksV1;
+        case r'SharedSpaceAlbumFoldersV1': return SyncRequestType.sharedSpaceAlbumFoldersV1;
         case r'SharedSpaceAlbumToAssetsV1': return SyncRequestType.sharedSpaceAlbumToAssetsV1;
         case r'SharedSpaceAlbumAssetsV1': return SyncRequestType.sharedSpaceAlbumAssetsV1;
         case r'SharedSpaceAlbumAssetExifsV1': return SyncRequestType.sharedSpaceAlbumAssetExifsV1;

@@ -15907,6 +15907,258 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/album-folders": {
+      "get": {
+        "description": "Returns every folder in the space as a flat list; the client builds the tree. Folder names are member-only information, so non-members are refused rather than given an empty list.",
+        "operationId": "getSharedSpaceAlbumFolders",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SharedSpaceAlbumFolderDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List the album folders of a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      },
+      "post": {
+        "operationId": "createSharedSpaceAlbumFolder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpaceAlbumFolderCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSpaceAlbumFolderDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create an album folder in a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpaceAlbumFolder.create",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{id}/album-folders/{folderId}": {
+      "delete": {
+        "description": "Direct children are promoted one level up. Albums are never unlinked, and structure below the deleted folder is preserved.",
+        "operationId": "deleteSharedSpaceAlbumFolder",
+        "parameters": [
+          {
+            "name": "folderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete an album folder",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpaceAlbumFolder.delete",
+        "x-immich-state": "Beta"
+      },
+      "patch": {
+        "description": "Pass parentId: null to move the folder to the space root.",
+        "operationId": "updateSharedSpaceAlbumFolder",
+        "parameters": [
+          {
+            "name": "folderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpaceAlbumFolderUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Rename or move an album folder",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpaceAlbumFolder.update",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/albums": {
       "get": {
         "operationId": "getSharedSpaceAlbums",
@@ -16159,6 +16411,76 @@
           }
         ],
         "x-immich-permission": "sharedSpaceAlbum.create",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{id}/albums/{albumId}/folder": {
+      "put": {
+        "description": "Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required — making it optional would regenerate the Dart client into three-state territory.",
+        "operationId": "setSharedSpaceAlbumFolder",
+        "parameters": [
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpaceAlbumFolderMoveAlbumDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Move a linked album into a folder",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpaceAlbum.update",
         "x-immich-state": "Beta"
       }
     },
@@ -30340,6 +30662,9 @@
           "sharedSpaceAlbum.create",
           "sharedSpaceAlbum.update",
           "sharedSpaceAlbum.delete",
+          "sharedSpaceAlbumFolder.create",
+          "sharedSpaceAlbumFolder.update",
+          "sharedSpaceAlbumFolder.delete",
           "userGroup.create",
           "userGroup.read",
           "userGroup.update",
@@ -33175,6 +33500,104 @@
         ],
         "type": "object"
       },
+      "SharedSpaceAlbumFolderCreateDto": {
+        "properties": {
+          "name": {
+            "description": "Folder name",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentId": {
+            "description": "Parent folder ID; omit or null for the space root",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "SharedSpaceAlbumFolderDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdById": {
+            "description": "User who created the folder",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "description": "Folder ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Folder name",
+            "type": "string"
+          },
+          "parentId": {
+            "description": "Parent folder ID, or null when at the space root",
+            "nullable": true,
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "createdById",
+          "id",
+          "name",
+          "parentId",
+          "spaceId",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SharedSpaceAlbumFolderMoveAlbumDto": {
+        "properties": {
+          "folderId": {
+            "description": "Destination folder ID; null moves the album to the space root",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "folderId"
+        ],
+        "type": "object"
+      },
+      "SharedSpaceAlbumFolderUpdateDto": {
+        "properties": {
+          "name": {
+            "description": "New folder name",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentId": {
+            "description": "New parent folder ID; null moves the folder to the space root",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "SharedSpaceAlbumLinkUpdateDto": {
         "properties": {
           "showInTimeline": {
@@ -33334,6 +33757,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "folderId": {
+            "description": "Folder this album sits in within the space, or null for the root",
+            "nullable": true,
+            "type": "string"
+          },
           "hasSharedLink": {
             "description": "Has shared link",
             "type": "boolean"
@@ -33401,6 +33829,7 @@
           "assetCount",
           "createdAt",
           "description",
+          "folderId",
           "hasSharedLink",
           "hiddenFromMyTimeline",
           "id",
@@ -36194,6 +36623,9 @@
           "SharedSpaceAlbumHiddenV1",
           "SharedSpaceAlbumHiddenDeleteV1",
           "SharedSpaceAlbumHiddenBackfillV1",
+          "SharedSpaceAlbumFolderV1",
+          "SharedSpaceAlbumFolderDeleteV1",
+          "SharedSpaceAlbumFolderBackfillV1",
           "SharedSpaceAlbumToAssetV1",
           "SharedSpaceAlbumToAssetDeleteV1",
           "SharedSpaceAlbumToAssetBackfillV1",
@@ -36598,6 +37030,7 @@
           "SharedSpaceLibrariesV1",
           "SharedSpaceAlbumsV1",
           "SharedSpaceAlbumLinksV1",
+          "SharedSpaceAlbumFoldersV1",
           "SharedSpaceAlbumToAssetsV1",
           "SharedSpaceAlbumAssetsV1",
           "SharedSpaceAlbumAssetExifsV1",
@@ -36607,6 +37040,62 @@
       },
       "SyncResetV1": {
         "properties": {},
+        "type": "object"
+      },
+      "SyncSharedSpaceAlbumFolderDeleteV1": {
+        "properties": {
+          "folderId": {
+            "description": "Folder ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "folderId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceAlbumFolderV1": {
+        "properties": {
+          "createdAt": {
+            "description": "Created at",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "id": {
+            "description": "Folder ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Folder name",
+            "type": "string"
+          },
+          "parentId": {
+            "description": "Parent folder ID",
+            "nullable": true,
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Updated at",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "name",
+          "parentId",
+          "spaceId",
+          "updatedAt"
+        ],
         "type": "object"
       },
       "SyncSharedSpaceAlbumHiddenDeleteV1": {
@@ -36688,6 +37177,11 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "type": "string"
           },
+          "folderId": {
+            "description": "Album folder ID within the space, or null if at the space root",
+            "nullable": true,
+            "type": "string"
+          },
           "showInTimeline": {
             "description": "Whether this album appears in the space timeline",
             "type": "boolean"
@@ -36708,6 +37202,7 @@
           "addedById",
           "albumId",
           "createdAt",
+          "folderId",
           "showInTimeline",
           "spaceId",
           "updatedAt"

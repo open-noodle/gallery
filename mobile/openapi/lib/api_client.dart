@@ -951,6 +951,10 @@ class ApiClient {
           return SyncPersonV1.fromJson(value);
         case 'SyncRequestType':
           return SyncRequestTypeTypeTransformer().decode(value);
+        case 'SyncSharedSpaceAlbumFolderDeleteV1':
+          return SyncSharedSpaceAlbumFolderDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceAlbumFolderV1':
+          return SyncSharedSpaceAlbumFolderV1.fromJson(value);
         case 'SyncSharedSpaceAlbumHiddenDeleteV1':
           return SyncSharedSpaceAlbumHiddenDeleteV1.fromJson(value);
         case 'SyncSharedSpaceAlbumHiddenV1':

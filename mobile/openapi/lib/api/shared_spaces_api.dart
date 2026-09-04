@@ -256,6 +256,64 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Create an album folder in a shared space
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumFolderCreateDto] sharedSpaceAlbumFolderCreateDto (required):
+  Future<Response> createSharedSpaceAlbumFolderWithHttpInfo(String id, SharedSpaceAlbumFolderCreateDto sharedSpaceAlbumFolderCreateDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/album-folders'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpaceAlbumFolderCreateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Create an album folder in a shared space
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumFolderCreateDto] sharedSpaceAlbumFolderCreateDto (required):
+  Future<SharedSpaceAlbumFolderDto?> createSharedSpaceAlbumFolder(String id, SharedSpaceAlbumFolderCreateDto sharedSpaceAlbumFolderCreateDto, { Future<void>? abortTrigger, }) async {
+    final response = await createSharedSpaceAlbumFolderWithHttpInfo(id, sharedSpaceAlbumFolderCreateDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpaceAlbumFolderDto',) as SharedSpaceAlbumFolderDto;
+    
+    }
+    return null;
+  }
+
   /// Create a shared space
   ///
   /// Create a new shared space for collaborative asset management.
@@ -358,6 +416,61 @@ class SharedSpacesApi {
   /// * [String] id (required):
   Future<void> deduplicateSpacePeople(String id, { Future<void>? abortTrigger, }) async {
     final response = await deduplicateSpacePeopleWithHttpInfo(id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Delete an album folder
+  ///
+  /// Direct children are promoted one level up. Albums are never unlinked, and structure below the deleted folder is preserved.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] folderId (required):
+  ///
+  /// * [String] id (required):
+  Future<Response> deleteSharedSpaceAlbumFolderWithHttpInfo(String folderId, String id, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/album-folders/{folderId}'
+      .replaceAll('{folderId}', folderId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Delete an album folder
+  ///
+  /// Direct children are promoted one level up. Albums are never unlinked, and structure below the deleted folder is preserved.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] folderId (required):
+  ///
+  /// * [String] id (required):
+  Future<void> deleteSharedSpaceAlbumFolder(String folderId, String id, { Future<void>? abortTrigger, }) async {
+    final response = await deleteSharedSpaceAlbumFolderWithHttpInfo(folderId, id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -717,6 +830,67 @@ class SharedSpacesApi {
       final responseBody = await _decodeBodyBytes(response);
       return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpaceMemberResponseDto>') as List)
         .cast<SharedSpaceMemberResponseDto>()
+        .toList(growable: false);
+
+    }
+    return null;
+  }
+
+  /// List the album folders of a shared space
+  ///
+  /// Returns every folder in the space as a flat list; the client builds the tree. Folder names are member-only information, so non-members are refused rather than given an empty list.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<Response> getSharedSpaceAlbumFoldersWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/album-folders'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// List the album folders of a shared space
+  ///
+  /// Returns every folder in the space as a flat list; the client builds the tree. Folder names are member-only information, so non-members are refused rather than given an empty list.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<List<SharedSpaceAlbumFolderDto>?> getSharedSpaceAlbumFolders(String id, { Future<void>? abortTrigger, }) async {
+    final response = await getSharedSpaceAlbumFoldersWithHttpInfo(id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      final responseBody = await _decodeBodyBytes(response);
+      return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpaceAlbumFolderDto>') as List)
+        .cast<SharedSpaceAlbumFolderDto>()
         .toList(growable: false);
 
     }
@@ -2010,7 +2184,7 @@ class SharedSpacesApi {
 
   /// Link an album to a shared space
   ///
-  /// Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.
+  /// Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor. Pass folderId to place the album directly in a folder in the same request.
   ///
   /// Note: This method returns the HTTP [Response].
   ///
@@ -2019,7 +2193,10 @@ class SharedSpacesApi {
   /// * [String] albumId (required):
   ///
   /// * [String] id (required):
-  Future<Response> linkAlbumWithHttpInfo(String albumId, String id, { Future<void>? abortTrigger, }) async {
+  ///
+  /// * [String] folderId:
+  ///   Place the newly linked album in this folder
+  Future<Response> linkAlbumWithHttpInfo(String albumId, String id, { String? folderId, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/albums/{albumId}'
       .replaceAll('{albumId}', albumId)
@@ -2031,6 +2208,10 @@ class SharedSpacesApi {
     final queryParams = <QueryParam>[];
     final headerParams = <String, String>{};
     final formParams = <String, String>{};
+
+    if (folderId != null) {
+      queryParams.addAll(_queryParams('', 'folderId', folderId));
+    }
 
     const contentTypes = <String>[];
 
@@ -2049,15 +2230,18 @@ class SharedSpacesApi {
 
   /// Link an album to a shared space
   ///
-  /// Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor.
+  /// Link an album so its photos appear in the space. Requires space editor/owner and album owner/editor. Pass folderId to place the album directly in a folder in the same request.
   ///
   /// Parameters:
   ///
   /// * [String] albumId (required):
   ///
   /// * [String] id (required):
-  Future<void> linkAlbum(String albumId, String id, { Future<void>? abortTrigger, }) async {
-    final response = await linkAlbumWithHttpInfo(albumId, id, abortTrigger: abortTrigger,);
+  ///
+  /// * [String] folderId:
+  ///   Place the newly linked album in this folder
+  Future<void> linkAlbum(String albumId, String id, { String? folderId, Future<void>? abortTrigger, }) async {
+    final response = await linkAlbumWithHttpInfo(albumId, id, folderId: folderId, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -2465,6 +2649,65 @@ class SharedSpacesApi {
   /// * [String] id (required):
   Future<void> removeSpace(String id, { Future<void>? abortTrigger, }) async {
     final response = await removeSpaceWithHttpInfo(id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Move a linked album into a folder
+  ///
+  /// Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required — making it optional would regenerate the Dart client into three-state territory.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumFolderMoveAlbumDto] sharedSpaceAlbumFolderMoveAlbumDto (required):
+  Future<Response> setSharedSpaceAlbumFolderWithHttpInfo(String albumId, String id, SharedSpaceAlbumFolderMoveAlbumDto sharedSpaceAlbumFolderMoveAlbumDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/albums/{albumId}/folder'
+      .replaceAll('{albumId}', albumId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpaceAlbumFolderMoveAlbumDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PUT',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Move a linked album into a folder
+  ///
+  /// Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required — making it optional would regenerate the Dart client into three-state territory.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumFolderMoveAlbumDto] sharedSpaceAlbumFolderMoveAlbumDto (required):
+  Future<void> setSharedSpaceAlbumFolder(String albumId, String id, SharedSpaceAlbumFolderMoveAlbumDto sharedSpaceAlbumFolderMoveAlbumDto, { Future<void>? abortTrigger, }) async {
+    final response = await setSharedSpaceAlbumFolderWithHttpInfo(albumId, id, sharedSpaceAlbumFolderMoveAlbumDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -3006,6 +3249,65 @@ class SharedSpacesApi {
   /// * [SharedSpaceAlbumLinkUpdateDto] sharedSpaceAlbumLinkUpdateDto (required):
   Future<void> updateSharedSpaceAlbum(String albumId, String id, SharedSpaceAlbumLinkUpdateDto sharedSpaceAlbumLinkUpdateDto, { Future<void>? abortTrigger, }) async {
     final response = await updateSharedSpaceAlbumWithHttpInfo(albumId, id, sharedSpaceAlbumLinkUpdateDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Rename or move an album folder
+  ///
+  /// Pass parentId: null to move the folder to the space root.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] folderId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumFolderUpdateDto] sharedSpaceAlbumFolderUpdateDto (required):
+  Future<Response> updateSharedSpaceAlbumFolderWithHttpInfo(String folderId, String id, SharedSpaceAlbumFolderUpdateDto sharedSpaceAlbumFolderUpdateDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/album-folders/{folderId}'
+      .replaceAll('{folderId}', folderId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpaceAlbumFolderUpdateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PATCH',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Rename or move an album folder
+  ///
+  /// Pass parentId: null to move the folder to the space root.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] folderId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumFolderUpdateDto] sharedSpaceAlbumFolderUpdateDto (required):
+  Future<void> updateSharedSpaceAlbumFolder(String folderId, String id, SharedSpaceAlbumFolderUpdateDto sharedSpaceAlbumFolderUpdateDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateSharedSpaceAlbumFolderWithHttpInfo(folderId, id, sharedSpaceAlbumFolderUpdateDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
