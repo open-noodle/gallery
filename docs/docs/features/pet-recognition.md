@@ -5,7 +5,7 @@ Pet Recognition tells your individual pets apart. With it enabled, two dogs in y
 It builds on [Pet Detection](/features/pet-detection): detection finds the animal in the photo, recognition decides _which_ animal it is.
 
 :::info Dogs and cats only
-Only **dogs** and **cats** are recognized as individuals. The other four detected categories (bird, horse, sheep, cow) keep the one-person-per-species behaviour Pet Detection has always had.
+Only **dogs** and **cats** are recognized as individuals. The other four detected categories (bird, horse, sheep, cow) keep the one-person-per-species behaviour Pet Detection has always had — which means they are recorded but [not shown in the People section](/features/pet-detection#what-you-can-and-cannot-see).
 
 This is a limit of the model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird apart from another. It also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than a named identity would.
 :::
@@ -20,7 +20,7 @@ Pet Recognition is **off by default**, and turning it on is not enough on its ow
 
 Pet Detection must also be enabled, otherwise no new photos are scanned for animals at all and recognition has nothing to work with. The settings page warns you when detection is off.
 
-From that point on, **newly uploaded** photos go through the individual pipeline. Photos already in your library keep whatever they had — so until you reprocess, the library is in a mixed state: old photos still grouped in a "dog" bucket, new ones appearing as named-able individuals.
+From that point on, **newly uploaded** photos go through the individual pipeline. Photos already in your library keep whatever they had — so until you reprocess, the library is in a mixed state: old photos still attached to the shared "dog" entry, which is not listed in the People section, while new ones appear there as named-able individuals.
 
 ## Reprocessing your library
 
