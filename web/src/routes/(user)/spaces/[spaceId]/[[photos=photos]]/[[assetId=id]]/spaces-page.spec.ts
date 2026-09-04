@@ -799,7 +799,13 @@ describe('Spaces page search URL state', () => {
       id: 'space-1',
       sharedSpaceAssetAddDto: { assetIds: ['asset-1'] },
     });
-    expect(mockEventManager.emit).toHaveBeenCalledWith('SpaceAddAssets', { assetIds: ['asset-1'], spaceId: 'space-1' });
+    // #1041: the space page knows its own membership, so it states the caller's hide status
+    // outright rather than leaving listeners to guess.
+    expect(mockEventManager.emit).toHaveBeenCalledWith('SpaceAddAssets', {
+      assetIds: ['asset-1'],
+      spaceId: 'space-1',
+      hiddenFromMyTimeline: false,
+    });
     expect(mockAssetMultiSelectManager.clear).toHaveBeenCalled();
 
     vi.clearAllMocks();

@@ -7,12 +7,16 @@ import { eventManager } from '$lib/managers/event-manager.svelte';
 import { Route } from '$lib/route';
 import { handleError } from '$lib/utils/handle-error';
 
-export const addAssetsToSpace = async (spaceId: string, assetIds: string[], { notify }: { notify: boolean }) => {
+export const addAssetsToSpace = async (
+  spaceId: string,
+  assetIds: string[],
+  { notify, hiddenFromMyTimeline = false }: { notify: boolean; hiddenFromMyTimeline?: boolean },
+) => {
   const $t = get(t);
 
   try {
     await addAssets({ id: spaceId, sharedSpaceAssetAddDto: { assetIds } });
-    eventManager.emit('SpaceAddAssets', { assetIds, spaceId });
+    eventManager.emit('SpaceAddAssets', { assetIds, spaceId, hiddenFromMyTimeline });
 
     if (notify) {
       toastManager.primary(

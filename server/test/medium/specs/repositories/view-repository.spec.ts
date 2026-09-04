@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { ViewRepository } from 'src/repositories/view-repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
@@ -111,7 +112,12 @@ describe(ViewRepository.name, () => {
       expect(result).toContain(`/album/folder/${role}-album`);
     });
 
-    it('DENY — album with showInTimeline=false does not expose folder paths in the folder view', async () => {
+    // #1041 (slice 9): folder view is a personal-timeline surface now — the SHARED
+    // shared_space_album.showInTimeline flag governs only the space's own Photos tab (§3). `member`
+    // here is a DIFFERENT user than the album owner and has not personally hidden the album (no
+    // shared_space_album_hidden row), so the folder shows. Before slice 9 this asserted `.not.toContain`,
+    // which encoded exactly the #1041 bug report.
+    it('GRANT — album with showInTimeline=false still exposes folder paths to a viewer who has not personally hidden it', async () => {
       const { ctx, sut } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: member } = await ctx.newUser();
@@ -124,7 +130,26 @@ describe(ViewRepository.name, () => {
 
       const result = await sut.getUniqueOriginalPaths(member.id);
 
-      expect(result).not.toContain('/album/no-timeline');
+      expect(result).toContain('/album/no-timeline');
+    });
+
+    // #1041 (slice 9): the NEW, correct denial mechanism — a viewer's OWN per-user hide (never the
+    // shared showInTimeline flag) is what removes an album's folder from THEIR OWN folder view.
+    it("DENY — the viewer's OWN personal hide (shared_space_album_hidden) does remove the folder", async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'PersonallyHidden' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, originalPath: '/album/personally-hidden/IMG.jpg' });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      await ctx.get(SharedSpaceRepository).hideAlbumForUser(space.id, album.id, member.id);
+
+      const result = await sut.getUniqueOriginalPaths(member.id);
+
+      expect(result).not.toContain('/album/personally-hidden');
     });
 
     it('GRANT — same album with showInTimeline=true still exposes folder paths', async () => {
@@ -282,7 +307,9 @@ describe(ViewRepository.name, () => {
       await expect(sut.getAssetsByOriginalPath(member.id, path)).resolves.toEqual([]);
     });
 
-    it('DENY — album with showInTimeline=false does not expose folder contents in the folder view', async () => {
+    // #1041 (slice 9): same reasoning as the getUniqueOriginalPaths GRANT test above — the shared
+    // flag no longer reaches a viewer who has not personally hidden the album.
+    it('GRANT — album with showInTimeline=false still exposes folder contents to a viewer who has not personally hidden it', async () => {
       const { ctx, sut } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: member } = await ctx.newUser();
@@ -293,6 +320,25 @@ describe(ViewRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: owner.id, originalPath: `${path}/IMG.jpg` });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const result = await sut.getAssetsByOriginalPath(member.id, path);
+
+      expect(result.map((a) => a.id)).toContain(asset.id);
+    });
+
+    // #1041 (slice 9): same NEW denial mechanism as getUniqueOriginalPaths above.
+    it("DENY — the viewer's OWN personal hide (shared_space_album_hidden) does remove the folder contents", async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'PersonallyHiddenContents' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      const path = '/album/personally-hidden-contents';
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, originalPath: `${path}/IMG.jpg` });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      await ctx.get(SharedSpaceRepository).hideAlbumForUser(space.id, album.id, member.id);
 
       const result = await sut.getAssetsByOriginalPath(member.id, path);
 

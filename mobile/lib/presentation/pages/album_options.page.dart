@@ -174,7 +174,7 @@ class AlbumOptionsPage extends HookConsumerWidget {
                     subtitle: link.showInTimeline
                         ? null
                         : Text(
-                            context.t.space_albums_hidden_from_timeline,
+                            context.t.space_albums_hidden_from_space_photos,
                             key: Key('album-space-link-hidden-badge-${link.spaceId}'),
                             style: TextStyle(color: context.colorScheme.onSurfaceSecondary),
                           ),

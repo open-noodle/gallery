@@ -137,10 +137,16 @@ test.describe('Spaces — Albums UI (editor flows + viewer-denied gating)', () =
       // But the editor-only controls must be absent.
       await expect(page.getByTestId('link-album-button')).not.toBeVisible();
 
-      // The context menu is inside the card and is only rendered when canManage is true.
-      // It is hidden via CSS opacity-0 on non-hover; asserting not.toBeVisible() covers
-      // both the missing-from-DOM case (viewer, canManage=false) and hidden-via-CSS.
-      await expect(page.getByTestId('space-album-card-menu')).not.toBeVisible();
+      // #1041: the card menu is now rendered for a viewer too — "hide this album from my
+      // timeline" is a personal preference, not an editor action. Only the space-wide items
+      // remain canManage-gated, so assert the menu's CONTENTS rather than its absence.
+      const cardMenu = page.getByTestId('space-album-card-menu');
+      await expect(cardMenu).toBeAttached();
+      await cardMenu.getByRole('button', { name: 'More' }).click();
+      await expect(page.getByText('Hide this album from my timeline')).toBeVisible();
+      await expect(page.getByText("Hide this album from the space's photos")).toHaveCount(0);
+      await expect(page.getByText('Unlink album')).toHaveCount(0);
+      await page.keyboard.press('Escape');
     });
 
     test('can open a linked album but sees no Add-photos button', async ({ context, page }) => {
@@ -274,8 +280,15 @@ test.describe('Spaces — Albums UI (editor flows + viewer-denied gating)', () =
 
       await expect(page.getByTestId('link-album-button')).not.toBeVisible();
       await expect(page.getByTestId('create-album-button')).not.toBeVisible();
-      // The card's ⋯ menu (unlink / show-in-timeline) is canManage-gated.
-      await expect(page.getByTestId('space-album-card-menu')).not.toBeVisible();
+      // #1041: the card's ⋯ menu now also carries a personal "hide from my timeline" item, which
+      // every member may use, so the menu itself is no longer canManage-gated. The space-wide
+      // items inside it still are.
+      const cardMenu = page.getByTestId('space-album-card-menu');
+      await expect(cardMenu).toBeAttached();
+      await cardMenu.getByRole('button', { name: 'More' }).click();
+      await expect(page.getByText("Hide this album from the space's photos")).toHaveCount(0);
+      await expect(page.getByText('Unlink album')).toHaveCount(0);
+      await page.keyboard.press('Escape');
     });
 
     test('editor sees link + unlink affordances', async ({ context, page }) => {
