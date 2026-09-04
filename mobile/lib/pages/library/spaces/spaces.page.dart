@@ -50,10 +50,7 @@ class SpacesPage extends HookConsumerWidget {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: context.t.name,
-                    hintText: context.t.spaces_create_name_hint,
-                  ),
+                  decoration: InputDecoration(labelText: context.t.name, hintText: context.t.spaces_create_name_hint),
                   autofocus: true,
                 ),
                 const SizedBox(height: 8),
@@ -67,14 +64,8 @@ class SpacesPage extends HookConsumerWidget {
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(context.t.cancel),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(context.t.create),
-              ),
+              TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(context.t.cancel)),
+              TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(context.t.create)),
             ],
           );
         },
@@ -125,11 +116,7 @@ class SpacesPage extends HookConsumerWidget {
         ref.invalidate(sharedSpacesProvider);
       } catch (e) {
         if (context.mounted) {
-          ImmichToast.show(
-            context: context,
-            msg: context.t.spaces_delete_failed,
-            toastType: ToastType.error,
-          );
+          ImmichToast.show(context: context, msg: context.t.spaces_delete_failed, toastType: ToastType.error);
         }
       }
     }
@@ -289,10 +276,7 @@ class SpacesPage extends HookConsumerWidget {
               const SizedBox(height: 16),
               Text(context.t.spaces_load_failed(error: '$error')),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(sharedSpacesProvider),
-                child: Text(context.t.retry),
-              ),
+              ElevatedButton(onPressed: () => ref.invalidate(sharedSpacesProvider), child: Text(context.t.retry)),
             ],
           ),
         ),

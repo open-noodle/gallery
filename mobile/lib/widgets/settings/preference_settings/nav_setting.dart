@@ -33,10 +33,7 @@ class NavSetting extends HookConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SettingGroupTitle(
-          title: context.t.setting_nav_title,
-          icon: Icons.navigation_outlined,
-        ),
+        SettingGroupTitle(title: context.t.setting_nav_title, icon: Icons.navigation_outlined),
         SettingsSwitchListTile(
           key: const Key('nav-show-spaces-switch'),
           valueNotifier: valueNotifier,
