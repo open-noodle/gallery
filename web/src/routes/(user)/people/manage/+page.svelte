@@ -29,6 +29,8 @@
       displayName: person.name,
       thumbnailUrl: getPeopleThumbnailUrl(person),
       isHidden: person.isHidden,
+      type: person.type,
+      species: person.species,
     })),
   );
 

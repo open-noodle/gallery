@@ -8,8 +8,9 @@
   import { ToggleVisibility } from '$lib/constants';
   import { locale } from '$lib/stores/preferences.store';
   import { handleError } from '$lib/utils/handle-error';
-  import { Button, IconButton, toastManager } from '@immich/ui';
-  import { mdiClose, mdiEye, mdiEyeOff, mdiEyeSettings, mdiRestart } from '@mdi/js';
+  import { getPetBadgeLabel } from '$lib/utils/pet-species';
+  import { Button, Icon, IconButton, toastManager } from '@immich/ui';
+  import { mdiClose, mdiEye, mdiEyeOff, mdiEyeSettings, mdiPaw, mdiRestart } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -220,6 +221,18 @@
               hiddenIconClass="text-white group-hover:text-black transition-colors"
               preload={false}
             />
+          {/if}
+          {#if person.type === 'pet'}
+            {@const petBadgeLabel = getPetBadgeLabel(person.species, $t)}
+            <div
+              class="absolute right-1 bottom-1 rounded-full bg-immich-primary p-1 text-white"
+              data-testid="pet-badge"
+              role="img"
+              aria-label={petBadgeLabel}
+              title={petBadgeLabel}
+            >
+              <Icon icon={mdiPaw} size="16" class="text-white" />
+            </div>
           {/if}
           {#if person.displayName}
             <span class="absolute inset-s-0 bottom-2 w-full px-1 text-center font-medium text-white select-text">
