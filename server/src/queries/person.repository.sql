@@ -732,13 +732,34 @@ WITH
       AND "asset"."deletedAt" IS NULL
       AND "asset_face"."deletedAt" IS NULL
       AND "asset_face"."isVisible" = true
+      AND (
+        $3 = ''
+        OR "person"."type" = $4
+      )
+      AND (
+        $5 <> 'pet'
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            "asset_face" "pet_face"
+            INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
+          WHERE
+            "pet_face"."personGroupId" = "person"."personGroupId"
+        )
+      )
       -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
     GROUP BY
       "person"."ownerId",
-      "person"."personGroupId"
+      "person"."personGroupId",
+      "person"."type"
     HAVING
       NULLIF(BTRIM("person"."name"), '') IS NOT NULL
-      OR COUNT("asset_face"."assetId") >= $3
+      OR (
+        $6 = 'pet'
+        AND "person"."type" = 'pet'
+      )
+      OR COUNT("asset_face"."assetId") >= $7
   )
 SELECT
   COUNT(*)::int AS "total",

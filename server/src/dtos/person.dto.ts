@@ -100,6 +100,14 @@ const PersonSearchSchema = z
     withSharedSpaces: stringToBool
       .optional()
       .describe('Include identity-grouped people from timeline-enabled shared spaces'),
+    type: z
+      .enum(['person', 'pet'])
+      .optional()
+      .describe(
+        'Filter the list. `person` returns human people. `pet` returns the individual pets that pet ' +
+          'recognition identified — species buckets, which the detector produces without an embedding, are ' +
+          'excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.',
+      ),
     closestPersonId: z.uuidv4().optional().describe('Closest person ID for similarity search'),
     closestAssetId: z.uuidv4().optional().describe('Closest asset ID for similarity search'),
     page: z.coerce.number().int().min(1).default(1).describe('Page number for pagination'),
