@@ -35,6 +35,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(PeopleSortBy.photoCount);
+    registerFallbackValue(PeopleFilterBy.all);
   });
 
   setUp(() {
@@ -102,6 +103,44 @@ void main() {
       // The online path must never fall through to the local repository, so minFaces threading
       // (which only applies to the offline fallback) cannot leak into the server-backed path.
       verifyNever(() => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')));
+    });
+
+    // M6: the People/Pets filter must reach the server-backed repository call unchanged.
+    test('threads filterBy through to the server-backed repository call', () async {
+      when(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(
+          sortBy: any(named: 'sortBy'),
+          filterBy: any(named: 'filterBy'),
+        ),
+      ).thenAnswer((_) async => [person('pet-1')]);
+
+      final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets);
+
+      expect(result, [person('pet-1')]);
+      verify(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets),
+      ).called(1);
+    });
+
+    // M8: the local sync DB is owner-scoped AND has no `type` column, so the offline fallback
+    // cannot honour filterBy at all. It must still return the unfiltered local list — an empty
+    // grid under a Pets filter reads as data loss, while a degraded-but-real list does not.
+    test('falls back to the unfiltered local list when the server is unreachable', () async {
+      when(
+        () => mockApiRepository.getAllPeopleWithSharedSpaces(
+          sortBy: any(named: 'sortBy'),
+          filterBy: any(named: 'filterBy'),
+        ),
+      ).thenThrow(Exception('offline'));
+      when(
+        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+      ).thenAnswer((_) async => [person('local-person')]);
+
+      final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets);
+
+      expect(result, isNotEmpty); // local Drift has no type column; unfiltered is correct
+      expect(result, [person('local-person')]);
+      verify(() => mockRepository.getAllPeople(minFaces: 3, sortBy: PeopleSortBy.name)).called(1);
     });
 
     // Offline / server failure must not blank the page: the viewer's own people still render

@@ -3,6 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/string_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/people/people_filter_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/people_grid.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/people_sort_button.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
@@ -31,7 +32,8 @@ class _DriftPeopleCollectionPageState extends ConsumerState<DriftPeopleCollectio
   @override
   Widget build(BuildContext context) {
     final sortBy = ref.watch(appConfigProvider.select((config) => config.people.sortBy));
-    final people = ref.watch(driftGetAllPeopleWithSharedSpacesProvider(sortBy));
+    final filterBy = ref.watch(appConfigProvider.select((config) => config.people.filterBy));
+    final people = ref.watch(driftGetAllPeopleWithSharedSpacesProvider((sortBy: sortBy, filterBy: filterBy)));
 
     return Scaffold(
       appBar: AppBar(
@@ -47,6 +49,7 @@ class _DriftPeopleCollectionPageState extends ConsumerState<DriftPeopleCollectio
               )
             : Text('people'.tr()),
         actions: [
+          const PeopleFilterButton(),
           const PeopleSortButton(),
           IconButton(
             icon: Icon(_search != null ? Icons.close : Icons.search),

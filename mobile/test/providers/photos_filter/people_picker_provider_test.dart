@@ -24,7 +24,7 @@ PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: 
 // mirroring the web People picker. See slice 3 plan.
 ProviderContainer _containerWith(List<DriftPerson> people) {
   return ProviderContainer(
-    overrides: [driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => people)],
+    overrides: [driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, key) async => people)],
   );
 }
 
@@ -83,13 +83,31 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => sortBy == PeopleSortBy.photoCount ? [_d('pinned', 'Alice')] : [_d('leaked', 'Bob')],
+            (ref, key) async => key.sortBy == PeopleSortBy.photoCount ? [_d('pinned', 'Alice')] : [_d('leaked', 'Bob')],
           ),
         ],
       );
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
       expect(result.map((p) => p.id), ['person:pinned']);
+    });
+
+    // M10: regression guard for the picker's filterBy pin. The picker has no filter UI of its
+    // own and must always request the unfiltered (all) key so it keeps surfacing both people
+    // and pets, regardless of the global People page's own filter setting. Proven red by
+    // temporarily changing the picker call site to pass `filterBy: PeopleFilterBy.pets` — with
+    // that change this test returns an empty list instead of the stubbed person.
+    test('requests the unfiltered (all) key so it surfaces both people and pets', () async {
+      final c = ProviderContainer(
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, key) async => key.filterBy == PeopleFilterBy.all ? [_d('a', 'Alice')] : <DriftPerson>[],
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+      final result = await c.read(peoplePickerAllProvider.future);
+      expect(result.map((p) => p.id), ['person:a']);
     });
 
     // Slice 3: the picker row's photo count reads straight off the already-fetched

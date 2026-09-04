@@ -72,7 +72,7 @@ void main() {
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => sortBy == PeopleSortBy.photoCount
+            (ref, key) async => key.sortBy == PeopleSortBy.photoCount
                 ? [_person('zoe', 'Zoe'), _person('alice', 'Alice')]
                 : [_person('alice', 'Alice'), _person('zoe', 'Zoe')],
           ),
@@ -91,12 +91,44 @@ void main() {
       expect(SettingsRepository.instance.appConfig.people.sortBy, PeopleSortBy.name);
     });
 
+    // M7/M9: the page must watch the People/Pets filter setting alongside sort and pass it
+    // through the provider's record key, and PeopleFilterButton must be reachable from the
+    // app bar.
+    testWidgets('requests the filter-keyed provider and re-queries when the filter setting changes', (
+      tester,
+    ) async {
+      await tester.pumpConsumerWidget(
+        const DriftPeopleCollectionPage(),
+        overrides: [
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
+            (ref, key) async => switch (key.filterBy) {
+              PeopleFilterBy.pets => [_person('rex', 'Rex')],
+              _ => [_person('alice', 'Alice')],
+            },
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('Rex'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('people-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('people-filter-pets')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rex'), findsOneWidget);
+      expect(find.text('Alice'), findsNothing);
+      expect(SettingsRepository.instance.appConfig.people.filterBy, PeopleFilterBy.pets);
+    });
+
     testWidgets('the in-page search filter preserves the provider order', (tester) async {
       await tester.pumpConsumerWidget(
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_person('zo', 'Zora'), _person('al', 'Alora'), _person('bo', 'Bob')],
+            (ref, key) async => [_person('zo', 'Zora'), _person('al', 'Alora'), _person('bo', 'Bob')],
           ),
         ],
       );
@@ -121,7 +153,7 @@ void main() {
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_person('sp', '', spaceId: 'space-1')],
+            (ref, key) async => [_person('sp', '', spaceId: 'space-1')],
           ),
           driftSpaceEditableProvider.overrideWith((ref, spaceId) async => true),
         ],
@@ -136,7 +168,7 @@ void main() {
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_person('sp', '', spaceId: 'space-1')],
+            (ref, key) async => [_person('sp', '', spaceId: 'space-1')],
           ),
           driftSpaceEditableProvider.overrideWith((ref, spaceId) async => false),
         ],
@@ -151,7 +183,7 @@ void main() {
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
+            (ref, key) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
           ),
           driftSpaceEditableProvider.overrideWith((ref, spaceId) async => false),
         ],
@@ -177,7 +209,7 @@ void main() {
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
+            (ref, key) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
           ),
           driftSpaceEditableProvider.overrideWith((ref, spaceId) async => true),
         ],
@@ -192,7 +224,7 @@ void main() {
         const DriftPeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_person('me', 'Personal Pat')],
+            (ref, key) async => [_person('me', 'Personal Pat')],
           ),
         ],
       );

@@ -69,14 +69,17 @@ class DriftPeopleService {
   Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({
     int minFaces = 3,
     PeopleSortBy sortBy = PeopleSortBy.photoCount,
+    PeopleFilterBy filterBy = PeopleFilterBy.all,
   }) async {
     try {
-      return await _personApiRepository.getAllPeopleWithSharedSpaces(sortBy: sortBy);
+      return await _personApiRepository.getAllPeopleWithSharedSpaces(sortBy: sortBy, filterBy: filterBy);
     } catch (error, stackTrace) {
-      // Offline / server failure: fall back to the owner-scoped local list so the viewer's
-      // own people still render (their shared-space people are unavailable offline). The server
-      // already resolves the caller's minimumFaces preference for the online path (see M2); the
-      // local fallback must honor it too, so thread it through like the plain getAllPeople.
+      // Offline / server failure: the local sync DB is owner-scoped AND has no `type` column, so
+      // the fallback cannot honour filterBy at all. Returning the unfiltered local list is
+      // deliberate — an empty grid under a Pets filter reads as data loss, while a
+      // degraded-but-real list does not. The server already resolves the caller's minimumFaces
+      // preference for the online path (see M2); the local fallback must honor it too, so thread
+      // it through like the plain getAllPeople.
       _log.warning("Failed to fetch people from the server; using the local sync DB", error, stackTrace);
       return _repository.getAllPeople(minFaces: minFaces, sortBy: sortBy);
     }
