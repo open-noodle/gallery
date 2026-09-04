@@ -203,7 +203,9 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     // assert on via `router.stackData.last`.
     bool isTopmost() {
       final stack = context.router.stackData;
-      if (stack.isEmpty || stack.last.matchId != context.routeData.matchId) return false;
+      if (stack.isEmpty || stack.last.matchId != context.routeData.matchId) {
+        return false;
+      }
       // `stackData` tracks only AutoRoutePages. A dialog (`showDialog`), bottom sheet
       // (`showModalBottomSheet`) or popup menu is an IMPERATIVE route pushed onto the SAME
       // NavigatorState — this is a root-level route, so `context.router` is the root StackRouter
@@ -218,7 +220,9 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     }
 
     useEffect(() {
-      if (!pendingSelfPop.value) return null;
+      if (!pendingSelfPop.value) {
+        return null;
+      }
       final navigationHistory = context.router.navigationHistory;
       var disposed = false;
 
@@ -232,10 +236,16 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       // preemption, so no second call from either source can observe the flag as still-true once
       // the first one has cleared it, regardless of which of the two call sites gets there first.
       void trySelfPop() {
-        if (disposed || !pendingSelfPop.value) return;
-        if (!isTopmost()) return;
+        if (disposed || !pendingSelfPop.value) {
+          return;
+        }
+        if (!isTopmost()) {
+          return;
+        }
         pendingSelfPop.value = false;
-        if (context.mounted) unawaited(context.maybePop());
+        if (context.mounted) {
+          unawaited(context.maybePop());
+        }
       }
 
       void onVisibleRouteChanged() => trySelfPop();
@@ -254,9 +264,13 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       // reappeared — see the `ref.listen` callback below).
       void pollNextFrame() {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (disposed || !pendingSelfPop.value) return;
+          if (disposed || !pendingSelfPop.value) {
+            return;
+          }
           trySelfPop();
-          if (!disposed && pendingSelfPop.value) pollNextFrame();
+          if (!disposed && pendingSelfPop.value) {
+            pollNextFrame();
+          }
         });
       }
 
@@ -269,10 +283,16 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     }, [pendingSelfPop.value]);
 
     ref.listen<AsyncValue<List<SpaceAlbumFolder>>>(spaceAlbumFoldersProvider(spaceId), (previous, next) {
-      if (currentFolderId == null) return;
-      if (previous?.valueOrNull == null) return;
+      if (currentFolderId == null) {
+        return;
+      }
+      if (previous?.valueOrNull == null) {
+        return;
+      }
       final list = next.valueOrNull;
-      if (list == null) return;
+      if (list == null) {
+        return;
+      }
       if (!list.any((f) => f.id == currentFolderId)) {
         // ALWAYS go through the pending flag rather than popping inline, even when this page looks
         // topmost right now. The effect above is what owns retrying: it re-checks on every
@@ -301,8 +321,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         title: context.t.space_album_folder_new,
         confirmLabel: context.t.create,
       );
-      if (name == null) return;
-      if (!context.mounted) return;
+      if (name == null) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
       try {
         // Creates in the CURRENT folder, not always at the space root — `currentFolderId` is this
         // page instance's own `folderId`, i.e. wherever the user is browsing right now.
@@ -331,29 +355,29 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     // its own `space_album_error_link_after_create` toast instead, which says what actually
     // happened: the album was created, but could not be added to this space.
     Future<void> createAlbum() async {
-      final name = await _promptFolderName(
-        context,
-        title: context.t.space_album_new,
-        confirmLabel: context.t.create,
-      );
-      if (name == null) return;
-      if (!context.mounted) return;
+      final name = await _promptFolderName(context, title: context.t.space_album_new, confirmLabel: context.t.create);
+      if (name == null) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
 
       final RemoteAlbum? album;
       try {
         album = await ref.read(remoteAlbumProvider.notifier).createAlbum(title: name);
       } catch (error) {
         if (context.mounted) {
-          ImmichToast.show(
-            context: context,
-            msg: context.t.space_album_error_create,
-            toastType: ToastType.error,
-          );
+          ImmichToast.show(context: context, msg: context.t.space_album_error_create, toastType: ToastType.error);
         }
         return;
       }
-      if (album == null) return;
-      if (!context.mounted) return;
+      if (album == null) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
 
       try {
         // Link at `currentFolderId`, so an album created inside a folder lands there rather than
@@ -378,8 +402,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         confirmLabel: context.t.save,
         initialName: folder.name,
       );
-      if (name == null) return;
-      if (!context.mounted) return;
+      if (name == null) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
       try {
         await ref.read(spaceAlbumActionsProvider).renameFolder(spaceId, folder.id, name);
       } catch (error) {
@@ -407,8 +435,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       // Same picked-vs-folderId==null distinction as moveAlbumToFolder below: both a dismissal and
       // picking the root resolve `folderId: null`, so branching on `folderId == null` alone would
       // treat a dismissal as "move to the root".
-      if (!result.picked) return;
-      if (!context.mounted) return;
+      if (!result.picked) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
       try {
         await ref.read(spaceAlbumActionsProvider).moveFolder(spaceId, folder.id, result.folderId);
       } catch (error) {
@@ -424,8 +456,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
 
     Future<void> deleteFolder(SpaceAlbumFolder folder) async {
       final confirmed = await _confirmDeleteFolder(context, folder);
-      if (!confirmed) return;
-      if (!context.mounted) return;
+      if (!confirmed) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
       try {
         await ref.read(spaceAlbumActionsProvider).deleteFolder(spaceId, folder.id);
       } catch (error) {
@@ -482,8 +518,12 @@ class SpaceAlbumsPage extends HookConsumerWidget {
             // Both a dismissal and picking the root resolve `folderId: null` — only `picked`
             // tells them apart. Branching on `folderId == null` alone would treat a dismissal
             // as "move to the root".
-            if (!result.picked) return;
-            if (!context.mounted) return;
+            if (!result.picked) {
+              return;
+            }
+            if (!context.mounted) {
+              return;
+            }
             try {
               await ref.read(spaceAlbumActionsProvider).moveAlbumToFolder(spaceId, album.id, result.folderId);
             } catch (_) {
@@ -640,7 +680,9 @@ class SpaceAlbumsPage extends HookConsumerWidget {
   /// first frame, before sync has delivered it — rather than showing nothing.
   String _title(BuildContext context, List<SpaceAlbumFolder> folders) {
     final id = folderId;
-    if (id == null) return context.t.space_albums_page_title;
+    if (id == null) {
+      return context.t.space_albums_page_title;
+    }
     final folder = folders.firstWhereOrNull((f) => f.id == id);
     return folder?.name ?? context.t.space_albums_page_title;
   }
@@ -691,7 +733,9 @@ String _folderErrorMessage(BuildContext context, Object error, String fallback) 
 };
 
 String _folderErrorKey(Object error, String fallbackKey) {
-  if (error is! ApiException) return fallbackKey;
+  if (error is! ApiException) {
+    return fallbackKey;
+  }
   return spaceAlbumFolderErrorKey(error.message, fallbackKey);
 }
 
@@ -708,7 +752,9 @@ Future<String?> _promptFolderName(
     context: context,
     builder: (_) => _FolderNameDialog(title: title, confirmLabel: confirmLabel, initialName: initialName),
   );
-  if (name == null || name.isEmpty) return null;
+  if (name == null || name.isEmpty) {
+    return null;
+  }
   return name;
 }
 
@@ -1170,14 +1216,8 @@ class _AlbumCard extends ConsumerWidget {
                               : ctx.t.spaces_linked_albums_show_in_timeline,
                         ),
                       ),
-                      PopupMenuItem(
-                        value: _CardAction.unlink,
-                        child: Text(ctx.t.space_album_unlink_from_space),
-                      ),
-                      PopupMenuItem(
-                        value: _CardAction.move,
-                        child: Text(ctx.t.space_album_folder_move),
-                      ),
+                      PopupMenuItem(value: _CardAction.unlink, child: Text(ctx.t.space_album_unlink_from_space)),
+                      PopupMenuItem(value: _CardAction.move, child: Text(ctx.t.space_album_folder_move)),
                     ],
                   ),
                 ),

@@ -34,7 +34,9 @@ void main() {
       expect(directory.existsSync(), isTrue, reason: '$dir moved — update scannedDirs');
 
       for (final entity in directory.listSync(recursive: true)) {
-        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        if (entity is! File || !entity.path.endsWith('.dart')) {
+          continue;
+        }
         scannedFiles++;
 
         for (final match in callPattern.allMatches(entity.readAsStringSync())) {

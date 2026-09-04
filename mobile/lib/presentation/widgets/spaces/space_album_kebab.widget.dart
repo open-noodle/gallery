@@ -65,7 +65,9 @@ class SpaceAlbumKebab extends StatelessWidget {
           value: _KebabAction.toggle,
           enabled: toggleEnabled,
           child: Text(
-            showInTimeline ? context.t.space_albums_hide_from_space_photos : context.t.spaces_linked_albums_show_in_timeline,
+            showInTimeline
+                ? context.t.space_albums_hide_from_space_photos
+                : context.t.spaces_linked_albums_show_in_timeline,
           ),
         ),
         PopupMenuItem<_KebabAction>(
