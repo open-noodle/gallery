@@ -11,7 +11,7 @@ from immich_ml.models.base import InferenceModel
 from immich_ml.models.transforms import decode_pil
 from immich_ml.schemas import BoundingBox, ModelFormat, ModelSession, ModelTask, ModelType, PetDetectionOutput
 
-_HF_ORG = "Deeds67"
+_HF_ORG = "open-noodle"
 
 # The animals a household photo library actually contains, in RF-DETR's 91-class
 # COCO id space. bear/zebra/giraffe/elephant are deliberately absent: their only

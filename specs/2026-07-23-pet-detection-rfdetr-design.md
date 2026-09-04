@@ -219,9 +219,9 @@ arm to `ModelSource.RFDETR`.
 
 ### Model hosting
 
-`PetDetector._download` fetches `Deeds67/<clean_name(model_name)>`. `clean_name`
+`PetDetector._download` fetches `open-noodle/<clean_name(model_name)>`. `clean_name`
 (`machine-learning/immich_ml/config.py:92-96`) translates only `:\/` and strips `.`, so
-dashes survive and the repository names are `Deeds67/rfdetr-nano` and `Deeds67/rfdetr-small`,
+dashes survive and the repository names are `open-noodle/rfdetr-nano` and `open-noodle/rfdetr-small`,
 each containing `detection/model.onnx`.
 
 ### Server
@@ -301,7 +301,7 @@ Written **red first** in every slice. Grouped by concern; each row is one test.
 | 22  | All 300 queries fire  | Max-detection case returns all of them without error       |
 | 23  | `configure()`         | Updates `min_score` at runtime                             |
 | 24  | `model_path` fallback | Resolves `detection/model.onnx`, then the flat legacy path |
-| 25  | `_download` target    | Calls `snapshot_download` with `Deeds67/rfdetr-nano`       |
+| 25  | `_download` target    | Calls `snapshot_download` with `open-noodle/rfdetr-nano`       |
 
 ### Server (Slice 3)
 
@@ -328,7 +328,7 @@ Sized for `impl-loop`. Each slice is independently verifiable and leaves the tre
 
 ### Slice 1 — Publish RF-DETR weights to HuggingFace
 
-**Goal:** `Deeds67/rfdetr-nano` and `Deeds67/rfdetr-small` exist publicly, each containing
+**Goal:** `open-noodle/rfdetr-nano` and `open-noodle/rfdetr-small` exist publicly, each containing
 `detection/model.onnx` and a model card documenting the inference contract.
 
 **Blocked on:** a HuggingFace token with write scope. The currently configured token has role
