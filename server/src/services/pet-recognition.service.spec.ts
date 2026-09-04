@@ -205,6 +205,54 @@ describe(PetRecognitionService.name, () => {
       expect(mocks.person.purgePetRecognitionArtifacts).not.toHaveBeenCalled();
     });
 
+    // ConfigInit carries no oldConfig, so there is no "detection just turned on" edge to diff
+    // against. An admin who re-enables detection by editing the config file and restarting would
+    // otherwise never consume the flag and silently get no reprocess.
+    it('R5.6b ConfigInit consumes a pending reprocess when detection is enabled at boot', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        modelName: 'pet-recognition-large',
+        lastRun: '2026-07-01T00:00:00.000Z',
+        pendingReprocess: true,
+      });
+
+      await sut.onConfigInit({ newConfig: makeConfig({ modelName: 'pet-recognition-large', detectionEnabled: true }) });
+
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.PetRecognitionState, {
+        modelName: 'pet-recognition-large',
+        lastRun: '2026-07-01T00:00:00.000Z',
+        pendingReprocess: false,
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    });
+
+    it('R5.6b a second boot does not reprocess again — the flag was cleared by the first', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        modelName: 'pet-recognition-large',
+        lastRun: '2026-07-01T00:00:00.000Z',
+        pendingReprocess: false,
+      });
+
+      await sut.onConfigInit({ newConfig: makeConfig({ modelName: 'pet-recognition-large', detectionEnabled: true }) });
+
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('R5.6b ConfigInit leaves the flag alone while detection is still disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        modelName: 'pet-recognition-large',
+        lastRun: '2026-07-01T00:00:00.000Z',
+        pendingReprocess: true,
+      });
+
+      await sut.onConfigInit({
+        newConfig: makeConfig({ modelName: 'pet-recognition-large', detectionEnabled: false }),
+      });
+
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
     it('R5.7 switch with recognition off: scoped purge runs (not the full deleteAllPets purge), no requeue, no pendingReprocess flag', async () => {
       mocks.systemMetadata.get.mockResolvedValue(null);
       mocks.person.purgePetRecognitionArtifacts.mockResolvedValue();
@@ -280,6 +328,33 @@ describe(PetRecognitionService.name, () => {
       });
 
       expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Skipped);
+    });
+
+    // R6.19: the Reset confirmation promises "this always deletes all named pets and their
+    // embeddings", so the force purge must not sit behind the recognition-enabled gate — the exact
+    // silent-no-op #718 fixed for the sibling PetDetection queue.
+    it('R6.19 force: true still purges when pet recognition is disabled', async () => {
+      mocks.sharedSpace.deleteAllPets.mockResolvedValue(void 0);
+
+      expect(await sut.handleQueuePetRecognition({ force: true })).toEqual(JobStatus.Success);
+
+      expect(mocks.person.deleteAllPets).toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllPets).toHaveBeenCalled();
+      expect(mocks.person.deleteAllPetSearch).toHaveBeenCalled();
+      // The rebuild is requeued too, otherwise the reset would leave the library permanently
+      // pet-less. PetDetectionQueueAll gates itself on detection being enabled.
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+    });
+
+    it('R6.19 force: true still purges when machine learning is disabled entirely', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { enabled: false, petRecognition: { enabled: true } },
+      });
+      mocks.sharedSpace.deleteAllPets.mockResolvedValue(void 0);
+
+      expect(await sut.handleQueuePetRecognition({ force: true })).toEqual(JobStatus.Success);
+
+      expect(mocks.person.deleteAllPets).toHaveBeenCalled();
     });
 
     describe('when pet recognition is enabled', () => {
@@ -482,6 +557,24 @@ describe(PetRecognitionService.name, () => {
         expect(mocks.person.purgePetRecognitionArtifacts).toHaveBeenCalled();
         expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
         expect(mocks.person.getUnassignedPetFaces).not.toHaveBeenCalled();
+      });
+
+      // JOBS_ASSET_PAGINATION_SIZE is 1000: the fan-out flushes mid-stream at that boundary and
+      // again at the end, so a stream longer than one page proves both queueAll calls happen and
+      // that the buffer is reset between them (a missing `jobs = []` would re-queue page 1).
+      it('R6.20 flushes the fan-out in pages of 1000', async () => {
+        const faces = Array.from({ length: 1001 }, (_, index) => ({ id: `face-${index}` }));
+        mocks.person.getUnassignedPetFaces.mockReturnValue(makeStream(faces));
+
+        expect(await sut.handleQueuePetRecognition({ force: false })).toEqual(JobStatus.Success);
+
+        expect(mocks.job.queueAll).toHaveBeenCalledTimes(2);
+        const [firstPage] = mocks.job.queueAll.mock.calls[0];
+        const [secondPage] = mocks.job.queueAll.mock.calls[1];
+        expect(firstPage).toHaveLength(1000);
+        expect(secondPage).toHaveLength(1);
+        expect(firstPage[0]).toEqual({ name: JobName.PetRecognition, data: { id: 'face-0', deferred: false } });
+        expect(secondPage[0]).toEqual({ name: JobName.PetRecognition, data: { id: 'face-1000', deferred: false } });
       });
 
       it('R6.17 prewarms the pet vector index before fanning out (mirrors facial recognition)', async () => {
@@ -714,6 +807,28 @@ describe(PetRecognitionService.name, () => {
           identityId: 'new-identity',
           source: 'owner-person',
         });
+      });
+
+      // Pet people are collectable: a model switch's scoped purge, the generic orphan-person
+      // cleanup, or an admin merge can remove the person between the reassign and the
+      // representative-face update. getById returning nothing must be a quiet no-op, not a crash or
+      // a thumbnail job for a person that no longer exists.
+      it('R6.21 completes without a thumbnail job when the person disappears mid-recognition', async () => {
+        mocks.person.getPetFaceForRecognition.mockResolvedValue(makePetFace());
+        mocks.search.searchPets
+          .mockResolvedValueOnce([{ id: 'face-id', personId: null, distance: 0 }])
+          .mockResolvedValueOnce([]);
+        mocks.person.create.mockResolvedValue(makePerson({ id: 'new-person' }));
+        mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'new-identity' } as any);
+        mocks.person.getById.mockResolvedValue(void 0);
+        mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+        expect(await sut.handlePetRecognition({ id: 'face-id', label: 'dog' })).toEqual(JobStatus.Success);
+
+        expect(mocks.person.update).not.toHaveBeenCalled();
+        expect(mocks.job.queue).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: JobName.PersonGenerateThumbnail }),
+        );
       });
 
       it('queues SharedSpaceFaceMatch for the asset after assignment (5.12)', async () => {

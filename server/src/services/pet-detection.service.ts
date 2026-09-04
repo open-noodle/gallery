@@ -86,8 +86,16 @@ export class PetDetectionService extends BaseService {
         // model, so this in-flight request — still carrying embeddings computed under the OLD
         // model — must be dropped rather than writing mixed-model data. The config cache is
         // invalidated on every worker on ConfigUpdate, so this re-fetch observes the new value.
+        //
+        // Recognition being switched OFF mid-call is caught by the same guard: nothing purges on a
+        // recognition-off toggle, so writing these embeddings would leave individual-pipeline rows
+        // behind for a library that is now bucket-only. Skipping before the petsDetectedAt stamp
+        // leaves the asset unprocessed, so the next detection run redoes it under the new setting.
         const newConfig = await this.getConfig({ withCache: true });
-        if (newConfig.machineLearning.petRecognition.modelName !== machineLearning.petRecognition.modelName) {
+        if (
+          !isPetRecognitionEnabled(newConfig.machineLearning) ||
+          newConfig.machineLearning.petRecognition.modelName !== machineLearning.petRecognition.modelName
+        ) {
           return JobStatus.Skipped;
         }
 

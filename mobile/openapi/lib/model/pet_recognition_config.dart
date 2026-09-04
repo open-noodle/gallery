@@ -31,7 +31,7 @@ class PetRecognitionConfig {
   /// Minimum number of faces required for recognition
   ///
   /// Minimum value: 1
-  /// Maximum value: 9007199254740991
+  /// Maximum value: 1000
   int minFaces;
 
   /// Name of the model to use

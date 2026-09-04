@@ -243,6 +243,44 @@ describe('/pet-detection', () => {
       );
     });
 
+    it('should reject minFaces above 1000', async () => {
+      // searchPets rejects a numResults outside 1..1000 at query time, so an unbounded minFaces
+      // would be accepted here and then throw on every recognition job instead.
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.minFaces = 1001;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'minFaces'],
+            message: 'Too big: expected number to be <=1000',
+          },
+        ]),
+      );
+    });
+
+    // The whitelist lives in PetRecognitionService.onConfigValidate, not in the zod schema, so it
+    // surfaces as a plain BadRequest rather than a validation error. Unit-tested already; this pins
+    // that it actually reaches the HTTP layer.
+    it('should reject an unknown pet recognition model over HTTP', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.modelName = 'pet-recognition-enormous';
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body.message).toContain('Unknown pet recognition model: pet-recognition-enormous');
+    });
+
     it('should reset to defaults', async () => {
       await utils.resetAdminConfig(admin.accessToken);
 
@@ -764,8 +802,8 @@ describe('/pet-detection', () => {
 
   // Slice 9 — the e2e stack has no ML service (no real detect->embed->cluster flow to exercise),
   // so this covers what e2e *can* prove: the force-reset flow purges pet data and requeues
-  // detection through the real HTTP + queue + DB stack (R9.9), and that the recognition queue
-  // honours the config gate even under `force` (R9.10).
+  // detection through the real HTTP + queue + DB stack (R9.9), that the purge runs ahead of the
+  // recognition-enabled gate (R9.10), and that a non-force start still honours that gate (R9.10b).
   describe('Force Reset & Recognition Queue Gate', () => {
     beforeAll(async () => {
       await utils.resetDatabase();
@@ -777,8 +815,8 @@ describe('/pet-detection', () => {
       const asset = await utils.createAsset(admin.accessToken);
       const { personId } = await utils.createPetWithEmbedding(admin.userId, 'dog', asset.id, 'Rex');
 
-      // the force purge only runs when handleQueuePetRecognition sees recognition enabled —
-      // otherwise it returns Skipped before ever reaching the purge (see R9.10 below).
+      // Recognition is enabled here so this exercises the ordinary path; the purge itself runs
+      // ahead of the recognition-enabled gate either way (see R9.10 below).
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.enabled = true;
       config.machineLearning.petRecognition.enabled = true;
@@ -818,10 +856,17 @@ describe('/pet-detection', () => {
         command: QueueCommand.Resume,
         force: false,
       });
+      // Drain the requeued PetDetectionQueueAll{force:true} before leaving: its own purge (#718)
+      // is unconditional, so letting it land mid-way through the next test would delete that
+      // test's pets out from under it.
+      await utils.waitForQueueFinish(admin.accessToken, 'petDetection');
       await utils.resetAdminConfig(admin.accessToken);
     });
 
-    it('starting petRecognition with recognition disabled is a no-op even with force (R9.10)', async () => {
+    // The Reset dialog promises "this always deletes all named pets and their embeddings", so the
+    // purge must not sit behind the recognition-enabled gate — the same #718 ordering the sibling
+    // PetDetection queue already has. Only the non-force fan-out is gated.
+    it('force-resetting petRecognition purges pets even while recognition is disabled (R9.10)', async () => {
       const asset = await utils.createAsset(admin.accessToken);
       const petId = await utils.createPet(admin.userId, 'cat', 'Whiskers');
       await utils.createFace({ assetId: asset.id, personId: petId });
@@ -834,6 +879,33 @@ describe('/pet-detection', () => {
         .put('/jobs/petRecognition')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({ command: QueueCommand.Start, force: true });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      const { status: getStatus } = await request(app)
+        .get(`/people/${petId}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(getStatus).toBe(400);
+
+      // Same reason as R9.9: the reset requeues a force detection run whose own purge would
+      // otherwise land inside the next test.
+      await utils.waitForQueueFinish(admin.accessToken, 'petDetection');
+    });
+
+    it('starting petRecognition WITHOUT force stays a no-op while recognition is disabled (R9.10b)', async () => {
+      const asset = await utils.createAsset(admin.accessToken);
+      const petId = await utils.createPet(admin.userId, 'cat', 'Mittens');
+      await utils.createFace({ assetId: asset.id, personId: petId });
+
+      const config = await getSystemConfig(admin.accessToken);
+      expect(config.machineLearning.petRecognition.enabled).toBe(false);
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: false });
 
       expect(status).toBe(200);
       await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');

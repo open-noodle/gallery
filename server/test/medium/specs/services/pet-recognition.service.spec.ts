@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { SystemConfig } from 'src/config';
-import { AssetFileType, AssetVisibility, JobName, JobStatus, SystemMetadataKey } from 'src/enum';
+import { AssetFileType, AssetVisibility, JobName, JobStatus, SharedSpaceRole, SystemMetadataKey } from 'src/enum';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -91,6 +91,17 @@ const enablePetRecognition = async (
     },
   } as any);
 };
+
+// Full machineLearning config for the model-switch hooks, which read petDetection as well as
+// petRecognition (a switch only requeues detection when detection is enabled).
+const makeSwitchConfig = (modelName: string): SystemConfig =>
+  ({
+    machineLearning: {
+      enabled: true,
+      petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+      petRecognition: { enabled: true, modelName, maxDistance: 0.55, minFaces: 1 },
+    },
+  }) as SystemConfig;
 
 describe('PetRecognitionService.handlePetRecognition (medium)', () => {
   it('clusters two near-identical embeddings for the same owner into one pet person (5.14)', async () => {
@@ -485,6 +496,68 @@ describe('PetRecognitionService.handleQueuePetRecognition (medium)', () => {
     },
   );
 
+  // The composed footgun the docs now warn about: a reset with pet detection off wipes everything
+  // and the requeued detection run then skips, so the library sits at zero pets until detection is
+  // re-enabled and force-run. Pinned so the behaviour is a documented choice, not a surprise.
+  it('R6.22 a force reset with pet detection disabled empties the library and only requeues detection', async () => {
+    const { sut, ctx } = setup();
+    await ctx.get(SystemMetadataRepository).set(SystemMetadataKey.SystemConfig, {
+      machineLearning: {
+        enabled: true,
+        petDetection: { enabled: false, modelName: 'yolo11n', minScore: 0.6 },
+        petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+      },
+    } as any);
+    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const { user } = await ctx.newUser();
+
+    const { person: petPerson } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog' });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: petFace } = await ctx.newAssetFace({ assetId: asset.id, personId: petPerson.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: petFace.id, embedding: axisEmbedding('first') })
+      .execute();
+
+    expect(await sut.handleQueuePetRecognition({ force: true })).toBe(JobStatus.Success);
+
+    expect(
+      await ctx.database.selectFrom('person').select(['id']).where('id', '=', petPerson.id).execute(),
+    ).toHaveLength(0);
+    expect(
+      await ctx.database.selectFrom('asset_face').select(['id']).where('id', '=', petFace.id).execute(),
+    ).toHaveLength(0);
+    // The rebuild is requeued regardless; PetDetectionQueueAll is what gates itself on detection
+    // being enabled, and with it off nothing is rebuilt.
+    expect(jobMock.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
+  });
+
+  // getPetFaceForRecognition has no asset.deletedAt filter (parity with the human
+  // getFaceForFacialRecognitionJob), but searchPets excludes trashed assets — so a pet face on a
+  // trashed asset finds nothing, not even itself, and must exit without creating a person.
+  it('R6.23 a pet face on a trashed asset never becomes a new pet person', async () => {
+    const { sut, ctx } = setup();
+    await enablePetRecognition(ctx);
+    const { user } = await ctx.newUser();
+
+    const { asset } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+    const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: face.id, embedding: axisEmbedding('second') })
+      .execute();
+
+    // deferred: true so the run reaches the final resolution rather than requeueing itself.
+    expect(await sut.handlePetRecognition({ id: face.id, deferred: true, label: 'dog' })).toBe(JobStatus.Skipped);
+
+    const faceRow = await ctx.database
+      .selectFrom('asset_face')
+      .select(['personId'])
+      .where('id', '=', face.id)
+      .executeTakeFirstOrThrow();
+    expect(faceRow.personId).toBeNull();
+  });
+
   it('deleteAllPetSearch on an empty pet_search table is a no-op, not an error', async () => {
     const { sut, ctx } = setup();
     await enablePetRecognition(ctx);
@@ -598,6 +671,94 @@ describe('PetRecognitionService model switch (medium)', () => {
       expect(jobMock.queue).toHaveBeenCalledWith({ name: JobName.PetDetectionQueueAll, data: { force: true } });
     },
   );
+});
+
+// The shared_space_person arm of purgePetRecognitionArtifacts is the only destructive statement in
+// the scoped purge that the R5.13 test above does not reach. It deletes by identityId, so both wrong
+// filters are plausible and neither is visible from the person table alone: too broad wipes every
+// space person in the instance, too narrow leaves ghost pets in space People pages forever.
+describe('PetRecognitionService model switch — shared-space copies (medium)', () => {
+  it('R5.13b deletes only the space copy of the recognition-created individual', async () => {
+    const { sut, ctx } = setup();
+    await enablePetRecognition(ctx);
+    const { user } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+
+    // 1. An embedded pet face clusters into an individual, which linkFaceIdentity gives an identity.
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id });
+    await ctx.database
+      .insertInto('pet_search')
+      .values({ faceId: face.id, embedding: axisEmbedding('first') })
+      .execute();
+    expect(await sut.handlePetRecognition({ id: face.id, deferred: false, label: 'dog' })).toBe(JobStatus.Success);
+
+    const individual = await ctx.database
+      .selectFrom('person')
+      .innerJoin('asset_face', 'asset_face.personId', 'person.id')
+      .select(['person.id', 'person.identityId'])
+      .where('asset_face.id', '=', face.id)
+      .executeTakeFirstOrThrow();
+    expect(individual.identityId).not.toBeNull();
+
+    // 2. A species bucket, its own identity, and its own space copy — pure detector output, so it
+    //    must survive the switch along with its projection.
+    const { person: bucket } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'bird' });
+    const { asset: birdAsset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newAssetFace({ assetId: birdAsset.id, personId: bucket.id });
+    const bucketIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(bucket.id);
+
+    // 3. A human person with an identity and a space copy — the blast-radius control.
+    const { person: human } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+    const { asset: humanAsset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newAssetFace({ assetId: humanAsset.id, personId: human.id });
+    const humanIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(human.id);
+
+    const spaceIndividual = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, type: 'pet', name: 'Rex', identityId: individual.identityId })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const spaceBucket = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, type: 'pet', name: 'bird', identityId: bucketIdentity.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const spaceHuman = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, type: 'person', name: 'Space Alice', identityId: humanIdentity.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    // A space person with no identity at all (an unlinked projection) — a `identityId is not null`
+    // style filter inverted would take this one out.
+    const spaceOrphan = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, type: 'person', name: 'Unlinked' })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    await ctx
+      .get(SystemMetadataRepository)
+      .set(SystemMetadataKey.PetRecognitionState, { modelName: 'pet-recognition-base' });
+
+    await sut.onConfigInit({ newConfig: makeSwitchConfig('pet-recognition-large') });
+
+    expect(
+      await ctx.database
+        .selectFrom('shared_space_person')
+        .select(['id'])
+        .where('id', '=', spaceIndividual.id)
+        .execute(),
+    ).toHaveLength(0);
+
+    const survivors = await ctx.database
+      .selectFrom('shared_space_person')
+      .select(['id'])
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(survivors.map(({ id }) => id).sort()).toEqual([spaceBucket.id, spaceHuman.id, spaceOrphan.id].sort());
+  });
 });
 
 describe('PetRecognitionService.handleQueuePetRecognition state (medium)', () => {

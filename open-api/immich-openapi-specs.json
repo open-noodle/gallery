@@ -30538,7 +30538,7 @@
           },
           "minFaces": {
             "description": "Minimum number of faces required for recognition",
-            "maximum": 9007199254740991,
+            "maximum": 1000,
             "minimum": 1,
             "type": "integer"
           },

@@ -762,6 +762,37 @@ describe(PetDetectionService.name, () => {
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
         expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
       });
+
+      it('R5.12b mid-flight guard also covers recognition being switched OFF while the ML call was in flight', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockImplementation(() => {
+          clearConfigCache();
+          mocks.systemMetadata.get.mockResolvedValue({
+            machineLearning: {
+              enabled: true,
+              petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+              petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+            },
+          });
+          return Promise.resolve({
+            imageHeight: 100,
+            imageWidth: 200,
+            pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' }],
+          });
+        });
+
+        // Nothing purges on a recognition-off toggle, so writing these rows would leave
+        // individual-pipeline faces and embeddings in a library that is now bucket-only. Skipping
+        // before the petsDetectedAt stamp means the next detection run redoes the asset properly.
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Skipped);
+
+        expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -34,11 +34,14 @@ export class PetRecognitionService extends BaseService {
   async handleQueuePetRecognition({ force, nightly }: JobOf<JobName.PetRecognitionQueueAll>): Promise<JobStatus> {
     const config = await this.getConfig({ withCache: false });
     const { machineLearning } = config;
-    if (!isPetRecognitionEnabled(machineLearning)) {
-      return JobStatus.Skipped;
-    }
 
     if (force) {
+      // The force half runs BEFORE any recognition-enabled gate, mirroring the same #718 ordering in
+      // PetDetectionService.handleQueuePetDetection: the Reset confirmation promises "this always
+      // deletes all named pets and their embeddings", so an admin who turned recognition off and hit
+      // Reset to clear the pets it left behind must get that deletion rather than a silent no-op.
+      // Only the non-force fan-out below is gated on recognition being enabled.
+      //
       // F9's force half: drain any PetRecognition jobs queued before the reset — they'd otherwise
       // run against faces the purge below is about to delete, and the requeued detection force run
       // rebuilds everything from scratch anyway.
@@ -53,8 +56,17 @@ export class PetRecognitionService extends BaseService {
       await this.personRepository.deleteAllPets();
       await this.sharedSpaceRepository.deleteAllPets();
       await this.personRepository.deleteAllPetSearch();
+      // Requeued unconditionally, for the same reason the purge is: the rebuild is what stops a
+      // reset from leaving the library permanently empty of pets. PetDetectionQueueAll gates itself
+      // on pet detection being enabled (and rebuilds species buckets rather than individuals when
+      // recognition is off), which is exactly what the dialog's "reprocessing only runs while pet
+      // detection is enabled" promises.
       await this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force: true } });
     } else {
+      if (!isPetRecognitionEnabled(machineLearning)) {
+        return JobStatus.Skipped;
+      }
+
       const state = await this.systemMetadataRepository.get(SystemMetadataKey.PetRecognitionState);
 
       // Drift check: the model recorded at the last run differs from the configured one, meaning
@@ -235,11 +247,16 @@ export class PetRecognitionService extends BaseService {
       const newModel = newConfig.machineLearning.petRecognition.modelName;
       const recognitionEnabled = isPetRecognitionEnabled(newConfig.machineLearning);
       const detectionEnabled = isPetDetectionEnabled(newConfig.machineLearning);
-      const detectionTurnedOn = !!oldConfig && !isPetDetectionEnabled(oldConfig.machineLearning) && detectionEnabled;
+      // `oldConfig` only exists on ConfigUpdate. On ConfigInit (bootstrap) there is nothing to diff
+      // against, so "detection is on and a reprocess is still pending" is the boot-time equivalent:
+      // without it, an admin who re-enables detection by editing the config file and restarting
+      // never consumes the pending flag and silently gets no reprocess at all.
+      const detectionTurnedOn = detectionEnabled && (!oldConfig || !isPetDetectionEnabled(oldConfig.machineLearning));
 
       if (state?.modelName === newModel) {
         // Deferred reprocess: the switch already happened while detection was off, and detection
-        // has just been turned back on.
+        // has just been turned back on. Clearing the flag before the requeue keeps this to one
+        // reprocess per switch, restart or not.
         if (detectionTurnedOn && state.pendingReprocess) {
           await this.systemMetadataRepository.set(SystemMetadataKey.PetRecognitionState, {
             ...state,

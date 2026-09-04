@@ -74,7 +74,10 @@ export const PetRecognitionConfigSchema = ModelConfigSchema.extend({
     .min(0.1)
     .max(2)
     .describe('Maximum distance threshold for pet recognition'),
-  minFaces: z.int().min(1).describe('Minimum number of faces required for recognition'),
+  // Upper bound mirrors SearchRepository.searchPets's own `numResults` guard (1..1000): minFaces is
+  // passed straight through as the NN window size, so a larger value would make every recognition
+  // job throw rather than being rejected at save time.
+  minFaces: z.int().min(1).max(1000).describe('Minimum number of faces required for recognition'),
 }).meta({ id: 'PetRecognitionConfig' });
 
 export const OcrConfigSchema = ModelConfigSchema.extend({
