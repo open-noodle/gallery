@@ -199,6 +199,15 @@ describe('shared-space album <-> timeline behavioral matrix (S4a)', () => {
     return { spaceId, album, assets };
   };
 
+  /** Owner's own asset, in an album linked to a space, hidden from the owner's OWN timeline (§10). */
+  const hiddenOwnAsset = async (name: string) => {
+    const { spaceId, album, assets } = await freshLinkedFixture(name, 1);
+    const assetId = assets[0].id;
+    const hide = await patchAlbumTimeline(owner.accessToken, spaceId, album.id, false);
+    expect(hide.status).toBe(204);
+    return { spaceId, album, assetId };
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // 1. Link -> space Photos timeline contains the linked album's assets.
   // ─────────────────────────────────────────────────────────────────────────
@@ -688,6 +697,55 @@ describe('shared-space album <-> timeline behavioral matrix (S4a)', () => {
 
       const unhide = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, true);
       expect(unhide.status).toBe(204);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 10. A personal hide is a TIMELINE preference. Trash, Archive and Favorites
+  //     are recovery/curation surfaces: subtracting an owned asset there makes
+  //     it unreachable from the UI entirely — a photo you hid and then deleted
+  //     could be neither restored nor purged. Covered at the HTTP level because
+  //     the trigger is `timeBucketChecks` defaulting `dto.userId` for any browse
+  //     that is not an album/space browse, which only this layer exercises.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe('10. a personal hide never removes an owned asset from trash / archive / favorites', () => {
+    it('control: the hide really does remove it from the main timeline', async () => {
+      const { assetId } = await hiddenOwnAsset('s4a-10-control');
+
+      expect(await mainTimelineWithSpacesIds(owner.accessToken)).not.toContain(assetId);
+    });
+
+    it('a TRASHED asset in a hidden album is still in the trash, so it stays restorable', async () => {
+      const { assetId } = await hiddenOwnAsset('s4a-10-trash');
+      await utils.deleteAssets(owner.accessToken, [assetId]);
+
+      expect(await timelineIds(owner.accessToken, 'isTrashed=true')).toContain(assetId);
+    });
+
+    it('an ARCHIVED asset in a hidden album is still in the archive', async () => {
+      const { assetId } = await hiddenOwnAsset('s4a-10-archive');
+      await setVisibility(owner.accessToken, assetId, AssetVisibility.Archive);
+
+      expect(await timelineIds(owner.accessToken, 'visibility=archive')).toContain(assetId);
+    });
+
+    it('a FAVOURITED asset in a hidden album is still in favorites', async () => {
+      const { assetId } = await hiddenOwnAsset('s4a-10-favorite');
+      await updateAssets(
+        { assetBulkUpdateDto: { ids: [assetId], isFavorite: true } },
+        { headers: asBearerAuth(owner.accessToken) },
+      );
+
+      expect(await timelineIds(owner.accessToken, 'isFavorite=true')).toContain(assetId);
+    });
+
+    // The guard that keeps the hide off those three surfaces must fail CLOSED: a client that simply
+    // omits `visibility` is asking for the default timeline browse and must still get the hide.
+    it('still hides when the client omits `visibility` entirely', async () => {
+      const { assetId } = await hiddenOwnAsset('s4a-10-no-visibility');
+
+      expect(await timelineIds(owner.accessToken, 'withPartners=false')).not.toContain(assetId);
     });
   });
 });
