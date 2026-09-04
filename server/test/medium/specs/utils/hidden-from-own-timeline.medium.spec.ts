@@ -36,7 +36,7 @@ const keptAssetIds = async (scope: TimelineHiddenScope): Promise<Set<string>> =>
     .selectFrom('asset')
     .select('asset.id')
     .where((eb) => {
-      const predicate = hiddenFromOwnTimeline(eb, scope);
+      const predicate = hiddenFromOwnTimeline(eb, scope, { kind: 'sibling-arm' });
       return predicate ?? eb.lit(true);
     })
     .execute();
@@ -49,7 +49,7 @@ const compiledSql = (scope: TimelineHiddenScope): string => {
     .selectFrom('asset')
     .select('asset.id')
     .where((eb) => {
-      const predicate = hiddenFromOwnTimeline(eb, scope);
+      const predicate = hiddenFromOwnTimeline(eb, scope, { kind: 'sibling-arm' });
       return predicate ?? eb.lit(true);
     });
   return query.compile().sql;
@@ -71,7 +71,7 @@ describe('hiddenFromOwnTimeline', () => {
       .selectFrom('asset')
       .select('asset.id')
       .where((eb) => {
-        const predicate = hiddenFromOwnTimeline(eb, emptyScope);
+        const predicate = hiddenFromOwnTimeline(eb, emptyScope, { kind: 'sibling-arm' });
         sawUndefined = predicate === undefined;
         return predicate ?? eb.lit(true);
       })

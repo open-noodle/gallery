@@ -23,7 +23,7 @@ class SharedSpaceTimelineHidePreviewDto {
   /// Maximum value: 9007199254740991
   int hiddenAssetCount;
 
-  /// Photos in this space that stay on the caller's timeline via another visible path
+  /// Photos in this scope that stay on the caller's timeline via a path they did not hide
   ///
   /// Minimum value: 0
   /// Maximum value: 9007199254740991

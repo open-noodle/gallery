@@ -3087,6 +3087,7 @@
   "space_albums_hidden_from_timeline": "Verborgen uit je tijdlijn",
   "space_albums_hide_from_my_timeline": "Dit album verbergen uit mijn tijdlijn",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Hierdoor worden {count, plural, one {# foto} other {# foto’s}} uit je tijdlijn verwijderd. Alleen jouw tijdlijn verandert.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# foto blijft omdat die deze ruimte ook op een andere manier bereikt.} other {# foto's blijven omdat ze deze ruimte ook op een andere manier bereiken.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "\"{name}\" verbergen uit je tijdlijn?",
   "space_albums_hide_from_space_photos": "Dit album verbergen uit de Space-foto's",
   "space_albums_hide_from_space_photos_confirm_prompt": "Niemand in de Space ziet het daar nog. De persoonlijke tijdlijnen van anderen blijven ongewijzigd.",

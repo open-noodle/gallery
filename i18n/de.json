@@ -3087,6 +3087,7 @@
   "space_albums_hidden_from_timeline": "Aus deiner Zeitleiste ausgeblendet",
   "space_albums_hide_from_my_timeline": "Dieses Album aus meiner Zeitleiste ausblenden",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Dadurch werden {count, plural, one {# Foto} other {# Fotos}} aus deiner Zeitleiste entfernt. Nur deine Zeitleiste ändert sich.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# Foto bleibt, weil es diesen Space auch auf einem anderen Weg erreicht.} other {# Fotos bleiben, weil sie diesen Space auch auf einem anderen Weg erreichen.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "„{name}“ aus deiner Zeitleiste ausblenden?",
   "space_albums_hide_from_space_photos": "Dieses Album aus den Space-Fotos ausblenden",
   "space_albums_hide_from_space_photos_confirm_prompt": "Niemand im Space sieht es dort noch. Die eigenen Zeitleisten der anderen sind davon nicht betroffen.",

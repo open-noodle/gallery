@@ -102,17 +102,17 @@
           albumId: album.id,
           sharedSpaceAlbumLinkUpdateDto: { showInTimeline: false },
         });
+        // The shared flag is now committed on the server. Anything that fails below must NOT strand
+        // the page showing the old flag — reconcile in `finally` regardless, or the row keeps
+        // offering "Hide from the space's photos" for a flag that is already off.
+        albums = albums.map((a) => (a.id === album.id ? { ...a, showInTimeline: false } : a));
         if (result.alsoHideFromMyTimeline && !album.hiddenFromMyTimeline) {
           await updateAlbumTimelineForMember({
             id: space.id,
             albumId: album.id,
             sharedSpaceAlbumMemberTimelineDto: { showInTimeline: false },
           });
-          albums = albums.map((a) =>
-            a.id === album.id ? { ...a, showInTimeline: false, hiddenFromMyTimeline: true } : a,
-          );
-        } else {
-          albums = albums.map((a) => (a.id === album.id ? { ...a, showInTimeline: false } : a));
+          albums = albums.map((a) => (a.id === album.id ? { ...a, hiddenFromMyTimeline: true } : a));
         }
       } else {
         await updateSharedSpaceAlbum({
@@ -126,6 +126,11 @@
       await invalidateAll();
     } catch (error) {
       handleError(error, $t('spaces_linked_albums_error_update'));
+      // This handler makes TWO writes, and the first one may already have landed — so a failure
+      // does not mean "nothing changed". Re-read rather than leave the page rendering a flag the
+      // server no longer has. Deliberately here and not in a `finally`: the cancel path returns
+      // early and must still not touch the server.
+      await invalidateAll();
     }
   }
 
@@ -136,10 +141,14 @@
   async function handleToggleMyTimeline(album: SharedSpaceLinkedAlbumDto) {
     try {
       if (!album.hiddenFromMyTimeline) {
-        const { hiddenAssetCount } = await getAlbumTimelineHidePreview({ id: space.id, albumId: album.id });
+        const { hiddenAssetCount, retainedAssetCount } = await getAlbumTimelineHidePreview({
+          id: space.id,
+          albumId: album.id,
+        });
         const confirmed = await modalManager.show(AlbumHideFromMyTimelineConfirmModal, {
           albumName: album.albumName,
           count: hiddenAssetCount,
+          retainedCount: retainedAssetCount,
         });
         if (!confirmed) {
           return;

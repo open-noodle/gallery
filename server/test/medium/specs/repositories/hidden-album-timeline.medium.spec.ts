@@ -99,6 +99,31 @@ const idsInBucket = async (
   return new Set((JSON.parse(json) as { id?: string[] }).id);
 };
 
+const hiddenThenFiltered = async (
+  ctx: MediumTestContext,
+  opts: { visibility?: AssetVisibility; isFavorite?: boolean; trashed?: boolean } = {},
+) => {
+  const spaceRepo = ctx.get(SharedSpaceRepository);
+  const { user } = await ctx.newUser();
+  await giveASecondVisibleSpace(ctx, user.id);
+
+  const { space } = await ctx.newSharedSpace({ createdById: user.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, showInTimeline: true });
+  const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'E2' });
+  await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+  const asset = await mkAsset(ctx, user.id, {
+    visibility: opts.visibility ?? AssetVisibility.Timeline,
+    isFavorite: opts.isFavorite ?? false,
+  });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+  await spaceRepo.hideAlbumForUser(space.id, album.id, user.id);
+  if (opts.trashed) {
+    await defaultDatabase.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
+  }
+
+  return { user, auth: factory.auth({ user }), asset, space, album };
+};
+
 describe('#1041 slice 8 — personal timeline (/photos)', () => {
   it('S1: I own an asset in no space — shows', async () => {
     const { sut, ctx } = setupTimeline();
@@ -392,26 +417,54 @@ describe('#1041 slice 8 — personal timeline (/photos)', () => {
     expect(ids.has(asset.id)).toBe(true);
   });
 
-  it('E2: asset in a hidden album AND trashed — still absent; trash unaffected', async () => {
+  // §4 lists the surfaces the subtraction is FOR: /photos, scrubber covers, mobile, folder view,
+  // memories. Trash, Archive and Favorites are not among them, and each is a recovery/curation
+  // surface where losing an owned asset is unrecoverable from the UI. The three tests below pin
+  // that boundary. E2 previously asserted the OPPOSITE for trash — a photo you had hidden and then
+  // deleted was missing from Trash, so it could be neither restored nor purged.
+  it('E2: an asset in a hidden album that I then TRASHED is still in my trash (restorable)', async () => {
     const { sut, ctx } = setupTimeline();
-    const spaceRepo = ctx.get(SharedSpaceRepository);
-    const { user } = await ctx.newUser();
-    const auth = factory.auth({ user });
-    await giveASecondVisibleSpace(ctx, user.id);
+    const { auth, asset } = await hiddenThenFiltered(ctx, { trashed: true });
 
-    const { space } = await ctx.newSharedSpace({ createdById: user.id });
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, showInTimeline: true });
-    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'E2' });
-    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
-    const asset = await mkAsset(ctx, user.id);
-    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await spaceRepo.hideAlbumForUser(space.id, album.id, user.id);
-    await defaultDatabase.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
-
-    // withSharedSpaces + isTrashed is rejected by timeBucketChecks (trash is always a personal,
-    // space-free browse) — so this exercises the !timelineSpaceIds branch (block1), same as E12,
-    // proving the subtraction and the trash filter compose without erroring or double-admitting.
     const ids = await idsInBucket(sut, auth, { isTrashed: true });
+    expect(ids.has(asset.id)).toBe(true);
+  });
+
+  it('E2b: an ARCHIVED asset in a hidden album is still in my archive', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { auth, asset } = await hiddenThenFiltered(ctx, { visibility: AssetVisibility.Archive });
+
+    const ids = await idsInBucket(sut, auth, { visibility: AssetVisibility.Archive });
+    expect(ids.has(asset.id)).toBe(true);
+  });
+
+  it('E2c: a FAVOURITED asset in a hidden album is still in my favorites', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { auth, asset } = await hiddenThenFiltered(ctx, { isFavorite: true });
+
+    const ids = await idsInBucket(sut, auth, { isFavorite: true });
+    expect(ids.has(asset.id)).toBe(true);
+  });
+
+  // The guard that keeps the subtraction off trash/archive/favorites must fail CLOSED: a client
+  // that simply omits `visibility` is asking for the default timeline browse, and the hide has to
+  // still apply. Excluding by surface (trashed / favorite-filtered / archive-or-private visibility)
+  // does that; keying on `visibility === Timeline` would not.
+  it('E2e: the hide still applies when the client omits `visibility` entirely', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { auth, asset } = await hiddenThenFiltered(ctx);
+
+    // `withSharedSpaces` is deliberately absent: timeBucketChecks rejects it alongside an omitted
+    // visibility, so this is the only shape an omitted-visibility browse can take.
+    const ids = await idsInBucket(sut, auth, { visibility: undefined });
+    expect(ids.has(asset.id)).toBe(false);
+  });
+
+  it('E2d: control — the same asset is still hidden from /photos itself', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { auth, asset } = await hiddenThenFiltered(ctx);
+
+    const ids = await idsInBucket(sut, auth, { withSharedSpaces: true });
     expect(ids.has(asset.id)).toBe(false);
   });
 
@@ -487,7 +540,7 @@ describe('#1041 slice 8 — personal timeline (/photos)', () => {
     // shared_space_album_hidden uses the identical `= any(...)` column-reference shape and would
     // make a substring match ambiguous.
     const eb = expressionBuilder<DB, 'asset'>();
-    expect(hiddenFromOwnTimeline(eb, scope)).toBeUndefined();
+    expect(hiddenFromOwnTimeline(eb, scope, { kind: 'sibling-arm' })).toBeUndefined();
   });
 
   it('E7: a contribution (album_space_asset) honours the hide in its own, only-linked space', async () => {
@@ -639,6 +692,67 @@ describe('#1041 slice 8 — personal timeline (/photos)', () => {
     const asset = await mkAsset(ctx, user.id);
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await spaceRepo.hideAlbumForUser(space.id, album.id, user.id);
+
+    const ids = await idsInBucket(sut, auth, { withSharedSpaces: false });
+    expect(ids.has(asset.id)).toBe(false);
+  });
+
+  // §3's "another visible path re-admits this photo" is a property of the SUBTRACTION, not of the
+  // space-merge feature — so it must survive `withSharedSpaces: false`. E12 above passes without it
+  // only because `getTimelineHiddenScope` happens to cancel ALBUMS in TypeScript; the direct-add and
+  // library arms have no such cancel and relied entirely on the sibling visible-path arm, which the
+  // `!timelineSpaceIds` branch never emits. Reachable from Recently Added and from /photos with a
+  // Favorites chip.
+  it('E12b: withSharedSpaces=false — a direct add to a space I SHOW still rescues my own asset', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+
+    const { space: hidden } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: hidden.id, userId: user.id, showInTimeline: false });
+    const { space: shown } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: shown.id, userId: user.id, showInTimeline: true });
+
+    const asset = await mkAsset(ctx, user.id);
+    await ctx.newSharedSpaceAsset({ spaceId: hidden.id, assetId: asset.id });
+    await ctx.newSharedSpaceAsset({ spaceId: shown.id, assetId: asset.id });
+
+    // The same asset, same flags, on /photos WITH the merge on — S6, already passing.
+    const merged = await idsInBucket(sut, auth, { withSharedSpaces: true });
+    expect(merged.has(asset.id)).toBe(true);
+
+    const ids = await idsInBucket(sut, auth, { withSharedSpaces: false });
+    expect(ids.has(asset.id)).toBe(true);
+  });
+
+  it('E12c: withSharedSpaces=false — a library linked to a space I SHOW still rescues my own asset', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    const { space: hidden } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: hidden.id, userId: user.id, showInTimeline: false });
+    await ctx.newSharedSpaceLibrary({ spaceId: hidden.id, libraryId: library.id });
+    const { space: shown } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: shown.id, userId: user.id, showInTimeline: true });
+    await ctx.newSharedSpaceLibrary({ spaceId: shown.id, libraryId: library.id });
+
+    const asset = await mkAsset(ctx, user.id, { libraryId: library.id });
+
+    const ids = await idsInBucket(sut, auth, { withSharedSpaces: false });
+    expect(ids.has(asset.id)).toBe(true);
+  });
+
+  it('E12d: control — withSharedSpaces=false and the ONLY path is hidden, so it stays absent', async () => {
+    const { sut, ctx } = setupTimeline();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+
+    const { space: hidden } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: hidden.id, userId: user.id, showInTimeline: false });
+    const asset = await mkAsset(ctx, user.id);
+    await ctx.newSharedSpaceAsset({ spaceId: hidden.id, assetId: asset.id });
 
     const ids = await idsInBucket(sut, auth, { withSharedSpaces: false });
     expect(ids.has(asset.id)).toBe(false);
@@ -912,6 +1026,109 @@ describe('#1041 slice 13 — memories', () => {
     const assetIds = new Set(mine!.assets.map((a) => a.id));
     expect(assetIds.has(hiddenAsset.id)).toBe(false);
     expect(assetIds.has(otherAsset.id)).toBe(true);
+  });
+
+  // §3's rescue applies to memories exactly as it does to /photos: a photo the timeline still shows
+  // because a SECOND, visible path exists must not vanish from a memory. These three are the memory
+  // equivalents of the S3/S4/S6 timeline scenarios above, which all assert `shows === true`.
+  it('S3 equivalent: also in a visible album Y in the same space — stays in the memory', async () => {
+    const { sut, ctx } = setupMemory();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+    await giveASecondVisibleSpace(ctx, user.id);
+
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, showInTimeline: true });
+    const { result: albumX } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Mem-S3-X' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: albumX.id, addedById: user.id });
+    const { result: albumY } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Mem-S3-Y' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: albumY.id, addedById: user.id });
+    const asset = await mkAsset(ctx, user.id);
+    await ctx.newAlbumAsset({ albumId: albumX.id, assetId: asset.id });
+    await ctx.newAlbumAsset({ albumId: albumY.id, assetId: asset.id });
+    await spaceRepo.hideAlbumForUser(space.id, albumX.id, user.id);
+
+    const { result: memory } = await ctx.newMemory({ ownerId: user.id });
+    await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+    const memories = await sut.search(auth, {});
+    const mine = memories.find((m) => m.id === memory.id);
+    expect(mine).toBeDefined();
+    expect(new Set(mine!.assets.map((a) => a.id)).has(asset.id)).toBe(true);
+  });
+
+  it('S4 equivalent: also added to the space directly — stays in the memory', async () => {
+    const { sut, ctx } = setupMemory();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+    await giveASecondVisibleSpace(ctx, user.id);
+
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, showInTimeline: true });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Mem-S4' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+    const asset = await mkAsset(ctx, user.id);
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    await spaceRepo.hideAlbumForUser(space.id, album.id, user.id);
+
+    const { result: memory } = await ctx.newMemory({ ownerId: user.id });
+    await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+    const memories = await sut.search(auth, {});
+    const mine = memories.find((m) => m.id === memory.id);
+    expect(mine).toBeDefined();
+    expect(new Set(mine!.assets.map((a) => a.id)).has(asset.id)).toBe(true);
+  });
+
+  it('S6 equivalent: also direct in a second, shown space — stays in the memory', async () => {
+    const { sut, ctx } = setupMemory();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+
+    const { space: hidden } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: hidden.id, userId: user.id, showInTimeline: false });
+    const { space: shown } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: shown.id, userId: user.id, showInTimeline: true });
+    const asset = await mkAsset(ctx, user.id);
+    await ctx.newSharedSpaceAsset({ spaceId: hidden.id, assetId: asset.id });
+    await ctx.newSharedSpaceAsset({ spaceId: shown.id, assetId: asset.id });
+
+    const { result: memory } = await ctx.newMemory({ ownerId: user.id });
+    await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+    const memories = await sut.search(auth, {});
+    const mine = memories.find((m) => m.id === memory.id);
+    expect(mine).toBeDefined();
+    expect(new Set(mine!.assets.map((a) => a.id)).has(asset.id)).toBe(true);
+  });
+
+  // The consequence that makes over-subtraction worse than it looks: MemoryService.search drops a
+  // memory once its asset list is empty, so a rescued photo being wrongly subtracted takes the
+  // WHOLE memory card off /memories, not just one frame.
+  it('a memory whose only asset is rescued by a visible path is still listed at all', async () => {
+    const { sut, ctx } = setupMemory();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+    await giveASecondVisibleSpace(ctx, user.id);
+
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, showInTimeline: true });
+    const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Mem-vanish' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
+    const asset = await mkAsset(ctx, user.id);
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    await spaceRepo.hideAlbumForUser(space.id, album.id, user.id);
+
+    const { result: memory } = await ctx.newMemory({ ownerId: user.id });
+    await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+    const memories = await sut.search(auth, {});
+    expect(memories.find((m) => m.id === memory.id)).toBeDefined();
   });
 
   it('E10 equivalent: a partner-owned asset in an album I hid still shows in MY memories (the partner trap)', async () => {

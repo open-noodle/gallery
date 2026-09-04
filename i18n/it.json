@@ -3087,6 +3087,7 @@
   "space_albums_hidden_from_timeline": "Nascosto dalla tua timeline",
   "space_albums_hide_from_my_timeline": "Nascondi questo album dalla mia timeline",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Questo rimuove {count, plural, one {# foto} other {# foto}} dalla tua timeline. Cambia solo la tua timeline.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# foto resta perché raggiunge questo spazio anche in un altro modo.} other {# foto restano perché raggiungono questo spazio anche in un altro modo.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "Nascondere \"{name}\" dalla tua timeline?",
   "space_albums_hide_from_space_photos": "Nascondi questo album dalle foto dello Space",
   "space_albums_hide_from_space_photos_confirm_prompt": "Nessuno nello Space lo vedrà più lì. Le timeline personali degli altri non sono interessate.",

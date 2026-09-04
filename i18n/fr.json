@@ -3087,6 +3087,7 @@
   "space_albums_hidden_from_timeline": "Masqué de votre Chronologie",
   "space_albums_hide_from_my_timeline": "Masquer cet album de ma Chronologie",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Cela retire {count, plural, one {# photo} other {# photos}} de votre Chronologie. Seule votre Chronologie change.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# photo reste, car elle atteint aussi cet espace par un autre chemin.} other {# photos restent, car elles atteignent aussi cet espace par un autre chemin.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "Masquer « {name} » de votre Chronologie ?",
   "space_albums_hide_from_space_photos": "Masquer cet album des photos de l'espace",
   "space_albums_hide_from_space_photos_confirm_prompt": "Plus personne dans l'espace ne le verra là-bas. Les chronologies personnelles des autres membres ne sont pas affectées.",

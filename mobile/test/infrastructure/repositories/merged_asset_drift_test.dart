@@ -1086,5 +1086,116 @@ void main() {
 
       await expectShows('asset-1');
     });
+
+    // E10, the "partner trap" (design doc §6.4). Every scenario above runs single-user, which makes
+    // this trap structurally unreachable: the subtraction legs are correlated to :current_user_id's
+    // MEMBER rows, but they are ANDed against every row in :user_ids — which also carries partner
+    // ids. So the CALLER's own hide could remove a PARTNER's photos. The server splits the arm to
+    // prevent exactly this (ownerArmWithHiddenSubtraction) and asserts it in its own E10.
+    const partnerId = 'partner-1';
+
+    Future<void> insertPartner() => db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: partnerId, email: 'partner@test.dev', name: 'P'));
+
+    Future<void> insertPartnerAsset(String assetId, DateTime at) => db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: assetId,
+            name: '$assetId.jpg',
+            type: AssetType.image,
+            checksum: 'checksum-$assetId',
+            ownerId: partnerId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(at),
+            updatedAt: Value(at),
+            localDateTime: Value(at),
+          ),
+        );
+
+    Future<void> expectShowsForPair(String assetId) async {
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: [viewerId, partnerId], currentUserId: viewerId, limit: (_) => Limit(50, 0))
+          .get();
+      expect(
+        rows.map((r) => r.remoteId),
+        contains(assetId),
+        reason: "expected $assetId to show — a partner's asset is never subtracted by MY hides",
+      );
+
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [viewerId, partnerId], currentUserId: viewerId)
+          .get();
+      expect(
+        buckets.fold<int>(0, (sum, b) => sum + b.assetCount),
+        greaterThan(0),
+        reason: 'expected $assetId to be counted in the buckets too',
+      );
+    }
+
+    test('E10: a PARTNER asset in an album I hid still shows (the partner trap)', () async {
+      await insertViewer();
+      await insertPartner();
+      await insertPartnerAsset('partner-asset', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertAlbumAssetRow('album-x', 'partner-asset');
+      await hideAlbumForViewer('space-s', 'album-x');
+
+      await expectShowsForPair('partner-asset');
+    });
+
+    test('E10b: a PARTNER asset in a SPACE I hid still shows (same trap, member-flag leg)', () async {
+      await insertViewer();
+      await insertPartner();
+      await insertPartnerAsset('partner-asset', createdAt);
+      await insertSpace('space-h');
+      await insertMember('space-h', showInTimeline: false);
+      await insertDirectSpaceAsset('space-h', 'partner-asset');
+
+      await expectShowsForPair('partner-asset');
+    });
+
+    test('E10c: a PARTNER asset in a LIBRARY linked to a space I hid still shows', () async {
+      await insertViewer();
+      await insertPartner();
+      await db
+          .into(db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion.insert(
+              id: 'partner-lib-asset',
+              name: 'partner-lib-asset.jpg',
+              type: AssetType.image,
+              checksum: 'checksum-partner-lib-asset',
+              ownerId: partnerId,
+              visibility: AssetVisibility.timeline,
+              createdAt: Value(createdAt),
+              updatedAt: Value(createdAt),
+              localDateTime: Value(createdAt),
+              libraryId: const Value('lib-1'),
+            ),
+          );
+      await insertSpace('space-h');
+      await insertMember('space-h', showInTimeline: false);
+      await insertLibraryLink('space-h', 'lib-1');
+
+      await expectShowsForPair('partner-lib-asset');
+    });
+
+    test('E10d: control — MY OWN asset on the same hidden path is still subtracted', () async {
+      await insertViewer();
+      await insertPartner();
+      await insertOwnedAsset('my-asset', createdAt);
+      await insertSpace('space-h');
+      await insertMember('space-h', showInTimeline: false);
+      await insertDirectSpaceAsset('space-h', 'my-asset');
+
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: [viewerId, partnerId], currentUserId: viewerId, limit: (_) => Limit(50, 0))
+          .get();
+      expect(rows.map((r) => r.remoteId), isNot(contains('my-asset')));
+    });
   });
 }

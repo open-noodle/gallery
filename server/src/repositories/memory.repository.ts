@@ -134,7 +134,7 @@ export class MemoryRepository implements IBulkAsset {
   // via the candidate builder above). The subtraction is therefore `ownerId != asset.ownerId OR
   // notHidden`, never a bare AND — the same partner-trap shape §6.4 guards on the timeline. Passing
   // no `hiddenScope` (the only caller today, generation-time dedup) leaves the query unchanged.
-  search(ownerId: string, dto: MemorySearchDto, hiddenScope?: TimelineHiddenScope) {
+  search(ownerId: string, dto: MemorySearchDto, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
     return this.searchBuilder(ownerId, dto)
       .select((eb) =>
         jsonArrayFrom(
@@ -147,7 +147,14 @@ export class MemoryRepository implements IBulkAsset {
             .where('asset.deletedAt', 'is', null)
             .$if(!!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
               qb.where((eb) =>
-                eb.or([eb('asset.ownerId', '!=', asUuid(ownerId)), hiddenFromOwnTimeline(eb, hiddenScope!)!]),
+                eb.or([
+                  eb('asset.ownerId', '!=', asUuid(ownerId)),
+                  hiddenFromOwnTimeline(eb, hiddenScope!, {
+                    kind: 'inline',
+                    visibleSpaceIds,
+                    viewerId: ownerId,
+                  })!,
+                ]),
               ),
             )
             .where((eb) =>
@@ -233,7 +240,12 @@ export class MemoryRepository implements IBulkAsset {
   }
 
   // #1041: same partner-trap-safe shape as `search` above, resolved for the VIEWER (`userId`).
-  searchAccessible(userId: string, dto: MemorySearchDto, hiddenScope?: TimelineHiddenScope) {
+  searchAccessible(
+    userId: string,
+    dto: MemorySearchDto,
+    hiddenScope?: TimelineHiddenScope,
+    visibleSpaceIds: string[] = [],
+  ) {
     return this.accessibleSearchBuilder(userId, dto)
       .select((eb) =>
         jsonArrayFrom(
@@ -246,7 +258,10 @@ export class MemoryRepository implements IBulkAsset {
             .where('asset.deletedAt', 'is', null)
             .$if(!!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
               qb.where((eb) =>
-                eb.or([eb('asset.ownerId', '!=', asUuid(userId)), hiddenFromOwnTimeline(eb, hiddenScope!)!]),
+                eb.or([
+                  eb('asset.ownerId', '!=', asUuid(userId)),
+                  hiddenFromOwnTimeline(eb, hiddenScope!, { kind: 'inline', visibleSpaceIds, viewerId: userId })!,
+                ]),
               ),
             )
             .where((eb) =>
@@ -278,8 +293,8 @@ export class MemoryRepository implements IBulkAsset {
   // after the caller's own action and pass neither, so their SQL is unchanged. `get()` is the
   // read surface and is the one MemoryService resolves a scope for.
   @GenerateSql({ params: [DummyValue.UUID] })
-  get(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope) {
-    return this.getByIdBuilder(id, viewerId, hiddenScope).executeTakeFirst();
+  get(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
+    return this.getByIdBuilder(id, viewerId, hiddenScope, visibleSpaceIds).executeTakeFirst();
   }
 
   async create(memory: Insertable<MemoryTable>, assetIds: Set<string>) {
@@ -385,7 +400,12 @@ export class MemoryRepository implements IBulkAsset {
     await this.db.deleteFrom('memory_asset').where('memoriesId', '=', id).where('assetId', 'in', assetIds).execute();
   }
 
-  private getByIdBuilder(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope) {
+  private getByIdBuilder(
+    id: string,
+    viewerId?: string,
+    hiddenScope?: TimelineHiddenScope,
+    visibleSpaceIds: string[] = [],
+  ) {
     return this.db
       .selectFrom('memory')
       .selectAll('memory')
@@ -401,7 +421,10 @@ export class MemoryRepository implements IBulkAsset {
             .where('asset.deletedAt', 'is', null)
             .$if(!!viewerId && !!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
               qb.where((eb) =>
-                eb.or([eb('asset.ownerId', '!=', asUuid(viewerId!)), hiddenFromOwnTimeline(eb, hiddenScope!)!]),
+                eb.or([
+                  eb('asset.ownerId', '!=', asUuid(viewerId!)),
+                  hiddenFromOwnTimeline(eb, hiddenScope!, { kind: 'inline', visibleSpaceIds, viewerId: viewerId! })!,
+                ]),
               ),
             ),
         ).as('assets'),

@@ -626,12 +626,17 @@ export class SharedSpaceService extends BaseService {
     const callerId = auth.user.id;
 
     const before = await this.countOwnTimeline(callerId);
-    const after = await this.sharedSpaceRepository.previewInRolledBackTransaction(
+    // Both reads run inside the SAME rolled-back transaction, so they observe one consistent
+    // hypothetical state — mirrors getTimelineHidePreview above.
+    const { after, retained } = await this.sharedSpaceRepository.previewInRolledBackTransaction(
       (trx) => this.sharedSpaceRepository.hideAlbumForUser(spaceId, albumId, callerId, trx),
-      (trx) => this.countOwnTimeline(callerId, trx),
+      async (trx) => ({
+        after: await this.countOwnTimeline(callerId, trx),
+        retained: await this.countOwnTimeline(callerId, trx, undefined, { spaceId, albumId }),
+      }),
     );
 
-    return { hiddenAssetCount: Math.max(0, before - after) };
+    return { hiddenAssetCount: Math.max(0, before - after), retainedAssetCount: retained };
   }
 
   // The caller's own merged-personal-timeline asset count, exactly as `/timeline/buckets` would
@@ -645,6 +650,11 @@ export class SharedSpaceService extends BaseService {
     callerId: string,
     db?: Kysely<DB> | Transaction<DB>,
     spaceId?: string,
+    // #1041 follow-up: narrows the same count to ONE linked album, which is how the album preview's
+    // `retainedAssetCount` is measured. Scoping to the album (not its space) matters — a space-wide
+    // count would include photos that were never in the album, and the dialog's sentence is about
+    // the album.
+    album?: { spaceId: string; albumId: string },
   ): Promise<number> {
     const [hiddenScope, spaceRows] = await Promise.all([
       this.sharedSpaceRepository.getTimelineHiddenScope(callerId, db),
@@ -657,7 +667,10 @@ export class SharedSpaceService extends BaseService {
         callerId,
         hiddenScope,
         timelineSpaceIds: timelineSpaceIds.length > 0 ? timelineSpaceIds : undefined,
+        visibleSpaceIds: timelineSpaceIds,
         spaceId,
+        albumId: album?.albumId,
+        albumSpaceIds: album ? [album.spaceId] : undefined,
       },
       db,
     );

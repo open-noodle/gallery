@@ -163,9 +163,7 @@ export class MemoryService extends BaseService {
   private async createOnThisDayMemories(ownerId: string, target: DateTime) {
     const showAt = target.startOf('day').toISO();
     const hideAt = target.endOf('day').toISO();
-    // #1041 §4: keep a hidden album's assets out of brand-new "on this day" candidates.
-    const hiddenScope = await this.sharedSpaceRepository.getTimelineHiddenScope(ownerId);
-    const memories = await this.assetRepository.getByDayOfYear([ownerId], target, hiddenScope);
+    const memories = await this.assetRepository.getByDayOfYear([ownerId], target);
     await Promise.all(
       memories.map(({ year, assets }) =>
         this.memoryRepository.create(
@@ -470,8 +468,8 @@ export class MemoryService extends BaseService {
 
   async search(auth: AuthDto, dto: MemorySearchDto) {
     // #1041 §6.2: resolved once per request, same as timeline.service.ts / view.service.ts.
-    const hiddenScope = await this.sharedSpaceRepository.getTimelineHiddenScope(auth.user.id);
-    const memories = await this.memoryRepository.searchAccessible(auth.user.id, dto, hiddenScope);
+    const [hiddenScope, visibleSpaceIds] = await this.resolveHiddenScopeAndVisibleSpaces(auth.user.id);
+    const memories = await this.memoryRepository.searchAccessible(auth.user.id, dto, hiddenScope, visibleSpaceIds);
     const assetIds = memories.flatMap((memory) => memory.assets.map((asset) => asset.id));
     const allowedAssetIds = await this.checkAccess({ auth, permission: Permission.AssetView, ids: assetIds });
 
@@ -594,11 +592,22 @@ export class MemoryService extends BaseService {
     return results;
   }
 
+  // #1041 §3: `visibleSpaceIds` is what lets the subtraction honour "another visible path re-admits
+  // this photo". Memories have no sibling visible-path arm of their own (unlike the timeline and
+  // folder view), so without it the subtraction over-removes — see TimelineRescue.
+  private async resolveHiddenScopeAndVisibleSpaces(userId: string) {
+    const [hiddenScope, spaceRows] = await Promise.all([
+      this.sharedSpaceRepository.getTimelineHiddenScope(userId),
+      this.sharedSpaceRepository.getSpaceIdsForTimeline(userId),
+    ]);
+    return [hiddenScope, spaceRows.map((row) => row.spaceId)] as const;
+  }
+
   private async findOrFail(id: string, viewerId?: string) {
     // #1041 §4: leave the memory's assets hidden from a viewer's own timeline immediately, not just
     // after the next generation pass — see the repository doc comment.
-    const hiddenScope = viewerId ? await this.sharedSpaceRepository.getTimelineHiddenScope(viewerId) : undefined;
-    const memory = await this.memoryRepository.get(id, viewerId, hiddenScope);
+    const resolved = viewerId ? await this.resolveHiddenScopeAndVisibleSpaces(viewerId) : undefined;
+    const memory = await this.memoryRepository.get(id, viewerId, resolved?.[0], resolved?.[1]);
     if (!memory) {
       throw new BadRequestException('Memory not found');
     }

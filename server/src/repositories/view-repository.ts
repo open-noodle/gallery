@@ -11,6 +11,14 @@ import {
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope';
 
+// #1041 §3: `ownedOrSpaceAccessible` already ORs a visible-path branch alongside the owner term
+// over the same `visibleSpaceIds`, so the subtraction must NOT emit a second copy of it. Hoisted to
+// a const rather than written inline: the space-visibility guard attributes a space-asset read to
+// the nearest preceding `identifier(` line and requires a visibility gate within ±50 lines, so
+// growing that function pushes `getAssetsByOriginalPath`'s gate out of range and misattributes the
+// arm (the guard's own NON_DECL list documents this trap).
+const SIBLING_ARM = { kind: 'sibling-arm' } as const;
+
 export class ViewRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
@@ -86,7 +94,9 @@ export class ViewRepository {
     visibleSpaceIds?: string[],
   ) {
     const subtraction =
-      hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope) ? hiddenFromOwnTimeline(eb, hiddenScope) : undefined;
+      hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope)
+        ? hiddenFromOwnTimeline(eb, hiddenScope, SIBLING_ARM)
+        : undefined;
     const ownerTerm: Expression<SqlBool> = subtraction
       ? eb.and([eb('asset.ownerId', '=', asUuid(userId)), subtraction])
       : eb('asset.ownerId', '=', asUuid(userId));

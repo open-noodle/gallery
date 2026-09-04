@@ -10537,12 +10537,48 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(20).mockResolvedValueOnce(5);
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(20).mockResolvedValueOnce(5).mockResolvedValueOnce(0);
 
       const result = await sut.getAlbumTimelineHidePreview(auth, space.id, albumId);
 
-      expect(result).toEqual({ hiddenAssetCount: 15 });
+      expect(result).toEqual({ hiddenAssetCount: 15, retainedAssetCount: 0 });
       expect(mocks.sharedSpace.hideAlbumForUser).toHaveBeenCalledWith(space.id, albumId, auth.user.id, stubTrx);
+    });
+
+    // #1041 follow-up: the album dialog said "This removes 0 photos" whenever the album's photos
+    // ALSO reach the space another way — a direct add, or a linked external library. That is §3
+    // working as designed, but with no explanation it reads as broken; it is the shape the #1041
+    // reporter actually hit. The space-level preview already answers this with retainedAssetCount.
+    it("reports how many of THIS ALBUM's photos stay on the timeline via another path", async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      const albumId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: space.id }] as any);
+      mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      // before = 20, after = 20 (nothing actually leaves), retained-in-album = 3.
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(20).mockResolvedValueOnce(20).mockResolvedValueOnce(3);
+
+      const result = await sut.getAlbumTimelineHidePreview(auth, space.id, albumId);
+
+      expect(result).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 3 });
+      // Scoped to the ALBUM, not the whole space — otherwise it would count photos that were never
+      // in the album and the sentence would be wrong.
+      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ albumId, albumSpaceIds: [space.id] }),
+        stubTrx,
+      );
     });
 
     it('the zero case returns 0 rather than erroring', async () => {
@@ -10562,10 +10598,11 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(8).mockResolvedValueOnce(8);
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(8).mockResolvedValueOnce(8).mockResolvedValueOnce(0);
 
       await expect(sut.getAlbumTimelineHidePreview(auth, space.id, albumId)).resolves.toEqual({
         hiddenAssetCount: 0,
+        retainedAssetCount: 0,
       });
     });
   });

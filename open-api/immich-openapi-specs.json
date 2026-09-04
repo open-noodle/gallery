@@ -33894,7 +33894,7 @@
             "type": "integer"
           },
           "retainedAssetCount": {
-            "description": "Photos in this space that stay on the caller's timeline via another visible path",
+            "description": "Photos in this scope that stay on the caller's timeline via a path they did not hide",
             "maximum": 9007199254740991,
             "minimum": 0,
             "type": "integer"

@@ -3089,6 +3089,7 @@
   "space_albums_hidden_from_timeline": "Скрыт с вашей временной шкалы",
   "space_albums_hide_from_my_timeline": "Скрыть этот альбом с моей временной шкалы",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Это удалит {count, plural, one {# фото} few {# фото} many {# фото} other {# фото}} с вашей временной шкалы. Изменится только ваша временная шкала.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# фото останется, так как оно попадает в это пространство и другим путём.} few {# фото останутся, так как они попадают в это пространство и другим путём.} many {# фото останется, так как они попадают в это пространство и другим путём.} other {# фото останется, так как они попадают в это пространство и другим путём.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "Скрыть «{name}» с вашей временной шкалы?",
   "space_albums_hide_from_space_photos": "Скрыть этот альбом из фотографий Space",
   "space_albums_hide_from_space_photos_confirm_prompt": "Никто в Space больше не увидит его там. На личные временные шкалы других участников это не повлияет.",

@@ -3105,6 +3105,7 @@
   "space_albums_hidden_from_timeline": "Ukryte na Twojej osi czasu",
   "space_albums_hide_from_my_timeline": "Ukryj ten album z mojej osi czasu",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Spowoduje to usunięcie {count, plural, one {# zdjęcia} few {# zdjęć} many {# zdjęć} other {# zdjęcia}} z Twojej osi czasu. Zmieni się tylko Twoja oś czasu.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# zdjęcie pozostaje, ponieważ trafia do tej przestrzeni również inną drogą.} few {# zdjęcia pozostają, ponieważ trafiają do tej przestrzeni również inną drogą.} many {# zdjęć pozostaje, ponieważ trafiają do tej przestrzeni również inną drogą.} other {# zdjęcia pozostaje, ponieważ trafiają do tej przestrzeni również inną drogą.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "Ukryć „{name}” na Twojej osi czasu?",
   "space_albums_hide_from_space_photos": "Ukryj ten album ze zdjęć Space",
   "space_albums_hide_from_space_photos_confirm_prompt": "Nikt w przestrzeni nie będzie już tego tam widział. Nie wpłynie to na osie czasu innych osób.",

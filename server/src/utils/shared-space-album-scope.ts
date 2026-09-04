@@ -523,6 +523,24 @@ export function timelineHiddenScopeIsEmpty(scope: TimelineHiddenScope): boolean 
 }
 
 /**
+ * How this call site supplies §3's "another visible path re-admits the photo" arm.
+ *
+ * A REQUIRED discriminated union, not an optional list, for the same reason {@link AlbumTimelineGate}
+ * is: the rescue is half of the rule, and an optional parameter let three call sites (memories ×3,
+ * and the `!timelineSpaceIds` timeline branch) emit the subtraction WITHOUT it and silently
+ * over-subtract. A new call site now has to say which shape it is.
+ *
+ *  - 'sibling-arm' : the caller already ORs a visible-path branch alongside the owner term, so this
+ *                    predicate must emit the bare subtraction. `withTimeBucketAssetFilters`'s
+ *                    `timelineSpaceIds` branch and `ViewRepository.ownedOrSpaceAccessible` are the
+ *                    only two — both OR `spaceAssetPathBranches` at the same level.
+ *  - 'inline'      : there is no sibling arm; the rescue must be built into the predicate itself.
+ *                    Needs the viewer's visible spaces (`getSpaceIdsForTimeline`) and their id, the
+ *                    same two inputs the sibling arm is built from.
+ */
+export type TimelineRescue = { kind: 'sibling-arm' } | { kind: 'inline'; visibleSpaceIds: string[]; viewerId: string };
+
+/**
  * #1041: the subtraction applied to the caller's OWN assets — "I have hidden every way this photo
  * reaches a space, so keep it off my timeline".
  *
@@ -533,10 +551,13 @@ export function timelineHiddenScopeIsEmpty(scope: TimelineHiddenScope): boolean 
  * Attach ONLY to the caller's own-id arm — never to `userIds`, which includes partners. See §6.4 of
  * the design doc: AND-ing this into the shared owner arm would remove a PARTNER's photos based on the
  * CALLER's flags.
+ *
+ * `rescue` carries §3's other half — see {@link TimelineRescue}.
  */
 export function hiddenFromOwnTimeline(
   eb: ExpressionBuilder<DB, keyof DB>,
   scope: TimelineHiddenScope,
+  rescue: TimelineRescue,
 ): Expression<SqlBool> | undefined {
   const terms: Expression<SqlBool>[] = [];
 
@@ -600,7 +621,31 @@ export function hiddenFromOwnTimeline(
     );
   }
 
-  return terms.length > 0 ? eb.and(terms) : undefined;
+  if (terms.length === 0) {
+    return undefined;
+  }
+
+  const noHiddenPath = eb.and(terms);
+  if (rescue.kind === 'sibling-arm' || rescue.visibleSpaceIds.length === 0) {
+    return noHiddenPath;
+  }
+
+  // §3: `¬H ∨ V`. Note the visible-path branches carry NO `spaceVisibilityGate` here — that gate
+  // exists on the sibling arm to stop OTHER members' Hidden/Locked assets surfacing, and this
+  // predicate only ever runs against the caller's own rows, whose visibility the query's own
+  // top-level filter already resolved.
+  return eb.or([
+    noHiddenPath,
+    eb.or(
+      spaceAssetPathBranches(eb, {
+        correlateAssetId: 'asset.id',
+        correlateLibraryId: 'asset.libraryId',
+        scope: { spaceIds: rescue.visibleSpaceIds },
+        albumTimelineGate: 'personal',
+        viewerId: rescue.viewerId,
+      }),
+    ),
+  ]);
 }
 
 export function spaceAlbumAssetExistsSql(options: SpaceAlbumAssetSqlOptions): RawBuilder<SqlBool> {

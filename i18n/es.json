@@ -3087,6 +3087,7 @@
   "space_albums_hidden_from_timeline": "Oculto de tu línea de tiempo",
   "space_albums_hide_from_my_timeline": "Ocultar este álbum de mi línea de tiempo",
   "space_albums_hide_from_my_timeline_confirm_prompt": "Esto elimina {count, plural, one {# foto} other {# fotos}} de tu línea de tiempo. Solo cambia tu línea de tiempo.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# foto permanece porque también llega a este espacio por otra vía.} other {# fotos permanecen porque también llegan a este espacio por otra vía.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "¿Ocultar \"{name}\" de tu línea de tiempo?",
   "space_albums_hide_from_space_photos": "Ocultar este álbum de las fotos del Space",
   "space_albums_hide_from_space_photos_confirm_prompt": "Nadie en el Space volverá a verlo ahí. Las líneas de tiempo personales de los demás no se ven afectadas.",

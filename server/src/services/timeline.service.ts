@@ -13,6 +13,7 @@ import { BaseService } from 'src/services/base.service';
 import { requireElevatedPermission } from 'src/utils/access';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids';
 import { getMyPartnerIds } from 'src/utils/asset.util';
+import { timelineHiddenScopeIsEmpty } from 'src/utils/shared-space-album-scope';
 import { normalizeTimeBucketForBucketSize } from 'src/utils/timeline-bucket';
 
 @Injectable()
@@ -71,6 +72,7 @@ export class TimelineService extends BaseService {
     // partner ids). See TimeBucketOptions.callerId — the subtraction below attaches ONLY here.
     let callerId: string | undefined;
     let hiddenScope: TimeBucketOptions['hiddenScope'];
+    let visibleSpaceIds: string[] | undefined;
 
     if (userId) {
       userIds = [userId];
@@ -91,10 +93,38 @@ export class TimelineService extends BaseService {
         }
       }
 
-      // #1041 §6.2: resolved ONCE per request, beside getSpaceIdsForTimeline above — never
-      // per-bucket. Independent of `withSharedSpaces`: E12 requires the subtraction to still
-      // apply when the caller has shared spaces disabled for this browse.
-      hiddenScope = await this.sharedSpaceRepository.getTimelineHiddenScope(auth.user.id);
+      // #1041 §4: the subtraction is a PERSONAL TIMELINE rule, and this is the only place that
+      // decides which surfaces are one. Trash, Archive and Favorites all reach this method — they
+      // are not album/space browses, so `timeBucketChecks` fills in `dto.userId` for them too —
+      // but none is in §4's scope, and each is a recovery/curation surface where subtracting an
+      // owned asset makes it unreachable from the UI entirely (E2/E2b/E2c). Independent of
+      // `withSharedSpaces`, which is a merge switch, not a surface: E12 still applies.
+      // Written as an EXCLUSION list, not `visibility === Timeline`: a client that omits
+      // `visibility` is asking for the default timeline browse and must still get the hide, so the
+      // guard has to fail CLOSED (E2e). Archive/Hidden/Locked are the caller's own private buckets —
+      // subtracting there strands an owned asset exactly the way trash does.
+      const isPersonalTimeline =
+        !dto.isTrashed &&
+        dto.isFavorite === undefined &&
+        dto.visibility !== AssetVisibility.Archive &&
+        dto.visibility !== AssetVisibility.Hidden &&
+        dto.visibility !== AssetVisibility.Locked;
+
+      if (isPersonalTimeline) {
+        hiddenScope = await this.sharedSpaceRepository.getTimelineHiddenScope(auth.user.id);
+        if (!timelineHiddenScopeIsEmpty(hiddenScope)) {
+          // §3's rescue needs the viewer's visible spaces even when this browse is NOT merging
+          // space content (E12b/E12c). Reuse the list resolved above when we already have it; the
+          // extra lookup only happens for a caller who has actually hidden something AND turned
+          // shared spaces off for this browse.
+          if (timelineSpaceIds) {
+            visibleSpaceIds = timelineSpaceIds;
+          } else {
+            const rows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+            visibleSpaceIds = rows.map((row) => row.spaceId);
+          }
+        }
+      }
     }
 
     // #752 P0-2: album browse — resolve the viewer's live member-spaces linking this album so the
@@ -113,6 +143,7 @@ export class TimelineService extends BaseService {
       albumSpaceIds,
       callerId,
       hiddenScope,
+      visibleSpaceIds,
     };
   }
 

@@ -3053,7 +3053,7 @@ export type SharedSpaceAlbumMemberTimelineDto = {
 export type SharedSpaceTimelineHidePreviewDto = {
     /** Photos that would leave the caller's own timeline */
     hiddenAssetCount: number;
-    /** Photos in this space that stay on the caller's timeline via another visible path */
+    /** Photos in this scope that stay on the caller's timeline via a path they did not hide */
     retainedAssetCount?: number;
 };
 export type SharedSpaceAssetRemoveDto = {

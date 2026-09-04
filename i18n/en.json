@@ -3090,6 +3090,7 @@
   "space_albums_hidden_from_timeline": "Hidden from your timeline",
   "space_albums_hide_from_my_timeline": "Hide this album from my timeline",
   "space_albums_hide_from_my_timeline_confirm_prompt": "This removes {count, plural, one {# photo} other {# photos}}. Only your timeline changes.",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, one {# photo stays because it also reaches this space another way.} other {# photos stay because they also reach this space another way.}}",
   "space_albums_hide_from_my_timeline_confirm_title": "Hide \"{name}\" from your timeline?",
   "space_albums_hide_from_space_photos": "Hide this album from the space's photos",
   "space_albums_hide_from_space_photos_confirm_prompt": "Everyone in the space stops seeing it there. Their own timelines are unaffected.",

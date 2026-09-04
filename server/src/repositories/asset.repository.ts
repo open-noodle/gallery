@@ -69,6 +69,7 @@ import {
   spaceVisibilityGate,
   TimelineHiddenScope,
   timelineHiddenScopeIsEmpty,
+  TimelineRescue,
 } from 'src/utils/shared-space-album-scope';
 
 export type AssetStats = Record<AssetType, number>;
@@ -169,6 +170,13 @@ export interface TimeBucketOptions extends AssetBuilderOptions {
    * was before #1041, at no cost to callers who have hidden nothing.
    */
   hiddenScope?: TimelineHiddenScope;
+  /**
+   * #1041 §3: the spaces the caller still shows (`getSpaceIdsForTimeline`), used ONLY to build the
+   * "another visible path re-admits this photo" rescue inside the subtraction. Distinct from
+   * `timelineSpaceIds`, which additionally MERGES other members' assets into the result — this one
+   * never widens the result set, so it is resolved even when `withSharedSpaces` is off.
+   */
+  visibleSpaceIds?: string[];
 }
 
 export interface TimeBucketItem {
@@ -345,11 +353,12 @@ const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): str
 function ownerArmWithHiddenSubtraction(
   eb: ExpressionBuilder<DB, 'asset'>,
   options: TimeBucketOptions,
+  rescue: TimelineRescue,
 ): Expression<SqlBool> {
   const userIds = options.userIds!;
   const subtraction =
     options.callerId && options.hiddenScope && !timelineHiddenScopeIsEmpty(options.hiddenScope)
-      ? hiddenFromOwnTimeline(eb, options.hiddenScope)
+      ? hiddenFromOwnTimeline(eb, options.hiddenScope, rescue)
       : undefined;
 
   if (!subtraction || !options.callerId) {
@@ -532,17 +541,27 @@ export function withTimeBucketAssetFilters<O>(
       )
       // #1041 §4: the `!timelineSpaceIds` branch — userIds set, shared spaces off. E12 requires the
       // subtraction still applies here even with `withSharedSpaces: false`; easy to miss because this
-      // branch never touches a space table.
+      // branch never touches a space table. There is no sibling visible-path arm here, so §3's
+      // rescue has to be built INTO the predicate (E12b/E12c) — that is what `visibleSpaceIds` is
+      // for, and it is resolved independently of `withSharedSpaces`.
       .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
-        qb.where((eb) => ownerArmWithHiddenSubtraction(eb, options)),
+        qb.where((eb) =>
+          ownerArmWithHiddenSubtraction(eb, options, {
+            kind: 'inline',
+            visibleSpaceIds: options.visibleSpaceIds ?? [],
+            viewerId: options.callerId ?? options.userIds![0],
+          }),
+        ),
       )
       .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
           eb.or([
             // Caller's own (and partner) rows follow the resolved top-level visibility; the
             // caller's own id additionally carries the #1041 subtraction (never the partner's — see
-            // ownerArmWithHiddenSubtraction).
-            ownerArmWithHiddenSubtraction(eb, options),
+            // ownerArmWithHiddenSubtraction). §3's rescue is the sibling arm immediately below —
+            // it ORs the same `spaceAssetPathBranches` over the same visible spaces — so the
+            // subtraction here must NOT emit its own copy.
+            ownerArmWithHiddenSubtraction(eb, options, { kind: 'sibling-arm' }),
             // Fork RBAC (Fix A): other members' rows are constrained to Archive+Timeline via the
             // INDEPENDENT gate, so an explicit `visibility=HIDDEN`/`LOCKED` can't surface their
             // Hidden/Locked in-space assets. Mirrors searchAssetBuilder's timelineSpaceIds arm.
@@ -886,13 +905,13 @@ export class AssetRepository {
     return ids.map(({ id }) => id);
   }
 
-  // #1041 §4: the "on this day" candidate query — this decides which of `ownerIds`' own assets ever
-  // become memory candidates, so subtracting hidden ones here (rather than only at display time)
-  // keeps them out of memories generated from tonight onward. Unlike the personal-timeline queries
-  // above, this WHERE already restricts every row to `ownerId = ANY(ownerIds)` with no partner/space
-  // mixing, so the subtraction ANDs directly — no partner-trap split needed.
+  // #1041: deliberately NOT subtracted here. Filtering candidates at GENERATION time is sticky —
+  // the asset is left out of the `memory_asset` rows for good, so a later un-hide cannot bring it
+  // back and the photo is lost from that memory permanently. The read paths
+  // (`MemoryRepository.search` / `searchAccessible` / `getByIdBuilder`) apply the subtraction at
+  // DISPLAY time instead, which is reversible and is the only place that has the viewer's scope.
   @GenerateSql({ params: [DummyValue.UUID, { year: 2000, day: 1, month: 1 }] })
-  getByDayOfYear(ownerIds: string[], { year, day, month }: YearMonthDay, hiddenScope?: TimelineHiddenScope) {
+  getByDayOfYear(ownerIds: string[], { year, day, month }: YearMonthDay) {
     return this.db
       .with('res', (qb) =>
         qb
@@ -918,14 +937,6 @@ export class AssetRepository {
                 .where(sql`(asset."localDateTime" at time zone 'UTC')::date`, '=', sql`today.date`)
                 .where('asset.ownerId', '=', anyUuid(ownerIds))
                 .where('asset.visibility', '=', AssetVisibility.Timeline)
-                // Built from a detached `expressionBuilder<DB, 'asset'>()`, not the callback's own
-                // `eb`: the `today`/lateral-join CTEs widen this query's schema past what
-                // `hiddenFromOwnTimeline`'s `ExpressionBuilder<DB, keyof DB>` parameter accepts. The
-                // emitted SQL is identical — the predicate only ever references `asset.*` and other
-                // real DB tables (see the identical pattern above in getFacetsForExploreStrip).
-                .$if(!!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
-                  qb.where(hiddenFromOwnTimeline(expressionBuilder<DB, 'asset'>(), hiddenScope!)!),
-                )
                 .where((eb) =>
                   eb.exists((qb) =>
                     qb

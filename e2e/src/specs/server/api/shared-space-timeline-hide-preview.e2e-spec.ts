@@ -5,7 +5,8 @@
  *   GET /shared-spaces/:spaceId/timeline-hide-preview
  *   GET /shared-spaces/:spaceId/albums/:albumId/timeline-hide-preview
  *
- * Both return `{ hiddenAssetCount }` — always the CALLER's own count of photos that would leave
+ * Both return `{ hiddenAssetCount, retainedAssetCount }` — always the CALLER's own counts of photos
+ * that would leave, and of photos that would stay because a path they did not hide still reaches
  * THEIR OWN personal timeline if they flipped the relevant "hide from my timeline" switch. This
  * file proves three things per endpoint: a non-member is rejected, the number genuinely matches
  * what `/timeline/buckets?withSharedSpaces=true` actually drops once the switch is flipped for
@@ -170,7 +171,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
 
       const res = await albumPreview(user.accessToken, spaceId, albumId);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ hiddenAssetCount: 0 });
+      expect(res.body).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 0 });
     });
 
     it('the count matches exactly what /timeline/buckets actually drops once the album is hidden', async () => {
@@ -181,7 +182,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
 
       const preview = await albumPreview(user.accessToken, spaceId, albumId);
       expect(preview.status).toBe(200);
-      expect(preview.body).toEqual({ hiddenAssetCount: 2 });
+      expect(preview.body).toEqual({ hiddenAssetCount: 2, retainedAssetCount: 0 });
 
       const toggle = await request(app)
         .patch(`/shared-spaces/${spaceId}/albums/${albumId}/me/timeline`)
@@ -194,7 +195,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
       expect(after).toBe(0);
     });
 
-    it('an asset also added to the space directly is not counted — the preview matches the real drop of 0', async () => {
+    it('an asset also added to the space directly is not counted, and retainedAssetCount explains why', async () => {
       const { user, spaceId, albumId, assets } = await freshOwnerWithLinkedAlbum(admin, 'al-second-path', 1);
       // Same asset also reaches the space directly, independent of the album link.
       await utils.addSpaceAssets(
@@ -207,7 +208,11 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
       expect(before).toBe(1);
 
       const preview = await albumPreview(user.accessToken, spaceId, albumId);
-      expect(preview.body).toEqual({ hiddenAssetCount: 0 });
+      // 0 removed is correct (§3: the direct add is a path the caller did not hide) — and without
+      // the second number the dialog says "This removes 0 photos" about a non-empty album and reads
+      // as broken. This is the #1041 reporter's own shape, with an external library in place of the
+      // direct add.
+      expect(preview.body).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 1 });
 
       const toggle = await request(app)
         .patch(`/shared-spaces/${spaceId}/albums/${albumId}/me/timeline`)
@@ -232,7 +237,8 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
 
       const preview = await albumPreview(user.accessToken, spaceId, albumId);
       expect(preview.status).toBe(200);
-      expect(preview.body).toEqual({ hiddenAssetCount: 0 });
+      // Nothing is retained either: the whole space is hidden, so no path survives.
+      expect(preview.body).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 0 });
     });
   });
 });

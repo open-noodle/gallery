@@ -364,6 +364,25 @@ describe('Space albums page', () => {
       );
     });
 
+    // Partial failure: the shared flag write SUCCEEDED, so the server state has already changed.
+    // If the follow-up own-row write throws, the page must still reconcile with the server —
+    // otherwise the row keeps rendering "Hide from the space's photos" for a flag that is already
+    // off, and only a manual reload fixes it.
+    it('still reconciles with the server when the second (own-row) write fails', async () => {
+      sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
+      sdkMock.updateAlbumTimelineForMember.mockRejectedValue(new Error('boom') as never);
+      modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: true });
+      const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
+      renderPage([album], SharedSpaceRole.Owner);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+
+      await waitFor(() => expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalled());
+      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+    });
+
     it('leaving the "also hide from my timeline" checkbox unticked writes only the shared flag', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
       modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });

@@ -151,16 +151,18 @@ const SharedSpaceTimelineHidePreviewSchema = z
   .object({
     hiddenAssetCount: z.number().int().min(0).describe("Photos that would leave the caller's own timeline"),
     // #1041 follow-up: the "another visible path wins" rule (§3) makes hiddenAssetCount arbitrarily
-    // small when a photo also reaches a space the caller still shows — a 58,977-photo space reported
-    // "removes 3 photos" in real use, which reads as broken. This is the rest of the explanation:
-    // photos in THIS space that stay on the caller's timeline anyway. Optional so the album preview
-    // endpoints, which do not compute it, keep their existing shape.
+    // small when a photo also reaches the caller by a path they did not hide — a 58,977-photo space
+    // reported "removes 3 photos" in real use, which reads as broken. This is the rest of the
+    // explanation. BOTH preview endpoints compute it, and the rescuing path differs by endpoint:
+    // for the space preview it is another SPACE the caller still shows; for the album preview it is
+    // another way into the SAME space (a direct add, or a linked external library — the shape the
+    // #1041 reporter hit). Still optional so an older client keeps working.
     retainedAssetCount: z
       .number()
       .int()
       .min(0)
       .optional()
-      .describe("Photos in this space that stay on the caller's timeline via another visible path"),
+      .describe("Photos in this scope that stay on the caller's timeline via a path they did not hide"),
   })
   .meta({ id: 'SharedSpaceTimelineHidePreviewDto' });
 

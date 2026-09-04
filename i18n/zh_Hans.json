@@ -3087,6 +3087,7 @@
   "space_albums_hidden_from_timeline": "已从您的时间线中隐藏",
   "space_albums_hide_from_my_timeline": "从我的时间线中隐藏此相簿",
   "space_albums_hide_from_my_timeline_confirm_prompt": "这会从您的时间线中移除 {count} 张照片。只有您的时间线会改变。",
+  "space_albums_hide_from_my_timeline_confirm_retained": "{count, plural, other {# 张照片会保留，因为它们还通过其他方式进入此空间。}}",
   "space_albums_hide_from_my_timeline_confirm_title": "要从您的时间线中隐藏“{name}”吗？",
   "space_albums_hide_from_space_photos": "从 Space 照片中隐藏此相簿",
   "space_albums_hide_from_space_photos_confirm_prompt": "Space 中的所有成员都将不再看到它。其他成员各自的时间线不受影响。",
