@@ -401,6 +401,7 @@ const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
   thumbnailCropY: null,
   faceRecognitionEnabled: true,
   petsEnabled: true,
+  dailyChallengeEnabled: null,
   lastActivityAt: null,
   createdAt: newDate(),
   updatedAt: newDate(),

@@ -29,6 +29,10 @@ const getDefaultPreferences = (): UserPreferences => {
       enabled: true,
       sidebarWeb: false,
     },
+    photoGuesser: {
+      includePartners: false,
+      includeSpaces: false,
+    },
     ratings: {
       enabled: false,
     },

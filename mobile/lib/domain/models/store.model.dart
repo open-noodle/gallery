@@ -17,6 +17,9 @@ enum StoreKey<T> {
   readonlyModeEnabled<bool>._(138),
   filterSheetCollapsedSections<String>._(143),
   filterSheetHiddenSections<String>._(144),
+  // JSON array of space ids whose daily-challenge banner this device hides on the space timeline.
+  // Empty (the default) means every banner shows, so an upgrade never hides one already on screen.
+  spacesHiddenDailyBanner<String>._(145),
 
   syncMigrationStatus<String>._(1013),
 

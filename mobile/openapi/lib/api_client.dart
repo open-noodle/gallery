@@ -487,6 +487,48 @@ class ApiClient {
           return FoldersResponse.fromJson(value);
         case 'FoldersUpdate':
           return FoldersUpdate.fromJson(value);
+        case 'GameChallengeDetailResponseDto':
+          return GameChallengeDetailResponseDto.fromJson(value);
+        case 'GameChallengeListItemResponseDto':
+          return GameChallengeListItemResponseDto.fromJson(value);
+        case 'GameChallengeResponseDto':
+          return GameChallengeResponseDto.fromJson(value);
+        case 'GameChallengeType':
+          return GameChallengeTypeTypeTransformer().decode(value);
+        case 'GameCreateDto':
+          return GameCreateDto.fromJson(value);
+        case 'GameDailyResponseDto':
+          return GameDailyResponseDto.fromJson(value);
+        case 'GameGuessDto':
+          return GameGuessDto.fromJson(value);
+        case 'GameGuessResponseDto':
+          return GameGuessResponseDto.fromJson(value);
+        case 'GameLeaderboardResponseDto':
+          return GameLeaderboardResponseDto.fromJson(value);
+        case 'GameLeaderboardResponseDtoEntriesInner':
+          return GameLeaderboardResponseDtoEntriesInner.fromJson(value);
+        case 'GameRoundDetailResponseDto':
+          return GameRoundDetailResponseDto.fromJson(value);
+        case 'GameRoundDetailResponseDtoAnswer':
+          return GameRoundDetailResponseDtoAnswer.fromJson(value);
+        case 'GameRoundDetailResponseDtoGuess':
+          return GameRoundDetailResponseDtoGuess.fromJson(value);
+        case 'GameRoundType':
+          return GameRoundTypeTypeTransformer().decode(value);
+        case 'GameSoloCreateDto':
+          return GameSoloCreateDto.fromJson(value);
+        case 'GameSoloHistoryItemResponseDto':
+          return GameSoloHistoryItemResponseDto.fromJson(value);
+        case 'GameSoloHistoryResponseDto':
+          return GameSoloHistoryResponseDto.fromJson(value);
+        case 'GameSoloSourcesDto':
+          return GameSoloSourcesDto.fromJson(value);
+        case 'GameSoloStatsResponseDto':
+          return GameSoloStatsResponseDto.fromJson(value);
+        case 'GameStandingsResponseDto':
+          return GameStandingsResponseDto.fromJson(value);
+        case 'GameStandingsResponseDtoEntriesInner':
+          return GameStandingsResponseDtoEntriesInner.fromJson(value);
         case 'HlsVideoResolution':
           return HlsVideoResolutionTypeTransformer().decode(value);
         case 'ImageFormat':
@@ -645,6 +687,10 @@ class ApiClient {
           return PersonUpdateDto.fromJson(value);
         case 'PetDetectionConfig':
           return PetDetectionConfig.fromJson(value);
+        case 'PhotoGuesserResponse':
+          return PhotoGuesserResponse.fromJson(value);
+        case 'PhotoGuesserUpdate':
+          return PhotoGuesserUpdate.fromJson(value);
         case 'PinCodeChangeDto':
           return PinCodeChangeDto.fromJson(value);
         case 'PinCodeResetDto':

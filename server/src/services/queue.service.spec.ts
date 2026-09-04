@@ -353,6 +353,7 @@ describe(QueueService.name, () => {
         { name: JobName.UserDeleteCheck },
         { name: JobName.PersonCleanup },
         { name: JobName.MemoryCleanup },
+        { name: JobName.GameChallengeCleanup },
         { name: JobName.SessionCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.AuditTableCleanup },
@@ -381,6 +382,23 @@ describe(QueueService.name, () => {
       await sut.handleNightlyJobs();
       expect(mocks.job.queueAll.mock.calls[0][0]).not.toContainEqual(
         expect.objectContaining({ name: JobName.SharedSpaceAlbumGrantReconcileSweep }),
+      );
+    });
+
+    // Grouped with the other database-cleanup jobs, next to MemoryCleanup - see the comment on
+    // that block. An admin who disables nightlyTasks.databaseCleanup opts out of this prune too,
+    // matching the existing all-maintenance-off contract.
+    it('queues the game cleanup with the other database-cleanup jobs', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ nightlyTasks: { databaseCleanup: true } });
+      await sut.handleNightlyJobs();
+      expect(mocks.job.queueAll).toHaveBeenCalledWith(expect.arrayContaining([{ name: JobName.GameChallengeCleanup }]));
+    });
+
+    it('does not queue the game cleanup when database cleanup is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ nightlyTasks: { databaseCleanup: false } });
+      await sut.handleNightlyJobs();
+      expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+        expect.arrayContaining([{ name: JobName.GameChallengeCleanup }]),
       );
     });
 
@@ -464,6 +482,7 @@ describe(QueueService.name, () => {
       expect(call).not.toContainEqual({ name: JobName.AssetDeleteCheck });
       expect(call).not.toContainEqual({ name: JobName.UserDeleteCheck });
       expect(call).not.toContainEqual({ name: JobName.PersonCleanup });
+      expect(call).not.toContainEqual({ name: JobName.GameChallengeCleanup });
       expect(call).not.toContainEqual({ name: JobName.SessionCleanup });
     });
 

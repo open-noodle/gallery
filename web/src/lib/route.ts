@@ -131,6 +131,12 @@ export const Route = {
   viewSpacePerson: (spaceId: string, personId: string, params?: { previousRoute?: string; action?: 'merge' }) =>
     `/spaces/${spaceId}/people/${personId}` + asQueryString(params),
 
+  // photoguesser
+  photoGuesser: () => '/photoguesser',
+  // Solo only. A space challenge lives under viewSpaceGame instead, and each route 404s the other
+  // scope's id rather than redirecting - see the loaders.
+  viewPhotoGuesserGame: ({ challengeId }: { challengeId: string }) => `/photoguesser/${challengeId}`,
+
   // photos
   // `city` / `country` are filter-panel params (FILTER_URL_PARAMS) — /photos hydrates its filter
   // state from the URL, so this lands on the timeline already narrowed to that place (#867).
@@ -167,6 +173,9 @@ export const Route = {
   viewSpaceAlbums: ({ id }: { id: string }) => `/spaces/${id}/albums`,
   viewSpaceAlbum: ({ spaceId, albumId }: { spaceId: string; albumId: string }) =>
     `/spaces/${spaceId}/albums/${albumId}`,
+  viewSpaceGames: ({ id }: { id: string }) => `/spaces/${id}/games`,
+  viewSpaceGame: ({ spaceId, challengeId }: { spaceId: string; challengeId: string }) =>
+    `/spaces/${spaceId}/games/${challengeId}`,
 
   // shared links
   sharedLinks: (params?: { filter?: SharedLinkTab }) => '/shared-links' + asQueryString(params),

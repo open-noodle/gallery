@@ -374,6 +374,23 @@ describe('space [spaceId] +layout.svelte', () => {
     expect(screen.queryByTestId('space-overflow')).not.toBeInTheDocument();
   });
 
+  it('defers entirely to the child on a game challenge play route — no nested shell chrome', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/games/challenge-1');
+    renderLayout(SharedSpaceRole.Owner);
+    // The play route renders its own immersive, full-bleed shell; the space cover + tabs must not
+    // compress it.
+    expect(screen.queryByTestId('space-tabs')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-add-photos')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-overflow')).not.toBeInTheDocument();
+  });
+
+  it('keeps the space chrome on the games list route (not a detail route)', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/games');
+    renderLayout(SharedSpaceRole.Owner);
+    // Unlike `/games/<id>`, the list has no sub-segment and behaves like any other tab.
+    expect(screen.getByTestId('space-tabs')).toBeInTheDocument();
+  });
+
   it('suppresses the app bar, tabs and cover when chrome is hidden (full-screen selection mode)', async () => {
     const { spaceUiManager } = await import('$lib/managers/space-ui-manager.svelte');
     spaceUiManager.setChromeHidden(true);

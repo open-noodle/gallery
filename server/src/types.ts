@@ -631,7 +631,10 @@ export type JobItem =
   | { name: JobName.AssetClassify; data: IEntityJob }
 
   // Face Repair
-  | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob };
+  | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob }
+
+  // Games
+  | { name: JobName.GameChallengeCleanup; data?: IBaseJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
 
@@ -781,6 +784,14 @@ export type UserPreferences = {
   sharedLinks: {
     enabled: boolean;
     sidebarWeb: boolean;
+  };
+  /** PhotoGuesser's solo pool: own library by default, widened only when a toggle is on. Server-side
+   * rather than per-device because the daily is generated lazily on first read - two devices with
+   * different local settings would race to generate different dailies for the same
+   * (ownerId, dailyOn). */
+  photoGuesser: {
+    includePartners: boolean;
+    includeSpaces: boolean;
   };
   tags: {
     enabled: boolean;

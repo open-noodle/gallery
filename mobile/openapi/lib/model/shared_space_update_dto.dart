@@ -14,6 +14,7 @@ class SharedSpaceUpdateDto {
   /// Returns a new [SharedSpaceUpdateDto] instance.
   SharedSpaceUpdateDto({
     this.color = const Optional.absent(),
+    this.dailyChallengeEnabled = const Optional.absent(),
     this.description = const Optional.absent(),
     this.faceRecognitionEnabled = const Optional.absent(),
     this.name = const Optional.absent(),
@@ -29,6 +30,15 @@ class SharedSpaceUpdateDto {
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
   Optional<UserAvatarColor?> color;
+
+  /// Enable the daily challenge for this space
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<bool?> dailyChallengeEnabled;
 
   /// Space description
   ///
@@ -78,6 +88,7 @@ class SharedSpaceUpdateDto {
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceUpdateDto &&
     other.color == color &&
+    other.dailyChallengeEnabled == dailyChallengeEnabled &&
     other.description == description &&
     other.faceRecognitionEnabled == faceRecognitionEnabled &&
     other.name == name &&
@@ -89,6 +100,7 @@ class SharedSpaceUpdateDto {
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (color == null ? 0 : color!.hashCode) +
+    (dailyChallengeEnabled == null ? 0 : dailyChallengeEnabled!.hashCode) +
     (description == null ? 0 : description!.hashCode) +
     (faceRecognitionEnabled == null ? 0 : faceRecognitionEnabled!.hashCode) +
     (name == null ? 0 : name!.hashCode) +
@@ -97,13 +109,17 @@ class SharedSpaceUpdateDto {
     (thumbnailCropY == null ? 0 : thumbnailCropY!.hashCode);
 
   @override
-  String toString() => 'SharedSpaceUpdateDto[color=$color, description=$description, faceRecognitionEnabled=$faceRecognitionEnabled, name=$name, petsEnabled=$petsEnabled, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY]';
+  String toString() => 'SharedSpaceUpdateDto[color=$color, dailyChallengeEnabled=$dailyChallengeEnabled, description=$description, faceRecognitionEnabled=$faceRecognitionEnabled, name=$name, petsEnabled=$petsEnabled, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (this.color.isPresent) {
       final value = this.color.value;
       json[r'color'] = value;
+    }
+    if (this.dailyChallengeEnabled.isPresent) {
+      final value = this.dailyChallengeEnabled.value;
+      json[r'dailyChallengeEnabled'] = value;
     }
     if (this.description.isPresent) {
       final value = this.description.value;
@@ -142,6 +158,7 @@ class SharedSpaceUpdateDto {
 
       return SharedSpaceUpdateDto(
         color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
+        dailyChallengeEnabled: json.containsKey(r'dailyChallengeEnabled') ? Optional.present(mapValueOfType<bool>(json, r'dailyChallengeEnabled')) : const Optional.absent(),
         description: json.containsKey(r'description') ? Optional.present(mapValueOfType<String>(json, r'description')) : const Optional.absent(),
         faceRecognitionEnabled: json.containsKey(r'faceRecognitionEnabled') ? Optional.present(mapValueOfType<bool>(json, r'faceRecognitionEnabled')) : const Optional.absent(),
         name: json.containsKey(r'name') ? Optional.present(mapValueOfType<String>(json, r'name')) : const Optional.absent(),

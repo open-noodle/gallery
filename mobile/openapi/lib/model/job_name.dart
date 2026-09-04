@@ -105,6 +105,7 @@ enum JobName {
   sharedSpaceIdentityReconciliationSweep._(r'SharedSpaceIdentityReconciliationSweep'),
   assetClassifyQueueAll._(r'AssetClassifyQueueAll'),
   assetClassify._(r'AssetClassify'),
+  gameChallengeCleanup._(r'GameChallengeCleanup'),
   ;
 
   /// Instantiate a new enum with the provided value.
@@ -257,6 +258,7 @@ class JobNameTypeTransformer {
         case r'SharedSpaceIdentityReconciliationSweep': return JobName.sharedSpaceIdentityReconciliationSweep;
         case r'AssetClassifyQueueAll': return JobName.assetClassifyQueueAll;
         case r'AssetClassify': return JobName.assetClassify;
+        case r'GameChallengeCleanup': return JobName.gameChallengeCleanup;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');

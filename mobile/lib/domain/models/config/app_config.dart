@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/config/album_config.dart';
 import 'package:immich_mobile/domain/models/config/backup_config.dart';
 import 'package:immich_mobile/domain/models/config/cleanup_config.dart';
 import 'package:immich_mobile/domain/models/config/feature_message_config.dart';
+import 'package:immich_mobile/domain/models/config/games_config.dart';
 import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/config/map_config.dart';
 import 'package:immich_mobile/domain/models/config/network_config.dart';
@@ -39,6 +40,7 @@ class AppConfig {
   final PeopleConfig people;
   final SpaceAlbumsConfig spaceAlbums;
   final SpacesConfig spaces;
+  final GamesConfig games;
   final BackupConfig backup;
   final NetworkConfig network;
   final ShareConfig share;
@@ -57,6 +59,7 @@ class AppConfig {
     this.people = const .new(),
     this.spaceAlbums = const .new(),
     this.spaces = const .new(),
+    this.games = const .new(),
     this.backup = const .new(),
     this.network = const .new(),
     this.share = const .new(),
@@ -76,6 +79,7 @@ class AppConfig {
     PeopleConfig? people,
     SpaceAlbumsConfig? spaceAlbums,
     SpacesConfig? spaces,
+    GamesConfig? games,
     BackupConfig? backup,
     NetworkConfig? network,
     ShareConfig? share,
@@ -93,6 +97,7 @@ class AppConfig {
     people: people ?? this.people,
     spaceAlbums: spaceAlbums ?? this.spaceAlbums,
     spaces: spaces ?? this.spaces,
+    games: games ?? this.games,
     backup: backup ?? this.backup,
     network: network ?? this.network,
     share: share ?? this.share,
@@ -115,6 +120,7 @@ class AppConfig {
           other.people == people &&
           other.spaceAlbums == spaceAlbums &&
           other.spaces == spaces &&
+          other.games == games &&
           other.backup == backup &&
           other.network == network &&
           other.share == share &&
@@ -134,6 +140,7 @@ class AppConfig {
     people,
     spaceAlbums,
     spaces,
+    games,
     backup,
     network,
     share,
@@ -142,7 +149,7 @@ class AppConfig {
 
   @override
   String toString() =>
-      'AppConfig(logLevel: $logLevel, theme: $theme, cleanup: $cleanup, map: $map, timeline: $timeline, image: $image, viewer: $viewer, slideshow: $slideshow, album: $album, people: $people, spaceAlbums: $spaceAlbums, spaces: $spaces, backup: $backup, network: $network, share: $share, featureMessage: $featureMessage)';
+      'AppConfig(logLevel: $logLevel, theme: $theme, cleanup: $cleanup, map: $map, timeline: $timeline, image: $image, viewer: $viewer, slideshow: $slideshow, album: $album, people: $people, spaceAlbums: $spaceAlbums, spaces: $spaces, games: $games, backup: $backup, network: $network, share: $share, featureMessage: $featureMessage)';
 
   T read<T>(SettingsKey<T> key) =>
       (switch (key) {
@@ -170,6 +177,11 @@ class AppConfig {
             .spaceAlbumsIsReverse => spaceAlbums.isReverse,
             .spacesSortMode => spaces.sortMode,
             .spacesIsReverse => spaces.isReverse,
+            .gameDailyReminderEnabled => games.dailyReminderEnabled,
+            .gameDailyReminderMinuteOfDay => games.dailyReminderMinuteOfDay,
+            .gameSpaceDailyLastPlayed => games.spaceDailyLastPlayed,
+            .gameSoloDailyLastPlayed => games.soloDailyLastPlayed,
+            .gameSoloDailyUnavailableOn => games.soloDailyUnavailableOn,
             .backupEnabled => backup.enabled,
             .backupUseCellularForVideos => backup.useCellularForVideos,
             .backupUseCellularForPhotos => backup.useCellularForPhotos,
@@ -231,6 +243,11 @@ class AppConfig {
       .spaceAlbumsIsReverse => copyWith(spaceAlbums: spaceAlbums.copyWith(isReverse: value as bool)),
       .spacesSortMode => copyWith(spaces: spaces.copyWith(sortMode: value as SpaceSortMode)),
       .spacesIsReverse => copyWith(spaces: spaces.copyWith(isReverse: value as bool)),
+      .gameDailyReminderEnabled => copyWith(games: games.copyWith(dailyReminderEnabled: value as bool)),
+      .gameDailyReminderMinuteOfDay => copyWith(games: games.copyWith(dailyReminderMinuteOfDay: value as int)),
+      .gameSpaceDailyLastPlayed => copyWith(games: games.copyWith(spaceDailyLastPlayed: value as String?)),
+      .gameSoloDailyLastPlayed => copyWith(games: games.copyWith(soloDailyLastPlayed: value as String?)),
+      .gameSoloDailyUnavailableOn => copyWith(games: games.copyWith(soloDailyUnavailableOn: value as String?)),
       .backupEnabled => copyWith(backup: backup.copyWith(enabled: value as bool)),
       .backupUseCellularForVideos => copyWith(backup: backup.copyWith(useCellularForVideos: value as bool)),
       .backupUseCellularForPhotos => copyWith(backup: backup.copyWith(useCellularForPhotos: value as bool)),

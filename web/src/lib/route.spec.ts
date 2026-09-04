@@ -184,6 +184,18 @@ describe('Route', () => {
     });
   });
 
+  describe('viewSpaceGame', () => {
+    it('links to a challenge inside a space', () => {
+      expect(Route.viewSpaceGame({ spaceId: 'space-1', challengeId: 'challenge-2' })).toBe(
+        '/spaces/space-1/games/challenge-2',
+      );
+    });
+
+    it('links to a space games tab', () => {
+      expect(Route.viewSpaceGames({ id: 'space-1' })).toBe('/spaces/space-1/games');
+    });
+  });
+
   describe(Route.map.name, () => {
     it('emits a bare /map with no arguments', () => {
       expect(Route.map()).toBe('/map');

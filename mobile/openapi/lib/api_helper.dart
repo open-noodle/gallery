@@ -109,6 +109,12 @@ String parameterToString(dynamic value) {
   if (value is Colorspace) {
     return ColorspaceTypeTransformer().encode(value).toString();
   }
+  if (value is GameChallengeType) {
+    return GameChallengeTypeTypeTransformer().encode(value).toString();
+  }
+  if (value is GameRoundType) {
+    return GameRoundTypeTypeTransformer().encode(value).toString();
+  }
   if (value is HlsVideoResolution) {
     return HlsVideoResolutionTypeTransformer().encode(value).toString();
   }

@@ -20,6 +20,7 @@ class UserPreferencesResponseDto {
     required this.folders,
     required this.memories,
     required this.people,
+    required this.photoGuesser,
     required this.purchase,
     required this.ratings,
     required this.recentlyAdded,
@@ -41,6 +42,8 @@ class UserPreferencesResponseDto {
 
   PeopleResponse people;
 
+  PhotoGuesserResponse photoGuesser;
+
   PurchaseResponse purchase;
 
   RatingsResponse ratings;
@@ -60,6 +63,7 @@ class UserPreferencesResponseDto {
     other.folders == folders &&
     other.memories == memories &&
     other.people == people &&
+    other.photoGuesser == photoGuesser &&
     other.purchase == purchase &&
     other.ratings == ratings &&
     other.recentlyAdded == recentlyAdded &&
@@ -76,6 +80,7 @@ class UserPreferencesResponseDto {
     (folders.hashCode) +
     (memories.hashCode) +
     (people.hashCode) +
+    (photoGuesser.hashCode) +
     (purchase.hashCode) +
     (ratings.hashCode) +
     (recentlyAdded.hashCode) +
@@ -83,7 +88,7 @@ class UserPreferencesResponseDto {
     (tags.hashCode);
 
   @override
-  String toString() => 'UserPreferencesResponseDto[albums=$albums, cast=$cast, download=$download, emailNotifications=$emailNotifications, folders=$folders, memories=$memories, people=$people, purchase=$purchase, ratings=$ratings, recentlyAdded=$recentlyAdded, sharedLinks=$sharedLinks, tags=$tags]';
+  String toString() => 'UserPreferencesResponseDto[albums=$albums, cast=$cast, download=$download, emailNotifications=$emailNotifications, folders=$folders, memories=$memories, people=$people, photoGuesser=$photoGuesser, purchase=$purchase, ratings=$ratings, recentlyAdded=$recentlyAdded, sharedLinks=$sharedLinks, tags=$tags]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -94,6 +99,7 @@ class UserPreferencesResponseDto {
       json[r'folders'] = this.folders;
       json[r'memories'] = this.memories;
       json[r'people'] = this.people;
+      json[r'photoGuesser'] = this.photoGuesser;
       json[r'purchase'] = this.purchase;
       json[r'ratings'] = this.ratings;
       json[r'recentlyAdded'] = this.recentlyAdded;
@@ -118,6 +124,7 @@ class UserPreferencesResponseDto {
         folders: FoldersResponse.fromJson(json[r'folders'])!,
         memories: MemoriesResponse.fromJson(json[r'memories'])!,
         people: PeopleResponse.fromJson(json[r'people'])!,
+        photoGuesser: PhotoGuesserResponse.fromJson(json[r'photoGuesser'])!,
         purchase: PurchaseResponse.fromJson(json[r'purchase'])!,
         ratings: RatingsResponse.fromJson(json[r'ratings'])!,
         recentlyAdded: RecentlyAddedResponse.fromJson(json[r'recentlyAdded'])!,
@@ -177,6 +184,7 @@ class UserPreferencesResponseDto {
     'folders',
     'memories',
     'people',
+    'photoGuesser',
     'purchase',
     'ratings',
     'recentlyAdded',

@@ -1031,6 +1031,24 @@ describe(SharedSpaceService.name, () => {
       expect(result.lastViewedAt).toBe('2026-03-09T10:00:00.000Z');
       expect(result.newAssetCount).toBe(3);
     });
+
+    it('maps a never-asked space to null rather than defaulting it on', async () => {
+      const auth = factory.auth();
+      // The two lines above this field in mapSpace use `?? true` because their columns default to true.
+      // Copying that idiom here would opt every space in and the first-visit prompt would never render.
+      // tsc cannot see that mistake, so this test is the only thing guarding it.
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1', dailyChallengeEnabled: null }));
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ role: SharedSpaceRole.Owner, lastViewedAt: null }),
+      );
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+
+      const result = await sut.get(auth, 'space-1');
+
+      expect(result.dailyChallengeEnabled).toBeNull();
+    });
   });
 
   describe('update', () => {
@@ -1574,6 +1592,45 @@ describe(SharedSpaceService.name, () => {
       await expect(
         sut.update(factory.auth(), spaceId, { faceRecognitionEnabled: true, petsEnabled: false }),
       ).rejects.toThrow('Insufficient role');
+    });
+
+    it('lets an EDITOR turn the daily challenge on', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1' }));
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: 'space-1', dailyChallengeEnabled: true }));
+
+      await sut.update(auth, 'space-1', { dailyChallengeEnabled: true });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith('space-1', { dailyChallengeEnabled: true });
+    });
+
+    it('rejects a mixed payload from an editor outright, applying none of it', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1' }));
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+
+      // This does NOT prove dailyChallengeEnabled stayed off isOwnerOnlySettingsUpdate — petsEnabled
+      // alone already forces the Owner branch here, so this would stay green even if someone added
+      // dailyChallengeEnabled to that list too. The real guard for that mistake is
+      // 'lets an EDITOR turn the daily challenge on' above, which genuinely fails the moment the
+      // field joins the owner-only list. This test only proves a mixed payload from an editor is
+      // rejected outright, with nothing partially applied.
+      await expect(sut.update(auth, 'space-1', { dailyChallengeEnabled: true, petsEnabled: false })).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a VIEWER turning the daily challenge on', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1' }));
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+
+      // Pins the permission floor (Viewer is always below the Editor minimum), not this field's
+      // behaviour specifically — it would pass even with the daily-challenge feature entirely absent.
+      await expect(sut.update(auth, 'space-1', { dailyChallengeEnabled: true })).rejects.toThrow(ForbiddenException);
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
     });
   });
 

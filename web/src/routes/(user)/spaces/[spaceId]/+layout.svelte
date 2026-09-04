@@ -64,9 +64,11 @@
   // other members.
   const hasOwnLinkedAlbums = $derived(data.linkedAlbums.some((album) => album.addedById === authManager.user.id));
 
-  // A detail route (person or album) suppresses the cover + tabs; it keeps its own back nav.
+  // A detail route (person, album, or a game challenge in play) suppresses the cover + tabs; it
+  // keeps its own back nav. `/games` (the list) has no sub-segment and stays a normal tab; only
+  // `/games/<id>` (the play route) matches.
   const suffix = $derived(page.url.pathname.slice(base.length));
-  const isDetailRoute = $derived(/^\/(people|albums)\/[^/]+/.test(suffix));
+  const isDetailRoute = $derived(/^\/(people|albums|games)\/[^/]+/.test(suffix));
   const showChrome = $derived(!isDetailRoute && !spaceUiManager.chromeHidden);
 
   // The cover (SpaceHero) is tall + scroll-collapsible on the Photos route, compact on other tabs.

@@ -25,10 +25,14 @@ import 'package:immich_mobile/pages/common/headers_settings.page.dart';
 import 'package:immich_mobile/pages/common/settings.page.dart';
 import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/pages/common/tab_shell.page.dart';
+import 'package:immich_mobile/pages/games/game_play.page.dart';
+import 'package:immich_mobile/pages/games/game_round_review.page.dart';
+import 'package:immich_mobile/pages/games/photo_guesser.page.dart';
 import 'package:immich_mobile/presentation/pages/common/gallery_tab_shell.page.dart';
 import 'package:immich_mobile/pages/library/folder/folder.page.dart';
 import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
 import 'package:immich_mobile/pages/library/partner/partner.page.dart';
+import 'package:immich_mobile/pages/library/spaces/games/space_games.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_link_album.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
@@ -168,6 +172,19 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SpacePeopleRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceAlbumDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
+    // No _duplicateGuard, for the same reason FolderRoute below omits it: this route is pushed
+    // from its own page. "Play again" on a finished solo game creates the next challenge and opens
+    // it, and the guard compares route NAMES — a const string with no challenge id in it — so it
+    // reads that as re-opening the page you are already on and cancels the push silently.
+    AutoRoute(page: GamePlayRoute.page, guards: [_authGuard]),
+    // No _duplicateGuard: it compares route NAMES, a const string with no round index in it, so it
+    // cannot tell one round's review apart from another. Today this route is only ever pushed from
+    // the review list, one at a time, so the gap is latent — but a row-to-row "next round" push
+    // within review is one small iteration away, and a name-based guard would cancel that silently
+    // the same way it would have cancelled "Play again" above.
+    AutoRoute(page: GameRoundReviewRoute.page, guards: [_authGuard]),
+    AutoRoute(page: SpaceGamesRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: PhotoGuesserRoute.page, guards: [_authGuard, _duplicateGuard]),
     CustomRoute(
       page: SpaceLinkAlbumRoute.page,
       guards: [_authGuard, _duplicateGuard],

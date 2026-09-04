@@ -9,14 +9,23 @@
 // `album.deletedAt IS NULL` guard ("A1 invariant") and, on timeline surfaces, the
 // `shared_space_album.showInTimeline = true` gate.
 //
-// This module encodes that album path — and the A1 invariant — exactly ONCE.
-// Every call site routes its album leg through `spaceAlbumAssetExists` (used
-// positively for read/scope, or negated via `eb.not(...)` for "no other space
-// path" face cleanup). Because the module is fork-only, an upstream rebase never
-// touches it; each upstream call site shrinks to a single, stable helper call.
+// This module encodes that album path — and the A1 invariant — in TWO places, not
+// one. `spaceAlbumAssetExists` is the EXISTS/per-row form nearly every call site
+// routes its album leg through (positively for read/scope, or negated via
+// `eb.not(...)` for "no other space path" face cleanup). `spaceAssetIdUnion` is a
+// second, hand-written encoding of the same path, used only when driving FROM the
+// space's membership rows instead of testing membership per candidate row (see its
+// own doc comment for why that split exists). Because the module is fork-only, an
+// upstream rebase never touches it; each upstream call site still shrinks to a
+// single, stable helper call — only `spaceAssetIdUnion`'s callers carry the second
+// copy. The two encodings are pinned separately, not against each other: the
+// static SQL-shape guard in game.repository.spec.ts pins `spaceAssetIdUnion`'s
+// emitted arms directly, and this file's own guard.spec.ts pins that a
+// `shared_space_library` reference in a scanned file always has album coverage
+// nearby, so a future call site can't lose the album leg silently.
 //
 // See docs / data/sa-abstraction-spec-t8/report.md for the full design + slices.
-import { Expression, ExpressionBuilder, RawBuilder, ReferenceExpression, sql, SqlBool } from 'kysely';
+import { Expression, ExpressionBuilder, Kysely, RawBuilder, ReferenceExpression, sql, SqlBool } from 'kysely';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { DB } from 'src/schema';
 import { anyUuid, asUuid } from 'src/utils/database';
@@ -57,11 +66,20 @@ export function spaceVisibilityGate(
  * `{ memberUserId }` additionally accepts an optional `memberRole` — when set, the membership
  * join also requires `shared_space_member.role IN (memberRole)` (e.g. restricting to Owner/Editor
  * for a write-capable scope). Omitting it preserves the original any-role membership check.
+ *
+ * It also accepts an optional `memberShowInTimeline` — when true, the membership join additionally
+ * requires `shared_space_member.showInTimeline = true`: the member has not hidden that space from
+ * their own timeline. This is the PER-MEMBER flag, independent of `requireShowInTimeline` below
+ * (which is the per-LINK `shared_space_album.showInTimeline`); a surface that wants "spaces this
+ * user actually wants to see" needs both. It defaults to false so every pre-existing caller keeps
+ * the behaviour it was written with — the surfaces that already honour the flag resolve the
+ * timeline-enabled space ids themselves and pass `{ spaceIds }`, so only a caller scoping purely
+ * by membership has to decide, and it has to decide deliberately.
  */
 export type SpaceScope =
   | { spaceId: string }
   | { spaceIds: string[] }
-  | { memberUserId: string; memberRole?: SharedSpaceRole[] }
+  | { memberUserId: string; memberRole?: SharedSpaceRole[]; memberShowInTimeline?: boolean }
   | { spaceIdRef: ReferenceExpression<DB, keyof DB> };
 
 export interface SpaceAlbumAssetOptions {
@@ -157,6 +175,9 @@ function linkedAlbumAssetExists(
           .where('shared_space_member.userId', '=', asUuid((scope as { memberUserId: string }).memberUserId))
           .$if(!!(scope as { memberRole?: SharedSpaceRole[] }).memberRole?.length, (qb2) =>
             qb2.where('shared_space_member.role', 'in', (scope as { memberRole: SharedSpaceRole[] }).memberRole),
+          )
+          .$if(!!(scope as { memberShowInTimeline?: boolean }).memberShowInTimeline, (qb2) =>
+            qb2.where('shared_space_member.showInTimeline', '=', true),
           ),
       )
       .select(eb.lit(1).as('exists'))
@@ -212,6 +233,9 @@ export function spaceContributedAssetExists(
           .where('shared_space_member.userId', '=', asUuid((scope as { memberUserId: string }).memberUserId))
           .$if(!!(scope as { memberRole?: SharedSpaceRole[] }).memberRole?.length, (qb2) =>
             qb2.where('shared_space_member.role', 'in', (scope as { memberRole: SharedSpaceRole[] }).memberRole),
+          )
+          .$if(!!(scope as { memberShowInTimeline?: boolean }).memberShowInTimeline, (qb2) =>
+            qb2.where('shared_space_member.showInTimeline', '=', true),
           ),
       )
       .select(eb.lit(1).as('exists'))
@@ -258,6 +282,9 @@ export function spaceDirectAssetExists(
           .where('shared_space_member.userId', '=', asUuid((scope as { memberUserId: string }).memberUserId))
           .$if(!!(scope as { memberRole?: SharedSpaceRole[] }).memberRole?.length, (qb2) =>
             qb2.where('shared_space_member.role', 'in', (scope as { memberRole: SharedSpaceRole[] }).memberRole),
+          )
+          .$if(!!(scope as { memberShowInTimeline?: boolean }).memberShowInTimeline, (qb2) =>
+            qb2.where('shared_space_member.showInTimeline', '=', true),
           ),
       )
       .select(eb.lit(1).as('exists'))
@@ -293,6 +320,9 @@ export function spaceLibraryAssetExists(
           .where('shared_space_member.userId', '=', asUuid((scope as { memberUserId: string }).memberUserId))
           .$if(!!(scope as { memberRole?: SharedSpaceRole[] }).memberRole?.length, (qb2) =>
             qb2.where('shared_space_member.role', 'in', (scope as { memberRole: SharedSpaceRole[] }).memberRole),
+          )
+          .$if(!!(scope as { memberShowInTimeline?: boolean }).memberShowInTimeline, (qb2) =>
+            qb2.where('shared_space_member.showInTimeline', '=', true),
           ),
       )
       .select(eb.lit(1).as('exists'))
@@ -333,6 +363,118 @@ export function spaceAssetPathBranches(
       requireShowInTimeline: options.requireShowInTimeline,
     }),
   ];
+}
+
+/**
+ * How a `spaceAssetIdUnion` is bound: to ONE space, or to every space a user belongs to. The
+ * narrower cousin of `SpaceScope` - the union form has no correlated outer row to reference, so
+ * the `spaceIdRef` and `spaceIds` cases have no meaning here. `memberShowInTimeline` means the same
+ * thing it does there, and defaults the same way.
+ */
+export type SpaceAssetUnionScope = { spaceId: string } | { memberUserId: string; memberShowInTimeline?: boolean };
+
+/**
+ * Every asset id reachable from one space - or from every space a user belongs to - as a UNION
+ * over the four access paths.
+ *
+ * The counterpart to `spaceAssetPathBranches`, which tests membership per candidate row. Both
+ * express the same set; they differ in which side drives. Use the branches when you already have
+ * a specific asset (one index probe); use this union when you are SELECTING the space's assets,
+ * because the correlated form makes cost proportional to the whole asset table rather than to the
+ * space - measured at 3.7 GB of buffers and 14 s cold for a 56.5k-asset space, versus 406 MB and
+ * 169 ms driving from here.
+ *
+ * `union` (not `union all`) because the paths overlap: an asset can be both directly added and
+ * present through a linked album. Under `{ memberUserId }` they overlap harder still - two of the
+ * user's spaces can each hold the same asset - and the dedup is what keeps that from weighting a
+ * photo twice in whatever the caller does downstream.
+ *
+ * `requireShowInTimeline` defaults to `true` here, unlike `spaceAssetPathBranches` (whose default
+ * is `false`) - every current caller (`GameRepository`'s candidate queries) is a timeline surface,
+ * so this keeps their call sites unchanged. The two album arms below hardcode the flag onto their
+ * own `shared_space_album.showInTimeline` filter with no other escape hatch, so a non-timeline
+ * consumer MUST pass `requireShowInTimeline: false` explicitly rather than relying on the default.
+ */
+export function spaceAssetIdUnion(
+  db: Kysely<DB>,
+  scope: SpaceAssetUnionScope,
+  options: { requireShowInTimeline?: boolean } = {},
+) {
+  const requireShowInTimeline = options.requireShowInTimeline ?? true;
+  // Keyed off which case of the scope was passed, never off the truthiness of the id it carries.
+  // An empty-string id under a truthiness test would drop the filter entirely and hand back every
+  // space's assets - failing OPEN, the one direction this function must never fail in. Written
+  // this way it emits `= ''`, which matches nothing.
+  const bySpaceId = 'spaceId' in scope;
+  const byMember = 'memberUserId' in scope;
+  const spaceId = bySpaceId ? scope.spaceId : '';
+  const memberUserId = byMember ? scope.memberUserId : '';
+  // Same per-member flag, same default, and the same reasoning as `SpaceScope` - see its doc.
+  const memberShowInTimeline = byMember && !!scope.memberShowInTimeline;
+
+  return db
+    .selectFrom('shared_space_asset')
+    .select('shared_space_asset.assetId as assetId')
+    .$if(bySpaceId, (qb) => qb.where('shared_space_asset.spaceId', '=', asUuid(spaceId)))
+    .$if(byMember, (qb) =>
+      qb
+        .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+        .where('shared_space_member.userId', '=', asUuid(memberUserId))
+        .$if(memberShowInTimeline, (qb2) => qb2.where('shared_space_member.showInTimeline', '=', true)),
+    )
+    .union(
+      db
+        .selectFrom('asset')
+        .innerJoin('shared_space_library', (join) => {
+          const onLibrary = join.onRef('shared_space_library.libraryId', '=', 'asset.libraryId');
+          return bySpaceId ? onLibrary.on('shared_space_library.spaceId', '=', asUuid(spaceId)) : onLibrary;
+        })
+        .$if(byMember, (qb) =>
+          qb
+            .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+            .where('shared_space_member.userId', '=', asUuid(memberUserId))
+            .$if(memberShowInTimeline, (qb2) => qb2.where('shared_space_member.showInTimeline', '=', true)),
+        )
+        .select('asset.id as assetId'),
+    )
+    .union(
+      db
+        .selectFrom('shared_space_album')
+        .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+        .innerJoin('album', (join) =>
+          join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+        )
+        .$if(byMember, (qb) =>
+          qb
+            .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+            .where('shared_space_member.userId', '=', asUuid(memberUserId))
+            .$if(memberShowInTimeline, (qb2) => qb2.where('shared_space_member.showInTimeline', '=', true)),
+        )
+        .select('album_asset.assetId as assetId')
+        .$if(bySpaceId, (qb) => qb.where('shared_space_album.spaceId', '=', asUuid(spaceId)))
+        .$if(requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true)),
+    )
+    .union(
+      db
+        .selectFrom('shared_space_album')
+        .innerJoin('album_space_asset', (join) =>
+          join
+            .onRef('album_space_asset.albumId', '=', 'shared_space_album.albumId')
+            .onRef('album_space_asset.spaceId', '=', 'shared_space_album.spaceId'),
+        )
+        .innerJoin('album', (join) =>
+          join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+        )
+        .$if(byMember, (qb) =>
+          qb
+            .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+            .where('shared_space_member.userId', '=', asUuid(memberUserId))
+            .$if(memberShowInTimeline, (qb2) => qb2.where('shared_space_member.showInTimeline', '=', true)),
+        )
+        .select('album_space_asset.assetId as assetId')
+        .$if(bySpaceId, (qb) => qb.where('shared_space_album.spaceId', '=', asUuid(spaceId)))
+        .$if(requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true)),
+    );
 }
 
 // ---------------------------------------------------------------------------

@@ -203,4 +203,30 @@ describe('/api-keys', () => {
       expect(status).toBe(200);
     });
   });
+
+  describe('game permission', () => {
+    // Every game route used to be gated on sharedSpace.read/Update, so a solo player's API key had
+    // to carry shared-space scope just to play alone. GET .../games only needs membership (checked
+    // in GameService, not here) - listing as the space's own owner (a member by construction) with
+    // nothing but game.read proves the route no longer demands sharedSpace.read.
+    it('lets a game-scoped API key list a space it belongs to, without any shared-space permission', async () => {
+      const space = await utils.createSpace(user.accessToken, { name: 'api-key-game-space' });
+      const key = await utils.createApiKey(user.accessToken, [Permission.GameRead]);
+
+      const { status } = await request(app).get(`/shared-spaces/${space.id}/games`).set('x-api-key', key.secret);
+
+      expect(status, 'a game-scoped key must not need sharedSpace.read').toBe(200);
+    });
+
+    // The solo half of the same rule, and the one the permission exists for: this route takes no
+    // space at all, so a key that could read it only by also carrying sharedSpace.read would be
+    // demanding scope over a feature the player may never have used.
+    it('lets a game-scoped API key read solo stats, with no shared space anywhere', async () => {
+      const key = await utils.createApiKey(user.accessToken, [Permission.GameRead]);
+
+      const { status } = await request(app).get('/games/solo/stats').set('x-api-key', key.secret);
+
+      expect(status, 'a solo game must not need sharedSpace.read').toBe(200);
+    });
+  });
 });

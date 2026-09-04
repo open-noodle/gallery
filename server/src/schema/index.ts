@@ -57,6 +57,9 @@ import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.ta
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table';
+import { GameRoundTable } from 'src/schema/tables/game-round.table';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table';
@@ -176,6 +179,9 @@ export class ImmichDatabase {
     PersonTable,
     PersonAuditTable,
     FacePersonVerdictTable,
+    GameChallengeTable,
+    GameRoundTable,
+    GameGuessTable,
     SessionTable,
     SharedLinkAssetTable,
     SharedLinkTable,
@@ -323,6 +329,10 @@ export interface DB {
   person: PersonTable;
   person_audit: PersonAuditTable;
   face_person_verdict: FacePersonVerdictTable;
+
+  game_challenge: GameChallengeTable;
+  game_round: GameRoundTable;
+  game_guess: GameGuessTable;
 
   session: SessionTable;
   session_sync_checkpoint: SessionSyncCheckpointTable;

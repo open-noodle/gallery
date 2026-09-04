@@ -14,6 +14,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/constants/locales.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/services/background_worker.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
@@ -24,13 +25,16 @@ import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/platform/background_worker_lock_api.g.dart';
 import 'package:immich_mobile/providers/app_life_cycle.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/share_intent_upload.provider.dart';
+import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/view_intent/view_intent_handler.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/routes.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/theme.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/services/deep_link.service.dart';
@@ -38,6 +42,8 @@ import 'package:immich_mobile/theme/dynamic_theme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/utils/cache/widgets_binding.dart';
+import 'package:immich_mobile/utils/daily_reminder_routing.dart';
+import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/utils/licenses.dart';
 import 'package:immich_mobile/utils/migration.dart';
@@ -45,6 +51,7 @@ import 'package:immich_mobile/wm_executor.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logging/logging.dart';
+import 'package:openapi/api.dart';
 import 'package:timezone/data/latest.dart';
 
 void main() async {
@@ -130,6 +137,7 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
         dPrint(() => "[APP STATE] resumed");
         ref.read(appStateProvider.notifier).handleAppResume();
         unawaited(ref.read(viewIntentHandlerProvider).onAppResumed());
+        unawaited(ref.read(dailyReminderProvider).refresh());
         break;
       case AppLifecycleState.inactive:
         dPrint(() => "[APP STATE] inactive");
@@ -167,12 +175,66 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
     }
     SystemChrome.setSystemUIOverlayStyle(overlayStyle);
 
-    await FlutterLocalNotificationsPlugin().initialize(
+    final notifications = FlutterLocalNotificationsPlugin();
+    await notifications.initialize(
       const InitializationSettings(
         android: AndroidInitializationSettings('@drawable/notification_icon'),
         iOS: DarwinInitializationSettings(),
       ),
+      onDidReceiveNotificationResponse: _onNotificationResponse,
     );
+
+    // `onDidReceiveNotificationResponse` above only fires while the app is already running. At
+    // 18:00 the app is almost always terminated — which is the entire point of a scheduled
+    // reminder — so the launched-by-notification case has to be read back explicitly, as
+    // flutter_local_notifications documents. Both paths route through the same handler.
+    final launchDetails = await notifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      _onNotificationResponse(launchDetails?.notificationResponse);
+    }
+
+    // Cold start. AppLifeCycleEnum.resumed does NOT fire on a cold launch, so without this a
+    // fresh install (or a killed app) would have nothing scheduled until it was backgrounded once.
+    unawaited(ref.read(dailyReminderProvider).refresh());
+  }
+
+  /// The single place a tapped notification is dispatched from, whether the tap arrived while the
+  /// app was running or launched it from cold. A reminder that opens the timeline is a reminder
+  /// about nothing, so only the daily-reminder payload is routed at all.
+  void _onNotificationResponse(NotificationResponse? response) {
+    if (response?.payload != kDailyReminderPayload) return;
+    unawaited(_openDailyChallenge());
+  }
+
+  /// Routes a tapped daily-reminder notification. The decision itself is pure — see
+  /// `resolveDailyReminderDestination`'s doc for the full policy, including the one case where a
+  /// finished space daily is skipped in favour of an unplayed solo one; this just gathers the
+  /// inputs (the spaces list, and today's play state for each scope) and dispatches the result.
+  Future<void> _openDailyChallenge() async {
+    final router = ref.read(appRouterProvider);
+
+    var spaces = const <SharedSpaceResponseDto>[];
+    try {
+      spaces = await ref.read(sharedSpacesProvider.future);
+    } catch (_) {
+      // Offline, or the request otherwise failed — fall through to the personal daily below.
+    }
+
+    final config = ref.read(appConfigProvider);
+    final today = dailyKeyFor(DateTime.now());
+    final destination = resolveDailyReminderDestination(
+      spaces: spaces,
+      currentUserId: ref.read(currentUserProvider)?.id,
+      spacePlayedToday: config.read(SettingsKey.gameSpaceDailyLastPlayed) == today,
+      soloPlayedToday: config.read(SettingsKey.gameSoloDailyLastPlayed) == today,
+    );
+
+    switch (destination) {
+      case SpaceDailyDestination(:final spaceId, :final canEdit):
+        await router.push(SpaceGamesRoute(spaceId: spaceId, canEdit: canEdit));
+      case SoloDailyDestination():
+        await router.push(const PhotoGuesserRoute());
+    }
   }
 
   Future<DeepLink> _deepLinkBuilder(PlatformDeepLink deepLink) async {

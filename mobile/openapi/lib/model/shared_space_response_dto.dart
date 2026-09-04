@@ -18,6 +18,7 @@ class SharedSpaceResponseDto {
     this.color = const Optional.absent(),
     required this.createdAt,
     required this.createdById,
+    this.dailyChallengeEnabled = const Optional.absent(),
     this.description = const Optional.absent(),
     this.faceRecognitionEnabled = const Optional.absent(),
     this.hasPets = const Optional.absent(),
@@ -64,6 +65,9 @@ class SharedSpaceResponseDto {
 
   /// Creator user ID
   String createdById;
+
+  /// Whether the daily challenge is enabled; null when nobody has been asked yet
+  Optional<bool?> dailyChallengeEnabled;
 
   /// Space description
   Optional<String?> description;
@@ -154,6 +158,7 @@ class SharedSpaceResponseDto {
     other.color == color &&
     other.createdAt == createdAt &&
     other.createdById == createdById &&
+    other.dailyChallengeEnabled == dailyChallengeEnabled &&
     other.description == description &&
     other.faceRecognitionEnabled == faceRecognitionEnabled &&
     other.hasPets == hasPets &&
@@ -181,6 +186,7 @@ class SharedSpaceResponseDto {
     (color == null ? 0 : color!.hashCode) +
     (createdAt.hashCode) +
     (createdById.hashCode) +
+    (dailyChallengeEnabled == null ? 0 : dailyChallengeEnabled!.hashCode) +
     (description == null ? 0 : description!.hashCode) +
     (faceRecognitionEnabled == null ? 0 : faceRecognitionEnabled!.hashCode) +
     (hasPets == null ? 0 : hasPets!.hashCode) +
@@ -201,7 +207,7 @@ class SharedSpaceResponseDto {
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'SharedSpaceResponseDto[albumCount=$albumCount, assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, faceRecognitionEnabled=$faceRecognitionEnabled, hasPets=$hasPets, id=$id, lastActivityAt=$lastActivityAt, lastContributor=$lastContributor, lastViewedAt=$lastViewedAt, linkedLibraries=$linkedLibraries, memberCount=$memberCount, members=$members, name=$name, newAssetCount=$newAssetCount, petsEnabled=$petsEnabled, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY, updatedAt=$updatedAt]';
+  String toString() => 'SharedSpaceResponseDto[albumCount=$albumCount, assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, dailyChallengeEnabled=$dailyChallengeEnabled, description=$description, faceRecognitionEnabled=$faceRecognitionEnabled, hasPets=$hasPets, id=$id, lastActivityAt=$lastActivityAt, lastContributor=$lastContributor, lastViewedAt=$lastViewedAt, linkedLibraries=$linkedLibraries, memberCount=$memberCount, members=$members, name=$name, newAssetCount=$newAssetCount, petsEnabled=$petsEnabled, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -219,6 +225,10 @@ class SharedSpaceResponseDto {
     }
       json[r'createdAt'] = this.createdAt;
       json[r'createdById'] = this.createdById;
+    if (this.dailyChallengeEnabled.isPresent) {
+      final value = this.dailyChallengeEnabled.value;
+      json[r'dailyChallengeEnabled'] = value;
+    }
     if (this.description.isPresent) {
       final value = this.description.value;
       json[r'description'] = value;
@@ -299,6 +309,7 @@ class SharedSpaceResponseDto {
         color: json.containsKey(r'color') ? Optional.present(UserAvatarColor.fromJson(json[r'color'])) : const Optional.absent(),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
         createdById: mapValueOfType<String>(json, r'createdById')!,
+        dailyChallengeEnabled: json.containsKey(r'dailyChallengeEnabled') ? Optional.present(mapValueOfType<bool>(json, r'dailyChallengeEnabled')) : const Optional.absent(),
         description: json.containsKey(r'description') ? Optional.present(mapValueOfType<String>(json, r'description')) : const Optional.absent(),
         faceRecognitionEnabled: json.containsKey(r'faceRecognitionEnabled') ? Optional.present(mapValueOfType<bool>(json, r'faceRecognitionEnabled')) : const Optional.absent(),
         hasPets: json.containsKey(r'hasPets') ? Optional.present(mapValueOfType<bool>(json, r'hasPets')) : const Optional.absent(),

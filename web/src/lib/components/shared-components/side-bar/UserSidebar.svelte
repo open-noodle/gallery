@@ -34,6 +34,8 @@
     mdiLockOutline,
     mdiMagnify,
     mdiMap,
+    mdiMapMarkerQuestion,
+    mdiMapMarkerQuestionOutline,
     mdiMapOutline,
     mdiTagMultipleOutline,
     mdiToolbox,
@@ -80,6 +82,16 @@
   {#if featureFlagsManager.value.map}
     <SidebarNavItem title={$t('map')} href={Route.map()} icon={mdiMapOutline} activeIcon={mdiMap} />
   {/if}
+
+  <!-- Deliberately outside the map feature gate: PhotoGuesser needs no reverse geocoding and its
+       date rounds need no coordinates at all, so an instance with the map switched off can still
+       play. Also no preference gate - there is no PhotoGuesser sidebar preference to read. -->
+  <SidebarNavItem
+    title={$t('photoguesser')}
+    href={Route.photoGuesser()}
+    icon={mdiMapMarkerQuestionOutline}
+    activeIcon={mdiMapMarkerQuestion}
+  />
 
   {#if authManager.preferences.people.enabled && authManager.preferences.people.sidebarWeb}
     <SidebarNavItem title={$t('people')} href={Route.people()} icon={mdiAccountOutline} activeIcon={mdiAccount} />

@@ -302,6 +302,7 @@ export class QueueService extends BaseService {
         { name: JobName.UserDeleteCheck },
         { name: JobName.PersonCleanup },
         { name: JobName.MemoryCleanup },
+        { name: JobName.GameChallengeCleanup },
         { name: JobName.SessionCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.AuditTableCleanup },

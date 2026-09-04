@@ -590,6 +590,12 @@ export type PeopleResponse = {
     /** Whether people appear in web sidebar */
     sidebarWeb: boolean;
 };
+export type PhotoGuesserResponse = {
+    /** Whether PhotoGuesser solo rounds include partner photos */
+    includePartners: boolean;
+    /** Whether PhotoGuesser solo rounds include shared-space photos */
+    includeSpaces: boolean;
+};
 export type PurchaseResponse = {
     /** Date until which to hide buy button */
     hideBuyButtonUntil: string;
@@ -624,6 +630,7 @@ export type UserPreferencesResponseDto = {
     folders: FoldersResponse;
     memories: MemoriesResponse;
     people: PeopleResponse;
+    photoGuesser: PhotoGuesserResponse;
     purchase: PurchaseResponse;
     ratings: RatingsResponse;
     recentlyAdded: RecentlyAddedResponse;
@@ -678,6 +685,12 @@ export type PeopleUpdate = {
     /** Whether people appear in web sidebar */
     sidebarWeb?: boolean;
 };
+export type PhotoGuesserUpdate = {
+    /** Whether PhotoGuesser solo rounds include partner photos */
+    includePartners?: boolean;
+    /** Whether PhotoGuesser solo rounds include shared-space photos */
+    includeSpaces?: boolean;
+};
 export type PurchaseUpdate = {
     /** Date until which to hide buy button */
     hideBuyButtonUntil?: string;
@@ -713,6 +726,7 @@ export type UserPreferencesUpdateDto = {
     folders?: FoldersUpdate;
     memories?: MemoriesUpdate;
     people?: PeopleUpdate;
+    photoGuesser?: PhotoGuesserUpdate;
     purchase?: PurchaseUpdate;
     ratings?: RatingsUpdate;
     recentlyAdded?: RecentlyAddedUpdate;
@@ -1514,6 +1528,201 @@ export type AssetFaceDeleteDto = {
 export type FaceDto = {
     /** Face ID */
     id: string;
+};
+export type GameSoloSourcesDto = {
+    /** Also draw from partners' photos */
+    includePartners?: boolean;
+    /** Also draw from shared-space photos */
+    includeSpaces?: boolean;
+};
+export type GameSoloCreateDto = {
+    /** Number of rounds to generate */
+    roundCount?: number;
+    /** Override the stored source toggles for this game */
+    sources?: GameSoloSourcesDto;
+    /** Which kinds of round to generate */
+    "type"?: GameChallengeType;
+};
+export type GameChallengeResponseDto = {
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** Challenge name */
+    name: string;
+    /** Owning user ID, or null for a shared-space challenge */
+    ownerId: string | null;
+    /** Number of rounds actually generated (may be less than requested) */
+    roundCount: number;
+    /** Frozen day scale used to score date rounds */
+    scaleDays: number;
+    /** Frozen distance scale used to score location rounds */
+    scaleKm: number;
+    /** Shared space ID, or null for a solo challenge */
+    spaceId: string | null;
+};
+export type GameChallengeListItemResponseDto = {
+    /** Number of rounds the caller has answered */
+    answered: number;
+    /** When this challenge was closed, if at all */
+    closedAt: string | null;
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** How many of the rounds are location rounds */
+    locationRoundCount: number;
+    /** Challenge name */
+    name: string;
+    /** Owning user ID, or null for a shared-space challenge */
+    ownerId: string | null;
+    /** Number of rounds actually generated (may be less than requested) */
+    roundCount: number;
+    /** Frozen day scale used to score date rounds */
+    scaleDays: number;
+    /** Frozen distance scale used to score location rounds */
+    scaleKm: number;
+    /** Shared space ID, or null for a solo challenge */
+    spaceId: string | null;
+    /** The caller's total score across answered rounds */
+    total: number;
+};
+export type GameDailyResponseDto = {
+    /** Today's daily, if one could be generated */
+    challenge: (GameChallengeListItemResponseDto) | null;
+};
+export type GameSoloHistoryItemResponseDto = {
+    /** Number of rounds the player answered */
+    answered: number;
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this was the daily for, or null for a free-play game */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** Challenge name */
+    name: string;
+    /** Number of rounds in the challenge */
+    roundCount: number;
+    /** Total score across the rounds they answered */
+    total: number;
+};
+export type GameSoloHistoryResponseDto = {
+    /** Whether another page follows this one */
+    hasNextPage: boolean;
+    /** Games played, newest first */
+    items: GameSoloHistoryItemResponseDto[];
+};
+export type GameSoloStatsResponseDto = {
+    /** Mean total across games played, rounded to whole points */
+    averageScore: number;
+    /** The highest total scored in a single game */
+    bestScore: number;
+    /** The longest such run ever */
+    bestStreak: number;
+    /** Consecutive UTC days of fully played dailies, ending today or yesterday */
+    currentStreak: number;
+    /** How many games have at least one guess */
+    gamesPlayed: number;
+};
+export type GameRoundDetailResponseDto = {
+    /** The round answer - present only once guessed */
+    answer?: {
+        /** Answer date, for a date round */
+        date: string | null;
+        /** Answer latitude, for a location round */
+        lat: number | null;
+        /** Answer longitude, for a location round */
+        lon: number | null;
+    };
+    /** Round photo asset ID - present only once the caller has guessed */
+    assetId?: string;
+    /** The caller's own guess - present only once guessed */
+    guess?: {
+        /** Guessed date, for a date round */
+        date: string | null;
+        /** Distance from the answer, in km */
+        distanceKm: number | null;
+        /** Guessed latitude, for a location round */
+        lat: number | null;
+        /** Guessed longitude, for a location round */
+        lon: number | null;
+        /** Day offset from the answer */
+        offsetDays: number | null;
+    };
+    /** Round index (0-based) */
+    index: number;
+    /** The caller's score for this round - present only once guessed */
+    score?: number;
+    /** Round type */
+    "type": GameRoundType;
+};
+export type GameChallengeDetailResponseDto = {
+    /** When this challenge was closed, if at all */
+    closedAt: string | null;
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** Challenge name */
+    name: string;
+    /** Owning user ID, or null for a shared-space challenge */
+    ownerId: string | null;
+    /** Number of rounds actually generated (may be less than requested) */
+    roundCount: number;
+    /** Rounds, with answers withheld until guessed */
+    rounds: GameRoundDetailResponseDto[];
+    /** Frozen day scale used to score date rounds */
+    scaleDays: number;
+    /** Frozen distance scale used to score location rounds */
+    scaleKm: number;
+    /** Shared space ID, or null for a solo challenge */
+    spaceId: string | null;
+};
+export type GameLeaderboardResponseDto = {
+    /** Per-player totals, highest first */
+    entries: {
+        /** Number of rounds answered */
+        answered: number;
+        /** User name */
+        name: string;
+        /** Total score across all guessed rounds */
+        total: number;
+        /** User ID */
+        userId: string;
+    }[];
+};
+export type GameGuessDto = {
+    /** Guessed date, for a date round */
+    date?: string;
+    /** Guessed latitude, for a location round */
+    lat?: number;
+    /** Guessed longitude, for a location round */
+    lon?: number;
+};
+export type GameGuessResponseDto = {
+    /** Distance between the guess and the answer, in km */
+    distanceKm: number | null;
+    /** Guessed date */
+    guessDate: string | null;
+    /** Guessed latitude */
+    guessLat: number | null;
+    /** Guessed longitude */
+    guessLon: number | null;
+    /** Day offset between the guess and the answer */
+    offsetDays: number | null;
+    /** Round ID */
+    roundId: string;
+    /** Score awarded for this guess */
+    score: number;
+    /** User ID */
+    userId: string;
 };
 export type QueueStatisticsDto = {
     /** Number of active jobs */
@@ -2915,6 +3124,8 @@ export type SharedSpaceResponseDto = {
     createdAt: string;
     /** Creator user ID */
     createdById: string;
+    /** Whether the daily challenge is enabled; null when nobody has been asked yet */
+    dailyChallengeEnabled?: boolean | null;
     /** Space description */
     description?: string | null;
     /** Whether face recognition is enabled for this space */
@@ -2965,6 +3176,8 @@ export type SharedSpaceCreateDto = {
 export type SharedSpaceUpdateDto = {
     /** Space color */
     color?: UserAvatarColor;
+    /** Enable the daily challenge for this space */
+    dailyChallengeEnabled?: boolean;
     /** Space description */
     description?: string;
     /** Enable face recognition for this space */
@@ -3146,6 +3359,29 @@ export type SharedSpacePersonMergeDto = {
 export type SpaceRepresentativeFaceUpdateDto = {
     /** Asset face ID used as the space representative face */
     assetFaceId: string | null;
+};
+export type GameCreateDto = {
+    /** Challenge name */
+    name?: string;
+    /** Number of rounds to generate */
+    roundCount?: number;
+    /** Which kinds of round to generate */
+    "type"?: GameChallengeType;
+};
+export type GameStandingsResponseDto = {
+    /** Per-player totals, best first, non-players last */
+    entries: {
+        /** Number of daily challenges played this month */
+        daysPlayed: number;
+        /** User name */
+        name: string;
+        /** Total score across the month's daily challenges */
+        total: number;
+        /** User ID */
+        userId: string;
+    }[];
+    /** The UTC calendar month these standings cover, as YYYY-MM. The client formats the name. */
+    month: string;
 };
 export type StackResponseDto = {
     assets: AssetResponseDto[];
@@ -6298,6 +6534,128 @@ export function getFilteredMapMarkers({ albumId, city, country, description, isF
     }));
 }
 /**
+ * Start a solo photo guessing challenge
+ */
+export function createSoloChallenge({ gameSoloCreateDto }: {
+    gameSoloCreateDto: GameSoloCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: GameChallengeResponseDto;
+    }>("/games/solo", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: gameSoloCreateDto
+    })));
+}
+/**
+ * Get the caller's daily challenge
+ */
+export function getSoloDailyChallenge(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameDailyResponseDto;
+    }>("/games/solo/daily", {
+        ...opts
+    }));
+}
+/**
+ * Get the caller's solo game history
+ */
+export function getSoloHistory({ page, size }: {
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameSoloHistoryResponseDto;
+    }>(`/games/solo/history${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get the caller's solo statistics
+ */
+export function getSoloStats(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameSoloStatsResponseDto;
+    }>("/games/solo/stats", {
+        ...opts
+    }));
+}
+/**
+ * Delete a photo guessing challenge
+ */
+export function deleteChallenge({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/games/${encodeURIComponent(id)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get a photo guessing challenge
+ */
+export function getChallenge({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameChallengeDetailResponseDto;
+    }>(`/games/${encodeURIComponent(id)}`, {
+        ...opts
+    }));
+}
+/**
+ * Get a challenge leaderboard
+ */
+export function getLeaderboard({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameLeaderboardResponseDto;
+    }>(`/games/${encodeURIComponent(id)}/leaderboard`, {
+        ...opts
+    }));
+}
+/**
+ * Submit a round guess
+ */
+export function guessRound({ id, index, gameGuessDto }: {
+    id: string;
+    index: number;
+    gameGuessDto: GameGuessDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: GameGuessResponseDto;
+    }>(`/games/${encodeURIComponent(id)}/rounds/${encodeURIComponent(index)}/guess`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: gameGuessDto
+    })));
+}
+/**
+ * Get a round image
+ */
+export function getRoundImage({ id, index }: {
+    id: string;
+    index: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/games/${encodeURIComponent(id)}/rounds/${encodeURIComponent(index)}/image`, {
+        ...opts
+    }));
+}
+/**
  * Retrieve queue counts and status
  */
 export function getQueuesLegacy(opts?: Oazapfts.RequestOpts) {
@@ -8804,6 +9162,61 @@ export function markSpaceViewed({ id }: {
     }));
 }
 /**
+ * List photo guessing challenges
+ */
+export function getChallenges({ spaceId }: {
+    spaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameChallengeListItemResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games`, {
+        ...opts
+    }));
+}
+/**
+ * Create a photo guessing challenge
+ */
+export function createChallenge({ spaceId, gameCreateDto }: {
+    spaceId: string;
+    gameCreateDto: GameCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: GameChallengeResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: gameCreateDto
+    })));
+}
+/**
+ * Get the space's daily challenge
+ */
+export function getDailyChallenge({ spaceId }: {
+    spaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameDailyResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games/daily`, {
+        ...opts
+    }));
+}
+/**
+ * Get the space's monthly standings
+ */
+export function getStandings({ spaceId }: {
+    spaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameStandingsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games/standings`, {
+        ...opts
+    }));
+}
+/**
  * Delete stacks
  */
 export function deleteStacks({ bulkIdsDto }: {
@@ -10074,6 +10487,9 @@ export enum Permission {
     FaceUpdate = "face.update",
     FaceDelete = "face.delete",
     FolderRead = "folder.read",
+    GameCreate = "game.create",
+    GameRead = "game.read",
+    GameDelete = "game.delete",
     JobCreate = "job.create",
     JobRead = "job.read",
     LibraryCreate = "library.create",
@@ -10247,6 +10663,15 @@ export enum MapMediaType {
     Image = "IMAGE",
     Video = "VIDEO"
 }
+export enum GameChallengeType {
+    Mixed = "mixed",
+    Location = "location",
+    Date = "date"
+}
+export enum GameRoundType {
+    Location = "location",
+    Date = "date"
+}
 export enum ManualJobName {
     PersonCleanup = "person-cleanup",
     TagCleanup = "tag-cleanup",
@@ -10416,7 +10841,8 @@ export enum JobName {
     SharedSpaceAlbumGrantReconcileSweep = "SharedSpaceAlbumGrantReconcileSweep",
     SharedSpaceIdentityReconciliationSweep = "SharedSpaceIdentityReconciliationSweep",
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
-    AssetClassify = "AssetClassify"
+    AssetClassify = "AssetClassify",
+    GameChallengeCleanup = "GameChallengeCleanup"
 }
 export enum QueueJobStatus {
     Active = "active",

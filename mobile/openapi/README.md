@@ -193,6 +193,19 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**triggerScan**](doc//FacesApi.md#triggerscan) | **POST** /admin/face-repair/scan | Trigger a face-repair scan
 *FacesApi* | [**unconfirmFaceRepairFaces**](doc//FacesApi.md#unconfirmfacerepairfaces) | **POST** /admin/face-repair/unconfirm | Un-confirm human-placed faces so a re-scan may flag them again
 *GalleryMapApi* | [**getFilteredMapMarkers**](doc//GalleryMapApi.md#getfilteredmapmarkers) | **GET** /gallery/map/markers | Get filtered map markers
+*GamesApi* | [**createChallenge**](doc//GamesApi.md#createchallenge) | **POST** /shared-spaces/{spaceId}/games | Create a photo guessing challenge
+*GamesApi* | [**createSoloChallenge**](doc//GamesApi.md#createsolochallenge) | **POST** /games/solo | Start a solo photo guessing challenge
+*GamesApi* | [**deleteChallenge**](doc//GamesApi.md#deletechallenge) | **DELETE** /games/{id} | Delete a photo guessing challenge
+*GamesApi* | [**getChallenge**](doc//GamesApi.md#getchallenge) | **GET** /games/{id} | Get a photo guessing challenge
+*GamesApi* | [**getChallenges**](doc//GamesApi.md#getchallenges) | **GET** /shared-spaces/{spaceId}/games | List photo guessing challenges
+*GamesApi* | [**getDailyChallenge**](doc//GamesApi.md#getdailychallenge) | **GET** /shared-spaces/{spaceId}/games/daily | Get the space's daily challenge
+*GamesApi* | [**getLeaderboard**](doc//GamesApi.md#getleaderboard) | **GET** /games/{id}/leaderboard | Get a challenge leaderboard
+*GamesApi* | [**getRoundImage**](doc//GamesApi.md#getroundimage) | **GET** /games/{id}/rounds/{index}/image | Get a round image
+*GamesApi* | [**getSoloDailyChallenge**](doc//GamesApi.md#getsolodailychallenge) | **GET** /games/solo/daily | Get the caller's daily challenge
+*GamesApi* | [**getSoloHistory**](doc//GamesApi.md#getsolohistory) | **GET** /games/solo/history | Get the caller's solo game history
+*GamesApi* | [**getSoloStats**](doc//GamesApi.md#getsolostats) | **GET** /games/solo/stats | Get the caller's solo statistics
+*GamesApi* | [**getStandings**](doc//GamesApi.md#getstandings) | **GET** /shared-spaces/{spaceId}/games/standings | Get the space's monthly standings
+*GamesApi* | [**guessRound**](doc//GamesApi.md#guessround) | **POST** /games/{id}/rounds/{index}/guess | Submit a round guess
 *JobsApi* | [**createJob**](doc//JobsApi.md#createjob) | **POST** /jobs | Create a manual job
 *JobsApi* | [**getQueuesLegacy**](doc//JobsApi.md#getqueueslegacy) | **GET** /jobs | Retrieve queue counts and status
 *JobsApi* | [**runQueueCommandLegacy**](doc//JobsApi.md#runqueuecommandlegacy) | **PUT** /jobs/{name} | Run jobs
@@ -595,6 +608,27 @@ Class | Method | HTTP request | Description
  - [FilterSuggestionsTagDto](doc//FilterSuggestionsTagDto.md)
  - [FoldersResponse](doc//FoldersResponse.md)
  - [FoldersUpdate](doc//FoldersUpdate.md)
+ - [GameChallengeDetailResponseDto](doc//GameChallengeDetailResponseDto.md)
+ - [GameChallengeListItemResponseDto](doc//GameChallengeListItemResponseDto.md)
+ - [GameChallengeResponseDto](doc//GameChallengeResponseDto.md)
+ - [GameChallengeType](doc//GameChallengeType.md)
+ - [GameCreateDto](doc//GameCreateDto.md)
+ - [GameDailyResponseDto](doc//GameDailyResponseDto.md)
+ - [GameGuessDto](doc//GameGuessDto.md)
+ - [GameGuessResponseDto](doc//GameGuessResponseDto.md)
+ - [GameLeaderboardResponseDto](doc//GameLeaderboardResponseDto.md)
+ - [GameLeaderboardResponseDtoEntriesInner](doc//GameLeaderboardResponseDtoEntriesInner.md)
+ - [GameRoundDetailResponseDto](doc//GameRoundDetailResponseDto.md)
+ - [GameRoundDetailResponseDtoAnswer](doc//GameRoundDetailResponseDtoAnswer.md)
+ - [GameRoundDetailResponseDtoGuess](doc//GameRoundDetailResponseDtoGuess.md)
+ - [GameRoundType](doc//GameRoundType.md)
+ - [GameSoloCreateDto](doc//GameSoloCreateDto.md)
+ - [GameSoloHistoryItemResponseDto](doc//GameSoloHistoryItemResponseDto.md)
+ - [GameSoloHistoryResponseDto](doc//GameSoloHistoryResponseDto.md)
+ - [GameSoloSourcesDto](doc//GameSoloSourcesDto.md)
+ - [GameSoloStatsResponseDto](doc//GameSoloStatsResponseDto.md)
+ - [GameStandingsResponseDto](doc//GameStandingsResponseDto.md)
+ - [GameStandingsResponseDtoEntriesInner](doc//GameStandingsResponseDtoEntriesInner.md)
  - [HlsVideoResolution](doc//HlsVideoResolution.md)
  - [ImageFormat](doc//ImageFormat.md)
  - [IntegrityReport](doc//IntegrityReport.md)
@@ -674,6 +708,8 @@ Class | Method | HTTP request | Description
  - [PersonStatisticsResponseDto](doc//PersonStatisticsResponseDto.md)
  - [PersonUpdateDto](doc//PersonUpdateDto.md)
  - [PetDetectionConfig](doc//PetDetectionConfig.md)
+ - [PhotoGuesserResponse](doc//PhotoGuesserResponse.md)
+ - [PhotoGuesserUpdate](doc//PhotoGuesserUpdate.md)
  - [PinCodeChangeDto](doc//PinCodeChangeDto.md)
  - [PinCodeResetDto](doc//PinCodeResetDto.md)
  - [PinCodeSetupDto](doc//PinCodeSetupDto.md)

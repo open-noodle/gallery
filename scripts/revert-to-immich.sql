@@ -22,6 +22,7 @@
 --   * Asset duplicate checksums
 --   * Library sync state (library_audit, library_user, library.createId)
 --   * Storage migration history
+--   * Photo-guessing-game challenges, rounds and guesses
 --
 -- Assets you uploaded through Gallery are preserved as long as they are stored
 -- in Immich-native rows (asset, asset_exif, asset_face, etc.). If an asset
@@ -131,6 +132,12 @@ DROP TABLE IF EXISTS "shared_space_album_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member" CASCADE;
 DROP TABLE IF EXISTS "shared_space" CASCADE;
+
+-- Photo guessing game (child tables first so the FKs unwind, though CASCADE
+-- makes the order non-load-bearing, same as everywhere else in this section)
+DROP TABLE IF EXISTS "game_guess" CASCADE;
+DROP TABLE IF EXISTS "game_round" CASCADE;
+DROP TABLE IF EXISTS "game_challenge" CASCADE;
 
 -- Face identities
 DROP TABLE IF EXISTS "face_repair_scan_flagged_face" CASCADE;
@@ -250,6 +257,8 @@ DELETE FROM "migration_overrides"
    'index_face_person_verdict_spacePersonId_status_distance_idx',
    'index_face_person_verdict_identityId_assetFaceId_idx',
    'index_face_repair_scan_in_flight_uq',
+   'index_game_challenge_daily_uq',
+   'index_game_challenge_owner_daily_uq',
    'index_person_ownerId_identityId_key',
    'index_shared_space_person_identityId_spaceId_idx',
    'index_shared_space_person_space_name_idx',
@@ -286,7 +295,8 @@ DELETE FROM "migration_overrides"
    'trigger_shared_space_member_updatedAt',
    'trigger_shared_space_person_updatedAt',
    'trigger_shared_space_updatedAt',
-   'trigger_user_group_updatedAt'
+   'trigger_user_group_updatedAt',
+   'trigger_game_challenge_updatedAt'
  );
 
 -- -----------------------------------------------------------------------------
@@ -444,7 +454,11 @@ DELETE FROM "kysely_migrations"
    '1788000000000-ReconcileFacePersonVerdictConstraints',
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
    '1790000000000-FixFaceRepairScanInFlightIndex',
+   '1791000000000-AddPhotoGuessingGame',
+   '1792000000000-AddDailyGameChallenge',
    '1792123120451-AddSharedLinkSpaceId',
+   '1793000000000-AddSpaceDailyChallengeEnabled',
+   '1794000000000-AddSoloGameChallenge',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",
@@ -513,7 +527,9 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairDecline%'
       OR "name" LIKE '%AddFaceRepairLock%'
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
-      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%';
+      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
+      OR "name" LIKE '%AddPhotoGuessingGame%'
+      OR "name" LIKE '%AddDailyGameChallenge%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -539,7 +555,8 @@ BEGIN
        'classification_prompt_embedding', 'classification_category',
        'storage_migration_log', 'asset_duplicate_checksum',
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
-       'face_repair_scan_flagged_face', 'face_repair_lock'
+       'face_repair_scan_flagged_face', 'face_repair_lock',
+       'game_challenge', 'game_round', 'game_guess'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;

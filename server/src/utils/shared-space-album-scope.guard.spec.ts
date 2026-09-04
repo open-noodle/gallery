@@ -52,13 +52,22 @@ import { describe, expect, it } from 'vitest';
 const SERVER_ROOT = process.cwd();
 
 const REPO_DIR = 'src/repositories';
-const EXTRA_FILES = ['src/utils/database.ts'];
+// Non-repository files that carry space reads. `game-solo-eligibility.ts` calls both space helpers
+// and is where the solo game pool's visibility floor is written, so it belongs in the scan for
+// exactly the reason the derivation glob exists: a space read nobody scans is a space read nobody
+// notices losing its gate.
+const EXTRA_FILES = ['src/utils/database.ts', 'src/utils/game-solo-eligibility.ts'];
 
 // Fork-owned space-scope helpers. A call to any of these IS a space read (they
 // encode the direct/library/album access path). Detected as bare identifiers so a
 // call, spread, or import all count.
+//
+// A helper missing from this list is INVISIBLE to both scans - the file it is called from can
+// lose its visibility gate and nothing here notices - so a new one that wraps any of the others
+// belongs in it. `eligibleSoloAsset` / `soloPoolAssetIdUnion` (game-solo-eligibility.ts) are the
+// solo game pool's two forms of the same wrapping.
 const SPACE_HELPER =
-  /\b(spaceAssetPathBranches|spaceAlbumAssetExists|spaceAlbumAssetExistsSql|spaceContributedAssetExists|spaceDirectAssetExists|spaceLibraryAssetExists|accessibleSpaces|accessibleSpaceAlbums|accessibleLibraries)\b/;
+  /\b(spaceAssetPathBranches|spaceAssetIdUnion|spaceAlbumAssetExists|spaceAlbumAssetExistsSql|spaceContributedAssetExists|spaceDirectAssetExists|spaceLibraryAssetExists|accessibleSpaces|accessibleSpaceAlbums|accessibleLibraries|eligibleSoloAsset|soloPoolAssetIdUnion)\b/;
 
 // The raw join tables. A reference to any of these is also a space read.
 const SPACE_TABLE = /\bshared_space_(asset|library|album)\b/;
@@ -159,7 +168,7 @@ const key = (file: string, fn: string) => `${shortName(file)}::${fn}`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ALBUM_MARKER =
-  /shared_space_album|spaceAlbumAssetExists|spaceAssetPathBranches|spaceAlbumAssetExistsSql|accessibleSpaceAlbums/;
+  /shared_space_album|spaceAlbumAssetExists|spaceAssetPathBranches|spaceAlbumAssetExistsSql|accessibleSpaceAlbums|spaceAssetIdUnion/;
 const LIBRARY_REF = /\bshared_space_library\b/;
 const WINDOW = 45;
 
@@ -391,6 +400,15 @@ const VIS_ALLOWLIST: Record<string, string> = {
   // which was never gate-scanned before this arm's shared_space_album reference existed).
   'database.ts::inAlbums':
     'live-link EXISTS(shared_space_album) correlated on albumId+spaceId; link-existence check, no asset content (Task 9)',
+
+  // The solo game pool's round-image resolver. Its gate is real but lives one level down, inside
+  // eligibleSoloAsset (the correlated per-asset predicate it passes to .where), which is where the
+  // whole floor - not-deleted, image, timeline-only - is written. Listed here so this scan's
+  // verdict on the function does not depend on which other query happens to sit within 50 lines of
+  // it. The gate itself is pinned on the EMITTED sql, per source combination, by
+  // game.repository.spec.ts ("keeps the solo pool behind the timeline visibility floor").
+  'game.repository.ts::getSoloEligibleRoundAsset':
+    'gate lives in eligibleSoloAsset, one level down; pinned on the generated SQL by game.repository.spec.ts',
 };
 
 const VIS_WINDOW = 50;

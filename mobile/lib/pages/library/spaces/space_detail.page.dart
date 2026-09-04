@@ -12,6 +12,7 @@ import 'package:immich_mobile/presentation/widgets/spaces/space_top_sliver.widge
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
+import 'package:immich_mobile/providers/game/game.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -393,6 +394,47 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     context.pushRoute(SpacePeopleRoute(spaceId: widget.spaceId, canEdit: _canEdit));
   }
 
+  void _navigateToChallenges() {
+    context.pushRoute(SpaceGamesRoute(spaceId: widget.spaceId, canEdit: _canEdit));
+  }
+
+  /// Plays today's daily, then refreshes what the pop lands back on.
+  ///
+  /// The refresh is the point: the daily is a plain FutureProvider whose cached value survives the
+  /// pop, so without it the card keeps its pre-play snapshot and a finished daily still reads
+  /// "Play" — which also hides the Leaderboard button that is the signposted route to the
+  /// month's standings.
+  Future<void> _playDaily() async {
+    final daily = ref.read(gameDailyProvider(widget.spaceId)).valueOrNull;
+    if (daily == null) return;
+    await context.pushRoute(GamePlayRoute(challengeId: daily.id));
+    if (!mounted) return;
+    invalidateSpaceGames(ref, widget.spaceId);
+  }
+
+  // The tri-state itself lives on `_space`, refreshed like any other metadata change; the daily
+  // provider is invalidated too so `DailySlot` (which reads it directly) picks up the new value
+  // right away instead of waiting for its own next watch.
+  Future<void> _decideDaily(bool enabled) async {
+    try {
+      final space = await ref
+          .read(sharedSpaceApiRepositoryProvider)
+          .update(widget.spaceId, dailyChallengeEnabled: enabled);
+      if (mounted) {
+        setState(() => _space = space);
+      }
+      ref.invalidate(gameDailyProvider(widget.spaceId));
+    } catch (e) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'game_daily_toggle_failed'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -430,6 +472,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
 
     final isRemoteSyncing = ref.watch(syncStatusProvider.select((s) => s.isRemoteSyncing));
+    // `dailyChallengeEnabled` is `Optional<bool?>` and `Absent.value` THROWS — this must stay
+    // `.orElse(null)`, never `.value`.
+    final dailyChallengeEnabled = _space!.dailyChallengeEnabled.orElse(null);
 
     return TimelineRouteScope(
       timelineServiceBuilder: (ref, scope, groupBy) => ref
@@ -458,12 +503,20 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
               onUnlink: _onUnlinkAlbum,
             ),
           ),
+          dailyChallengeEnabled: dailyChallengeEnabled,
+          onDecideDaily: _decideDaily,
+          // Today's daily challenge, once opted in and generated server-side.
+          onPlayDaily: () => unawaited(_playDaily()),
+          // No standings section lives on the timeline itself — the Challenges page has the one
+          // and only leaderboard, so route there.
+          onDailyStandings: _navigateToChallenges,
         ),
         topSliverWidgetHeight: computeTopSliverHeight(
           ref: ref,
           spaceId: widget.spaceId,
           canEdit: _canEdit,
           isRemoteSyncing: isRemoteSyncing,
+          dailyChallengeEnabled: dailyChallengeEnabled,
         ),
         appBar: SliverAppBar(
           title: Text(_space!.name),
@@ -489,6 +542,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
               onToggleTimeline: _toggleTimeline,
               onPeople: _navigateToSpacePeople,
               onMembers: _navigateToMembers,
+              onChallenges: _navigateToChallenges,
               onEdit: _editSpace,
               onDelete: _deleteSpace,
             ),

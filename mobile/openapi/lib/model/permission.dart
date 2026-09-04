@@ -61,6 +61,9 @@ enum Permission {
   facePeriodUpdate._(r'face.update'),
   facePeriodDelete._(r'face.delete'),
   folderPeriodRead._(r'folder.read'),
+  gamePeriodCreate._(r'game.create'),
+  gamePeriodRead._(r'game.read'),
+  gamePeriodDelete._(r'game.delete'),
   jobPeriodCreate._(r'job.create'),
   jobPeriodRead._(r'job.read'),
   libraryPeriodCreate._(r'library.create'),
@@ -294,6 +297,9 @@ class PermissionTypeTransformer {
         case r'face.update': return Permission.facePeriodUpdate;
         case r'face.delete': return Permission.facePeriodDelete;
         case r'folder.read': return Permission.folderPeriodRead;
+        case r'game.create': return Permission.gamePeriodCreate;
+        case r'game.read': return Permission.gamePeriodRead;
+        case r'game.delete': return Permission.gamePeriodDelete;
         case r'job.create': return Permission.jobPeriodCreate;
         case r'job.read': return Permission.jobPeriodRead;
         case r'library.create': return Permission.libraryPeriodCreate;

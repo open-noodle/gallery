@@ -49,6 +49,23 @@ enum SettingsKey<T> {
   spacesSortMode<SpaceSortMode>(codec: EnumCodec(SpaceSortMode.values, fallback: SpaceSortMode.recentActivity)),
   spacesIsReverse<bool>(),
 
+  // Games
+  gameDailyReminderEnabled<bool>(),
+  gameDailyReminderMinuteOfDay<int>(),
+  // Split from a single gameDailyLastPlayed: a space daily and the solo daily are separate streaks
+  // computed server-side, so finishing one must not be recorded as if it satisfied the other — see
+  // dailyReminderOccurrences's doc for what that used to cost the player. The old key's value is
+  // abandoned, not migrated, on upgrade: it is at most one day's worth of "already played" state,
+  // so the worst case is a single redundant reminder before these two keys are written fresh.
+  gameSpaceDailyLastPlayed<String?>(),
+  gameSoloDailyLastPlayed<String?>(),
+  // The UTC day the solo daily was last CONFIRMED unavailable (the player's library could not
+  // fill one) — written from wherever the solo daily is actually fetched (see
+  // DailyReminderController.recordSoloDailyUnavailable's doc), never read here directly. Day-
+  // keyed, not a standing flag: a library that cannot fill a daily today may fill one tomorrow,
+  // and comparing against a specific day is what makes this re-evaluate rather than latch.
+  gameSoloDailyUnavailableOn<String?>(),
+
   // Backup
   backupEnabled<bool>(),
   backupUseCellularForVideos<bool>(),

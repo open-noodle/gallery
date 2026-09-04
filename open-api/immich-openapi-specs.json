@@ -7627,6 +7627,532 @@
         "x-immich-state": "Beta"
       }
     },
+    "/games/solo": {
+      "post": {
+        "description": "Generate and freeze a new challenge from the caller's own photos, plus whichever of partner and shared-space photos they have asked for.",
+        "operationId": "createSoloChallenge",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameSoloCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameChallengeResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Start a solo photo guessing challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.create",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/solo/daily": {
+      "get": {
+        "description": "Get today's personal daily challenge, generating it on first read. Returns a null challenge when the caller has no photos usable for one.",
+        "operationId": "getSoloDailyChallenge",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDailyResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the caller's daily challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/solo/history": {
+      "get": {
+        "description": "One page of the games the caller has played, newest first. Paging past the last page returns an empty page rather than an error.",
+        "operationId": "getSoloHistory",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Number of games per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSoloHistoryResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the caller's solo game history",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/solo/stats": {
+      "get": {
+        "description": "Streak, best score, average and games played, computed from the games themselves on every read. A player who has never played gets zeroes, never nulls.",
+        "operationId": "getSoloStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSoloStatsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the caller's solo statistics",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/{id}": {
+      "delete": {
+        "description": "Permanently delete a challenge, cascading its rounds and guesses.",
+        "operationId": "deleteChallenge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete a photo guessing challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.delete",
+        "x-immich-state": "Beta"
+      },
+      "get": {
+        "description": "Get challenge detail. Round answers are withheld until the caller has guessed that round.",
+        "operationId": "getChallenge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameChallengeDetailResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get a photo guessing challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/{id}/leaderboard": {
+      "get": {
+        "description": "Get per-player totals for a challenge.",
+        "operationId": "getLeaderboard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameLeaderboardResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get a challenge leaderboard",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/{id}/rounds/{index}/guess": {
+      "post": {
+        "description": "Submit a guess for one round of a challenge and receive the score and the answer.",
+        "operationId": "guessRound",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameGuessDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameGuessResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Submit a round guess",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/{id}/rounds/{index}/image": {
+      "get": {
+        "description": "Serve a round's photo as a generic, EXIF-free preview keyed by (challenge, round index). Never discloses the underlying asset id or original filename.",
+        "operationId": "getRoundImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get a round image",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/jobs": {
       "get": {
         "deprecated": true,
@@ -18799,6 +19325,245 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{spaceId}/games": {
+      "get": {
+        "description": "List a shared space's challenges along with the caller's progress on each.",
+        "operationId": "getChallenges",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GameChallengeListItemResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List photo guessing challenges",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      },
+      "post": {
+        "description": "Generate and freeze a new challenge from a shared space's own photos.",
+        "operationId": "createChallenge",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameChallengeResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create a photo guessing challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.create",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{spaceId}/games/daily": {
+      "get": {
+        "description": "Get today's daily challenge for a shared space, generating it on first read. Returns a null challenge when the space has no photos usable for one.",
+        "operationId": "getDailyChallenge",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDailyResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the space's daily challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{spaceId}/games/standings": {
+      "get": {
+        "description": "Per-player totals across this UTC calendar month's daily challenges. Custom challenges never contribute. Membership-gated, like the daily.",
+        "operationId": "getStandings",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameStandingsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the space's monthly standings",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/stacks": {
       "delete": {
         "description": "Delete multiple stacks by providing a list of stack IDs.",
@@ -23976,6 +24741,10 @@
     {
       "name": "Classification",
       "description": "Endpoints for managing auto-classification categories that automatically tag and archive photos based on CLIP similarity."
+    },
+    {
+      "name": "Games",
+      "description": "A photo guessing game played on a shared space's own photos - guess where or when each round's photo was taken."
     }
   ],
   "servers": [
@@ -27972,6 +28741,668 @@
         },
         "type": "object"
       },
+      "GameChallengeDetailResponseDto": {
+        "properties": {
+          "closedAt": {
+            "description": "When this challenge was closed, if at all",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "nullable": true,
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Creation date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "dailyOn": {
+            "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "description": "Challenge ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Challenge name",
+            "type": "string"
+          },
+          "ownerId": {
+            "description": "Owning user ID, or null for a shared-space challenge",
+            "nullable": true,
+            "type": "string"
+          },
+          "roundCount": {
+            "description": "Number of rounds actually generated (may be less than requested)",
+            "type": "number"
+          },
+          "rounds": {
+            "description": "Rounds, with answers withheld until guessed",
+            "items": {
+              "$ref": "#/components/schemas/GameRoundDetailResponseDto"
+            },
+            "type": "array"
+          },
+          "scaleDays": {
+            "description": "Frozen day scale used to score date rounds",
+            "type": "number"
+          },
+          "scaleKm": {
+            "description": "Frozen distance scale used to score location rounds",
+            "type": "number"
+          },
+          "spaceId": {
+            "description": "Shared space ID, or null for a solo challenge",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "closedAt",
+          "createdAt",
+          "dailyOn",
+          "id",
+          "name",
+          "ownerId",
+          "roundCount",
+          "rounds",
+          "scaleDays",
+          "scaleKm",
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "GameChallengeListItemResponseDto": {
+        "properties": {
+          "answered": {
+            "description": "Number of rounds the caller has answered",
+            "type": "number"
+          },
+          "closedAt": {
+            "description": "When this challenge was closed, if at all",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "nullable": true,
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Creation date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "dailyOn": {
+            "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "description": "Challenge ID",
+            "type": "string"
+          },
+          "locationRoundCount": {
+            "description": "How many of the rounds are location rounds",
+            "type": "number"
+          },
+          "name": {
+            "description": "Challenge name",
+            "type": "string"
+          },
+          "ownerId": {
+            "description": "Owning user ID, or null for a shared-space challenge",
+            "nullable": true,
+            "type": "string"
+          },
+          "roundCount": {
+            "description": "Number of rounds actually generated (may be less than requested)",
+            "type": "number"
+          },
+          "scaleDays": {
+            "description": "Frozen day scale used to score date rounds",
+            "type": "number"
+          },
+          "scaleKm": {
+            "description": "Frozen distance scale used to score location rounds",
+            "type": "number"
+          },
+          "spaceId": {
+            "description": "Shared space ID, or null for a solo challenge",
+            "nullable": true,
+            "type": "string"
+          },
+          "total": {
+            "description": "The caller's total score across answered rounds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "answered",
+          "closedAt",
+          "createdAt",
+          "dailyOn",
+          "id",
+          "locationRoundCount",
+          "name",
+          "ownerId",
+          "roundCount",
+          "scaleDays",
+          "scaleKm",
+          "spaceId",
+          "total"
+        ],
+        "type": "object"
+      },
+      "GameChallengeResponseDto": {
+        "properties": {
+          "createdAt": {
+            "description": "Creation date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "dailyOn": {
+            "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "description": "Challenge ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Challenge name",
+            "type": "string"
+          },
+          "ownerId": {
+            "description": "Owning user ID, or null for a shared-space challenge",
+            "nullable": true,
+            "type": "string"
+          },
+          "roundCount": {
+            "description": "Number of rounds actually generated (may be less than requested)",
+            "type": "number"
+          },
+          "scaleDays": {
+            "description": "Frozen day scale used to score date rounds",
+            "type": "number"
+          },
+          "scaleKm": {
+            "description": "Frozen distance scale used to score location rounds",
+            "type": "number"
+          },
+          "spaceId": {
+            "description": "Shared space ID, or null for a solo challenge",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "dailyOn",
+          "id",
+          "name",
+          "ownerId",
+          "roundCount",
+          "scaleDays",
+          "scaleKm",
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "GameChallengeType": {
+        "enum": [
+          "mixed",
+          "location",
+          "date"
+        ],
+        "type": "string"
+      },
+      "GameCreateDto": {
+        "properties": {
+          "name": {
+            "description": "Challenge name",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "roundCount": {
+            "default": 5,
+            "description": "Number of rounds to generate",
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/GameChallengeType",
+            "default": "mixed",
+            "description": "Which kinds of round to generate"
+          }
+        },
+        "type": "object"
+      },
+      "GameDailyResponseDto": {
+        "properties": {
+          "challenge": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GameChallengeListItemResponseDto"
+              }
+            ],
+            "description": "Today's daily, if one could be generated",
+            "nullable": true
+          }
+        },
+        "required": [
+          "challenge"
+        ],
+        "type": "object"
+      },
+      "GameGuessDto": {
+        "properties": {
+          "date": {
+            "description": "Guessed date, for a date round",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "lat": {
+            "description": "Guessed latitude, for a location round",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "lon": {
+            "description": "Guessed longitude, for a location round",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "GameGuessResponseDto": {
+        "properties": {
+          "distanceKm": {
+            "description": "Distance between the guess and the answer, in km",
+            "nullable": true,
+            "type": "number"
+          },
+          "guessDate": {
+            "description": "Guessed date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "nullable": true,
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "guessLat": {
+            "description": "Guessed latitude",
+            "nullable": true,
+            "type": "number"
+          },
+          "guessLon": {
+            "description": "Guessed longitude",
+            "nullable": true,
+            "type": "number"
+          },
+          "offsetDays": {
+            "description": "Day offset between the guess and the answer",
+            "nullable": true,
+            "type": "number"
+          },
+          "roundId": {
+            "description": "Round ID",
+            "type": "string"
+          },
+          "score": {
+            "description": "Score awarded for this guess",
+            "type": "number"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "distanceKm",
+          "guessDate",
+          "guessLat",
+          "guessLon",
+          "offsetDays",
+          "roundId",
+          "score",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "GameLeaderboardResponseDto": {
+        "properties": {
+          "entries": {
+            "description": "Per-player totals, highest first",
+            "items": {
+              "properties": {
+                "answered": {
+                  "description": "Number of rounds answered",
+                  "type": "number"
+                },
+                "name": {
+                  "description": "User name",
+                  "type": "string"
+                },
+                "total": {
+                  "description": "Total score across all guessed rounds",
+                  "type": "number"
+                },
+                "userId": {
+                  "description": "User ID",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "total",
+                "answered"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "type": "object"
+      },
+      "GameRoundDetailResponseDto": {
+        "properties": {
+          "answer": {
+            "description": "The round answer - present only once guessed",
+            "properties": {
+              "date": {
+                "description": "Answer date, for a date round",
+                "example": "2024-01-01T00:00:00.000Z",
+                "format": "date-time",
+                "nullable": true,
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "type": "string"
+              },
+              "lat": {
+                "description": "Answer latitude, for a location round",
+                "nullable": true,
+                "type": "number"
+              },
+              "lon": {
+                "description": "Answer longitude, for a location round",
+                "nullable": true,
+                "type": "number"
+              }
+            },
+            "required": [
+              "lat",
+              "lon",
+              "date"
+            ],
+            "type": "object"
+          },
+          "assetId": {
+            "description": "Round photo asset ID - present only once the caller has guessed",
+            "type": "string"
+          },
+          "guess": {
+            "description": "The caller's own guess - present only once guessed",
+            "properties": {
+              "date": {
+                "description": "Guessed date, for a date round",
+                "example": "2024-01-01T00:00:00.000Z",
+                "format": "date-time",
+                "nullable": true,
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "type": "string"
+              },
+              "distanceKm": {
+                "description": "Distance from the answer, in km",
+                "nullable": true,
+                "type": "number"
+              },
+              "lat": {
+                "description": "Guessed latitude, for a location round",
+                "nullable": true,
+                "type": "number"
+              },
+              "lon": {
+                "description": "Guessed longitude, for a location round",
+                "nullable": true,
+                "type": "number"
+              },
+              "offsetDays": {
+                "description": "Day offset from the answer",
+                "nullable": true,
+                "type": "number"
+              }
+            },
+            "required": [
+              "lat",
+              "lon",
+              "date",
+              "distanceKm",
+              "offsetDays"
+            ],
+            "type": "object"
+          },
+          "index": {
+            "description": "Round index (0-based)",
+            "type": "number"
+          },
+          "score": {
+            "description": "The caller's score for this round - present only once guessed",
+            "type": "number"
+          },
+          "type": {
+            "$ref": "#/components/schemas/GameRoundType",
+            "description": "Round type"
+          }
+        },
+        "required": [
+          "index",
+          "type"
+        ],
+        "type": "object"
+      },
+      "GameRoundType": {
+        "enum": [
+          "location",
+          "date"
+        ],
+        "type": "string"
+      },
+      "GameSoloCreateDto": {
+        "properties": {
+          "roundCount": {
+            "default": 5,
+            "description": "Number of rounds to generate",
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sources": {
+            "$ref": "#/components/schemas/GameSoloSourcesDto",
+            "description": "Override the stored source toggles for this game"
+          },
+          "type": {
+            "$ref": "#/components/schemas/GameChallengeType",
+            "default": "mixed",
+            "description": "Which kinds of round to generate"
+          }
+        },
+        "type": "object"
+      },
+      "GameSoloHistoryItemResponseDto": {
+        "properties": {
+          "answered": {
+            "description": "Number of rounds the player answered",
+            "type": "number"
+          },
+          "createdAt": {
+            "description": "Creation date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "dailyOn": {
+            "description": "The UTC date this was the daily for, or null for a free-play game",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "description": "Challenge ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Challenge name",
+            "type": "string"
+          },
+          "roundCount": {
+            "description": "Number of rounds in the challenge",
+            "type": "number"
+          },
+          "total": {
+            "description": "Total score across the rounds they answered",
+            "type": "number"
+          }
+        },
+        "required": [
+          "answered",
+          "createdAt",
+          "dailyOn",
+          "id",
+          "name",
+          "roundCount",
+          "total"
+        ],
+        "type": "object"
+      },
+      "GameSoloHistoryResponseDto": {
+        "properties": {
+          "hasNextPage": {
+            "description": "Whether another page follows this one",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "Games played, newest first",
+            "items": {
+              "$ref": "#/components/schemas/GameSoloHistoryItemResponseDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "hasNextPage",
+          "items"
+        ],
+        "type": "object"
+      },
+      "GameSoloSourcesDto": {
+        "properties": {
+          "includePartners": {
+            "description": "Also draw from partners' photos",
+            "type": "boolean"
+          },
+          "includeSpaces": {
+            "description": "Also draw from shared-space photos",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "GameSoloStatsResponseDto": {
+        "properties": {
+          "averageScore": {
+            "description": "Mean total across games played, rounded to whole points",
+            "type": "number"
+          },
+          "bestScore": {
+            "description": "The highest total scored in a single game",
+            "type": "number"
+          },
+          "bestStreak": {
+            "description": "The longest such run ever",
+            "type": "number"
+          },
+          "currentStreak": {
+            "description": "Consecutive UTC days of fully played dailies, ending today or yesterday",
+            "type": "number"
+          },
+          "gamesPlayed": {
+            "description": "How many games have at least one guess",
+            "type": "number"
+          }
+        },
+        "required": [
+          "averageScore",
+          "bestScore",
+          "bestStreak",
+          "currentStreak",
+          "gamesPlayed"
+        ],
+        "type": "object"
+      },
+      "GameStandingsResponseDto": {
+        "properties": {
+          "entries": {
+            "description": "Per-player totals, best first, non-players last",
+            "items": {
+              "properties": {
+                "daysPlayed": {
+                  "description": "Number of daily challenges played this month",
+                  "type": "number"
+                },
+                "name": {
+                  "description": "User name",
+                  "type": "string"
+                },
+                "total": {
+                  "description": "Total score across the month's daily challenges",
+                  "type": "number"
+                },
+                "userId": {
+                  "description": "User ID",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "total",
+                "daysPlayed"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "month": {
+            "description": "The UTC calendar month these standings cover, as YYYY-MM. The client formats the name.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entries",
+          "month"
+        ],
+        "type": "object"
+      },
       "HlsVideoResolution": {
         "description": "HLS video resolution",
         "enum": [
@@ -28168,7 +29599,8 @@
           "SharedSpaceAlbumGrantReconcileSweep",
           "SharedSpaceIdentityReconciliationSweep",
           "AssetClassifyQueueAll",
-          "AssetClassify"
+          "AssetClassify",
+          "GameChallengeCleanup"
         ],
         "type": "string"
       },
@@ -30091,6 +31523,9 @@
           "face.update",
           "face.delete",
           "folder.read",
+          "game.create",
+          "game.read",
+          "game.delete",
           "job.create",
           "job.read",
           "library.create",
@@ -30627,6 +32062,36 @@
           "minScore",
           "modelName"
         ],
+        "type": "object"
+      },
+      "PhotoGuesserResponse": {
+        "properties": {
+          "includePartners": {
+            "description": "Whether PhotoGuesser solo rounds include partner photos",
+            "type": "boolean"
+          },
+          "includeSpaces": {
+            "description": "Whether PhotoGuesser solo rounds include shared-space photos",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "includePartners",
+          "includeSpaces"
+        ],
+        "type": "object"
+      },
+      "PhotoGuesserUpdate": {
+        "properties": {
+          "includePartners": {
+            "description": "Whether PhotoGuesser solo rounds include partner photos",
+            "type": "boolean"
+          },
+          "includeSpaces": {
+            "description": "Whether PhotoGuesser solo rounds include shared-space photos",
+            "type": "boolean"
+          }
+        },
         "type": "object"
       },
       "PinCodeChangeDto": {
@@ -33515,6 +34980,11 @@
             "description": "Creator user ID",
             "type": "string"
           },
+          "dailyChallengeEnabled": {
+            "description": "Whether the daily challenge is enabled; null when nobody has been asked yet",
+            "nullable": true,
+            "type": "boolean"
+          },
           "description": {
             "description": "Space description",
             "nullable": true,
@@ -33639,6 +35109,10 @@
           "color": {
             "$ref": "#/components/schemas/UserAvatarColor",
             "description": "Space color"
+          },
+          "dailyChallengeEnabled": {
+            "description": "Enable the daily challenge for this space",
+            "type": "boolean"
           },
           "description": {
             "description": "Space description",
@@ -39220,6 +40694,9 @@
           "people": {
             "$ref": "#/components/schemas/PeopleResponse"
           },
+          "photoGuesser": {
+            "$ref": "#/components/schemas/PhotoGuesserResponse"
+          },
           "purchase": {
             "$ref": "#/components/schemas/PurchaseResponse"
           },
@@ -39244,6 +40721,7 @@
           "folders",
           "memories",
           "people",
+          "photoGuesser",
           "purchase",
           "ratings",
           "recentlyAdded",
@@ -39277,6 +40755,9 @@
           },
           "people": {
             "$ref": "#/components/schemas/PeopleUpdate"
+          },
+          "photoGuesser": {
+            "$ref": "#/components/schemas/PhotoGuesserUpdate"
           },
           "purchase": {
             "$ref": "#/components/schemas/PurchaseUpdate"

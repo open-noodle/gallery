@@ -25,6 +25,30 @@ void main() {
       expect(value['download']['includeEmbeddedVideos'], false);
     });
 
+    test('a server older than PhotoGuesser still yields a parsable, feature-off preference', () {
+      // `photoGuesser` is in UserPreferencesResponseDto.requiredKeys and the generated model
+      // deserialises it as `PhotoGuesserResponse.fromJson(json[r'photoGuesser'])!` — a bang on a
+      // value an older server does not send at all. Updating the app from the store before
+      // updating the server is an ordinary deployment order, and without this patch it hard-fails
+      // the preferences fetch every login.
+      final dynamic value = jsonDecode("""
+{
+  "download": {
+    "archiveSize": 4294967296,
+    "includeEmbeddedVideos": false
+  }
+}
+""");
+
+      upgradeDto(value, 'UserPreferencesResponseDto');
+
+      // Off, matching the server's own default. A patch that defaulted either toggle on would
+      // silently widen an old server's pool to photos the player never opted to play with.
+      final photoGuesser = PhotoGuesserResponse.fromJson(value['photoGuesser'])!;
+      expect(photoGuesser.includePartners, isFalse);
+      expect(photoGuesser.includeSpaces, isFalse);
+    });
+
     test('addDefault', () {
       dynamic value = jsonDecode("""
 {

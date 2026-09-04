@@ -39,6 +39,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
+import { GameRepository } from 'src/repositories/game.repository';
 import { IntegrityRepository } from 'src/repositories/integrity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -581,6 +582,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
     case FaceRepairRepository:
     case FaceRepairScanRepository:
     case FacePersonVerdictRepository:
+    case GameRepository:
     case IntegrityRepository:
     case MemoryRepository:
     case NotificationRepository:

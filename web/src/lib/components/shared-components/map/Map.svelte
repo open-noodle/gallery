@@ -88,6 +88,12 @@
     spaceId,
   }: Props = $props();
 
+  // Every current caller supplies `mapMarkers` (even an explicit `[]`); the self-fetch paths below
+  // exist only for a hypothetical caller that doesn't. Capture at init, before either self-fetch
+  // path can run - checking `mapMarkers === undefined` later would flip to false the instant the
+  // first self-fetch populates it, silently re-opening both paths for every caller.
+  const selfManagedMarkers = mapMarkers === undefined;
+
   // Calculate initial bounds from markers once during initialization
   const initialBounds = (() => {
     if (!autoFitBounds || center || zoom !== undefined || !mapMarkers || mapMarkers.length === 0) {
@@ -279,13 +285,31 @@
   });
 
   onMount(async () => {
-    if (!mapMarkers) {
+    if (selfManagedMarkers && !mapMarkers) {
       mapMarkers = await loadMapMarkers();
     }
   });
 
   onDestroy(() => {
     abortController?.abort();
+  });
+
+  // maplibre sizes its canvas when the map is created and never re-reads the container afterwards,
+  // so any in-page resize leaves a stretched, clipped canvas until something calls resize(). The
+  // only existing call site is afterNavigate, which by definition does not fire for a container
+  // that changes size while staying on the page - e.g. the guessing map growing on hover, or any
+  // panel this map lives in being opened, collapsed or dragged. Observing the container covers
+  // every frame of a CSS transition, not just its end state.
+  $effect(() => {
+    if (!map) {
+      return;
+    }
+
+    const currentMap = map;
+    const observer = new ResizeObserver(() => currentMap.resize());
+    observer.observe(currentMap.getContainer());
+
+    return () => observer.disconnect();
   });
 
   $effect(() => {
@@ -324,6 +348,13 @@
   });
 
   const onAssetsChanged = async () => {
+    // Fires on a GLOBAL websocket event (asset delete/archive/unarchive) sent to every one of the
+    // owner's sessions, regardless of which page is open or what triggered it (another tab, mobile,
+    // a background job) - not gated by any interaction on this page. A caller-supplied mapMarkers
+    // must never be clobbered by it; see `selfManagedMarkers` above.
+    if (!selfManagedMarkers) {
+      return;
+    }
     mapMarkers = await loadMapMarkers();
   };
 </script>
