@@ -1094,9 +1094,8 @@ void main() {
     // prevent exactly this (ownerArmWithHiddenSubtraction) and asserts it in its own E10.
     const partnerId = 'partner-1';
 
-    Future<void> insertPartner() => db
-        .into(db.userEntity)
-        .insert(UserEntityCompanion.insert(id: partnerId, email: 'partner@test.dev', name: 'P'));
+    Future<void> insertPartner() =>
+        db.into(db.userEntity).insert(UserEntityCompanion.insert(id: partnerId, email: 'partner@test.dev', name: 'P'));
 
     Future<void> insertPartnerAsset(String assetId, DateTime at) => db
         .into(db.remoteAssetEntity)
