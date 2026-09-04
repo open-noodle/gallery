@@ -264,6 +264,10 @@ export class QueueService extends BaseService {
         return this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force } });
       }
 
+      case QueueName.PetRecognition: {
+        return this.jobRepository.queue({ name: JobName.PetRecognitionQueueAll, data: { force } });
+      }
+
       case QueueName.Classification: {
         return this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: { force } });
       }
@@ -285,6 +289,7 @@ export class QueueService extends BaseService {
   private isConcurrentQueue(name: QueueName): name is ConcurrentQueueName {
     return ![
       QueueName.FacialRecognition,
+      QueueName.PetRecognition,
       QueueName.StorageTemplateMigration,
       QueueName.DuplicateDetection,
       QueueName.BackupDatabase,
@@ -333,6 +338,10 @@ export class QueueService extends BaseService {
         // identity) collapse without any user action. Gated with face clustering — moot when off.
         { name: JobName.SharedSpaceIdentityReconciliationSweep },
       );
+    }
+
+    if (config.nightlyTasks.clusterNewPets) {
+      jobs.push({ name: JobName.PetRecognitionQueueAll, data: { force: false, nightly: true } });
     }
 
     await this.jobRepository.queueAll(jobs);

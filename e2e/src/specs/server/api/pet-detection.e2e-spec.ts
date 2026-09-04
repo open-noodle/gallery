@@ -1,10 +1,11 @@
-import { LoginResponseDto, QueueCommand, mergePerson, updateConfig } from '@immich/sdk';
+import { LoginResponseDto, QueueCommand, QueueName, getQueuesLegacy, mergePerson, updateConfig } from '@immich/sdk';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const getSystemConfig = (accessToken: string) => utils.getSystemConfig(accessToken);
+const getQueues = (accessToken: string) => getQueuesLegacy({ headers: asBearerAuth(accessToken) });
 
 describe('/pet-detection', () => {
   let admin: LoginResponseDto;
@@ -157,6 +158,142 @@ describe('/pet-detection', () => {
     });
   });
 
+  describe('Pet Recognition Config Management', () => {
+    it('should have pet recognition disabled by default with pet-recognition-base, 0.55 maxDistance and 1 minFaces', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+
+      expect(config.machineLearning.petRecognition).toEqual({
+        enabled: false,
+        modelName: 'pet-recognition-base',
+        maxDistance: 0.55,
+        minFaces: 1,
+      });
+    });
+
+    it('should enable pet recognition and round-trip the change', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.enabled = true;
+      const updated = await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      expect(updated.machineLearning.petRecognition.enabled).toBe(true);
+
+      const refetched = await getSystemConfig(admin.accessToken);
+      expect(refetched.machineLearning.petRecognition.enabled).toBe(true);
+
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should reject maxDistance below 0.1', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.maxDistance = 0.05;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'maxDistance'],
+            message: 'Too small: expected number to be >=0.1',
+          },
+        ]),
+      );
+    });
+
+    it('should reject maxDistance above 2', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.maxDistance = 2.5;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'maxDistance'],
+            message: 'Too big: expected number to be <=2',
+          },
+        ]),
+      );
+    });
+
+    it('should reject minFaces below 1', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.minFaces = 0;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'minFaces'],
+            message: 'Too small: expected number to be >=1',
+          },
+        ]),
+      );
+    });
+
+    it('should reject minFaces above 1000', async () => {
+      // searchPets rejects a numResults outside 1..1000 at query time, so an unbounded minFaces
+      // would be accepted here and then throw on every recognition job instead.
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.minFaces = 1001;
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(
+        errorDto.validationError([
+          {
+            path: ['machineLearning', 'petRecognition', 'minFaces'],
+            message: 'Too big: expected number to be <=1000',
+          },
+        ]),
+      );
+    });
+
+    // The whitelist lives in PetRecognitionService.onConfigValidate, not in the zod schema, so it
+    // surfaces as a plain BadRequest rather than a validation error. Unit-tested already; this pins
+    // that it actually reaches the HTTP layer.
+    it('should reject an unknown pet recognition model over HTTP', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.modelName = 'pet-recognition-enormous';
+
+      const { status, body } = await request(app)
+        .put('/system-config')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(config);
+
+      expect(status).toBe(400);
+      expect(body.message).toContain('Unknown pet recognition model: pet-recognition-enormous');
+    });
+
+    it('should reset to defaults', async () => {
+      await utils.resetAdminConfig(admin.accessToken);
+
+      const config = await getSystemConfig(admin.accessToken);
+      expect(config.machineLearning.petRecognition).toEqual({
+        enabled: false,
+        modelName: 'pet-recognition-base',
+        maxDistance: 0.55,
+        minFaces: 1,
+      });
+    });
+  });
+
   describe('Queue Operations', () => {
     it('should list petDetection in queues', async () => {
       const { status, body } = await request(app).get('/jobs').set('Authorization', `Bearer ${admin.accessToken}`);
@@ -222,6 +359,57 @@ describe('/pet-detection', () => {
       await utils.waitForQueueFinish(admin.accessToken, 'petDetection');
 
       await utils.resetAdminConfig(admin.accessToken);
+    });
+  });
+
+  describe('Pet Recognition Queue Operations', () => {
+    it('should list petRecognition in queues', async () => {
+      const { status, body } = await request(app).get('/jobs').set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(status).toBe(200);
+      expect(body).toHaveProperty('petRecognition');
+    });
+
+    it('should accept start command on petRecognition queue', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.petRecognition.enabled = true;
+      config.machineLearning.enabled = true;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: false });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should pause and resume petRecognition queue', async () => {
+      const { status: pauseStatus } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Pause, force: false });
+
+      expect(pauseStatus).toBe(200);
+
+      const { status: resumeStatus } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Resume, force: false });
+
+      expect(resumeStatus).toBe(200);
+    });
+
+    it('should empty petRecognition queue', async () => {
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Empty, force: false });
+
+      expect(status).toBe(200);
     });
   });
 
@@ -500,7 +688,15 @@ describe('/pet-detection', () => {
 
     it('should include pet in asset people list', async () => {
       const asset = await utils.getAssetInfo(admin.accessToken, integrationAssetId);
-      expect(asset).toBeDefined();
+
+      const petEntry = asset.people?.find((person) => person.id === integrationPetId);
+      expect(petEntry).toBeDefined();
+      expect(petEntry?.type).toBe('pet');
+      expect(petEntry?.species).toBe('cat');
+
+      const humanEntry = asset.people?.find((person) => person.id === integrationPersonId);
+      expect(humanEntry).toBeDefined();
+      expect(humanEntry?.type).toBe('person');
     });
 
     it('should handle multiple pets in same asset', async () => {
@@ -601,6 +797,126 @@ describe('/pet-detection', () => {
       expect(pet2.species).toBe('dog');
       expect(pet1.name).toBe('Rover');
       expect(pet2.name).toBe('Spot');
+    });
+  });
+
+  // Slice 9 — the e2e stack has no ML service (no real detect->embed->cluster flow to exercise),
+  // so this covers what e2e *can* prove: the force-reset flow purges pet data and requeues
+  // detection through the real HTTP + queue + DB stack (R9.9), that the purge runs ahead of the
+  // recognition-enabled gate (R9.10), and that a non-force start still honours that gate (R9.10b).
+  describe('Force Reset & Recognition Queue Gate', () => {
+    beforeAll(async () => {
+      await utils.resetDatabase();
+      admin = await utils.adminSetup();
+      await utils.connectDatabase();
+    });
+
+    it('force-resets pet recognition: purges pet people and requeues detection under a paused petDetection queue (R9.9)', async () => {
+      const asset = await utils.createAsset(admin.accessToken);
+      const { personId } = await utils.createPetWithEmbedding(admin.userId, 'dog', asset.id, 'Rex');
+
+      // Recognition is enabled here so this exercises the ordinary path; the purge itself runs
+      // ahead of the recognition-enabled gate either way (see R9.10 below).
+      const config = await getSystemConfig(admin.accessToken);
+      config.machineLearning.enabled = true;
+      config.machineLearning.petRecognition.enabled = true;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      // Pause petDetection *before* triggering the reset so the PetDetectionQueueAll{force:true}
+      // job the reset requeues is captured rather than immediately drained — a paused BullMQ
+      // queue holds newly-added jobs under `paused`, not `waiting`, so the assertion below sums
+      // both rather than asserting `waiting` alone.
+      await utils.queueCommand(admin.accessToken, QueueName.PetDetection, {
+        command: QueueCommand.Pause,
+        force: false,
+      });
+      await utils.waitForQueuePaused(admin.accessToken, 'petDetection');
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: true });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      const { body } = await request(app)
+        .get('/people')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .query({ withHidden: true });
+      const petIds = body.people.map((p: any) => p.id);
+      expect(petIds).not.toContain(personId);
+
+      const queues = await getQueues(admin.accessToken);
+      expect(queues.petDetection.jobCounts.waiting + queues.petDetection.jobCounts.paused).toBeGreaterThan(0);
+
+      // Clean up shared queue state before the next test / spec file runs (the e2e stack's
+      // BullMQ queues are a machine-wide singleton across the whole vitest run).
+      await utils.queueCommand(admin.accessToken, QueueName.PetDetection, {
+        command: QueueCommand.Resume,
+        force: false,
+      });
+      // Drain the requeued PetDetectionQueueAll{force:true} before leaving: its own purge (#718)
+      // is unconditional, so letting it land mid-way through the next test would delete that
+      // test's pets out from under it.
+      await utils.waitForQueueFinish(admin.accessToken, 'petDetection');
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    // The Reset dialog promises "this always deletes all named pets and their embeddings", so the
+    // purge must not sit behind the recognition-enabled gate — the same #718 ordering the sibling
+    // PetDetection queue already has. Only the non-force fan-out is gated.
+    it('force-resetting petRecognition purges pets even while recognition is disabled (R9.10)', async () => {
+      const asset = await utils.createAsset(admin.accessToken);
+      const petId = await utils.createPet(admin.userId, 'cat', 'Whiskers');
+      await utils.createFace({ assetId: asset.id, personId: petId });
+
+      // Recognition (and detection) stay at their default-disabled state here.
+      const config = await getSystemConfig(admin.accessToken);
+      expect(config.machineLearning.petRecognition.enabled).toBe(false);
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: true });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      const { status: getStatus } = await request(app)
+        .get(`/people/${petId}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(getStatus).toBe(400);
+
+      // Same reason as R9.9: the reset requeues a force detection run whose own purge would
+      // otherwise land inside the next test.
+      await utils.waitForQueueFinish(admin.accessToken, 'petDetection');
+    });
+
+    it('starting petRecognition WITHOUT force stays a no-op while recognition is disabled (R9.10b)', async () => {
+      const asset = await utils.createAsset(admin.accessToken);
+      const petId = await utils.createPet(admin.userId, 'cat', 'Mittens');
+      await utils.createFace({ assetId: asset.id, personId: petId });
+
+      const config = await getSystemConfig(admin.accessToken);
+      expect(config.machineLearning.petRecognition.enabled).toBe(false);
+
+      const { status } = await request(app)
+        .put('/jobs/petRecognition')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: false });
+
+      expect(status).toBe(200);
+      await utils.waitForQueueFinish(admin.accessToken, 'petRecognition');
+
+      const { status: getStatus, body } = await request(app)
+        .get(`/people/${petId}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(getStatus).toBe(200);
+      expect(body.type).toBe('pet');
+      expect(body.species).toBe('cat');
     });
   });
 });

@@ -14,6 +14,7 @@ class SystemConfigNightlyTasksDto {
   /// Returns a new [SystemConfigNightlyTasksDto] instance.
   SystemConfigNightlyTasksDto({
     required this.clusterNewFaces,
+    required this.clusterNewPets,
     required this.databaseCleanup,
     required this.generateMemories,
     required this.missingThumbnails,
@@ -23,6 +24,9 @@ class SystemConfigNightlyTasksDto {
 
   /// Cluster new faces
   bool clusterNewFaces;
+
+  /// Cluster new pets
+  bool clusterNewPets;
 
   /// Database cleanup
   bool databaseCleanup;
@@ -42,6 +46,7 @@ class SystemConfigNightlyTasksDto {
   @override
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigNightlyTasksDto &&
     other.clusterNewFaces == clusterNewFaces &&
+    other.clusterNewPets == clusterNewPets &&
     other.databaseCleanup == databaseCleanup &&
     other.generateMemories == generateMemories &&
     other.missingThumbnails == missingThumbnails &&
@@ -52,6 +57,7 @@ class SystemConfigNightlyTasksDto {
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (clusterNewFaces.hashCode) +
+    (clusterNewPets.hashCode) +
     (databaseCleanup.hashCode) +
     (generateMemories.hashCode) +
     (missingThumbnails.hashCode) +
@@ -59,11 +65,12 @@ class SystemConfigNightlyTasksDto {
     (syncQuotaUsage.hashCode);
 
   @override
-  String toString() => 'SystemConfigNightlyTasksDto[clusterNewFaces=$clusterNewFaces, databaseCleanup=$databaseCleanup, generateMemories=$generateMemories, missingThumbnails=$missingThumbnails, startTime=$startTime, syncQuotaUsage=$syncQuotaUsage]';
+  String toString() => 'SystemConfigNightlyTasksDto[clusterNewFaces=$clusterNewFaces, clusterNewPets=$clusterNewPets, databaseCleanup=$databaseCleanup, generateMemories=$generateMemories, missingThumbnails=$missingThumbnails, startTime=$startTime, syncQuotaUsage=$syncQuotaUsage]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'clusterNewFaces'] = this.clusterNewFaces;
+      json[r'clusterNewPets'] = this.clusterNewPets;
       json[r'databaseCleanup'] = this.databaseCleanup;
       json[r'generateMemories'] = this.generateMemories;
       json[r'missingThumbnails'] = this.missingThumbnails;
@@ -82,6 +89,7 @@ class SystemConfigNightlyTasksDto {
 
       return SystemConfigNightlyTasksDto(
         clusterNewFaces: mapValueOfType<bool>(json, r'clusterNewFaces')!,
+        clusterNewPets: mapValueOfType<bool>(json, r'clusterNewPets')!,
         databaseCleanup: mapValueOfType<bool>(json, r'databaseCleanup')!,
         generateMemories: mapValueOfType<bool>(json, r'generateMemories')!,
         missingThumbnails: mapValueOfType<bool>(json, r'missingThumbnails')!,
@@ -135,6 +143,7 @@ class SystemConfigNightlyTasksDto {
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
     'clusterNewFaces',
+    'clusterNewPets',
     'databaseCleanup',
     'generateMemories',
     'missingThumbnails',

@@ -77,6 +77,8 @@ enum JobName {
   ocr._(r'Ocr'),
   petDetectionQueueAll._(r'PetDetectionQueueAll'),
   petDetection._(r'PetDetection'),
+  petRecognitionQueueAll._(r'PetRecognitionQueueAll'),
+  petRecognition._(r'PetRecognition'),
   workflowAssetTrigger._(r'WorkflowAssetTrigger'),
   integrityUntrackedFilesQueueAll._(r'IntegrityUntrackedFilesQueueAll'),
   integrityUntrackedFiles._(r'IntegrityUntrackedFiles'),
@@ -229,6 +231,8 @@ class JobNameTypeTransformer {
         case r'Ocr': return JobName.ocr;
         case r'PetDetectionQueueAll': return JobName.petDetectionQueueAll;
         case r'PetDetection': return JobName.petDetection;
+        case r'PetRecognitionQueueAll': return JobName.petRecognitionQueueAll;
+        case r'PetRecognition': return JobName.petRecognition;
         case r'WorkflowAssetTrigger': return JobName.workflowAssetTrigger;
         case r'IntegrityUntrackedFilesQueueAll': return JobName.integrityUntrackedFilesQueueAll;
         case r'IntegrityUntrackedFiles': return JobName.integrityUntrackedFiles;

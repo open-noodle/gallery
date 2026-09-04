@@ -75,12 +75,16 @@ describe(QueueService.name, () => {
     it('should update concurrency', () => {
       sut.onConfigUpdate({ newConfig: defaults, oldConfig: {} as SystemConfig });
 
-      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(23);
+      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(24);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(5, QueueName.FacialRecognition, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(7, QueueName.DuplicateDetection, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(8, QueueName.BackgroundTask, 5);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(9, QueueName.PeopleBackfill, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(10, QueueName.StorageTemplateMigration, 1);
+      // Pet recognition clusters faces one at a time (search -> create person -> assign). Running it
+      // concurrently races two faces of the same pet into two separate people, so it is pinned to 1
+      // the same way facial recognition is.
+      expect(mocks.job.setConcurrency).toHaveBeenCalledWith(QueueName.PetRecognition, 1);
     });
 
     it('should update cron expression on non-microservices worker when lock held', async () => {
@@ -362,6 +366,7 @@ describe(QueueService.name, () => {
         { name: JobName.AssetGenerateThumbnailsQueueAll, data: { force: false } },
         { name: JobName.FacialRecognitionQueueAll, data: { force: false, nightly: true } },
         { name: JobName.SharedSpaceIdentityReconciliationSweep },
+        { name: JobName.PetRecognitionQueueAll, data: { force: false, nightly: true } },
       ]);
     });
 
@@ -412,6 +417,7 @@ describe(QueueService.name, () => {
           syncQuotaUsage: false,
           missingThumbnails: true,
           clusterNewFaces: false,
+          clusterNewPets: false,
         },
       });
 
@@ -526,6 +532,39 @@ describe(QueueService.name, () => {
       });
     });
 
+    it('should queue nightly pet recognition clustering when enabled (6.6)', async () => {
+      await sut.handleNightlyJobs();
+
+      const jobs = mocks.job.queueAll.mock.calls[0][0];
+      expect(jobs).toContainEqual({
+        name: JobName.PetRecognitionQueueAll,
+        data: { force: false, nightly: true },
+      });
+      expect(jobs).not.toContainEqual(
+        expect.objectContaining({
+          name: JobName.PetRecognitionQueueAll,
+          data: expect.objectContaining({ force: true }),
+        }),
+      );
+    });
+
+    it('should skip clustering new pets when disabled (6.6)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        nightlyTasks: {
+          ...defaults.nightlyTasks,
+          clusterNewPets: false,
+        },
+      });
+
+      await sut.handleNightlyJobs();
+
+      const call = mocks.job.queueAll.mock.calls[0][0];
+      expect(call).not.toContainEqual({
+        name: JobName.PetRecognitionQueueAll,
+        data: { force: false, nightly: true },
+      });
+    });
+
     it('should queue empty array when all nightly tasks are disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue({
         nightlyTasks: {
@@ -535,6 +574,7 @@ describe(QueueService.name, () => {
           syncQuotaUsage: false,
           missingThumbnails: false,
           clusterNewFaces: false,
+          clusterNewPets: false,
         },
       });
 
@@ -571,6 +611,7 @@ describe(QueueService.name, () => {
         [QueueName.BackupDatabase]: expected,
         [QueueName.Ocr]: expected,
         [QueueName.PetDetection]: expected,
+        [QueueName.PetRecognition]: expected,
         [QueueName.Workflow]: expected,
         [QueueName.IntegrityCheck]: expected,
         [QueueName.Editor]: expected,
@@ -895,6 +936,15 @@ describe(QueueService.name, () => {
       await sut.runCommandLegacy(QueueName.Ocr, { command: QueueCommand.Start, force: false });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.OcrQueueAll, data: { force: false } });
+    });
+
+    it('should handle a start pet recognition command', async () => {
+      mocks.job.isActive.mockResolvedValue(false);
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+      await sut.runCommandLegacy(QueueName.PetRecognition, { command: QueueCommand.Start, force: false });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetRecognitionQueueAll, data: { force: false } });
     });
 
     it('should handle a start people backfill command', async () => {

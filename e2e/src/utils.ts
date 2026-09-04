@@ -611,6 +611,37 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
+  // Slice 9 (R9.9): the e2e stack has no ML service, so the force-reset flow can't be exercised by
+  // running detect->embed->cluster — it needs a pet person that already has an assigned face *and*
+  // a `pet_search` embedding row, seeded directly. Composes utils.createPet + utils.createFace (the
+  // person + assigned-face halves) and adds the one piece neither covers: a `pet_search` row.
+  // Inserting a 512-d vector literal is uncharted elsewhere in e2e — no existing util writes
+  // face_search/pet_search. Unlike Kysely's typed inserts (server/test/medium/...), the node-postgres
+  // client has no notion of the `vector` column type, so the parameter needs an explicit `::vector`
+  // cast in the query text rather than relying on the target column to coerce a bare string.
+  createPetWithEmbedding: async (
+    ownerId: string,
+    species: string,
+    assetId: string,
+    name?: string,
+  ): Promise<{ personId: string; faceId: string }> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const personId = await utils.createPet(ownerId, species, name);
+    const faceId = await utils.createFace({ assetId, personId });
+
+    const embedding = `[${Array.from({ length: 512 }, () => '0.1').join(',')}]`;
+    await client.query(`INSERT INTO "pet_search" ("faceId", "embedding", "species") VALUES ($1, $2::vector, $3)`, [
+      faceId,
+      embedding,
+      species,
+    ]);
+
+    return { personId, faceId };
+  },
+
   createSpacePerson: async (
     spaceId: string,
     name: string,

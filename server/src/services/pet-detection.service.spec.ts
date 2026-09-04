@@ -1,5 +1,6 @@
 import { AssetVisibility, ImmichWorker, JobName, JobStatus } from 'src/enum';
 import { PetDetectionService } from 'src/services/pet-detection.service';
+import { clearConfigCache } from 'src/utils/config';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { systemConfigStub } from 'test/fixtures/system-config.stub';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
@@ -252,6 +253,33 @@ describe(PetDetectionService.name, () => {
       expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
     });
 
+    it('behaves exactly like today when pet recognition is disabled: species buckets, no embeddings requested, no recognition jobs queued (5.1 guard)', async () => {
+      const asset = AssetFactory.create();
+      mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
+      mocks.machineLearning.detectPets.mockResolvedValue({
+        imageHeight: 100,
+        imageWidth: 200,
+        pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog' }],
+      });
+      mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
+      mocks.person.create.mockResolvedValue(makePerson());
+      mocks.person.createAssetFace.mockResolvedValue('face-id');
+      mocks.person.getById.mockResolvedValue(makePerson());
+      mocks.person.update.mockResolvedValue({} as any);
+
+      expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+      // detectPets must be requested WITHOUT a recognition model — byte-identical to today's request.
+      expect(mocks.machineLearning.detectPets.mock.calls[0][2]).toBeUndefined();
+      expect(mocks.person.getByOwnerAndSpecies).toHaveBeenCalledWith('owner-id', 'dog');
+      expect(mocks.person.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'dog', type: 'pet', species: 'dog' }),
+      );
+      expect(mocks.person.createAssetFace).toHaveBeenCalledWith(expect.objectContaining({ personId: 'person-id' }));
+      expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+      expectNoQueuedJobNames(mocks, [JobName.PetRecognition]);
+    });
+
     it('should create new pet person when none exists for species', async () => {
       const asset = AssetFactory.create();
       mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
@@ -471,6 +499,299 @@ describe(PetDetectionService.name, () => {
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
         expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
         expect(mocks.event.emit).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('when pet recognition is enabled', () => {
+      const recognitionConfig = {
+        machineLearning: {
+          enabled: true,
+          petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+          petRecognition: { enabled: true, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+        },
+      };
+
+      it('R4.1 writes faces with caller-generated ids, pairs embeddings by faceId, and queues one job per pet (5.2)', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [
+            { boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' },
+            { boundingBox: { x1: 50, y1: 60, x2: 70, y2: 80 }, score: 0.8, label: 'cat', embedding: '[4,5,6]' },
+          ],
+        });
+        mocks.crypto.randomUUID.mockReturnValueOnce('face-1').mockReturnValueOnce('face-2');
+        mocks.person.refreshPetFaces.mockResolvedValue();
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        expect(mocks.machineLearning.detectPets.mock.calls[0][2]).toEqual({ modelName: 'pet-recognition-base' });
+        expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
+          [
+            expect.objectContaining({
+              id: 'face-1',
+              assetId: asset.id,
+              imageHeight: 100,
+              imageWidth: 200,
+              boundingBoxX1: 10,
+              boundingBoxY1: 20,
+              boundingBoxX2: 30,
+              boundingBoxY2: 40,
+            }),
+            expect.objectContaining({
+              id: 'face-2',
+              assetId: asset.id,
+              imageHeight: 100,
+              imageWidth: 200,
+              boundingBoxX1: 50,
+              boundingBoxY1: 60,
+              boundingBoxX2: 70,
+              boundingBoxY2: 80,
+            }),
+          ],
+          // Paired by explicit faceId, not by position, and carrying the species for the F8 fallback.
+          [
+            { faceId: 'face-1', embedding: '[1,2,3]', species: 'dog' },
+            { faceId: 'face-2', embedding: '[4,5,6]', species: 'cat' },
+          ],
+        );
+        for (const face of mocks.person.refreshPetFaces.mock.calls[0][0]) {
+          expect((face as Record<string, unknown>).personId).toBeUndefined();
+        }
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'dog' } },
+          { name: JobName.PetRecognition, data: { id: 'face-2', deferred: false, label: 'cat' } },
+        ]);
+        expect(mocks.person.getByOwnerAndSpecies).not.toHaveBeenCalled();
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+      });
+
+      it('routes a species the re-ID model cannot identify to a species bucket instead of an individual', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'bird', embedding: '[1,2,3]' }],
+        });
+        mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
+        mocks.person.create.mockResolvedValue(makePerson());
+        mocks.person.createAssetFace.mockResolvedValue('face-id');
+        mocks.person.getById.mockResolvedValue(makePerson());
+        mocks.person.update.mockResolvedValue({} as any);
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        // The bird takes the pre-recognition path: one shared bucket person, no embedding stored,
+        // no PetRecognition job — so a misfired detection can never become its own identity.
+        expect(mocks.person.create).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'bird', type: 'pet', species: 'bird' }),
+        );
+        expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ name: JobName.PetRecognition })]),
+        );
+      });
+
+      it('splits a mixed photo: dog to individual recognition, non-recognizable species to buckets', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [
+            { boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' },
+            { boundingBox: { x1: 50, y1: 60, x2: 70, y2: 80 }, score: 0.8, label: 'horse', embedding: '[4,5,6]' },
+          ],
+        });
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockResolvedValue();
+        mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
+        mocks.person.create.mockResolvedValue(makePerson());
+        mocks.person.createAssetFace.mockResolvedValue('face-id');
+        mocks.person.getById.mockResolvedValue(makePerson());
+        mocks.person.update.mockResolvedValue({} as any);
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        // Only the dog's face and embedding reach the recognition store.
+        expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
+          [expect.objectContaining({ id: 'face-1', boundingBoxX1: 10, boundingBoxY1: 20 })],
+          [{ faceId: 'face-1', embedding: '[1,2,3]', species: 'dog' }],
+        );
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'dog' } },
+        ]);
+        // ...while the horse gets a species bucket.
+        expect(mocks.person.create).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'horse', type: 'pet', species: 'horse' }),
+        );
+        expect(mocks.person.createAssetFace).toHaveBeenCalledWith(
+          expect.objectContaining({ boundingBoxX1: 50, boundingBoxY1: 60, personId: 'person-id' }),
+        );
+      });
+
+      it('R4.2 routes a recognizable pet that arrives without an embedding to the species bucket (5.3)', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [
+            { boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' },
+            { boundingBox: { x1: 50, y1: 60, x2: 70, y2: 80 }, score: 0.8, label: 'cat' }, // no embedding
+          ],
+        });
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockResolvedValue();
+        mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
+        mocks.person.create.mockResolvedValue(makePerson({ species: 'cat', name: 'cat' }));
+        mocks.person.createAssetFace.mockResolvedValue('bucket-face-id');
+        mocks.person.getById.mockResolvedValue(makePerson({ species: 'cat', name: 'cat' }));
+        mocks.person.update.mockResolvedValue({} as any);
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        // Only the embedded dog reaches the individual pipeline...
+        expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
+          [expect.objectContaining({ id: 'face-1', boundingBoxX1: 10 })],
+          [{ faceId: 'face-1', embedding: '[1,2,3]', species: 'dog' }],
+        );
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'dog' } },
+        ]);
+
+        // ...the embedding-less cat becomes a species bucket instead of an unassigned face with no
+        // pet_search row, which would match neither arm of petFacePredicate and be unprotected.
+        expect(mocks.person.create).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'cat', type: 'pet', species: 'cat' }),
+        );
+        expect(mocks.person.createAssetFace).toHaveBeenCalledWith(
+          expect.objectContaining({ boundingBoxX1: 50, personId: 'person-id' }),
+        );
+      });
+
+      it('stamps petsDetectedAt with no writes or jobs when zero pets are detected (5.4)', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({ imageHeight: 100, imageWidth: 200, pets: [] });
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
+        expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith(
+          expect.objectContaining({ assetId: asset.id, petsDetectedAt: expect.any(Date) }),
+        );
+      });
+
+      it('pin: fails and does not stamp petsDetectedAt when refreshPetFaces rejects', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' }],
+        });
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockRejectedValue(new Error('embedding dimension mismatch'));
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
+
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      });
+
+      it('pin: species routing accepts a capitalized label (e.g. "Dog") case-insensitively', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockResolvedValue({
+          imageHeight: 100,
+          imageWidth: 200,
+          pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'Dog', embedding: '[1,2,3]' }],
+        });
+        mocks.crypto.randomUUID.mockReturnValue('face-1');
+        mocks.person.refreshPetFaces.mockResolvedValue();
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
+
+        // 'Dog' (capitalized) still resolves as a recognizable species, so it reaches the
+        // individual recognition pipeline rather than falling through to a species bucket.
+        expect(mocks.person.refreshPetFaces).toHaveBeenCalledWith(
+          [expect.objectContaining({ id: 'face-1' })],
+          [{ faceId: 'face-1', embedding: '[1,2,3]', species: 'Dog' }],
+        );
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.PetRecognition, data: { id: 'face-1', deferred: false, label: 'Dog' } },
+        ]);
+        expect(mocks.person.create).not.toHaveBeenCalled();
+      });
+
+      it('R5.12 mid-flight model-switch guard: skips the write when the config model changed while the ML call was in flight', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockImplementation(() => {
+          // Simulates a ConfigUpdate (PetRecognitionService.handleModelSwitch) landing while this
+          // ML request was in flight: it clears the shared config cache and persists a new model
+          // name, so the re-fetch below observes the switch.
+          clearConfigCache();
+          mocks.systemMetadata.get.mockResolvedValue({
+            machineLearning: {
+              enabled: true,
+              petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+              petRecognition: { enabled: true, modelName: 'pet-recognition-large', maxDistance: 0.55, minFaces: 1 },
+            },
+          });
+          return Promise.resolve({
+            imageHeight: 100,
+            imageWidth: 200,
+            pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' }],
+          });
+        });
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Skipped);
+
+        expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      });
+
+      it('R5.12b mid-flight guard also covers recognition being switched OFF while the ML call was in flight', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(recognitionConfig);
+        mocks.machineLearning.detectPets.mockImplementation(() => {
+          clearConfigCache();
+          mocks.systemMetadata.get.mockResolvedValue({
+            machineLearning: {
+              enabled: true,
+              petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+              petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+            },
+          });
+          return Promise.resolve({
+            imageHeight: 100,
+            imageWidth: 200,
+            pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'dog', embedding: '[1,2,3]' }],
+          });
+        });
+
+        // Nothing purges on a recognition-off toggle, so writing these rows would leave
+        // individual-pipeline faces and embeddings in a library that is now bucket-only. Skipping
+        // before the petsDetectedAt stamp means the next detection run redoes the asset properly.
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Skipped);
+
+        expect(mocks.person.refreshPetFaces).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.job.queueAll).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
       });
     });
   });

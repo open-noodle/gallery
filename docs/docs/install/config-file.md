@@ -158,6 +158,17 @@ The default configuration looks like this:
       "minRecognitionScore": 0.8,
       "modelName": "PP-OCRv5_mobile"
     },
+    "petDetection": {
+      "enabled": false,
+      "minScore": 0.6,
+      "modelName": "yolo11s"
+    },
+    "petRecognition": {
+      "enabled": false,
+      "maxDistance": 0.55,
+      "minFaces": 1,
+      "modelName": "pet-recognition-base"
+    },
     "urls": ["http://immich-machine-learning:3003"]
   },
   "map": {
@@ -313,6 +324,12 @@ Unassigned detected faces and pets are not counted as known human faces.
 Face-aware categories require facial recognition. When facial recognition is disabled, categories with a non-`off` `faceExclusion` value are skipped.
 
 See the [Auto-Classification docs](/features/auto-classification) for the full field reference and prompt writing tips.
+:::
+
+:::danger Pet recognition model changes bypass the confirmation dialog
+`machineLearning.petRecognition.modelName` is destructive to change: every model has its own embedding space, so switching it **deletes all pet people and their embeddings and reprocesses the library**. The admin UI asks you to confirm first — editing this file does not, so the purge simply happens on the next start.
+
+If pet detection is disabled at that moment, nothing is rebuilt: the reprocess is deferred until detection is enabled again. Species buckets (bird, horse, ...) are pure detector output and survive a model switch either way. See [Pet Recognition](/features/pet-recognition).
 :::
 
 :::info Memories

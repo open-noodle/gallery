@@ -1506,6 +1506,26 @@ export function vectorIndexQuery({ vectorExtension, table, indexName, lists }: V
   }
 }
 
+/** A pet face: has a pet embedding, or is assigned to a pet person. Pet faces share
+ *  sourceType 'machine-learning' with human faces, so this predicate is the ONLY way
+ *  human-pipeline queries can avoid destroying pet data (F1–F4). */
+export const petFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+  eb.or([
+    eb.exists(
+      eb
+        .selectFrom('pet_search')
+        .select(sql`1`.as('one'))
+        .whereRef('pet_search.faceId', '=', 'asset_face.id'),
+    ),
+    eb.exists(
+      eb
+        .selectFrom('person')
+        .select(sql`1`.as('one'))
+        .whereRef('person.id', '=', 'asset_face.personId')
+        .where('person.type', '=', 'pet'),
+    ),
+  ]);
+
 export const updateLockedColumns = <T extends Record<string, unknown> & { lockedProperties?: LockableProperty[] }>(
   exif: T,
 ) => {

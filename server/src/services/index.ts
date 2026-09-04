@@ -32,6 +32,7 @@ import { OcrService } from 'src/services/ocr.service';
 import { PartnerService } from 'src/services/partner.service';
 import { PersonService } from 'src/services/person.service';
 import { PetDetectionService } from 'src/services/pet-detection.service';
+import { PetRecognitionService } from 'src/services/pet-recognition.service';
 import { PluginService } from 'src/services/plugin.service';
 import { QueueService } from 'src/services/queue.service';
 import { SearchService } from 'src/services/search.service';
@@ -93,6 +94,7 @@ export const services = [
   OcrService,
   PartnerService,
   PetDetectionService,
+  PetRecognitionService,
   PersonService,
   PluginService,
   QueueService,

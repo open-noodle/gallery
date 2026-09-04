@@ -873,7 +873,9 @@ export class PersonService extends BaseService {
     }
 
     if (force) {
-      await this.personRepository.deleteFaces({ sourceType: SourceType.MachineLearning });
+      // excludePetFaces: pet faces carry the same machine-learning sourceType, so an unfiltered
+      // delete here hard-deletes every pet face and its embedding (F3).
+      await this.personRepository.deleteFaces({ sourceType: SourceType.MachineLearning, excludePetFaces: true });
       await this.handlePersonCleanup();
       await this.sharedSpaceRepository.deleteAllOrphanedPersons();
       await this.personRepository.vacuum({ reindexVectors: true });
@@ -933,13 +935,21 @@ export class PersonService extends BaseService {
     const mlFaceIds = new Set<string>();
 
     for (const face of asset.faces) {
-      if (face.sourceType === SourceType.MachineLearning) {
+      // Pet faces carry the same machine-learning sourceType as human faces, so without the isPet
+      // guard they land in faceIdsToRemove and get hard-deleted on every re-detection (F4).
+      if (face.sourceType === SourceType.MachineLearning && !face.isPet) {
         mlFaceIds.add(face.id);
       }
     }
 
     for (const { boundingBox, embedding } of faces) {
       const match = asset.faces.find((face) => {
+        // A detected human box must never resolve to a pet face: the match either consumes it or,
+        // once consumed, receives a human face_search embedding written over the pet (F4).
+        if (face.isPet) {
+          return false;
+        }
+
         const heightScale = face.imageHeight / imageHeight;
         const widthScale = face.imageWidth / imageWidth;
         const scaledBox = {
@@ -1057,16 +1067,21 @@ export class PersonService extends BaseService {
     const hasPendingRecognitionWork = waiting > 0 || delayed > 0 || paused > 0 || hasOtherActiveRecognitionWork;
 
     if (force) {
-      await this.personRepository.unassignFaces({ sourceType: SourceType.MachineLearning });
-      await this.faceIdentityRepository.unlinkFacesBySourceType(SourceType.MachineLearning);
+      // excludePetFaces / excludePets throughout: pet faces share the machine-learning sourceType
+      // and space pet copies are untyped-wipe collateral, so an unfiltered human reset unassigns
+      // pet faces, unlinks their identities and deletes every space pet copy (F1).
+      await this.personRepository.unassignFaces({ sourceType: SourceType.MachineLearning, excludePetFaces: true });
+      await this.faceIdentityRepository.unlinkFacesBySourceType(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
       await this.handlePersonCleanup();
       await this.personRepository.vacuum({ reindexVectors: false });
 
       // Wipe shared-space person state so the new strict clustering algorithm can
       // rebuild from scratch. Aliases cascade via the FK on personId; named
       // space-persons are lost by design (Force already clears named native persons).
-      await this.sharedSpaceRepository.deleteAllPersonFaces();
-      await this.sharedSpaceRepository.deleteAllPersons();
+      await this.sharedSpaceRepository.deleteAllPersonFaces({ excludePets: true });
+      await this.sharedSpaceRepository.deleteAllPersons({ excludePets: true });
       await this.faceIdentityRepository.deleteUnreferencedIdentities();
       // Slice 8 (F16): the reaper for face_person_verdict rows deleteUnreferencedIdentities is what nulls a
       // row's LAST remaining key (personId/spacePersonId are already NULL by this point, via the person and
@@ -1089,10 +1104,17 @@ export class PersonService extends BaseService {
     // Slice 5 (F9): excludeManuallyPlaced only applies on the non-forced branch. The forced branch already
     // wiped every face_identity_face row via unassignFaces above, so there is nothing left to preserve —
     // passing it there would be meaningless.
+    // excludePetFaces on both arms: pet faces would otherwise be fanned out as human
+    // FacialRecognition jobs, which fail (no face_search embedding) on every run (F2).
     const facePagination = this.personRepository.getAllFaces(
       force
-        ? { sourceType: SourceType.MachineLearning }
-        : { personId: null, sourceType: SourceType.MachineLearning, excludeManuallyPlaced: true },
+        ? { sourceType: SourceType.MachineLearning, excludePetFaces: true }
+        : {
+            personId: null,
+            sourceType: SourceType.MachineLearning,
+            excludeManuallyPlaced: true,
+            excludePetFaces: true,
+          },
     );
 
     let jobs: {

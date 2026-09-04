@@ -30,6 +30,7 @@ enum QueueName {
   backupDatabase._(r'backupDatabase'),
   ocr._(r'ocr'),
   petDetection._(r'petDetection'),
+  petRecognition._(r'petRecognition'),
   workflow._(r'workflow'),
   integrityCheck._(r'integrityCheck'),
   editor._(r'editor'),
@@ -112,6 +113,7 @@ class QueueNameTypeTransformer {
         case r'backupDatabase': return QueueName.backupDatabase;
         case r'ocr': return QueueName.ocr;
         case r'petDetection': return QueueName.petDetection;
+        case r'petRecognition': return QueueName.petRecognition;
         case r'workflow': return QueueName.workflow;
         case r'integrityCheck': return QueueName.integrityCheck;
         case r'editor': return QueueName.editor;

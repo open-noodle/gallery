@@ -9,7 +9,7 @@ import type { PeopleFaceStatistics, PersonStatistics } from 'src/repositories/pe
 import { DB } from 'src/schema';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
-import { anyUuid, retryOnDeadlock } from 'src/utils/database';
+import { anyUuid, petFacePredicate, retryOnDeadlock } from 'src/utils/database';
 import { asDateString, asDateTimeString } from 'src/utils/date';
 import { targetTokens } from 'src/utils/face-repair';
 import { rekeyVerdictIdentity } from 'src/utils/face-verdict-merge';
@@ -2578,10 +2578,19 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({ params: [SourceType.MachineLearning] })
-  async unlinkFacesBySourceType(sourceType: SourceType): Promise<void> {
+  async unlinkFacesBySourceType(sourceType: SourceType, options: { excludePetFaces?: boolean } = {}): Promise<void> {
     await this.db
       .deleteFrom('face_identity_face')
-      .where('assetFaceId', 'in', this.db.selectFrom('asset_face').select('id').where('sourceType', '=', sourceType))
+      .where(
+        'assetFaceId',
+        'in',
+        this.db
+          .selectFrom('asset_face')
+          .select('id')
+          .where('sourceType', '=', sourceType)
+          // Human resets must not unlink pet identities: pet faces share this sourceType (F1).
+          .$if(!!options.excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb)))),
+      )
       .execute();
   }
 

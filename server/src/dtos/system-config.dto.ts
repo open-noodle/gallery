@@ -7,6 +7,7 @@ import {
   FacialRecognitionConfigSchema,
   OcrConfigSchema,
   PetDetectionConfigSchema,
+  PetRecognitionConfigSchema,
 } from 'src/dtos/model-config.dto';
 import {
   AudioCodecSchema,
@@ -192,6 +193,7 @@ const SystemConfigMachineLearningSchema = z
     facialRecognition: FacialRecognitionConfigSchema,
     ocr: OcrConfigSchema,
     petDetection: PetDetectionConfigSchema,
+    petRecognition: PetRecognitionConfigSchema,
   })
   .meta({ id: 'SystemConfigMachineLearningDto' });
 
@@ -259,6 +261,7 @@ const SystemConfigNightlyTasksSchema = z
     databaseCleanup: configBool.describe('Database cleanup'),
     missingThumbnails: configBool.describe('Missing thumbnails'),
     clusterNewFaces: configBool.describe('Cluster new faces'),
+    clusterNewPets: configBool.describe('Cluster new pets'),
     generateMemories: configBool.describe('Generate memories'),
     syncQuotaUsage: configBool.describe('Sync quota usage'),
   })

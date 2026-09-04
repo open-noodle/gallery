@@ -95,3 +95,10 @@ per-file-ignores = { "test_main.py" = ["F403"] }
 
 [tool.pytest.ini_options]
 markers = ["providers", "ov_device_ids"]
+# pet-recognition-training is a separate uv project with its own venv and dependencies;
+# collecting it from here fails on imports (torch, petid) the ML service does not have. Its suite has
+# its own CI job (`mise run test-training`) — see .github/workflows/test.yml.
+#
+# Setting norecursedirs REPLACES pytest's defaults rather than adding to them, so they are repeated
+# here; dropping them would start collecting a future build/ or node_modules/ under machine-learning.
+norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "pet-recognition-training"]

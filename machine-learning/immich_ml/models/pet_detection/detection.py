@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 from immich_ml.config import clean_name
 from immich_ml.models.base import InferenceModel
 from immich_ml.models.transforms import decode_cv2
-from immich_ml.schemas import BoundingBox, ModelSession, ModelTask, ModelType, PetDetectionOutput
+from immich_ml.schemas import BoundingBox, ModelFormat, ModelSession, ModelTask, ModelType, PetDetectionOutput
 
 _HF_ORG = "Deeds67"
 
@@ -54,10 +54,16 @@ class PetDetector(InferenceModel):
     def _download(self) -> None:
         from huggingface_hub import snapshot_download
 
+        ignored_patterns: dict[ModelFormat, list[str]] = {
+            ModelFormat.ONNX: ["*.armnn", "*.rknn"],
+            ModelFormat.ARMNN: ["*.rknn"],
+            ModelFormat.RKNN: ["*.armnn"],
+        }
         snapshot_download(
             f"{_HF_ORG}/{clean_name(self.model_name)}",
             cache_dir=self.cache_dir,
             local_dir=self.cache_dir,
+            ignore_patterns=ignored_patterns.get(self.model_format, []),
         )
 
     def _load(self) -> ModelSession:
@@ -140,10 +146,10 @@ class PetDetector(InferenceModel):
         results: PetDetectionOutput = []
         for i in range(len(boxes_xyxy)):
             bbox: BoundingBox = {
-                "x1": int(round(boxes_xyxy[i, 0])),
-                "y1": int(round(boxes_xyxy[i, 1])),
-                "x2": int(round(boxes_xyxy[i, 2])),
-                "y2": int(round(boxes_xyxy[i, 3])),
+                "x1": max(0, min(int(round(boxes_xyxy[i, 0])), orig_w)),
+                "y1": max(0, min(int(round(boxes_xyxy[i, 1])), orig_h)),
+                "x2": max(0, min(int(round(boxes_xyxy[i, 2])), orig_w)),
+                "y2": max(0, min(int(round(boxes_xyxy[i, 3])), orig_h)),
             }
             results.append(
                 {

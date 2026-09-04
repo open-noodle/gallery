@@ -116,6 +116,12 @@ export type SystemConfig = {
       modelName: string;
       minScore: number;
     };
+    petRecognition: {
+      enabled: boolean;
+      modelName: string;
+      maxDistance: number;
+      minFaces: number;
+    };
   };
   map: {
     enabled: boolean;
@@ -177,6 +183,7 @@ export type SystemConfig = {
     databaseCleanup: boolean;
     missingThumbnails: boolean;
     clusterNewFaces: boolean;
+    clusterNewPets: boolean;
     generateMemories: boolean;
     syncQuotaUsage: boolean;
   };
@@ -373,6 +380,12 @@ export const defaults = Object.freeze<SystemConfig>({
       modelName: 'yolo11s',
       minScore: 0.6,
     },
+    petRecognition: {
+      enabled: false,
+      modelName: 'pet-recognition-base',
+      maxDistance: 0.55,
+      minFaces: 1,
+    },
   },
   map: {
     enabled: true,
@@ -453,6 +466,7 @@ export const defaults = Object.freeze<SystemConfig>({
     syncQuotaUsage: true,
     missingThumbnails: true,
     clusterNewFaces: true,
+    clusterNewPets: true,
   },
   memories: {
     retentionDays: 365,
