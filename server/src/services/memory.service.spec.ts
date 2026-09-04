@@ -107,6 +107,18 @@ describe(MemoryService.name, () => {
     // dead (see F3). Stubbing to a no-op here keeps that path live everywhere.
     mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
     mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
+    // #1041 §4/§6.2: resolved for every memory read/generation call. Default to "nothing hidden"
+    // so pre-existing tests keep their original behaviour; hide-from-timeline-specific tests
+    // override this per-test.
+    mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+      hiddenSpaceIds: [],
+      hiddenAlbumIds: [],
+      hiddenAlbumSpacePairs: [],
+      hiddenLibraryIds: [],
+    });
+    // #1041 §3: resolved beside the scope on every memory read — it carries the "another visible
+    // path re-admits this photo" arm, which memories have no sibling arm for.
+    mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -1370,7 +1382,19 @@ describe(MemoryService.name, () => {
 
       await sut.search(auth, dto);
 
-      expect(mocks.memory.searchAccessible).toHaveBeenCalledWith(auth.user.id, dto);
+      // #1041: search() now also resolves and threads the caller's hidden scope (§6.2) and the
+      // visible spaces that carry §3's rescue arm.
+      expect(mocks.memory.searchAccessible).toHaveBeenCalledWith(
+        auth.user.id,
+        dto,
+        {
+          hiddenSpaceIds: [],
+          hiddenAlbumIds: [],
+          hiddenAlbumSpacePairs: [],
+          hiddenLibraryIds: [],
+        },
+        [],
+      );
     });
 
     it('should only return assets the user can access', async () => {
@@ -1566,7 +1590,19 @@ describe(MemoryService.name, () => {
         id: memory.id,
       });
 
-      expect(mocks.memory.get).toHaveBeenCalledWith(memory.id);
+      // #1041: get() now also resolves and threads the viewer id + hidden scope (§6.2) and the
+      // visible spaces that carry §3's rescue arm.
+      expect(mocks.memory.get).toHaveBeenCalledWith(
+        memory.id,
+        userId,
+        {
+          hiddenSpaceIds: [],
+          hiddenAlbumIds: [],
+          hiddenAlbumSpacePairs: [],
+          hiddenLibraryIds: [],
+        },
+        [],
+      );
       expect(mocks.access.memory.checkOwnerAccess).toHaveBeenCalledWith(memory.ownerId, new Set([memory.id]));
     });
   });

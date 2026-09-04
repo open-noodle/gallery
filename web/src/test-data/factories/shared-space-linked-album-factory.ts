@@ -16,6 +16,7 @@ export const sharedSpaceLinkedAlbumFactory = Sync.makeFactory<SharedSpaceLinkedA
   order: AssetOrder.Desc,
   ownerId: Sync.each(() => faker.string.uuid()),
   showInTimeline: true,
+  hiddenFromMyTimeline: false,
   addedById: Sync.each(() => faker.string.uuid()),
   linkedAt: Sync.each(() => faker.date.recent().toISOString()),
 });

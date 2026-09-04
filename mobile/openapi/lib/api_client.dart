@@ -793,6 +793,8 @@ class ApiClient {
           return SharedSpaceActivityResponseDto.fromJson(value);
         case 'SharedSpaceAlbumLinkUpdateDto':
           return SharedSpaceAlbumLinkUpdateDto.fromJson(value);
+        case 'SharedSpaceAlbumMemberTimelineDto':
+          return SharedSpaceAlbumMemberTimelineDto.fromJson(value);
         case 'SharedSpaceAssetAddDto':
           return SharedSpaceAssetAddDto.fromJson(value);
         case 'SharedSpaceAssetLinkedAlbumDto':
@@ -835,6 +837,8 @@ class ApiClient {
           return SharedSpaceResponseDtoLastContributor.fromJson(value);
         case 'SharedSpaceRole':
           return SharedSpaceRoleTypeTransformer().decode(value);
+        case 'SharedSpaceTimelineHidePreviewDto':
+          return SharedSpaceTimelineHidePreviewDto.fromJson(value);
         case 'SharedSpaceUpdateDto':
           return SharedSpaceUpdateDto.fromJson(value);
         case 'SignUpDto':
@@ -939,6 +943,10 @@ class ApiClient {
           return SyncPersonV1.fromJson(value);
         case 'SyncRequestType':
           return SyncRequestTypeTypeTransformer().decode(value);
+        case 'SyncSharedSpaceAlbumHiddenDeleteV1':
+          return SyncSharedSpaceAlbumHiddenDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceAlbumHiddenV1':
+          return SyncSharedSpaceAlbumHiddenV1.fromJson(value);
         case 'SyncSharedSpaceAlbumLinkDeleteV1':
           return SyncSharedSpaceAlbumLinkDeleteV1.fromJson(value);
         case 'SyncSharedSpaceAlbumLinkV1':

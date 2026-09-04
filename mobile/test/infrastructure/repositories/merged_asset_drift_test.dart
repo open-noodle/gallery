@@ -6,6 +6,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_hidden.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
@@ -731,7 +732,8 @@ void main() {
       expect(rows.single.remoteId, 'asset-1');
     });
 
-    test('mergedBucket excludes an album-linked asset when the album LINK showInTimeline is false', () async {
+    test('mergedBucket still includes an album-linked asset when the album LINK showInTimeline is false '
+        '(#1041: that shared flag now governs only the space\'s own Photos tab, not personal timelines)', () async {
       final createdAt = DateTime(2024, 1, 1, 12);
       await setUpUsers();
       await insertAlbumAsset(createdAt);
@@ -742,7 +744,8 @@ void main() {
           .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
           .get();
 
-      expect(buckets, isEmpty);
+      expect(buckets, hasLength(1));
+      expect(buckets.single.assetCount, 1);
     });
 
     test('mergedBucket excludes an album-linked asset when the MEMBER showInTimeline is false', () async {
@@ -777,6 +780,9 @@ void main() {
     });
 
     test('mergedBucket watch stream re-emits when the album link showInTimeline toggles', () async {
+      // The shared LINK flag no longer gates personal timelines (#1041), so toggling it must NOT
+      // change what the viewer sees — but the query still reads the table (readsFrom), so the
+      // stream is expected to re-emit with the SAME contents, not go empty.
       final createdAt = DateTime(2024, 1, 1, 12);
       await setUpUsers();
       await insertAlbumAsset(createdAt);
@@ -796,10 +802,400 @@ void main() {
             ..where((t) => t.spaceId.equals('space-1') & t.albumId.equals('album-1')))
           .write(const SharedSpaceAlbumLinkEntityCompanion(showInTimeline: Value(false)));
 
-      await _waitFor(() => emissions.length >= 2);
-      expect(emissions.last, isEmpty);
+      // Give the stream a moment to (not) re-emit an empty list; then confirm it settled non-empty.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(emissions.last, hasLength(1));
 
       await subscription.cancel();
+    });
+
+    test(
+      'mergedBucket watch stream re-emits when the viewer hides the album for themselves (shared_space_album_hidden)',
+      () async {
+        // This is the mechanism that now actually gates personal timelines (#1041).
+        final createdAt = DateTime(2024, 1, 1, 12);
+        await setUpUsers();
+        await insertAlbumAsset(createdAt);
+        await setUpSpaceAndMember(memberShowInTimeline: true);
+        await linkAlbum(linkShowInTimeline: true);
+
+        final emissions = <List<MergedBucketResult>>[];
+        final subscription = db.mergedAssetDrift
+            .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: ['viewer-1'], currentUserId: 'viewer-1')
+            .watch()
+            .listen(emissions.add);
+
+        await _waitFor(() => emissions.isNotEmpty);
+        expect(emissions.last, hasLength(1));
+
+        await db
+            .into(db.sharedSpaceAlbumHiddenEntity)
+            .insert(
+              SharedSpaceAlbumHiddenEntityCompanion.insert(spaceId: 'space-1', albumId: 'album-1', userId: 'viewer-1'),
+            );
+
+        await _waitFor(() => emissions.length >= 2);
+        expect(emissions.last, isEmpty);
+
+        await subscription.cancel();
+      },
+    );
+  });
+
+  group('#1041: owned assets are subtracted from the personal timeline via hidden spaces/albums', () {
+    // These are the mobile copies of the server's scenarios (design doc §9.5): the .drift
+    // predicate is a hand-written mirror, so a server test proves nothing about it.
+    const viewerId = 'viewer-1';
+
+    Future<void> insertViewer() =>
+        db.into(db.userEntity).insert(UserEntityCompanion.insert(id: viewerId, email: 'viewer@test.dev', name: 'V'));
+
+    Future<void> insertOwnedAsset(String assetId, DateTime createdAt, {String? libraryId}) => db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: assetId,
+            name: '$assetId.jpg',
+            type: AssetType.image,
+            checksum: 'checksum-$assetId',
+            ownerId: viewerId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(createdAt),
+            updatedAt: Value(createdAt),
+            localDateTime: Value(createdAt),
+            libraryId: libraryId == null ? const Value.absent() : Value(libraryId),
+          ),
+        );
+
+    Future<void> insertSpace(String spaceId, {String name = 'Space'}) => db
+        .into(db.sharedSpaceEntity)
+        .insert(SharedSpaceEntityCompanion.insert(id: spaceId, name: name, createdById: viewerId));
+
+    Future<void> insertMember(String spaceId, {required bool showInTimeline}) => db
+        .into(db.sharedSpaceMemberEntity)
+        .insert(
+          SharedSpaceMemberEntityCompanion.insert(
+            spaceId: spaceId,
+            userId: viewerId,
+            role: 'owner',
+            showInTimeline: Value(showInTimeline),
+          ),
+        );
+
+    Future<void> insertDirectSpaceAsset(String spaceId, String assetId) => db
+        .into(db.sharedSpaceAssetEntity)
+        .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
+
+    Future<void> insertLibraryLink(String spaceId, String libraryId) => db
+        .into(db.sharedSpaceLibraryEntity)
+        .insert(SharedSpaceLibraryEntityCompanion.insert(spaceId: spaceId, libraryId: libraryId));
+
+    Future<void> insertAlbumLink(String spaceId, String albumId) => db
+        .into(db.sharedSpaceAlbumLinkEntity)
+        .insert(SharedSpaceAlbumLinkEntityCompanion.insert(spaceId: spaceId, albumId: albumId));
+
+    Future<void> insertAlbumAssetRow(String albumId, String assetId) => db
+        .into(db.sharedSpaceAlbumAssetEntity)
+        .insert(SharedSpaceAlbumAssetEntityCompanion.insert(albumId: albumId, assetId: assetId));
+
+    Future<void> hideAlbumForViewer(String spaceId, String albumId) => db
+        .into(db.sharedSpaceAlbumHiddenEntity)
+        .insert(SharedSpaceAlbumHiddenEntityCompanion.insert(spaceId: spaceId, albumId: albumId, userId: viewerId));
+
+    Future<void> expectShows(String assetId) async {
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [viewerId], currentUserId: viewerId)
+          .get();
+      expect(buckets, hasLength(1), reason: 'expected $assetId to show in bucket counts');
+      expect(buckets.single.assetCount, 1);
+
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: [viewerId], currentUserId: viewerId, limit: (_) => Limit(50, 0))
+          .get();
+      expect(rows.map((r) => r.remoteId), contains(assetId), reason: 'expected $assetId to show in the asset list');
+    }
+
+    Future<void> expectAbsent(String assetId) async {
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [viewerId], currentUserId: viewerId)
+          .get();
+      expect(buckets, isEmpty, reason: 'expected $assetId to be absent from bucket counts');
+
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: [viewerId], currentUserId: viewerId, limit: (_) => Limit(50, 0))
+          .get();
+      expect(
+        rows.map((r) => r.remoteId),
+        isNot(contains(assetId)),
+        reason: 'expected $assetId to be absent from the asset list',
+      );
+    }
+
+    final createdAt = DateTime(2024, 1, 1, 12);
+
+    test('S1: owned asset in no space -> shows', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+
+      await expectShows('asset-1');
+    });
+
+    test('S2: owned, only in an album I hid -> ABSENT', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+      await hideAlbumForViewer('space-s', 'album-x');
+
+      await expectAbsent('asset-1');
+    });
+
+    test('S3: S2 + also in a visible album -> shows', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+      await hideAlbumForViewer('space-s', 'album-x');
+      // Also in a visible album Y, linked to the same shown space.
+      await insertAlbumLink('space-s', 'album-y');
+      await insertAlbumAssetRow('album-y', 'asset-1');
+
+      await expectShows('asset-1');
+    });
+
+    test('S4: S2 + also added to the space directly -> shows', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+      await hideAlbumForViewer('space-s', 'album-x');
+      await insertDirectSpaceAsset('space-s', 'asset-1');
+
+      await expectShows('asset-1');
+    });
+
+    test('S5: owned, only in a space I hid (member flag) -> ABSENT', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: false);
+      await insertDirectSpaceAsset('space-s', 'asset-1');
+
+      await expectAbsent('asset-1');
+    });
+
+    test('S6: S5 + also direct in a second, shown space -> shows', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: false);
+      await insertDirectSpaceAsset('space-s', 'asset-1');
+      await insertSpace('space-t');
+      await insertMember('space-t', showInTimeline: true);
+      await insertDirectSpaceAsset('space-t', 'asset-1');
+
+      await expectShows('asset-1');
+    });
+
+    test('S7: album in a hidden space AND a shown space, not hidden by me in the shown one -> shows', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: false);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertSpace('space-t');
+      await insertMember('space-t', showInTimeline: true);
+      await insertAlbumLink('space-t', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+
+      await expectShows('asset-1');
+    });
+
+    test('S8: owned via a library linked to a hidden space -> ABSENT', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt, libraryId: 'library-1');
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: false);
+      await insertLibraryLink('space-s', 'library-1');
+
+      await expectAbsent('asset-1');
+    });
+
+    test('S15: album hidden by me in space S, also linked to space T -> shows via T', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await hideAlbumForViewer('space-s', 'album-x');
+      await insertSpace('space-t');
+      await insertMember('space-t', showInTimeline: true);
+      await insertAlbumLink('space-t', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+
+      await expectShows('asset-1');
+    });
+
+    test('E5: viewer belongs to no space -> shows (predicate collapses)', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+
+      await expectShows('asset-1');
+    });
+
+    test('E6: viewer has spaces but hid nothing -> shows', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+
+      await expectShows('asset-1');
+    });
+
+    test('E9: album linked to two spaces, hidden by me in both -> ABSENT', () async {
+      await insertViewer();
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await hideAlbumForViewer('space-s', 'album-x');
+      await insertSpace('space-t');
+      await insertMember('space-t', showInTimeline: true);
+      await insertAlbumLink('space-t', 'album-x');
+      await hideAlbumForViewer('space-t', 'album-x');
+      await insertAlbumAssetRow('album-x', 'asset-1');
+
+      await expectAbsent('asset-1');
+    });
+
+    test('E13: owned asset with NULL libraryId, while a hidden space has a linked library -> STILL SHOW', () async {
+      await insertViewer();
+      // No libraryId on this asset at all.
+      await insertOwnedAsset('asset-1', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: false);
+      await insertLibraryLink('space-s', 'some-other-library');
+
+      await expectShows('asset-1');
+    });
+
+    // E10, the "partner trap" (design doc §6.4). Every scenario above runs single-user, which makes
+    // this trap structurally unreachable: the subtraction legs are correlated to :current_user_id's
+    // MEMBER rows, but they are ANDed against every row in :user_ids — which also carries partner
+    // ids. So the CALLER's own hide could remove a PARTNER's photos. The server splits the arm to
+    // prevent exactly this (ownerArmWithHiddenSubtraction) and asserts it in its own E10.
+    const partnerId = 'partner-1';
+
+    Future<void> insertPartner() => db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: partnerId, email: 'partner@test.dev', name: 'P'));
+
+    Future<void> insertPartnerAsset(String assetId, DateTime at) => db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: assetId,
+            name: '$assetId.jpg',
+            type: AssetType.image,
+            checksum: 'checksum-$assetId',
+            ownerId: partnerId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(at),
+            updatedAt: Value(at),
+            localDateTime: Value(at),
+          ),
+        );
+
+    Future<void> expectShowsForPair(String assetId) async {
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: [viewerId, partnerId], currentUserId: viewerId, limit: (_) => Limit(50, 0))
+          .get();
+      expect(
+        rows.map((r) => r.remoteId),
+        contains(assetId),
+        reason: "expected $assetId to show — a partner's asset is never subtracted by MY hides",
+      );
+
+      final buckets = await db.mergedAssetDrift
+          .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [viewerId, partnerId], currentUserId: viewerId)
+          .get();
+      expect(
+        buckets.fold<int>(0, (sum, b) => sum + b.assetCount),
+        greaterThan(0),
+        reason: 'expected $assetId to be counted in the buckets too',
+      );
+    }
+
+    test('E10: a PARTNER asset in an album I hid still shows (the partner trap)', () async {
+      await insertViewer();
+      await insertPartner();
+      await insertPartnerAsset('partner-asset', createdAt);
+      await insertSpace('space-s');
+      await insertMember('space-s', showInTimeline: true);
+      await insertAlbumLink('space-s', 'album-x');
+      await insertAlbumAssetRow('album-x', 'partner-asset');
+      await hideAlbumForViewer('space-s', 'album-x');
+
+      await expectShowsForPair('partner-asset');
+    });
+
+    test('E10b: a PARTNER asset in a SPACE I hid still shows (same trap, member-flag leg)', () async {
+      await insertViewer();
+      await insertPartner();
+      await insertPartnerAsset('partner-asset', createdAt);
+      await insertSpace('space-h');
+      await insertMember('space-h', showInTimeline: false);
+      await insertDirectSpaceAsset('space-h', 'partner-asset');
+
+      await expectShowsForPair('partner-asset');
+    });
+
+    test('E10c: a PARTNER asset in a LIBRARY linked to a space I hid still shows', () async {
+      await insertViewer();
+      await insertPartner();
+      await db
+          .into(db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion.insert(
+              id: 'partner-lib-asset',
+              name: 'partner-lib-asset.jpg',
+              type: AssetType.image,
+              checksum: 'checksum-partner-lib-asset',
+              ownerId: partnerId,
+              visibility: AssetVisibility.timeline,
+              createdAt: Value(createdAt),
+              updatedAt: Value(createdAt),
+              localDateTime: Value(createdAt),
+              libraryId: const Value('lib-1'),
+            ),
+          );
+      await insertSpace('space-h');
+      await insertMember('space-h', showInTimeline: false);
+      await insertLibraryLink('space-h', 'lib-1');
+
+      await expectShowsForPair('partner-lib-asset');
+    });
+
+    test('E10d: control — MY OWN asset on the same hidden path is still subtracted', () async {
+      await insertViewer();
+      await insertPartner();
+      await insertOwnedAsset('my-asset', createdAt);
+      await insertSpace('space-h');
+      await insertMember('space-h', showInTimeline: false);
+      await insertDirectSpaceAsset('space-h', 'my-asset');
+
+      final rows = await db.mergedAssetDrift
+          .mergedAsset(userIds: [viewerId, partnerId], currentUserId: viewerId, limit: (_) => Limit(50, 0))
+          .get();
+      expect(rows.map((r) => r.remoteId), isNot(contains('my-asset')));
     });
   });
 }

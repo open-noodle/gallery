@@ -576,6 +576,26 @@ const SyncSharedSpaceAlbumLinkDeleteV1Schema = z
   })
   .meta({ id: 'SyncSharedSpaceAlbumLinkDeleteV1' });
 
+// #1041: per-member "album hidden from MY timeline" rows. The row's existence IS the flag, so the
+// payload is just the composite key. Unlike SyncSharedSpaceAlbumLinkDeleteV1 above, the delete
+// schema also carries userId: shared_space_album_hidden's primary key is (spaceId, albumId, userId)
+// — userId is part of what identifies the row, not an incidental field.
+const SyncSharedSpaceAlbumHiddenV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    albumId: z.string().describe('Album ID'),
+    userId: z.string().describe('User ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceAlbumHiddenV1' });
+
+const SyncSharedSpaceAlbumHiddenDeleteV1Schema = z
+  .object({
+    spaceId: z.string().describe('Shared space ID'),
+    albumId: z.string().describe('Album ID'),
+    userId: z.string().describe('User ID'),
+  })
+  .meta({ id: 'SyncSharedSpaceAlbumHiddenDeleteV1' });
+
 @ExtraModel()
 export class SyncSharedSpaceDeleteV1 extends createZodDto(SyncSharedSpaceDeleteV1Schema) {}
 
@@ -614,6 +634,12 @@ export class SyncSharedSpaceAlbumLinkV1 extends createZodDto(SyncSharedSpaceAlbu
 
 @ExtraModel()
 export class SyncSharedSpaceAlbumLinkDeleteV1 extends createZodDto(SyncSharedSpaceAlbumLinkDeleteV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceAlbumHiddenV1 extends createZodDto(SyncSharedSpaceAlbumHiddenV1Schema) {}
+
+@ExtraModel()
+export class SyncSharedSpaceAlbumHiddenDeleteV1 extends createZodDto(SyncSharedSpaceAlbumHiddenDeleteV1Schema) {}
 
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
@@ -703,6 +729,9 @@ export type SyncItem = {
   [SyncEntityType.SharedSpaceAlbumLinkV1]: SyncSharedSpaceAlbumLinkV1;
   [SyncEntityType.SharedSpaceAlbumLinkBackfillV1]: SyncSharedSpaceAlbumLinkV1;
   [SyncEntityType.SharedSpaceAlbumLinkDeleteV1]: SyncSharedSpaceAlbumLinkDeleteV1;
+  [SyncEntityType.SharedSpaceAlbumHiddenV1]: SyncSharedSpaceAlbumHiddenV1;
+  [SyncEntityType.SharedSpaceAlbumHiddenBackfillV1]: SyncSharedSpaceAlbumHiddenV1;
+  [SyncEntityType.SharedSpaceAlbumHiddenDeleteV1]: SyncSharedSpaceAlbumHiddenDeleteV1;
   [SyncEntityType.SharedSpaceAlbumToAssetV1]: SyncAlbumToAssetV1;
   [SyncEntityType.SharedSpaceAlbumToAssetBackfillV1]: SyncAlbumToAssetV1;
   [SyncEntityType.SharedSpaceAlbumToAssetDeleteV1]: SyncAlbumToAssetDeleteV1;

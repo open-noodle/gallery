@@ -782,6 +782,15 @@ from
 order by
   "bucket_counts"."timeBucket" desc
 
+-- AssetRepository.getTimelineAssetCount
+select
+  count(*) as "count"
+from
+  "asset"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" in ('archive', 'timeline')
+
 -- AssetRepository.getTimeBucket
 with
   "filtered" as (

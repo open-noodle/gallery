@@ -23,7 +23,8 @@ class SyncApiRepository {
     return _api.syncApi.deleteSyncAck(SyncAckDeleteDto(types: Optional.present(types)));
   }
 
-  /// The five Phase-2B space-album request types. Kept in one place so the capability
+  /// The six Phase-2B space-album request types (five original + the per-member
+  /// hidden-album rows added in #1041). Kept in one place so the capability
   /// filter and the version-gate fallback can never drift apart.
   static const _spaceAlbumSyncTypes = [
     SyncRequestType.sharedSpaceAlbumsV1,
@@ -31,6 +32,7 @@ class SyncApiRepository {
     SyncRequestType.sharedSpaceAlbumToAssetsV1,
     SyncRequestType.sharedSpaceAlbumAssetsV1,
     SyncRequestType.sharedSpaceAlbumAssetExifsV1,
+    SyncRequestType.sharedSpaceAlbumHiddensV1,
   ];
 
   Future<void> streamChanges(
@@ -313,6 +315,10 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.sharedSpaceAlbumAssetExifCreateV1: SyncAssetExifV1.fromJson,
   SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1: SyncAssetExifV1.fromJson,
   SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+  SyncEntityType.sharedSpaceAlbumHiddenV1: SyncSharedSpaceAlbumHiddenV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumHiddenBackfillV1: SyncSharedSpaceAlbumHiddenV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumHiddenDeleteV1: SyncSharedSpaceAlbumHiddenDeleteV1.fromJson,
 };
 
 class _SyncEmptyDto {

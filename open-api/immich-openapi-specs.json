@@ -16151,6 +16151,143 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/albums/{albumId}/me/timeline": {
+      "patch": {
+        "description": "Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.",
+        "operationId": "updateAlbumTimelineForMember",
+        "parameters": [
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpaceAlbumMemberTimelineDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Hide or show a linked album in the caller's own timeline",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{id}/albums/{albumId}/timeline-hide-preview": {
+      "get": {
+        "description": "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
+        "operationId": "getAlbumTimelineHidePreview",
+        "parameters": [
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSpaceTimelineHidePreviewDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Preview how many of the caller's own photos hiding this album would remove",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/assets": {
       "delete": {
         "description": "Remove one or more assets from a shared space. Returns the ids that were actually removed (a selected asset that is only present via a linked album, not a direct member, is a no-op and is not returned).",
@@ -18732,6 +18869,63 @@
           }
         ],
         "summary": "Get a space person thumbnail",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{id}/timeline-hide-preview": {
+      "get": {
+        "description": "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
+        "operationId": "getTimelineHidePreview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSpaceTimelineHidePreviewDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Preview how many of the caller's own photos hiding this space would remove",
         "tags": [
           "Shared Spaces"
         ],
@@ -32982,6 +33176,18 @@
         ],
         "type": "object"
       },
+      "SharedSpaceAlbumMemberTimelineDto": {
+        "properties": {
+          "showInTimeline": {
+            "description": "Show this album's assets in your own personal timeline",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "showInTimeline"
+        ],
+        "type": "object"
+      },
       "SharedSpaceAssetAddDto": {
         "properties": {
           "assetIds": {
@@ -33121,6 +33327,10 @@
             "description": "Has shared link",
             "type": "boolean"
           },
+          "hiddenFromMyTimeline": {
+            "description": "Whether the caller has hidden this album from their own timeline (§2 personal switch)",
+            "type": "boolean"
+          },
           "id": {
             "description": "Album ID",
             "format": "uuid",
@@ -33181,6 +33391,7 @@
           "createdAt",
           "description",
           "hasSharedLink",
+          "hiddenFromMyTimeline",
           "id",
           "isActivityEnabled",
           "linkedAt",
@@ -33673,6 +33884,26 @@
           "viewer"
         ],
         "type": "string"
+      },
+      "SharedSpaceTimelineHidePreviewDto": {
+        "properties": {
+          "hiddenAssetCount": {
+            "description": "Photos that would leave the caller's own timeline",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "retainedAssetCount": {
+            "description": "Photos in this scope that stay on the caller's timeline via a path they did not hide",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hiddenAssetCount"
+        ],
+        "type": "object"
       },
       "SharedSpaceUpdateDto": {
         "properties": {
@@ -35949,6 +36180,9 @@
           "SharedSpaceAlbumLinkV1",
           "SharedSpaceAlbumLinkDeleteV1",
           "SharedSpaceAlbumLinkBackfillV1",
+          "SharedSpaceAlbumHiddenV1",
+          "SharedSpaceAlbumHiddenDeleteV1",
+          "SharedSpaceAlbumHiddenBackfillV1",
           "SharedSpaceAlbumToAssetV1",
           "SharedSpaceAlbumToAssetDeleteV1",
           "SharedSpaceAlbumToAssetBackfillV1",
@@ -36355,12 +36589,57 @@
           "SharedSpaceAlbumLinksV1",
           "SharedSpaceAlbumToAssetsV1",
           "SharedSpaceAlbumAssetsV1",
-          "SharedSpaceAlbumAssetExifsV1"
+          "SharedSpaceAlbumAssetExifsV1",
+          "SharedSpaceAlbumHiddensV1"
         ],
         "type": "string"
       },
       "SyncResetV1": {
         "properties": {},
+        "type": "object"
+      },
+      "SyncSharedSpaceAlbumHiddenDeleteV1": {
+        "properties": {
+          "albumId": {
+            "description": "Album ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "albumId",
+          "spaceId",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceAlbumHiddenV1": {
+        "properties": {
+          "albumId": {
+            "description": "Album ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "albumId",
+          "spaceId",
+          "userId"
+        ],
         "type": "object"
       },
       "SyncSharedSpaceAlbumLinkDeleteV1": {

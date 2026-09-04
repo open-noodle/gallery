@@ -392,7 +392,7 @@ class _AlbumCard extends ConsumerWidget {
                         value: _CardAction.toggle,
                         child: Text(
                           album.showInTimeline
-                              ? 'spaces_hide_from_timeline'.t(context: ctx)
+                              ? 'space_albums_hide_from_space_photos'.t(context: ctx)
                               : 'spaces_linked_albums_show_in_timeline'.t(context: ctx),
                         ),
                       ),

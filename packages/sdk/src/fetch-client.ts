@@ -3019,6 +3019,8 @@ export type SharedSpaceLinkedAlbumDto = {
     endDate?: string;
     /** Has shared link */
     hasSharedLink: boolean;
+    /** Whether the caller has hidden this album from their own timeline (§2 personal switch) */
+    hiddenFromMyTimeline: boolean;
     /** Album ID */
     id: string;
     /** Activity feed enabled */
@@ -3043,6 +3045,16 @@ export type SharedSpaceLinkedAlbumDto = {
 export type SharedSpaceAlbumLinkUpdateDto = {
     /** Include this album in the space timeline */
     showInTimeline: boolean;
+};
+export type SharedSpaceAlbumMemberTimelineDto = {
+    /** Show this album's assets in your own personal timeline */
+    showInTimeline: boolean;
+};
+export type SharedSpaceTimelineHidePreviewDto = {
+    /** Photos that would leave the caller's own timeline */
+    hiddenAssetCount: number;
+    /** Photos in this scope that stay on the caller's timeline via a path they did not hide */
+    retainedAssetCount?: number;
 };
 export type SharedSpaceAssetRemoveDto = {
     /** Asset IDs */
@@ -4361,6 +4373,22 @@ export type SyncPersonV1 = {
     updatedAt: string;
 };
 export type SyncResetV1 = {};
+export type SyncSharedSpaceAlbumHiddenDeleteV1 = {
+    /** Album ID */
+    albumId: string;
+    /** Shared space ID */
+    spaceId: string;
+    /** User ID */
+    userId: string;
+};
+export type SyncSharedSpaceAlbumHiddenV1 = {
+    /** Album ID */
+    albumId: string;
+    /** Shared space ID */
+    spaceId: string;
+    /** User ID */
+    userId: string;
+};
 export type SyncSharedSpaceAlbumLinkDeleteV1 = {
     /** Album ID */
     albumId: string;
@@ -8252,6 +8280,34 @@ export function linkAlbum({ albumId, id }: {
     }));
 }
 /**
+ * Hide or show a linked album in the caller's own timeline
+ */
+export function updateAlbumTimelineForMember({ albumId, id, sharedSpaceAlbumMemberTimelineDto }: {
+    albumId: string;
+    id: string;
+    sharedSpaceAlbumMemberTimelineDto: SharedSpaceAlbumMemberTimelineDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}/me/timeline`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceAlbumMemberTimelineDto
+    })));
+}
+/**
+ * Preview how many of the caller's own photos hiding this album would remove
+ */
+export function getAlbumTimelineHidePreview({ albumId, id }: {
+    albumId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceTimelineHidePreviewDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}/timeline-hide-preview`, {
+        ...opts
+    }));
+}
+/**
  * Remove assets from a shared space
  */
 export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
@@ -8803,6 +8859,19 @@ export function getSpacePersonThumbnail({ id, personId }: {
         status: 200;
         data: Blob;
     }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
+ * Preview how many of the caller's own photos hiding this space would remove
+ */
+export function getTimelineHidePreview({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceTimelineHidePreviewDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/timeline-hide-preview`, {
         ...opts
     }));
 }
@@ -10560,6 +10629,9 @@ export enum SyncEntityType {
     SharedSpaceAlbumLinkV1 = "SharedSpaceAlbumLinkV1",
     SharedSpaceAlbumLinkDeleteV1 = "SharedSpaceAlbumLinkDeleteV1",
     SharedSpaceAlbumLinkBackfillV1 = "SharedSpaceAlbumLinkBackfillV1",
+    SharedSpaceAlbumHiddenV1 = "SharedSpaceAlbumHiddenV1",
+    SharedSpaceAlbumHiddenDeleteV1 = "SharedSpaceAlbumHiddenDeleteV1",
+    SharedSpaceAlbumHiddenBackfillV1 = "SharedSpaceAlbumHiddenBackfillV1",
     SharedSpaceAlbumToAssetV1 = "SharedSpaceAlbumToAssetV1",
     SharedSpaceAlbumToAssetDeleteV1 = "SharedSpaceAlbumToAssetDeleteV1",
     SharedSpaceAlbumToAssetBackfillV1 = "SharedSpaceAlbumToAssetBackfillV1",
@@ -10614,7 +10686,8 @@ export enum SyncRequestType {
     SharedSpaceAlbumLinksV1 = "SharedSpaceAlbumLinksV1",
     SharedSpaceAlbumToAssetsV1 = "SharedSpaceAlbumToAssetsV1",
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
-    SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1"
+    SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1",
+    SharedSpaceAlbumHiddensV1 = "SharedSpaceAlbumHiddensV1"
 }
 export enum Action {
     Tag = "tag",

@@ -167,7 +167,7 @@ class DriftAlbumOptionsPage extends HookConsumerWidget {
                     subtitle: link.showInTimeline
                         ? null
                         : Text(
-                            "space_albums_hidden_from_timeline".t(context: context),
+                            "space_albums_hidden_from_space_photos".t(context: context),
                             key: Key('album-space-link-hidden-badge-${link.spaceId}'),
                             style: TextStyle(color: context.colorScheme.onSurfaceSecondary),
                           ),

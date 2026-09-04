@@ -11,6 +11,15 @@ describe(TimelineService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(TimelineService));
+    // #1041 §6.2: resolved once per request for every /photos-style browse. Default to "nothing
+    // hidden" so pre-existing tests that don't care about the hide-from-timeline feature keep their
+    // original behaviour; tests that DO care override this per-test.
+    mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+      hiddenSpaceIds: [],
+      hiddenAlbumIds: [],
+      hiddenAlbumSpacePairs: [],
+      hiddenLibraryIds: [],
+    });
   });
 
   describe('getTimeBuckets', () => {

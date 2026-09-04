@@ -762,6 +762,7 @@ export class FacePersonVerdictRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceId },
+                albumTimelineGate: 'none',
               }),
             ),
           ),
@@ -847,6 +848,7 @@ export class FacePersonVerdictRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceId },
+                albumTimelineGate: 'none',
               }),
             ),
           ),
@@ -888,6 +890,7 @@ export class FacePersonVerdictRepository {
             correlateAssetId: 'asset.id',
             correlateLibraryId: 'asset.libraryId',
             scope: { spaceId },
+            albumTimelineGate: 'none',
           }),
         ),
       )

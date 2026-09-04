@@ -547,6 +547,69 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Preview how many of the caller's own photos hiding this album would remove
+  ///
+  /// Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  Future<Response> getAlbumTimelineHidePreviewWithHttpInfo(String albumId, String id, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/albums/{albumId}/timeline-hide-preview'
+      .replaceAll('{albumId}', albumId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Preview how many of the caller's own photos hiding this album would remove
+  ///
+  /// Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  Future<SharedSpaceTimelineHidePreviewDto?> getAlbumTimelineHidePreview(String albumId, String id, { Future<void>? abortTrigger, }) async {
+    final response = await getAlbumTimelineHidePreviewWithHttpInfo(albumId, id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpaceTimelineHidePreviewDto',) as SharedSpaceTimelineHidePreviewDto;
+    
+    }
+    return null;
+  }
+
   /// Get all shared spaces
   ///
   /// Retrieve all shared spaces the user is a member of.
@@ -1813,6 +1876,64 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Preview how many of the caller's own photos hiding this space would remove
+  ///
+  /// Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<Response> getTimelineHidePreviewWithHttpInfo(String id, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/timeline-hide-preview'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Preview how many of the caller's own photos hiding this space would remove
+  ///
+  /// Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<SharedSpaceTimelineHidePreviewDto?> getTimelineHidePreview(String id, { Future<void>? abortTrigger, }) async {
+    final response = await getTimelineHidePreviewWithHttpInfo(id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpaceTimelineHidePreviewDto',) as SharedSpaceTimelineHidePreviewDto;
+    
+    }
+    return null;
+  }
+
   /// Ignore a face suggestion for a person in a shared space
   ///
   /// Ignore this suggestion for the space person. The face stays unassigned. Idempotent — the response reports whether it acted.
@@ -2513,6 +2634,65 @@ class SharedSpacesApi {
   /// * [String] libraryId (required):
   Future<void> unlinkLibrary(String id, String libraryId, { Future<void>? abortTrigger, }) async {
     final response = await unlinkLibraryWithHttpInfo(id, libraryId, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Hide or show a linked album in the caller's own timeline
+  ///
+  /// Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumMemberTimelineDto] sharedSpaceAlbumMemberTimelineDto (required):
+  Future<Response> updateAlbumTimelineForMemberWithHttpInfo(String albumId, String id, SharedSpaceAlbumMemberTimelineDto sharedSpaceAlbumMemberTimelineDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/albums/{albumId}/me/timeline'
+      .replaceAll('{albumId}', albumId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpaceAlbumMemberTimelineDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PATCH',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Hide or show a linked album in the caller's own timeline
+  ///
+  /// Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumMemberTimelineDto] sharedSpaceAlbumMemberTimelineDto (required):
+  Future<void> updateAlbumTimelineForMember(String albumId, String id, SharedSpaceAlbumMemberTimelineDto sharedSpaceAlbumMemberTimelineDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateAlbumTimelineForMemberWithHttpInfo(albumId, id, sharedSpaceAlbumMemberTimelineDto, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

@@ -609,6 +609,22 @@ export const shared_space_album_delete_audit = registerFunction({
     END`,
 });
 
+// gallery-fork: unhiding an album is a row DELETE on shared_space_album_hidden, so record it
+// for the per-user delete sync stream. Ungated and unconditional — the row's disappearance is
+// the whole event, and every cascade path (unlink, space delete, album delete, user delete)
+// should reach a synced client identically.
+export const shared_space_album_hidden_delete_audit = registerFunction({
+  name: 'shared_space_album_hidden_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO shared_space_album_hidden_audit ("spaceId", "albumId", "userId")
+      SELECT "spaceId", "albumId", "userId" FROM "old";
+      RETURN NULL;
+    END`,
+});
+
 // Fan-out trigger: on member removal, revoke album grants for all albums linked
 // to that space, gated. Skips during shared_space cascade (EXISTS guard fails).
 // Mirrors shared_space_member_delete_library_audit.
