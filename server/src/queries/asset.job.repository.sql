@@ -463,7 +463,26 @@ select
     from
       (
         select
-          "asset_face".*
+          "asset_face".*,
+          (
+            exists (
+              select
+                1 as "one"
+              from
+                "pet_search"
+              where
+                "pet_search"."faceId" = "asset_face"."id"
+            )
+            or exists (
+              select
+                1 as "one"
+              from
+                "person"
+              where
+                "person"."personGroupId" = "asset_face"."personGroupId"
+                and "person"."type" = $1
+            )
+          ) as "isPet"
         from
           "asset_face"
         where
@@ -495,7 +514,7 @@ from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."id" = $1
+  "asset"."id" = $2
 
 -- AssetJobRepository.getForOcr
 select

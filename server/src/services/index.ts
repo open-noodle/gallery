@@ -35,6 +35,7 @@ import { PartnerService } from 'src/services/partner.service.js';
 import { PasskeyService } from 'src/services/passkey.service.js';
 import { PersonService } from 'src/services/person.service.js';
 import { PetDetectionService } from 'src/services/pet-detection.service.js';
+import { PetRecognitionService } from 'src/services/pet-recognition.service.js';
 import { PluginService } from 'src/services/plugin.service.js';
 import { QueueService } from 'src/services/queue.service.js';
 import { SearchService } from 'src/services/search.service.js';
@@ -99,6 +100,7 @@ export const services = [
   PartnerService,
   PasskeyService,
   PetDetectionService,
+  PetRecognitionService,
   PersonService,
   PluginService,
   QueueService,

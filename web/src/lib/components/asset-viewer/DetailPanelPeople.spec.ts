@@ -46,7 +46,7 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
   },
 }));
 
-const person = (name: string): PersonResponseDto =>
+const person = (name: string, overrides: Partial<PersonResponseDto> = {}): PersonResponseDto =>
   ({
     id: `person-${name}`,
     name,
@@ -55,6 +55,7 @@ const person = (name: string): PersonResponseDto =>
     isHidden: false,
     isFavorite: false,
     updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
   }) as unknown as PersonResponseDto;
 
 // `assetFactory` randomises `type` (see web/src/test-data/factories/asset-factory.ts), and
@@ -559,5 +560,90 @@ describe('DetailPanelPeople', () => {
       expect(toggle()).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'tag_people' })).toBeInTheDocument();
     });
+  });
+
+  // Slice 7 (pet recognition): a pet in a photo should read as a pet in the asset viewer, mirroring
+  // the paw-badge treatment already shipped on the People-page tile (person-tile.svelte:68-75).
+  it('renders the paw badge titled with the species for a pet', () => {
+    faceManagerMock.people = [person('Mochi', { type: 'pet', species: 'dog' })];
+
+    renderPanel({ isOwner: true });
+
+    // svelte-i18n's `dev` fallback locale (global test setup) renders an unmatched key literally,
+    // so a resolved translation key ('species_dog') proves the species went through
+    // pet-species.ts's map rather than being used raw — see R8.2 below for the full a11y contract.
+    expect(screen.getByTestId('pet-badge')).toHaveAttribute('title', 'species_dog');
+  });
+
+  // R8.1 (review-fixes F13): the badge markup is shared by both people sources — closes the
+  // audited gap that only the owner/faceManager path had badge coverage, not the space-viewer
+  // asset.people path a non-owner space member actually renders through.
+  it('renders the accessible paw badge via the space-viewer asset.people data path', () => {
+    faceManagerMock.people = [person('Should Not Appear')];
+
+    renderPanel({ isOwner: false, spaceId: 'space-1', people: [person('Rex', { type: 'pet', species: 'dog' })] });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('role', 'img');
+    expect(badge).toHaveAttribute('aria-label', 'species_dog');
+  });
+
+  // R8.2 (review-fixes F13): badge a11y + i18n — role, aria-label, and a translated species
+  // tooltip, with a raw-value fallback for a species pet-species.ts doesn't map.
+  it('gives the badge an aria-label with the translated species tooltip', () => {
+    faceManagerMock.people = [person('Mochi', { type: 'pet', species: 'dog' })];
+
+    renderPanel({ isOwner: true });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('role', 'img');
+    expect(badge).toHaveAttribute('aria-label', 'species_dog');
+  });
+
+  it('falls back to the raw species value in the badge tooltip for an unrecognized species', () => {
+    faceManagerMock.people = [person('Bandit', { type: 'pet', species: 'axolotl' })];
+
+    renderPanel({ isOwner: true });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('aria-label', 'axolotl');
+    expect(badge).toHaveAttribute('title', 'axolotl');
+  });
+
+  it('renders no paw badge for a human person', () => {
+    faceManagerMock.people = [person('Alice', { type: 'person' })];
+
+    renderPanel({ isOwner: true });
+
+    expect(screen.queryByTestId('pet-badge')).not.toBeInTheDocument();
+  });
+
+  it('renders a person with an undefined type as a human, not a pet (older payloads)', () => {
+    faceManagerMock.people = [person('Alice')];
+
+    renderPanel({ isOwner: true });
+
+    expect(screen.queryByTestId('pet-badge')).not.toBeInTheDocument();
+  });
+
+  // A `role="img"` with no accessible name is a WCAG 1.1.1 failure, and species is genuinely absent
+  // on some surfaces — a space person carries `type` but no `species` — so the badge falls back to a
+  // generic "pet" label rather than going unnamed.
+  it('falls back to the generic pet label for a pet with no recorded species', () => {
+    faceManagerMock.people = [person('Mochi', { type: 'pet', species: null })];
+
+    renderPanel({ isOwner: true });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('aria-label', 'pet');
+    expect(badge).toHaveAttribute('title', 'pet');
+  });
+
+  it('falls back to the generic pet label for a space person, which carries no species', () => {
+    renderPanel({ isOwner: false, spaceId: 'space-1', people: [person('Rex', { type: 'pet' })] });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('role', 'img');
+    expect(badge).toHaveAttribute('aria-label', 'pet');
   });
 });

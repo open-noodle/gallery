@@ -269,6 +269,7 @@ describe(DatabaseService.name, () => {
         expect(mocks.database.reindexVectorsIfNeeded).toHaveBeenCalledExactlyOnceWith([
           VectorIndex.Clip,
           VectorIndex.Face,
+          VectorIndex.Pet,
         ]);
         expect(mocks.database.reindexVectorsIfNeeded).toHaveBeenCalledTimes(1);
         expect(mocks.database.runMigrations).toHaveBeenCalledTimes(1);
@@ -283,12 +284,23 @@ describe(DatabaseService.name, () => {
         expect(mocks.database.reindexVectorsIfNeeded).toHaveBeenCalledExactlyOnceWith([
           VectorIndex.Clip,
           VectorIndex.Face,
+          VectorIndex.Pet,
         ]);
         expect(mocks.database.runMigrations).not.toHaveBeenCalled();
         expect(mocks.logger.fatal).not.toHaveBeenCalled();
         expect(mocks.logger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Could not run vector reindexing checks.'),
         );
+      });
+
+      it('should prewarm every vector index on boot, including pet (regression guard: a future index cannot be added without maintenance coverage)', async () => {
+        await expect(sut.onBootstrap()).resolves.toBeUndefined();
+
+        const prewarmedIndexes = mocks.database.prewarm.mock.calls.map(([index]) => index);
+        expect(prewarmedIndexes).toEqual(expect.arrayContaining(Object.values(VectorIndex)));
+
+        const reindexedIndexes = mocks.database.reindexVectorsIfNeeded.mock.calls[0][0];
+        expect(reindexedIndexes).toEqual(expect.arrayContaining(Object.values(VectorIndex)));
       });
     });
 
