@@ -2209,7 +2209,10 @@ describe(PersonService.name, () => {
       await expect(sut.handleQueueDetectFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.person.deleteFaces).toHaveBeenCalledTimes(1);
-      expect(mocks.person.deleteFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
+      expect(mocks.person.deleteFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
       expect(mocks.person.deleteFaces).not.toHaveBeenCalledWith({ sourceType: SourceType.Manual });
       expect(mocks.person.deleteFaces).not.toHaveBeenCalledWith({ sourceType: SourceType.Exif });
       expect(mocks.person.delete).toHaveBeenCalledWith([orphan.personGroupId], undefined);
@@ -2353,6 +2356,7 @@ describe(PersonService.name, () => {
         personGroupId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2387,6 +2391,7 @@ describe(PersonService.name, () => {
 
       expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
         sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2520,8 +2525,13 @@ describe(PersonService.name, () => {
       await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.job.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
-      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
-      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning);
+      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
       expect(mocks.person.delete).toHaveBeenCalledWith([orphan.personGroupId], undefined);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
@@ -2560,7 +2570,10 @@ describe(PersonService.name, () => {
 
       await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
-      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
+      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
       expect(mocks.person.getAllFaces).not.toHaveBeenCalledWith(undefined);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2616,6 +2629,50 @@ describe(PersonService.name, () => {
       ]);
     });
 
+    it('R2.7 force recognition passes the pet exclusions to every destructive human call site', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: true });
+
+      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
+      expect(mocks.sharedSpace.deleteAllPersonFaces).toHaveBeenCalledWith({ excludePets: true });
+      expect(mocks.sharedSpace.deleteAllPersons).toHaveBeenCalledWith({ excludePets: true });
+      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
+    });
+
+    it('R2.7 non-force recognition fan-out is pet-excluded too', async () => {
+      const face = AssetFaceFactory.create();
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+
+      await sut.handleQueueRecognizeFaces({ force: false });
+
+      expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
+        personGroupId: null,
+        sourceType: SourceType.MachineLearning,
+        // Slice 5 (F9) rides along on this same non-forced arm; the pet exclusion is what this
+        // test is about.
+        excludeManuallyPlaced: true,
+        excludePetFaces: true,
+      });
+    });
+
     it('non-force recognition keeps incremental shared-space matching enabled', async () => {
       const face = AssetFaceFactory.create();
       mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
@@ -2652,7 +2709,9 @@ describe(PersonService.name, () => {
 
       await sut.handleQueueRecognizeFaces({ force: true });
 
-      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning);
+      expect(mocks.faceIdentity.unlinkFacesBySourceType).toHaveBeenCalledWith(SourceType.MachineLearning, {
+        excludePetFaces: true,
+      });
     });
 
     it('should delete unreferenced identities after force reset removes people and shared-space people', async () => {
@@ -2704,6 +2763,7 @@ describe(PersonService.name, () => {
         personGroupId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2764,7 +2824,10 @@ describe(PersonService.name, () => {
       await sut.handleQueueRecognizeFaces({ force: true });
 
       expect(mocks.person.deleteFaces).not.toHaveBeenCalled();
-      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
+      expect(mocks.person.unassignFaces).toHaveBeenCalledWith({
+        sourceType: SourceType.MachineLearning,
+        excludePetFaces: true,
+      });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
           name: JobName.FacialRecognition,
@@ -3152,6 +3215,76 @@ describe(PersonService.name, () => {
       });
       const facesRecognizedAt = mocks.asset.upsertJobStatus.mock.calls[0][0].facesRecognizedAt as Date;
       expect(facesRecognizedAt.getTime()).toBeGreaterThanOrEqual(start);
+    });
+
+    // F4: pet faces live in asset_face with the same machine-learning sourceType as human faces.
+    // Per-asset detection must neither sweep them up as "stale ML faces" nor IoU-match a detected
+    // human box onto one (which would write a human face_search embedding over a pet face).
+    // getForDetectFacesJob resolves the computed `isPet` column; these tests supply it directly.
+    const withIsPet = (asset: ReturnType<AssetFactory['build']>, isPetById: Record<string, boolean>) => {
+      const base = getForDetectedFaces(asset);
+      return { ...base, faces: base.faces.map((face) => ({ ...face, isPet: isPetById[face.id] ?? false })) };
+    };
+
+    it('R3.1 does not remove a pet face when detection returns no faces', async () => {
+      const petFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().face(petFace).build();
+
+      mocks.machineLearning.detectFaces.mockResolvedValue({ imageHeight: 500, imageWidth: 400, faces: [] });
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(withIsPet(asset, { [petFace.id]: true }) as any);
+      mocks.person.refreshFaces.mockResolvedValue();
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.person.refreshFaces).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.arrayContaining([petFace.id]),
+        expect.anything(),
+      );
+      expect(mocks.faceIdentity.unlinkFaces).not.toHaveBeenCalled();
+    });
+
+    it('R3.2 never writes a human embedding onto an IoU-overlapping pet face', async () => {
+      const petFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().face(petFace).build();
+      const firstNewFaceId = newUuid();
+      const secondNewFaceId = newUuid();
+
+      // Two detected human boxes, both exactly the pet face's box (IoU 1.0 — the strongest possible
+      // cross-match). Before the fix the first detection consumed the pet face out of mlFaceIds and
+      // the second one, finding it already consumed, wrote its human embedding straight onto the
+      // pet face. Neither box may touch it.
+      const detected = getAsDetectedFace(petFace);
+      mocks.machineLearning.detectFaces.mockResolvedValue({
+        ...detected,
+        faces: [...detected.faces, ...detected.faces],
+      });
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(withIsPet(asset, { [petFace.id]: true }) as any);
+      mocks.crypto.randomUUID.mockReturnValueOnce(firstNewFaceId).mockReturnValueOnce(secondNewFaceId);
+      mocks.person.refreshFaces.mockResolvedValue();
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      const call = mocks.person.refreshFaces.mock.calls[0];
+      expect(call).toBeDefined();
+      const [facesToAdd, faceIdsToRemove, embeddings] = call!;
+      expect(facesToAdd.map((face) => face.id)).toEqual([firstNewFaceId, secondNewFaceId]);
+      expect(faceIdsToRemove).not.toContain(petFace.id);
+      expect((embeddings ?? []).map((embedding) => embedding.faceId)).not.toContain(petFace.id);
+    });
+
+    it('R3.3 pin: a stale human machine-learning face is still removed', async () => {
+      const staleFace = AssetFaceFactory.create({ sourceType: SourceType.MachineLearning });
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().face(staleFace).build();
+
+      mocks.machineLearning.detectFaces.mockResolvedValue({ imageHeight: 500, imageWidth: 400, faces: [] });
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(withIsPet(asset, {}) as any);
+      mocks.person.refreshFaces.mockResolvedValue();
+
+      await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.person.refreshFaces).toHaveBeenCalledWith([], [staleFace.id], []);
+      expect(mocks.faceIdentity.unlinkFaces).toHaveBeenCalledWith([staleFace.id]);
     });
 
     it('should not write facesRecognizedAt or queue recognition when ML face detection throws', async () => {
@@ -6348,6 +6481,7 @@ describe(PersonService.name, () => {
         personGroupId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
+        excludePetFaces: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognition, data: { id: face.id, deferred: false } },

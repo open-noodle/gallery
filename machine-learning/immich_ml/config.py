@@ -40,6 +40,7 @@ class PreloadModelData(BaseModel):
 class MaxBatchSize(BaseModel):
     facial_recognition: int | None = None
     ocr: int | None = None
+    pet_recognition: int | None = None
 
 
 def default_worker_timeout() -> int:
