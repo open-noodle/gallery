@@ -20,8 +20,20 @@ void main() {
   Map<String, dynamic> locale(String code) =>
       jsonDecode(File('../i18n/$code.json').readAsStringSync()) as Map<String, dynamic>;
 
+  /// ROLLING: upstream (immich-31038) made [FeatureHighlight] an enum, so a batch entry is a
+  /// member rather than a const construction and the copy lives in the enum's title/body switch.
+  /// The keys are still derivable from the member name — the same convention that switch follows —
+  /// so the i18n guarantees below are unchanged.
+  String snake(String camel) => camel.replaceAllMapped(RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}');
+  String titleKey(FeatureHighlight h) => '${snake(h.name)}_title';
+  String bodyKey(FeatureHighlight h) => '${snake(h.name)}_body';
+
   test("the app shows the Gallery batch, not upstream's own", () {
-    expect(featureMessageHighlights, same(galleryFeatureMessageHighlights));
+    // Reverting `visibleFeatureMessageHighlights` to `FeatureHighlight.values` would re-show
+    // upstream's six Immich 3.0 cards; every visible entry must come from the fork's batch.
+    for (final highlight in visibleFeatureMessageHighlights) {
+      expect(galleryFeatureMessageHighlights, contains(highlight));
+    }
     expect(featureMessageRelease, galleryFeatureMessageRelease);
   });
 
@@ -43,8 +55,8 @@ void main() {
   test('every highlight key exists in en.json', () {
     final en = locale('en');
     for (final highlight in galleryFeatureMessageHighlights) {
-      expect(en, contains(highlight.titleKey), reason: '${highlight.titleKey} would render as the raw key');
-      expect(en, contains(highlight.bodyKey), reason: '${highlight.bodyKey} would render as the raw key');
+      expect(en, contains(titleKey(highlight)), reason: '${titleKey(highlight)} would render as the raw key');
+      expect(en, contains(bodyKey(highlight)), reason: '${bodyKey(highlight)} would render as the raw key');
     }
   });
 
@@ -58,8 +70,10 @@ void main() {
     for (final code in maintained) {
       final translations = locale(code);
       for (final highlight in galleryFeatureMessageHighlights) {
-        for (final key in [highlight.titleKey, highlight.bodyKey]) {
-          if (!translations.containsKey(key)) missing.add('$code: $key');
+        for (final key in [titleKey(highlight), bodyKey(highlight)]) {
+          if (!translations.containsKey(key)) {
+            missing.add('$code: $key');
+          }
         }
       }
     }

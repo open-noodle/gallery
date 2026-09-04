@@ -34,7 +34,9 @@ class _SpaceAlbumEmptyStateState extends State<SpaceAlbumEmptyState> with Single
   }
 
   Widget _reveal(int index, int count, bool reduceMotion, Widget child) {
-    if (reduceMotion) return child;
+    if (reduceMotion) {
+      return child;
+    }
     final start = (index / (count + 1)).clamp(0.0, 0.8);
     final animation = CurvedAnimation(
       parent: _controller,
