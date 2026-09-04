@@ -1340,15 +1340,41 @@ class TestPetDetection:
         assert len(results) == 1
         assert results[0]["score"] == pytest.approx(0.5, abs=1e-4)
 
-    def test_maps_all_domestic_labels(self, mocker: MockerFixture) -> None:
+    def test_maps_pet_labels(self, mocker: MockerFixture) -> None:
         """Spec #8. 91-class ids, not YOLO's 80-class space."""
-        expected = {16: "bird", 17: "cat", 18: "dog", 19: "horse", 20: "sheep", 21: "cow"}
+        expected = {17: "cat", 18: "dog"}
         for class_id, label in expected.items():
             detector = self._detector(mocker)
             detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.9)])
             results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
             assert len(results) == 1
             assert results[0]["label"] == label
+
+    def test_excludes_non_pet_domestic_classes(self, mocker: MockerFixture) -> None:
+        """bird/horse/sheep/cow are scored but never emitted — only cats and dogs are pets."""
+        for class_id in (16, 19, 20, 21):
+            detector = self._detector(mocker)
+            detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.99)])
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            assert results == []
+
+    def test_non_pet_animal_is_dropped_not_relabelled(self, mocker: MockerFixture) -> None:
+        """A horse must stay scored so it wins its own argmax and is dropped.
+
+        Removing horse from the scoring subspace instead would make this query surface as a
+        0.40 dog, filing horses and cows under the dog entry rather than discarding them.
+        """
+        detector = self._detector(mocker)
+        dets = np.zeros((1, 300, 4), dtype=np.float32)
+        logits = np.full((1, 300, 91), -30.0, dtype=np.float32)
+        dets[0, 0] = (0.5, 0.5, 0.2, 0.2)
+        logits[0, 0, 19] = float(np.log(0.99 / 0.01))  # horse
+        logits[0, 0, 18] = float(np.log(0.40 / 0.60))  # dog
+        detector.session.run.return_value = [dets, logits]
+
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+
+        assert results == []
 
     def test_excludes_safari_classes(self, mocker: MockerFixture) -> None:
         """Spec #9. elephant/bear/zebra/giraffe at 0.99 emit nothing — the reported bug."""
