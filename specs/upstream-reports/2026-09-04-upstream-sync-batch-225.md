@@ -261,6 +261,43 @@ Scoped by tree identity against the last 10/10-green tip: `machine-learning` and
 | i18n + docs prettier                             | PASS          |                                                                                            |
 | web eslint                                       | see Remote CI |                                                                                            |
 
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-225`
+- **Commit validated**: `2dcf6365318` (every row below confirmed by `headSha`, not by branch name)
+
+| Workflow                                  | Status | Notes                                                                                                          |
+| ----------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | red on the first run; see below                                                                                |
+| `docker.yml`                              | GREEN  | builds the shipped server/web/cli/ml images                                                                    |
+| `static_analysis.yml`                     | GREEN  | independently confirms the mobile work — `dart analyze --fatal-infos`, `dart format`, generated-file freshness |
+| `gallery-build-mobile.yml`                | GREEN  | real iOS + Android compile of #931's route table and nav slots                                                 |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                                                                                |
+| `storage-migration-tests.yml`             | GREEN  |                                                                                                                |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                                                                |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | validates the migration renumber end to end — coverage grep over the branch tree, then a tagged-image boot     |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                                                                                |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                                                                                |
+
+Dispatched in two waves (non-Docker first, then the Docker-heavy set 40 s apart) per the registry
+rate-limit lesson. **Zero infrastructure failures** — no `toomanyrequests`, no image-pull deaths.
+
+### The one red, and why it was not a regression
+
+`test.yml`'s **Medium Tests (Server)** failed on the first run: **4 failed / 3163 passed**, confined to
+**1 of 180** spec files (`face-repair.service.spec.ts`, the `decline filter` describe).
+
+Every one of the four failed with `PostgresError: sorry, too many clients already` and a
+`postgres/src/connection.js` stack — **no assertion failure anywhere**. That is the known, still-unfixed
+rolling-only pool exhaustion (~160 of 165 medium specs leak `getKyselyDB` pools), so whichever file
+happens to run once the pool is starved fails. Nothing in this cycle touches face-repair service logic.
+
+Confirmed rather than assumed: re-running only the failed job — no code change — turned it **green**,
+which is the documented tell for contention (the failing set shifts or empties). Worth noting the run
+still surfaces plenty of alarming-looking `PostgresError` strings in its log that are deliberate
+negative-test fixtures (`function avg(vector) does not exist`, `expected 512 dimensions, not 3`); read
+the failing _test's_ error, not the log's error strings.
+
 ## Decisions Requiring Judgment
 
 Two resolutions were not mechanical. Both are flagged for review:
