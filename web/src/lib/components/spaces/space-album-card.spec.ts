@@ -16,6 +16,7 @@ describe('SpaceAlbumCard', () => {
     assetCount: 12,
     albumThumbnailAssetId: null,
     showInTimeline: true,
+    hiddenFromMyTimeline: false,
     addedById: null,
     linkedAt: '2026-01-01T00:00:00Z',
     albumUsers: [],
@@ -38,48 +39,72 @@ describe('SpaceAlbumCard', () => {
     expect(screen.getByText(/12 items/i)).toBeInTheDocument();
   });
 
-  it('editor sees the manage menu; viewer does not', () => {
+  it('editor and viewer both see the card menu (the "my timeline" item is not editor-gated)', () => {
     renderWithTooltips(SpaceAlbumCard, {
       spaceId: 's-1',
       album,
       canManage: true,
       onUnlink: vi.fn(),
       onToggleTimeline: vi.fn(),
+      onToggleMyTimeline: vi.fn(),
     });
     expect(screen.getByTestId('space-album-card-menu')).toBeInTheDocument();
+
+    renderWithTooltips(SpaceAlbumCard, { spaceId: 's-1', album, canManage: false, onToggleMyTimeline: vi.fn() });
+    expect(screen.getAllByTestId('space-album-card-menu')).toHaveLength(2);
   });
 
-  it('viewer has no manage menu', () => {
-    renderWithTooltips(SpaceAlbumCard, { spaceId: 's-1', album, canManage: false });
-    expect(screen.queryByTestId('space-album-card-menu')).not.toBeInTheDocument();
-  });
-
-  it('shows hidden-from-timeline sublabel when showInTimeline is false', () => {
+  it("shows hidden-from-the-space's-photos sublabel when showInTimeline is false", () => {
     renderWithTooltips(SpaceAlbumCard, {
       spaceId: 's-1',
       album: { ...album, showInTimeline: false },
       canManage: false,
     });
-    expect(screen.getByText(/hidden from timeline/i)).toBeInTheDocument();
+    expect(screen.getByText(/Hidden from the space's photos/)).toBeInTheDocument();
   });
 
-  it('when canManage=true, both the unlink and the toggle menu options are present', () => {
+  it('shows hidden-from-your-timeline sublabel when the caller has hidden it from their own timeline', () => {
+    renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album: { ...album, hiddenFromMyTimeline: true },
+      canManage: false,
+    });
+    expect(screen.getByText(/Hidden from your timeline/)).toBeInTheDocument();
+  });
+
+  // #1041 regression guard: the space-level switch and the album-level "my timeline" switch used
+  // to share the literal string "Hide from timeline". They must render DIFFERENT strings now.
+  it('the "my timeline" menu item text differs from the space-level switch\'s old shared label', () => {
+    renderWithTooltips(SpaceAlbumCard, {
+      spaceId: 's-1',
+      album,
+      canManage: false,
+      onToggleMyTimeline: vi.fn(),
+    });
+    expect(screen.getByText('Hide this album from my timeline')).toBeInTheDocument();
+    expect(screen.queryByText('Hide from timeline')).not.toBeInTheDocument();
+  });
+
+  it('when canManage=true, the my-timeline item, the space-photos toggle, and unlink are all present', () => {
     renderWithTooltips(SpaceAlbumCard, {
       spaceId: 's-1',
       album,
       canManage: true,
       onUnlink: vi.fn(),
       onToggleTimeline: vi.fn(),
+      onToggleMyTimeline: vi.fn(),
     });
-    // album.showInTimeline=true → toggle option reads "Hide from timeline"
-    expect(screen.getByText('Hide from timeline')).toBeInTheDocument();
+    expect(screen.getByText('Hide this album from my timeline')).toBeInTheDocument();
+    // album.showInTimeline=true → the editor-only toggle reads "Hide this album from the space's photos"
+    expect(screen.getByText("Hide this album from the space's photos")).toBeInTheDocument();
     expect(screen.getByText('Unlink album')).toBeInTheDocument();
   });
 
-  it('when canManage=false, neither the unlink nor the toggle menu option is present', () => {
-    renderWithTooltips(SpaceAlbumCard, { spaceId: 's-1', album, canManage: false });
-    expect(screen.queryByText('Hide from timeline')).not.toBeInTheDocument();
-    expect(screen.queryByText('Show in timeline')).not.toBeInTheDocument();
+  it('when canManage=false, only the my-timeline item is present — the editor-only items are hidden', () => {
+    renderWithTooltips(SpaceAlbumCard, { spaceId: 's-1', album, canManage: false, onToggleMyTimeline: vi.fn() });
+    expect(screen.getByText('Hide this album from my timeline')).toBeInTheDocument();
+    expect(screen.queryByText("Hide this album from the space's photos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Show this album in the space's photos")).not.toBeInTheDocument();
     expect(screen.queryByText('Unlink album')).not.toBeInTheDocument();
   });
 

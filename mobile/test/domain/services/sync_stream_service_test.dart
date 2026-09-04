@@ -207,6 +207,9 @@ void main() {
     when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).thenAnswer(successHandler);
+    // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumHiddenV1(any())).thenAnswer(successHandler);
     when(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset()).thenAnswer(successHandler);
 
     sut = SyncStreamService(
@@ -690,6 +693,25 @@ void main() {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifBackfillV1]);
         verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-exif-backfill-ack'])).called(1);
+      });
+
+      // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+      test('stores a hidden row from a SharedSpaceAlbumHiddenV1 upsert', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumHiddenV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-hidden-v1-ack'])).called(1);
+      });
+
+      test('stores a hidden row from a SharedSpaceAlbumHiddenBackfillV1 event', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumHiddenBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-hidden-backfill-ack'])).called(1);
+      });
+
+      test('removes the row on SharedSpaceAlbumHiddenDeleteV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceAlbumHiddenDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumHiddenV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['sa-album-hidden-delete-ack'])).called(1);
       });
     });
   });

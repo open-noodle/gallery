@@ -60,6 +60,7 @@ export const sharedLinkSpaceTether = (eb: ExpressionBuilder<DB, keyof DB>): Expr
         correlateAssetId: 'asset.id',
         correlateLibraryId: 'asset.libraryId',
         scope: { spaceIdRef: 'shared_link.spaceId' },
+        albumTimelineGate: 'none',
       }),
     ),
   ]);

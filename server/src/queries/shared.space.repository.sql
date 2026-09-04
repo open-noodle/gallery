@@ -162,6 +162,24 @@ where
   "userId" = $1
   and "showInTimeline" = $2
 
+-- SharedSpaceRepository.getHiddenAlbumIdsForUser
+select
+  "albumId"
+from
+  "shared_space_album_hidden"
+where
+  "spaceId" = $1::uuid
+  and "userId" = $2::uuid
+
+-- SharedSpaceRepository.getTimelineHiddenScope
+select
+  "spaceId",
+  "showInTimeline"
+from
+  "shared_space_member"
+where
+  "userId" = $1::uuid
+
 -- SharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled
 select
   "id"

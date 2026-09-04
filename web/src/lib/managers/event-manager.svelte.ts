@@ -50,7 +50,10 @@ export type Events = {
   AlbumUserUpdate: [{ albumId: string; userId: string; role: AlbumUserRole }];
   AlbumUserDelete: [{ albumId: string; userId: string }];
 
-  SpaceAddAssets: [{ assetIds: string[]; spaceId: string }];
+  // #1041: `hiddenFromMyTimeline` tells listeners the receiving space is one the emitting user has
+  // hidden from their own timeline, so a timeline showing those assets is now stale. Optional —
+  // absent means "not known to be hidden", which listeners must treat as "leave the timeline alone".
+  SpaceAddAssets: [{ assetIds: string[]; spaceId: string; hiddenFromMyTimeline?: boolean }];
   SpaceRemoveAssets: [{ assetIds: string[]; spaceId: string }];
   SpaceLinkAlbum: [{ spaceId: string }];
   SpaceUnlinkAlbum: [{ spaceId: string }];

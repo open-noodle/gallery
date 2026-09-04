@@ -9,7 +9,9 @@
  *  - download / access / sync / search: Timeline + Archive present; Hidden + Locked ABSENT.
  *  - map / memory / view / folders: Timeline ONLY (Archive excluded by design).
  *  - showInTimeline=false album: ABSENT on projection surfaces; PRESENT on grant surfaces
- *    (album-asset sync backfill, direct album download/access).
+ *    (album-asset sync backfill, direct album download/access). EXCEPTION since #1041 (slice 9):
+ *    view/folders is a personal-timeline-like surface — the SHARED flag no longer gates it for a
+ *    viewer who has not personally hidden the album (albumTimelineGate: 'personal'); see SURFACE 17.
  *  - soft-deleted album: ABSENT on all surfaces.
  *  - space people-facets: a face on another member's Hidden asset must NOT surface the
  *    space-person (visibility-gated by getPersonsBySpaceId + getPersonAssetIds).
@@ -1414,11 +1416,13 @@ describe('matrix: memory searchAccessible', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // SURFACE 17: view / folders (getUniqueOriginalPaths / getAssetsByOriginalPath)
 // Rule: Timeline ONLY; Archive excluded; Hidden+Locked absent.
-// showInTimeline=false album: ABSENT (requireShowInTimeline in ownedOrSpaceAccessible).
+// #1041 (slice 9): showInTimeline=false album — PRESENT for a viewer who has not personally hidden
+// it (albumTimelineGate: 'personal' in ownedOrSpaceAccessible). This is a personal-timeline-like
+// surface now, same as /photos — the SHARED flag governs only the space's own Photos tab (§3).
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('matrix: view/folders (getUniqueOriginalPaths)', () => {
-  it('includes Timeline paths; excludes Archive+Hidden+Locked+noTimeline', async () => {
+  it('includes Timeline paths; excludes Archive+Hidden+Locked; a noTimeline album now SHOWS for a viewer who has not personally hidden it (#1041)', async () => {
     const { viewRepo, spaceRepo, ctx } = setup();
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
@@ -1463,7 +1467,13 @@ describe('matrix: view/folders (getUniqueOriginalPaths)', () => {
     expect(paths).toContain(tlPath); // Timeline ✓
     expect(paths).not.toContain(arPath); // Archive excluded ✓
     expect(paths).not.toContain(hiPath); // Hidden blocked ✓
-    expect(paths).not.toContain(noTlPath); // showInTimeline=false excluded ✓
+    // #1041 (design doc §3): the SHARED shared_space_album.showInTimeline flag governs only the
+    // space's OWN Photos tab now — it no longer reaches a personal-timeline-like surface such as
+    // folder view. `viewer` here is a DIFFERENT member than the album's owner and has not
+    // personally hidden this album (no shared_space_album_hidden row), so the album's assets show.
+    // Before slice 9 this asserted `.not.toContain(noTlPath)`, which encoded exactly the #1041 bug:
+    // the shared flag leaking into a per-viewer surface.
+    expect(paths).toContain(noTlPath);
   });
 });
 

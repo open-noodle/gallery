@@ -1,6 +1,10 @@
 import { toastManager } from '@immich/ui';
-import type { PickerCollection } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
+import {
+  isHiddenFromMyTimeline,
+  type PickerCollection,
+} from '$lib/components/shared-components/collection-selection/collection-selection-utils';
 import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import { addAssetsToAlbums } from '$lib/services/album.service';
 import { addAssetsToSpace } from '$lib/services/space.service';
 import { getFormatter } from '$lib/utils/i18n';
@@ -30,12 +34,20 @@ export const addAssetsToCollections = async (
   const $t = await getFormatter();
 
   const albumIds = collections.filter((c) => c.kind === 'album').map((c) => c.id);
-  const spaceIds =
+  // #1041: carry the caller's own "hidden from my timeline" flag alongside each space id, resolved
+  // here from the picker's already-loaded DTO, so `addAssetsToSpace` can tell the timeline that
+  // assets landing in a hidden space have just left it.
+  const spaces =
     contributionMode || assetIds.length > MAX_SPACE_ASSETS_PER_REQUEST
       ? []
-      : collections.filter((c) => c.kind === 'space').map((c) => c.id);
+      : collections
+          .filter((c) => c.kind === 'space')
+          .map((c) => ({
+            id: c.id,
+            hiddenFromMyTimeline: isHiddenFromMyTimeline(c.space, authManager.user?.id ?? null),
+          }));
 
-  const total = albumIds.length + spaceIds.length;
+  const total = albumIds.length + spaces.length;
   if (total === 0) {
     return true;
   }
@@ -43,8 +55,11 @@ export const addAssetsToCollections = async (
   if (total === 1 && albumIds.length === 1) {
     return addAssetsToAlbums(albumIds, assetIds, { notify: true });
   }
-  if (total === 1 && spaceIds.length === 1) {
-    return addAssetsToSpace(spaceIds[0], assetIds, { notify: true });
+  if (total === 1 && spaces.length === 1) {
+    return addAssetsToSpace(spaces[0].id, assetIds, {
+      notify: true,
+      hiddenFromMyTimeline: spaces[0].hiddenFromMyTimeline,
+    });
   }
 
   const tasks: { count: number; run: () => Promise<boolean> }[] = [];
@@ -55,8 +70,12 @@ export const addAssetsToCollections = async (
   } else if (albumIds.length > 0) {
     tasks.push({ count: albumIds.length, run: () => addAssetsToAlbums(albumIds, assetIds, { notify: false }) });
   }
-  for (const id of spaceIds) {
-    tasks.push({ count: 1, run: () => addAssetsToSpace(id, assetIds, { notify: false }) });
+  for (const space of spaces) {
+    tasks.push({
+      count: 1,
+      run: () =>
+        addAssetsToSpace(space.id, assetIds, { notify: false, hiddenFromMyTimeline: space.hiddenFromMyTimeline }),
+    });
   }
 
   const settled = await Promise.allSettled(tasks.map((task) => task.run()));

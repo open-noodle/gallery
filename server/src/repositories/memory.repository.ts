@@ -9,7 +9,13 @@ import { AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum';
 import { DB } from 'src/schema';
 import { MemoryTable } from 'src/schema/tables/memory.table';
 import { IBulkAsset } from 'src/types';
-import { spaceAlbumAssetExists } from 'src/utils/shared-space-album-scope';
+import { asUuid } from 'src/utils/database';
+import {
+  hiddenFromOwnTimeline,
+  spaceAlbumAssetExists,
+  TimelineHiddenScope,
+  timelineHiddenScopeIsEmpty,
+} from 'src/utils/shared-space-album-scope';
 
 @Injectable()
 export class MemoryRepository implements IBulkAsset {
@@ -120,7 +126,7 @@ export class MemoryRepository implements IBulkAsset {
                 spaceAlbumAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { memberUserId: userId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               ]),
             ),
@@ -151,7 +157,12 @@ export class MemoryRepository implements IBulkAsset {
     { name: 'upcoming filter', params: [DummyValue.UUID, { isUpcoming: true }] },
     { name: 'not upcoming filter', params: [DummyValue.UUID, { isUpcoming: false }] },
   )
-  search(ownerId: string, dto: MemorySearchDto) {
+  // #1041: `hiddenScope` is OPTIONAL and, when provided, resolved for `ownerId` — the memory
+  // row's owner, NOT necessarily every asset's owner (a memory can include partner/space assets
+  // via the candidate builder above). The subtraction is therefore `ownerId != asset.ownerId OR
+  // notHidden`, never a bare AND — the same partner-trap shape §6.4 guards on the timeline. Passing
+  // no `hiddenScope` (the only caller today, generation-time dedup) leaves the query unchanged.
+  search(ownerId: string, dto: MemorySearchDto, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
     return this.searchBuilder(ownerId, dto)
       .select((eb) =>
         jsonArrayFrom(
@@ -162,6 +173,18 @@ export class MemoryRepository implements IBulkAsset {
             .whereRef('memory_asset.memoriesId', '=', 'memory.id')
             .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
             .where('asset.deletedAt', 'is', null)
+            .$if(!!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
+              qb.where((eb) =>
+                eb.or([
+                  eb('asset.ownerId', '!=', asUuid(ownerId)),
+                  hiddenFromOwnTimeline(eb, hiddenScope!, {
+                    kind: 'inline',
+                    visibleSpaceIds,
+                    viewerId: ownerId,
+                  })!,
+                ]),
+              ),
+            )
             .where((eb) =>
               eb.not(
                 eb.exists(
@@ -259,7 +282,13 @@ export class MemoryRepository implements IBulkAsset {
     return row?.oldest ?? null;
   }
 
-  searchAccessible(userId: string, dto: MemorySearchDto) {
+  // #1041: same partner-trap-safe shape as `search` above, resolved for the VIEWER (`userId`).
+  searchAccessible(
+    userId: string,
+    dto: MemorySearchDto,
+    hiddenScope?: TimelineHiddenScope,
+    visibleSpaceIds: string[] = [],
+  ) {
     return (
       this.accessibleSearchBuilder(userId, dto)
         .select((eb) =>
@@ -271,6 +300,14 @@ export class MemoryRepository implements IBulkAsset {
               .whereRef('memory_asset.memoriesId', '=', 'memory.id')
               .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
               .where('asset.deletedAt', 'is', null)
+              .$if(!!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
+                qb.where((eb) =>
+                  eb.or([
+                    eb('asset.ownerId', '!=', asUuid(userId)),
+                    hiddenFromOwnTimeline(eb, hiddenScope!, { kind: 'inline', visibleSpaceIds, viewerId: userId })!,
+                  ]),
+                ),
+              )
               .where((eb) =>
                 eb.not(
                   eb.exists(
@@ -307,9 +344,12 @@ export class MemoryRepository implements IBulkAsset {
     );
   }
 
+  // #1041: `viewerId`/`hiddenScope` are optional — `create`/`update` below return the object right
+  // after the caller's own action and pass neither, so their SQL is unchanged. `get()` is the
+  // read surface and is the one MemoryService resolves a scope for.
   @GenerateSql({ params: [DummyValue.UUID] })
-  get(id: string) {
-    return this.getByIdBuilder(id).executeTakeFirst();
+  get(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
+    return this.getByIdBuilder(id, viewerId, hiddenScope, visibleSpaceIds).executeTakeFirst();
   }
 
   async create(memory: Insertable<MemoryTable>, assetIds: Set<string>) {
@@ -415,7 +455,12 @@ export class MemoryRepository implements IBulkAsset {
     await this.db.deleteFrom('memory_asset').where('memoriesId', '=', id).where('assetId', 'in', assetIds).execute();
   }
 
-  private getByIdBuilder(id: string) {
+  private getByIdBuilder(
+    id: string,
+    viewerId?: string,
+    hiddenScope?: TimelineHiddenScope,
+    visibleSpaceIds: string[] = [],
+  ) {
     return this.db
       .selectFrom('memory')
       .selectAll('memory')
@@ -428,7 +473,15 @@ export class MemoryRepository implements IBulkAsset {
             .whereRef('memory_asset.memoriesId', '=', 'memory.id')
             .orderBy('asset.localDateTime', 'asc')
             .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-            .where('asset.deletedAt', 'is', null),
+            .where('asset.deletedAt', 'is', null)
+            .$if(!!viewerId && !!hiddenScope && !timelineHiddenScopeIsEmpty(hiddenScope), (qb) =>
+              qb.where((eb) =>
+                eb.or([
+                  eb('asset.ownerId', '!=', asUuid(viewerId!)),
+                  hiddenFromOwnTimeline(eb, hiddenScope!, { kind: 'inline', visibleSpaceIds, viewerId: viewerId! })!,
+                ]),
+              ),
+            ),
         ).as('assets'),
       )
       .where('id', '=', id)
