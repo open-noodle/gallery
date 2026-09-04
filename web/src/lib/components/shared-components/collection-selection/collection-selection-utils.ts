@@ -32,6 +32,18 @@ export const isWritableSpace = (space: SharedSpaceResponseDto, currentUserId: st
   return role === SharedSpaceRole.Owner || role === SharedSpaceRole.Editor;
 };
 
+/**
+ * #1041: has the caller hidden this space from their OWN timeline? Read from the caller's own
+ * `shared_space_member` row, which `getAllSpaces` already embeds in `members` — the same lookup
+ * {@link isWritableSpace} does for `role`, so this costs no extra request.
+ *
+ * Used to decide whether adding a photo to this space should drop it from the caller's timeline
+ * view. Defaults to `false` (shown) when the member row is absent: an unknown membership must never
+ * make photos disappear, and the next timeline load corrects it either way.
+ */
+export const isHiddenFromMyTimeline = (space: SharedSpaceResponseDto, currentUserId: string | null): boolean =>
+  space.members?.find((member) => member.userId === currentUserId)?.showInTimeline === false;
+
 // Album description is `string`, space description is `string | null | undefined` — normalise both to
 // '' so an absent description can never match (`''.includes(query)` is false for a non-empty query,
 // and the converter only filters when the query is non-empty).

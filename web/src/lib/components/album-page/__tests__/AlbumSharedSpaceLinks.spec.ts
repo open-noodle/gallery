@@ -47,7 +47,10 @@ describe('AlbumSharedSpaceLinks', () => {
     expect(screen.getAllByTestId('album-space-link-unlink')).toHaveLength(2);
   });
 
-  it('shows the "hidden from timeline" indicator only for links with showInTimeline=false', () => {
+  // link.showInTimeline is the shared, editor-controlled flag (the space's own Photos tab), so the
+  // indicator must be the space-photos badge — never space_albums_hidden_from_timeline, which is
+  // now reserved for the caller's own per-member "my timeline" preference (#1041 §2).
+  it('shows the "hidden from the space\'s photos" indicator only for links with showInTimeline=false', () => {
     renderWithTooltips(AlbumSharedSpaceLinks, {
       album: albumFactory.build({
         id: 'album-1',
@@ -58,7 +61,7 @@ describe('AlbumSharedSpaceLinks', () => {
       }),
     });
 
-    expect(screen.getAllByText('Hidden from timeline', { exact: false })).toHaveLength(1);
+    expect(screen.getAllByText("Hidden from the space's photos", { exact: false })).toHaveLength(1);
   });
 
   it('calls unlinkAlbum with the space id + album id after confirming', async () => {

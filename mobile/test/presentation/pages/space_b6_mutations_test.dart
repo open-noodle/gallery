@@ -120,8 +120,8 @@ void main() {
       await tester.tap(find.byKey(const Key('space-album-card-menu-a1')));
       await tester.pumpAndSettle();
 
-      // Tap the "Hide from timeline" option
-      await tester.tap(find.text('Hide from timeline'));
+      // Tap the album's hide-from-space-photos option
+      await tester.tap(find.text("Hide this album from the space's photos"));
       await tester.pumpAndSettle();
 
       expect(toggledId, 'a1');
@@ -220,7 +220,7 @@ void main() {
 
       await tester.tap(find.byWidgetPredicate((w) => w is PopupMenuButton));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Hide from timeline'));
+      await tester.tap(find.text("Hide this album from the space's photos"));
       await tester.pumpAndSettle();
 
       expect(toggleCount, 1);

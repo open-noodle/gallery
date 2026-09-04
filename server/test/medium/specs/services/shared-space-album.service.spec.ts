@@ -497,7 +497,14 @@ const setupTimeline = () =>
   });
 
 describe('SharedSpaceService — linked-album assets in space timeline', () => {
-  it('includes album assets when showInTimeline is true, excludes them when false', async () => {
+  // #1041 (slice 8): this reads the VIEWER's PERSONAL /photos timeline (dto.userId +
+  // withSharedSpaces), not the space's own Photos tab (that's the sibling describe block below,
+  // "via direct spaceId timeline", which is correctly unchanged). The shared
+  // shared_space_album.showInTimeline flag governs only the space's own tab now (§2/§3) — it no
+  // longer reaches a personal timeline for a viewer who has not personally hidden the album. Before
+  // slice 8 this test toggled the shared flag and asserted the asset left the VIEWER's own /photos,
+  // which encoded exactly the #1041 bug report.
+  it('the shared showInTimeline flag does NOT reach a viewer who has not personally hidden the album', async () => {
     const { sut, ctx } = setupTimeline();
 
     // Owner creates the space and album
@@ -541,10 +548,11 @@ describe('SharedSpaceService — linked-album assets in space timeline', () => {
     const idsOn: string[] = JSON.parse(bucketRawOn).id;
     expect(idsOn).toContain(assetInA.id);
 
-    // Toggle showInTimeline off for the album
+    // Toggle showInTimeline off for the album (the SHARED, space-tab flag — see the describe-level
+    // #1041 comment: this no longer reaches the viewer's personal timeline).
     await ctx.get(SharedSpaceRepository).setAlbumShowInTimeline(space.id, album.id, false);
 
-    // Viewer reads again — asset should no longer appear
+    // Viewer reads again — the asset still appears: the viewer never personally hid the album.
     const bucketsOff = await sut.getTimeBuckets(viewerAuth, {
       userId: viewer.id,
       withSharedSpaces: true,
@@ -552,7 +560,7 @@ describe('SharedSpaceService — linked-album assets in space timeline', () => {
       bucketSize: TimeBucketSize.Month,
     });
     const bucketOff = bucketsOff.find((b) => b.timeBucket === '2024-03-01');
-    expect(bucketOff?.count ?? 0).toBe(0);
+    expect(bucketOff?.count ?? 0).toBe(1);
 
     const bucketRawOff = await sut.getTimeBucket(viewerAuth, {
       timeBucket: '2024-03-01',
@@ -562,7 +570,7 @@ describe('SharedSpaceService — linked-album assets in space timeline', () => {
       bucketSize: TimeBucketSize.Month,
     });
     const idsOff: string[] = JSON.parse(bucketRawOff).id;
-    expect(idsOff).not.toContain(assetInA.id);
+    expect(idsOff).toContain(assetInA.id);
   });
 });
 

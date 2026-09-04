@@ -42,6 +42,7 @@ import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
   SharedSpaceAlbumLinkUpdateDto,
+  SharedSpaceAlbumMemberTimelineDto,
   SharedSpaceAlbumParamDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetLinkedAlbumDto,
@@ -60,6 +61,7 @@ import {
   SharedSpacePersonFaceParamDto,
   SharedSpacePersonParamDto,
   SharedSpaceResponseDto,
+  SharedSpaceTimelineHidePreviewDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
 import { ApiTag, Permission } from 'src/enum';
@@ -178,6 +180,20 @@ export class SharedSpaceController {
     @Body() dto: SharedSpaceMemberTimelineDto,
   ): Promise<SharedSpaceMemberResponseDto> {
     return this.service.updateMemberTimeline(auth, id, dto);
+  }
+
+  @Get(':id/timeline-hide-preview')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: "Preview how many of the caller's own photos hiding this space would remove",
+    description: "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getTimelineHidePreview(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+  ): Promise<SharedSpaceTimelineHidePreviewDto> {
+    return this.service.getTimelineHidePreview(auth, id);
   }
 
   @Patch(':id/members/me/preferences')
@@ -705,6 +721,37 @@ export class SharedSpaceController {
     @Body() dto: SharedSpaceAlbumLinkUpdateDto,
   ): Promise<void> {
     return this.service.updateAlbumLink(auth, id, albumId, dto);
+  }
+
+  @Patch(':id/albums/:albumId/me/timeline')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: "Hide or show a linked album in the caller's own timeline",
+    description:
+      "Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateAlbumTimelineForMember(
+    @Auth() auth: AuthDto,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
+    @Body() dto: SharedSpaceAlbumMemberTimelineDto,
+  ): Promise<void> {
+    return this.service.updateAlbumTimelineForMember(auth, id, albumId, dto);
+  }
+
+  @Get(':id/albums/:albumId/timeline-hide-preview')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: "Preview how many of the caller's own photos hiding this album would remove",
+    description: "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getAlbumTimelineHidePreview(
+    @Auth() auth: AuthDto,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
+  ): Promise<SharedSpaceTimelineHidePreviewDto> {
+    return this.service.getAlbumTimelineHidePreview(auth, id, albumId);
   }
 
   @Delete(':id/albums/:albumId')
