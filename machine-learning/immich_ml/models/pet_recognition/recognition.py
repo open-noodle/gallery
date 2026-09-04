@@ -12,7 +12,6 @@ from immich_ml.models.base import InferenceModel
 from immich_ml.models.transforms import decode_cv2, serialize_np_array
 from immich_ml.schemas import (
     BoundingBox,
-    DetectedPet,
     ModelFormat,
     ModelSession,
     ModelTask,
@@ -72,7 +71,6 @@ class PetRecognizer(InferenceModel):
         height, width = image.shape[:2]
 
         results: PetRecognitionOutput = []
-        embeddable_pets: list[DetectedPet] = []
         embeddable_indices: list[int] = []
         crops: list[NDArray[np.float32]] = []
         for i, pet in enumerate(pets):
@@ -87,7 +85,6 @@ class PetRecognizer(InferenceModel):
 
             crop = image[y1:y2, x1:x2]
             crops.append(self._resize_and_normalize(crop))
-            embeddable_pets.append(pet)
             embeddable_indices.append(i)
 
         if crops:

@@ -1354,12 +1354,23 @@ class TestPetRecognition:
         recognizer._input_name = "input"
         recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
 
+        # The crop shape is the load-bearing assertion, not "an embedding came back": numpy reads a
+        # negative slice bound from the END of the axis, so an unclamped image[-10:1000, -20:1000]
+        # still yields a non-empty (10, 20) crop and still embeds — just of the wrong region.
+        mock_resize = mocker.patch(
+            "immich_ml.models.pet_recognition.recognition.cv2.resize",
+            return_value=np.zeros((224, 224, 3), dtype=np.uint8),
+        )
+
         image = np.zeros((50, 50, 3), dtype=np.uint8)
         pets: PetDetectionOutput = [
             {"boundingBox": {"x1": -20, "y1": -10, "x2": 1000, "y2": 1000}, "score": 0.9, "label": "dog"},
         ]
 
         results = recognizer.predict(image, pets)
+
+        assert mock_resize.call_count == 1
+        assert mock_resize.call_args_list[0].args[0].shape == (50, 50, 3)
 
         assert len(results) == 1
         embedding_str = results[0].get("embedding")
