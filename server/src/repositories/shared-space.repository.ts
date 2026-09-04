@@ -2475,6 +2475,7 @@ export class SharedSpaceRepository {
       takenAfter?: Date;
       takenBefore?: Date;
       minimumFaceCount?: number;
+      type?: string;
     },
   ) {
     const escapedName = options.name
@@ -2487,6 +2488,21 @@ export class SharedSpaceRepository {
     const takenAfterFilter = options.takenAfter ? sql`AND "asset"."fileCreatedAt" >= ${options.takenAfter}` : sql``;
     const takenBeforeFilter = options.takenBefore ? sql`AND "asset"."fileCreatedAt" < ${options.takenBefore}` : sql``;
     const petPersonFilter = options.petsEnabled ? sql`` : sql`AND "shared_space_person"."type" != 'pet'`;
+    // type filter, count-arm twin of getPersonsBySpaceId's $if(!!options.type, ...) / $if(options.type
+    // === 'pet', ...) (shared-space.repository.ts ~2378-2391). Spliced into person_rows ONLY — never
+    // into assignedPersonFaceFilter, which feeds detectedFaceCount and must stay unfiltered (S24).
+    const typePersonFilter = options.type ? sql`AND "shared_space_person"."type" = ${options.type}` : sql``;
+    const petIndividualFilter =
+      options.type === 'pet'
+        ? sql`
+            AND EXISTS (
+              SELECT 1
+              FROM "shared_space_person_face" "spf"
+              INNER JOIN "pet_search" ON "pet_search"."faceId" = "spf"."assetFaceId"
+              WHERE "spf"."personId" = "shared_space_person"."id"
+            )
+          `
+        : sql``;
     const namedPersonFilter = options.named ? sql`AND "shared_space_person"."name" != ''` : sql``;
     const namePersonFilter = namePattern
       ? sql`AND "shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`
@@ -2498,6 +2514,7 @@ export class SharedSpaceRepository {
             AND (
               "shared_space_person"."name" != ''
               OR "shared_space_person"."assetCount" >= ${minimumFaceCount}
+              ${options.type === 'pet' ? sql`OR "shared_space_person"."type" = 'pet'` : sql``}
             )
           `;
     // Always require at least one visible, in-scope face (visibility already enforced by asset_scope CTE).
@@ -2585,6 +2602,8 @@ export class SharedSpaceRepository {
         FROM "shared_space_person"
         WHERE "shared_space_person"."spaceId" = ${spaceId}
           ${petPersonFilter}
+          ${typePersonFilter}
+          ${petIndividualFilter}
           ${namedPersonFilter}
           ${namePersonFilter}
           ${minimumPersonFilter}
