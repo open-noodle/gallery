@@ -8,7 +8,7 @@ This guide walks through switching a Gallery instance back to upstream [Immich](
 - Shared spaces (members, assets, person clusters, libraries, activity, audit history)
 - User groups and memberships
 - Classification categories and prompts
-- Pet detection results
+- Pet detection results, and every individual pet you named through pet recognition
 - Asset duplicate checksums
 - Library sync state
 
