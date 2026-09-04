@@ -8,6 +8,15 @@ const compatibilityAliases = [
     from: '1777667825574-ChangeDurationToInteger',
     to: '1776735180298-ChangeDurationToInteger',
   },
+  // Renumbered on the rolling branch when fork PR #1060 landed
+  // `1793000000000-AddSharedSpaceAlbumHidden` on the same timestamp. That PR is already on `main`
+  // under its name, so the rolling-only cleanup migration is the one that had to move — but staging
+  // (and any other rolling RC) had ALREADY applied it as `1793000000000` and records that name.
+  // Without this alias those databases boot into a recorded-migration-with-no-file hard failure.
+  {
+    from: '1793300000000-ClearPreOptionMFaceRepairScans',
+    to: '1793000000000-ClearPreOptionMFaceRepairScans',
+  },
 ];
 
 function migrationNames(folder, extension) {
