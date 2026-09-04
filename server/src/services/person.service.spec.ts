@@ -432,6 +432,39 @@ describe(PersonService.name, () => {
       expect(mocks.person.getAllForUser).not.toHaveBeenCalled();
     });
 
+    // The /people page's All / People / Pets filter. Both arms must receive it — the page itself
+    // only ever takes the withSharedSpaces one, but a client that omits that flag takes the other.
+    it('forwards the type filter to the identity resolver', async () => {
+      const auth = AuthFactory.create();
+      (mocks.faceIdentity as any).getAccessiblePeople.mockResolvedValue({
+        total: 0,
+        hidden: 0,
+        hasNextPage: false,
+        people: [],
+      });
+
+      await sut.getAll(auth, { withHidden: false, withSharedSpaces: true, page: 1, size: 50, type: 'pet' } as any);
+
+      expect((mocks.faceIdentity as any).getAccessiblePeople).toHaveBeenCalledWith(
+        auth.user.id,
+        expect.objectContaining({ type: 'pet' }),
+      );
+    });
+
+    it('forwards the type filter to the owner-scoped repository', async () => {
+      const auth = AuthFactory.create();
+      mocks.person.getAllForUser.mockResolvedValue({ items: [], hasNextPage: false });
+      mocks.person.getNumberOfPeople.mockResolvedValue({ total: 0, hidden: 0 });
+
+      await sut.getAll(auth, { withHidden: false, withSharedSpaces: false, page: 1, size: 50, type: 'pet' } as any);
+
+      expect(mocks.person.getAllForUser).toHaveBeenCalledWith(
+        expect.anything(),
+        auth.user.id,
+        expect.objectContaining({ type: 'pet' }),
+      );
+    });
+
     it('should preserve identity-aware people ordering returned by repository', async () => {
       const auth = AuthFactory.create();
       const response = {
