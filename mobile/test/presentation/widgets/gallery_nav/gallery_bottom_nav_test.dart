@@ -436,14 +436,16 @@ void main() {
     // slot index now diverge.
     final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [remoteAlbumProvider.overrideWith(_FakeRemoteAlbumNotifier.new)],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [remoteAlbumProvider.overrideWith(_FakeRemoteAlbumNotifier.new)],
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('nav_library'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_library));
     await tester.pumpAndSettle();
 
     expect(router.setCalls, [2]);
@@ -494,7 +496,9 @@ void main() {
 
   testWidgets('with Spaces on, the pill renders a Spaces segment and no Albums segment', (tester) async {
     final router = FakeTabsRouter();
-    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: true)));
+    await tester.pumpWidget(
+      localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: true))),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('gallery-nav-segment-spaces')), findsOneWidget);
@@ -503,7 +507,9 @@ void main() {
 
   testWidgets('with Spaces off, the pill renders an Albums segment and no Spaces segment', (tester) async {
     final router = FakeTabsRouter();
-    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: false)));
+    await tester.pumpWidget(
+      localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: false))),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('gallery-nav-segment-albums')), findsOneWidget);
@@ -515,9 +521,11 @@ void main() {
     final albums = _FakeRemoteAlbumNotifier();
 
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [..._navOverrides(showSpaces: true), remoteAlbumProvider.overrideWith(() => albums)],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [..._navOverrides(showSpaces: true), remoteAlbumProvider.overrideWith(() => albums)],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -554,12 +562,14 @@ void main() {
     addTearDown(sub.close);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: MediaQuery(
-            data: _portraitMq,
-            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: _portraitMq,
+              child: Material(child: GalleryBottomNav(tabsRouter: router)),
+            ),
           ),
         ),
       ),
@@ -578,9 +588,11 @@ void main() {
     final albums = _FakeRemoteAlbumNotifier();
 
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [..._navOverrides(showSpaces: false), remoteAlbumProvider.overrideWith(() => albums)],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [..._navOverrides(showSpaces: false), remoteAlbumProvider.overrideWith(() => albums)],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -596,9 +608,11 @@ void main() {
     final router = FakeTabsRouter();
 
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [..._navOverrides(showSpaces: true), readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [..._navOverrides(showSpaces: true), readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -611,10 +625,12 @@ void main() {
     final router = FakeTabsRouter();
 
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: _navOverrides(showSpaces: true),
-        mq: const MediaQueryData(size: Size(900, 400)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: _navOverrides(showSpaces: true),
+          mq: const MediaQueryData(size: Size(900, 400)),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -623,8 +639,8 @@ void main() {
     expect(rail.destinations, hasLength(3));
     // Raw keys, not translations: this harness has no EasyLocalization above
     // it, so `tr()` returns the key — same convention as the taps above.
-    expect(find.text('spaces'.tr()), findsOneWidget);
-    expect(find.text('nav_albums'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.spaces), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.nav_albums), findsNothing);
   });
 
   testWidgets('the active segment follows the slot occupant after a flip', (tester) async {
@@ -639,12 +655,14 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: MediaQuery(
-            data: _portraitMq,
-            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: _portraitMq,
+              child: Material(child: GalleryBottomNav(tabsRouter: router)),
+            ),
           ),
         ),
       ),
