@@ -10,7 +10,7 @@ import 'package:openapi/api.dart';
 /// Edit a space's name, description and colour.
 ///
 /// Naming and appearance are editor-level server-side, so this sheet is gated by
-/// its callers (Slice 4), not by itself.
+/// its callers, not by itself.
 ///
 /// Takes an [onClose] callback rather than calling `Navigator.pop` directly: that
 /// keeps the sheet independent of routing so it can be widget-tested by pumping it

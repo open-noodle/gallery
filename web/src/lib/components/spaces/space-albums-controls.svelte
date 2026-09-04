@@ -21,6 +21,7 @@
     mdiArrowDownThin,
     mdiArrowUpThin,
     mdiChevronDown,
+    mdiFolderPlusOutline,
     mdiFolderRemoveOutline,
     mdiFormatListBulletedSquare,
     mdiLinkVariantPlus,
@@ -37,9 +38,17 @@
     canManage?: boolean;
     onCreate?: () => void;
     onLink?: () => void;
+    onCreateFolder?: () => void;
   }
 
-  let { groupIds = [], searchQuery = $bindable(''), canManage = false, onCreate, onLink }: Props = $props();
+  let {
+    groupIds = [],
+    searchQuery = $bindable(''),
+    canManage = false,
+    onCreate,
+    onLink,
+    onCreateFolder,
+  }: Props = $props();
 
   let showSortMenu = $state(false);
   let showGroupMenu = $state(false);
@@ -144,8 +153,14 @@
       </button>
 
       {#if showSortMenu}
+        <!-- z-30, not z-10: these panels drop down OVER the album grid, whose cards carry an
+             `absolute … z-10` hover-kebab overlay (space-album-card / space-album-folder-card).
+             At an equal z-index the tie is broken by DOM order, so the card — which comes after
+             this toolbar — paints on top and, because `opacity-0` still hit-tests, silently
+             swallows every click that lands on it. z-30 matches the dropdown panel in
+             space-card.svelte and clears every in-content overlay on this page. -->
         <div
-          class="absolute top-full right-0 z-10 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          class="absolute top-full right-0 z-30 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
           data-testid="space-albums-sort-menu"
         >
           {#each spaceAlbumSortOptionsMetadata as option (option.id)}
@@ -179,8 +194,9 @@
       </button>
 
       {#if showGroupMenu}
+        <!-- z-30 for the same reason as the sort panel above. -->
         <div
-          class="absolute top-full right-0 z-10 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          class="absolute top-full right-0 z-30 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
           data-testid="space-albums-group-menu"
         >
           {#each spaceGroupOptionsMetadata as option (option.id)}
@@ -246,6 +262,15 @@
     {/if}
 
     {#if canManage}
+      <Button
+        size="small"
+        variant="ghost"
+        leadingIcon={mdiFolderPlusOutline}
+        onclick={() => onCreateFolder?.()}
+        data-testid="create-folder-button"
+      >
+        {$t('space_album_folder_new')}
+      </Button>
       <Button size="small" leadingIcon={mdiPlus} onclick={() => onCreate?.()} data-testid="create-album-button">
         {$t('create_album')}
       </Button>

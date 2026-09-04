@@ -147,7 +147,7 @@ class _CollectionCards extends StatelessWidget {
             _PeopleCollectionCard(),
             _PlacesCollectionCard(),
             _LocalAlbumsCollectionCard(),
-            _AlbumsCollectionCard(),
+            AlbumsCollectionCard(),
             _MemoriesCollectionCard(),
           ],
         ),
@@ -534,6 +534,7 @@ class _AlbumsCollectionCard extends ConsumerWidget {
         final size = context.width * widthFactor - 20.0;
 
         return GestureDetector(
+          key: const Key('library-albums-card'),
           onTap: () => context.pushRoute(const AlbumsRoute()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

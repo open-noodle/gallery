@@ -285,6 +285,7 @@ const VIS_ALLOWLIST: Record<string, string> = {
     'membership lookup; returns spaceId, not asset data (on album-leg allowlist too)',
   'shared-space.repository.ts::getLinkedLibraries': 'returns library metadata rows, not asset rows',
   'shared-space.repository.ts::hasLibraryLink': 'boolean link-existence check; no asset data',
+  'shared-space.repository.ts::hasAlbumLink': 'boolean link-existence check; no asset data',
   'shared-space.repository.ts::getLinkedAlbums': 'returns album metadata rows for management UI; no asset content',
   'shared-space.repository.ts::getLinkedAlbumsContainingAssets':
     "resolves linked-album id/name for the caller's OWN selected assetIds (remove-from-space message); returns album metadata only, no asset content",
@@ -379,6 +380,14 @@ const VIS_ALLOWLIST: Record<string, string> = {
   //   space streams (SharedSpaceAssetSync etc.) carry the visibility gate separately.
   'sync.repository.ts::getUpserts':
     'sync stream of shared_space metadata columns (accessibleSpaces-scoped), not asset rows',
+  // — Every getDeletes in sync.repository.ts is the same shape: auditQuery() over a
+  //   shared_space*_audit tombstone table selecting ids only (id/spaceId plus the deleted
+  //   row's own id), scoped by accessibleSpaces so a member is told only about spaces they
+  //   can see. Tombstones carry no asset content, so no visibility gate applies; the asset
+  //   streams that DO serve rows carry theirs separately. Listed explicitly because these
+  //   arms used to pass only by sitting within VIS_WINDOW of a neighbouring gated stream —
+  //   proximity that any later insertion between the classes silently removes.
+  'sync.repository.ts::getDeletes': 'audit-table tombstone stream (ids only, accessibleSpaces-scoped), not asset rows',
   // LibrarySync.getCreatedAfter streams library_user access-GRANT rows (libraryId,
   // createId) scoped by accessibleLibraries — a per-user grant ledger, not asset
   // rows. The library asset streams (LibraryAssetSync/ExifSync) carry the gate.

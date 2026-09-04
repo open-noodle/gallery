@@ -276,6 +276,95 @@ void main() {
     expect(await ctx.db.select(ctx.db.sharedSpaceAlbumAssetEntity).get(), isNotEmpty);
   });
 
+  group('watchFolders', () {
+    // R-01 — folder names are member-only information, so leaking another space's folders into
+    // this stream would surface names the user should not see.
+    test('R-01: emits only the requested space folders', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final other = await ctx.newSharedSpace(createdById: user.id);
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Trips');
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: other.id, id: 'f2', name: 'Secret');
+
+      final folders = await repo.watchFolders(space.id).first;
+
+      expect(folders.map((f) => f.id), ['f1']);
+    });
+
+    // R-02
+    test('R-02: re-emits when a folder is inserted', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final stream = repo.watchFolders(space.id);
+      expect(await stream.first, isEmpty);
+
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Trips');
+
+      expect(await stream.first, hasLength(1));
+    });
+
+    // R-03
+    test('R-03: re-emits without a folder after it is deleted', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Trips');
+      expect(await repo.watchFolders(space.id).first, hasLength(1));
+
+      await ctx.db.customStatement('DELETE FROM shared_space_album_folder_entity WHERE id = ?', ['f1']);
+
+      expect(await repo.watchFolders(space.id).first, isEmpty);
+    });
+
+    // R-06
+    test('R-06: folders cascade away when the space is deleted', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Trips');
+
+      await ctx.db.customStatement('DELETE FROM shared_space_entity WHERE id = ?', [space.id]);
+
+      expect(await repo.watchFolders(space.id).first, isEmpty);
+    });
+
+    test('R-01: preserves parentId so the tree can be rebuilt', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'parent', name: 'Trips');
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'child', parentId: 'parent', name: '2026');
+
+      final folders = await repo.watchFolders(space.id).first;
+
+      expect(folders.firstWhere((f) => f.id == 'child').parentId, 'parent');
+    });
+  });
+
+  group('watchLinkedAlbums placement', () {
+    // R-04
+    test('R-04: projects folderId onto the album', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final a1 = await ctx.newSharedSpaceAlbum(name: 'Rome');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: a1.id, folderId: 'trips');
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+
+      expect(albums.single.folderId, 'trips');
+    });
+
+    // R-05 — a root album must be null, NOT dropped. Dropping it would empty the root level.
+    test('R-05: an album with no placement is projected with a null folderId, not dropped', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final a1 = await ctx.newSharedSpaceAlbum(name: 'Rome');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: a1.id);
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+
+      expect(albums, hasLength(1));
+      expect(albums.single.folderId, isNull);
+    });
+  });
+
   group('absorbed album add-photos (mobile F1 regression)', () {
     test('local junction write throws on an absorbed album (no remote_album row), leaving no junction row', () async {
       final user = await ctx.newUser();
