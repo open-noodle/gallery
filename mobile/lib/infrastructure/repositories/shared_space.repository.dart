@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
 
-class SharedSpaceRepository extends DriftDatabaseRepository {
+class SharedSpaceRepository {
   final Drift _db;
-  const SharedSpaceRepository(this._db) : super(_db);
+  const SharedSpaceRepository(this._db);
 
   /// The id of a space that hands [userId] the asset [assetId], or null when none does.
   ///
