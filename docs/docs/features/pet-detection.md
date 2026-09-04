@@ -1,22 +1,45 @@
 # Pet Detection
 
 Gallery can automatically detect pets and other animals in your photos using RF-DETR object
-detection. Detected animals appear in the **People** section alongside human faces, making it
-easy to browse all photos of a specific pet.
+detection. Paired with [Pet Recognition](/features/pet-recognition), your individual dogs and
+cats appear in the **People** section alongside human faces, so you can name them and browse
+every photo of a specific pet.
 
-By default every animal of a species shares one entry — one "dog", one "cat". Turn on [Pet Recognition](/features/pet-recognition) to tell your individual dogs and cats apart and name them.
+Detection on its own does not add anything to the People section. It records each animal it
+finds against a single per-species entry — one "dog", one "cat", one "bird" — and those
+per-species entries are not displayed. See
+[What you can and cannot see](#what-you-can-and-cannot-see) before enabling it on its own.
 
 ## How It Works
 
 When a photo is uploaded or reprocessed, the machine learning service runs an RF-DETR model to
-detect animals. Each detected animal is cropped and added to the People section as a
-recognisable entity, similar to how face detection works for people.
+detect animals. Each detected animal is cropped and recorded with its bounding box, the same
+way face detection records a human face.
 
 The model detects the following animal categories: bird, cat, dog, horse, sheep, and cow.
 
 Wild animals such as bears, zebras, giraffes and elephants are deliberately **not** detected.
 They are rare in a household photo library, and including them caused bear-like dog breeds —
 Newfoundlands, Keeshonds, Great Pyrenees — to be confidently mislabelled as bears.
+
+## What you can and cannot see
+
+Detection records every animal it finds, but only some of them are browsable today.
+
+| What was detected                                                  | Where it ends up                                                 |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| A dog or cat, with [Pet Recognition](/features/pet-recognition) on | An individual pet in **People** — nameable, mergeable, browsable |
+| A dog or cat, with Pet Recognition off                             | A shared per-species entry, **not shown**                        |
+| A bird, horse, sheep or cow                                        | A shared per-species entry, **not shown**                        |
+
+Per-species entries are stored, but the People page lists identities rather than raw person
+records, and a per-species entry is never given one. So with Pet Recognition switched off,
+**Pet Detection alone puts nothing in your People section** — it quietly records detections
+you have no way to view, rename or delete from the UI. The same is true of birds, horses,
+sheep and cows whether or not Pet Recognition is on.
+
+If what you want is named pets, enable Pet Recognition too. If you only want the other species
+catalogued, be aware that today the results are effectively write-only.
 
 ## Model Options
 
@@ -114,9 +137,10 @@ of machine-learning work on your server without asking.
 - **Existing detections are left exactly as they were.** They were produced by the old model,
   so they keep its mistakes. Nothing re-runs over them.
 - **Wild-animal entries become permanent until you rebuild.** Any bear, zebra, giraffe or
-  elephant YOLO11 created stays in your People section. RF-DETR will never produce those
-  species again, so nothing will ever correct or replace them on its own — a Reset is the only
-  thing that clears them.
+  elephant YOLO11 created stays in your library as a per-species entry. RF-DETR will never
+  produce those species again, so nothing will ever correct or replace them on its own — and
+  because per-species entries are not shown in the People section, a Reset is the only thing
+  that clears them.
 - **Individual pets are not re-clustered.** If you use [Pet Recognition](/features/pet-recognition),
   your existing pets keep the embeddings the old detector's crops produced.
 - **Your confidence threshold is not migrated.** This is the one to check. If you never changed
@@ -195,10 +219,14 @@ Pet detection extends two existing tables rather than creating new ones:
 Detected pets are stored as `person` rows with `type = 'pet'`. Each species creates one person
 entry per user (e.g., one "dog" person, one "cat" person), and individual detections are
 stored as `asset_face` rows with bounding box coordinates linked to that person. This reuses
-the existing face/person infrastructure for thumbnails, naming, merging, and browsing.
+the existing face/person storage for thumbnails and bounding boxes.
+
+Note that a per-species `person` row is never given a `face_identity`, and the People page
+queries identities rather than `person` rows directly — which is why these entries do not
+appear there. Only pets promoted to individuals by Pet Recognition receive one.
 
 :::note Pet Recognition covers dogs and cats only
-When [Pet Recognition](/features/pet-recognition) is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. The other four detected categories (bird, horse, sheep, cow) always keep the one-person-per-species behaviour described above.
+When [Pet Recognition](/features/pet-recognition) is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. The other four detected categories (bird, horse, sheep, cow) always keep the one-person-per-species behaviour described above, which means they are recorded but never listed in the People section.
 
 This is a limit of the recognition model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Restricting it also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than an individual identity would.
 :::
