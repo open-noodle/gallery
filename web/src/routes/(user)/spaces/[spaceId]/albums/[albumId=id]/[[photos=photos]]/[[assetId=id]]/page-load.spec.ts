@@ -37,6 +37,7 @@ const linkedAlbums = [
     albumName: 'Vacation',
     assetCount: 5,
     albumThumbnailAssetId: null,
+    folderId: null as string | null,
     showInTimeline: true,
     addedById: null,
     linkedAt: '2026-01-01T00:00:00.000Z',
@@ -93,8 +94,22 @@ describe('space album detail page load', () => {
 
     expect(result).toEqual({
       album,
+      folderId: null,
       meta: { title: 'Vacation' },
     });
+  });
+
+  // The back button navigates to the album's own folder rather than the space root, so the
+  // loader has to surface the placement. Derived from the album's link row, not from how the
+  // user arrived, so a refresh or a deep link lands in the right place too.
+  it('returns the folderId of the album when it lives inside a folder', async () => {
+    const event = makeEvent({
+      linkedAlbums: linkedAlbums.map((a) => ({ ...a, folderId: 'folder-trips' })),
+    });
+
+    const result = await load(event as never);
+
+    expect(result).toEqual(expect.objectContaining({ folderId: 'folder-trips' }));
   });
 
   it('redirects to /spaces/:id/albums and does NOT call getAlbumInfo when album is not linked to this space', async () => {
