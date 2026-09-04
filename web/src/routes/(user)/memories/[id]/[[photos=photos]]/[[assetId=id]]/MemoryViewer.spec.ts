@@ -220,7 +220,7 @@ describe('MemoryViewer view in timeline (#1047)', () => {
     );
   });
 
-  it('sends a photo from the viewer\u2019s own library to the personal timeline', async () => {
+  it('sends a photo from the viewer’s own library to the personal timeline', async () => {
     renderViewer();
 
     expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=memory-asset-1');
