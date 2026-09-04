@@ -53,7 +53,7 @@ class ModelSource(StrEnum):
     OPENCLIP = "openclip"
     PADDLE = "paddle"
     PET_RECOGNITION = "pet-recognition"
-    YOLO = "yolo"
+    RFDETR = "rfdetr"
 
 
 class ModelPrecision(StrEnum):

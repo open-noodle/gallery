@@ -38,13 +38,13 @@ describe('/pet-detection', () => {
   });
 
   describe('Config Management', () => {
-    it('should have pet detection disabled by default with yolo11s and 0.6 minScore', async () => {
+    it('should have pet detection disabled by default with rfdetr-nano and 0.3 minScore', async () => {
       const config = await getSystemConfig(admin.accessToken);
 
       expect(config.machineLearning.petDetection).toEqual({
         enabled: false,
-        modelName: 'yolo11s',
-        minScore: 0.6,
+        modelName: 'rfdetr-nano',
+        minScore: 0.3,
       });
     });
 
@@ -59,22 +59,22 @@ describe('/pet-detection', () => {
       expect(refetched.machineLearning.petDetection.enabled).toBe(true);
     });
 
-    it('should change model to yolo11n', async () => {
+    it('should change model to rfdetr-small', async () => {
       const config = await getSystemConfig(admin.accessToken);
-      config.machineLearning.petDetection.modelName = 'yolo11n';
+      config.machineLearning.petDetection.modelName = 'rfdetr-small';
       await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const refetched = await getSystemConfig(admin.accessToken);
-      expect(refetched.machineLearning.petDetection.modelName).toBe('yolo11n');
+      expect(refetched.machineLearning.petDetection.modelName).toBe('rfdetr-small');
     });
 
-    it('should change model to yolo11m', async () => {
+    it('should migrate a persisted legacy model to rfdetr-nano', async () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.modelName = 'yolo11m';
       await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const refetched = await getSystemConfig(admin.accessToken);
-      expect(refetched.machineLearning.petDetection.modelName).toBe('yolo11m');
+      expect(refetched.machineLearning.petDetection.modelName).toBe('rfdetr-nano');
     });
 
     it('should change minScore to 0.3', async () => {
@@ -152,8 +152,8 @@ describe('/pet-detection', () => {
       const config = await getSystemConfig(admin.accessToken);
       expect(config.machineLearning.petDetection).toEqual({
         enabled: false,
-        modelName: 'yolo11s',
-        minScore: 0.6,
+        modelName: 'rfdetr-nano',
+        minScore: 0.3,
       });
     });
   });
