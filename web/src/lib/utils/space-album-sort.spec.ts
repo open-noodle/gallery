@@ -15,6 +15,7 @@ const A = (o: Partial<SharedSpaceLinkedAlbumDto>): SharedSpaceLinkedAlbumDto => 
   albumThumbnailAssetId: null,
   showInTimeline: true,
   hiddenFromMyTimeline: false,
+  folderId: null,
   addedById: null,
   linkedAt: '2026-01-01T00:00:00.000Z',
   description: '',

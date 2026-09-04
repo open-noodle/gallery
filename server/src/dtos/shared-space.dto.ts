@@ -165,10 +165,66 @@ const SharedSpaceTimelineHidePreviewSchema = z
       .describe("Photos in this scope that stay on the caller's timeline via a path they did not hide"),
   })
   .meta({ id: 'SharedSpaceTimelineHidePreviewDto' });
+export const SHARED_SPACE_ALBUM_FOLDER_NAME_MAX = 128;
+
+const SharedSpaceAlbumFolderSchema = z
+  .object({
+    id: z.string().describe('Folder ID'),
+    spaceId: z.string().describe('Shared space ID'),
+    parentId: z.string().nullable().describe('Parent folder ID, or null when at the space root'),
+    name: z.string().describe('Folder name'),
+    createdById: z.string().nullable().describe('User who created the folder'),
+    createdAt: z.string().meta({ format: 'date-time' }),
+    updatedAt: z.string().meta({ format: 'date-time' }),
+  })
+  .meta({ id: 'SharedSpaceAlbumFolderDto' });
+
+// .trim() documents the constraint in the OpenAPI schema; the service re-validates so that
+// the rules are testable at the service layer and enforced for any non-HTTP caller.
+const SharedSpaceAlbumFolderCreateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(SHARED_SPACE_ALBUM_FOLDER_NAME_MAX).describe('Folder name'),
+    parentId: z.uuidv4().nullable().optional().describe('Parent folder ID; omit or null for the space root'),
+  })
+  .meta({ id: 'SharedSpaceAlbumFolderCreateDto' });
+
+const SharedSpaceAlbumFolderUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(SHARED_SPACE_ALBUM_FOLDER_NAME_MAX).optional().describe('New folder name'),
+    parentId: z
+      .uuidv4()
+      .nullable()
+      .optional()
+      .describe('New parent folder ID; null moves the folder to the space root'),
+  })
+  .refine((dto) => dto.name !== undefined || dto.parentId !== undefined, {
+    message: 'Provide at least one of name or parentId',
+  })
+  .meta({ id: 'SharedSpaceAlbumFolderUpdateDto' });
+
+const SharedSpaceAlbumFolderMoveAlbumSchema = z
+  .object({
+    folderId: z.uuidv4().nullable().describe('Destination folder ID; null moves the album to the space root'),
+  })
+  .meta({ id: 'SharedSpaceAlbumFolderMoveAlbumDto' });
 
 const SharedSpaceAlbumParamSchema = z.object({
   id: z.uuidv4(),
   albumId: z.uuidv4(),
+});
+
+// A QUERY param, not a body. A NestJS `@Body() dto` emits `required: true` in the OpenAPI
+// document even when every field is optional, which would change the generated Dart
+// `linkAlbum` signature and break mobile's existing no-argument call.
+const SharedSpaceAlbumLinkQuerySchema = z.object({
+  folderId: z.uuidv4().optional().describe('Place the newly linked album in this folder'),
+});
+
+// security-9: every path param is a uuidv4, so a non-UUID segment becomes a 400 rather than a
+// raw Postgres 22P02 -> 500.
+const SharedSpaceAlbumFolderParamSchema = z.object({
+  id: z.uuidv4(),
+  folderId: z.uuidv4(),
 });
 
 // security-9: every one of these path params is a uuidv4 id in Immich (space.id, user.id,
@@ -204,6 +260,7 @@ const SharedSpaceLinkedAlbumSchema = AlbumResponseSchema.omit({ albumUsers: true
     hiddenFromMyTimeline: z
       .boolean()
       .describe('Whether the caller has hidden this album from their own timeline (§2 personal switch)'),
+    folderId: z.string().nullable().describe('Folder this album sits in within the space, or null for the root'),
   })
   .meta({ id: 'SharedSpaceLinkedAlbumDto' });
 
@@ -267,7 +324,13 @@ export class SharedSpaceLibraryLinkDto extends createZodDto(SharedSpaceLibraryLi
 export class SharedSpaceAlbumLinkUpdateDto extends createZodDto(SharedSpaceAlbumLinkUpdateSchema) {}
 export class SharedSpaceAlbumMemberTimelineDto extends createZodDto(SharedSpaceAlbumMemberTimelineSchema) {}
 export class SharedSpaceTimelineHidePreviewDto extends createZodDto(SharedSpaceTimelineHidePreviewSchema) {}
+export class SharedSpaceAlbumFolderDto extends createZodDto(SharedSpaceAlbumFolderSchema) {}
+export class SharedSpaceAlbumFolderCreateDto extends createZodDto(SharedSpaceAlbumFolderCreateSchema) {}
+export class SharedSpaceAlbumFolderUpdateDto extends createZodDto(SharedSpaceAlbumFolderUpdateSchema) {}
+export class SharedSpaceAlbumFolderMoveAlbumDto extends createZodDto(SharedSpaceAlbumFolderMoveAlbumSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
+export class SharedSpaceAlbumLinkQueryDto extends createZodDto(SharedSpaceAlbumLinkQuerySchema) {}
+export class SharedSpaceAlbumFolderParamDto extends createZodDto(SharedSpaceAlbumFolderParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}
 export class SharedSpacePersonFaceParamDto extends createZodDto(SharedSpacePersonFaceParamSchema) {}

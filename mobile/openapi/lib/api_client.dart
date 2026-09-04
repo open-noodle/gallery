@@ -791,6 +791,14 @@ class ApiClient {
           return SharedLinksUpdate.fromJson(value);
         case 'SharedSpaceActivityResponseDto':
           return SharedSpaceActivityResponseDto.fromJson(value);
+        case 'SharedSpaceAlbumFolderCreateDto':
+          return SharedSpaceAlbumFolderCreateDto.fromJson(value);
+        case 'SharedSpaceAlbumFolderDto':
+          return SharedSpaceAlbumFolderDto.fromJson(value);
+        case 'SharedSpaceAlbumFolderMoveAlbumDto':
+          return SharedSpaceAlbumFolderMoveAlbumDto.fromJson(value);
+        case 'SharedSpaceAlbumFolderUpdateDto':
+          return SharedSpaceAlbumFolderUpdateDto.fromJson(value);
         case 'SharedSpaceAlbumLinkUpdateDto':
           return SharedSpaceAlbumLinkUpdateDto.fromJson(value);
         case 'SharedSpaceAlbumMemberTimelineDto':
@@ -943,6 +951,10 @@ class ApiClient {
           return SyncPersonV1.fromJson(value);
         case 'SyncRequestType':
           return SyncRequestTypeTypeTransformer().decode(value);
+        case 'SyncSharedSpaceAlbumFolderDeleteV1':
+          return SyncSharedSpaceAlbumFolderDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceAlbumFolderV1':
+          return SyncSharedSpaceAlbumFolderV1.fromJson(value);
         case 'SyncSharedSpaceAlbumHiddenDeleteV1':
           return SyncSharedSpaceAlbumHiddenDeleteV1.fromJson(value);
         case 'SyncSharedSpaceAlbumHiddenV1':

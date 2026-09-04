@@ -24,7 +24,7 @@ import 'package:immich_mobile/presentation/widgets/collection/collection_picker.
 /// Role-gating is on [canEdit] (space role), not album ownership (D3).
 ///
 /// [onRemoved] is called after a successful remove-from-album action so the
-/// caller can fire the sync-nudge (B6).
+/// caller can fire the sync-nudge.
 class SpaceAlbumBottomSheet extends ConsumerStatefulWidget {
   const SpaceAlbumBottomSheet({super.key, required this.canEdit, required this.albumId, this.onRemoved});
 

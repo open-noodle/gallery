@@ -103,6 +103,9 @@ enum Permission {
   sharedSpaceAlbumPeriodCreate._(r'sharedSpaceAlbum.create'),
   sharedSpaceAlbumPeriodUpdate._(r'sharedSpaceAlbum.update'),
   sharedSpaceAlbumPeriodDelete._(r'sharedSpaceAlbum.delete'),
+  sharedSpaceAlbumFolderPeriodCreate._(r'sharedSpaceAlbumFolder.create'),
+  sharedSpaceAlbumFolderPeriodUpdate._(r'sharedSpaceAlbumFolder.update'),
+  sharedSpaceAlbumFolderPeriodDelete._(r'sharedSpaceAlbumFolder.delete'),
   userGroupPeriodCreate._(r'userGroup.create'),
   userGroupPeriodRead._(r'userGroup.read'),
   userGroupPeriodUpdate._(r'userGroup.update'),
@@ -336,6 +339,9 @@ class PermissionTypeTransformer {
         case r'sharedSpaceAlbum.create': return Permission.sharedSpaceAlbumPeriodCreate;
         case r'sharedSpaceAlbum.update': return Permission.sharedSpaceAlbumPeriodUpdate;
         case r'sharedSpaceAlbum.delete': return Permission.sharedSpaceAlbumPeriodDelete;
+        case r'sharedSpaceAlbumFolder.create': return Permission.sharedSpaceAlbumFolderPeriodCreate;
+        case r'sharedSpaceAlbumFolder.update': return Permission.sharedSpaceAlbumFolderPeriodUpdate;
+        case r'sharedSpaceAlbumFolder.delete': return Permission.sharedSpaceAlbumFolderPeriodDelete;
         case r'userGroup.create': return Permission.userGroupPeriodCreate;
         case r'userGroup.read': return Permission.userGroupPeriodRead;
         case r'userGroup.update': return Permission.userGroupPeriodUpdate;

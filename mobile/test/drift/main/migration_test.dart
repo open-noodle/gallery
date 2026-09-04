@@ -1,6 +1,8 @@
 // dart format width=80
 // ignore_for_file: unused_local_variable, unused_import
-import 'package:drift/drift.dart';
+// `hide isNull`: drift and flutter_test both export `isNull` (see
+// test/utils/migration_test.dart for the same fix).
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -10,6 +12,8 @@ import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v23.dart' as v23;
 import 'generated/schema_v24.dart' as v24;
+import 'generated/schema_v37.dart' as v37;
+import 'generated/schema_v38.dart' as v38;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -241,4 +245,79 @@ void main() {
       await db.close();
     },
   );
+
+  // R-07: the migration failure that would be catastrophic and silent. Drift's TableMigration
+  // REBUILDS the table; a wrong columnTransformer or a missed column drops rows. Every album in
+  // every space is linked through shared_space_album_link, so getting this wrong unlinks every
+  // album from every space on upgrade.
+  //
+  // Follows this file's established data-migration idiom exactly (see the from23To24 group):
+  // seed the OLD schema with raw SQL, close it, migrate a fresh Drift over the same schema, close
+  // that, then open the NEW schema class to assert. `migrateAndValidate` returns void — it does
+  // NOT hand back a database.
+  group('gallery-fork: from37To38 data migration', () {
+    test('R-07: preserves existing album links, with a null folderId', () async {
+      final schema = await verifier.schemaAt(37);
+      final oldDb = v37.DatabaseAtV37(schema.newConnection());
+      // shared_space_entity.created_by_id has a hard FK to user_entity, checked by the
+      // PRAGMA foreign_key_check assertion the app's migration runs in kDebugMode (true
+      // under `flutter test`) — seed the referenced user first.
+      await oldDb.customStatement("""
+        INSERT INTO user_entity (id, name, email)
+        VALUES ('user-1', 'User One', 'user1@test.example')
+      """);
+      await oldDb.customStatement("""
+        INSERT INTO shared_space_entity (id, name, created_by_id)
+        VALUES ('space-1', 'Family', 'user-1')
+      """);
+      // show_in_timeline is seeded 0 — the OPPOSITE of its column default (1) — and added_by_id
+      // is seeded non-null: every value this test used to seed equalled its column default (or,
+      // for folder_id, was a brand-new nullable column that `isNull` can never fail to see), so a
+      // wrong columnTransformer that silently substituted defaults for every carried-over column
+      // passed unnoticed. space_id is asserted explicitly too: the row is looked up by album_id
+      // alone, but (space_id, album_id) is the table's actual primary key, so a corrupted
+      // space_id would still be found by this same query.
+      await oldDb.customStatement("""
+        INSERT INTO shared_space_album_link_entity (space_id, album_id, show_in_timeline, added_by_id)
+        VALUES ('space-1', 'album-1', 0, 'user-1')
+      """);
+      await oldDb.close();
+
+      final dbForMigration = Drift(schema.newConnection());
+      await verifier.migrateAndValidate(dbForMigration, 38);
+      await dbForMigration.close();
+
+      final migratedDb = v38.DatabaseAtV38(schema.newConnection());
+      final row = await migratedDb
+          .customSelect(
+            "SELECT * FROM shared_space_album_link_entity WHERE album_id = 'album-1'",
+          )
+          .getSingle();
+
+      expect(row.data['space_id'], 'space-1');
+      expect(row.data['album_id'], 'album-1');
+      expect(row.data['show_in_timeline'], 0);
+      expect(row.data['added_by_id'], 'user-1');
+      expect(row.data['folder_id'], isNull);
+      await migratedDb.close();
+    });
+
+    // R-08
+    test('R-08: creates an empty folder table', () async {
+      final schema = await verifier.schemaAt(37);
+      final dbForMigration = Drift(schema.newConnection());
+      await verifier.migrateAndValidate(dbForMigration, 38);
+      await dbForMigration.close();
+
+      final migratedDb = v38.DatabaseAtV38(schema.newConnection());
+      final count = await migratedDb
+          .customSelect(
+            'SELECT COUNT(*) AS c FROM shared_space_album_folder_entity',
+          )
+          .getSingle();
+
+      expect(count.data['c'], 0);
+      await migratedDb.close();
+    });
+  });
 }

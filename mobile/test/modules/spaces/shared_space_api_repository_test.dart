@@ -72,6 +72,9 @@ void main() {
     registerFallbackValue(api.SharedSpaceAssetRemoveDto(assetIds: []));
     registerFallbackValue(api.SharedSpaceMemberTimelineDto(showInTimeline: false));
     registerFallbackValue(api.SharedSpaceAlbumLinkUpdateDto(showInTimeline: false));
+    registerFallbackValue(api.SharedSpaceAlbumFolderCreateDto(name: ''));
+    registerFallbackValue(api.SharedSpaceAlbumFolderUpdateDto());
+    registerFallbackValue(api.SharedSpaceAlbumFolderMoveAlbumDto(folderId: null));
   });
 
   setUp(() {
@@ -478,9 +481,7 @@ void main() {
 
   group('linkAlbum', () {
     test('calls SDK linkAlbum(albumId, spaceId) — note arg order', () async {
-      when(
-        () => mockApi.linkAlbum('album-1', 'space-1'),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.linkAlbum('album-1', 'space-1')).thenAnswer((_) async {});
 
       await repository.linkAlbum('space-1', 'album-1');
 
@@ -490,9 +491,7 @@ void main() {
 
   group('unlinkAlbum', () {
     test('calls SDK unlinkAlbum(albumId, spaceId) — note arg order', () async {
-      when(
-        () => mockApi.unlinkAlbum('album-1', 'space-1'),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.unlinkAlbum('album-1', 'space-1')).thenAnswer((_) async {});
 
       await repository.unlinkAlbum('space-1', 'album-1');
 
@@ -502,9 +501,7 @@ void main() {
 
   group('updateAlbumLink', () {
     test('calls updateSharedSpaceAlbum with showInTimeline:false', () async {
-      when(
-        () => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any()),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any())).thenAnswer((_) async {});
 
       await repository.updateAlbumLink('space-1', 'album-1', showInTimeline: false);
 
@@ -512,21 +509,13 @@ void main() {
         () => mockApi.updateSharedSpaceAlbum(
           'album-1',
           'space-1',
-          any(
-            that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having(
-              (d) => d.showInTimeline,
-              'showInTimeline',
-              false,
-            ),
-          ),
+          any(that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having((d) => d.showInTimeline, 'showInTimeline', false)),
         ),
       ).called(1);
     });
 
     test('calls updateSharedSpaceAlbum with showInTimeline:true', () async {
-      when(
-        () => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any()),
-      ).thenAnswer((_) async {});
+      when(() => mockApi.updateSharedSpaceAlbum('album-1', 'space-1', any())).thenAnswer((_) async {});
 
       await repository.updateAlbumLink('space-1', 'album-1', showInTimeline: true);
 
@@ -534,13 +523,164 @@ void main() {
         () => mockApi.updateSharedSpaceAlbum(
           'album-1',
           'space-1',
+          any(that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having((d) => d.showInTimeline, 'showInTimeline', true)),
+        ),
+      ).called(1);
+    });
+  });
+
+  // The folder DTO the API returns after a mutating call; only the shape matters to these tests,
+  // not the values, since createAlbumFolder/renameAlbumFolder/moveAlbumFolder all discard it save
+  // for the null-check.
+  api.SharedSpaceAlbumFolderDto folderDto({String? parentId}) => api.SharedSpaceAlbumFolderDto(
+    id: 'folder-1',
+    spaceId: 'space-1',
+    name: 'Trips',
+    parentId: parentId,
+    createdAt: DateTime.utc(2024, 1, 1),
+    updatedAt: DateTime.utc(2024, 1, 1),
+    createdById: 'user-1',
+  );
+
+  group('createAlbumFolder', () {
+    test('sends parentId absent at the space root', () async {
+      when(() => mockApi.createSharedSpaceAlbumFolder('space-1', any())).thenAnswer((_) async => folderDto());
+
+      await repository.createAlbumFolder('space-1', 'Trips');
+
+      verify(
+        () => mockApi.createSharedSpaceAlbumFolder(
+          'space-1',
           any(
-            that: isA<api.SharedSpaceAlbumLinkUpdateDto>().having(
-              (d) => d.showInTimeline,
-              'showInTimeline',
-              true,
-            ),
+            that: isA<api.SharedSpaceAlbumFolderCreateDto>()
+                .having((d) => d.name, 'name', 'Trips')
+                .having((d) => d.parentId.isEmpty, 'parentId absent', true),
           ),
+        ),
+      ).called(1);
+    });
+
+    test('sends parentId present when nesting under a parent', () async {
+      when(
+        () => mockApi.createSharedSpaceAlbumFolder('space-1', any()),
+      ).thenAnswer((_) async => folderDto(parentId: 'folder-parent'));
+
+      await repository.createAlbumFolder('space-1', 'Italy', parentId: 'folder-parent');
+
+      verify(
+        () => mockApi.createSharedSpaceAlbumFolder(
+          'space-1',
+          any(
+            that: isA<api.SharedSpaceAlbumFolderCreateDto>()
+                .having((d) => d.parentId.isPresent, 'parentId present', true)
+                .having((d) => d.parentId.value, 'parentId value', 'folder-parent'),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('throws when the API returns null', () async {
+      when(() => mockApi.createSharedSpaceAlbumFolder(any(), any())).thenAnswer((_) async => null);
+
+      expect(() => repository.createAlbumFolder('space-1', 'Trips'), throwsA(isA<Exception>()));
+    });
+  });
+
+  group('renameAlbumFolder', () {
+    test('sends the new name and leaves parentId absent', () async {
+      when(() => mockApi.updateSharedSpaceAlbumFolder('folder-1', 'space-1', any())).thenAnswer((_) async {});
+
+      await repository.renameAlbumFolder('space-1', 'folder-1', 'Travel');
+
+      verify(
+        () => mockApi.updateSharedSpaceAlbumFolder(
+          'folder-1',
+          'space-1',
+          any(
+            that: isA<api.SharedSpaceAlbumFolderUpdateDto>()
+                .having((d) => d.name.isPresent, 'name present', true)
+                .having((d) => d.name.value, 'name value', 'Travel')
+                .having((d) => d.parentId.isEmpty, 'parentId absent', true),
+          ),
+        ),
+      ).called(1);
+    });
+  });
+
+  group('moveAlbumFolder', () {
+    test('sends parentId as present-null when moving to the space root (A-07)', () async {
+      when(() => mockApi.updateSharedSpaceAlbumFolder('folder-1', 'space-1', any())).thenAnswer((_) async {});
+
+      await repository.moveAlbumFolder('space-1', 'folder-1', null);
+
+      verify(
+        () => mockApi.updateSharedSpaceAlbumFolder(
+          'folder-1',
+          'space-1',
+          any(
+            that: isA<api.SharedSpaceAlbumFolderUpdateDto>()
+                .having((d) => d.parentId.isPresent, 'parentId present', true)
+                .having((d) => d.parentId.value, 'parentId value', isNull)
+                .having((d) => d.name.isEmpty, 'name absent', true),
+          ),
+        ),
+      ).called(1);
+    });
+
+    test('sends parentId as present-value when moving under another folder', () async {
+      when(() => mockApi.updateSharedSpaceAlbumFolder('folder-1', 'space-1', any())).thenAnswer((_) async {});
+
+      await repository.moveAlbumFolder('space-1', 'folder-1', 'folder-2');
+
+      verify(
+        () => mockApi.updateSharedSpaceAlbumFolder(
+          'folder-1',
+          'space-1',
+          any(
+            that: isA<api.SharedSpaceAlbumFolderUpdateDto>()
+                .having((d) => d.parentId.isPresent, 'parentId present', true)
+                .having((d) => d.parentId.value, 'parentId value', 'folder-2'),
+          ),
+        ),
+      ).called(1);
+    });
+  });
+
+  group('deleteAlbumFolder', () {
+    test('calls SDK deleteSharedSpaceAlbumFolder(folderId, spaceId) — note arg order', () async {
+      when(() => mockApi.deleteSharedSpaceAlbumFolder('folder-1', 'space-1')).thenAnswer((_) async {});
+
+      await repository.deleteAlbumFolder('space-1', 'folder-1');
+
+      verify(() => mockApi.deleteSharedSpaceAlbumFolder('folder-1', 'space-1')).called(1);
+    });
+  });
+
+  group('setAlbumFolder', () {
+    test('sends the destination folderId', () async {
+      when(() => mockApi.setSharedSpaceAlbumFolder('album-1', 'space-1', any())).thenAnswer((_) async {});
+
+      await repository.setAlbumFolder('space-1', 'album-1', 'folder-1');
+
+      verify(
+        () => mockApi.setSharedSpaceAlbumFolder(
+          'album-1',
+          'space-1',
+          any(that: isA<api.SharedSpaceAlbumFolderMoveAlbumDto>().having((d) => d.folderId, 'folderId', 'folder-1')),
+        ),
+      ).called(1);
+    });
+
+    test('sends a null folderId to move the album to the space root (A-08)', () async {
+      when(() => mockApi.setSharedSpaceAlbumFolder('album-1', 'space-1', any())).thenAnswer((_) async {});
+
+      await repository.setAlbumFolder('space-1', 'album-1', null);
+
+      verify(
+        () => mockApi.setSharedSpaceAlbumFolder(
+          'album-1',
+          'space-1',
+          any(that: isA<api.SharedSpaceAlbumFolderMoveAlbumDto>().having((d) => d.folderId, 'folderId', isNull)),
         ),
       ).called(1);
     });
@@ -569,11 +709,7 @@ void main() {
           'space-1',
           any(
             that: dtoThat(
-              (d) =>
-                  d.name.isPresent &&
-                  d.name.value == 'Renamed' &&
-                  d.description.isEmpty &&
-                  d.color.isEmpty,
+              (d) => d.name.isPresent && d.name.value == 'Renamed' && d.description.isEmpty && d.color.isEmpty,
               'name present, description and color absent',
             ),
           ),
@@ -590,10 +726,7 @@ void main() {
         () => mockApi.updateSpace(
           'space-1',
           any(
-            that: dtoThat(
-              (d) => d.description.isPresent && d.description.value == '',
-              'description present and empty',
-            ),
+            that: dtoThat((d) => d.description.isPresent && d.description.value == '', 'description present and empty'),
           ),
         ),
       ).called(1);
@@ -645,12 +778,7 @@ void main() {
       verify(
         () => mockApi.updateSpace(
           'space-1',
-          any(
-            that: dtoThat(
-              (d) => d.color.isPresent && d.color.value == api.UserAvatarColor.amber,
-              'color present',
-            ),
-          ),
+          any(that: dtoThat((d) => d.color.isPresent && d.color.value == api.UserAvatarColor.amber, 'color present')),
         ),
       ).called(1);
     });

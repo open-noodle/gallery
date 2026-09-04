@@ -3001,6 +3001,32 @@ export type SharedSpaceActivityResponseDto = {
     /** User profile image path */
     userProfileImagePath?: string | null;
 };
+export type SharedSpaceAlbumFolderDto = {
+    createdAt: string;
+    /** User who created the folder */
+    createdById: string | null;
+    /** Folder ID */
+    id: string;
+    /** Folder name */
+    name: string;
+    /** Parent folder ID, or null when at the space root */
+    parentId: string | null;
+    /** Shared space ID */
+    spaceId: string;
+    updatedAt: string;
+};
+export type SharedSpaceAlbumFolderCreateDto = {
+    /** Folder name */
+    name: string;
+    /** Parent folder ID; omit or null for the space root */
+    parentId?: string | null;
+};
+export type SharedSpaceAlbumFolderUpdateDto = {
+    /** New folder name */
+    name?: string;
+    /** New parent folder ID; null moves the folder to the space root */
+    parentId?: string | null;
+};
 export type SharedSpaceLinkedAlbumDto = {
     /** User who linked the album into the space */
     addedById: string | null;
@@ -3017,6 +3043,8 @@ export type SharedSpaceLinkedAlbumDto = {
     description: string;
     /** End date (latest asset) */
     endDate?: string;
+    /** Folder this album sits in within the space, or null for the root */
+    folderId: string | null;
     /** Has shared link */
     hasSharedLink: boolean;
     /** Whether the caller has hidden this album from their own timeline (§2 personal switch) */
@@ -3045,6 +3073,10 @@ export type SharedSpaceLinkedAlbumDto = {
 export type SharedSpaceAlbumLinkUpdateDto = {
     /** Include this album in the space timeline */
     showInTimeline: boolean;
+};
+export type SharedSpaceAlbumFolderMoveAlbumDto = {
+    /** Destination folder ID; null moves the album to the space root */
+    folderId: string | null;
 };
 export type SharedSpaceAlbumMemberTimelineDto = {
     /** Show this album's assets in your own personal timeline */
@@ -4373,6 +4405,24 @@ export type SyncPersonV1 = {
     updatedAt: string;
 };
 export type SyncResetV1 = {};
+export type SyncSharedSpaceAlbumFolderDeleteV1 = {
+    /** Folder ID */
+    folderId: string;
+};
+export type SyncSharedSpaceAlbumFolderV1 = {
+    /** Created at */
+    createdAt: string;
+    /** Folder ID */
+    id: string;
+    /** Folder name */
+    name: string;
+    /** Parent folder ID */
+    parentId: string | null;
+    /** Shared space ID */
+    spaceId: string;
+    /** Updated at */
+    updatedAt: string;
+};
 export type SyncSharedSpaceAlbumHiddenDeleteV1 = {
     /** Album ID */
     albumId: string;
@@ -4402,6 +4452,8 @@ export type SyncSharedSpaceAlbumLinkV1 = {
     albumId: string;
     /** Created at */
     createdAt: string;
+    /** Album folder ID within the space, or null if at the space root */
+    folderId: string | null;
     /** Whether this album appears in the space timeline */
     showInTimeline: boolean;
     /** Shared space ID */
@@ -8229,6 +8281,61 @@ export function getSpaceActivities({ id, limit, offset }: {
     }));
 }
 /**
+ * List the album folders of a shared space
+ */
+export function getSharedSpaceAlbumFolders({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceAlbumFolderDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/album-folders`, {
+        ...opts
+    }));
+}
+/**
+ * Create an album folder in a shared space
+ */
+export function createSharedSpaceAlbumFolder({ id, sharedSpaceAlbumFolderCreateDto }: {
+    id: string;
+    sharedSpaceAlbumFolderCreateDto: SharedSpaceAlbumFolderCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpaceAlbumFolderDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/album-folders`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceAlbumFolderCreateDto
+    })));
+}
+/**
+ * Delete an album folder
+ */
+export function deleteSharedSpaceAlbumFolder({ folderId, id }: {
+    folderId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/album-folders/${encodeURIComponent(folderId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Rename or move an album folder
+ */
+export function updateSharedSpaceAlbumFolder({ folderId, id, sharedSpaceAlbumFolderUpdateDto }: {
+    folderId: string;
+    id: string;
+    sharedSpaceAlbumFolderUpdateDto: SharedSpaceAlbumFolderUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/album-folders/${encodeURIComponent(folderId)}`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceAlbumFolderUpdateDto
+    })));
+}
+/**
  * List albums linked to a shared space
  */
 export function getSharedSpaceAlbums({ id }: {
@@ -8270,14 +8377,31 @@ export function updateSharedSpaceAlbum({ albumId, id, sharedSpaceAlbumLinkUpdate
 /**
  * Link an album to a shared space
  */
-export function linkAlbum({ albumId, id }: {
+export function linkAlbum({ albumId, folderId, id }: {
     albumId: string;
+    folderId?: string;
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}`, {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}${QS.query(QS.explode({
+        folderId
+    }))}`, {
         ...opts,
         method: "PUT"
     }));
+}
+/**
+ * Move a linked album into a folder
+ */
+export function setSharedSpaceAlbumFolder({ albumId, id, sharedSpaceAlbumFolderMoveAlbumDto }: {
+    albumId: string;
+    id: string;
+    sharedSpaceAlbumFolderMoveAlbumDto: SharedSpaceAlbumFolderMoveAlbumDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}/folder`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: sharedSpaceAlbumFolderMoveAlbumDto
+    })));
 }
 /**
  * Hide or show a linked album in the caller's own timeline
@@ -10199,6 +10323,9 @@ export enum Permission {
     SharedSpaceAlbumCreate = "sharedSpaceAlbum.create",
     SharedSpaceAlbumUpdate = "sharedSpaceAlbum.update",
     SharedSpaceAlbumDelete = "sharedSpaceAlbum.delete",
+    SharedSpaceAlbumFolderCreate = "sharedSpaceAlbumFolder.create",
+    SharedSpaceAlbumFolderUpdate = "sharedSpaceAlbumFolder.update",
+    SharedSpaceAlbumFolderDelete = "sharedSpaceAlbumFolder.delete",
     UserGroupCreate = "userGroup.create",
     UserGroupRead = "userGroup.read",
     UserGroupUpdate = "userGroup.update",
@@ -10632,6 +10759,9 @@ export enum SyncEntityType {
     SharedSpaceAlbumHiddenV1 = "SharedSpaceAlbumHiddenV1",
     SharedSpaceAlbumHiddenDeleteV1 = "SharedSpaceAlbumHiddenDeleteV1",
     SharedSpaceAlbumHiddenBackfillV1 = "SharedSpaceAlbumHiddenBackfillV1",
+    SharedSpaceAlbumFolderV1 = "SharedSpaceAlbumFolderV1",
+    SharedSpaceAlbumFolderDeleteV1 = "SharedSpaceAlbumFolderDeleteV1",
+    SharedSpaceAlbumFolderBackfillV1 = "SharedSpaceAlbumFolderBackfillV1",
     SharedSpaceAlbumToAssetV1 = "SharedSpaceAlbumToAssetV1",
     SharedSpaceAlbumToAssetDeleteV1 = "SharedSpaceAlbumToAssetDeleteV1",
     SharedSpaceAlbumToAssetBackfillV1 = "SharedSpaceAlbumToAssetBackfillV1",
@@ -10684,6 +10814,7 @@ export enum SyncRequestType {
     SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1",
     SharedSpaceAlbumsV1 = "SharedSpaceAlbumsV1",
     SharedSpaceAlbumLinksV1 = "SharedSpaceAlbumLinksV1",
+    SharedSpaceAlbumFoldersV1 = "SharedSpaceAlbumFoldersV1",
     SharedSpaceAlbumToAssetsV1 = "SharedSpaceAlbumToAssetsV1",
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
     SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1",

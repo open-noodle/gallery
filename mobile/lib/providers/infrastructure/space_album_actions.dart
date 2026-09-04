@@ -5,10 +5,15 @@ import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 
 /// Centralises the space-album mutation operations:
-///   - [link]           — PUT  /shared-spaces/{id}/albums/{albumId} (one or more)
-///   - [unlink]         — DELETE /shared-spaces/{id}/albums/{albumId}
-///   - [toggleTimeline] — PATCH  /shared-spaces/{id}/albums/{albumId}
-///   - [addAssets]      — PUT  /albums/{albumId}/assets (server-only)
+///   - [link]             — PUT  /shared-spaces/{id}/albums/{albumId} (one or more)
+///   - [unlink]           — DELETE /shared-spaces/{id}/albums/{albumId}
+///   - [toggleTimeline]   — PATCH  /shared-spaces/{id}/albums/{albumId}
+///   - [addAssets]        — PUT  /albums/{albumId}/assets (server-only)
+///   - [createFolder]     — POST   /shared-spaces/{id}/album-folders
+///   - [renameFolder]     — PATCH  /shared-spaces/{id}/album-folders/{folderId}
+///   - [moveFolder]       — PATCH  /shared-spaces/{id}/album-folders/{folderId}
+///   - [deleteFolder]     — DELETE /shared-spaces/{id}/album-folders/{folderId}
+///   - [moveAlbumToFolder] — PUT   /shared-spaces/{id}/albums/{albumId}/folder
 ///
 /// Each operation calls the API repo, fires the sync-nudge
 /// (`BackgroundSyncManager.syncRemote()`), then returns.
@@ -29,10 +34,14 @@ class SpaceAlbumActions {
   ///
   /// Calls PUT for each albumId sequentially. On success fires one sync-nudge.
   /// If [albumIds] is empty, does nothing (no API call, no nudge).
-  Future<void> link(String spaceId, List<String> albumIds) async {
+  ///
+  /// [folderId] is the space album folder to link into; null means the space root. Callers
+  /// linking from inside a folder must pass it, or the album lands at the root instead of
+  /// where the user is looking.
+  Future<void> link(String spaceId, List<String> albumIds, {String? folderId}) async {
     if (albumIds.isEmpty) return;
     for (final albumId in albumIds) {
-      await _repo.linkAlbum(spaceId, albumId);
+      await _repo.linkAlbum(spaceId, albumId, folderId: folderId);
     }
     await _syncManager.syncRemote();
   }
@@ -69,6 +78,36 @@ class SpaceAlbumActions {
     final result = await _albumApiRepo.addAssets(albumId, assetIds);
     await _syncManager.syncRemote();
     return result.added.length;
+  }
+
+  /// Create a folder in [spaceId], optionally nested under [parentId].
+  Future<void> createFolder(String spaceId, String name, {String? parentId}) async {
+    await _repo.createAlbumFolder(spaceId, name, parentId: parentId);
+    await _syncManager.syncRemote();
+  }
+
+  /// Rename a folder.
+  Future<void> renameFolder(String spaceId, String folderId, String name) async {
+    await _repo.renameAlbumFolder(spaceId, folderId, name);
+    await _syncManager.syncRemote();
+  }
+
+  /// Move a folder under [parentId], or to the space root when [parentId] is null.
+  Future<void> moveFolder(String spaceId, String folderId, String? parentId) async {
+    await _repo.moveAlbumFolder(spaceId, folderId, parentId);
+    await _syncManager.syncRemote();
+  }
+
+  /// Delete a folder. Direct children are promoted one level up server-side.
+  Future<void> deleteFolder(String spaceId, String folderId) async {
+    await _repo.deleteAlbumFolder(spaceId, folderId);
+    await _syncManager.syncRemote();
+  }
+
+  /// Move a linked album into [folderId], or to the space root when [folderId] is null.
+  Future<void> moveAlbumToFolder(String spaceId, String albumId, String? folderId) async {
+    await _repo.setAlbumFolder(spaceId, albumId, folderId);
+    await _syncManager.syncRemote();
   }
 }
 

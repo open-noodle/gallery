@@ -79,6 +79,7 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
     sharedSpaceAlbum: makeSub(),
     sharedSpaceAlbumLink: makeSub(),
     sharedSpaceAlbumHidden: makeSub(),
+    sharedSpaceAlbumFolder: makeSub(),
     sharedSpaceAlbumToAsset: makeSub(),
   };
 
@@ -1195,6 +1196,7 @@ describe(SyncService.name, () => {
       expect(syncSubs.sharedSpaceAlbum.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.sharedSpaceAlbumLink.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.sharedSpaceAlbumHidden.cleanupAuditTable).toHaveBeenCalledWith(31);
+      expect(syncSubs.sharedSpaceAlbumFolder.cleanupAuditTable).toHaveBeenCalledWith(31);
       expect(syncSubs.sharedSpaceAlbumToAsset.cleanupAuditTable).toHaveBeenCalledWith(31);
     });
   });

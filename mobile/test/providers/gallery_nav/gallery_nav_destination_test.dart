@@ -28,4 +28,14 @@ void main() {
     expect(d.activeIcon, Icons.space_dashboard_rounded);
     expect(d.routeBuilder(), isA<DriftLibraryRoute>());
   });
+
+  test('spaces destination carries the shared Spaces identity', () {
+    final destination = GalleryNavDestination.forTab(GalleryTabEnum.spaces);
+
+    expect(destination.tab, GalleryTabEnum.spaces);
+    expect(destination.labelKey, 'spaces');
+    expect(destination.idleIcon, Icons.workspaces_outlined);
+    expect(destination.activeIcon, Icons.workspaces);
+    expect(destination.routeBuilder(), isA<SpacesRoute>());
+  });
 }

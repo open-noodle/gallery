@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 
 class SpaceAlbumRepository extends DriftDatabaseRepository {
@@ -18,6 +19,20 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
               ..limit(1))
             .getSingleOrNull();
     return row != null;
+  }
+
+  /// Watches the album folders of [spaceId]. Ordered by name so the UI has a stable default;
+  /// level filtering happens in the Dart tree module, not here, so one stream serves every level.
+  Stream<List<SpaceAlbumFolder>> watchFolders(String spaceId) {
+    final folder = _db.sharedSpaceAlbumFolderEntity;
+    final query = _db.select(folder)
+      ..where((f) => f.spaceId.equals(spaceId))
+      ..orderBy([(f) => OrderingTerm.asc(f.name)]);
+
+    return query.watch().map(
+      (rows) =>
+          rows.map((r) => SpaceAlbumFolder(id: r.id, spaceId: r.spaceId, parentId: r.parentId, name: r.name)).toList(),
+    );
   }
 
   /// Watches albums linked to [spaceId], joining metadata + link fields.
@@ -66,6 +81,7 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
           description: m.description,
           thumbnailAssetId: m.thumbnailAssetId,
           showInTimeline: l.showInTimeline,
+          folderId: l.folderId,
           assetCount: row.read(assetCountExp) ?? 0,
           linkedAt: l.createdAt,
           updatedAt: m.updatedAt,
