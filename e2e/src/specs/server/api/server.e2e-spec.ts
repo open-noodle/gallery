@@ -120,6 +120,7 @@ describe('/server', () => {
           'SharedSpacesV1',
           'SharedSpaceAlbumsV1',
           'SharedSpaceAlbumLinksV1',
+          'SharedSpaceAlbumHiddensV1',
           'SharedSpaceAlbumToAssetsV1',
           'SharedSpaceAlbumAssetsV1',
           'SharedSpaceAlbumAssetExifsV1',

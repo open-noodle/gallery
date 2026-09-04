@@ -61,7 +61,7 @@ class SpaceDetailKebab extends StatelessWidget {
           key: const Key('space-detail-kebab-timeline'),
           value: _KebabAction.toggleTimeline,
           enabled: !timelineBusy,
-          child: Text(showInTimeline ? context.t.spaces_hide_from_timeline : context.t.show_in_timeline),
+          child: Text(showInTimeline ? context.t.spaces_hide_from_timeline : context.t.spaces_show_on_timeline),
         ),
         if (showPeople)
           PopupMenuItem<_KebabAction>(

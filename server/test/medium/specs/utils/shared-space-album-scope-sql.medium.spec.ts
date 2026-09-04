@@ -29,7 +29,12 @@ const kyselyIds = async (spaceId: string, requireAlbumNotDeleted = true): Promis
     .selectFrom('asset')
     .select('asset.id')
     .where((eb) =>
-      spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, requireAlbumNotDeleted }),
+      spaceAlbumAssetExists(eb, {
+        correlateAssetId: 'asset.id',
+        scope: { spaceId },
+        requireAlbumNotDeleted,
+        albumTimelineGate: 'none',
+      }),
     )
     .execute();
   return new Set(rows.map((r) => r.id));
@@ -40,6 +45,7 @@ const rawIds = async (spaceId: string, requireAlbumNotDeleted = true): Promise<S
     assetIdColumn: sql`asset.id`,
     spaceScopeJoin: sql`INNER JOIN shared_space ON shared_space.id = shared_space_album."spaceId" AND shared_space.id = ${spaceId}`,
     requireAlbumNotDeleted,
+    albumTimelineGate: 'none',
   });
   const result = await sql<{ id: string }>`SELECT asset.id FROM asset WHERE ${existsFragment}`.execute(db);
   return new Set(result.rows.map((r) => r.id));
@@ -124,7 +130,11 @@ const kyselyIdsTimeline = async (spaceId: string, requireShowInTimeline: boolean
     .selectFrom('asset')
     .select('asset.id')
     .where((eb) =>
-      spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, requireShowInTimeline }),
+      spaceAlbumAssetExists(eb, {
+        correlateAssetId: 'asset.id',
+        scope: { spaceId },
+        albumTimelineGate: requireShowInTimeline ? 'space-tab' : 'none',
+      }),
     )
     .execute();
   return new Set(rows.map((r) => r.id));
@@ -134,7 +144,7 @@ const rawIdsTimeline = async (spaceId: string, requireShowInTimeline: boolean): 
   const existsFragment = spaceAlbumAssetExistsSql({
     assetIdColumn: sql`asset.id`,
     spaceScopeJoin: sql`INNER JOIN shared_space ON shared_space.id = shared_space_album."spaceId" AND shared_space.id = ${spaceId}`,
-    requireShowInTimeline,
+    albumTimelineGate: requireShowInTimeline ? 'space-tab' : 'none',
   });
   const result = await sql<{ id: string }>`SELECT asset.id FROM asset WHERE ${existsFragment}`.execute(db);
   return new Set(result.rows.map((r) => r.id));

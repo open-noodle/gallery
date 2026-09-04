@@ -60,7 +60,7 @@ void main() {
     expect(find.byType(PopupMenuButton<dynamic>), findsNothing);
   });
 
-  testWidgets('canEdit:true showInTimeline:false — toggle item shows "Show in timeline"', (tester) async {
+  testWidgets('canEdit:true showInTimeline:false — toggle item shows the space-photos show label', (tester) async {
     await tester.pumpConsumerWidget(
       _wrap(
         SpaceAlbumKebab(
@@ -76,7 +76,7 @@ void main() {
     await tester.tap(find.byType(SpaceAlbumKebab));
     await tester.pumpAndSettle();
 
-    expect(find.text('Show in timeline'), findsOneWidget);
-    expect(find.text('Hide from timeline'), findsNothing);
+    expect(find.text("Show this album in the space's photos"), findsOneWidget);
+    expect(find.text("Hide this album from the space's photos"), findsNothing);
   });
 }
