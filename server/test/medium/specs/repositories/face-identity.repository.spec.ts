@@ -58,6 +58,28 @@ const seedCharacterisationIdentity = async (
   return { person, identity };
 };
 
+// Seeds an owned person of a given type with `assets` timeline photos, for the People-page type
+// filter cases below.
+const seedTypedIdentity = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  sut: FaceIdentityRepository,
+  input: { userId: string; type?: string; species?: string; name?: string; assets: number },
+) => {
+  const { person } = await ctx.newPerson({
+    ownerId: input.userId,
+    name: input.name ?? '',
+    ...(input.type && { type: input.type }),
+    ...(input.species && { species: input.species }),
+  });
+  const identity = await sut.ensurePersonIdentity(person.id);
+  for (let index = 0; index < input.assets; index++) {
+    const { asset } = await ctx.newAsset({ ownerId: input.userId, visibility: AssetVisibility.Timeline });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+  }
+  return { person, identity };
+};
+
 const newSpacePerson = async (ctx: ReturnType<typeof setup>['ctx'], spaceId: string) => {
   return ctx.database.insertInto('shared_space_person').values({ spaceId }).returningAll().executeTakeFirstOrThrow();
 };
@@ -5548,5 +5570,127 @@ describe(FaceIdentityRepository.name, () => {
       expect(tokens.get(person.id)).toEqual([`identity:${identity.id}`, `person:${person.id}`]);
       expect(tokens.get(personWithoutIdentity.id)).toEqual([`person:${personWithoutIdentity.id}`]);
     });
+  });
+});
+
+// getAccessiblePeople is the arm the web /people page actually calls (it always sends
+// withSharedSpaces=true). The type filter and the pets minimumFaces exemption must hold here too,
+// or the filter silently does nothing on the real page.
+describe('FaceIdentityRepository getAccessiblePeople type filter', () => {
+  it('returns only pets when type is pet', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: human } = await seedTypedIdentity(ctx, sut, { userId: user.id, name: 'Alice', assets: 3 });
+    const { person: pet } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'dog',
+      name: 'Rex',
+      assets: 3,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'pet' });
+
+    const ids = result.people.map(({ id }) => id);
+    expect(ids).toContain(pet.id);
+    expect(ids).not.toContain(human.id);
+  });
+
+  it('returns only humans when type is person', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: human } = await seedTypedIdentity(ctx, sut, { userId: user.id, name: 'Bob', assets: 3 });
+    const { person: pet } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'cat',
+      name: 'Mochi',
+      assets: 3,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'person' });
+
+    const ids = result.people.map(({ id }) => id);
+    expect(ids).toContain(human.id);
+    expect(ids).not.toContain(pet.id);
+  });
+
+  it('surfaces an unnamed pet with a single face, despite the minimumFaceCount gate', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: pet } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'dog',
+      assets: 1,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+    });
+
+    expect(result.people.map(({ id }) => id)).toContain(pet.id);
+  });
+
+  // The header count is derived from the same query. If it kept the old gate, the page would read
+  // "73 people" above a grid of 260 — the count and the grid must agree on the pets exemption.
+  it('counts an exempt single-face pet in the header total', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', assets: 1 });
+
+    const result = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+    });
+
+    expect(result.total).toBe(result.people.length);
+    expect(result.total).toBe(1);
+  });
+
+  // The People header prefers getPeopleStatistics over the list's own totals when the
+  // peopleStatistics feature flag is on (people/+page.ts), so this path needs the same exemption or
+  // the header and the grid disagree depending on a flag.
+  it('counts an exempt single-face pet in the overview statistics', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', assets: 1 });
+
+    const stats = await sut.getAccessiblePeopleStatistics(user.id, { minimumFaceCount: 3 });
+
+    expect(stats.total).toBe(1);
+  });
+
+  // The face-statistics query carries its own copy of the same gate. A single-face pet's face is
+  // assigned and visible, so it must count as assigned rather than falling into "unassigned".
+  it('counts an exempt single-face pet face as assigned, not unassigned', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', assets: 1 });
+
+    const stats = await sut.getAccessiblePeopleFaceStatistics(user.id, { minimumFaceCount: 3 });
+
+    expect(stats.assignedVisibleFaceCount).toBe(1);
+    expect(stats.unassignedFaceCount).toBe(0);
+  });
+
+  it('still hides an unnamed human with a single face', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: human } = await seedTypedIdentity(ctx, sut, { userId: user.id, assets: 1 });
+
+    const result = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+    });
+
+    expect(result.people.map(({ id }) => id)).not.toContain(human.id);
   });
 });

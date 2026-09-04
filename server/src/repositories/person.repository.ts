@@ -24,6 +24,8 @@ import {
 export interface PersonSearchOptions {
   withHidden: boolean;
   closestFaceAssetId?: string;
+  /** People-page type filter: 'person' or 'pet'. Undefined returns both. */
+  type?: string;
 }
 
 export interface PersonNameSearchOptions {
@@ -593,6 +595,12 @@ export class PersonRepository {
       .having((eb) =>
         eb.or([
           eb('person.name', '!=', ''),
+          // Pets are exempt from the human minimumFaces threshold. Pet clustering already applied
+          // its own `petRecognition.minFaces` (shipped default 1, chosen so a pet photographed once
+          // still becomes its own individual); re-applying a threshold tuned for noisy human face
+          // clusters on top would hide exactly those pets. Grouping is by person.id (the PK), so
+          // person.type is functionally dependent and legal here.
+          eb('person.type', '=', sql.lit('pet')),
           eb(
             (innerEb) => innerEb.fn.count('asset_face.assetId'),
             '>=',
@@ -634,6 +642,7 @@ export class PersonRepository {
           .orderBy('person.id'),
       )
       .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
+      .$if(!!options?.type, (qb) => qb.where('person.type', '=', options!.type!))
       .offset(pagination.skip ?? 0)
       .limit(pagination.take + 1)
       .execute();

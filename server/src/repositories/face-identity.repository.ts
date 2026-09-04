@@ -123,6 +123,8 @@ type AccessiblePeopleOptions = {
   page: number;
   size: number;
   minimumFaceCount?: number;
+  /** People-page type filter: 'person' or 'pet'. Undefined returns both. */
+  type?: string;
 };
 
 type AccessiblePeopleSearchOptions = {
@@ -957,6 +959,7 @@ export class FaceIdentityRepository {
       offset: (page - 1) * size,
       minimumFaceCount,
       hasTimelineSpaces,
+      type: options.type,
     });
 
     const pageRows = rows.slice(0, size);
@@ -1020,7 +1023,7 @@ export class FaceIdentityRepository {
         GROUP BY accessible_faces."identityId"
       ),
       accessible_profiles AS (
-        SELECT person."identityId", person."isHidden", person.name
+        SELECT person."identityId", person."isHidden", person.name, person.type
         FROM person
         WHERE person."ownerId" = ${userId}
           AND person."identityId" IS NOT NULL
@@ -1029,7 +1032,8 @@ export class FaceIdentityRepository {
         SELECT
           shared_space_person."identityId",
           shared_space_person."isHidden",
-          COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name
+          COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name,
+          shared_space_person.type
         FROM shared_space_person
         INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
         LEFT JOIN shared_space_person_alias
@@ -1053,7 +1057,8 @@ export class FaceIdentityRepository {
         SELECT
           "identityId",
           bool_or("isHidden" = false) AS "hasVisibleProfile",
-          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
+          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile",
+          bool_or(type = 'pet') AS "hasPetProfile"
         FROM accessible_profiles
         GROUP BY "identityId"
       ),
@@ -1064,6 +1069,7 @@ export class FaceIdentityRepository {
         FROM identity_visibility
         INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
         WHERE identity_visibility."hasNamedProfile" = true
+          OR identity_visibility."hasPetProfile"
           OR identity_counts."visibleAssetCount" >= ${minimumFaceCount}
       )
       SELECT
@@ -1125,7 +1131,7 @@ export class FaceIdentityRepository {
         GROUP BY accessible_faces."identityId"
       ),
       accessible_profiles AS (
-        SELECT person."identityId", person."isHidden", person.name
+        SELECT person."identityId", person."isHidden", person.name, person.type
         FROM person
         WHERE person."ownerId" = ${userId}
           AND person."identityId" IS NOT NULL
@@ -1134,7 +1140,8 @@ export class FaceIdentityRepository {
         SELECT
           shared_space_person."identityId",
           shared_space_person."isHidden",
-          COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name
+          COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name,
+          shared_space_person.type
         FROM shared_space_person
         INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
         LEFT JOIN shared_space_person_alias
@@ -1160,6 +1167,7 @@ export class FaceIdentityRepository {
           bool_or("isHidden" = false) AS "hasVisibleProfile",
           bool_or("isHidden" = true) AS "hasHiddenProfile",
           bool_or(NULLIF(BTRIM(name), '') IS NOT NULL) AS "hasNamedProfile",
+          bool_or(type = 'pet') AS "hasPetProfile",
           bool_or("isHidden" = false AND NULLIF(BTRIM(name), '') IS NOT NULL) AS "hasNamedVisibleProfile"
         FROM accessible_profiles
         GROUP BY "identityId"
@@ -1173,6 +1181,7 @@ export class FaceIdentityRepository {
         FROM identity_visibility
         INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
         WHERE identity_visibility."hasNamedProfile" = true
+          OR identity_visibility."hasPetProfile"
           OR identity_counts."visibleAssetCount" >= ${minimumFaceCount}
       ),
       face_classification AS (
@@ -1675,6 +1684,7 @@ export class FaceIdentityRepository {
   async getAccessiblePeoplePageWithTotals(input: {
     userId: string;
     withHidden: boolean;
+    type?: string;
     limit: number;
     offset: number;
     minimumFaceCount: number;
@@ -1694,6 +1704,8 @@ export class FaceIdentityRepository {
   private async queryAccessiblePeoplePage(input: {
     userId: string;
     withHidden: boolean;
+    /** People-page type filter: 'person' or 'pet'. Undefined/empty returns both. */
+    type?: string;
     limit: number;
     offset: number;
     minimumFaceCount: number;
@@ -1709,6 +1721,7 @@ export class FaceIdentityRepository {
     withTotals?: boolean;
   }): Promise<AccessiblePeoplePageRawRow[]> {
     const searchName = input.searchName ?? '';
+    const typeFilter = input.type ?? '';
     const hasTimelineSpaces = input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId));
 
     // Fix C — the People header's total/hidden used to come from a third query that rebuilt
@@ -1735,7 +1748,8 @@ export class FaceIdentityRepository {
         SELECT
           "identityId",
           bool_or("isHidden" = false) AS "hasVisibleProfile",
-          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
+          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile",
+          bool_or(type = 'pet') AS "hasPetProfile"
         FROM accessible_profiles
         GROUP BY "identityId"
       ),
@@ -1746,6 +1760,7 @@ export class FaceIdentityRepository {
         FROM identity_visibility
         INNER JOIN all_identity_counts ON all_identity_counts."identityId" = identity_visibility."identityId"
         WHERE identity_visibility."hasNamedProfile" = true
+          OR identity_visibility."hasPetProfile"
           OR all_identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
       )`
       : sql``;
@@ -1783,6 +1798,7 @@ export class FaceIdentityRepository {
           person."isFavorite",
           person."updatedAt",
           person.id AS "profileId",
+          person.type,
           0 AS "profileRank"
         FROM person
         WHERE person."ownerId" = ${input.userId}
@@ -1798,6 +1814,7 @@ export class FaceIdentityRepository {
           NULL::boolean AS "isFavorite",
           shared_space_person."updatedAt",
           shared_space_person.id AS "profileId",
+          shared_space_person.type,
           CASE WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2 ELSE 1 END AS "profileRank"
         FROM shared_space_person
         INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
@@ -1823,6 +1840,15 @@ export class FaceIdentityRepository {
         FROM accessible_profiles
         WHERE (${input.withHidden}::boolean OR "isHidden" = false)
           AND (${searchName} = '' OR name ILIKE ${`%${searchName}%`})
+          AND (${typeFilter} = '' OR type = ${typeFilter})
+      ),
+      -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
+      -- own petRecognition.minFaces, and re-applying a human-tuned threshold hides exactly the
+      -- single-photo pets that setting exists to surface.
+      identity_types AS (
+        SELECT "identityId", bool_or(type = 'pet') AS "isPet"
+        FROM eligible_profiles
+        GROUP BY "identityId"
       ),
       identity_counts AS (
         SELECT
@@ -1871,7 +1897,9 @@ export class FaceIdentityRepository {
         FROM identity_counts
         INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
         INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+        INNER JOIN identity_types ON identity_types."identityId" = identity_counts."identityId"
         WHERE NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+          OR identity_types."isPet"
           OR identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
         ORDER BY
           COALESCE(identity_favorites."isFavorite", false) DESC,

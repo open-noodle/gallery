@@ -55,6 +55,25 @@ const giveOwnFace = async (ctx: ReturnType<typeof setup>['ctx'], assetId: string
   return faceId;
 };
 
+// Seeds a person of a given type with `faces` timeline photos, for the getAllForUser type-filter
+// block. Module scope: eslint's consistent-function-scoping rejects helpers defined in a describe.
+const seedTypedPerson = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  input: { ownerId: string; type?: string; species?: string | null; name?: string; faces: number },
+) => {
+  const { person } = await ctx.newPerson({
+    ownerId: input.ownerId,
+    name: input.name ?? '',
+    ...(input.type && { type: input.type }),
+    ...(input.species !== undefined && { species: input.species }),
+  });
+  for (let i = 0; i < input.faces; i++) {
+    const { asset } = await ctx.newAsset({ ownerId: input.ownerId, visibility: AssetVisibility.Timeline });
+    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  }
+  return person;
+};
+
 describe(PersonRepository.name, () => {
   describe('getByName', () => {
     it('matches names case-insensitively', async () => {
@@ -429,6 +448,85 @@ describe(PersonRepository.name, () => {
           birthDate: new Date('1990-04-23T00:00:00Z'),
         }),
       ]);
+    });
+  });
+
+  // The /people page's type filter (All / People / Pets). Both list arms must honour it —
+  // getAllForUser here, and FaceIdentityRepository.getAccessiblePeople for the withSharedSpaces
+  // path the web page actually calls — or the filter leaks through whichever arm was missed.
+  describe('getAllForUser type filter', () => {
+    it('returns only pets when type is pet', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Alice', faces: 3 });
+      const pet = await seedTypedPerson(ctx, { ownerId: user.id, type: 'pet', species: 'dog', name: 'Rex', faces: 3 });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type: 'pet' });
+
+      const ids = items.map(({ id }) => id);
+      expect(ids).toContain(pet.id);
+      expect(ids).not.toContain(human.id);
+    });
+
+    it('returns only humans when type is person', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Bob', faces: 3 });
+      const pet = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'cat',
+        name: 'Mochi',
+        faces: 3,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type: 'person' });
+
+      const ids = items.map(({ id }) => id);
+      expect(ids).toContain(human.id);
+      expect(ids).not.toContain(pet.id);
+    });
+
+    // Pet recognition deliberately ships minFaces: 1 so a pet photographed once still surfaces as
+    // its own individual. The People page's own minimumFaces preference (default 3) is tuned for
+    // noisy human face clusters and would double-filter exactly those pets away — on Pierre's
+    // library, 187 of 260 pets. Pets are exempt from it; humans are not.
+    it('surfaces an unnamed pet with a single face, despite the minimumFaces gate', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const pet = await seedTypedPerson(ctx, { ownerId: user.id, type: 'pet', species: 'dog', faces: 1 });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+
+      expect(items.map(({ id }) => id)).toContain(pet.id);
+    });
+
+    it('still hides an unnamed human with a single face', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, faces: 1 });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+
+      expect(items.map(({ id }) => id)).not.toContain(human.id);
+    });
+
+    it('returns both when no type is given', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Cara', faces: 3 });
+      const pet = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'dog',
+        name: 'Bandit',
+        faces: 3,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+
+      const ids = items.map(({ id }) => id);
+      expect(ids).toEqual(expect.arrayContaining([human.id, pet.id]));
     });
   });
 
