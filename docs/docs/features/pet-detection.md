@@ -35,6 +35,36 @@ size while costing the same time per photo as the old default.
 a landscape, or across a room. On COCO it detects roughly 8% more small objects than the nano
 model.
 
+## Accuracy
+
+Measured two ways: on **Oxford-IIIT Pet** (7,390 photos, sampled evenly across all 37 breeds),
+which represents the common case of a pet filling the frame; and on **COCO val2017**, which
+represents pets that are small, partly hidden, or in cluttered scenes.
+
+Species recall — the share of photos where the correct species was detected:
+
+| Model                     | Pet portraits | Cluttered scenes | Small pets | Time per photo |
+| ------------------------- | ------------- | ---------------- | ---------- | -------------- |
+| `rfdetr-small`            | 98.3%         | 78.9%            | 56.2%      | ~73 ms         |
+| `rfdetr-nano` _(default)_ | 98.1%         | 74.5%            | 48.3%      | ~41 ms         |
+| `yolo11s` _(old default)_ | 95.6%         | 68.8%            | 42.5%      | ~44 ms         |
+
+`rfdetr-nano` is more accurate than every YOLO11 model at any size, including ones three times
+slower, while costing about what the old default cost.
+
+The gap widens on harder photos: on cluttered scenes `rfdetr-nano` leads the old default by
+5.7 points rather than 2.5, and it finds more small pets at 384×384 than YOLO11 did at 640×640.
+
+Together with the RGB and letterboxing corrections that ship alongside the new model, end-to-end
+species recall on pet portraits moves from **84.8% to 98.1%**, and photos where no animal was
+detected at all fall from 10.0% to 0.7%.
+
+:::note One thing to watch
+RF-DETR produces roughly twice as many low-confidence extra boxes per image as YOLO11 did. Much
+of that is an artefact of how the benchmark counts near-duplicate boxes on the same animal, but
+if you do see spurious detections, raising the **minimum confidence score** is the lever.
+:::
+
 ## Configuration
 
 ### Admin Settings
@@ -58,12 +88,46 @@ The deletion happens even when pet detection is disabled — that is deliberate,
 **Missing** is the safe option, and the one you want here: it only processes assets that have never been through pet detection.
 :::
 
-:::note Upgrading from a previous version
-If pet detection was enabled before Gallery moved to RF-DETR, your existing detections were
-produced by the older, less accurate pipeline. Use **Jobs → Pet Detection → Reset** to clear
-them and re-run. Instances that had a YOLO model selected are switched to `rfdetr-nano`
-automatically.
+## Upgrading from YOLO11
+
+Earlier versions of Gallery used YOLO11 (`yolo11n`, `yolo11s`, `yolo11m`). If you had pet
+detection enabled before this release, here is exactly what changes.
+
+### What happens on its own
+
+- **Your model setting is migrated.** Any `yolo*` value becomes `rfdetr-nano` when the server
+  starts. There is nothing to do, and the old names are no longer offered.
+- **The new model downloads on first use** — about 108 MB for `rfdetr-nano`, cached afterwards.
+- **New photos use RF-DETR immediately.**
+
+### What does _not_ happen on its own
+
+- **Existing detections are left exactly as they were.** They were produced by the old model,
+  so they keep its mistakes — including any bears, zebras, giraffes or elephants it found.
+  Those entries stay in your People section until you rebuild.
+- **Your confidence threshold is not migrated.** This is the one to check. If you never changed
+  it, you get the new default of `0.3` and nothing more is needed. But if you _explicitly_ set a
+  value for YOLO11, it carries over — and the two models are calibrated differently, so the old
+  default of `0.6` behaves roughly twice as strictly under RF-DETR and will miss pets. Open
+  **Administration → Machine Learning Settings → Pet Detection** and set it back to `0.3` unless
+  you have a reason not to.
+
+Until you rebuild, your library is in a mixed state: older photos carry YOLO11's detections and
+newer ones carry RF-DETR's.
+
+### Rebuilding
+
+To re-detect everything with the new model, run **Administration → Jobs → Pet Detection →
+Reset**.
+
+:::danger Reset deletes your named pets
+Reset removes every pet person and detection first — including any names you gave them and the
+copies projected into shared spaces — and only then re-detects. Names are not recoverable. On a
+large library the rebuild takes a while, since every photo goes through the detector again.
 :::
+
+If you use [Pet Recognition](/features/pet-recognition), the rebuild also re-embeds and
+re-clusters your dogs and cats, so individual pets are rebuilt from scratch too.
 
 ## Tips
 
