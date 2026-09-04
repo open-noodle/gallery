@@ -22,8 +22,14 @@ const PET_SPECIES_I18N_KEYS: Record<string, Translations> = {
  * not an arbitrary string, so the fallback has to happen at the call site rather than by passing
  * the raw value through as if it were a key.
  */
-export const getPetSpeciesI18nKey = (species: string): Translations | undefined =>
-  PET_SPECIES_I18N_KEYS[species.toLowerCase()];
+export const getPetSpeciesI18nKey = (species: string): Translations | undefined => {
+  const normalized = species.toLowerCase();
+  // `Object.hasOwn` rather than a bare lookup: a species literally named `constructor` or
+  // `toString` would otherwise resolve to an inherited Object.prototype member and be handed to
+  // `$t()` as a key. Unreachable with the COCO labels the detector emits, but the map is a plain
+  // object and the input is model output, so don't rely on that staying true.
+  return Object.hasOwn(PET_SPECIES_I18N_KEYS, normalized) ? PET_SPECIES_I18N_KEYS[normalized] : undefined;
+};
 
 /** Display label for a pet species: translated when known, the raw value otherwise. */
 export const getPetSpeciesLabel = (
@@ -37,3 +43,14 @@ export const getPetSpeciesLabel = (
   const key = getPetSpeciesI18nKey(species);
   return key ? translate(key) : species;
 };
+
+/**
+ * Label for the paw badge, which must always be named: `role="img"` with no accessible name is a
+ * WCAG 1.1.1 failure. Species is the best label when we have one, but not every surface carries it —
+ * a shared space projects its own person rows (`SharedSpacePersonResponseDto` has `type`, no
+ * `species`), and a pet person can predate the species column — so fall back to a generic "Pet".
+ */
+export const getPetBadgeLabel = (
+  species: string | null | undefined,
+  translate: (key: Translations) => string,
+): string => getPetSpeciesLabel(species, translate) ?? translate('pet');

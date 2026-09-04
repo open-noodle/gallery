@@ -1,6 +1,6 @@
 import type { Translations } from 'svelte-i18n';
 import { describe, expect, it } from 'vitest';
-import { getPetSpeciesI18nKey, getPetSpeciesLabel } from './pet-species';
+import { getPetBadgeLabel, getPetSpeciesI18nKey, getPetSpeciesLabel } from './pet-species';
 
 // R8.5 (pet-recognition review-fixes, F13): pet-species.ts maps a raw species string (as recorded
 // by the pet-detection model) to its i18n translation key. `$t()` takes a typed key rather than an
@@ -48,5 +48,38 @@ describe('getPetSpeciesLabel', () => {
     expect(getPetSpeciesLabel(null, translate)).toBeUndefined();
     expect(getPetSpeciesLabel(undefined, translate)).toBeUndefined();
     expect(getPetSpeciesLabel('', translate)).toBeUndefined();
+  });
+});
+
+// The paw badge renders `role="img"`, which is a WCAG 1.1.1 failure without an accessible name, and
+// species is genuinely absent on some surfaces (a shared space's own person rows carry `type` but no
+// `species`). getPetBadgeLabel is the never-undefined variant used by every badge.
+describe('getPetBadgeLabel', () => {
+  const translate = (key: Translations) => `translated:${key}`;
+
+  it('prefers the translated species when there is one', () => {
+    expect(getPetBadgeLabel('dog', translate)).toBe('translated:species_dog');
+  });
+
+  it('keeps the raw value for an unmapped species', () => {
+    expect(getPetBadgeLabel('axolotl', translate)).toBe('axolotl');
+  });
+
+  it('falls back to the generic pet label when no species is recorded', () => {
+    expect(getPetBadgeLabel(null, translate)).toBe('translated:pet');
+    expect(getPetBadgeLabel(undefined, translate)).toBe('translated:pet');
+    expect(getPetBadgeLabel('', translate)).toBe('translated:pet');
+  });
+});
+
+// A species named after an Object.prototype member must not resolve to an inherited property and be
+// handed to `$t()` as a key. Unreachable with COCO labels, but the map is a plain object and the
+// input is model output.
+describe('prototype pollution guard', () => {
+  const translate = (key: Translations) => `translated:${key}`;
+
+  it.each(['constructor', 'toString', 'hasOwnProperty', '__proto__'])('treats %s as an unmapped species', (species) => {
+    expect(getPetSpeciesI18nKey(species)).toBeUndefined();
+    expect(getPetSpeciesLabel(species, translate)).toBe(species);
   });
 });

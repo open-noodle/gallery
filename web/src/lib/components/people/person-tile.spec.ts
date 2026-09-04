@@ -39,6 +39,20 @@ describe('PersonTile', () => {
     expect(screen.getByText('Footer content')).toBeInTheDocument();
   });
 
+  // A space People grid maps SharedSpacePersonResponseDto, which carries `type` but no `species`, so
+  // the badge would otherwise be a `role="img"` with no accessible name (WCAG 1.1.1).
+  it('names the pet badge generically when the person carries no species', () => {
+    render(PersonTileWrapper, {
+      props: {
+        person: basePerson({ displayName: 'Rex', type: 'pet' }),
+      },
+    });
+
+    const petBadge = screen.getByTitle('pet');
+    expect(petBadge).toHaveAttribute('role', 'img');
+    expect(petBadge).toHaveAttribute('aria-label', 'pet');
+  });
+
   it('renders action menu slot only on hover when provided', async () => {
     render(PersonTileWrapper, {
       props: {

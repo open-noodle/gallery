@@ -467,7 +467,10 @@
             disabled={disabled || !configToEdit.machineLearning.enabled}
           />
 
-          {#if !config.machineLearning.petDetection.enabled}
+          <!-- Reads configToEdit, not the saved config: every input on this form is bound to the
+               draft, so turning pet detection off and pet recognition on in one unsaved edit has to
+               surface the warning before the admin saves, not after. -->
+          {#if !configToEdit.machineLearning.petDetection.enabled}
             <Text color="warning" size="small">{$t('admin.pet_recognition_requires_detection')}</Text>
           {/if}
 
@@ -512,6 +515,7 @@
             bind:value={configToEdit.machineLearning.petRecognition.minFaces}
             step="1"
             min={1}
+            max={1000}
             disabled={disabled ||
               !configToEdit.machineLearning.enabled ||
               !configToEdit.machineLearning.petRecognition.enabled}

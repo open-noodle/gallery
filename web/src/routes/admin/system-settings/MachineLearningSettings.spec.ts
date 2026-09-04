@@ -63,6 +63,9 @@ const mocks = vi.hoisted(() => ({
   cloneValue: vi.fn(),
   cloneDefaultValue: vi.fn(),
   showDialog: vi.fn(),
+  // Which accordion sections render their body. Mutable so a test that needs to drive a control in
+  // another section (e.g. the pet-detection switch) can open it without re-mocking the manager.
+  openAccordions: ['facial-recognition', 'pet-recognition'] as string[],
 }));
 
 vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
@@ -90,7 +93,7 @@ vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
 // stub it to keep the facial-recognition section open and avoid SvelteKit navigation in tests.
 vi.mock(import('$lib/managers/accordion-manager.svelte'), () => ({
   accordionManager: {
-    isOpen: (key: string) => key === 'facial-recognition' || key === 'pet-recognition',
+    isOpen: (key: string) => mocks.openAccordions.includes(key),
     open: vi.fn(),
     close: vi.fn(),
   } as never,
@@ -276,6 +279,7 @@ describe('MachineLearningSettings suggestions toggle availability', () => {
 describe('MachineLearningSettings pet recognition', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.openAccordions = ['facial-recognition', 'pet-recognition'];
     mocks.featureFlags.configFile = false;
     mocks.systemConfig = makeMachineLearningConfig();
     mocks.defaultSystemConfig = makeMachineLearningConfig();
@@ -308,6 +312,27 @@ describe('MachineLearningSettings pet recognition', () => {
       render(MachineLearningSettings);
 
       expect(screen.queryByText('admin.pet_recognition_requires_detection')).not.toBeInTheDocument();
+    });
+
+    // The hint reads the draft (configToEdit), not the saved config: turning detection off and
+    // recognition on in one unsaved edit has to warn before the admin presses save, not after.
+    it('shows the hint as soon as pet detection is switched off, before saving', async () => {
+      const user = userEvent.setup();
+      mocks.openAccordions = ['facial-recognition', 'pet-recognition', 'pet-detection'];
+      mocks.systemConfig = makeMachineLearningConfig(
+        {},
+        { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5 } },
+      );
+      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
+
+      render(MachineLearningSettings);
+
+      expect(screen.queryByText('admin.pet_recognition_requires_detection')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('switch', { name: 'admin.machine_learning_pet_detection_setting' }));
+
+      await waitFor(() => expect(screen.getByText('admin.pet_recognition_requires_detection')).toBeInTheDocument());
+      expect(handleSystemConfigSave).not.toHaveBeenCalled();
     });
   });
 

@@ -626,13 +626,24 @@ describe('DetailPanelPeople', () => {
     expect(screen.queryByTestId('pet-badge')).not.toBeInTheDocument();
   });
 
-  it('does not render title="null" for a pet with no recorded species', () => {
+  // A `role="img"` with no accessible name is a WCAG 1.1.1 failure, and species is genuinely absent
+  // on some surfaces — a space person carries `type` but no `species` — so the badge falls back to a
+  // generic "pet" label rather than going unnamed.
+  it('falls back to the generic pet label for a pet with no recorded species', () => {
     faceManagerMock.people = [person('Mochi', { type: 'pet', species: null })];
 
     renderPanel({ isOwner: true });
 
     const badge = screen.getByTestId('pet-badge');
-    expect(badge).not.toHaveAttribute('title', 'null');
-    expect(badge.getAttribute('title')).toBeNull();
+    expect(badge).toHaveAttribute('aria-label', 'pet');
+    expect(badge).toHaveAttribute('title', 'pet');
+  });
+
+  it('falls back to the generic pet label for a space person, which carries no species', () => {
+    renderPanel({ isOwner: false, spaceId: 'space-1', people: [person('Rex', { type: 'pet' })] });
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge).toHaveAttribute('role', 'img');
+    expect(badge).toHaveAttribute('aria-label', 'pet');
   });
 });
