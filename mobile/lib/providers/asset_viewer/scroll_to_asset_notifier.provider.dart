@@ -11,15 +11,26 @@ class TimelineScrollTarget {
   /// local date, so a UTC instant would match the wrong segment (#28941).
   final DateTime date;
 
-  const TimelineScrollTarget({required this.asset, required this.date});
+  /// The space whose timeline must honour this request, or null for the personal
+  /// timeline. A Space timeline is pushed OVER the main one, which stays mounted and
+  /// listening, so without a scope whichever is laid out first consumes the request —
+  /// and for a Space photo that is the main timeline, which lands on the right day with
+  /// nothing to show (#1047).
+  final String? spaceId;
+
+  const TimelineScrollTarget({required this.asset, required this.date, this.spaceId});
 
   @override
   bool operator ==(Object other) =>
-      other is TimelineScrollTarget && date == other.date && asset.refersToSameAsset(other.asset);
+      other is TimelineScrollTarget &&
+      date == other.date &&
+      spaceId == other.spaceId &&
+      asset.refersToSameAsset(other.asset);
 
   // Only `date` participates: `==` compares assets by identity rather than by
   // field equality (two copies of one asset can differ in localId), and equal
-  // targets always share a date. Hashing on date alone keeps the contract intact.
+  // targets always share a date — spaceId included, since equality only narrows
+  // which targets match. Hashing on date alone keeps the contract intact.
   @override
   int get hashCode => date.hashCode;
 }
@@ -36,10 +47,11 @@ final scrollToAssetNotifierProvider = ScrollToAssetNotifier(null);
 class ScrollToAssetNotifier extends ValueNotifier<TimelineScrollTarget?> {
   ScrollToAssetNotifier(super.value);
 
-  /// Requests a scroll to [asset]. Always notifies listeners, even when the same
-  /// asset is requested twice in a row, so repeated taps re-trigger the scroll.
-  void scrollToAsset(BaseAsset asset) {
-    final target = TimelineScrollTarget(asset: asset, date: asset.createdAt.toLocal());
+  /// Requests a scroll to [asset] on the timeline of [spaceId] (or the personal
+  /// timeline when it is null). Always notifies listeners, even when the same asset is
+  /// requested twice in a row, so repeated taps re-trigger the scroll.
+  void scrollToAsset(BaseAsset asset, {String? spaceId}) {
+    final target = TimelineScrollTarget(asset: asset, date: asset.createdAt.toLocal(), spaceId: spaceId);
     if (value == target) {
       notifyListeners();
     } else {
