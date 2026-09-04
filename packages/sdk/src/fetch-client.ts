@@ -280,6 +280,16 @@ export type AdminConfigPetDetectionDto = {
     /** Name of the model to use */
     modelName: string;
 };
+export type AdminConfigPetRecognitionDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Maximum distance threshold for pet recognition */
+    maxDistance: number;
+    /** Minimum number of faces required for recognition */
+    minFaces: number;
+    /** Name of the model to use */
+    modelName: string;
+};
 export type AdminConfigMachineLearningDto = {
     availabilityChecks: AdminConfigMachineLearningAvailabilityChecksDto;
     clip: AdminConfigClipDto;
@@ -289,6 +299,7 @@ export type AdminConfigMachineLearningDto = {
     facialRecognition: AdminConfigFacialRecognitionDto;
     ocr: AdminConfigOcrDto;
     petDetection: AdminConfigPetDetectionDto;
+    petRecognition: AdminConfigPetRecognitionDto;
     /** ML service URLs */
     urls: string[];
 };
@@ -331,6 +342,8 @@ export type AdminConfigNewVersionCheckDto = {
 export type AdminConfigNightlyTasksDto = {
     /** Cluster new faces */
     clusterNewFaces: boolean;
+    /** Cluster new pets */
+    clusterNewPets: boolean;
     /** Database cleanup */
     databaseCleanup: boolean;
     /** Generate memories */
@@ -2166,6 +2179,7 @@ export type QueuesResponseLegacyDto = {
     ocr: QueueResponseLegacyDto;
     peopleBackfill: QueueResponseLegacyDto;
     petDetection: QueueResponseLegacyDto;
+    petRecognition: QueueResponseLegacyDto;
     search: QueueResponseLegacyDto;
     sidecar: QueueResponseLegacyDto;
     smartSearch: QueueResponseLegacyDto;
@@ -11104,6 +11118,7 @@ export enum QueueName {
     BackupDatabase = "backupDatabase",
     Ocr = "ocr",
     PetDetection = "petDetection",
+    PetRecognition = "petRecognition",
     Workflow = "workflow",
     IntegrityCheck = "integrityCheck",
     Editor = "editor",
@@ -11211,6 +11226,8 @@ export enum JobName {
     Ocr = "Ocr",
     PetDetectionQueueAll = "PetDetectionQueueAll",
     PetDetection = "PetDetection",
+    PetRecognitionQueueAll = "PetRecognitionQueueAll",
+    PetRecognition = "PetRecognition",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",
     IntegrityUntrackedFilesQueueAll = "IntegrityUntrackedFilesQueueAll",
     IntegrityUntrackedFiles = "IntegrityUntrackedFiles",

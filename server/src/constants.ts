@@ -27,6 +27,12 @@ export const VECTOR_VERSION_RANGE = '>=0.5 <1';
 export const JOBS_ASSET_PAGINATION_SIZE = 1000;
 export const JOBS_LIBRARY_PAGINATION_SIZE = 10_000;
 
+export const PET_RECOGNITION_MODEL_NAMES = [
+  'pet-recognition-small',
+  'pet-recognition-base',
+  'pet-recognition-large',
+] as const;
+
 export const MANIFEST_PAGE_SIZE = 1000;
 export const MANIFEST_SCHEMA_VERSION = 1;
 
@@ -42,6 +48,7 @@ export const VECTOR_EXTENSIONS = [DatabaseExtension.VectorChord, DatabaseExtensi
 export const VECTOR_INDEX_TABLES = {
   [VectorIndex.Clip]: 'smart_search',
   [VectorIndex.Face]: 'face_search',
+  [VectorIndex.Pet]: 'pet_search',
 } as const;
 
 export const VECTORCHORD_LIST_SLACK_FACTOR = 1.2;

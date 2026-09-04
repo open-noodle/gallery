@@ -93,6 +93,8 @@ _PADDLE_MODELS = {
 
 _YOLO_MODELS = {"yolo11n", "yolo11s", "yolo11m"}
 
+_PET_RECOGNITION_MODELS = {"pet-recognition-small", "pet-recognition-base", "pet-recognition-large"}
+
 SUPPORTED_PROVIDERS = [
     "nv_tensorrt_rtx",
     "CUDAExecutionProvider",
@@ -180,6 +182,9 @@ def get_model_source(model_name: str) -> ModelSource | None:
 
     if cleaned_name in _PADDLE_MODELS:
         return ModelSource.PADDLE
+
+    if cleaned_name in _PET_RECOGNITION_MODELS:
+        return ModelSource.PET_RECOGNITION
 
     if cleaned_name in _YOLO_MODELS:
         return ModelSource.YOLO

@@ -9,17 +9,17 @@ This document names the major Gallery concepts so discussions can start from pro
 
 ## Top-down map
 
-| Term                         | Definition                                                                                           | Aliases to avoid                |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------- |
-| **Client surface**           | A user-facing entry point that talks to Gallery through generated API clients.                       | Frontend, app thing             |
-| **API boundary**             | The server layer that validates requests, exposes DTOs, and generates OpenAPI contracts for clients. | Controller code, route plumbing |
-| **Domain service**           | Server business logic that enforces rules, access, side effects, jobs, and response shaping.         | Backend component, handler      |
-| **Persistence layer**        | Typed database access and schema definitions around Postgres.                                        | DB stuff, query code            |
-| **Job pipeline**             | Redis/BullMQ-backed background work for media processing, ML, cleanup, migration, and notifications. | Worker magic, queue stuff       |
-| **Machine learning service** | The Python service that hosts ONNX models for CLIP, face recognition, OCR, and pet detection.        | AI server, model box            |
-| **Storage layer**            | The disk/S3 abstraction that writes, reads, serves, deletes, and migrates media files.               | Filesystem code, S3 code        |
-| **Realtime layer**           | Websocket and audit/update-id infrastructure that lets clients react to server-side changes.         | Socket code, sync code          |
-| **Generated SDK**            | The OpenAPI-generated client used by web, mobile, CLI, and tests to call the server.                 | API wrapper, SDK stuff          |
+| Term                         | Definition                                                                                                | Aliases to avoid                |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| **Client surface**           | A user-facing entry point that talks to Gallery through generated API clients.                            | Frontend, app thing             |
+| **API boundary**             | The server layer that validates requests, exposes DTOs, and generates OpenAPI contracts for clients.      | Controller code, route plumbing |
+| **Domain service**           | Server business logic that enforces rules, access, side effects, jobs, and response shaping.              | Backend component, handler      |
+| **Persistence layer**        | Typed database access and schema definitions around Postgres.                                             | DB stuff, query code            |
+| **Job pipeline**             | Redis/BullMQ-backed background work for media processing, ML, cleanup, migration, and notifications.      | Worker magic, queue stuff       |
+| **Machine learning service** | The Python service that hosts ONNX models for CLIP, face recognition, OCR, and pet detection/recognition. | AI server, model box            |
+| **Storage layer**            | The disk/S3 abstraction that writes, reads, serves, deletes, and migrates media files.                    | Filesystem code, S3 code        |
+| **Realtime layer**           | Websocket and audit/update-id infrastructure that lets clients react to server-side changes.              | Socket code, sync code          |
+| **Generated SDK**            | The OpenAPI-generated client used by web, mobile, CLI, and tests to call the server.                      | API wrapper, SDK stuff          |
 
 ## Codebase areas
 
@@ -92,7 +92,9 @@ This document names the major Gallery concepts so discussions can start from pro
 | **Favorite person**              | A Personal Person pinned ahead of other personal people.                                                                                                             | Pinned person                   |
 | **Person alias**                 | A member-specific display override for a Space Person.                                                                                                               | Nickname                        |
 | **Person name override**         | The Space Person name that supersedes the linked Personal Person name inside that Shared Space.                                                                      | Space name, renamed person      |
-| **Pet person**                   | A person-like cluster whose type is pet and whose faces come from pet detection.                                                                                     | Pet, animal tag                 |
+| **Pet person**                   | A person-like cluster whose type is pet and whose faces come from pet detection. Either a species bucket or an individual pet.                                       | Pet, animal tag                 |
+| **Species bucket**               | The one-pet-person-per-(owner, species) cluster the detector alone produces — one "dog", one "cat". The only form for species pet recognition cannot identify.       | Species person, pet bucket      |
+| **Individual pet**               | A pet person clustered from pet embeddings rather than species, so one row per real animal. Dogs and cats only, and only while pet recognition is enabled.           | Named pet, pet identity         |
 | **Face matching**                | The process that assigns faces to existing people or creates new people.                                                                                             | Recognition, clustering         |
 | **Space face matching**          | The Shared Space process that maps already-assigned personal faces into Space People and bridges across owners.                                                      | Space recognition               |
 | **Person dedup pass**            | A background pass that merges duplicate person clusters when embeddings indicate the same real-world subject.                                                        | Merge job                       |
@@ -191,7 +193,7 @@ This document names the major Gallery concepts so discussions can start from pro
 | **Search Palette**      | `web/src/lib/managers/global-search-manager.svelte.ts`, `web/src/lib/components/global-search/`, `docs/docs/features/search-palette.md`                                                                                                                                   |
 | **Shared Spaces**       | `server/src/services/shared-space.service.ts`, `server/src/repositories/shared-space.repository.ts`, `server/src/schema/tables/shared-space*.ts`, `web/src/routes/(user)/spaces/`, `web/src/lib/components/spaces/`                                                       |
 | **People**              | `server/src/schema/tables/person.table.ts`, `server/src/schema/tables/asset-face.table.ts`, `server/src/schema/tables/face-identity*.ts`, `server/src/schema/tables/shared-space-person*.ts`, `web/src/routes/(user)/people/`, `docs/docs/features/facial-recognition.md` |
-| **ML features**         | `server/src/services/smart-info.service.ts`, `server/src/services/classification.service.ts`, `server/src/services/pet-detection.service.ts`, `machine-learning/`, `docs/docs/features/searching.md`                                                                      |
+| **ML features**         | `server/src/services/smart-info.service.ts`, `server/src/services/classification.service.ts`, `server/src/services/pet-detection.service.ts`, `server/src/services/pet-recognition.service.ts`, `machine-learning/`, `docs/docs/features/searching.md`                    |
 | **Duplicates**          | `server/src/services/duplicate.service.ts`, `server/src/schema/tables/asset-duplicate-checksum.table.ts`, `docs/docs/features/duplicates-utility.md`, `docs/docs/features/video-duplicate-detection.md`                                                                   |
 | **Storage**             | `server/src/services/storage.service.ts`, `server/src/repositories/storage.repository.ts`, `server/src/backends/`, `docs/docs/features/s3-storage.md`, `docs/docs/features/storage-migration.md`                                                                          |
 | **Permissions**         | `server/src/middleware/auth.guard.ts`, `server/src/repositories/access.repository.ts`, `server/src/enum.ts`                                                                                                                                                               |

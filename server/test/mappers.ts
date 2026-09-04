@@ -188,7 +188,9 @@ export const getForDetectedFaces = (asset: ReturnType<AssetFactory['build']>) =>
   id: asset.id,
   visibility: asset.visibility,
   exifInfo: getDehydrated(asset.exifInfo),
-  faces: asset.faces.map((face) => getDehydrated(face)),
+  // isPet is computed by getForDetectFacesJob (petFacePredicate) and drives the pet-face guards in
+  // handleDetectFaces. Defaults to false here; pet-face tests override it per face.
+  faces: asset.faces.map((face) => ({ ...getDehydrated(face), isPet: false })),
   previewFile: asset.files
     .filter((file) => file.type === AssetFileType.Preview)
     .toSorted((a) => (a.isEdited ? -1 : 1))
