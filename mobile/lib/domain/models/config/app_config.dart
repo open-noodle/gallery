@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/models/config/cleanup_config.dart';
 import 'package:immich_mobile/domain/models/config/feature_message_config.dart';
 import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/config/map_config.dart';
+import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/config/network_config.dart';
 import 'package:immich_mobile/domain/models/config/people_config.dart';
 import 'package:immich_mobile/domain/models/config/share_config.dart';
@@ -47,6 +48,7 @@ abstract class AppConfig with _$AppConfig {
     @Default(PeopleConfig()) PeopleConfig people,
     @Default(SpaceAlbumsConfig()) SpaceAlbumsConfig spaceAlbums,
     @Default(SpacesConfig()) SpacesConfig spaces,
+    @Default(NavConfig()) NavConfig nav,
     @Default(BackupConfig()) BackupConfig backup,
     @Default(NetworkConfig()) NetworkConfig network,
     @Default(ShareConfig()) ShareConfig share,
@@ -79,6 +81,7 @@ abstract class AppConfig with _$AppConfig {
             .spaceAlbumsIsReverse => spaceAlbums.isReverse,
             .spacesSortMode => spaces.sortMode,
             .spacesIsReverse => spaces.isReverse,
+            .navShowSpaces => nav.showSpaces,
             .backupEnabled => backup.enabled,
             .backupUseCellularForVideos => backup.useCellularForVideos,
             .backupUseCellularForPhotos => backup.useCellularForPhotos,
@@ -140,6 +143,7 @@ abstract class AppConfig with _$AppConfig {
       .spaceAlbumsIsReverse => copyWith(spaceAlbums: spaceAlbums.copyWith(isReverse: value as bool)),
       .spacesSortMode => copyWith(spaces: spaces.copyWith(sortMode: value as SpaceSortMode)),
       .spacesIsReverse => copyWith(spaces: spaces.copyWith(isReverse: value as bool)),
+      .navShowSpaces => copyWith(nav: nav.copyWith(showSpaces: value as bool)),
       .backupEnabled => copyWith(backup: backup.copyWith(enabled: value as bool)),
       .backupUseCellularForVideos => copyWith(backup: backup.copyWith(useCellularForVideos: value as bool)),
       .backupUseCellularForPhotos => copyWith(backup: backup.copyWith(useCellularForPhotos: value as bool)),

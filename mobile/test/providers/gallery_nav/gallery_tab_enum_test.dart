@@ -4,17 +4,42 @@ import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 
 void main() {
   group('GalleryTabEnum', () {
-    test('enum values in canonical order', () {
-      expect(GalleryTabEnum.values, [GalleryTabEnum.photos, GalleryTabEnum.albums, GalleryTabEnum.library]);
+    test('carries a value per destination, including Spaces', () {
+      expect(GalleryTabEnum.values, [
+        GalleryTabEnum.photos,
+        GalleryTabEnum.albums,
+        GalleryTabEnum.spaces,
+        GalleryTabEnum.library,
+      ]);
     });
 
-    test('indices match the fork-only constants', () {
-      expect(GalleryTabEnum.photos.index, kGalleryPhotosIndex);
-      expect(GalleryTabEnum.albums.index, kGalleryAlbumsIndex);
-      expect(GalleryTabEnum.library.index, kGalleryLibraryIndex);
+    test('slot constants describe positions, not enum indices', () {
       expect(kGalleryPhotosIndex, 0);
-      expect(kGalleryAlbumsIndex, 1);
+      expect(kGalleryCollectionIndex, 1);
       expect(kGalleryLibraryIndex, 2);
+    });
+  });
+
+  group('galleryNavSlots', () {
+    test('puts Spaces in the middle slot when enabled', () {
+      expect(galleryNavSlots(showSpaces: true), [GalleryTabEnum.photos, GalleryTabEnum.spaces, GalleryTabEnum.library]);
+    });
+
+    test('puts Albums in the middle slot when disabled', () {
+      expect(galleryNavSlots(showSpaces: false), [
+        GalleryTabEnum.photos,
+        GalleryTabEnum.albums,
+        GalleryTabEnum.library,
+      ]);
+    });
+
+    test('always yields exactly three slots and never both collection tabs', () {
+      for (final showSpaces in [true, false]) {
+        final slots = galleryNavSlots(showSpaces: showSpaces);
+        expect(slots, hasLength(3));
+        expect(slots.toSet(), hasLength(3), reason: 'no slot may repeat');
+        expect(slots.contains(GalleryTabEnum.albums) && slots.contains(GalleryTabEnum.spaces), isFalse);
+      }
     });
   });
 

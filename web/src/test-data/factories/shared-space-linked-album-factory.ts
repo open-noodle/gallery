@@ -7,6 +7,8 @@ export const sharedSpaceLinkedAlbumFactory = Sync.makeFactory<SharedSpaceLinkedA
   albumName: Sync.each(() => faker.commerce.product()),
   description: '',
   albumThumbnailAssetId: null,
+  // null means "at the space root" — where every album sat before folders existed.
+  folderId: null,
   assetCount: Sync.each((i) => i % 5),
   createdAt: Sync.each(() => faker.date.past().toISOString()),
   updatedAt: Sync.each(() => faker.date.past().toISOString()),
