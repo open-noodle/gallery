@@ -12,8 +12,8 @@ import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v23.dart' as v23;
 import 'generated/schema_v24.dart' as v24;
-import 'generated/schema_v36.dart' as v36;
 import 'generated/schema_v37.dart' as v37;
+import 'generated/schema_v38.dart' as v38;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -255,10 +255,10 @@ void main() {
   // seed the OLD schema with raw SQL, close it, migrate a fresh Drift over the same schema, close
   // that, then open the NEW schema class to assert. `migrateAndValidate` returns void — it does
   // NOT hand back a database.
-  group('gallery-fork: from36To37 data migration', () {
+  group('gallery-fork: from37To38 data migration', () {
     test('R-07: preserves existing album links, with a null folderId', () async {
-      final schema = await verifier.schemaAt(36);
-      final oldDb = v36.DatabaseAtV36(schema.newConnection());
+      final schema = await verifier.schemaAt(37);
+      final oldDb = v37.DatabaseAtV37(schema.newConnection());
       // shared_space_entity.created_by_id has a hard FK to user_entity, checked by the
       // PRAGMA foreign_key_check assertion the app's migration runs in kDebugMode (true
       // under `flutter test`) — seed the referenced user first.
@@ -284,10 +284,10 @@ void main() {
       await oldDb.close();
 
       final dbForMigration = Drift(schema.newConnection());
-      await verifier.migrateAndValidate(dbForMigration, 37);
+      await verifier.migrateAndValidate(dbForMigration, 38);
       await dbForMigration.close();
 
-      final migratedDb = v37.DatabaseAtV37(schema.newConnection());
+      final migratedDb = v38.DatabaseAtV38(schema.newConnection());
       final row = await migratedDb
           .customSelect(
             "SELECT * FROM shared_space_album_link_entity WHERE album_id = 'album-1'",
@@ -304,12 +304,12 @@ void main() {
 
     // R-08
     test('R-08: creates an empty folder table', () async {
-      final schema = await verifier.schemaAt(36);
+      final schema = await verifier.schemaAt(37);
       final dbForMigration = Drift(schema.newConnection());
-      await verifier.migrateAndValidate(dbForMigration, 37);
+      await verifier.migrateAndValidate(dbForMigration, 38);
       await dbForMigration.close();
 
-      final migratedDb = v37.DatabaseAtV37(schema.newConnection());
+      final migratedDb = v38.DatabaseAtV38(schema.newConnection());
       final count = await migratedDb
           .customSelect(
             'SELECT COUNT(*) AS c FROM shared_space_album_folder_entity',
