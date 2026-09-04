@@ -5,6 +5,7 @@
   import AlbumTitle from '$lib/components/album-page/AlbumTitle.svelte';
   import AlbumDescription from '$lib/components/album-page/AlbumDescription.svelte';
   import AlbumSummary from '$lib/components/album-page/AlbumSummary.svelte';
+  import { Route } from '$lib/route';
   import { isSpaceAlbumRoute } from '$lib/utils/navigation';
   import {
     clearFilters,
@@ -587,7 +588,7 @@
       shape="round"
       color="secondary"
       aria-label={$t('back')}
-      onclick={() => void goto(`/spaces/${space.id}/albums`)}
+      onclick={() => void goto(Route.viewSpaceAlbums({ id: space.id, folderId: data.folderId }))}
       icon={mdiArrowLeft}
     />
   {/snippet}

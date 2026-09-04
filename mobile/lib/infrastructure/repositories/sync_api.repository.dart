@@ -24,10 +24,11 @@ class SyncApiRepository {
     return _api.syncApi.deleteSyncAck(SyncAckDeleteDto(types: Optional.present(types)));
   }
 
-  /// The six Phase-2B space-album request types (five original + the per-member
-  /// hidden-album rows added in #1041). Kept in one place so the capability
-  /// filter and the version-gate fallback can never drift apart.
-  static const _spaceAlbumSyncTypes = [
+  /// The Phase-2B space-album request types that are safe to send from the `serverVersion >
+  /// 5.0.0` fallback below: the original five that every fork server shipping version-gated
+  /// space albums accepts, plus the per-member hidden-album rows from #1041, which ride the
+  /// same gate.
+  static const _legacySpaceAlbumSyncTypes = [
     SyncRequestType.sharedSpaceAlbumsV1,
     SyncRequestType.sharedSpaceAlbumLinksV1,
     SyncRequestType.sharedSpaceAlbumToAssetsV1,
@@ -35,6 +36,14 @@ class SyncApiRepository {
     SyncRequestType.sharedSpaceAlbumAssetExifsV1,
     SyncRequestType.sharedSpaceAlbumHiddensV1,
   ];
+
+  /// All space-album request types, including ones introduced AFTER M14 capability signalling
+  /// shipped (currently just SharedSpaceAlbumFoldersV1, for nestable folders). Only ever used
+  /// behind an explicit server declaration (`supportedSyncTypes`) — never the version-gate
+  /// fallback, because no pre-declaration server can accept a type that didn't exist yet when
+  /// its SyncRequestTypeSchema was built. A future type in this situation must join only this
+  /// list, never `_legacySpaceAlbumSyncTypes`.
+  static const _spaceAlbumSyncTypes = [..._legacySpaceAlbumSyncTypes, SyncRequestType.sharedSpaceAlbumFoldersV1];
 
   Future<void> streamChanges(
     Future<void> Function(List<SyncEvent>, Function() abort, Function() reset) onData, {
@@ -101,7 +110,7 @@ class SyncApiRepository {
           SyncRequestType.sharedSpaceLibrariesV1,
           // --- gallery-fork: shared-space album sync types (Phase 2B) ---
           //
-          // mobile-1: gate these 5 request types behind the fork-server version that
+          // mobile-1: gate the legacy 5 request types behind the fork-server version that
           // first ships the space-albums feature. An older fork server's
           // SyncRequestTypeSchema (z.enum) REJECTS unknown enum values with a 400 for
           // the WHOLE /sync/stream request → a total sync outage on an app that is
@@ -109,15 +118,19 @@ class SyncApiRepository {
           // is a FORK version: deployed fork servers report FORK_VERSION (stamped into
           // server/package.json by branding/scripts/apply-branding.sh patch_versions),
           // NOT the upstream Immich version — so do NOT copy the 3.0.0 OCR gate. v5.0.0
-          // is the last release WITHOUT space-albums; the feature (and its enum values)
-          // ship in the next release, so gate on strictly-after-5.0.0, which also admits
-          // the feature's release-candidates. See slice-5 plan §0.1 for the full evidence
-          // and the release-time reconciliation note. There is no complementary
-          // server-side defense: a slice-5 filter that dropped unknown request types
-          // was later reverted, so an older/skewed server's SyncRequestTypeSchema
-          // still 400s the WHOLE /sync/stream request on any unrecognized type. This
-          // client-side version gate is therefore the ONLY protection — every future
-          // gallery-fork-only request type MUST be gated the same way.
+          // is the last release WITHOUT space-albums; the feature (and its original five
+          // enum values) ship in the next release, so gate on strictly-after-5.0.0, which
+          // also admits the feature's release-candidates. See slice-5 plan §0.1 for the
+          // full evidence and the release-time reconciliation note. There is no
+          // complementary server-side defense: a slice-5 filter that dropped unknown
+          // request types was later reverted, so an older/skewed server's
+          // SyncRequestTypeSchema still 400s the WHOLE /sync/stream request on any
+          // unrecognized type. This client-side version gate is therefore the ONLY
+          // protection — every future gallery-fork-only request type MUST be gated the
+          // same way. CAVEAT: that was true only until capability signalling shipped — see
+          // the M14 paragraph immediately below, which supersedes this instruction for any
+          // request type introduced afterward. Do NOT add a new type to
+          // _legacySpaceAlbumSyncTypes on the strength of this sentence alone.
           // M14 resolution: servers now DECLARE the request types they accept via
           // GET /server/features (syncRequestTypes), which the sync service passes in as
           // [supportedSyncTypes]. The declaration is authoritative in both directions — it
@@ -126,10 +139,17 @@ class SyncApiRepository {
           // version) and keeps it closed on future servers that drop a type. The version
           // gate below survives only as the fallback for fork servers that predate
           // capability signalling (their /server/features has no syncRequestTypes field).
+          // A request type introduced AFTER capability signalling shipped — currently
+          // SharedSpaceAlbumFoldersV1, added for nestable folders — must join ONLY the
+          // declared-capability list (_spaceAlbumSyncTypes), never the version-gate
+          // fallback (_legacySpaceAlbumSyncTypes): no pre-declaration server can accept
+          // it, by definition, since capability signalling shipped before the type
+          // existed. That is why the fallback below sends _legacySpaceAlbumSyncTypes,
+          // not the full _spaceAlbumSyncTypes list.
           if (supportedSyncTypes != null)
             ...(_spaceAlbumSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson())))
           else if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0))
-            ..._spaceAlbumSyncTypes,
+            ..._legacySpaceAlbumSyncTypes,
         ],
       ).toJson(),
     );
@@ -296,6 +316,9 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.sharedSpaceAlbumLinkV1: SyncSharedSpaceAlbumLinkV1.fromJson,
   SyncEntityType.sharedSpaceAlbumLinkBackfillV1: SyncSharedSpaceAlbumLinkV1.fromJson,
   SyncEntityType.sharedSpaceAlbumLinkDeleteV1: SyncSharedSpaceAlbumLinkDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderV1: SyncSharedSpaceAlbumFolderV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderBackfillV1: SyncSharedSpaceAlbumFolderV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderDeleteV1: SyncSharedSpaceAlbumFolderDeleteV1.fromJson,
   SyncEntityType.sharedSpaceAlbumToAssetV1: SyncAlbumToAssetV1.fromJson,
   SyncEntityType.sharedSpaceAlbumToAssetBackfillV1: SyncAlbumToAssetV1.fromJson,
   SyncEntityType.sharedSpaceAlbumToAssetDeleteV1: SyncAlbumToAssetDeleteV1.fromJson,

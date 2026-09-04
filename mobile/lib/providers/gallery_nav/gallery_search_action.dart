@@ -17,10 +17,10 @@ typedef ProviderReader = T Function<T>(ProviderListenable<T>);
 
 Future<void> openGallerySearch(TabsRouter tabsRouter, ProviderReader read) async {
   read(hapticFeedbackProvider.notifier).selectionClick();
-  final onPhotos = tabsRouter.activeIndex == GalleryTabEnum.photos.index;
+  final onPhotos = tabsRouter.activeIndex == kGalleryPhotosIndex;
 
   if (!onPhotos) {
-    tabsRouter.setActiveIndex(GalleryTabEnum.photos.index);
+    tabsRouter.setActiveIndex(kGalleryPhotosIndex);
     await Future<void>.delayed(kGalleryTabTransitionDelay);
   }
 

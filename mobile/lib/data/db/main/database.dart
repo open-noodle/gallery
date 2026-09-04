@@ -34,6 +34,7 @@ import 'package:immich_mobile/data/db/main/table/remote/library.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_asset.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_folder.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_hidden.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_link.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.dart';
@@ -95,6 +96,7 @@ import 'package:sqlite_async/sqlite_async.dart';
     SharedSpaceAlbumLinkEntity,
     SharedSpaceAlbumAssetEntity,
     SharedSpaceAlbumHiddenEntity,
+    SharedSpaceAlbumFolderEntity,
     MemoryEntity,
     MemoryAssetEntity,
     StackEntity,
@@ -182,7 +184,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 37;
+  int get schemaVersion => 38;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -427,6 +429,17 @@ class Drift extends $Drift {
               from36To37: (m, v37) async {
                 await m.createTable(v37.sharedSpaceAlbumHiddenEntity);
                 await m.createIndex(v37.idxSharedSpaceAlbumHiddenAlbumSpace);
+              },
+              from37To38: (m, v38) async {
+                // Album folders (Drift v38). Create the new table, then add the nullable
+                // folderId column to the existing link table. The link table is rebuilt by
+                // TableMigration, so every existing row must survive with folderId null —
+                // see the R-07 migration test.
+                await m.create(v38.sharedSpaceAlbumFolderEntity);
+                await m.createIndex(v38.idxSharedSpaceAlbumFolderSpace);
+                await m.alterTable(
+                  TableMigration(v38.sharedSpaceAlbumLinkEntity, newColumns: [v38.sharedSpaceAlbumLinkEntity.folderId]),
+                );
               },
             ),
           ),
