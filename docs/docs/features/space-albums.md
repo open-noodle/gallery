@@ -80,9 +80,11 @@ You can't remove an asset from a space directly if it's only present through a l
 Whether a linked album's photos show up in a timeline is controlled by two independent switches, each on the album's ⋯ menu:
 
 1. **"Hide this album from the space's photos"** (Owners/Editors only) — governs whether the album appears on the space's own Albums/Photos tabs at all, for **every member**. Turn it off to keep an album browsable but out of the space's aggregated view.
-2. **"Hide this album from my timeline"** (any member, yourself only) — a personal preference that removes just this one album from **your own** main Photos timeline, without changing what anyone else sees or what the space itself shows.
+2. **"Hide this album from my timeline"** (any member, yourself only) — a personal preference that removes just this one album from **your own** main Photos timeline, Folders view and Memories, without changing what anyone else sees or what the space itself shows. The same menu switches it back on again.
 
-These don't combine with AND: hiding an album from the space's photos does **not** also remove it from any member's personal timeline — each member decides that for themselves with switch 2. See [Timeline Integration](shared-spaces.md#timeline-integration) for the full picture, including the space-level "hide all space photos from my timeline" switch and the truth table for when a photo disappears from your timeline.
+These don't combine with AND: hiding an album from the space's photos does **not** also remove it from any member's personal timeline — each member decides that for themselves with switch 2. Switch 2 is available to every member including Viewers, since it only changes your own view. See [Timeline Integration](shared-spaces.md#timeline-integration) for the full picture, including the space-level "hide all space photos from my timeline" switch, the truth table for when a photo disappears from your timeline, and [where hiding applies](shared-spaces.md#where-hiding-applies).
+
+Switch 2 only removes an album's photos when the album is the **only** way they reach you. If the same photos also arrive through a linked library or were added to the space directly, hiding the album changes nothing for them — the confirmation dialog says so, and gives the count that stays.
 
 Hiding is a tidiness feature, not a privacy feature — it never restricts anyone's access to the album or its photos.
 

@@ -203,6 +203,29 @@ A photo disappears from your timeline only when **every** way it reaches you thr
 
 **Hiding is a tidiness feature, not a privacy feature.** It only changes what appears in _your own_ timeline (or, for the editor switch, the space's own Photos tab) — it never restricts anyone's access. Hidden photos stay fully visible in the space itself, in search, and in any shared links. If you need to actually restrict access, expire or delete the shared link, or unlink the album from the space instead.
 
+### Where hiding applies
+
+Hiding is a **timeline** preference, so it reaches the surfaces that make up your timeline — and deliberately nothing else:
+
+| Follows your hide                                | Ignores it — the photos stay             |
+| ------------------------------------------------ | ---------------------------------------- |
+| Main **Photos** timeline (and its date scrubber) | The **space** itself, and album pages    |
+| **Folders** view                                 | **Search**, **Map**, the **People** page |
+| **Memories**                                     | **Trash**, **Archive**, **Favorites**    |
+| The **mobile** timeline                          | Any **shared link**                      |
+
+Trash, Archive and Favorites keep hidden photos on purpose: those are the places you go to _find_ or _recover_ something, so hiding a photo must never make it unreachable there. A photo you hid and later deleted is still in your trash, and still restorable.
+
+Memories and Folders follow the same "every path must be hidden" rule as the timeline, so a photo your timeline still shows is never quietly missing from a memory.
+
+Only your own photos and the space content you can see are affected. Photos shared with you by a **partner** are never removed by your hiding — that is their sharing setting, not yours.
+
+### What the confirmation tells you
+
+Hiding asks for confirmation and states how many photos it will actually remove from your timeline. When that number is smaller than you expect — sometimes zero — the dialog also says how many stay, because they reach you by a path you have not hidden.
+
+That is the usual surprise: a photo can be in a linked album _and_ in a linked external library, or added to the space directly as well. Hiding the album alone changes nothing for those photos until the other path is hidden too, so hide the whole space (or unlink the library) if you want them all gone.
+
 > Timeline integration cannot be combined with archive, favorites, or trash filters.
 
 ## Renaming and Editing Space Details
