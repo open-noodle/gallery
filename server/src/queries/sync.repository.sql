@@ -2339,6 +2339,57 @@ where
 order by
   "shared_space_album"."updateId" asc
 
+-- SyncRepository.sharedSpaceAlbumHidden.getBackfill
+select
+  "shared_space_album_hidden"."spaceId",
+  "shared_space_album_hidden"."albumId",
+  "shared_space_album_hidden"."userId",
+  "shared_space_album_hidden"."updateId"
+from
+  "shared_space_album_hidden" as "shared_space_album_hidden"
+  inner join "album" on "album"."id" = "shared_space_album_hidden"."albumId"
+where
+  "shared_space_album_hidden"."updateId" < $1
+  and "shared_space_album_hidden"."updateId" <= $2
+  and "shared_space_album_hidden"."updateId" > $3
+  and "shared_space_album_hidden"."spaceId" = $4
+  and "shared_space_album_hidden"."userId" = $5::uuid
+  and "album"."deletedAt" is null
+order by
+  "shared_space_album_hidden"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumHidden.getDeletes
+select
+  "id",
+  "spaceId",
+  "albumId",
+  "userId"
+from
+  "shared_space_album_hidden_audit" as "shared_space_album_hidden_audit"
+where
+  "shared_space_album_hidden_audit"."id" < $1
+  and "shared_space_album_hidden_audit"."id" > $2
+  and "userId" = $3::uuid
+order by
+  "shared_space_album_hidden_audit"."id" asc
+
+-- SyncRepository.sharedSpaceAlbumHidden.getUpserts
+select
+  "shared_space_album_hidden"."spaceId",
+  "shared_space_album_hidden"."albumId",
+  "shared_space_album_hidden"."userId",
+  "shared_space_album_hidden"."updateId"
+from
+  "shared_space_album_hidden" as "shared_space_album_hidden"
+  inner join "album" on "album"."id" = "shared_space_album_hidden"."albumId"
+where
+  "shared_space_album_hidden"."updateId" < $1
+  and "shared_space_album_hidden"."updateId" > $2
+  and "shared_space_album_hidden"."userId" = $3::uuid
+  and "album"."deletedAt" is null
+order by
+  "shared_space_album_hidden"."updateId" asc
+
 -- SyncRepository.sharedSpaceAlbumToAsset.getBackfill
 select
   "album_asset"."assetId" as "assetId",
