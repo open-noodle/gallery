@@ -994,11 +994,11 @@ void main() {
     // persists in `stackData` regardless — so `stackData` is what actually proves "A's route
     // is still in the stack, nothing was popped."
     expect(router.stackData.length, 3); // nothing popped yet — A is still buried in the stack
-    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    final topArgs = router.stackData.last.args! as SpaceAlbumsRouteArgs;
     expect(topArgs.folderId, 'folder-b');
     expect(
       router.stackData.any(
-        (d) => d.args is SpaceAlbumsRouteArgs && (d.args as SpaceAlbumsRouteArgs).folderId == 'folder-a',
+        (d) => d.args is SpaceAlbumsRouteArgs && (d.args! as SpaceAlbumsRouteArgs).folderId == 'folder-a',
       ),
       isTrue,
       reason: "A's route must still be in the stack, buried but untouched",
@@ -1035,7 +1035,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.stackData.length, 2); // harness + A
-    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    final topArgs = router.stackData.last.args! as SpaceAlbumsRouteArgs;
     expect(topArgs.folderId, 'folder-a');
     expect(find.byType(SpaceAlbumsPage), findsOneWidget);
   });
@@ -1060,7 +1060,10 @@ void main() {
     // matters is that it is an imperative route above the page, not which one it is.
     final pageContext = tester.element(find.byType(SpaceAlbumsPage));
     unawaited(
-      showDialog<void>(context: pageContext, builder: (_) => const AlertDialog(content: Text('dialog-under-test'))),
+      showDialog<void>(
+        context: pageContext,
+        builder: (_) => const AlertDialog(content: Text('dialog-under-test')),
+      ),
     );
     await tester.pumpAndSettle();
     expect(find.text('dialog-under-test'), findsOneWidget);
@@ -1163,7 +1166,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.stackData.length, 2); // harness + X — A self-popped exactly once
-    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    final topArgs = router.stackData.last.args! as SpaceAlbumsRouteArgs;
     expect(topArgs.folderId, 'folder-x');
     expect(find.byType(SpaceAlbumsPage), findsOneWidget);
   });
@@ -1203,7 +1206,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.stackData.length, 2); // harness + A — A stays visible
-    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    final topArgs = router.stackData.last.args! as SpaceAlbumsRouteArgs;
     expect(topArgs.folderId, 'folder-a');
     expect(find.byType(SpaceAlbumsPage), findsOneWidget);
   });
@@ -1288,7 +1291,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.stackData.length, 3);
-    final topArgs = router.stackData.last.args as SpaceAlbumsRouteArgs;
+    final topArgs = router.stackData.last.args! as SpaceAlbumsRouteArgs;
     expect(topArgs.folderId, 'trips');
   });
 
@@ -1297,13 +1300,13 @@ void main() {
 
     await tester.tap(find.byType(SpaceAlbumFolderCard));
     await tester.pumpAndSettle();
-    expect((router.stackData.last.args as SpaceAlbumsRouteArgs).folderId, 'trips');
+    expect((router.stackData.last.args! as SpaceAlbumsRouteArgs).folderId, 'trips');
 
     await router.maybePop();
     await tester.pumpAndSettle();
 
     expect(router.stackData.length, 2);
-    expect((router.stackData.last.args as SpaceAlbumsRouteArgs).folderId, isNull);
+    expect((router.stackData.last.args! as SpaceAlbumsRouteArgs).folderId, isNull);
   });
 
   // ---------------------------------------------------------------------

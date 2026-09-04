@@ -34,7 +34,7 @@ void main() {
     // AuthGuard reads the access token synchronously and bounces to Login when it is missing,
     // so a real navigation test needs a seeded Store. Reading the route table alone does not.
     db = Drift(DatabaseConnection(NativeDatabase.memory()));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
     await Store.put(StoreKey.accessToken, 'test-token');
 
     // The guards only stash their dependencies at construction time, so mocks
@@ -88,7 +88,7 @@ void main() {
           .timeout(_never, onTimeout: () => null);
 
       expect(router.stack.map((route) => route.name), ['SpaceAlbumsRoute', 'SpaceAlbumsRoute']);
-      expect((router.stack.last.routeData.args as SpaceAlbumsRouteArgs).folderId, 'trips');
+      expect((router.stack.last.routeData.args! as SpaceAlbumsRouteArgs).folderId, 'trips');
     });
 
     // The regression this guard exists for: two quick taps on "See all" (or a folder card) before
@@ -111,7 +111,7 @@ void main() {
       await router.push(SpaceAlbumsRoute(spaceId: 'space-2', canEdit: true)).timeout(_never, onTimeout: () => null);
 
       expect(router.stack.map((route) => route.name), ['SpaceAlbumsRoute', 'SpaceAlbumsRoute']);
-      expect((router.stack.last.routeData.args as SpaceAlbumsRouteArgs).spaceId, 'space-2');
+      expect((router.stack.last.routeData.args! as SpaceAlbumsRouteArgs).spaceId, 'space-2');
     });
 
     // The sibling space routes are NOT self-recursive, so they must keep the plain guard — this
