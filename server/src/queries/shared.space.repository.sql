@@ -466,6 +466,7 @@ select
   "album".*,
   "shared_space_album"."addedById",
   "shared_space_album"."showInTimeline",
+  "shared_space_album"."folderId",
   "shared_space_album"."createdAt" as "linkedAt",
   (
     select
@@ -584,6 +585,163 @@ where
 update "shared_space_album"
 set
   "showInTimeline" = $1
+where
+  "spaceId" = $2
+  and "albumId" = $3
+
+-- SharedSpaceRepository.createAlbumFolder
+begin
+SELECT
+  pg_advisory_xact_lock(
+    hashtext ('shared-space-album-folder-move'),
+    hashtext ($1)
+  )
+select
+  count(*) as "count"
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+insert into
+  "shared_space_album_folder" ("spaceId", "parentId", "name", "createdById")
+values
+  ($1, $2, $3, $4)
+returning
+  *
+rollback
+
+-- SharedSpaceRepository.getAlbumFolderById
+select
+  *
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+  and "id" = $2
+
+-- SharedSpaceRepository.getAlbumFoldersBySpace
+select
+  *
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+order by
+  "name" asc
+
+-- SharedSpaceRepository.getAlbumFolderAncestors
+with recursive
+  "ancestors" as (
+    select
+      "id",
+      "parentId",
+      "name",
+      0 as "hops"
+    from
+      "shared_space_album_folder"
+    where
+      "id" = $1
+    union all
+    select
+      "f"."id",
+      "f"."parentId",
+      "f"."name",
+      a.hops + 1 as "hops"
+    from
+      "shared_space_album_folder" as "f"
+      inner join "ancestors" as "a" on "a"."parentId" = "f"."id"
+    where
+      a.hops < $2
+  )
+select
+  "id",
+  "parentId",
+  "name"
+from
+  "ancestors"
+
+-- SharedSpaceRepository.getAlbumFolderSubtree
+with recursive
+  "subtree" as (
+    select
+      "id",
+      0 as "depth"
+    from
+      "shared_space_album_folder"
+    where
+      "id" = $1
+    union all
+    select
+      "f"."id",
+      s.depth + 1 as "depth"
+    from
+      "shared_space_album_folder" as "f"
+      inner join "subtree" as "s" on "s"."id" = "f"."parentId"
+    where
+      s.depth < $2
+  )
+select
+  *
+from
+  "subtree"
+
+-- SharedSpaceRepository.hasSiblingAlbumFolderName
+select
+  "id"
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+  and LOWER(BTRIM("name")) = LOWER(BTRIM($2))
+  and "parentId" is null
+
+-- SharedSpaceRepository.updateAlbumFolder
+update "shared_space_album_folder"
+set
+  "name" = $1
+where
+  "spaceId" = $2
+  and "id" = $3
+
+-- SharedSpaceRepository.deleteAlbumFolderPromotingChildren
+begin
+SELECT
+  pg_advisory_xact_lock(
+    hashtext ('shared-space-album-folder-move'),
+    hashtext ($1)
+  )
+select
+  "id",
+  "parentId",
+  "name"
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+  and "id" = $2
+for update
+commit
+
+-- SharedSpaceRepository.moveAlbumFolderChecked
+begin
+SELECT
+  pg_advisory_xact_lock(
+    hashtext ('shared-space-album-folder-move'),
+    hashtext ($1)
+  )
+select
+  "id"
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+  and "id" = $2
+commit
+
+-- SharedSpaceRepository.setAlbumLinkFolder
+update "shared_space_album"
+set
+  "folderId" = $1
 where
   "spaceId" = $2
   and "albumId" = $3

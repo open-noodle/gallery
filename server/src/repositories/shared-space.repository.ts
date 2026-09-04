@@ -44,6 +44,63 @@ export interface TimelineHiddenScope {
   hiddenLibraryIds: string[];
 }
 
+// Internal marker thrown inside deleteAlbumFolderPromotingChildren's transaction to force a
+// normal Kysely rollback (rather than trying to return a value from an already-aborted Postgres
+// transaction) when a promote would collide with an existing folder name at the destination.
+// `folderName` is null for the raced-23505 backstop path, which has no name to report.
+/**
+ * [reason] distinguishes the two structurally different ways a promote collides, because they need
+ * different advice:
+ * - `sibling` — the child's name is already taken by another folder under the DESTINATION parent.
+ * - `parent` — the child is named like the folder being deleted, which is still alive when the
+ *   promote UPDATE runs (it is dropped a few statements later). Spec F-04 permits that name pair,
+ *   so this is reachable, and telling the user to look at the destination sends them somewhere
+ *   nothing is wrong.
+ * - `unknown` — the raced 23505 backstop, which has no name and no idea which of the two it was.
+ */
+class AlbumFolderPromotionConflictError extends Error {
+  constructor(
+    readonly folderName: string | null,
+    readonly reason: 'sibling' | 'parent' | 'unknown',
+  ) {
+    super('shared_space_album_folder promote conflict');
+  }
+}
+
+/**
+ * Hard stop for the folder-tree recursive CTEs.
+ *
+ * The service refuses to CREATE a cycle (moveAlbumFolderChecked re-checks the ancestor chain
+ * under a per-space advisory lock), but nothing stops one already being in the data: a restored
+ * backup, a manual `UPDATE`, or a defect in a future code path. A `WITH RECURSIVE` walk over a
+ * cyclic adjacency list never terminates — it does not error, it spins, holding a connection
+ * until something kills it. Every one of these walks is on the request path, so that is an
+ * availability bug, not a data bug.
+ *
+ * Bounding the walk turns it into a refusal instead. It is deliberately ABOVE the service's
+ * depth cap (SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH), so a legitimate chain is always returned
+ * whole and the bound can never make a folder look shallower than it is — which would let a
+ * create through that should have been refused. Anything that does hit the bound is either
+ * cyclic or already deeper than the cap, and both correctly end in a 400.
+ *
+ * `shared-space-album-folder.repository.spec.ts` pins the ordering against the service's cap.
+ */
+export const ALBUM_FOLDER_TRAVERSAL_LIMIT = 32;
+
+/**
+ * How deep a folder chain may nest, root counting as 1.
+ *
+ * Lives here rather than in the service because the WRITER has to be the one that enforces it.
+ * The service's pre-check runs outside the per-space advisory lock, so two concurrent moves can
+ * each pass it against a tree that is still shallow and then compose past the cap once both
+ * commit — the same reason the cycle check is re-run under the lock in moveAlbumFolderChecked.
+ * The service still pre-checks, because that is what produces the specific 400 message; this is
+ * the backstop that makes the cap an actual invariant rather than an advisory one.
+ *
+ * Re-exported from shared-space.service.ts, which is where callers have always imported it from.
+ */
+export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
+
 type SpacePersonStatistics = {
   assets: number;
   faces: number;
@@ -1176,6 +1233,7 @@ export class SharedSpaceRepository {
         .select([
           'shared_space_album.addedById',
           'shared_space_album.showInTimeline',
+          'shared_space_album.folderId',
           'shared_space_album.createdAt as linkedAt',
         ])
         .select((eb) =>
@@ -1363,6 +1421,444 @@ export class SharedSpaceRepository {
       .where('spaceId', '=', spaceId)
       .where('albumId', '=', albumId)
       .execute();
+  }
+
+  // ==========================================
+  // Shared Space Album Folder CRUD
+  // ==========================================
+
+  // Counts and inserts under the SAME per-space advisory lock the move and delete paths take, so
+  // the per-space folder cap is actually a cap. Checking the count in the service and inserting
+  // afterwards was a TOCTOU: under READ COMMITTED, N concurrent creates at 499 all read 499 and
+  // all insert. Folding the count into an `INSERT ... SELECT ... WHERE (SELECT count(*)) < cap`
+  // would NOT have fixed it either — each statement still evaluates that subquery against its own
+  // snapshot. Only serialising the read-then-write closes it.
+  //
+  // The cap is what makes the whole-space folder fetch the web client does on page load safe
+  // rather than merely likely, so it is worth holding to. Creates are rare and bounded (500 per
+  // space, ever), so the lock costs nothing.
+  //
+  // Everything below uses `trx` — a `this.db` query inside a transaction callback deadlocks.
+  @GenerateSql({
+    params: [{ spaceId: DummyValue.UUID, parentId: null, name: 'Trips', createdById: DummyValue.UUID }, 500],
+  })
+  createAlbumFolder(
+    dto: { spaceId: string; parentId: string | null; name: string; createdById: string | null },
+    maxPerSpace: number,
+  ) {
+    return this.db.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${dto.spaceId}))`.execute(
+        trx,
+      );
+
+      const { count } = await trx
+        .selectFrom('shared_space_album_folder')
+        .select((eb) => eb.fn.countAll<string>().as('count'))
+        .where('spaceId', '=', dto.spaceId)
+        .executeTakeFirstOrThrow();
+
+      if (Number(count) >= maxPerSpace) {
+        return { outcome: 'cap' as const };
+      }
+
+      const folder = await trx
+        .insertInto('shared_space_album_folder')
+        .values(dto)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      return { outcome: 'ok' as const, folder };
+    });
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getAlbumFolderById(spaceId: string, folderId: string) {
+    return this.db
+      .selectFrom('shared_space_album_folder')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .where('id', '=', folderId)
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumFoldersBySpace(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_album_folder')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .orderBy('name', 'asc')
+      .execute();
+  }
+
+  // Self first, then each parent up to the root. The service uses `.length` as the folder's
+  // depth (root = 1) and reverses the array for the breadcrumb.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumFolderAncestors(folderId: string) {
+    return (
+      this.db
+        .withRecursive('ancestors', (qb) =>
+          qb
+            .selectFrom('shared_space_album_folder')
+            .select(['id', 'parentId', 'name', sql<number>`0`.as('hops')])
+            .where('id', '=', folderId)
+            .unionAll(
+              qb
+                .selectFrom('shared_space_album_folder as f')
+                .innerJoin('ancestors as a', 'a.parentId', 'f.id')
+                .select(['f.id', 'f.parentId', 'f.name', sql<number>`a.hops + 1`.as('hops')])
+                // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. Without it a cyclic parent chain
+                // spins this CTE forever instead of returning.
+                .where(sql<boolean>`a.hops < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
+            ),
+        )
+        .selectFrom('ancestors')
+        // `hops` is internal bookkeeping; the caller's shape is unchanged.
+        .select(['id', 'parentId', 'name'])
+        .execute()
+    );
+  }
+
+  // Self at depth 0, descendants at increasing depth. max(depth) is the subtree's height,
+  // which the move guard adds to the target's depth.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAlbumFolderSubtree(folderId: string) {
+    return this.db
+      .withRecursive('subtree', (qb) =>
+        qb
+          .selectFrom('shared_space_album_folder')
+          .select(['id', sql<number>`0`.as('depth')])
+          .where('id', '=', folderId)
+          .unionAll(
+            qb
+              .selectFrom('shared_space_album_folder as f')
+              .innerJoin('subtree as s', 's.id', 'f.parentId')
+              .select(['f.id', sql<number>`s.depth + 1`.as('depth')])
+              // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. `depth` doubles as the hop
+              // counter here, so a cyclic subtree reports an over-cap height and the move is
+              // refused rather than the query spinning.
+              .where(sql<boolean>`s.depth < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
+          ),
+      )
+      .selectFrom('subtree')
+      .selectAll()
+      .execute();
+  }
+
+  // excludeId keeps a rename-to-itself (N-03) and a move-to-current-parent (M-09) from
+  // colliding with the row being modified.
+  @GenerateSql({ params: [DummyValue.UUID, null, 'Trips', null] })
+  async hasSiblingAlbumFolderName(
+    spaceId: string,
+    parentId: string | null,
+    name: string,
+    excludeId: string | null,
+  ): Promise<boolean> {
+    let query = this.db
+      .selectFrom('shared_space_album_folder')
+      .select('id')
+      .where('spaceId', '=', spaceId)
+      .where(sql<boolean>`LOWER(BTRIM("name")) = LOWER(BTRIM(${name}))`);
+
+    query = parentId === null ? query.where('parentId', 'is', null) : query.where('parentId', '=', parentId);
+
+    if (excludeId) {
+      query = query.where('id', '!=', excludeId);
+    }
+
+    const row = await query.executeTakeFirst();
+    return !!row;
+  }
+
+  // dto is deliberately `{ name: string }` only — NOT `parentId` too. A parentId write through
+  // this method would bypass the advisory-lock + cycle machinery in moveAlbumFolderChecked, which
+  // is the only path allowed to reparent a folder. The service only ever calls this for a
+  // rename-only update; moves always go through moveAlbumFolderChecked.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { name: 'Travel' }] })
+  async updateAlbumFolder(spaceId: string, folderId: string, dto: { name: string }): Promise<boolean> {
+    const result = await this.db
+      .updateTable('shared_space_album_folder')
+      .set(dto)
+      .where('spaceId', '=', spaceId)
+      .where('id', '=', folderId)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows) > 0;
+  }
+
+  // Promote-then-delete, in ONE transaction. Direct child folders and direct album links move
+  // to the deleted folder's parent; grandchildren keep their parents. Because children are
+  // cleared first, the CASCADE self-FK never fires here — it only ever runs on space deletion.
+  //
+  // Both partial unique indexes (§3.3 of the design) are non-deferrable, so promoting a child
+  // straight into a destination that already has a same-named folder raises 23505 immediately —
+  // spec F-04 explicitly allows the same name under different parents, so this is a reachable,
+  // documented collision, not an edge case. Two guards catch it:
+  //   1. A pre-check, run after taking the row and before the promote UPDATE, comparing each
+  //      direct child's trimmed/lower-cased name against the DESTINATION parent's other existing
+  //      children (excluding the folder being deleted itself, which is about to disappear and so
+  //      cannot collide with anything). This is the primary path, and the only one that can name
+  //      the colliding folder for the caller.
+  //   2. A narrow catch on the promote UPDATE's own 23505, as a backstop for the race where a
+  //      second editor creates the colliding name between the pre-check and the write. Only this
+  //      one statement's unique-violation is caught here — nothing else in the transaction is
+  //      blanket-caught, and the caught error is rethrown as a typed marker so Kysely still sees
+  //      the callback reject and rolls the transaction back the normal way, rather than us trying
+  //      to return a value from inside an already-aborted Postgres transaction.
+  //
+  // Everything inside the callback uses `trx`. Running a `this.db` query inside a Kysely
+  // transaction callback deadlocks (issue #595).
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  deleteAlbumFolderPromotingChildren(
+    spaceId: string,
+    folderId: string,
+  ): Promise<
+    | { outcome: 'ok' }
+    | { outcome: 'notfound' }
+    | { outcome: 'conflict'; name: string; reason: 'sibling' | 'parent' | 'unknown' }
+  > {
+    return this.db
+      .transaction()
+      .execute(async (trx) => {
+        // The SAME per-space advisory lock moveAlbumFolderChecked takes, for the same reason
+        // and in the same namespace: a delete and a move are both structural rewrites of the
+        // tree, and interleaving them corrupts it. Without this, moving X into F while F is
+        // being deleted races the promote — the move's foreign-key check blocks on the row lock
+        // below, then fails with 23503 once the delete commits (a 500 before the service learned
+        // to map it), and in the window where it does NOT block, F's self-referencing CASCADE
+        // would delete X and its whole subtree instead of promoting it. Taking the lock first
+        // makes delete and move mutually exclusive per space, so neither can observe the other
+        // mid-flight. Folder writes are rare; serialising them per space costs nothing.
+        await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${spaceId}))`.execute(
+          trx,
+        );
+
+        const folder = await trx
+          .selectFrom('shared_space_album_folder')
+          .select(['id', 'parentId', 'name'])
+          .where('spaceId', '=', spaceId)
+          .where('id', '=', folderId)
+          .forUpdate()
+          .executeTakeFirst();
+
+        if (!folder) {
+          return { outcome: 'notfound' as const };
+        }
+
+        const children = await trx
+          .selectFrom('shared_space_album_folder')
+          .select(['name'])
+          .where('parentId', '=', folderId)
+          .execute();
+
+        if (children.length > 0) {
+          let destinationSiblings = trx
+            .selectFrom('shared_space_album_folder')
+            .select(['name'])
+            .where('spaceId', '=', spaceId)
+            .where('id', '!=', folderId);
+          destinationSiblings =
+            folder.parentId === null
+              ? destinationSiblings.where('parentId', 'is', null)
+              : destinationSiblings.where('parentId', '=', folder.parentId);
+          const siblings = await destinationSiblings.execute();
+
+          const siblingNames = new Set(siblings.map((sibling) => sibling.name.trim().toLowerCase()));
+          const colliding = children.find((child) => siblingNames.has(child.name.trim().toLowerCase()));
+          if (colliding) {
+            throw new AlbumFolderPromotionConflictError(colliding.name, 'sibling');
+          }
+
+          // The destination-sibling query above excludes this folder (`id != folderId`), because it
+          // is about to disappear. But it does not disappear until the DELETE several statements
+          // below — it is still present, and still holding its index entry, when the promote UPDATE
+          // runs. So a child named like its own parent violates the unique index even though no
+          // destination sibling collides. Catching it here is what lets the error say which folder
+          // to rename; left to the 23505 backstop it arrives nameless.
+          const parentName = folder.name.trim().toLowerCase();
+          const collidingWithParent = children.find((child) => child.name.trim().toLowerCase() === parentName);
+          if (collidingWithParent) {
+            throw new AlbumFolderPromotionConflictError(collidingWithParent.name, 'parent');
+          }
+        }
+
+        try {
+          await trx
+            .updateTable('shared_space_album_folder')
+            .set({ parentId: folder.parentId })
+            .where('parentId', '=', folderId)
+            .execute();
+        } catch (error: unknown) {
+          if ((error as { code?: string })?.code === '23505') {
+            throw new AlbumFolderPromotionConflictError(null, 'unknown');
+          }
+          throw error;
+        }
+
+        await trx
+          .updateTable('shared_space_album')
+          .set({ folderId: folder.parentId })
+          .where('folderId', '=', folderId)
+          .execute();
+
+        await trx.deleteFrom('shared_space_album_folder').where('id', '=', folderId).execute();
+
+        return { outcome: 'ok' as const };
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AlbumFolderPromotionConflictError) {
+          // A raced backstop hit (guard 2) has no name to report — the pre-check (guard 1) is the
+          // only path that knows which child collided, and which of the two collisions it was.
+          return { outcome: 'conflict' as const, name: error.folderName ?? '', reason: error.reason };
+        }
+        throw error;
+      });
+  }
+
+  // Serialised per space by a transaction-scoped advisory lock, shared with
+  // deleteAlbumFolderPromotingChildren so no move can interleave with a promote. A row lock on
+  // the moved folder alone is NOT enough: in the mutual race (move X into Y while moving Y into
+  // X) the two transactions touch disjoint rows, both ancestor checks pass, and the result is a
+  // detached cycle. Folder moves are rare, so serialising them per space costs nothing.
+  //
+  // Two-argument hashtext form: the single-arg pg_advisory_xact_lock(hashtext(id)) shares one
+  // cluster-wide keyspace with DatabaseRepository.withLock's pg_advisory_lock(DatabaseLock.X) and
+  // with identity-merge-propagation.service.ts's own lock. Namespacing with a constant first key
+  // keeps this lock's ids out of collision range with either of those.
+  //
+  // This depends on READ COMMITTED (Postgres's default, unchanged here): under REPEATABLE READ
+  // the transaction's snapshot is taken before the lock blocks, so the ancestor re-read below
+  // would still see pre-lock data and both concurrent moves could pass the cycle check.
+  //
+  // Everything below uses `trx` — a `this.db` query inside a transaction callback deadlocks (#595).
+  //
+  // The verdict is authoritative for CYCLES and for the DEPTH CAP. Both are re-checked here,
+  // under the lock, because both are check-then-write races the service's optimistic pre-check
+  // cannot close: two moves that each pass their own pre-check against a still-shallow tree
+  // serialise on this lock and compose past the cap (destination depth 2 + a subtree whose height
+  // grew because the other move landed first). Returning `{ depth }` rather than a bare string
+  // lets the service report the depth it actually would have been, not the one it guessed.
+  //
+  // Destination name-uniqueness is still optimistic: a raced collision raises 23505 and the
+  // service maps it to the same 400 the pre-check produces, so the invariant holds via the index
+  // itself. Depth has no index to fall back on, which is why it needs the explicit re-check.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID, 'Trips'] })
+  moveAlbumFolderChecked(
+    spaceId: string,
+    folderId: string,
+    newParentId: string | null,
+    name?: string,
+  ): Promise<'ok' | 'cycle' | 'notfound' | { depth: number }> {
+    return this.db.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${spaceId}))`.execute(
+        trx,
+      );
+
+      const folder = await trx
+        .selectFrom('shared_space_album_folder')
+        .select(['id'])
+        .where('spaceId', '=', spaceId)
+        .where('id', '=', folderId)
+        .executeTakeFirst();
+
+      if (!folder) {
+        return 'notfound' as const;
+      }
+
+      if (newParentId !== null) {
+        const target = await trx
+          .selectFrom('shared_space_album_folder')
+          .select(['id'])
+          .where('spaceId', '=', spaceId)
+          .where('id', '=', newParentId)
+          .executeTakeFirst();
+
+        if (!target) {
+          return 'notfound' as const;
+        }
+
+        // Re-read the target's ancestor chain under the lock, so a concurrently-committed move
+        // is visible here even though it was not when the service ran its optimistic check.
+        const ancestors = await trx
+          .withRecursive('ancestors', (qb) =>
+            qb
+              .selectFrom('shared_space_album_folder')
+              .select(['id', 'parentId', sql<number>`0`.as('hops')])
+              .where('id', '=', newParentId)
+              .unionAll(
+                qb
+                  .selectFrom('shared_space_album_folder as f')
+                  .innerJoin('ancestors as a', 'a.parentId', 'f.id')
+                  .select(['f.id', 'f.parentId', sql<number>`a.hops + 1`.as('hops')])
+                  // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. This walk is the cycle CHECK
+                  // itself, so it is the one that must never be the thing that hangs: a cycle
+                  // that predates this transaction would otherwise spin here, holding the
+                  // per-space lock the whole time and blocking every other move in the space.
+                  .where(sql<boolean>`a.hops < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
+              ),
+          )
+          .selectFrom('ancestors')
+          .select('id')
+          .execute();
+
+        if (ancestors.some((a) => a.id === folderId)) {
+          return 'cycle' as const;
+        }
+
+        // Same formula the service pre-checks with (destination depth + 1 + moved subtree height),
+        // but computed from rows read under the lock, so a concurrently-committed move is included.
+        // `ancestors` is self-first-then-parents, so its length IS the destination's depth with
+        // root = 1.
+        const subtree = await trx
+          .withRecursive('subtree', (qb) =>
+            qb
+              .selectFrom('shared_space_album_folder')
+              .select(['id', sql<number>`0`.as('depth')])
+              .where('id', '=', folderId)
+              .unionAll(
+                qb
+                  .selectFrom('shared_space_album_folder as f')
+                  .innerJoin('subtree as s', 's.id', 'f.parentId')
+                  .select(['f.id', sql<number>`s.depth + 1`.as('depth')])
+                  // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. A cyclic subtree reports an
+                  // over-cap height and the move is refused, rather than spinning while holding
+                  // the per-space lock.
+                  .where(sql<boolean>`s.depth < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
+              ),
+          )
+          .selectFrom('subtree')
+          .select('depth')
+          .execute();
+
+        const height = Math.max(0, ...subtree.map((node) => node.depth));
+        const resultingDepth = ancestors.length + 1 + height;
+        if (resultingDepth > SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH) {
+          return { depth: resultingDepth };
+        }
+      }
+
+      // The rename (when given) lands in the SAME statement as the reparent, so the row is never
+      // briefly visible under its old name at the new parent — the transient state that would
+      // trip the destination's uniqueness index even though the caller's pre-check, run against
+      // the intended END state, passed.
+      await trx
+        .updateTable('shared_space_album_folder')
+        .set({ parentId: newParentId, ...(name !== undefined && { name }) })
+        .where('id', '=', folderId)
+        .execute();
+
+      return 'ok' as const;
+    });
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID] })
+  async setAlbumLinkFolder(spaceId: string, albumId: string, folderId: string | null): Promise<boolean> {
+    const result = await this.db
+      .updateTable('shared_space_album')
+      .set({ folderId })
+      .where('spaceId', '=', spaceId)
+      .where('albumId', '=', albumId)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows) > 0;
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

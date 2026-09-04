@@ -26,7 +26,7 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
 import 'package:openapi/api.dart';
 
-// PR 2 — Task 35: the space timeline is now served directly by the Drift
+// The space timeline is served directly by the Drift
 // sharedSpace() query (see TimelineRepository.sharedSpace), so this page
 // no longer fetches assets over the network. Metadata + member list still
 // load from the API because they are not yet mirrored in Drift.
@@ -277,7 +277,10 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   /// pre-excluded. The picker returns the selected ids via [context.maybePop];
   /// this method calls [_onAlbumsPicked] once on the returned list to loop the
   /// PUT endpoint and fire the sync-nudge.
-  Future<void> _openLinkPicker() async {
+  /// [folderId] is the space album folder the user is currently viewing on the albums page;
+  /// null links at the space root. This page always shows the root, so its own affordances pass
+  /// nothing — only the albums page, which can be several folders deep, supplies it.
+  Future<void> _openLinkPicker([String? folderId]) async {
     // Collect the ids of albums already linked to this space so the picker
     // can exclude them from the candidate list.
     final linkedAlbumIds =
@@ -296,17 +299,17 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     if (picked == null || picked.isEmpty) {
       return;
     }
-    await _onAlbumsPicked(picked);
+    await _onAlbumsPicked(picked, folderId);
   }
 
-  /// B6: Loop PUT /shared-spaces/:id/albums/:albumId for each picked album,
-  /// then fire the sync-nudge and show a success toast.
-  Future<void> _onAlbumsPicked(List<String> ids) async {
+  /// Loops PUT /shared-spaces/:id/albums/:albumId for each picked album, then
+  /// fires the sync-nudge and shows a success toast.
+  Future<void> _onAlbumsPicked(List<String> ids, [String? folderId]) async {
     if (ids.isEmpty) {
       return;
     }
     try {
-      await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids);
+      await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids, folderId: folderId);
       if (mounted) {
         ImmichToast.show(
           context: context,
@@ -321,7 +324,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
-  /// B6: Toggle `showInTimeline` for a linked album from the list/manage page.
+  /// Toggles `showInTimeline` for a linked album from the list/manage page.
   Future<void> _onToggleAlbumTimeline(String albumId) async {
     final albumsAsync = ref.read(spaceAlbumsProvider(widget.spaceId));
     final album = albumsAsync.valueOrNull?.where((a) => a.id == albumId).firstOrNull;
@@ -349,7 +352,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
-  /// B6: Confirm + unlink an album from the list/manage page.
+  /// Confirms, then unlinks an album from the list/manage page.
   Future<void> _onUnlinkAlbum(String albumId) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -459,12 +462,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         topSliverWidget: SpaceTopSliver(
           spaceId: widget.spaceId,
           canEdit: _canEdit,
-          // B5: opens the link picker.
-          onLinkTap: _openLinkPicker,
-          // B4: tapping an album tile pushes the detail page.
+          // Opens the link picker.
+          onLinkTap: () => _openLinkPicker(),
+          // Tapping an album tile pushes the detail page.
           onAlbumTap: (albumId) =>
               context.pushRoute(SpaceAlbumDetailRoute(spaceId: widget.spaceId, albumId: albumId, canEdit: _canEdit)),
-          // B3: "See all ▸" pushes the list/manage page; B5/B6 pass the real callbacks.
+          // "See all ▸" pushes the list/manage page, carrying the same link and
+          // mutation callbacks this page owns.
           onSeeAll: () => context.pushRoute(
             SpaceAlbumsRoute(
               spaceId: widget.spaceId,

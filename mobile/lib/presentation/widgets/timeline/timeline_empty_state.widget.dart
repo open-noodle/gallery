@@ -7,6 +7,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/presentation/widgets/common/polaroid_hero.widget.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 
 /// Shown on the main Photos timeline when it resolves to zero assets.
@@ -91,7 +92,7 @@ class _FirstRunEmptyState extends State<_FirstRunEmpty> with SingleTickerProvide
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final content = <Widget>[
-      const _PolaroidHero(),
+      const PolaroidHero(),
       const SizedBox(height: 28),
       Text(
         context.t.timeline_empty_title,
@@ -126,36 +127,6 @@ class _FirstRunEmptyState extends State<_FirstRunEmpty> with SingleTickerProvide
           constraints: const BoxConstraints(maxWidth: 320),
           child: Column(mainAxisSize: MainAxisSize.min, children: children),
         ),
-      ),
-    );
-  }
-}
-
-/// Theme-aware polaroid illustration sitting on a soft accent glow, so the
-/// empty screen reads as intentional negative space rather than a black void.
-class _PolaroidHero extends StatelessWidget {
-  const _PolaroidHero();
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = context.isDarkTheme ? 'assets/polaroid-dark.png' : 'assets/polaroid-light.png';
-    return SizedBox(
-      width: 180,
-      height: 180,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: context.primaryColor.withValues(alpha: 0.14), blurRadius: 80, spreadRadius: 12),
-              ],
-            ),
-            child: const SizedBox(width: 110, height: 110),
-          ),
-          Image.asset(asset, width: 150, filterQuality: FilterQuality.high, isAntiAlias: true),
-        ],
       ),
     );
   }

@@ -51,4 +51,31 @@ void main() {
       expect(SpaceAlbumSortMode.recentlyLinked.name, 'recentlyLinked');
     });
   });
+
+  group('AppConfig nav prefs', () {
+    test('navShowSpaces defaults to true', () {
+      const c = AppConfig();
+      expect(c.nav.showSpaces, true);
+      expect(c.read(SettingsKey.navShowSpaces), true);
+    });
+
+    test('navShowSpaces round-trips both ways', () {
+      const c = AppConfig();
+
+      final off = c.write(SettingsKey.navShowSpaces, false);
+      expect(off.read(SettingsKey.navShowSpaces), false);
+
+      final backOn = off.write(SettingsKey.navShowSpaces, true);
+      expect(backOn.read(SettingsKey.navShowSpaces), true);
+    });
+
+    test('an upgrading store with rows for other keys but none for nav still reads true', () {
+      // fromEntries is what SettingsRepository._build feeds; a key with no row
+      // simply never appears in the map.
+      final config = AppConfig.fromEntries({SettingsKey.albumIsGrid: true});
+
+      expect(config.read(SettingsKey.navShowSpaces), true);
+      expect(config.read(SettingsKey.albumIsGrid), true);
+    });
+  });
 }

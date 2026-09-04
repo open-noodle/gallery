@@ -49,6 +49,9 @@ enum SettingsKey<T> {
   spacesSortMode<SpaceSortMode>(codec: EnumCodec(SpaceSortMode.values, fallback: SpaceSortMode.recentActivity)),
   spacesIsReverse<bool>(),
 
+  // Navigation
+  navShowSpaces<bool>(),
+
   // Backup
   backupEnabled<bool>(),
   backupUseCellularForVideos<bool>(),
