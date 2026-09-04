@@ -41,6 +41,11 @@ def get_model_class(model_name: str, model_type: ModelType, model_task: ModelTas
 
             return PetDetector
 
+        case ModelSource.PET_RECOGNITION, ModelType.RECOGNITION, ModelTask.PET_DETECTION:
+            from immich_ml.models.pet_recognition import PetRecognizer
+
+            return PetRecognizer
+
         case _:
             raise ValueError(f"Unknown model combination: {source}, {model_type}, {model_task}")
 

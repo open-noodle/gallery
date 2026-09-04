@@ -419,6 +419,7 @@ export enum SystemMetadataKey {
   MediaLocation = 'MediaLocation',
   ReverseGeocodingState = 'reverse-geocoding-state',
   FacialRecognitionState = 'facial-recognition-state',
+  PetRecognitionState = 'pet-recognition-state',
   MemoriesState = 'memories-state',
   AdminOnboarding = 'admin-onboarding',
   MaintenanceMode = 'maintenance-mode',
@@ -900,6 +901,7 @@ export enum QueueName {
   BackupDatabase = 'backupDatabase',
   Ocr = 'ocr',
   PetDetection = 'petDetection',
+  PetRecognition = 'petRecognition',
   Workflow = 'workflow',
   IntegrityCheck = 'integrityCheck',
   Editor = 'editor',
@@ -1009,6 +1011,10 @@ export enum JobName {
   PetDetectionQueueAll = 'PetDetectionQueueAll',
   PetDetection = 'PetDetection',
 
+  // Pet Recognition
+  PetRecognitionQueueAll = 'PetRecognitionQueueAll',
+  PetRecognition = 'PetRecognition',
+
   // Workflow
   WorkflowAssetTrigger = 'WorkflowAssetTrigger',
 
@@ -1090,6 +1096,7 @@ export enum QueueCleanType {
 export enum VectorIndex {
   Clip = 'clip_index',
   Face = 'face_index',
+  Pet = 'pet_index',
 }
 
 export enum DatabaseLock {
@@ -1110,6 +1117,7 @@ export enum DatabaseLock {
   IntegrityCheck = 67,
   VersionCheck = 800,
   HlsSessionCleanup = 850,
+  PetRecognitionModelSwitch = 860,
 }
 
 export enum MaintenanceAction {
