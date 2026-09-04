@@ -11,7 +11,6 @@ import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
-import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/routing/auth_guard.dart';
@@ -26,8 +25,6 @@ import 'package:mocktail/mocktail.dart';
 class _MockApiService extends Mock implements ApiService {}
 
 class _MockAuthService extends Mock implements AuthService {}
-
-class _MockGalleryPermissionNotifier extends Mock implements GalleryPermissionNotifier {}
 
 class _MockSecureStorageService extends Mock implements SecureStorageService {}
 
@@ -80,7 +77,7 @@ Widget _tabStub(String routeName) => Scaffold(key: Key('tab-$routeName'), body: 
 /// declaration — covered directly by the `AppRouter` tests at the bottom of
 /// this file.
 ///
-/// `DriftCreateAlbumRoute` is declared top-level, exactly as in `AppRouter`:
+/// `CreateAlbumRoute` is declared top-level, exactly as in `AppRouter`:
 /// each tab child is a LEAF `AutoRoute` with no `children:`, so a push from a
 /// tab resolves against the top-level declarations and covers the whole shell.
 RootStackRouter _harnessRouter() => RootStackRouter.build(
@@ -92,7 +89,7 @@ RootStackRouter _harnessRouter() => RootStackRouter.build(
     ),
     AutoRoute(
       page: PageInfo(
-        DriftCreateAlbumRoute.name,
+        CreateAlbumRoute.name,
         builder: (_) => const Scaffold(key: Key('pushed-over-shell'), body: SizedBox.shrink()),
       ),
     ),
@@ -247,7 +244,7 @@ void main() {
     await activateIndex(tester, kGalleryCollectionIndex);
     expect(find.byKey(const Key('tab-AlbumsRoute')), findsOneWidget);
 
-    await pushOverShell(tester, harness, const DriftCreateAlbumRoute());
+    await pushOverShell(tester, harness, const CreateAlbumRoute());
     expect(find.byKey(const Key('pushed-over-shell')), findsOneWidget);
 
     await setShowSpaces(tester, harness, true);
@@ -277,13 +274,7 @@ void main() {
     setUp(() {
       // The guards only stash their dependencies at construction time, so mocks
       // are enough to read the route table back (see routing/router_test.dart).
-      router = AppRouter(
-        _MockApiService(),
-        _MockAuthService(),
-        _MockGalleryPermissionNotifier(),
-        _MockSecureStorageService(),
-        _MockLocalAuthService(),
-      );
+      router = AppRouter(_MockApiService(), _MockAuthService(), _MockSecureStorageService(), _MockLocalAuthService());
     });
 
     List<AutoRoute> shellChildren() =>

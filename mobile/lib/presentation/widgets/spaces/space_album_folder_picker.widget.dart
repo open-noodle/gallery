@@ -124,6 +124,8 @@ Future<({bool picked, String? folderId})> showSpaceAlbumFolderPicker(
     ),
   );
 
-  if (result == null) return (picked: false, folderId: null);
+  if (result == null) {
+    return (picked: false, folderId: null);
+  }
   return (picked: true, folderId: result.folderId);
 }
