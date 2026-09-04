@@ -1,19 +1,20 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { scrollMemoryClearer } from '#lib/actions/scroll-memory.svelte.ts';
   import { shortcuts } from '#lib/actions/shortcut.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
-  import OnEvents from '#lib/components/OnEvents.svelte';
   import BirthdayConfetti from '#lib/components/memories/BirthdayConfetti.svelte';
+  import OnEvents from '#lib/components/OnEvents.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
   import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
-  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
   import DeleteAssets from '#lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '#lib/components/timeline/actions/FavoriteAction.svelte';
+  import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -24,7 +25,7 @@
   import { locale } from '#lib/stores/preferences.store.ts';
   import { getAssetMediaUrl, handlePromiseError, memoryLaneTitle } from '#lib/utils.ts';
   import { fromISODateTimeUTC, toTimelineAsset } from '#lib/utils/timeline-util.ts';
-  import { AssetMediaSize, AssetTypeEnum, MemoryType, getAssetInfo } from '@immich/sdk';
+  import { AssetMediaSize, type AssetResponseDto, AssetTypeEnum, getAssetInfo, MemoryType } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, Text } from '@immich/ui';
   import {
     mdiCakeVariant,
@@ -51,7 +52,6 @@
   import { t } from 'svelte-i18n';
   import type { Attachment } from 'svelte/attachments';
   import { Tween } from 'svelte/motion';
-  import { goto } from '$app/navigation';
   import MemoryPhotoViewer from './MemoryPhotoViewer.svelte';
   import MemoryVideoViewer from './MemoryVideoViewer.svelte';
 
@@ -86,6 +86,15 @@
   const galleryViewport: Viewport = $derived({ height: viewport.height, width: viewport.width - 32 });
   let progressBarController: Tween<number> | undefined = $state(undefined);
   let videoPlayer: HTMLVideoElement | undefined = $state();
+  // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline
+  // carries such a photo only while that membership is shown in the timeline, so sending every jump
+  // to /photos scrolled to the right date and showed nothing. `resolvedSpaceId` is set by the server
+  // exactly for an asset the viewer does not own but reaches through a space they belong to.
+  const viewInTimelineHref = (asset: AssetResponseDto) => {
+    const at = asset.stack?.primaryAssetId ?? asset.id;
+    return asset.resolvedSpaceId ? Route.viewSpace({ id: asset.resolvedSpaceId }, { at }) : Route.photos({ at });
+  };
+
   const handleNavigate = async (href: string | undefined, options?: { replaceState?: boolean }) => {
     if (assetViewerManager.isViewing || !href) {
       return;
@@ -310,7 +319,7 @@
 {/if}
 
 <section
-  data-testid="memory-viewer"
+  id="memory-viewer"
   data-sveltekit-reset={false}
   class="dark w-full bg-immich-dark-gray text-white"
   {@attach scrollMemoryClearer({ routeStartsWith: Route.memories() })}
@@ -520,7 +529,7 @@
                 {#await currentMemoryAssetFull then asset}
                   {#if asset}
                     <IconButton
-                      href={Route.photos({ at: asset.stack?.primaryAssetId ?? asset.id })}
+                      href={viewInTimelineHref(asset)}
                       icon={mdiImageSearch}
                       aria-label={$t('view_in_timeline')}
                       color="secondary"
@@ -629,7 +638,7 @@
       />
     </div>
 
-    <div data-testid="memory-gallery" {@attach galleryObserver} bind:this={memoryGallery}>
+    <div id="gallery-memory" {@attach galleryObserver} bind:this={memoryGallery}>
       <GalleryViewer
         assets={currentTimelineAssets}
         viewerAssets={current.viewerAssets}
