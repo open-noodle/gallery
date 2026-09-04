@@ -99,7 +99,7 @@ class SpaceAlbumFolderCard extends StatelessWidget {
                       style: context.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      context.t.space_album_folder_albums_count(count: albumCount.toString()),
+                      context.t.space_album_folder_albums_count(count: albumCount),
                       style: context.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
@@ -225,7 +225,7 @@ class _FolderCoverCollage extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(ColorScheme cs) {
-    return Container(
+    return ColoredBox(
       color: cs.surfaceContainerHighest,
       child: Center(child: Icon(Icons.folder_outlined, size: 40, color: cs.onSurfaceVariant)),
     );
@@ -243,7 +243,9 @@ class _FolderCoverCollage extends ConsumerWidget {
     final thumbnailId = album.thumbnailAssetId;
     // Defensive only: `folderPreviewAlbums` already filters to albums with a
     // non-null `thumbnailAssetId`, so this should never trigger in practice.
-    if (thumbnailId == null) return _buildTileFallback(cs);
+    if (thumbnailId == null) {
+      return _buildTileFallback(cs);
+    }
 
     return FutureBuilder<RemoteAsset?>(
       future: ref.read(assetServiceProvider).getRemoteAsset(thumbnailId),
