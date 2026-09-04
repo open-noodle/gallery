@@ -1463,7 +1463,7 @@ class TestPetDetection:
 
         detector._download()
 
-        assert snapshot_download.call_args[0][0] == "Deeds67/rfdetr-nano"
+        assert snapshot_download.call_args[0][0] == "open-noodle/rfdetr-nano"
 
 
 class TestPetRecognition:
