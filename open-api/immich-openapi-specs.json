@@ -26271,6 +26271,9 @@
           "petDetection": {
             "$ref": "#/components/schemas/AdminConfigPetDetectionDto"
           },
+          "petRecognition": {
+            "$ref": "#/components/schemas/AdminConfigPetRecognitionDto"
+          },
           "urls": {
             "description": "ML service URLs",
             "items": {
@@ -26288,6 +26291,7 @@
           "facialRecognition",
           "ocr",
           "petDetection",
+          "petRecognition",
           "urls"
         ],
         "type": "object"
@@ -26394,6 +26398,10 @@
             "description": "Cluster new faces",
             "type": "boolean"
           },
+          "clusterNewPets": {
+            "description": "Cluster new pets",
+            "type": "boolean"
+          },
           "databaseCleanup": {
             "description": "Database cleanup",
             "type": "boolean"
@@ -26418,6 +26426,7 @@
         },
         "required": [
           "clusterNewFaces",
+          "clusterNewPets",
           "databaseCleanup",
           "generateMemories",
           "missingThumbnails",
@@ -26632,6 +26641,39 @@
         "required": [
           "enabled",
           "minScore",
+          "modelName"
+        ],
+        "type": "object"
+      },
+      "AdminConfigPetRecognitionDto": {
+        "properties": {
+          "enabled": {
+            "description": "Whether the task is enabled",
+            "type": "boolean"
+          },
+          "maxDistance": {
+            "description": "Maximum distance threshold for pet recognition",
+            "format": "double",
+            "maximum": 2,
+            "minimum": 0.1,
+            "type": "number"
+          },
+          "minFaces": {
+            "description": "Minimum number of faces required for recognition",
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "modelName": {
+            "description": "Name of the model to use",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "maxDistance",
+          "minFaces",
           "modelName"
         ],
         "type": "object"
@@ -31350,6 +31392,8 @@
           "Ocr",
           "PetDetectionQueueAll",
           "PetDetection",
+          "PetRecognitionQueueAll",
+          "PetRecognition",
           "WorkflowAssetTrigger",
           "IntegrityUntrackedFilesQueueAll",
           "IntegrityUntrackedFiles",
@@ -35194,6 +35238,7 @@
           "backupDatabase",
           "ocr",
           "petDetection",
+          "petRecognition",
           "workflow",
           "integrityCheck",
           "editor",
@@ -35366,6 +35411,9 @@
           "petDetection": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "petRecognition": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "search": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -35407,6 +35455,7 @@
           "ocr",
           "peopleBackfill",
           "petDetection",
+          "petRecognition",
           "search",
           "sidecar",
           "smartSearch",

@@ -708,6 +708,43 @@ where
   "asset_face"."id" = $1
   and "asset_face"."deletedAt" is null
 
+-- PersonRepository.getPetFaceForRecognition
+select
+  "asset_face"."id",
+  "asset_face"."assetId",
+  "asset_face"."personGroupId",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "asset"."ownerId"
+        from
+          "asset"
+        where
+          "asset"."id" = "asset_face"."assetId"
+      ) as obj
+  ) as "asset",
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "pet_search".*
+        from
+          "pet_search"
+        where
+          "pet_search"."faceId" = "asset_face"."id"
+      ) as obj
+  ) as "petSearch"
+from
+  "asset_face"
+where
+  "asset_face"."id" = $1
+  and "asset_face"."deletedAt" is null
+
 -- PersonRepository.getDataForThumbnailGenerationJob
 select
   "person"."ownerId",
@@ -1528,22 +1565,13 @@ from
       1
   ) as "dummy"
 
--- PersonRepository.updateForWritableOwners
-update "person"
-set
-  "name" = $1
-where
-  "person"."personGroupId" = $2
-  and "person"."ownerId" in (
-    select
-      "person_user"."sharedById"
-    from
-      "person_user"
-    where
-      "person_user"."personGroupId" = $3
-      and "person_user"."sharedWithId" = $4
-      and "person_user"."role" in ($5, $6)
-  )
+-- PersonRepository.refreshPetFaces
+begin
+insert into
+  "asset_face" ("id", "assetId")
+values
+  ($1, $2)
+rollback
 
 -- PersonRepository.getFacesByIds
 select
