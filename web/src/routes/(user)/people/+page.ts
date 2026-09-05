@@ -3,15 +3,27 @@ import { PEOPLE_PAGE_SIZE } from '$lib/constants';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { authenticate } from '$lib/utils/auth';
 import { getFormatter } from '$lib/utils/i18n';
+import { getPersistedPeopleFilterBy, peopleFilterToTypeParam } from '$lib/utils/people-filter';
 import type { PageLoad } from './$types';
 
 export const load = (async ({ parent, url }) => {
   await authenticate(url);
 
+  // Apply the persisted People/Pets choice to the FIRST request. The page used to load unfiltered
+  // and re-fetch in onMount, so refreshing under a Pets filter painted the full people list for one
+  // round trip before narrowing to pets.
+  const filterBy = getPersistedPeopleFilterBy();
+  const type = peopleFilterToTypeParam(filterBy);
+
   // Fire the (heavy) people query up front so it overlaps the root layout's init() instead of
   // serializing behind await parent(). ssr=false, so the SDK's global fetch works even before
   // init() assigns defaults.fetch. It is awaited below via Promise.all.
-  const peoplePromise = getAllPeople({ withHidden: true, withSharedSpaces: true, size: PEOPLE_PAGE_SIZE });
+  const peoplePromise = getAllPeople({
+    withHidden: true,
+    withSharedSpaces: true,
+    size: PEOPLE_PAGE_SIZE,
+    $type: type,
+  });
 
   // parent() resolves once the root layout's init() has populated the feature-flags manager.
   await parent();
@@ -31,6 +43,11 @@ export const load = (async ({ parent, url }) => {
   return {
     people,
     peopleStatistics,
+    // Header totals for an active filter. The overview-statistics endpoint is unfiltered, so under a
+    // filter the header has to read the filtered list's own totals; handing them over here saves the
+    // page a round trip to discover what it already fetched. Null under `All`, where the unfiltered
+    // overview statistics are the right source.
+    peopleListTotals: type ? { total: people.total, hidden: people.hidden } : null,
     meta: {
       title: $t('people'),
     },
