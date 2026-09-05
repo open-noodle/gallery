@@ -40,6 +40,7 @@ enum SettingsKey<T> {
 
   // People
   peopleSortBy<PeopleSortBy>(codec: EnumCodec(PeopleSortBy.values)),
+  peopleFilterBy<PeopleFilterBy>(codec: EnumCodec(PeopleFilterBy.values, fallback: PeopleFilterBy.all)),
 
   // Spaces
   spaceAlbumsSortMode<SpaceAlbumSortMode>(

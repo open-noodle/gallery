@@ -6505,6 +6505,56 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toEqual([]);
     });
+
+    it('passes a non-empty type filter through to the repository (S26)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: true });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+
+      await sut.getSpacePeople(auth, spaceId, { type: 'pet' });
+
+      const [, options] = mocks.sharedSpace.getPersonsBySpaceId.mock.calls.at(-1)!;
+      expect(options.type).toBe('pet');
+      expect(mocks.sharedSpace.getPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        withHidden: false,
+        petsEnabled: true,
+        minimumFaceCount: 3,
+        limit: undefined,
+        offset: undefined,
+        named: undefined,
+        takenAfter: undefined,
+        takenBefore: undefined,
+        type: 'pet',
+      });
+    });
+
+    it('short-circuits to an empty list when face recognition is disabled, regardless of type (S28)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+
+      const result = await sut.getSpacePeople(auth, spaceId, { type: 'pet' });
+
+      expect(result).toEqual([]);
+      expect(mocks.sharedSpace.getPersonsBySpaceId).not.toHaveBeenCalled();
+    });
+
+    it('requires membership before applying a type filter (S29)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(sut.getSpacePeople(factory.auth(), 'space-1', { type: 'pet' })).rejects.toThrow('Not a member');
+
+      expect(mocks.sharedSpace.getById).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getPersonsBySpaceId).not.toHaveBeenCalled();
+    });
   });
 
   describe('getSpacePeopleStatistics', () => {
@@ -6560,6 +6610,61 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);
 
       await expect(sut.getSpacePeopleStatistics(factory.auth(), 'space-1')).rejects.toThrow('Not a member');
+
+      expect(mocks.sharedSpace.getById).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.countPersonsBySpaceId).not.toHaveBeenCalled();
+    });
+
+    it('passes a non-empty type filter through to the repository (S27)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: true });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.countPersonsBySpaceId.mockResolvedValue({
+        total: 1,
+        hidden: 0,
+        detectedFaceCount: 2,
+      } as any);
+
+      await sut.getSpacePeopleStatistics(auth, spaceId, { type: 'pet' });
+
+      const [, options] = mocks.sharedSpace.countPersonsBySpaceId.mock.calls.at(-1)!;
+      expect((options as { type?: string }).type).toBe('pet');
+      expect(mocks.sharedSpace.countPersonsBySpaceId).toHaveBeenCalledWith(spaceId, {
+        petsEnabled: true,
+        minimumFaceCount: 3,
+        named: undefined,
+        name: undefined,
+        takenAfter: undefined,
+        takenBefore: undefined,
+        type: 'pet',
+      });
+    });
+
+    it('short-circuits to zero statistics when face recognition is disabled, regardless of type (S28)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false }));
+
+      await expect(sut.getSpacePeopleStatistics(auth, spaceId, { type: 'pet' })).resolves.toEqual({
+        total: 0,
+        hidden: 0,
+        detectedFaceCount: 0,
+      });
+
+      expect(mocks.sharedSpace.countPersonsBySpaceId).not.toHaveBeenCalled();
+    });
+
+    it('requires membership before applying a type filter (S29)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(sut.getSpacePeopleStatistics(factory.auth(), 'space-1', { type: 'pet' })).rejects.toThrow(
+        'Not a member',
+      );
 
       expect(mocks.sharedSpace.getById).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.countPersonsBySpaceId).not.toHaveBeenCalled();
@@ -6635,6 +6740,35 @@ describe(SharedSpaceService.name, () => {
 
       expect(mocks.sharedSpace.getById).not.toHaveBeenCalled();
       expect((mocks.sharedSpace as any).getPeopleFaceStatisticsBySpaceId).not.toHaveBeenCalled();
+    });
+
+    it('leaves the space face statistics unchanged by the type filter (S32)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: true });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      (mocks.sharedSpace as any).getPeopleFaceStatisticsBySpaceId.mockResolvedValue({
+        detectedFaceCount: 1201,
+        assignedVisibleFaceCount: 1100,
+        namedVisiblePersonCount: 152,
+        assignedHiddenFaceCount: 75,
+        unassignedFaceCount: 26,
+      });
+
+      const unfiltered = await sut.getSpacePeopleFaceStatistics(auth, spaceId, {});
+      const filtered = await sut.getSpacePeopleFaceStatistics(auth, spaceId, { type: 'pet' });
+
+      expect(filtered).toEqual(unfiltered);
+
+      const mockFn = (mocks.sharedSpace as any).getPeopleFaceStatisticsBySpaceId;
+      const [, unfilteredOptions] = mockFn.mock.calls.at(-2)!;
+      const [, filteredOptions] = mockFn.mock.calls.at(-1)!;
+      // getPeopleFaceStatisticsBySpaceId takes no `type` option — the DTO's `type` field must not
+      // leak into the call, and the two calls' options must be identical regardless of the filter.
+      expect(filteredOptions).toEqual(unfilteredOptions);
+      expect(filteredOptions.type).toBeUndefined();
     });
   });
 
