@@ -20,8 +20,19 @@ void main() {
         children: [
           Consumer(
             builder: (context, ref, _) {
-              ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount));
-              ref.watch(driftSpacePeopleProvider((spaceId: 's1', sortBy: PeopleSortBy.photoCount)));
+              ref.watch(
+                driftGetAllPeopleWithSharedSpacesProvider((
+                  sortBy: PeopleSortBy.photoCount,
+                  filterBy: PeopleFilterBy.all,
+                )),
+              );
+              ref.watch(
+                driftSpacePeopleProvider((
+                  spaceId: 's1',
+                  sortBy: PeopleSortBy.photoCount,
+                  filterBy: PeopleFilterBy.all,
+                )),
+              );
               ref.watch(getAllPeopleProvider(PeopleSortBy.photoCount));
               return const SizedBox.shrink();
             },
