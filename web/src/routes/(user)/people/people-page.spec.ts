@@ -280,6 +280,55 @@ describe('Global people page', () => {
     expect(screen.queryByRole('button', { name: 'sort_people_most_photos' })).toBeNull();
   });
 
+  // A library with people but no pets, loaded under a persisted Pets filter — what a user is left
+  // with after resetting pet detection. `load` applies the filter, so the page is handed an empty
+  // list and zeroed filtered totals while the unfiltered overview statistics still count people.
+  const renderEmptyPetFilter = () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+    return renderPage([], { total: 12, hidden: 0, detectedFaceCount: 340 }, false, { total: 0, hidden: 0 });
+  };
+
+  it('keeps the type filter reachable when the active filter matches nobody', () => {
+    // An empty filtered list says nothing about whether the library has people. Gating the toolbar
+    // on the loaded rows takes the filter dropdown down with them, stranding the user on the empty
+    // view with no control to get back to All.
+    renderEmptyPetFilter();
+
+    expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
+  });
+
+  it('names pets, not people, in the empty state under the Pets filter', () => {
+    renderEmptyPetFilter();
+
+    // "No people" under an empty Pets filter reads as a claim about the whole library, which is
+    // exactly backwards: the library still has people, it just has no pets.
+    expect(screen.getByText('search_no_pets')).toBeInTheDocument();
+    expect(screen.queryByText('search_no_people')).toBeNull();
+  });
+
+  it('reloads the unfiltered people when an empty pet filter is switched back to All', async () => {
+    const user = userEvent.setup();
+    renderEmptyPetFilter();
+    sdkMock.getAllPeople.mockResolvedValue({
+      people: [makePerson({ id: 'p1', name: 'Alice' })],
+      total: 1,
+      hidden: 0,
+      hasNextPage: false,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'pets' }));
+    await user.click(screen.getByRole('button', { name: 'all' }));
+
+    await waitFor(() => expect(screen.getByDisplayValue('Alice')).toBeInTheDocument());
+    expect(sdkMock.getAllPeople).toHaveBeenLastCalledWith({
+      withHidden: true,
+      withSharedSpaces: true,
+      page: 1,
+      size: PEOPLE_PAGE_SIZE,
+      $type: undefined,
+    });
+  });
+
   it('falls back to the default order when the stored preference is corrupt', () => {
     peopleViewSettings.set({ sortBy: 'garbage' as PeopleSortBy });
     renderPage([
