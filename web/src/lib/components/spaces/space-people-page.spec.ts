@@ -16,9 +16,27 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpacePeoplePage from '../../../routes/(user)/spaces/[spaceId]/people/+page.svelte';
+
+const PAGE_SIZE = 100;
+
+class VisibleObserver {
+  static callback: IntersectionObserverCallback;
+  observe = vi.fn((target: Element) => {
+    VisibleObserver.callback(
+      [{ isIntersecting: true, target } as IntersectionObserverEntry],
+      this as unknown as IntersectionObserver,
+    );
+  });
+  disconnect = vi.fn();
+  unobserve = vi.fn();
+  constructor(cb: IntersectionObserverCallback) {
+    VisibleObserver.callback = cb;
+  }
+}
 
 const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
   let pageValue = {
@@ -159,6 +177,7 @@ describe('Spaces people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     clearPeopleFaceStatisticsInfoCache();
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
     Element.prototype.animate = getAnimateMock();
     gotoMock.mockResolvedValue(undefined);
     pageStore.setUrl('http://localhost/spaces/space-1/people');
@@ -166,6 +185,10 @@ describe('Spaces people page', () => {
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
     sdkMock.getSpacePeopleFaceStatistics.mockResolvedValue(makeFaceStatistics());
     featureFlagsMock.value.peopleStatistics = true;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('shows the visible person count and detected face count next to the heading', () => {
@@ -1003,5 +1026,188 @@ describe('Spaces people page', () => {
 
     const link = baseElement.querySelector('a[href="/spaces/space-1/people/p1"]');
     expect(link).toBeTruthy();
+  });
+
+  describe('type filter', () => {
+    it('renders all three filter options, with All selected by default', async () => {
+      renderPage({ people: [makePerson({ id: 'p1' })] });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+
+      // The trigger itself is also labelled 'all' (the current selection), so it appears twice
+      // once the menu is open: once as the trigger, once as the highlighted option row.
+      expect(screen.getAllByRole('button', { name: 'all' })).toHaveLength(2);
+      expect(screen.getByRole('button', { name: 'people' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
+    });
+
+    it('requests only pets when the Pets filter is selected', async () => {
+      renderPage({ people: [makePerson({ id: 'p1' })] });
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+    });
+
+    it('carries the filter into the statistics request so the header agrees with the grid', async () => {
+      renderPage({ people: [makePerson({ id: 'p1' })] });
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 0 });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+    });
+
+    it('carries the filter into the paged request', async () => {
+      vi.stubGlobal('IntersectionObserver', VisibleObserver);
+      const pets = Array.from({ length: PAGE_SIZE }, (_, i) => makePerson({ id: `pet-${i}`, type: 'pet' }));
+      peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+      sdkMock.getSpacePeople.mockImplementation(({ offset }) => Promise.resolve(offset ? [] : pets));
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: PAGE_SIZE, hidden: 0, detectedFaceCount: 0 });
+
+      // The SSR-loaded data is unfiltered; the mount effect reapplies the persisted Pets filter.
+      renderPage({ people: [], peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 } });
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
+          expect.objectContaining({ $type: 'pet', offset: expect.any(Number) }),
+        );
+      });
+    });
+
+    it('composes the filter with an active search rather than replacing it', async () => {
+      renderPage({ people: [makePerson({ id: 'p0', name: 'Alice' })] });
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Rex', type: 'pet' })]);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 0 });
+
+      await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'rex' } });
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(
+          { id: 'space-1', name: 'rex' },
+          expect.any(Object),
+        );
+      });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet', name: 'rex' }));
+      });
+    });
+
+    it('resets paging rather than appending onto the previous type when the filter changes', async () => {
+      renderPage({ people: [makePerson({ id: 'p1', name: 'Alice' })] });
+      const pets = [
+        makePerson({ id: 'pet-1', name: 'Rex', type: 'pet' }),
+        makePerson({ id: 'pet-2', name: 'Fido', type: 'pet' }),
+      ];
+      sdkMock.getSpacePeople.mockResolvedValue(pets);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 2, hidden: 0, detectedFaceCount: 0 });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+
+      await waitFor(() => {
+        expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
+      });
+      expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(2);
+    });
+
+    it('sends no type parameter when All is selected', async () => {
+      renderPage({ people: [makePerson({ id: 'p1' })] });
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1' })]);
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+      await user.click(screen.getByRole('button', { name: 'all' }));
+
+      await waitFor(() => {
+        const call = sdkMock.getSpacePeople.mock.calls.at(-1)![0];
+        expect(call).not.toHaveProperty('$type');
+      });
+    });
+
+    it('reapplies a persisted non-All filter on mount, since SSR loads unfiltered', async () => {
+      peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', type: 'pet' })]);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 0 });
+
+      // SSR-loaded data (passed to renderPage) is always unfiltered.
+      renderPage({ people: [makePerson({ id: 'p0' })] });
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+    });
+
+    it('does not send the filter to the face-statistics endpoint', async () => {
+      renderPage({
+        people: [makePerson({ id: 'p1' })],
+        peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
+      });
+      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p2', type: 'pet' })]);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 2901 });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+
+      await user.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalled();
+      });
+      const call = sdkMock.getSpacePeopleFaceStatistics.mock.calls.at(-1)![0];
+      expect(call).not.toHaveProperty('$type');
+    });
+
+    it('keeps the filter/sort controls and show/hide access when the Pets filter yields zero results', async () => {
+      renderPage({
+        people: [makePerson({ id: 'p1' })],
+        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 0 },
+        members: [makeMember({ role: SharedSpaceRole.Editor })],
+      });
+      sdkMock.getSpacePeople.mockResolvedValue([]);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+
+      // The grid is empty (no pets), but a space with people at all must not lose the search bar,
+      // the filter/sort dropdowns (the only way back to All), or the show/hide screen.
+      expect(screen.getByPlaceholderText('search_people')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
+      expect(screen.getByText('show_and_hide_people')).toBeInTheDocument();
+    });
   });
 });
