@@ -63,7 +63,9 @@ void main() {
   // refetch, and exposes buttons that launch the real modal entry points.
   Widget harness(Person person) => Consumer(
     builder: (context, ref, _) {
-      ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount));
+      ref.watch(
+        driftGetAllPeopleWithSharedSpacesProvider((sortBy: PeopleSortBy.photoCount, filterBy: PeopleFilterBy.all)),
+      );
       return Column(
         children: [
           TextButton(
