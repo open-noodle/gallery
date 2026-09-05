@@ -186,4 +186,39 @@ same commit, per the repo rule. No new keys were added, so no coverage gap.
 
 ## Remote CI Verification
 
-Recorded in a follow-up commit once the dispatched suite reports.
+- **Test branch**: `rebase/upstream-batch-226`
+- **Commit validated**: `77711f5dade`
+- **Result**: **10/10 green.** Dispatched in two waves (3 then 7, ~30s apart) per the registry
+  rate-limit lesson — zero registry failures.
+
+| Workflow                                  | Status | Notes                                                    |
+| ----------------------------------------- | ------ | -------------------------------------------------------- |
+| `test.yml`                                | GREEN  | green after re-running Medium Tests (Server) — see below |
+| `docker.yml`                              | GREEN  |                                                          |
+| `static_analysis.yml`                     | GREEN  | green on re-run; see below                               |
+| `gallery-build-mobile.yml`                | GREEN  | iOS + Android compile                                    |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                          |
+| `gallery-ml-smoke.yml`                    | GREEN  | boots the RF-DETR ML image                               |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                          |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | both halves, incl. the Docker boot against `:main`       |
+| `storage-migration-tests.yml`             | GREEN  |                                                          |
+| `storage-migration-e2e.yml`               | GREEN  |                                                          |
+
+### Confirmed non-regressions (2)
+
+1. **Static Code Analysis — `Setup Mise`**, first pass. `curl: (35) Recv failure: Connection reset by
+peer` while downloading the **mise binary itself** from GitHub releases, before any repo code ran.
+   Pure network flake, same family as the ShellCheck `curl exit 35` seen on 2026-09-03. Ruled out the
+   lockfile variant of this failure first: both `mise.lock` and `mobile/mise.lock` are byte-identical
+   to the last green tip and the working tree was clean of lock edits. Green on re-run.
+
+2. **Medium Tests (Server)** — the known rolling-only connection-pool exhaustion.
+   `PostgresError: sorry, too many clients already` (53300), **179 of 180 files passed**, and all four
+   failing cases are in `face-repair.service.spec.ts` failing with the connection error rather than an
+   assertion. Proved a non-regression by tree identity rather than by pattern-matching the symptom:
+   both `test/medium/specs/services/face-repair.service.spec.ts` and
+   `src/services/face-repair.service.ts` are **byte-identical to `2dcf6365318`**, the last 10/10-green
+   tip, so nothing this cycle changed could have caused it. Green on re-run.
+
+   (The other `PostgresError` lines in that log — duplicate key, foreign key, `avg(vector)`,
+   `expected 512 dimensions` — are negative-path assertions, not failures.)
