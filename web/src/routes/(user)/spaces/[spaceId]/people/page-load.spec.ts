@@ -1,5 +1,6 @@
 import { SharedSpaceRole } from '@immich/sdk';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { load } from './+page';
 
 const { authenticate } = vi.hoisted(() => ({
@@ -75,6 +76,7 @@ describe('space people page load', () => {
     vi.resetAllMocks();
     sdkMock.getSpacePeople.mockResolvedValue(people as never);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue(peopleStatistics);
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
   });
 
   it('authenticates and loads space people with overview statistics', async () => {
@@ -82,6 +84,7 @@ describe('space people page load', () => {
     await expect(load(event as never)).resolves.toEqual({
       people,
       peopleStatistics,
+      hasSpacePeople: true,
     });
 
     expect(authenticate).toHaveBeenCalledWith(event.url);
@@ -100,7 +103,61 @@ describe('space people page load', () => {
     await expect(load(makeEvent() as never)).resolves.toEqual({
       people,
       peopleStatistics: null,
+      hasSpacePeople: true,
     });
+  });
+
+  // The tab used to load unfiltered and re-apply the persisted filter in onMount, so refreshing
+  // under a Pets filter painted the whole people list for one round trip before narrowing to pets.
+  it('applies a persisted Pets filter to the first request', async () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+    const filtered = { total: 3, hidden: 0, detectedFaceCount: 40 };
+    sdkMock.getSpacePeopleStatistics.mockImplementation((query: { $type?: string }) =>
+      Promise.resolve(query.$type ? filtered : peopleStatistics),
+    );
+
+    const result = await load(makeEvent() as never);
+
+    expect(sdkMock.getSpacePeople).toHaveBeenCalledWith({ id: 'space-1', limit: 100, $type: 'pet' });
+    expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', $type: 'pet' });
+    expect(result.peopleStatistics).toEqual(filtered);
+    // The filtered queries already found people, so the gate is answered without a second request.
+    expect(result.hasSpacePeople).toBe(true);
+    expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledTimes(1);
+  });
+
+  // The show/hide screen is the one place a misdetected species bucket can be corrected, so a Pets
+  // filter matching nothing must not hide it — that, and only that, is worth a second request.
+  it('spends one extra statistics request only when the active filter matches nothing', async () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+    sdkMock.getSpacePeople.mockResolvedValue([] as never);
+    sdkMock.getSpacePeopleStatistics.mockImplementation((query: { $type?: string }) =>
+      Promise.resolve(query.$type ? { total: 0, hidden: 0, detectedFaceCount: 0 } : peopleStatistics),
+    );
+
+    const result = await load(makeEvent() as never);
+
+    expect(result.hasSpacePeople).toBe(true);
+    expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
+    expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports no people when the space is genuinely empty', async () => {
+    sdkMock.getSpacePeople.mockResolvedValue([] as never);
+    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
+
+    const result = await load(makeEvent() as never);
+
+    expect(result.hasSpacePeople).toBe(false);
+    // No filter is active, so the single statistics call already answered the gate.
+    expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not spend a second statistics request under the All filter', async () => {
+    await load(makeEvent() as never);
+
+    expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledTimes(1);
+    expect(sdkMock.getSpacePeople).toHaveBeenCalledWith({ id: 'space-1', limit: 100 });
   });
 
   it('still rejects when the people list fails', async () => {
