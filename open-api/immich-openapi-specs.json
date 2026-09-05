@@ -18781,6 +18781,19 @@
             }
           },
           {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "person",
+                "pet"
+              ]
+            }
+          },
+          {
             "name": "withHidden",
             "required": false,
             "in": "query",
@@ -18962,6 +18975,19 @@
             }
           },
           {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "person",
+                "pet"
+              ]
+            }
+          },
+          {
             "name": "withHidden",
             "required": false,
             "in": "query",
@@ -19087,6 +19113,19 @@
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
               "example": "2024-01-01T00:00:00.000Z",
               "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "person",
+                "pet"
+              ]
             }
           },
           {

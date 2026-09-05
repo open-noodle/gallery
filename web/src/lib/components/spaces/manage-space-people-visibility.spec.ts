@@ -123,6 +123,40 @@ describe('ManageSpacePeopleVisibility', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  // --- Pet badge tests ---
+
+  it('should render the pet badge for a pet person', () => {
+    const people = [makePerson({ id: 'p1', name: 'Rex', type: 'pet' })];
+    renderComponent(people);
+
+    expect(screen.getByTestId('pet-badge')).toBeInTheDocument();
+  });
+
+  it('should not render the pet badge for a human person', () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice', type: 'person' })];
+    renderComponent(people);
+
+    expect(screen.queryByTestId('pet-badge')).not.toBeInTheDocument();
+  });
+
+  it('should give the pet badge a non-empty accessible name', () => {
+    const people = [makePerson({ id: 'p1', name: 'Rex', type: 'pet' })];
+    renderComponent(people);
+
+    expect(screen.getByTestId('pet-badge')).toHaveAccessibleName();
+  });
+
+  it('should badge a pet with no species with a generic label', () => {
+    // SharedSpacePersonResponseDto has no `species` field at all, so a space pet always falls
+    // through to getPetBadgeLabel's generic fallback ($t('pet')) — this is the designed
+    // behaviour, not a data gap to fill in.
+    const people = [makePerson({ id: 'p1', name: 'Rex', type: 'pet' })];
+    renderComponent(people);
+
+    const badge = screen.getByTestId('pet-badge');
+    expect(badge.getAttribute('aria-label')).toBe('pet');
+  });
+
   // --- Pagination tests ---
 
   it('should render loading text when hasMore and loading are true', () => {

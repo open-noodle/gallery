@@ -14,6 +14,7 @@ Person _p(String id, {String name = ''}) =>
 void main() {
   setUpAll(() {
     registerFallbackValue(PeopleSortBy.name);
+    registerFallbackValue(PeopleFilterBy.all);
   });
 
   late MockSharedSpaceApiRepository mockRepository;
@@ -27,34 +28,100 @@ void main() {
 
   test('passes the requested sort mode through to the repository', () async {
     when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy')),
+      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
     ).thenAnswer((_) async => [_p('sp1', name: 'Mia')]);
 
     final result = await container.read(
-      driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name)).future,
+      driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all)).future,
     );
 
     expect(result.single.id, 'sp1');
-    verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);
+    verify(
+      () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all),
+    ).called(1);
   });
 
   test('re-fetches when the sort mode changes because it is part of the family key', () async {
-    when(() => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'))).thenAnswer((_) async => [_p('sp1')]);
+    when(
+      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+    ).thenAnswer((_) async => [_p('sp1')]);
 
-    await container.read(driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name)).future);
-    await container.read(driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.photoCount)).future);
+    await container.read(
+      driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all)).future,
+    );
+    await container.read(
+      driftSpacePeopleProvider((
+        spaceId: 'space-1',
+        sortBy: PeopleSortBy.photoCount,
+        filterBy: PeopleFilterBy.all,
+      )).future,
+    );
 
-    verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);
-    verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.photoCount)).called(1);
+    verify(
+      () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all),
+    ).called(1);
+    verify(
+      () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.photoCount, filterBy: PeopleFilterBy.all),
+    ).called(1);
+  });
+
+  // M12: filterBy is part of the family key, mirroring the sort-mode test above — changing it
+  // must issue a fresh fetch with the new filter rather than replaying a cached instance keyed
+  // only on sortBy.
+  test('M12: re-fetches when the filter changes because it is part of the family key', () async {
+    when(
+      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+    ).thenAnswer((_) async => [_p('sp1')]);
+
+    await container.read(
+      driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all)).future,
+    );
+    await container.read(
+      driftSpacePeopleProvider((
+        spaceId: 'space-1',
+        sortBy: PeopleSortBy.name,
+        filterBy: PeopleFilterBy.pets,
+      )).future,
+    );
+
+    verify(
+      () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all),
+    ).called(1);
+    verify(
+      () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets),
+    ).called(1);
   });
 
   test('surfaces the failure instead of falling back to the owner-scoped local list', () async {
-    when(() => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'))).thenThrow(Exception('offline'));
+    when(
+      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+    ).thenThrow(Exception('offline'));
 
     // A local fallback would list people who are NOT in this space, which is wrong rather
     // than merely stale — so the error must reach the UI.
     await expectLater(
-      container.read(driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name)).future),
+      container.read(
+        driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all)).future,
+      ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  // M13: same guard as above, but for a FILTERED fetch — a failure while filterBy is
+  // people/pets must still surface as AsyncError, not silently fall back to any local list.
+  test('M13: surfaces the failure for a filtered fetch instead of falling back', () async {
+    when(
+      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+    ).thenThrow(Exception('offline'));
+
+    await expectLater(
+      container.read(
+        driftSpacePeopleProvider((
+          spaceId: 'space-1',
+          sortBy: PeopleSortBy.name,
+          filterBy: PeopleFilterBy.pets,
+        )).future,
+      ),
       throwsA(isA<Exception>()),
     );
   });
@@ -66,14 +133,16 @@ void main() {
     // read after that must issue a brand-new fetch rather than replaying a cached instance.
     fakeAsync((async) {
       when(
-        () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy')),
+        () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
       ).thenAnswer((_) async => [_p('sp1', name: 'Mia')]);
 
-      const key = (spaceId: 'space-1', sortBy: PeopleSortBy.name);
+      const key = (spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all);
 
       final subscription = container.listen(driftSpacePeopleProvider(key), (_, _) {});
       async.flushMicrotasks();
-      verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);
+      verify(
+        () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all),
+      ).called(1);
 
       // Drop the only listener and let the scheduler's disposal task run (it is scheduled
       // via a real Timer, not a microtask, so this needs elapse(), not just flushMicrotasks()).
@@ -84,7 +153,9 @@ void main() {
       container.listen(driftSpacePeopleProvider(key), (_, _) {});
       async.flushMicrotasks();
 
-      verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);
+      verify(
+        () => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all),
+      ).called(1);
     });
   });
 }

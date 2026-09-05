@@ -53,6 +53,7 @@ void main() {
         withSharedSpaces: any(named: 'withSharedSpaces'),
         page: any(named: 'page'),
         size: any(named: 'size'),
+        type: any(named: 'type'),
       ),
     ).thenAnswer((_) => answer());
   }
@@ -173,6 +174,7 @@ void main() {
           withSharedSpaces: true,
           page: any(named: 'page'),
           size: any(named: 'size'),
+          type: any(named: 'type'),
         ),
       ).called(1);
     });
@@ -223,8 +225,71 @@ void main() {
           withSharedSpaces: any(named: 'withSharedSpaces'),
           page: any(named: 'page'),
           size: any(named: 'size'),
+          type: any(named: 'type'),
         ),
       ).called(2);
+    });
+
+    // M5: the People/Pets filter maps to the server's `type` query param. `filterBy` defaults
+    // to PeopleFilterBy.all, which must translate to type: null (unfiltered) — not omitted.
+    test('passes type=null for the default (all) filter', () async {
+      stubGetAllPeople(() async => peopleResponse([personDto('p1', name: 'A')]));
+
+      await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+      verify(
+        () => mockApi.getAllPeople(
+          withHidden: any(named: 'withHidden'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+          page: any(named: 'page'),
+          size: any(named: 'size'),
+          type: null,
+        ),
+      ).called(1);
+    });
+
+    test('passes type=person for the people filter', () async {
+      stubGetAllPeople(() async => peopleResponse([personDto('p1', name: 'A')]));
+
+      await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.people);
+
+      verify(
+        () => mockApi.getAllPeople(
+          withHidden: any(named: 'withHidden'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+          page: any(named: 'page'),
+          size: any(named: 'size'),
+          type: 'person',
+        ),
+      ).called(1);
+    });
+
+    // The paging walk builds its request fresh on every iteration, so a test that only checks
+    // page 1 proves nothing about later pages. Stub two full pages plus a short one and assert
+    // `type` on every captured call.
+    test('sends the type parameter on every page of the paging walk', () async {
+      final capturedTypes = <String?>[];
+      var call = 0;
+      when(
+        () => mockApi.getAllPeople(
+          withHidden: any(named: 'withHidden'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+          page: any(named: 'page'),
+          size: any(named: 'size'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((invocation) async {
+        capturedTypes.add(invocation.namedArguments[#type] as String?);
+        call++;
+        return call < 3
+            ? peopleResponse([personDto('p$call', name: 'P$call')], hasNextPage: true)
+            : peopleResponse([personDto('p$call', name: 'P$call')]);
+      });
+
+      await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets);
+
+      expect(capturedTypes.length, greaterThan(1)); // page 1 alone proves nothing
+      expect(capturedTypes, everyElement('pet'));
     });
 
     test('throws when the API returns null', () async {
