@@ -209,6 +209,19 @@ main:has(> div.absolute.overflow-y-auto) {
   margin-block: 0 8px;
   margin-inline: 0 8px;
 }
+/* ...but the start gutter is only safe to omit while a sidebar is actually rendered. Below
+ * 850px `sidebarModeStore.layout` is 'overlay', so UserPageLayout collapses the grid's first
+ * column to --sidebar-width: 0px and the boundary the rule above relies on is simply not
+ * there: the panel butts against the window edge, its left rounded corners squared off
+ * against it while the other three sides keep their chrome band. Restore the gutter for
+ * exactly that case, keyed on the same data-sidebar-width the layout already exposes (and
+ * user-page-layout.spec.ts already asserts) rather than a second copy of the 850px query -
+ * '0' means "no sidebar column", which is the condition that actually matters here. The
+ * rail and expanded layouts are untouched, so the chrome band stays the width of the
+ * sidebar itself and the rail's icons stay centred. */
+[data-sidebar-width='0'] main:has(> div.absolute.overflow-y-auto) {
+  margin-inline-start: 8px;
+}
 /* Inset ONLY the page header row (title + actions: Albums, Settings, …) so it
  * clears the panel's rounded corners. Keyed on the stable page-header-title-row
  * testid; the timeline/content keeps its tighter gutter untouched. */
