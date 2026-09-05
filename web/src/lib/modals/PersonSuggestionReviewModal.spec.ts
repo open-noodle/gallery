@@ -6,10 +6,17 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
+import { reactivePageMock } from '@test-data/mocks/reactive-page.mock.svelte';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
+  locale: { subscribe: (run: (v: string) => void) => (run('en-US'), () => {}) },
 }));
+
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock };
+});
 
 vi.mock('$lib/utils/handle-error', () => ({ handleError: vi.fn() }));
 
@@ -50,6 +57,7 @@ function item(id: string) {
     boundingBoxX2: 40,
     boundingBoxY1: 10,
     boundingBoxY2: 40,
+    fileCreatedAt: '2015-08-12T14:32:00.000Z',
   };
 }
 const page1: PersonFaceSuggestionPageResponseDto = { total: 2, items: [item('f1'), item('f2')] };
@@ -506,5 +514,28 @@ describe('PersonSuggestionReviewModal', () => {
     const group = screen.getByTestId('suggestion-actions');
     expect(group).toHaveClass('flex-col', 'grow');
     expect(group).toHaveClass('sm:flex-row', 'sm:grow-0');
+  });
+
+  // #1039 — "this is sometimes difficult to tell if a face is the good person": the reviewer had to
+  // right-click and open the photo in a new tab to place it. The context row below the photo does that
+  // without leaving the queue. The block's own behaviour is covered in
+  // suggestion-asset-details.spec.ts; these two pin that the MODAL feeds it the right candidate and the
+  // right surface.
+  it('shows the current candidate’s date and a link to its photo', async () => {
+    reactivePageMock.reset('https://gallery.test/people/p1');
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+    expect(screen.getByTestId('suggestion-context-date')).toHaveTextContent('Aug 12, 2015');
+    expect(screen.getByTestId('suggestion-context-open')).toHaveAttribute('href', '/photos/asset-f1');
+  });
+
+  it('links into the space when the review is opened from a space person', async () => {
+    reactivePageMock.reset('https://gallery.test/spaces/s1/people/p1', { params: { spaceId: 's1' } });
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+    // A space viewer reaching this asset through the space would get a 403 from /photos/{id}.
+    expect(screen.getByTestId('suggestion-context-open')).toHaveAttribute('href', '/spaces/s1/photos/asset-f1');
   });
 });
