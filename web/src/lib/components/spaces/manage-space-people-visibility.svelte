@@ -24,6 +24,9 @@
         updatedAt: person.updatedAt,
       }),
       isHidden: person.isHidden,
+      type: person.type,
+      // `species` has no shared-space equivalent — SharedSpacePersonResponseDto carries only `type`.
+      // The badge must degrade to a generic pet badge without it.
     })),
   );
 

@@ -9318,7 +9318,7 @@ export function updateMemberMetadataContribution({ id, userId, sharedSpaceMember
 /**
  * Get people in a shared space
  */
-export function getSpacePeople({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+export function getSpacePeople({ id, limit, name, named, offset, takenAfter, takenBefore, $type, withHidden }: {
     id: string;
     limit?: number;
     name?: string;
@@ -9326,6 +9326,7 @@ export function getSpacePeople({ id, limit, name, named, offset, takenAfter, tak
     offset?: number;
     takenAfter?: string;
     takenBefore?: string;
+    $type?: "person" | "pet";
     withHidden?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -9338,6 +9339,7 @@ export function getSpacePeople({ id, limit, name, named, offset, takenAfter, tak
         offset,
         takenAfter,
         takenBefore,
+        "type": $type,
         withHidden
     }))}`, {
         ...opts
@@ -9357,7 +9359,7 @@ export function deduplicateSpacePeople({ id }: {
 /**
  * Get people face statistics in a shared space
  */
-export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, $type, withHidden }: {
     id: string;
     limit?: number;
     name?: string;
@@ -9365,6 +9367,7 @@ export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, t
     offset?: number;
     takenAfter?: string;
     takenBefore?: string;
+    $type?: "person" | "pet";
     withHidden?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -9377,6 +9380,7 @@ export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, t
         offset,
         takenAfter,
         takenBefore,
+        "type": $type,
         withHidden
     }))}`, {
         ...opts
@@ -9385,7 +9389,7 @@ export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, t
 /**
  * Get people statistics in a shared space
  */
-export function getSpacePeopleStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+export function getSpacePeopleStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, $type, withHidden }: {
     id: string;
     limit?: number;
     name?: string;
@@ -9393,6 +9397,7 @@ export function getSpacePeopleStatistics({ id, limit, name, named, offset, taken
     offset?: number;
     takenAfter?: string;
     takenBefore?: string;
+    $type?: "person" | "pet";
     withHidden?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -9405,6 +9410,7 @@ export function getSpacePeopleStatistics({ id, limit, name, named, offset, taken
         offset,
         takenAfter,
         takenBefore,
+        "type": $type,
         withHidden
     }))}`, {
         ...opts
