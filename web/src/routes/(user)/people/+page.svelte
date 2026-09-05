@@ -331,6 +331,20 @@
     [PeopleFilterBy.Pets]: $t('pets'),
   });
   let peopleFilterBy = $derived(resolvePeopleFilterBy($peopleViewSettings.filterBy));
+  // "No people" under an empty Pets filter reads as a claim about the whole library, which is
+  // exactly backwards: the library still has people, it just has no pets.
+  let emptyStateMessageKey: 'search_no_people' | 'search_no_people_named' | 'search_no_pets' = $derived(
+    searchName
+      ? 'search_no_people_named'
+      : peopleFilterBy === PeopleFilterBy.Pets
+        ? 'search_no_pets'
+        : 'search_no_people',
+  );
+  // A type filter that matches nothing — Pets after a pet-detection reset, say — legitimately
+  // empties `people` without meaning the library has none. Gating the toolbar on the loaded rows
+  // alone takes the filter dropdown down with them, stranding the user on the empty view with no
+  // control to get back to All.
+  let hasPeopleControls = $derived(people.length > 0 || peopleFilterBy !== PeopleFilterBy.All);
 
   const handleFilterChange = async (filterBy: PeopleFilterBy) => {
     $peopleViewSettings.filterBy = filterBy;
@@ -493,7 +507,7 @@
   {/snippet}
 
   {#snippet buttons()}
-    {#if people.length > 0}
+    {#if hasPeopleControls}
       <div class="flex items-center justify-center gap-2">
         <div class="hidden sm:block">
           <div class="h-10 w-40 lg:w-80">
@@ -575,7 +589,7 @@
       <div class="flex flex-col content-center items-center text-center">
         <Icon icon={mdiAccountOff} size="3.5em" />
         <p class="mt-5 line-clamp-2 max-w-lg overflow-hidden text-3xl font-medium">
-          {$t(searchName ? 'search_no_people_named' : 'search_no_people', { values: { name: searchName } })}
+          {$t(emptyStateMessageKey, { values: { name: searchName } })}
         </p>
       </div>
     </div>
