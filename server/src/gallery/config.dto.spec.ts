@@ -90,7 +90,7 @@ describe('fork config survives schema composition', () => {
   it('keeps the fork machine-learning fields', () => {
     expect(parsed.machineLearning.clip.maxDistance).toBe(0);
     expect(parsed.machineLearning.facialRecognition.suggestions).toEqual({ enabled: true, maxDistance: 0.7 });
-    expect(parsed.machineLearning.petDetection).toEqual({ enabled: false, modelName: 'yolo11s', minScore: 0.6 });
+    expect(parsed.machineLearning.petDetection).toEqual({ enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 });
   });
 
   it('keeps the fork server flag and job concurrencies', () => {
