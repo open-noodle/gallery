@@ -82,3 +82,26 @@ describe('L3 typography', () => {
     expect(theme![0]).toMatch(/--font-display:\s*['"]Bricolage Grotesque Variable['"]/);
   });
 });
+
+describe('content panel chrome gutter', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/styles/gallery-theme.css'), 'utf8');
+  const panelRule = (prefix: string) =>
+    css.match(new RegExp(String.raw`${prefix}main:has\(> div\.absolute\.overflow-y-auto\)\s*\{[\s\S]*?\n\}`));
+
+  it('omits the inline-start gutter while a sidebar is rendered', () => {
+    // Desktop intent: the chrome-tinted sidebar IS the panel's left boundary, so a gutter there
+    // would widen the chrome band past the sidebar itself and de-centre the rail's icons.
+    const rule = panelRule(String.raw`\n`);
+    expect(rule, 'content panel rule present').not.toBeNull();
+    expect(rule![0]).toMatch(/margin-inline:\s*0\s+8px/);
+  });
+
+  it('restores the inline-start gutter when the sidebar column is collapsed', () => {
+    // Below 850px `sidebarModeStore.layout` is 'overlay', so UserPageLayout renders
+    // --sidebar-width: 0px / data-sidebar-width="0" and no sidebar is left to stand in for the
+    // gutter — the panel butts against the window edge with its left corners squared off.
+    const rule = panelRule(String.raw`\[data-sidebar-width=['"]0['"]\]\s*`);
+    expect(rule, 'collapsed-sidebar panel rule present').not.toBeNull();
+    expect(rule![0]).toMatch(/margin-inline-start:\s*8px/);
+  });
+});
