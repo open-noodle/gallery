@@ -18,7 +18,7 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { PEOPLE_PAGE_SIZE } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { personFactory } from '@test-data/factories/person-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
@@ -119,6 +119,9 @@ function renderPage(
   people: PersonResponseDto[] = [makePerson()],
   peopleStatistics: PeopleStatisticsResponseDto | null = getDefaultPeopleStatistics(people),
   hasNextPage = false,
+  // Header totals for a filtered load, as `load` resolves them. Null under All, where the
+  // unfiltered overview statistics are the right source.
+  peopleListTotals: { total: number; hidden: number } | null = null,
 ) {
   return render(PeoplePage, {
     props: {
@@ -130,6 +133,7 @@ function renderPage(
           hasNextPage,
         },
         peopleStatistics,
+        peopleListTotals,
         meta: { title: 'People' },
       },
     },
@@ -179,7 +183,7 @@ function renderPaginatedPage() {
 describe('Global people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount });
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
     clearPeopleFaceStatisticsInfoCache();
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
     authManager.setPreferences(preferencesFactory.build());
@@ -305,6 +309,34 @@ describe('Global people page', () => {
         'Alice',
       ]);
     });
+  });
+
+  // Regression: the page used to re-apply a persisted filter in onMount, so refreshing under Pets
+  // painted the unfiltered list for one round trip before narrowing. `load` now fetches the filtered
+  // list, so mounting must issue no request at all — no request, no flash.
+  it('issues no request on mount under a persisted non-All filter', async () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+
+    renderPage([makePerson({ id: 'pet-1', name: 'Rex' })], { total: 1, hidden: 0, detectedFaceCount: 0 }, false, {
+      total: 1,
+      hidden: 0,
+    });
+
+    await waitFor(() => expect(screen.getByTestId('user-page-layout')).toBeInTheDocument());
+    expect(sdkMock.getAllPeople).not.toHaveBeenCalled();
+  });
+
+  // Under a filter the unfiltered overview statistics would report the whole library above a
+  // filtered grid, so the header has to read the totals `load` returned with the filtered list.
+  it('reads the header totals from the filtered load rather than the overview statistics', () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+
+    renderPage([makePerson({ id: 'pet-1', name: 'Rex' })], { total: 120, hidden: 20, detectedFaceCount: 2901 }, false, {
+      total: 4,
+      hidden: 1,
+    });
+
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(3) \u{B7} 2,901 faces');
   });
 
   it('shows visible people and detected faces in the heading', () => {

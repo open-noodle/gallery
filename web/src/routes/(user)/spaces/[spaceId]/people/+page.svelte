@@ -19,6 +19,7 @@
   import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
+  import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
   import { sortPeople } from '$lib/utils/people-utils';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
@@ -103,24 +104,7 @@
     [PeopleFilterBy.People]: $t('people'),
     [PeopleFilterBy.Pets]: $t('pets'),
   });
-  let peopleFilterBy = $derived(
-    Object.values(PeopleFilterBy).includes($peopleViewSettings.filterBy as PeopleFilterBy)
-      ? ($peopleViewSettings.filterBy as PeopleFilterBy)
-      : PeopleFilterBy.All,
-  );
-  const filterToTypeParam = (filterBy: PeopleFilterBy) => {
-    switch (filterBy) {
-      case PeopleFilterBy.People: {
-        return 'person' as const;
-      }
-      case PeopleFilterBy.Pets: {
-        return 'pet' as const;
-      }
-      default: {
-        return undefined;
-      }
-    }
-  };
+  let peopleFilterBy = $derived(resolvePeopleFilterBy($peopleViewSettings.filterBy));
 
   const visiblePeople = $derived(
     sortPeople(
@@ -167,12 +151,13 @@
   );
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
   let mergingPerson = $state<SharedSpacePersonResponseDto>();
-  // Unfiltered-by-type total, used only to gate show/hide access (canManageVisibility below).
-  // `peopleStatistics` gets re-fetched WITH the active type filter on every filter/search change, so
-  // it legitimately reads 0 under a Pets filter with no pets — that must not take the show/hide
-  // screen with it, since it's the one place a misdetected species bucket can be hidden. The SSR load
-  // (+page.ts) never passes a type, so this is set once here and left alone by refreshPeople/searchPeople.
-  let spacePeopleTotal = $state(0);
+  // Whether the space has any people at all, ignoring the type filter — it gates show/hide access
+  // (canManageVisibility below). `peopleStatistics` gets re-fetched WITH the active type filter on
+  // every filter/search change, so it legitimately reads 0 under a Pets filter with no pets; that
+  // must not take the show/hide screen with it, since it's the one place a misdetected species
+  // bucket can be corrected. `load` resolves this, so it is set once and left alone by
+  // refreshPeople/searchPeople.
+  let hasSpacePeople = $state(false);
 
   $effect(() => {
     if (data.space.id === loadedSpaceId) {
@@ -181,7 +166,7 @@
 
     people = data.people;
     peopleStatistics = data.peopleStatistics;
-    spacePeopleTotal = data.peopleStatistics?.total ?? data.people.length;
+    hasSpacePeople = data.hasSpacePeople;
     statisticsSearchName = null;
     hasMore = data.people.length >= PAGE_SIZE;
     mergingPerson = undefined;
@@ -191,19 +176,13 @@
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
   const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
   const isEditor = $derived(isOwner || currentMember?.role === SharedSpaceRole.Editor);
-  const canManageVisibility = $derived(isEditor && spacePeopleTotal > 0);
+  const canManageVisibility = $derived(isEditor && hasSpacePeople);
 
   onMount(() => {
     const searchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
     if (searchedPeople) {
       searchName = searchedPeople;
       handlePromiseError(searchPeople(searchedPeople));
-    }
-
-    // The SSR load (+page.ts) is always unfiltered, so a persisted non-All choice has to trigger
-    // a refetch here, same as the global people page.
-    if (peopleFilterBy !== PeopleFilterBy.All) {
-      handlePromiseError(handleFilterChange(peopleFilterBy));
     }
   });
 
