@@ -671,6 +671,7 @@ describe(AuthService.name, () => {
       '/api/admin/face-repair/resolutions',
       '/api/admin/face-repair/owner/owner-id/people',
       '/api/admin/face-repair/faces/asset-face-id/thumbnail',
+      '/api/admin/face-repair/faces/asset-face-id/preview',
     ])('allows the configured demo user to read allowlisted admin route %s in demo mode', async (uri) => {
       setDemoMode(true);
       mockSessionFor(demoUser);
@@ -733,6 +734,18 @@ describe(AuthService.name, () => {
       await expect(authenticateAdmin('GET', '/api/admin/face-repair/resolutions/export')).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    // The two file-serving face routes are anchored like everything else: opening the crop and the source
+    // photo must not open anything nested beneath them.
+    it.each([
+      '/api/admin/face-repair/faces/asset-face-id/preview/original',
+      '/api/admin/face-repair/faces/asset-face-id/thumbnail/original',
+    ])('blocks the demo user from the sub-route %s', async (uri) => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('GET', uri)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     // The single POST-shaped READ. Manual review reads its whole face grid from this route, and it cannot be

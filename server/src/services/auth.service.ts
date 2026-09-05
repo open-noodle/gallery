@@ -95,6 +95,14 @@ const DEMO_ADMIN_PREVIEW_READ_ROUTES = [
   /^\/api\/admin\/face-repair\/resolutions$/,
   /^\/api\/admin\/face-repair\/owner\/[^/]+\/people$/,
   /^\/api\/admin\/face-repair\/faces\/[^/]+\/thumbnail$/,
+  // `faces/:assetFaceId/preview` (#1061) serves the SOURCE PHOTO behind a crop, so the magnifier on a face
+  // tile can show the face in context. It rides on the same DATASET argument as the thumbnail above, and is
+  // strictly narrower than it by construction: getFaceByIdOnLiveAsset applies the same
+  // `asset.visibility IN (archive, timeline)` filter AND additionally excludes trashed assets, so every
+  // photo this can serve is already reachable — as a crop of the very same generated preview file — through
+  // the entry above it. Without this entry the magnifier opens a modal with a broken image, which is how
+  // the omission was found on the live demo rather than in review.
+  /^\/api\/admin\/face-repair\/faces\/[^/]+\/preview$/,
 ];
 
 const normalizeDemoAdminPreviewUri = (uri: string) => (uri.startsWith('/api/') ? uri : `/api${uri}`);
