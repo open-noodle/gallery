@@ -2340,12 +2340,29 @@ export class SharedSpaceRepository {
     return result.count > 0;
   }
 
-  @GenerateSql({
-    params: [
-      DummyValue.UUID,
-      { withHidden: false, petsEnabled: true, limit: 50, offset: 0, named: false, minimumFaceCount: 3 },
-    ],
-  })
+  @GenerateSql(
+    {
+      params: [
+        DummyValue.UUID,
+        { withHidden: false, petsEnabled: true, limit: 50, offset: 0, named: false, minimumFaceCount: 3 },
+      ],
+    },
+    {
+      name: 'type: pet',
+      params: [
+        DummyValue.UUID,
+        {
+          withHidden: false,
+          petsEnabled: true,
+          limit: 50,
+          offset: 0,
+          named: false,
+          minimumFaceCount: 3,
+          type: 'pet',
+        },
+      ],
+    },
+  )
   getPersonsBySpaceId(
     spaceId: string,
     options: {
@@ -2358,6 +2375,7 @@ export class SharedSpaceRepository {
       takenAfter?: Date;
       takenBefore?: Date;
       minimumFaceCount?: number;
+      type?: string;
     },
   ) {
     const escapedName = options.name
@@ -2367,82 +2385,115 @@ export class SharedSpaceRepository {
     const namePattern = escapedName ? `%${escapedName}%` : undefined;
     const minimumFaceCount = options.minimumFaceCount;
 
-    return this.db
-      .selectFrom('shared_space_person')
-      .selectAll('shared_space_person')
-      .where('shared_space_person.spaceId', '=', spaceId)
-      .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
-      .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
-      .$if(!!options.named, (qb) => qb.where('shared_space_person.name', '!=', ''))
-      .$if(!!namePattern, (qb) => qb.where(() => sql`"shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`))
-      .$if(minimumFaceCount !== undefined, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            eb('shared_space_person.name', '!=', ''),
-            eb('shared_space_person.assetCount', '>=', minimumFaceCount!),
-          ]),
-        ),
-      )
-      .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('shared_space_person_face as spf2')
-            .innerJoin('asset_face as af2', 'af2.id', 'spf2.assetFaceId')
-            .innerJoin('asset', 'asset.id', 'af2.assetId')
-            .whereRef('spf2.personId', '=', 'shared_space_person.id')
-            .where('af2.deletedAt', 'is', null)
-            .where('af2.isVisible', '=', true)
-            .where('asset.deletedAt', 'is', null)
-            .where('asset.isOffline', '=', false)
-            .where('asset.visibility', 'in', visibleSpaceAssetVisibilities)
-            .where((spaceEb) =>
-              spaceEb.or([
-                spaceEb.exists(
-                  spaceEb
-                    .selectFrom('shared_space_asset')
-                    .select('shared_space_asset.assetId')
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_asset.spaceId', '=', spaceId),
-                ),
-                spaceEb.exists(
-                  spaceEb
-                    .selectFrom('shared_space_library')
-                    .select('shared_space_library.libraryId')
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('shared_space_library.spaceId', '=', spaceId),
-                ),
-                spaceEb.exists(
-                  spaceEb
-                    .selectFrom('shared_space_album')
-                    .innerJoin('album', (j) =>
-                      j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
-                    )
-                    .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
-                    .select('shared_space_album.albumId')
-                    .whereRef('album_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_album.spaceId', '=', spaceId),
-                ),
-              ]),
-            )
-            .$if(!!options.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-            .$if(!!options.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options.takenBefore!)),
-        ),
-      )
-      .orderBy('shared_space_person.isHidden', 'asc')
-      .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '')`, (om) => om.asc().nullsLast())
-      .orderBy(
-        sql`CASE WHEN NULLIF(BTRIM(shared_space_person.name), '') IS NULL THEN "shared_space_person"."assetCount" END`,
-        (om) => om.desc().nullsLast(),
-      )
-      .orderBy('shared_space_person.id')
-      .$if(!!options.limit, (qb) => qb.limit(options.limit!))
-      .$if(!!options.offset, (qb) => qb.offset(options.offset!))
-      .execute();
+    return (
+      this.db
+        .selectFrom('shared_space_person')
+        .selectAll('shared_space_person')
+        .where('shared_space_person.spaceId', '=', spaceId)
+        .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
+        .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
+        .$if(!!options.type, (qb) => qb.where('shared_space_person.type', '=', options.type!))
+        // "Pets" means the individuals pet recognition identified, not the per-species buckets the
+        // detector alone produces. A bucket has no pet_search row on any of its faces. pet_search.faceId
+        // IS an asset_face.id and shared_space_person_face.assetFaceId already holds that id, so this
+        // joins directly — no asset_face hop, unlike the global query which needs one to reach personId.
+        // This EXISTS is satisfied by ANY face of the person, not specifically a visible, in-scope one
+        // — it does not reuse the visible/in-scope constraint the separate exists() below applies. A
+        // pet whose only embedding-carrying face was soft-deleted or left the space still reads as an
+        // individual rather than a bucket. Benign over-inclusion, matches the global list arm exactly
+        // (person.repository.ts:647-660) — do not "fix" only here without doing so there too.
+        .$if(options.type === 'pet', (qb) =>
+          qb.where((eb) =>
+            eb.exists(
+              eb
+                .selectFrom('shared_space_person_face as spf')
+                .innerJoin('pet_search', 'pet_search.faceId', 'spf.assetFaceId')
+                .select(sql`1`.as('one'))
+                .whereRef('spf.personId', '=', 'shared_space_person.id'),
+            ),
+          ),
+        )
+        .$if(!!options.named, (qb) => qb.where('shared_space_person.name', '!=', ''))
+        .$if(!!namePattern, (qb) => qb.where(() => sql`"shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`))
+        .$if(minimumFaceCount !== undefined, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb('shared_space_person.name', '!=', ''),
+              eb('shared_space_person.assetCount', '>=', minimumFaceCount!),
+              // Pets view only: pet clustering already applied its own petRecognition.minFaces
+              // (shipped default 1). Layering the human threshold on top hides exactly the
+              // single-photo pets this view exists to let you name.
+              ...(options.type === 'pet' ? [eb('shared_space_person.type', '=', sql.lit('pet'))] : []),
+            ]),
+          ),
+        )
+        .where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('shared_space_person_face as spf2')
+              .innerJoin('asset_face as af2', 'af2.id', 'spf2.assetFaceId')
+              .innerJoin('asset', 'asset.id', 'af2.assetId')
+              .whereRef('spf2.personId', '=', 'shared_space_person.id')
+              .where('af2.deletedAt', 'is', null)
+              .where('af2.isVisible', '=', true)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false)
+              .where('asset.visibility', 'in', visibleSpaceAssetVisibilities)
+              .where((spaceEb) =>
+                spaceEb.or([
+                  spaceEb.exists(
+                    spaceEb
+                      .selectFrom('shared_space_asset')
+                      .select('shared_space_asset.assetId')
+                      .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                      .where('shared_space_asset.spaceId', '=', spaceId),
+                  ),
+                  spaceEb.exists(
+                    spaceEb
+                      .selectFrom('shared_space_library')
+                      .select('shared_space_library.libraryId')
+                      .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                      .where('shared_space_library.spaceId', '=', spaceId),
+                  ),
+                  spaceEb.exists(
+                    spaceEb
+                      .selectFrom('shared_space_album')
+                      .innerJoin('album', (j) =>
+                        j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                      )
+                      .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                      .select('shared_space_album.albumId')
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('shared_space_album.spaceId', '=', spaceId),
+                  ),
+                ]),
+              )
+              .$if(!!options.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+              .$if(!!options.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options.takenBefore!)),
+          ),
+        )
+        .orderBy('shared_space_person.isHidden', 'asc')
+        .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '')`, (om) => om.asc().nullsLast())
+        .orderBy(
+          sql`CASE WHEN NULLIF(BTRIM(shared_space_person.name), '') IS NULL THEN "shared_space_person"."assetCount" END`,
+          (om) => om.desc().nullsLast(),
+        )
+        .orderBy('shared_space_person.id')
+        .$if(!!options.limit, (qb) => qb.limit(options.limit!))
+        .$if(!!options.offset, (qb) => qb.offset(options.offset!))
+        .execute()
+    );
   }
 
-  @GenerateSql({
-    params: [DummyValue.UUID, { petsEnabled: true, named: false, name: 'Alice', minimumFaceCount: 3 }],
-  })
+  @GenerateSql(
+    {
+      params: [DummyValue.UUID, { petsEnabled: true, named: false, name: 'Alice', minimumFaceCount: 3 }],
+    },
+    {
+      name: 'type: pet',
+      params: [DummyValue.UUID, { petsEnabled: true, named: false, name: 'Alice', minimumFaceCount: 3, type: 'pet' }],
+    },
+  )
   async countPersonsBySpaceId(
     spaceId: string,
     options: {
@@ -2452,6 +2503,7 @@ export class SharedSpaceRepository {
       takenAfter?: Date;
       takenBefore?: Date;
       minimumFaceCount?: number;
+      type?: string;
     },
   ) {
     const escapedName = options.name
@@ -2464,6 +2516,28 @@ export class SharedSpaceRepository {
     const takenAfterFilter = options.takenAfter ? sql`AND "asset"."fileCreatedAt" >= ${options.takenAfter}` : sql``;
     const takenBeforeFilter = options.takenBefore ? sql`AND "asset"."fileCreatedAt" < ${options.takenBefore}` : sql``;
     const petPersonFilter = options.petsEnabled ? sql`` : sql`AND "shared_space_person"."type" != 'pet'`;
+    // type filter, count-arm twin of getPersonsBySpaceId's $if(!!options.type, ...) / $if(options.type
+    // === 'pet', ...) (shared-space.repository.ts ~2378-2391). Spliced into person_rows ONLY — never
+    // into assignedPersonFaceFilter, which feeds detectedFaceCount and must stay unfiltered (S24).
+    const typePersonFilter = options.type ? sql`AND "shared_space_person"."type" = ${options.type}` : sql``;
+    // Count-arm twin of getPersonsBySpaceId's pet-individual EXISTS (shared-space.repository.ts
+    // ~2400-2410) — excludes per-species buckets, which have no pet_search row on any face. This
+    // EXISTS is satisfied by ANY face of the person, not specifically a visible, in-scope one: that
+    // constraint is visibleFaceFilter below, a separate and independent AND clause. A pet whose only
+    // embedding-carrying face was soft-deleted or left the space still reads as an individual rather
+    // than a bucket. Benign over-inclusion, matches the global count arm exactly
+    // (person.repository.ts:1032-1057) — do not "fix" only here without doing so there too.
+    const petIndividualFilter =
+      options.type === 'pet'
+        ? sql`
+            AND EXISTS (
+              SELECT 1
+              FROM "shared_space_person_face" "spf"
+              INNER JOIN "pet_search" ON "pet_search"."faceId" = "spf"."assetFaceId"
+              WHERE "spf"."personId" = "shared_space_person"."id"
+            )
+          `
+        : sql``;
     const namedPersonFilter = options.named ? sql`AND "shared_space_person"."name" != ''` : sql``;
     const namePersonFilter = namePattern
       ? sql`AND "shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`
@@ -2475,6 +2549,7 @@ export class SharedSpaceRepository {
             AND (
               "shared_space_person"."name" != ''
               OR "shared_space_person"."assetCount" >= ${minimumFaceCount}
+              ${options.type === 'pet' ? sql`OR "shared_space_person"."type" = 'pet'` : sql``}
             )
           `;
     // Always require at least one visible, in-scope face (visibility already enforced by asset_scope CTE).
@@ -2562,6 +2637,8 @@ export class SharedSpaceRepository {
         FROM "shared_space_person"
         WHERE "shared_space_person"."spaceId" = ${spaceId}
           ${petPersonFilter}
+          ${typePersonFilter}
+          ${petIndividualFilter}
           ${namedPersonFilter}
           ${namePersonFilter}
           ${minimumPersonFilter}
