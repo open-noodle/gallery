@@ -2143,6 +2143,14 @@ describe('search mode control placement', () => {
     expect(m.mode).toBe('description');
   });
 
+  it('keeps the chip out of the modal, where the rail already carries the mode', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    expect(document.querySelector('[data-testid="search-mode-chip"]')).toBeNull();
+  });
+
   it('keeps the rail out of the inline dropdown, where the chip already carries the mode', () => {
     const m = new GlobalSearchManager();
     const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });

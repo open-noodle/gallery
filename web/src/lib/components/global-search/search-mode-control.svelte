@@ -46,15 +46,57 @@
     }
   }
 
-  // Escape dismisses the menu and stops there. The chip sits inside the search field,
-  // whose `clickOutside` action closes the whole palette on Escape — letting the key
-  // through would tear down the search around the menu the user meant to dismiss.
-  function closeOnEscape(event: KeyboardEvent) {
-    if (!open || event.key !== 'Escape') {
+  let menuElement = $state<HTMLElement | null>(null);
+
+  const MENU_KEYS = new Set(['Escape', 'Enter', 'ArrowDown', 'ArrowUp', 'Home', 'End']);
+
+  // The chip renders inside `Command.Root`, whose onKeyDown runs the top search on Enter,
+  // moves the result selection on the arrows, and jumps it on Home/End — and the field's
+  // `clickOutside` action closes the whole palette on Escape. Every key this menu owns has
+  // to stop there, or picking a mode with the keyboard would also fire a search and
+  // navigate away.
+  function onMenuKeydown(event: KeyboardEvent) {
+    if (!open || !MENU_KEYS.has(event.key)) {
       return;
     }
-    open = false;
     event.stopPropagation();
+
+    if (event.key === 'Escape') {
+      open = false;
+      event.preventDefault();
+      return;
+    }
+    // Enter falls through to the button's own activation.
+    if (event.key === 'Enter') {
+      return;
+    }
+
+    const items = [...(menuElement?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])];
+    if (items.length === 0) {
+      return;
+    }
+    // -1 while focus is still on the trigger, which is why the two arrows enter the list
+    // from opposite ends rather than sharing one wrap-around expression.
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    let next: number;
+    switch (event.key) {
+      case 'Home': {
+        next = 0;
+        break;
+      }
+      case 'End': {
+        next = items.length - 1;
+        break;
+      }
+      case 'ArrowDown': {
+        next = current === -1 ? 0 : (current + 1) % items.length;
+        break;
+      }
+      default: {
+        next = current === -1 ? items.length - 1 : (current - 1 + items.length) % items.length;
+      }
+    }
+    items[next]?.focus();
     event.preventDefault();
   }
 
@@ -88,7 +130,7 @@
       data-testid="search-mode-chip-trigger"
       data-scoped={scoped}
       onclick={() => (open = !open)}
-      onkeydown={closeOnEscape}
+      onkeydown={onMenuKeydown}
       class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold tracking-wide text-gray-600 transition-colors duration-150 hover:border-primary/50 hover:text-primary dark:border-immich-dark-gray dark:bg-immich-dark-bg dark:text-gray-300 dark:hover:text-primary {scoped
         ? 'opacity-50'
         : ''}"
@@ -103,7 +145,8 @@
         role="menu"
         aria-label={$t('cmdk_search_mode')}
         tabindex="-1"
-        onkeydown={closeOnEscape}
+        bind:this={menuElement}
+        onkeydown={onMenuKeydown}
         class="absolute inset-e-0 top-full z-50 mt-1.5 min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] dark:border-gray-700 dark:bg-immich-dark-bg"
       >
         {#each options as option (option.value)}

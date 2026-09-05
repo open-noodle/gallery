@@ -145,6 +145,59 @@ describe('search-mode-control — chip menu dismissal', () => {
     }
   });
 
+  // Same reasoning as Escape, for the rest of the keys the palette acts on. `Command.Root`'s
+  // onKeyDown treats Enter as "run the top search" and the arrows as "move the result
+  // selection", so a key aimed at this menu must not reach it — pressing Enter to pick a
+  // mode would otherwise also fire activateSearch and navigate away.
+  it.each(['{Enter}', '{ArrowDown}', '{ArrowUp}', '{Home}', '{End}'])(
+    'keeps %s from reaching the surrounding palette',
+    async (key) => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const onKeyOutside = vi.fn();
+      document.addEventListener('keydown', onKeyOutside);
+
+      try {
+        await openMenu(user);
+        await user.keyboard(key);
+
+        expect(onKeyOutside).not.toHaveBeenCalled();
+      } finally {
+        document.removeEventListener('keydown', onKeyOutside);
+      }
+    },
+  );
+
+  it('still selects a mode when Enter activates a menu item', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onSelect = vi.fn();
+    render(SearchModeControl, { props: { variant: 'chip', mode: 'smart', onSelect } });
+
+    await user.click(screen.getByRole('button', { name: 'Search mode: Smart' }));
+    screen.getByRole('menuitemradio', { name: 'OCR' }).focus();
+    await user.keyboard('{Enter}');
+
+    expect(onSelect).toHaveBeenCalledWith('ocr');
+  });
+
+  it('moves focus down the menu with ArrowDown', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await openMenu(user);
+
+    await user.keyboard('{ArrowDown}');
+
+    expect(document.activeElement).toBe(screen.getByRole('menuitemradio', { name: 'Smart' }));
+  });
+
+  it('wraps from the last item back to the first', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await openMenu(user);
+
+    screen.getByRole('menuitemradio', { name: 'OCR' }).focus();
+    await user.keyboard('{ArrowDown}');
+
+    expect(document.activeElement).toBe(screen.getByRole('menuitemradio', { name: 'Smart' }));
+  });
+
   it('lets Escape through when the menu is already closed', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const onEscapeOutside = vi.fn();
