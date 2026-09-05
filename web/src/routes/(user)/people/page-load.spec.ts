@@ -1,5 +1,6 @@
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { PEOPLE_PAGE_SIZE } from '$lib/constants';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { load } from './+page';
 
 const { authenticate, getFormatter, featureFlagsMock } = vi.hoisted(() => ({
@@ -11,7 +12,13 @@ const { authenticate, getFormatter, featureFlagsMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/utils/auth', () => ({ authenticate }));
-vi.mock('$lib/utils/i18n', () => ({ getFormatter }));
+// preferences.store (reached via people-filter, for the persisted People/Pets choice) pulls the
+// locale helpers out of this module at import time, so the mock has to carry them too.
+vi.mock('$lib/utils/i18n', () => ({
+  getFormatter,
+  getPreferredLocale: () => 'en',
+  convertBCP47: (value: string) => value,
+}));
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: featureFlagsMock }));
 
 describe('people page load', () => {
@@ -39,6 +46,7 @@ describe('people page load', () => {
     sdkMock.getPeopleStatistics.mockResolvedValue(statisticsResponse);
     parent = vi.fn().mockResolvedValue({});
     featureFlagsMock.valueOrUndefined = { peopleStatistics: true };
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
   });
 
   it('authenticates, awaits parent, and loads a bounded first page with overview statistics when enabled', async () => {
@@ -47,6 +55,7 @@ describe('people page load', () => {
     await expect(runLoad(url)).resolves.toEqual({
       people: peopleResponse,
       peopleStatistics: statisticsResponse,
+      peopleListTotals: null,
       meta: { title: 'people' },
     });
 
@@ -63,6 +72,48 @@ describe('people page load', () => {
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
+  // The page used to load unfiltered and re-apply the persisted filter in onMount, so refreshing
+  // under a Pets filter painted the whole people list for one round trip before narrowing to pets.
+  it('applies a persisted Pets filter to the first request', async () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+
+    const result = await runLoad(new URL('https://gallery.test/people'));
+
+    expect(sdkMock.getAllPeople).toHaveBeenCalledWith({
+      withHidden: true,
+      withSharedSpaces: true,
+      size: PEOPLE_PAGE_SIZE,
+      $type: 'pet',
+    });
+    // Header totals come back with the list, so the page needs no second request to correct them.
+    expect(result.peopleListTotals).toEqual({ total: peopleResponse.total, hidden: peopleResponse.hidden });
+  });
+
+  it('applies a persisted People filter to the first request', async () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.People });
+
+    await runLoad(new URL('https://gallery.test/people'));
+
+    expect(sdkMock.getAllPeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'person' }));
+  });
+
+  it('sends no type and no list totals under the All filter', async () => {
+    const result = await runLoad(new URL('https://gallery.test/people'));
+
+    expect(sdkMock.getAllPeople).toHaveBeenCalledWith(expect.objectContaining({ $type: undefined }));
+    // Null, so the header keeps reading the unfiltered overview statistics.
+    expect(result.peopleListTotals).toBeNull();
+  });
+
+  it('falls back to All when the persisted filter is corrupt', async () => {
+    peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: 'Nonsense' as never });
+
+    const result = await runLoad(new URL('https://gallery.test/people'));
+
+    expect(sdkMock.getAllPeople).toHaveBeenCalledWith(expect.objectContaining({ $type: undefined }));
+    expect(result.peopleListTotals).toBeNull();
+  });
+
   it('skips the overview statistics query when the peopleStatistics flag is disabled', async () => {
     featureFlagsMock.valueOrUndefined = { peopleStatistics: false };
     const url = new URL('https://gallery.test/people');
@@ -70,6 +121,7 @@ describe('people page load', () => {
     await expect(runLoad(url)).resolves.toEqual({
       people: peopleResponse,
       peopleStatistics: null,
+      peopleListTotals: null,
       meta: { title: 'people' },
     });
 
@@ -110,6 +162,7 @@ describe('people page load', () => {
     await expect(runLoad(url)).resolves.toEqual({
       people: peopleResponse,
       peopleStatistics: null,
+      peopleListTotals: null,
       meta: { title: 'people' },
     });
   });
