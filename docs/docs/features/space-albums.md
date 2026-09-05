@@ -13,6 +13,7 @@ Like the rest of Shared Spaces, album actions are governed by the space's three 
 - **Two ways photos land in a space album:**
   - **Owner-added photos** — the album owner (or an editor of the album) adds their own photos to the album, exactly like a normal album.
   - **Cross-owner contributions** — a space Editor or Owner can add photos they _don't_ own into a linked space album. These become **contributions**: they show up in the album for all members, but they never leave their real owner's library. See [Contributions](#contributions).
+- **Foldable.** Albums can be grouped into nested folders on the Albums tab, up to 10 levels deep — see [Space Album Folders](space-album-folders.md).
 - **Independent timeline control.** Each linked album has its own "show in the space's photos" switch (Owners/Editors), and every member can separately hide any album from just their own timeline. See [Showing album photos in the timeline](#showing-album-photos-in-the-timeline).
 
 ## Roles and Permissions
@@ -43,6 +44,8 @@ Open a space and select the **Albums** tab to see every album linked into it. Th
 - **Cover ↔ List** view — switch between album-style cover cards and a compact list.
 
 Viewers get the full toolbar (search, sort, group, view) but no create/link/edit buttons — the tab is read-only for them.
+
+Once a space holds more albums than a flat list can usefully show, Owners and Editors can group them into nested folders. See **[Space Album Folders](space-album-folders.md)**.
 
 ## Linking and creating albums
 
