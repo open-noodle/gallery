@@ -59,8 +59,8 @@ final driftGetAllPeopleProvider = FutureProvider.family<List<DriftPerson>, Peopl
 /// the picker can each request their own combination from the same family; a no-argument
 /// `ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider)` still invalidates every keyed
 /// instance in the family, so call sites that only need a full refresh need no change.
-final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider
-    .family<List<DriftPerson>, ({PeopleSortBy sortBy, PeopleFilterBy filterBy})>((ref, key) async {
+final driftGetAllPeopleWithSharedSpacesProvider =
+    FutureProvider.family<List<DriftPerson>, ({PeopleSortBy sortBy, PeopleFilterBy filterBy})>((ref, key) async {
       final service = ref.watch(driftPeopleServiceProvider);
       final prefs = await ref.watch(userMetadataPreferencesProvider.future);
       return service.getAllPeopleWithSharedSpaces(

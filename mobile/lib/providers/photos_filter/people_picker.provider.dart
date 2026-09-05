@@ -38,10 +38,7 @@ final peoplePickerAllProvider = FutureProvider.autoDispose<List<PersonDto>>((ref
   // it always requests the unfiltered (all) list regardless of the People page's own filter
   // setting.
   final all = await ref.watch(
-    driftGetAllPeopleWithSharedSpacesProvider((
-      sortBy: PeopleSortBy.photoCount,
-      filterBy: PeopleFilterBy.all,
-    )).future,
+    driftGetAllPeopleWithSharedSpacesProvider((sortBy: PeopleSortBy.photoCount, filterBy: PeopleFilterBy.all)).future,
   );
   return all.where((p) => !p.isHidden && p.name.isNotEmpty).map(_toPersonDto).toList();
 });

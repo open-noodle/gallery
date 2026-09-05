@@ -48,9 +48,7 @@ class _SpacePeoplePageState extends ConsumerState<SpacePeoplePage> {
   Widget build(BuildContext context) {
     final sortBy = ref.watch(appConfigProvider.select((config) => config.people.sortBy));
     final filterBy = ref.watch(appConfigProvider.select((config) => config.people.filterBy));
-    final people = ref.watch(
-      driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy, filterBy: filterBy)),
-    );
+    final people = ref.watch(driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy, filterBy: filterBy)));
 
     return Scaffold(
       appBar: AppBar(
