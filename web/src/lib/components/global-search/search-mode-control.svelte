@@ -76,7 +76,7 @@
       return;
     }
     // -1 while focus is still on the trigger, which is why the two arrows enter the list
-    // from opposite ends rather than sharing one wrap-around expression.
+    // from opposite ends rather than sharing one modulo expression.
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
     let next: number;
     switch (event.key) {
