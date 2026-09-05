@@ -25,6 +25,7 @@
   import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
+  import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
   import { appendUniqueById, sortPeople } from '$lib/utils/people-utils';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
@@ -75,10 +76,11 @@
   // re-check), and both are gated on the `loading` prop below. Without it the same page is fetched
   // concurrently and appended twice.
   let loadingPage = $state(false);
-  // Totals for the currently applied type filter. The SSR load and the overview-statistics endpoint
-  // are both unfiltered, so once a filter is active the header has to read the filtered list's own
-  // total instead, or it reports the whole library above a filtered grid.
-  let listTotals = $state<{ total: number; hidden: number } | null>(null);
+  // Totals for the currently applied type filter. The overview-statistics endpoint is unfiltered, so
+  // once a filter is active the header has to read the filtered list's own total instead, or it
+  // reports the whole library above a filtered grid. `load` already applied the persisted filter, so
+  // seed this from its response rather than leaving the header wrong until the first filter change.
+  let listTotals = $state<{ total: number; hidden: number } | null>(data.peopleListTotals ?? null);
 
   onMount(() => {
     const getSearchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
@@ -87,10 +89,6 @@
       if (searchPeopleElement) {
         handlePromiseError(searchPeopleElement.searchPeople(true, searchName));
       }
-    }
-
-    if (peopleFilterBy !== PeopleFilterBy.All) {
-      handlePromiseError(handleFilterChange(peopleFilterBy));
     }
 
     return websocketEvents.on('on_person_thumbnail', (personId: string) => {
@@ -120,6 +118,9 @@
                   withSharedSpaces: true,
                   page: startingPage + i,
                   size: PEOPLE_PAGE_SIZE,
+                  // Restoring scroll must page over the SAME filtered list the first page came
+                  // from; without this, returning to a filtered grid appends unfiltered people.
+                  $type: filterToTypeParam(peopleFilterBy),
                 });
               }),
             )
@@ -329,24 +330,7 @@
     [PeopleFilterBy.People]: $t('people'),
     [PeopleFilterBy.Pets]: $t('pets'),
   });
-  let peopleFilterBy = $derived(
-    Object.values(PeopleFilterBy).includes($peopleViewSettings.filterBy as PeopleFilterBy)
-      ? ($peopleViewSettings.filterBy as PeopleFilterBy)
-      : PeopleFilterBy.All,
-  );
-  const filterToTypeParam = (filterBy: PeopleFilterBy) => {
-    switch (filterBy) {
-      case PeopleFilterBy.People: {
-        return 'person' as const;
-      }
-      case PeopleFilterBy.Pets: {
-        return 'pet' as const;
-      }
-      default: {
-        return undefined;
-      }
-    }
-  };
+  let peopleFilterBy = $derived(resolvePeopleFilterBy($peopleViewSettings.filterBy));
 
   const handleFilterChange = async (filterBy: PeopleFilterBy) => {
     $peopleViewSettings.filterBy = filterBy;
