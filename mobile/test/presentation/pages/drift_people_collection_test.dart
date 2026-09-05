@@ -85,11 +85,9 @@ void main() {
     // M7/M9: the page must watch the People/Pets filter setting alongside sort and pass it
     // through the provider's record key, and PeopleFilterButton must be reachable from the
     // app bar.
-    testWidgets('requests the filter-keyed provider and re-queries when the filter setting changes', (
-      tester,
-    ) async {
+    testWidgets('requests the filter-keyed provider and re-queries when the filter setting changes', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => switch (key.filterBy) {
@@ -216,9 +214,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
-          driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, key) async => [_person('me', 'Personal Pat')],
-          ),
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, key) async => [_person('me', 'Personal Pat')]),
         ],
       );
       await tester.pumpAndSettle();
