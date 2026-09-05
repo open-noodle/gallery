@@ -164,7 +164,7 @@ function renderPage({
       members,
       people,
       peopleStatistics,
-      hasSpacePeople: hasSpacePeople ?? ((peopleStatistics?.total ?? people.length) > 0),
+      hasSpacePeople: hasSpacePeople ?? (peopleStatistics?.total ?? people.length) > 0,
       meta: { title: `${space.name} - People` },
     },
   };
