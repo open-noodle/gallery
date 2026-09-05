@@ -28,7 +28,11 @@ void main() {
 
   test('passes the requested sort mode through to the repository', () async {
     when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+      () => mockRepository.getSpacePeople(
+        any(),
+        sortBy: any(named: 'sortBy'),
+        filterBy: any(named: 'filterBy'),
+      ),
     ).thenAnswer((_) async => [_p('sp1', name: 'Mia')]);
 
     final result = await container.read(
@@ -43,7 +47,11 @@ void main() {
 
   test('re-fetches when the sort mode changes because it is part of the family key', () async {
     when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+      () => mockRepository.getSpacePeople(
+        any(),
+        sortBy: any(named: 'sortBy'),
+        filterBy: any(named: 'filterBy'),
+      ),
     ).thenAnswer((_) async => [_p('sp1')]);
 
     await container.read(
@@ -70,18 +78,18 @@ void main() {
   // only on sortBy.
   test('M12: re-fetches when the filter changes because it is part of the family key', () async {
     when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+      () => mockRepository.getSpacePeople(
+        any(),
+        sortBy: any(named: 'sortBy'),
+        filterBy: any(named: 'filterBy'),
+      ),
     ).thenAnswer((_) async => [_p('sp1')]);
 
     await container.read(
       driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all)).future,
     );
     await container.read(
-      driftSpacePeopleProvider((
-        spaceId: 'space-1',
-        sortBy: PeopleSortBy.name,
-        filterBy: PeopleFilterBy.pets,
-      )).future,
+      driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets)).future,
     );
 
     verify(
@@ -94,7 +102,11 @@ void main() {
 
   test('surfaces the failure instead of falling back to the owner-scoped local list', () async {
     when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+      () => mockRepository.getSpacePeople(
+        any(),
+        sortBy: any(named: 'sortBy'),
+        filterBy: any(named: 'filterBy'),
+      ),
     ).thenThrow(Exception('offline'));
 
     // A local fallback would list people who are NOT in this space, which is wrong rather
@@ -111,16 +123,16 @@ void main() {
   // people/pets must still surface as AsyncError, not silently fall back to any local list.
   test('M13: surfaces the failure for a filtered fetch instead of falling back', () async {
     when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+      () => mockRepository.getSpacePeople(
+        any(),
+        sortBy: any(named: 'sortBy'),
+        filterBy: any(named: 'filterBy'),
+      ),
     ).thenThrow(Exception('offline'));
 
     await expectLater(
       container.read(
-        driftSpacePeopleProvider((
-          spaceId: 'space-1',
-          sortBy: PeopleSortBy.name,
-          filterBy: PeopleFilterBy.pets,
-        )).future,
+        driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets)).future,
       ),
       throwsA(isA<Exception>()),
     );
@@ -133,7 +145,11 @@ void main() {
     // read after that must issue a brand-new fetch rather than replaying a cached instance.
     fakeAsync((async) {
       when(
-        () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'), filterBy: any(named: 'filterBy')),
+        () => mockRepository.getSpacePeople(
+          any(),
+          sortBy: any(named: 'sortBy'),
+          filterBy: any(named: 'filterBy'),
+        ),
       ).thenAnswer((_) async => [_p('sp1', name: 'Mia')]);
 
       const key = (spaceId: 'space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.all);
