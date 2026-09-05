@@ -34,7 +34,12 @@ PersonDto _toPersonDto(DriftPerson p) => PersonDto(
 /// Pinned to photoCount ordering: peopleAlphaIndex preserves input order within
 /// letter buckets, so the People-view sort preference must not leak in here.
 final peoplePickerAllProvider = FutureProvider.autoDispose<List<PersonDto>>((ref) async {
-  final all = await ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount).future);
+  // The picker deliberately surfaces both people and pets; it has no filter UI of its own, so
+  // it always requests the unfiltered (all) list regardless of the People page's own filter
+  // setting.
+  final all = await ref.watch(
+    driftGetAllPeopleWithSharedSpacesProvider((sortBy: PeopleSortBy.photoCount, filterBy: PeopleFilterBy.all)).future,
+  );
   return all.where((p) => !p.isHidden && p.name.isNotEmpty).map(_toPersonDto).toList();
 });
 

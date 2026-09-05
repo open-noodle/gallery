@@ -92,7 +92,7 @@ void main() {
         const PersonPickerPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, sortBy) async => [_d('a', 'Alice'), _d('b', 'Bob')],
+            (ref, key) async => [_d('a', 'Alice'), _d('b', 'Bob')],
           ),
         ],
       );
@@ -134,7 +134,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, key) async => [_d('a', 'Alice')]),
         ],
       );
       await tester.pumpAndSettle();
@@ -153,7 +153,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => [_d('a', 'Alice')]),
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, key) async => [_d('a', 'Alice')]),
         ],
       );
       await tester.pumpAndSettle();
@@ -178,7 +178,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PersonPickerPage(),
         overrides: [
-          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async {
+          driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, key) async {
             calls++;
             if (calls == 1) throw Exception('network down');
             return [_d('a', 'Alice')];

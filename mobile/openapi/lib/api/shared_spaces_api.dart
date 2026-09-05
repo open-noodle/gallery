@@ -1239,8 +1239,11 @@ class SharedSpacesApi {
   ///
   /// * [DateTime] takenBefore:
   ///
+  /// * [String] type:
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.
+  ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
+  Future<Response> getSpacePeopleWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withHidden, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people'
       .replaceAll('{id}', id);
@@ -1269,6 +1272,9 @@ class SharedSpacesApi {
     }
     if (takenBefore != null) {
       queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
+    }
+    if (type != null) {
+      queryParams.addAll(_queryParams('', 'type', type));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -1312,9 +1318,12 @@ class SharedSpacesApi {
   ///
   /// * [DateTime] takenBefore:
   ///
+  /// * [String] type:
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.
+  ///
   /// * [bool] withHidden:
-  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
-    final response = await getSpacePeopleWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, abortTrigger: abortTrigger,);
+  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withHidden, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePeopleWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withHidden: withHidden, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1356,8 +1365,11 @@ class SharedSpacesApi {
   ///
   /// * [DateTime] takenBefore:
   ///
+  /// * [String] type:
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.
+  ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleFaceStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
+  Future<Response> getSpacePeopleFaceStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withHidden, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/face-statistics'
       .replaceAll('{id}', id);
@@ -1386,6 +1398,9 @@ class SharedSpacesApi {
     }
     if (takenBefore != null) {
       queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
+    }
+    if (type != null) {
+      queryParams.addAll(_queryParams('', 'type', type));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -1429,9 +1444,12 @@ class SharedSpacesApi {
   ///
   /// * [DateTime] takenBefore:
   ///
+  /// * [String] type:
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.
+  ///
   /// * [bool] withHidden:
-  Future<PeopleFaceStatisticsResponseDto?> getSpacePeopleFaceStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
-    final response = await getSpacePeopleFaceStatisticsWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, abortTrigger: abortTrigger,);
+  Future<PeopleFaceStatisticsResponseDto?> getSpacePeopleFaceStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withHidden, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePeopleFaceStatisticsWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withHidden: withHidden, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1470,8 +1488,11 @@ class SharedSpacesApi {
   ///
   /// * [DateTime] takenBefore:
   ///
+  /// * [String] type:
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.
+  ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
+  Future<Response> getSpacePeopleStatisticsWithHttpInfo(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withHidden, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people/statistics'
       .replaceAll('{id}', id);
@@ -1500,6 +1521,9 @@ class SharedSpacesApi {
     }
     if (takenBefore != null) {
       queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
+    }
+    if (type != null) {
+      queryParams.addAll(_queryParams('', 'type', type));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -1543,9 +1567,12 @@ class SharedSpacesApi {
   ///
   /// * [DateTime] takenBefore:
   ///
+  /// * [String] type:
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.
+  ///
   /// * [bool] withHidden:
-  Future<SharedSpacePeopleStatisticsResponseDto?> getSpacePeopleStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, Future<void>? abortTrigger, }) async {
-    final response = await getSpacePeopleStatisticsWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, abortTrigger: abortTrigger,);
+  Future<SharedSpacePeopleStatisticsResponseDto?> getSpacePeopleStatistics(String id, { int? limit, String? name, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withHidden, Future<void>? abortTrigger, }) async {
+    final response = await getSpacePeopleStatisticsWithHttpInfo(id, limit: limit, name: name, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withHidden: withHidden, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

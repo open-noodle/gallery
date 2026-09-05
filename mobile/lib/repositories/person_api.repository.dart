@@ -27,7 +27,11 @@ class PersonApiRepository extends ApiRepository {
   /// The local sync DB is owner-scoped and never receives shared-space people, so the
   /// mobile People page must read this RBAC-projected list to stay at parity with web.
   /// This is the People-page sibling of issue #727.
-  Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({required PeopleSortBy sortBy}) async {
+  Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({
+    required PeopleSortBy sortBy,
+    PeopleFilterBy filterBy = PeopleFilterBy.all,
+  }) async {
+    final type = filterBy.toTypeParam();
     final dtos = <PersonResponseDto>[];
     var page = 1;
     // The server pages people (default 500, max 1000 per page). Walk every page so a large
@@ -36,7 +40,7 @@ class PersonApiRepository extends ApiRepository {
     const maxPages = 100;
     while (page <= maxPages) {
       final response = await checkNull(
-        _api.getAllPeople(withSharedSpaces: true, withHidden: false, page: page, size: 1000),
+        _api.getAllPeople(withSharedSpaces: true, withHidden: false, page: page, size: 1000, type: type),
       );
       dtos.addAll(response.people);
       if (response.hasNextPage.orElse(null) != true || response.people.isEmpty) {

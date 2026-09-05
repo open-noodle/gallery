@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/string_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/people/people_filter_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/people_grid.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/people_sort_button.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
@@ -46,7 +47,8 @@ class _SpacePeoplePageState extends ConsumerState<SpacePeoplePage> {
   @override
   Widget build(BuildContext context) {
     final sortBy = ref.watch(appConfigProvider.select((config) => config.people.sortBy));
-    final people = ref.watch(driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy)));
+    final filterBy = ref.watch(appConfigProvider.select((config) => config.people.filterBy));
+    final people = ref.watch(driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy, filterBy: filterBy)));
 
     return Scaffold(
       appBar: AppBar(
@@ -63,6 +65,7 @@ class _SpacePeoplePageState extends ConsumerState<SpacePeoplePage> {
             : Text('people'.tr()),
         centerTitle: false,
         actions: [
+          const PeopleFilterButton(),
           const PeopleSortButton(),
           IconButton(
             key: const Key('space-people-search-toggle'),
@@ -79,7 +82,9 @@ class _SpacePeoplePageState extends ConsumerState<SpacePeoplePage> {
           error: (error, _) {
             dPrint(() => 'Error loading space people: $error');
             return _ErrorState(
-              onRetry: () => ref.invalidate(driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy))),
+              onRetry: () => ref.invalidate(
+                driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy, filterBy: filterBy)),
+              ),
             );
           },
           data: (people) {
