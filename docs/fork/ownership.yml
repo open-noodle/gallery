@@ -315,6 +315,7 @@ features:
       - server/src/schema/migrations-gallery/**
       - server/bin/sync-gallery-migrations.mjs
       - tools/upstream-preflight/**
+      - scripts/spec-citation-check.sh
       - Template/**
     upstream_extension_paths:
       - .github/workflows/**
