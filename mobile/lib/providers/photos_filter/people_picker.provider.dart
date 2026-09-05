@@ -33,7 +33,12 @@ FilterPerson _toFilterPerson(Person p) => FilterPerson(
 /// Pinned to photoCount ordering: peopleAlphaIndex preserves input order within
 /// letter buckets, so the People-view sort preference must not leak in here.
 final peoplePickerAllProvider = FutureProvider.autoDispose<List<FilterPerson>>((ref) async {
-  final all = await ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount).future);
+  // The picker deliberately surfaces both people and pets; it has no filter UI of its own, so
+  // it always requests the unfiltered (all) list regardless of the People page's own filter
+  // setting.
+  final all = await ref.watch(
+    driftGetAllPeopleWithSharedSpacesProvider((sortBy: PeopleSortBy.photoCount, filterBy: PeopleFilterBy.all)).future,
+  );
   // Hidden people never appear here: the server list is withHidden:false and the
   // local fallback filters isHidden in SQL.
   return all.where((p) => p.name.isNotEmpty).map(_toFilterPerson).toList();
