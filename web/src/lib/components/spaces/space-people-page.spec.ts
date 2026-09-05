@@ -144,12 +144,15 @@ function renderPage({
     detectedFaceCount: 0,
   },
   userId = 'current-user-id',
+  hasSpacePeople,
 }: {
   space?: SharedSpaceResponseDto;
   members?: SharedSpaceMemberResponseDto[];
   people?: SharedSpacePersonResponseDto[];
   peopleStatistics?: SharedSpacePeopleStatisticsResponseDto | null;
   userId?: string;
+  /** Whether the space has any people at all, ignoring the filter, as `load` resolves it. */
+  hasSpacePeople?: boolean;
 } = {}) {
   const currentUser = userAdminFactory.build({ id: userId });
   authManager.setUser(currentUser);
@@ -161,6 +164,7 @@ function renderPage({
       members,
       people,
       peopleStatistics,
+      hasSpacePeople: hasSpacePeople ?? ((peopleStatistics?.total ?? people.length) > 0),
       meta: { title: `${space.name} - People` },
     },
   };
@@ -1073,11 +1077,12 @@ describe('Spaces people page', () => {
       vi.stubGlobal('IntersectionObserver', VisibleObserver);
       const pets = Array.from({ length: PAGE_SIZE }, (_, i) => makePerson({ id: `pet-${i}`, type: 'pet' }));
       peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
-      sdkMock.getSpacePeople.mockImplementation(({ offset }) => Promise.resolve(offset ? [] : pets));
+      sdkMock.getSpacePeople.mockResolvedValue([]);
       sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: PAGE_SIZE, hidden: 0, detectedFaceCount: 0 });
 
-      // The SSR-loaded data is unfiltered; the mount effect reapplies the persisted Pets filter.
-      renderPage({ people: [], peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 } });
+      // `load` now delivers the filtered first page, so a full page means there is a second one to
+      // fetch — and that request has to carry the same filter, or paging widens the list.
+      renderPage({ people: pets, peopleStatistics: { total: PAGE_SIZE, hidden: 0, detectedFaceCount: 0 } });
 
       await waitFor(() => {
         expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
@@ -1148,18 +1153,37 @@ describe('Spaces people page', () => {
       });
     });
 
-    it('reapplies a persisted non-All filter on mount, since SSR loads unfiltered', async () => {
+    // Regression: the page used to re-apply a persisted filter in onMount, so a refresh under Pets
+    // painted the unfiltered list for one round trip before narrowing. `load` now fetches the
+    // filtered list, so mounting must issue no request at all — no request, no flash.
+    it('issues no request on mount under a persisted non-All filter', async () => {
       peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
-      sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', type: 'pet' })]);
-      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 0 });
 
-      // SSR-loaded data (passed to renderPage) is always unfiltered.
-      renderPage({ people: [makePerson({ id: 'p0' })] });
+      renderPage({
+        people: [makePerson({ id: 'pet-1', type: 'pet' })],
+        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 0 },
+        hasSpacePeople: true,
+      });
 
       await waitFor(() => {
-        expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+        expect(screen.getByTestId('space-people-heading-description')).toBeInTheDocument();
       });
-      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      expect(sdkMock.getSpacePeople).not.toHaveBeenCalled();
+      expect(sdkMock.getSpacePeopleStatistics).not.toHaveBeenCalled();
+    });
+
+    // The show/hide screen is the only place a misdetected species bucket can be corrected, so a
+    // Pets filter matching nothing must not hide it. `load` hands over the unfiltered total for it.
+    it('keeps show/hide reachable when the active filter matches nothing', () => {
+      peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.Pets });
+
+      renderPage({
+        people: [],
+        peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
+        hasSpacePeople: true,
+      });
+
+      expect(screen.getByRole('button', { name: 'show_and_hide_people' })).toBeInTheDocument();
     });
 
     it('does not send the filter to the face-statistics endpoint', async () => {
