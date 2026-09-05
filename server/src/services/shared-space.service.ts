@@ -1806,6 +1806,7 @@ export class SharedSpaceService extends BaseService {
       takenAfter: query?.takenAfter,
       takenBefore: query?.takenBefore,
       minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      type: query?.type,
     });
 
     const aliases =
@@ -1835,6 +1836,7 @@ export class SharedSpaceService extends BaseService {
       takenAfter: query?.takenAfter,
       takenBefore: query?.takenBefore,
       minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      type: query?.type,
     });
   }
 

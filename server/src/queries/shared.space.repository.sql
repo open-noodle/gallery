@@ -1287,6 +1287,85 @@ order by
 limit
   $12
 
+-- SharedSpaceRepository.getPersonsBySpaceId (type: pet)
+select
+  "shared_space_person".*
+from
+  "shared_space_person"
+where
+  "shared_space_person"."spaceId" = $1
+  and "shared_space_person"."isHidden" = $2
+  and "shared_space_person"."type" = $3
+  and exists (
+    select
+      1 as "one"
+    from
+      "shared_space_person_face" as "spf"
+      inner join "pet_search" on "pet_search"."faceId" = "spf"."assetFaceId"
+    where
+      "spf"."personId" = "shared_space_person"."id"
+  )
+  and (
+    "shared_space_person"."name" != $4
+    or "shared_space_person"."assetCount" >= $5
+    or "shared_space_person"."type" = 'pet'
+  )
+  and exists (
+    select
+    from
+      "shared_space_person_face" as "spf2"
+      inner join "asset_face" as "af2" on "af2"."id" = "spf2"."assetFaceId"
+      inner join "asset" on "asset"."id" = "af2"."assetId"
+    where
+      "spf2"."personId" = "shared_space_person"."id"
+      and "af2"."deletedAt" is null
+      and "af2"."isVisible" = $6
+      and "asset"."deletedAt" is null
+      and "asset"."isOffline" = $7
+      and "asset"."visibility" in ($8, $9)
+      and (
+        exists (
+          select
+            "shared_space_asset"."assetId"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = $10
+        )
+        or exists (
+          select
+            "shared_space_library"."libraryId"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = $11
+        )
+        or exists (
+          select
+            "shared_space_album"."albumId"
+          from
+            "shared_space_album"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = $12
+        )
+      )
+  )
+order by
+  "shared_space_person"."isHidden" asc,
+  NULLIF(BTRIM(shared_space_person.name), '') asc nulls last,
+  CASE
+    WHEN NULLIF(BTRIM(shared_space_person.name), '') IS NULL THEN "shared_space_person"."assetCount"
+  END desc nulls last,
+  "shared_space_person"."id"
+limit
+  $13
+
 -- SharedSpaceRepository.countPersonsBySpaceId
 WITH
   "asset_scope" AS (
@@ -1393,6 +1472,133 @@ WITH
           "shared_space_person_face"."assetFaceId" = "asset_face"."id"
           AND "shared_space_person"."spaceId" = $13
           AND "shared_space_person"."name" ILIKE $14 ESCAPE '\'
+      )
+  )
+SELECT
+  "person_counts"."total",
+  "person_counts"."hidden",
+  "face_counts"."detectedFaceCount"
+FROM
+  "person_counts",
+  "face_counts"
+
+-- SharedSpaceRepository.countPersonsBySpaceId (type: pet)
+WITH
+  "asset_scope" AS (
+    SELECT
+      "asset"."id" AS "assetId"
+    FROM
+      "shared_space_asset"
+      INNER JOIN "asset" ON "asset"."id" = "shared_space_asset"."assetId"
+    WHERE
+      "shared_space_asset"."spaceId" = $1
+      AND "asset"."deletedAt" IS NULL
+      AND "asset"."isOffline" = false
+      AND "asset"."visibility" IN ($2, $3)
+    UNION
+    SELECT
+      "asset"."id" AS "assetId"
+    FROM
+      "shared_space_library"
+      INNER JOIN "asset" ON "asset"."libraryId" = "shared_space_library"."libraryId"
+    WHERE
+      "shared_space_library"."spaceId" = $4
+      AND "asset"."deletedAt" IS NULL
+      AND "asset"."isOffline" = false
+      AND "asset"."visibility" IN ($5, $6)
+    UNION
+    SELECT
+      "asset"."id" AS "assetId"
+    FROM
+      "shared_space_album"
+      INNER JOIN "album" ON "album"."id" = "shared_space_album"."albumId"
+      AND "album"."deletedAt" IS NULL
+      INNER JOIN "album_asset" ON "album_asset"."albumId" = "shared_space_album"."albumId"
+      INNER JOIN "asset" ON "asset"."id" = "album_asset"."assetId"
+    WHERE
+      "shared_space_album"."spaceId" = $7
+      AND "asset"."deletedAt" IS NULL
+      AND "asset"."isOffline" = false
+      AND "asset"."visibility" IN ($8, $9)
+  ),
+  "person_rows" AS (
+    SELECT
+      COALESCE(
+        "shared_space_person"."identityId",
+        "shared_space_person"."id"
+      ) AS "personKey",
+      "shared_space_person"."isHidden"
+    FROM
+      "shared_space_person"
+    WHERE
+      "shared_space_person"."spaceId" = $10
+      AND "shared_space_person"."type" = $11
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          "shared_space_person_face" "spf"
+          INNER JOIN "pet_search" ON "pet_search"."faceId" = "spf"."assetFaceId"
+        WHERE
+          "spf"."personId" = "shared_space_person"."id"
+      )
+      AND "shared_space_person"."name" ILIKE $12 ESCAPE '\'
+      AND (
+        "shared_space_person"."name" != ''
+        OR "shared_space_person"."assetCount" >= $13
+        OR "shared_space_person"."type" = 'pet'
+      )
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          "shared_space_person_face"
+          INNER JOIN "asset_face" ON "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+          INNER JOIN "asset_scope" ON "asset_scope"."assetId" = "asset_face"."assetId"
+        WHERE
+          "shared_space_person_face"."personId" = "shared_space_person"."id"
+          AND "asset_face"."deletedAt" IS NULL
+          AND "asset_face"."isVisible" = true
+      )
+  ),
+  "person_keys" AS (
+    SELECT
+      "personKey",
+      BOOL_AND("isHidden") AS "allHidden"
+    FROM
+      "person_rows"
+    GROUP BY
+      "personKey"
+  ),
+  "person_counts" AS (
+    SELECT
+      COUNT(*)::int AS "total",
+      COUNT(*) FILTER (
+        WHERE
+          "allHidden"
+      )::int AS "hidden"
+    FROM
+      "person_keys"
+  ),
+  "face_counts" AS (
+    SELECT
+      COUNT(DISTINCT "asset_face"."id")::int AS "detectedFaceCount"
+    FROM
+      "asset_scope"
+      INNER JOIN "asset_face" ON "asset_face"."assetId" = "asset_scope"."assetId"
+    WHERE
+      "asset_face"."deletedAt" IS NULL
+      AND "asset_face"."isVisible" = true
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          "shared_space_person_face"
+          INNER JOIN "shared_space_person" ON "shared_space_person"."id" = "shared_space_person_face"."personId"
+        WHERE
+          "shared_space_person_face"."assetFaceId" = "asset_face"."id"
+          AND "shared_space_person"."spaceId" = $14
+          AND "shared_space_person"."name" ILIKE $15 ESCAPE '\'
       )
   )
 SELECT

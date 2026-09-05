@@ -46,14 +46,21 @@ final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((
 /// matching the web People page / picker. Kept distinct from [getAllPeopleProvider] so
 /// the remaining owner-scoped, local-first surface (the library people card) stays local.
 /// See issue #727.
-final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Person>, PeopleSortBy>((
-  ref,
-  sortBy,
-) async {
-  final service = ref.watch(peopleServiceProvider);
-  final prefs = await ref.watch(userMetadataPreferencesProvider.future);
-  return service.getAllPeopleWithSharedSpaces(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
-});
+///
+/// Keyed by a record of both `sortBy` and `filterBy` (people/pets/all) so the People page and
+/// the picker can each request their own combination from the same family; a no-argument
+/// `ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider)` still invalidates every keyed
+/// instance in the family, so call sites that only need a full refresh need no change.
+final driftGetAllPeopleWithSharedSpacesProvider =
+    FutureProvider.family<List<Person>, ({PeopleSortBy sortBy, PeopleFilterBy filterBy})>((ref, key) async {
+      final service = ref.watch(peopleServiceProvider);
+      final prefs = await ref.watch(userMetadataPreferencesProvider.future);
+      return service.getAllPeopleWithSharedSpaces(
+        minFaces: prefs?.minimumFaces ?? 3,
+        sortBy: key.sortBy,
+        filterBy: key.filterBy,
+      );
+    });
 
 /// People scoped to one shared space, for [SpacePeoplePage] — the mobile equivalent of the web
 /// space People tab.
@@ -73,9 +80,9 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Per
 /// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped
 /// (its only consumer), so re-opening the page always issues a fresh fetch.
 final driftSpacePeopleProvider = FutureProvider.autoDispose
-    .family<List<Person>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
+    .family<List<Person>, ({String spaceId, PeopleSortBy sortBy, PeopleFilterBy filterBy})>((ref, key) async {
       final repository = ref.watch(sharedSpaceApiRepositoryProvider);
-      return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy);
+      return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy, filterBy: key.filterBy);
     });
 
 /// Every server-backed people list. The local list is (post-reconciliation) a Drift

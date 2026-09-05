@@ -1718,6 +1718,16 @@ describe('/shared-spaces', () => {
 
       const rexRes = await utils.createSpacePerson(spaceId, 'Rex', owner.userId, spaceAssetId, { type: 'pet' });
       petPersonId = rexRes.spacePersonId;
+      // Give Rex a pet_search row on its face — the repository's type=pet filter (design doc
+      // "Trap 2") excludes any pet whose faces have NO pet_search row as a species bucket
+      // (the detector's undifferentiated output), so a fixture pet needs one to be treated as
+      // the individual re-ID result S31 is testing, not a bucket.
+      const petSearchDbClient = await utils.connectDatabase();
+      const petEmbedding = `[${Array.from({ length: 512 }, () => Math.random()).join(',')}]`;
+      await petSearchDbClient.query('INSERT INTO pet_search ("faceId", embedding) VALUES ($1, $2)', [
+        rexRes.faceId,
+        petEmbedding,
+      ]);
 
       // Fifth person whose underlying global thumbnailPath we'll blank — used by test 11
       // (the "minFaces gate" pin). Created here so test 11 can mutate and restore it
@@ -1843,6 +1853,80 @@ describe('/shared-spaces', () => {
       } finally {
         await dbClient.query('UPDATE shared_space SET "petsEnabled" = true WHERE id = $1', [spaceId]);
       }
+    });
+
+    it('filters the space people list by type and keeps the statistics in agreement (S31)', async () => {
+      // People/Pets filter parity (design doc 2026-09-04-people-pets-filter-parity): the same
+      // `type` query param filters both the listing and the /statistics counter, and the two
+      // must agree — this is the contract the mobile/web filter UI relies on.
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .query({ type: 'pet' })
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      expect(body.every((p: { type: string }) => p.type === 'pet')).toBe(true);
+      // Rex (petPersonId) is the only pet fixture in T09 — pin it's actually there, not just
+      // that an accidentally-empty list vacuously satisfies the .every() above.
+      const petIds = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(petIds).toContain(petPersonId);
+
+      const stats = await request(app)
+        .get(`/shared-spaces/${spaceId}/people/statistics`)
+        .query({ type: 'pet' })
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(stats.status).toBe(200);
+      expect(stats.body.total).toBe(body.length);
+
+      // Sanity: the unfiltered list is strictly bigger and includes non-pet people — proves the
+      // filter is actually narrowing, not that the endpoint always returns pets-only.
+      const unfiltered = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(unfiltered.status).toBe(200);
+      expect((unfiltered.body as Array<{ id: string; type: string }>).some((p) => p.type === 'person')).toBe(true);
+      expect((unfiltered.body as unknown[]).length).toBeGreaterThan((body as unknown[]).length);
+    });
+
+    it('type=person on the space people list excludes pets and matches the statistics count', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .query({ type: 'person' })
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string; type: string }>).map((p) => p.id);
+      expect(body.every((p: { type: string }) => p.type === 'person')).toBe(true);
+      expect(ids).not.toContain(petPersonId);
+      expect(ids).toContain(namedPersonId);
+
+      const stats = await request(app)
+        .get(`/shared-spaces/${spaceId}/people/statistics`)
+        .query({ type: 'person' })
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(stats.status).toBe(200);
+      // Unlike the S31 case (no hidden pets in the fixture), the type=person set includes
+      // Hannah (hidden). The listing defaults to withHidden=false and excludes her, but
+      // /statistics has no withHidden param — its `total` always counts hidden rows too
+      // (that's what the separate `hidden` field is for). So the apples-to-apples comparison
+      // is total minus hidden, not total against the (hidden-excluding) list length directly.
+      expect(stats.body.total - stats.body.hidden).toBe(body.length);
+    });
+
+    it('the type filter does not change the face-statistics endpoint (server design decision)', async () => {
+      // shared-space.controller.ts:387-400 — GET .../people/face-statistics shares
+      // SpacePeopleQueryDto with the two endpoints above, but getPeopleFaceStatisticsBySpaceId
+      // has no `type` option and ignores it by design (#1065's decision not to filter face
+      // statistics — see server/src/services/shared-space.service.spec.ts's S32 for the unit-level
+      // pin of this same decision).
+      const unfiltered = await request(app)
+        .get(`/shared-spaces/${spaceId}/people/face-statistics`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      const filtered = await request(app)
+        .get(`/shared-spaces/${spaceId}/people/face-statistics`)
+        .query({ type: 'pet' })
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(unfiltered.status).toBe(200);
+      expect(filtered.status).toBe(200);
+      expect(filtered.body).toEqual(unfiltered.body);
     });
 
     describe('pagination', () => {
