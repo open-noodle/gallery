@@ -2437,6 +2437,34 @@ describe(SharedSpaceRepository.name, () => {
         expect(result.map((p) => p.id)).not.toContain(pet.id);
       });
 
+      it('still hides an unnamed single-face human under minimumFaceCount, filtered and unfiltered (S7)', async () => {
+        // Sibling of S6/S8, human side: the pets waiver (the `type === 'pet'` OR arm) must not leak
+        // to humans — the exact regression #1065 shipped and had to revert.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const human = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: '',
+          assetCount: 1,
+        });
+
+        const filtered = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'person',
+          minimumFaceCount: 3,
+        });
+        expect(filtered.map((p) => p.id)).not.toContain(human.id);
+
+        const unfiltered = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, minimumFaceCount: 3 });
+        expect(unfiltered.map((p) => p.id)).not.toContain(human.id);
+      });
+
       it('returns nothing for type=pet when the space has pets disabled (S9)', async () => {
         // A human co-exists so this proves the AND: petsEnabled's existing `type != 'pet'` guard
         // alone would let the human through untouched — only the new type='pet' predicate excludes

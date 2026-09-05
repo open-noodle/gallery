@@ -2397,6 +2397,11 @@ export class SharedSpaceRepository {
         // detector alone produces. A bucket has no pet_search row on any of its faces. pet_search.faceId
         // IS an asset_face.id and shared_space_person_face.assetFaceId already holds that id, so this
         // joins directly — no asset_face hop, unlike the global query which needs one to reach personId.
+        // This EXISTS is satisfied by ANY face of the person, not specifically a visible, in-scope one
+        // — it does not reuse the visible/in-scope constraint the separate exists() below applies. A
+        // pet whose only embedding-carrying face was soft-deleted or left the space still reads as an
+        // individual rather than a bucket. Benign over-inclusion, matches the global list arm exactly
+        // (person.repository.ts:647-660) — do not "fix" only here without doing so there too.
         .$if(options.type === 'pet', (qb) =>
           qb.where((eb) =>
             eb.exists(
@@ -2515,6 +2520,13 @@ export class SharedSpaceRepository {
     // === 'pet', ...) (shared-space.repository.ts ~2378-2391). Spliced into person_rows ONLY — never
     // into assignedPersonFaceFilter, which feeds detectedFaceCount and must stay unfiltered (S24).
     const typePersonFilter = options.type ? sql`AND "shared_space_person"."type" = ${options.type}` : sql``;
+    // Count-arm twin of getPersonsBySpaceId's pet-individual EXISTS (shared-space.repository.ts
+    // ~2400-2410) — excludes per-species buckets, which have no pet_search row on any face. This
+    // EXISTS is satisfied by ANY face of the person, not specifically a visible, in-scope one: that
+    // constraint is visibleFaceFilter below, a separate and independent AND clause. A pet whose only
+    // embedding-carrying face was soft-deleted or left the space still reads as an individual rather
+    // than a bucket. Benign over-inclusion, matches the global count arm exactly
+    // (person.repository.ts:1032-1057) — do not "fix" only here without doing so there too.
     const petIndividualFilter =
       options.type === 'pet'
         ? sql`

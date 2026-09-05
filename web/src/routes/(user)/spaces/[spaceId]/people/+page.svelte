@@ -129,7 +129,15 @@
     ),
   );
   const countVisiblePeople = $derived(peopleStatistics ? peopleStatistics.total - peopleStatistics.hidden : 0);
-  const hasSearchablePeople = $derived(countVisiblePeople > 0 || visiblePeople.length > 0 || !!searchName.trim());
+  // The Pets filter (or People, in a space with only pets) legitimately zeroes countVisiblePeople,
+  // visiblePeople and peopleStatistics — none of that means the space itself has no people. Without
+  // `peopleFilterBy !== PeopleFilterBy.All` here, a zero-result filter would hide the search bar and
+  // both dropdowns, including the filter dropdown itself, trapping the user on the filtered view with
+  // no way back to All (S1-style dead end; the filter must stay a fixed three-option control per the
+  // design, not one whose shape shifts under the user mid-session).
+  const hasSearchablePeople = $derived(
+    countVisiblePeople > 0 || visiblePeople.length > 0 || !!searchName.trim() || peopleFilterBy !== PeopleFilterBy.All,
+  );
   const activeSearchFilterName = $derived(
     searchName.trim() || ($page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) ?? '').trim(),
   );
@@ -159,6 +167,12 @@
   );
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
   let mergingPerson = $state<SharedSpacePersonResponseDto>();
+  // Unfiltered-by-type total, used only to gate show/hide access (canManageVisibility below).
+  // `peopleStatistics` gets re-fetched WITH the active type filter on every filter/search change, so
+  // it legitimately reads 0 under a Pets filter with no pets — that must not take the show/hide
+  // screen with it, since it's the one place a misdetected species bucket can be hidden. The SSR load
+  // (+page.ts) never passes a type, so this is set once here and left alone by refreshPeople/searchPeople.
+  let spacePeopleTotal = $state(0);
 
   $effect(() => {
     if (data.space.id === loadedSpaceId) {
@@ -167,6 +181,7 @@
 
     people = data.people;
     peopleStatistics = data.peopleStatistics;
+    spacePeopleTotal = data.peopleStatistics?.total ?? data.people.length;
     statisticsSearchName = null;
     hasMore = data.people.length >= PAGE_SIZE;
     mergingPerson = undefined;
@@ -176,7 +191,7 @@
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
   const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
   const isEditor = $derived(isOwner || currentMember?.role === SharedSpaceRole.Editor);
-  const canManageVisibility = $derived(isEditor && (peopleStatistics?.total ?? people.length) > 0);
+  const canManageVisibility = $derived(isEditor && spacePeopleTotal > 0);
 
   onMount(() => {
     const searchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
@@ -358,6 +373,10 @@
 
   async function handleFilterChange(filterBy: PeopleFilterBy) {
     $peopleViewSettings.filterBy = filterBy;
+    // Cancel any in-flight search request first: without this, a request outstanding when the
+    // filter dropdown is used resolves against the pre-filter abortController/statisticsScopeMatches
+    // and overwrites `people` with the pre-filter list (mirrors onResetSearchBar above).
+    cancelSearchRequest();
     // refreshPeople re-fetches from offset 0, so switching filters replaces the loaded list
     // rather than appending onto it, and carries the active search along.
     await refreshPeople();

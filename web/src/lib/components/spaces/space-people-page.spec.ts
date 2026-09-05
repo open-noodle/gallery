@@ -1185,5 +1185,29 @@ describe('Spaces people page', () => {
       const call = sdkMock.getSpacePeopleFaceStatistics.mock.calls.at(-1)![0];
       expect(call).not.toHaveProperty('$type');
     });
+
+    it('keeps the filter/sort controls and show/hide access when the Pets filter yields zero results', async () => {
+      renderPage({
+        people: [makePerson({ id: 'p1' })],
+        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 0 },
+        members: [makeMember({ role: SharedSpaceRole.Editor })],
+      });
+      sdkMock.getSpacePeople.mockResolvedValue([]);
+      sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'all' }));
+      await user.click(screen.getByRole('button', { name: 'pets' }));
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith(expect.objectContaining({ $type: 'pet' }));
+      });
+
+      // The grid is empty (no pets), but a space with people at all must not lose the search bar,
+      // the filter/sort dropdowns (the only way back to All), or the show/hide screen.
+      expect(screen.getByPlaceholderText('search_people')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'pets' })).toBeInTheDocument();
+      expect(screen.getByText('show_and_hide_people')).toBeInTheDocument();
+    });
   });
 });
