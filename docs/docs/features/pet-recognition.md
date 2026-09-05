@@ -5,9 +5,9 @@ Pet Recognition tells your individual pets apart. With it enabled, two dogs in y
 It builds on [Pet Detection](/features/pet-detection): detection finds the animal in the photo, recognition decides _which_ animal it is.
 
 :::info Dogs and cats only
-Only **dogs** and **cats** are recognized as individuals. The other four detected categories (bird, horse, sheep, cow) keep the one-person-per-species behaviour Pet Detection has always had — which means they are recorded but [not shown in the People section](/features/pet-detection#what-you-can-and-cannot-see).
+Only **dogs** and **cats** are recognized as individuals — and they are now [the only two species Pet Detection records at all](/features/pet-detection#what-you-can-and-cannot-see). Birds, horses, sheep and cows used to land in a shared per-species entry that the People page never listed; those were write-only rows, so detection stopped writing them.
 
-This is a limit of the model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird apart from another. It also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than a named identity would.
+This is a limit of the model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird apart from another — which is exactly why recording those species had nowhere useful to go.
 :::
 
 ## Enabling it
@@ -70,7 +70,7 @@ Cats score about the same on all three, so if your library is mostly cats there 
 :::danger Switching the model deletes your named pets
 Every model produces its own embedding space, so embeddings from one model are meaningless to another. Changing the model therefore **deletes all pet people and their embeddings and reprocesses your entire library**, exactly like a reset. The admin page asks you to confirm before saving.
 
-Species buckets (the bird/horse/... entries) are pure detector output and are _not_ model-coupled, so they survive a model switch untouched.
+Species entries left over from before detection narrowed to cats and dogs are pure detector output and are _not_ model-coupled, so they survive a model switch untouched. Nothing creates new ones.
 :::
 
 ## Configuration
