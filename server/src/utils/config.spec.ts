@@ -1,4 +1,4 @@
-import { defaults } from 'src/config';
+import { defaults } from 'src/dtos/config.dto';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
