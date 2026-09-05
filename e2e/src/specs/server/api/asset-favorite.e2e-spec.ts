@@ -24,6 +24,33 @@ const putFavorites = (token: string, body: Record<string, unknown>) =>
 const singleUpdateAsset = (token: string, id: string, body: Record<string, unknown>) =>
   request(app).put(`/assets/${id}`).set('Authorization', `Bearer ${token}`).send(body);
 
+// The exact timeline query the /favorites page issues (baseTimelineOptions in
+// web/src/routes/(user)/favorites/[[photos=photos]]/[[assetId=id]]/+page.svelte, plus the
+// visibility the Timeline component supplies). Kept as one literal so the role suite below asserts
+// against what the page really sends rather than a hand-tuned superset that can drift green.
+const FAVORITES_PAGE_QUERY =
+  'visibility=timeline&isFavorite=true&withStacked=true&withPartners=true&withSharedSpaces=true';
+
+// The set of asset IDs the /favorites page would render for `token`. Buckets are enumerated and
+// then fetched so callers can assert on identity rather than a running total, which keeps the role
+// tests below order-independent.
+const favoritedAssetIds = async (token: string, query = FAVORITES_PAGE_QUERY): Promise<Set<string>> => {
+  const buckets = await request(app).get(`/timeline/buckets?${query}`).set(asBearerAuth(token));
+  expect(buckets.status).toBe(200);
+
+  const ids = new Set<string>();
+  for (const bucket of buckets.body as Array<{ timeBucket: string }>) {
+    const page = await request(app)
+      .get(`/timeline/bucket?${query}&timeBucket=${bucket.timeBucket}`)
+      .set(asBearerAuth(token));
+    expect(page.status).toBe(200);
+    for (const id of (page.body as { id?: string[] }).id ?? []) {
+      ids.add(id);
+    }
+  }
+  return ids;
+};
+
 // Shared across every describe in this file so the access-lifecycle suite below (#763 slice 4)
 // can reuse the same admin session without re-running resetDatabase (which would wipe the
 // order-dependent alice/bob/carol state above).
@@ -413,5 +440,91 @@ describe('favorite rows survive access loss and re-derive on read (#763 slice 4)
     expect(unfavoriteRes.status).toBe(204);
     daveInfo = await utils.getAssetInfo(dave.accessToken, assetConcurrent.id);
     expect(daveInfo.isFavorite).toBe(false);
+  });
+});
+
+// #763: every space role must be able to favorite a photo they do NOT own, and — the part that
+// actually shipped broken — that favorite must be reachable on the /favorites page, not merely
+// recorded. The describes above prove the WRITE lands (E3 covers a viewer) and read it back through
+// `GET /assets/:id`, which resolves the overlay for any asset the caller can read and therefore
+// stays green even when the favorites LISTING cannot see the row.
+//
+// pr-819-rc.1 shipped exactly that split: the heart filled and the toast said "Added to favorites",
+// but /favorites rendered its empty placeholder, because the page requested the timeline without
+// `withSharedSpaces`. Without that flag the server never resolves `timelineSpaceIds`, so
+// `withTimeBucketAssetFilters` falls back to a hard `asset.ownerId = caller` filter and drops every
+// favorite on a non-owned asset. The lifecycle describe above missed it because its helper
+// hardcodes `withSharedSpaces=true` — the exact flag the page omitted.
+//
+// So these assert through `favoritedAssetIds`, which mirrors the /favorites page's request options
+// verbatim. The final test pins the mechanism directly: drop the cross-scope flag and the
+// non-owned favorite disappears.
+describe('favoriting a photo you do not own, by space role (#763)', () => {
+  let hank: LoginResponseDto; // space OWNER — owns assetHank
+  let ivy: LoginResponseDto; // space EDITOR — owns assetIvy, contributed to the space
+  let jack: LoginResponseDto; // space VIEWER — owns nothing here
+  let roleSpaceId: string;
+  let assetHank: AssetMediaResponseDto;
+  let assetIvy: AssetMediaResponseDto;
+
+  beforeAll(async () => {
+    [hank, ivy, jack] = await Promise.all([
+      utils.userSetup(admin.accessToken, createUserDto.create('fav-hank')),
+      utils.userSetup(admin.accessToken, createUserDto.create('fav-ivy')),
+      utils.userSetup(admin.accessToken, createUserDto.create('fav-jack')),
+    ]);
+
+    const space = await utils.createSpace(hank.accessToken, { name: 'fav-roles-space' });
+    roleSpaceId = space.id;
+    await Promise.all([
+      utils.addSpaceMember(hank.accessToken, roleSpaceId, { userId: ivy.userId, role: SharedSpaceRole.Editor }),
+      utils.addSpaceMember(hank.accessToken, roleSpaceId, { userId: jack.userId, role: SharedSpaceRole.Viewer }),
+    ]);
+
+    [assetHank, assetIvy] = await Promise.all([
+      utils.createAsset(hank.accessToken),
+      utils.createAsset(ivy.accessToken),
+    ]);
+    // The editor contributes their own asset, giving the space OWNER a photo they do not own.
+    await utils.addSpaceAssets(hank.accessToken, roleSpaceId, [assetHank.id]);
+    await utils.addSpaceAssets(ivy.accessToken, roleSpaceId, [assetIvy.id]);
+  });
+
+  it("a VIEWER favorites a photo they don't own and finds it on their favorites page", async () => {
+    const { status } = await putFavorites(jack.accessToken, { ids: [assetHank.id], isFavorite: true });
+    expect(status).toBe(204);
+
+    expect(await favoritedAssetIds(jack.accessToken)).toContain(assetHank.id);
+    // Per-user: the owner of the photo never sees the viewer's favorite as their own.
+    expect(await favoritedAssetIds(hank.accessToken)).not.toContain(assetHank.id);
+  });
+
+  it("an EDITOR favorites a photo they don't own and finds it on their favorites page", async () => {
+    const { status } = await putFavorites(ivy.accessToken, { ids: [assetHank.id], isFavorite: true });
+    expect(status).toBe(204);
+
+    expect(await favoritedAssetIds(ivy.accessToken)).toContain(assetHank.id);
+    expect(await favoritedAssetIds(hank.accessToken)).not.toContain(assetHank.id);
+  });
+
+  it("a space OWNER favorites a member's contributed photo they don't own and finds it on their favorites page", async () => {
+    const { status } = await putFavorites(hank.accessToken, { ids: [assetIvy.id], isFavorite: true });
+    expect(status).toBe(204);
+
+    expect(await favoritedAssetIds(hank.accessToken)).toContain(assetIvy.id);
+    // The contributor's own favorites are untouched by the space owner's write.
+    expect(await favoritedAssetIds(ivy.accessToken)).not.toContain(assetIvy.id);
+  });
+
+  it('a non-owned favorite is only reachable while the request carries the cross-scope flag', async () => {
+    // jack favorited assetHank above. Owner-scoped, the row is invisible — this is precisely the
+    // query pr-819-rc.1's /favorites page sent, and precisely why the page looked empty.
+    const ownerScopedQuery = 'visibility=timeline&isFavorite=true&withStacked=true';
+    expect(await favoritedAssetIds(jack.accessToken, ownerScopedQuery)).not.toContain(assetHank.id);
+
+    // The overlay row is intact the whole time; only the scope of the read changed.
+    expect(await favoritedAssetIds(jack.accessToken)).toContain(assetHank.id);
+    const jackInfo = await utils.getAssetInfo(jack.accessToken, assetHank.id);
+    expect(jackInfo.isFavorite).toBe(true);
   });
 });

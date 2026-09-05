@@ -130,4 +130,39 @@ test.describe('Space viewer favorites a non-owned photo (#763)', () => {
     await expect(page.getByText('Added 1 to favorites')).toBeVisible();
     await thumbnailUtils.expectThumbnailIsFavorite(page, asset.id);
   });
+
+  // C) The reported pr-819-rc.1 bug, end to end: favoriting a non-owned photo succeeded (toast +
+  // filled heart) but /favorites rendered its empty placeholder, so the feature was unusable for
+  // exactly the account it exists for. Tests A and B stop at the write and the heart, which is why
+  // they stayed green through it.
+  //
+  // The break this catches: the /favorites page requesting the timeline without `withSharedSpaces`
+  // (or `withPartners`). The server only resolves `timelineSpaceIds` when that flag is present;
+  // without it the query hard-filters `asset.ownerId = caller` and every favorite on a non-owned
+  // asset vanishes from the page while its `asset_favorite` row survives untouched.
+  test("the favorited non-owned photo appears on the viewer's /favorites page", async ({ context, page }) => {
+    const { space, asset } = await createSpaceWithViewerAsset(owner.accessToken, viewer.userId, 'SVF-C');
+    await utils.setAuthCookies(context, viewer.accessToken);
+
+    await gotoAndWaitForTimeline(page, `/spaces/${space.id}`, 'discovery-timeline');
+    const favoriteResponse = page.waitForResponse(
+      (response) => response.request().method() === 'PUT' && response.url().includes('/assets/favorites'),
+    );
+    const thumb = thumbnailUtils.withAssetId(page, asset.id);
+    await thumb.hover();
+    await thumbnailUtils.selectButton(page, asset.id).click();
+    await page.getByRole('button', { name: 'Favorite', exact: true }).click();
+    await favoriteResponse;
+    await expect(page.getByText('Added 1 to favorites')).toBeVisible();
+
+    // The collection view, not the asset — this is the assertion the shipped bug failed.
+    await gotoAndWaitForTimeline(page, '/favorites');
+    await expect(thumbnailUtils.withAssetId(page, asset.id)).toBeVisible();
+
+    // The owner never favorited it, so their own /favorites page must stay empty — proving the page
+    // is per-user and not merely showing every space asset.
+    await utils.setAuthCookies(context, owner.accessToken);
+    await gotoAndWaitForTimeline(page, '/favorites');
+    await expect(thumbnailUtils.withAssetId(page, asset.id)).toHaveCount(0);
+  });
 });

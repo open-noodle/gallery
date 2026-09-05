@@ -26,6 +26,7 @@
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
+  import { AssetVisibility } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, modalManager } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -49,7 +50,26 @@
   };
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
-  const baseTimelineOptions = { isFavorite: true, withStacked: true };
+  // #763: favorites are a per-user overlay, so this page is cross-scope like the Photos timeline
+  // favorites filter (see buildPhotosTimelineOptions). Without these, a favorite a member placed on
+  // another member's Space asset — which the overlay explicitly permits — would be unreachable here.
+  // Access is still enforced per request: the server recomputes timelineSpaceIds from current
+  // membership, so losing Space access drops the asset even though the overlay row survives.
+  //
+  // `visibility` is required, not incidental: timeline.service.ts rejects withPartners/
+  // withSharedSpaces outright (400) when visibility is undefined, because undefined resolves to
+  // withDefaultVisibility = Archive+Timeline and would expose other users' ARCHIVED assets. An
+  // earlier attempt at this fix added the two flags alone and 400'd every request on this page,
+  // which is why it was reverted. Matching buildPhotosTimelineOptions keeps the two favorite
+  // surfaces consistent; the trade-off is that an archived favorite of your own no longer appears
+  // here, exactly as it already does not under the /photos favorites chip.
+  const baseTimelineOptions = {
+    isFavorite: true,
+    withStacked: true,
+    withPartners: true,
+    withSharedSpaces: true,
+    visibility: AssetVisibility.Timeline,
+  };
   const options = $derived({
     ...baseTimelineOptions,
     grouping: timelineGrouping,
