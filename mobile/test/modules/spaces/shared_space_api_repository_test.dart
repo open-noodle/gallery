@@ -56,6 +56,7 @@ void main() {
         limit: any(named: 'limit'),
         offset: any(named: 'offset'),
         withHidden: any(named: 'withHidden'),
+        type: any(named: 'type'),
       ),
     ).thenAnswer((invocation) => answer(invocation.namedArguments[#offset] as int? ?? 0));
   }
@@ -980,7 +981,7 @@ void main() {
       await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name);
 
       verify(
-        () => mockApi.getSpacePeople('space-1', limit: 100, offset: 0, withHidden: false),
+        () => mockApi.getSpacePeople('space-1', limit: 100, offset: 0, withHidden: false, type: null),
       ).called(1);
     });
 
@@ -997,6 +998,7 @@ void main() {
           limit: any(named: 'limit'),
           offset: any(named: 'offset'),
           withHidden: any(named: 'withHidden'),
+          type: any(named: 'type'),
         ),
       ).thenAnswer((invocation) async {
         limits.add(invocation.namedArguments[#limit] as int);
@@ -1004,6 +1006,30 @@ void main() {
       });
 
       await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name);
+
+      expect(limits, isNotEmpty);
+      expect(limits.every((limit) => limit <= 100), isTrue, reason: 'server caps limit at 100');
+    });
+
+    // M14: pageSize stays capped at 100 even for a filtered (people/pets) request —
+    // SpacePeopleQuerySchema.limit is .max(100) regardless of `type`, so the cap must hold
+    // no matter which filter is active, not just the default (all) filter above.
+    test('M14: never requests a page larger than the server limit cap for a filtered request', () async {
+      final limits = <int>[];
+      when(
+        () => mockApi.getSpacePeople(
+          any(),
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+          withHidden: any(named: 'withHidden'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((invocation) async {
+        limits.add(invocation.namedArguments[#limit] as int);
+        return [spacePerson('sp1')];
+      });
+
+      await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets);
 
       expect(limits, isNotEmpty);
       expect(limits.every((limit) => limit <= 100), isTrue, reason: 'server caps limit at 100');
@@ -1017,6 +1043,7 @@ void main() {
           limit: any(named: 'limit'),
           offset: any(named: 'offset'),
           withHidden: any(named: 'withHidden'),
+          type: any(named: 'type'),
         ),
       ).thenAnswer((_) async => [spacePerson('after-endpoint-change', name: 'Mia')]);
       when(() => mockApiService.sharedSpacesApi).thenReturn(rebuiltApi);
@@ -1024,6 +1051,89 @@ void main() {
       final result = await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name);
 
       expect(result.single.id, 'after-endpoint-change');
+    });
+  });
+
+  group('getSpacePeople filterBy', () {
+    test('passes type=null for the default (all) filter', () async {
+      stubGetSpacePeople((_) async => [spacePerson('sp1')]);
+
+      await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name);
+
+      verify(
+        () => mockApi.getSpacePeople(
+          'space-1',
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+          withHidden: any(named: 'withHidden'),
+          type: null,
+        ),
+      ).called(1);
+    });
+
+    test('passes type=person for the people filter', () async {
+      stubGetSpacePeople((_) async => [spacePerson('sp1')]);
+
+      await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.people);
+
+      verify(
+        () => mockApi.getSpacePeople(
+          'space-1',
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+          withHidden: any(named: 'withHidden'),
+          type: 'person',
+        ),
+      ).called(1);
+    });
+
+    test('passes type=pet for the pets filter', () async {
+      stubGetSpacePeople((_) async => [spacePerson('sp1')]);
+
+      await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets);
+
+      verify(
+        () => mockApi.getSpacePeople(
+          'space-1',
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+          withHidden: any(named: 'withHidden'),
+          type: 'pet',
+        ),
+      ).called(1);
+    });
+
+    // M11: the paging walk builds its request fresh on every iteration, so a test that only
+    // checks page 1 proves nothing about later pages. Stub two full pages plus a short one
+    // and assert `type` on every captured call.
+    test('M11: sends the type parameter on every page of the paging walk', () async {
+      final capturedTypes = <String?>[];
+      var call = 0;
+      when(
+        () => mockApi.getSpacePeople(
+          any(),
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+          withHidden: any(named: 'withHidden'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((invocation) async {
+        capturedTypes.add(invocation.namedArguments[#type] as String?);
+        call++;
+        return [spacePerson('p$call')];
+      });
+
+      // Force every page to be "full" (== pageSize) except the last, by using a pageSize of 1.
+      await repository.getSpacePeople(
+        'space-1',
+        sortBy: PeopleSortBy.name,
+        filterBy: PeopleFilterBy.pets,
+        pageSize: 1,
+        maxPages: 3,
+      );
+
+      expect(capturedTypes.length, greaterThan(1)); // page 1 alone proves nothing
+      expect(capturedTypes, everyElement('pet'));
     });
   });
 }

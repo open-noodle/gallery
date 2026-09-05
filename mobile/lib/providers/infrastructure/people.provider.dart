@@ -88,7 +88,7 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider
 /// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped
 /// (its only consumer), so re-opening the page always issues a fresh fetch.
 final driftSpacePeopleProvider = FutureProvider.autoDispose
-    .family<List<DriftPerson>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
+    .family<List<DriftPerson>, ({String spaceId, PeopleSortBy sortBy, PeopleFilterBy filterBy})>((ref, key) async {
       final repository = ref.watch(sharedSpaceApiRepositoryProvider);
-      return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy);
+      return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy, filterBy: key.filterBy);
     });

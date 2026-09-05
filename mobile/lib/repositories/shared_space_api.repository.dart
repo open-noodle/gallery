@@ -102,16 +102,18 @@ class SharedSpaceApiRepository extends ApiRepository {
   Future<List<DriftPerson>> getSpacePeople(
     String spaceId, {
     required PeopleSortBy sortBy,
+    PeopleFilterBy filterBy = PeopleFilterBy.all,
     int pageSize = 100,
     int maxPages = 100,
   }) async {
     // The endpoint returns a bare array with no hasNextPage envelope, so a short page is the
     // only end-of-list signal. maxPages is a runaway guard against a server that never returns
     // one; hitting it returns what we have rather than throwing.
+    final type = filterBy.toTypeParam();
     final dtos = <SharedSpacePersonResponseDto>[];
     for (var page = 0; page < maxPages; page++) {
       final batch = await checkNull(
-        _api.getSpacePeople(spaceId, limit: pageSize, offset: page * pageSize, withHidden: false),
+        _api.getSpacePeople(spaceId, limit: pageSize, offset: page * pageSize, withHidden: false, type: type),
       );
       dtos.addAll(batch);
       if (batch.length < pageSize) {
