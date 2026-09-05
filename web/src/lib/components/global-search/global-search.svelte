@@ -20,6 +20,7 @@
   import CommandRow from './rows/command-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
   import GlobalSearchPreview from './global-search-preview.svelte';
+  import SearchModeControl from '$lib/components/global-search/search-mode-control.svelte';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
@@ -669,6 +670,13 @@
           }}
           class="min-w-0 flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-500 focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-300"
         />
+        <SearchModeControl
+          variant="chip"
+          mode={manager.mode}
+          onSelect={(next) => manager.setMode(next)}
+          scoped={manager.scope !== 'all'}
+          smartUnavailable={!manager.mlHealthy}
+        />
         {#if !mediaQueryManager.pointerCoarse}
           <kbd
             class="hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-gray-500 sm:inline-block dark:border-immich-dark-gray dark:bg-immich-dark-bg dark:text-gray-300"
@@ -1051,6 +1059,13 @@
             aria-label={inputValue === '' ? $t('close') : $t('clear')}
           />
         </div>
+        <SearchModeControl
+          variant="rail"
+          mode={manager.mode}
+          onSelect={(next) => manager.setMode(next)}
+          scoped={manager.scope !== 'all'}
+          smartUnavailable={!manager.mlHealthy}
+        />
         <TypedSearchTokenRail tokens={manager.typedSearchDisplayTokens} />
         {#if showProgressStripe}
           <div
@@ -1427,7 +1442,7 @@
         </div>
 
         <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
-        <GlobalSearchFooter {manager} />
+        <GlobalSearchFooter />
       </Command.Root>
     </ModalBody>
   </Modal>
