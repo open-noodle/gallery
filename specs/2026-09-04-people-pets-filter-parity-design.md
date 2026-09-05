@@ -57,7 +57,7 @@ EXISTS (
 )
 ```
 
-(The global query needs the `asset_face` hop only because it reaches `personId` through it. Neither version filters `deletedAt` / `isVisible` inside the EXISTS — the surrounding query already constrains visible faces.)
+(The global query needs the `asset_face` hop only because it reaches `personId` through it. Neither version filters `deletedAt` / `isVisible` inside the EXISTS. That is deliberate but imprecisely justified in the first draft: the surrounding query constrains _some_ visible face, not _this_ face, so a pet whose only embedding-carrying face was soft-deleted still reads as an individual. Benign over-inclusion, identical to the shipped global arm — see correction 17.)
 
 A space person with no `pet_search` row on any of its faces is a bucket and is excluded from the Pets view. It remains visible on the unfiltered view (where it appears today) and remains hideable.
 
@@ -212,11 +212,15 @@ The raw-SQL twin. **No `tsc` safety net**, so every list-arm predicate gets a co
 
 **Counter-agreement property.** S18/S19 assert list length and count against the _same_ fixture rather than hardcoded numbers, so the two arms cannot drift apart without a failure.
 
-**The two arms do not count the same unit.** `countPersonsBySpaceId` collapses rows by identity — `person_rows` selects `COALESCE(identityId, id) AS personKey`, `person_keys` groups by it — so `total` counts **distinct identities**, while `getPersonsBySpaceId` returns **raw rows**. Where two space-person rows share an `identityId`, `total < list.length` **independent of any filter**. The agreement fixture must therefore give every person a distinct or NULL `identityId`, stated as an explicit precondition; otherwise the test fails while telling the truth. S33 separately guards that the collapse still happens under a filter.
+**The two arms look like they count different units — but do not.** `countPersonsBySpaceId` collapses rows by identity: `person_rows` selects `COALESCE(identityId, id) AS personKey` and `person_keys` groups by it, so `total` counts distinct identities while `getPersonsBySpaceId` returns raw rows. That reads like `total < list.length` whenever two space-person rows share an `identityId`.
 
-| #   | Kind | Test                                                                                |
-| --- | ---- | ----------------------------------------------------------------------------------- |
-| S33 | A    | Two same-identity pet rows still collapse to one counted person under `type: 'pet'` |
+**It is unreachable within one space.** `shared_space_person` carries a partial unique index `shared_space_person_spaceId_identityId_key` on `(spaceId, identityId) WHERE identityId IS NOT NULL` (`shared-space-person.table.ts:26-29`, created in `migrations-gallery/1778800000000`). So within a space, a non-null `identityId` is unique and a NULL one coalesces to the row's own id — `personKey` is injective per row and the collapse is a no-op for these queries. Implementation found this by trying to build the fixture and having Postgres refuse it.
+
+S33 was therefore rewritten to guard the risk that actually exists: that `petIndividualFilter`'s `EXISTS` stays a semi-join and never becomes a row-multiplying `INNER JOIN` in `person_rows`.
+
+| #   | Kind | Test                                                                                      |
+| --- | ---- | ----------------------------------------------------------------------------------------- |
+| S33 | A    | A pet with two qualifying faces is still counted once — the EXISTS does not multiply rows |
 
 ### Server — service and contract
 
@@ -345,3 +349,15 @@ A review of the derived implementation plan against the codebase surfaced three 
 13. **Arm 2b is smaller than first described.** The badge is in the shared visibility modal and `getPetBadgeLabel` already handles the no-`species` shared-space case by name. Passing `type` through the wrapper mapping is the whole change; W11 is a regression guard, not new behaviour.
 
 One trap belongs to the plan rather than this design, and is recorded there: `petPersonFilter` is interpolated in **two** places in the count query — `person_rows` and `assignedPersonFaceFilter` — and the new predicates belong only in the first, or `detectedFaceCount` gets filtered in contradiction of S24.
+
+## Third pass — what implementation and the whole-branch review corrected
+
+Nine tasks were implemented against this design, each independently reviewed. Four corrections belong in the design itself:
+
+14. **A test asserting the ABSENCE of something is never Kind A.** The TDD plan classified three such tests as "watch it fail first" when they cannot fail for the stated reason — before the feature exists, absence is the trivial default. S24 (`detectedFaceCount` unchanged by the filter) runs byte-identical SQL on both sides pre-implementation. W9 ("a human renders no badge") passes because the pre-fix mapping drops `type` for _everyone_. Both were caught independently by their implementers and proven instead by a deliberate break-and-revert, which is the correct handling. Classify absence-assertions as Kind B from the start.
+
+15. **The identity-collapse warning was unreachable** — see the count-arm section above. A schema constraint the design did not check made the hazard impossible.
+
+16. **"The Pets option is still offered" needed the toolbar to cooperate.** The design said a pets-free space should show the Pets option and an empty grid. The space People tab wraps its whole toolbar in a has-people guard, so once the counters became filtered, choosing Pets in a pets-free space hid the search bar, both dropdowns _including the filter itself_, and the show/hide button — with the choice persisted and re-applied on mount, leaving no way back. The whole-branch review caught it; every filter test until then had rendered a non-empty response, so the suite structurally could not see it. A design that changes what a count means must state which UI gates read that count. The same latent defect exists on the global `/people` page from #1065 and is left alone as out of scope.
+
+17. **The species-bucket EXISTS does not constrain the face to a visible, in-scope one.** This design justified the join by saying the surrounding query already constrains visible faces. It constrains _some_ face, not _this_ face — so a pet whose only embedding-carrying face was soft-deleted still reads as an individual. Benign over-inclusion, byte-identical to the shipped global arm, and left as-is; the comments in both arms now say what is actually true.
