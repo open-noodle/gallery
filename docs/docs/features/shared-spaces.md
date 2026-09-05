@@ -21,6 +21,7 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 - **Search within a space** — Smart search scoped to a single space's assets.
 - **Connected libraries** — Admins can link external libraries to spaces, automatically including all library photos.
 - **Space albums** — Link whole albums into a space and collaborate across owners. See [Space Albums](space-albums.md).
+- **Album folders** — Group a space's albums into nested folders so a busy space stays navigable. See [Space Album Folders](space-album-folders.md).
 
 ## Roles and Permissions
 
