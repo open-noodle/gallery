@@ -173,6 +173,78 @@ void main() {
     expect(find.text('Mia'), findsOneWidget);
   });
 
+  // M12: the page must watch the People/Pets filter setting alongside sort and pass it through
+  // the provider's record key, and PeopleFilterButton must be reachable from the app bar —
+  // mirrors the equivalent assertion on the global People page
+  // (drift_people_collection_test.dart).
+  testWidgets('requests the filter-keyed provider and re-queries when the filter setting changes', (tester) async {
+    await tester.pumpConsumerWidget(
+      const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
+      overrides: [
+        driftSpacePeopleProvider.overrideWith(
+          (ref, key) async => switch (key.filterBy) {
+            PeopleFilterBy.pets => [_p('rex', 'Rex')],
+            _ => [_p('sp1', 'Mia')],
+          },
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mia'), findsOneWidget);
+    expect(find.text('Rex'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('people-filter-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('people-filter-pets')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rex'), findsOneWidget);
+    expect(find.text('Mia'), findsNothing);
+    expect(SettingsRepository.instance.appConfig.people.filterBy, PeopleFilterBy.pets);
+  });
+
+  // M13: the error-state retry must invalidate the SAME family key it watched. Switch to the
+  // pets filter first so the watched key is (spaceId, sortBy, filterBy: pets) — if retry
+  // invalidated a different member (e.g. hardcoded filterBy: all), this second fetch would
+  // never happen and the error state would persist forever.
+  testWidgets('M13: retry after switching filters invalidates the filter-scoped key, not a different one', (
+    tester,
+  ) async {
+    var petsCalls = 0;
+    await tester.pumpConsumerWidget(
+      const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
+      overrides: [
+        driftSpacePeopleProvider.overrideWith((ref, key) async {
+          if (key.filterBy == PeopleFilterBy.pets) {
+            petsCalls++;
+            if (petsCalls == 1) {
+              throw Exception('offline');
+            }
+            return [_p('rex', 'Rex')];
+          }
+          return [_p('sp1', 'Mia')];
+        }),
+      ],
+    );
+
+    expect(find.text('Mia'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('people-filter-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('people-filter-pets')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('space-people-retry')), findsOneWidget);
+    expect(petsCalls, 1);
+
+    await tester.tap(find.byKey(const Key('space-people-retry')));
+    await tester.pumpAndSettle();
+
+    expect(petsCalls, 2);
+    expect(find.text('Rex'), findsOneWidget);
+  });
+
   group('invalidation', () {
     testWidgets('re-fetches after the space list provider is invalidated', (tester) async {
       var calls = 0;

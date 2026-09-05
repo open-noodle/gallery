@@ -30,3 +30,17 @@ abstract class Person with _$Person {
 }
 
 enum PeopleSortBy { photoCount, name }
+
+enum PeopleFilterBy {
+  all,
+  people,
+  pets;
+
+  /// The `type` query parameter for `GET /people` and `GET /shared-spaces/{id}/people`.
+  /// Null means unfiltered. Values match the server enum exactly.
+  String? toTypeParam() => switch (this) {
+    PeopleFilterBy.all => null,
+    PeopleFilterBy.people => 'person',
+    PeopleFilterBy.pets => 'pet',
+  };
+}

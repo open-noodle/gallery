@@ -17,6 +17,14 @@ const SpacePeopleQuerySchema = z
     offset: z.coerce.number().int().min(0).optional().describe('Number of people to skip'),
     named: stringToBool.optional(),
     name: z.string().trim().min(1).max(100).optional().describe('Search by person name'),
+    type: z
+      .enum(['person', 'pet'])
+      .optional()
+      .describe(
+        'Filter the list. `person` returns human people. `pet` returns the individual pets that pet ' +
+          'recognition identified — species buckets, which the detector produces without an embedding, are ' +
+          'excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.',
+      ),
   })
   .meta({ id: 'SpacePeopleQueryDto' });
 

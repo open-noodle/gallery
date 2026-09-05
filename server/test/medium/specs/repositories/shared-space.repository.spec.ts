@@ -221,6 +221,58 @@ const seedAlbumFace = async (
   return { space, album, asset, assetFace };
 };
 
+// getPersonsBySpaceId type filter (people/pets parity, sibling of #1065's global filter). Mirrors
+// person.repository.spec.ts's seedTypedPerson: an `embedded` face gets a pet_search row, which is
+// what makes a `type: 'pet'` space person the *individual* re-ID identified rather than a
+// pure-detector species bucket. pet_search.faceId IS an asset_face.id, and
+// shared_space_person_face.assetFaceId already holds that id — no asset_face hop, unlike the
+// global query (see Trap 2, specs/2026-09-04-people-pets-filter-parity-design.md). `assetCount`,
+// when given, is written directly rather than derived from `recountPersons`, so a test can pin the
+// minimumFaceCount boundary precisely regardless of how many faces were actually attached.
+// Module scope: eslint's consistent-function-scoping rejects helpers defined in a describe.
+const seedSpacePerson = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  sut: SharedSpaceRepository,
+  input: {
+    spaceId: string;
+    assetIds: string[];
+    type?: string;
+    name?: string;
+    isHidden?: boolean;
+    embedded?: boolean | boolean[];
+    assetCount?: number;
+  },
+) => {
+  const person = await sut.createPerson({
+    spaceId: input.spaceId,
+    name: input.name ?? '',
+    type: input.type ?? 'person',
+    representativeFaceId: null,
+    isHidden: input.isHidden ?? false,
+  });
+
+  for (const [index, assetId] of input.assetIds.entries()) {
+    const { assetFace } = await ctx.newAssetFace({ assetId });
+    await sut.addPersonFaces([{ personId: person.id, assetFaceId: assetFace.id }], { skipRecount: true });
+    const embed = Array.isArray(input.embedded) ? input.embedded[index] : input.embedded;
+    if (embed) {
+      await ctx.database.insertInto('pet_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
+    }
+  }
+
+  if (input.assetCount === undefined) {
+    await sut.recountPersons([person.id]);
+    return person;
+  }
+
+  return ctx.database
+    .updateTable('shared_space_person')
+    .set({ assetCount: input.assetCount })
+    .where('id', '=', person.id)
+    .returningAll()
+    .executeTakeFirstOrThrow();
+};
+
 describe(SharedSpaceRepository.name, () => {
   // ==========================================
   // Space CRUD
@@ -2228,6 +2280,553 @@ describe(SharedSpaceRepository.name, () => {
       expect(ids).not.toContain(hiddenPerson.id);
       expect(ids).not.toContain(lockedPerson.id);
     });
+
+    // The space People tab's All/People/Pets filter (parity with #1065's global filter). S-numbers
+    // reference specs/2026-09-04-people-pets-filter-parity-design.md's TDD plan.
+    describe('type filter', () => {
+      it('returns only humans when type is person (S1)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const human = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Alice',
+        });
+        const pet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'person' });
+
+        const ids = result.map((p) => p.id);
+        expect(ids).toContain(human.id);
+        expect(ids).not.toContain(pet.id);
+      });
+
+      it('returns only pets when type is pet (S2)', async () => {
+        // fixture: one human space person, one pet space person, both named, both above minFaces
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alice' });
+        const pet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        expect(result.map((p) => p.id)).toEqual([pet.id]);
+      });
+
+      it('returns both humans and pets when type is omitted (S3)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const human = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Alice',
+        });
+        const pet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true });
+
+        expect(result.map((p) => p.id)).toEqual(expect.arrayContaining([human.id, pet.id]));
+      });
+
+      it('excludes a species bucket from the pets view (S4)', async () => {
+        // fixture: pet space person whose faces have NO pet_search row
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const bucket = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'bird',
+        });
+        const individual = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        const ids = result.map((p) => p.id);
+        expect(ids).not.toContain(bucket.id);
+        expect(ids).toContain(individual.id);
+      });
+
+      it('keeps a species bucket on the unfiltered list (S5)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const bucket = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'bird',
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true });
+
+        expect(result.map((p) => p.id)).toContain(bucket.id);
+      });
+
+      it('returns an unnamed single-face pet under the pets view despite minimumFaceCount (S6)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const pet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 1,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'pet',
+          minimumFaceCount: 3,
+        });
+
+        expect(result.map((p) => p.id)).toContain(pet.id);
+      });
+
+      it('still hides an unnamed single-face pet on the unfiltered list under minimumFaceCount (S8)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const pet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 1,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, minimumFaceCount: 3 });
+
+        expect(result.map((p) => p.id)).not.toContain(pet.id);
+      });
+
+      it('still hides an unnamed single-face human under minimumFaceCount, filtered and unfiltered (S7)', async () => {
+        // Sibling of S6/S8, human side: the pets waiver (the `type === 'pet'` OR arm) must not leak
+        // to humans — the exact regression #1065 shipped and had to revert.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const human = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: '',
+          assetCount: 1,
+        });
+
+        const filtered = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'person',
+          minimumFaceCount: 3,
+        });
+        expect(filtered.map((p) => p.id)).not.toContain(human.id);
+
+        const unfiltered = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, minimumFaceCount: 3 });
+        expect(unfiltered.map((p) => p.id)).not.toContain(human.id);
+      });
+
+      it('returns nothing for type=pet when the space has pets disabled (S9)', async () => {
+        // A human co-exists so this proves the AND: petsEnabled's existing `type != 'pet'` guard
+        // alone would let the human through untouched — only the new type='pet' predicate excludes
+        // it too. A pet-only fixture can't tell "empty because AND" from "empty because
+        // petsEnabled already excluded every pet, with type ignored" (design doc's "empty, not
+        // everything").
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alice' });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: false, type: 'pet' });
+
+        expect(result).toEqual([]);
+      });
+
+      it('behaves exactly as today when petsEnabled is false and type is person (S10)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const human = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Alice',
+        });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: false, type: 'person' });
+
+        expect(result.map((p) => p.id)).toEqual([human.id]);
+      });
+
+      it('includes a pet whose faces are a mix of embedded and bucket faces (S11)', async () => {
+        // A human co-exists and must be excluded by the same query: nothing in an unimplemented
+        // type filter would otherwise exclude the mixed pet either (EXISTS only needs one matching
+        // face), so a pet-only fixture can't fail before the type predicate exists.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+        const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetA.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetB.id });
+
+        const mixed = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [assetA.id, assetB.id],
+          type: 'pet',
+          name: 'Mixed',
+          embedded: [true, false],
+        });
+        const human = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [assetA.id],
+          type: 'person',
+          name: 'Human',
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        const ids = result.map((p) => p.id);
+        expect(ids).toContain(mixed.id);
+        expect(ids).not.toContain(human.id);
+      });
+
+      it('composes with named (S12)', async () => {
+        // namedHuman is the discriminator: `named` alone (pre-existing, unrelated to this task)
+        // already excludes unnamedPet, so a fixture without a same-named human can't fail before
+        // the type predicate exists.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const namedPet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+        const unnamedPet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 5,
+        });
+        const namedHuman = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Bob',
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet', named: true });
+
+        const ids = result.map((p) => p.id);
+        expect(ids).toContain(namedPet.id);
+        expect(ids).not.toContain(unnamedPet.id);
+        expect(ids).not.toContain(namedHuman.id);
+      });
+
+      it('composes with name search (S13)', async () => {
+        // humanRex carries the SAME name as the pet, so the pre-existing `name` ILIKE filter alone
+        // cannot tell them apart — only the new type predicate excludes it. A differently-named
+        // human wouldn't discriminate: the name filter would exclude it on its own.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const rex = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+        const mochi = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Mochi',
+          embedded: true,
+        });
+        const humanRex = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Rex Owner',
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet', name: 'Rex' });
+
+        const ids = result.map((p) => p.id);
+        expect(ids).toContain(rex.id);
+        expect(ids).not.toContain(mochi.id);
+        expect(ids).not.toContain(humanRex.id);
+      });
+
+      it('composes with withHidden (S14)', async () => {
+        // hiddenHuman is the discriminator for the withHidden:true call: withHidden alone
+        // (pre-existing, unrelated to this task) already includes every hidden row regardless of
+        // type, so only the new type predicate excludes the human once hidden rows are let through.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const hiddenPet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+          isHidden: true,
+        });
+        const hiddenHuman = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Bob',
+          isHidden: true,
+        });
+
+        const hiddenExcluded = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+        expect(hiddenExcluded.map((p) => p.id)).not.toContain(hiddenPet.id);
+
+        const hiddenIncluded = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'pet',
+          withHidden: true,
+        });
+        const ids = hiddenIncluded.map((p) => p.id);
+        expect(ids).toContain(hiddenPet.id);
+        expect(ids).not.toContain(hiddenHuman.id);
+      });
+
+      it('composes with takenAfter and takenBefore (S15)', async () => {
+        // inRangeHuman is the discriminator: the date-range EXISTS filter alone (pre-existing,
+        // unrelated to this task) already excludes outOfRangePet, so a fixture without an in-range
+        // human of the other type can't fail before the type predicate exists.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset: inRangeAsset } = await ctx.newAsset({
+          ownerId: user.id,
+          fileCreatedAt: new Date('2024-02-15T00:00:00.000Z'),
+        });
+        const { asset: outOfRangeAsset } = await ctx.newAsset({
+          ownerId: user.id,
+          fileCreatedAt: new Date('2024-05-15T00:00:00.000Z'),
+        });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: inRangeAsset.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: outOfRangeAsset.id });
+
+        const inRangePet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [inRangeAsset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+        const outOfRangePet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [outOfRangeAsset.id],
+          type: 'pet',
+          name: 'Mochi',
+          embedded: true,
+        });
+        const inRangeHuman = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [inRangeAsset.id],
+          type: 'person',
+          name: 'Bob',
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'pet',
+          takenAfter: new Date('2024-02-01T00:00:00.000Z'),
+          takenBefore: new Date('2024-03-01T00:00:00.000Z'),
+        });
+
+        const ids = result.map((p) => p.id);
+        expect(ids).toContain(inRangePet.id);
+        expect(ids).not.toContain(outOfRangePet.id);
+        expect(ids).not.toContain(inRangeHuman.id);
+      });
+
+      it('composes with limit and offset, and page 2 of a filtered list excludes the other type (S16)', async () => {
+        // The human is named to sort FIRST alphabetically (before both pets). With type ignored,
+        // page 1 (offset 0, limit 1) would be the human, not petBravo — so this fails before the
+        // type predicate exists, rather than passing by coincidence of name ordering.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const petBravo = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Bravo',
+          embedded: true,
+        });
+        const petCharlie = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Charlie',
+          embedded: true,
+        });
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alpha' });
+
+        const page1 = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet', limit: 1, offset: 0 });
+        const page2 = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet', limit: 1, offset: 1 });
+
+        expect(page1.map((p) => p.id)).toEqual([petBravo.id]);
+        expect(page2.map((p) => p.id)).toEqual([petCharlie.id]);
+      });
+
+      it('keeps the 4-key ordering under a type filter (S17)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        const charlie = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Charlie',
+          embedded: true,
+          assetCount: 10,
+        });
+        const alice = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Alice',
+          embedded: true,
+          assetCount: 1,
+        });
+        const unnamedMany = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 10,
+        });
+        const unnamedFew = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 2,
+        });
+        const hiddenPet = await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Hidden',
+          embedded: true,
+          isHidden: true,
+        });
+
+        const result = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'pet',
+          withHidden: true,
+        });
+
+        expect(result.map((p) => p.id)).toEqual([alice.id, charlie.id, unnamedMany.id, unnamedFew.id, hiddenPet.id]);
+      });
+    });
   });
 
   describe('countPersonsBySpaceId', () => {
@@ -2570,6 +3169,297 @@ describe(SharedSpaceRepository.name, () => {
       expect(Number(result.total)).toBe(1);
       expect(Number(result.hidden)).toBe(0);
       expect(Number(result.detectedFaceCount)).toBe(2);
+    });
+
+    // countPersonsBySpaceId type filter — the count arm's raw-SQL twin of the getPersonsBySpaceId
+    // type-filter tests above (S1-S17). Mirrors #1065: the header count must never disagree with
+    // the grid it sits above. tsc cannot see inside these sql`` templates, so these tests are the
+    // only gate on the predicates.
+    describe('type filter', () => {
+      it('reports a total matching the length of the filtered list for type person (S18)', async () => {
+        // Fixture precondition: every space person here has a distinct or NULL identityId (none is
+        // set), so the count arm's COALESCE(identityId, id) collapse is a no-op and the two arms
+        // are directly comparable.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alice' });
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Bob' });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const list = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'person' });
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, type: 'person' });
+
+        expect(counts.total).toBe(list.length);
+      });
+
+      it('reports a total matching the length of the filtered list for type pet (S19)', async () => {
+        // Fixture precondition: every space person here has a distinct or NULL identityId (none is
+        // set), so the count arm's COALESCE(identityId, id) collapse is a no-op and the two arms
+        // are directly comparable.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alice' });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Fido',
+          embedded: true,
+        });
+
+        const list = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        expect(counts.total).toBe(list.length);
+      });
+
+      it('scopes hidden to the type filter (S20)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        // A hidden human co-exists so the assertion proves the type filter actually narrows
+        // `hidden`, rather than `hidden` happening to be 1 regardless of type.
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Hidden Alice',
+          isHidden: true,
+        });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'person',
+          name: 'Visible Bob',
+        });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Hidden Rex',
+          embedded: true,
+          isHidden: true,
+        });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Visible Fido',
+          embedded: true,
+        });
+
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        expect(counts.total).toBe(2);
+        expect(counts.hidden).toBe(1);
+      });
+
+      it('excludes a species bucket from the count under type pet (S21)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'pet', name: 'bird' });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const list = await sut.getPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        expect(counts.total).toBe(list.length);
+        expect(counts.total).toBe(1);
+      });
+
+      it('applies the minimumFaces waiver under type pet (S22)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 1,
+        });
+
+        const list = await sut.getPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'pet',
+          minimumFaceCount: 3,
+        });
+        const counts = await sut.countPersonsBySpaceId(space.id, {
+          petsEnabled: true,
+          type: 'pet',
+          minimumFaceCount: 3,
+        });
+
+        expect(counts.total).toBe(list.length);
+        expect(counts.total).toBe(1);
+      });
+
+      // Kind B guard: the waiver above is Pets-view-only (mirrors S8) — proven meaningful by
+      // temporarily removing the `options.type === 'pet'` condition from minimumPersonFilter (S23).
+      it('does not waive minimumFaces on the unfiltered list (S23)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: '',
+          embedded: true,
+          assetCount: 1,
+        });
+
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, minimumFaceCount: 3 });
+
+        expect(counts.total).toBe(0);
+      });
+
+      it('leaves detectedFaceCount unchanged by the type filter (S24)', async () => {
+        // detectedFaceCount is computed from `face_counts`, which reads `assignedPersonFaceFilter`
+        // (Trap #1) rather than `person_rows`. Force the `hasAssignedPersonFaceFilter` branch (via
+        // `named: true`) so a regression that mistakenly splices typePersonFilter/petIndividualFilter
+        // into assignedPersonFaceFilter, instead of person_rows only, would show up here.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alice' });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const unfiltered = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, named: true });
+        const filtered = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, named: true, type: 'pet' });
+
+        expect(filtered.detectedFaceCount).toBe(unfiltered.detectedFaceCount);
+      });
+
+      it('counts zero when petsEnabled is false and type is pet (S25)', async () => {
+        // A human co-exists so this proves the AND: petsEnabled's existing `type != 'pet'` guard
+        // alone already excludes the pet — only the new type='pet' predicate additionally excludes
+        // the human, which is what makes the total zero rather than 1 (design doc's "empty, not
+        // everything").
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [asset.id], type: 'person', name: 'Alice' });
+        await seedSpacePerson(ctx, sut, {
+          spaceId: space.id,
+          assetIds: [asset.id],
+          type: 'pet',
+          name: 'Rex',
+          embedded: true,
+        });
+
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: false, type: 'pet' });
+
+        expect(counts.total).toBe(0);
+      });
+
+      it('keeps counting an identity-linked pet as one despite two qualifying faces under the type filter (S33)', async () => {
+        // Design intent (S33): "two same-identity pet rows still collapse to one counted person
+        // under a filter." Literally two `shared_space_person` rows sharing a non-null identityId
+        // in the SAME space is impossible here: `shared_space_person_spaceId_identityId_key` is a
+        // real unique index on (spaceId, identityId) WHERE identityId IS NOT NULL (verified against
+        // Postgres directly — a second insert throws `23505 duplicate key value`). The reachable
+        // equivalent is one identity-linked shared_space_person row backed by two qualifying faces
+        // (both carrying pet_search rows): person_rows' COALESCE(identityId, id) grouping must still
+        // yield exactly one counted person for it, and the type/pet-individual predicates must not
+        // fan that single row out via a join instead of the EXISTS clauses Step 3 uses. A co-existing
+        // human proves the type filter is actually doing the excluding, not petsEnabled alone.
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: user.id });
+        const { asset: assetA } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        const { asset: assetB } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetA.id });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetB.id });
+
+        await seedSpacePerson(ctx, sut, { spaceId: space.id, assetIds: [assetA.id], type: 'person', name: 'Alice' });
+
+        const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: assetA.id });
+        const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: assetB.id });
+        const identity = await ctx.database
+          .insertInto('face_identity')
+          .values({ type: 'pet' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        const pet = await sut.createPerson({
+          spaceId: space.id,
+          name: 'Rex',
+          type: 'pet',
+          identityId: identity.id,
+          representativeFaceId: null,
+        });
+        await sut.addPersonFaces(
+          [
+            { personId: pet.id, assetFaceId: firstFace.id },
+            { personId: pet.id, assetFaceId: secondFace.id },
+          ],
+          { skipRecount: true },
+        );
+        await ctx.database
+          .insertInto('pet_search')
+          .values([
+            { faceId: firstFace.id, embedding: newEmbedding() },
+            { faceId: secondFace.id, embedding: newEmbedding() },
+          ])
+          .execute();
+
+        const counts = await sut.countPersonsBySpaceId(space.id, { petsEnabled: true, type: 'pet' });
+
+        expect(counts.total).toBe(1);
+      });
     });
   });
 
