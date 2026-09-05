@@ -147,7 +147,7 @@
         tabindex="-1"
         bind:this={menuElement}
         onkeydown={onMenuKeydown}
-        class="absolute inset-e-0 top-full z-50 mt-1.5 min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] dark:border-gray-700 dark:bg-immich-dark-bg"
+        class="absolute inset-e-0 top-full z-60 mt-1.5 min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] dark:border-gray-700 dark:bg-immich-dark-bg"
       >
         {#each options as option (option.value)}
           <button

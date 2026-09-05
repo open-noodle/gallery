@@ -2143,6 +2143,26 @@ describe('search mode control placement', () => {
     expect(m.mode).toBe('description');
   });
 
+  // Both the menu and the results panel are absolutely positioned under the field and
+  // overlap, and clicking the chip does not close the dropdown (the chip is inside the
+  // field's clickOutside wrapper). The panel is the later sibling, so at equal z-index it
+  // wins the paint and swallows the menu. Assert the menu outranks it.
+  it('paints the chip menu above the open results panel', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const m = new GlobalSearchManager();
+    m.open('dropdown');
+    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+
+    await user.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
+
+    const zIndexOf = (element: Element | null) => Number(/z-(\d+)/.exec(element?.className ?? '')?.[1] ?? 0);
+    const panel = container.querySelector('[data-cmdk-dropdown-panel]');
+    const menu = container.querySelector(':scope [data-testid="search-mode-chip"] [role="menu"]');
+    expect(panel).not.toBeNull();
+    expect(menu).not.toBeNull();
+    expect(zIndexOf(menu)).toBeGreaterThan(zIndexOf(panel));
+  });
+
   it('keeps the chip out of the modal, where the rail already carries the mode', () => {
     const m = new GlobalSearchManager();
     m.open();
