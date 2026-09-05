@@ -1883,16 +1883,16 @@ describe('prefix scoping — scoped rendering', () => {
     const manager = makeWithScope('@alice');
     render(GlobalSearch, { props: { manager } });
     // Modal portals its content to document.body, not the render container.
-    const radioGroup = document.querySelector('[role="radiogroup"]');
+    const radioGroup = document.querySelector('[data-testid="search-mode-rail"]');
     expect(radioGroup).not.toBeNull();
-    expect(radioGroup?.className).toMatch(/opacity-50/);
+    expect(radioGroup).toHaveAttribute('data-scoped', 'true');
     // The radiogroup + every radio input inside it must not carry aria-disabled —
     // they stay focusable so users can still preset a mode for when they clear
     // the prefix. Scoping to the radiogroup subtree avoids coincidental
     // `aria-disabled` from unrelated portal content (Modal chrome, etc.).
     expect(radioGroup?.hasAttribute('aria-disabled')).toBe(false);
     expect(radioGroup?.querySelectorAll('[aria-disabled]').length).toBe(0);
-    const radios = document.querySelectorAll('input[type="radio"][name="cmdk-mode"]');
+    const radios = document.querySelectorAll('input[type="radio"][name="search-mode-rail"]');
     expect(radios.length).toBeGreaterThan(0);
     // Radio inputs default to tabindex=0; confirm none are tabindex=-1.
     for (const r of radios) {
@@ -2095,5 +2095,86 @@ describe('prefix scoping — scoped rendering', () => {
     expect(document.querySelector('[data-cmdk-nav-section]')).not.toBeNull();
     const rows = document.querySelectorAll('[data-command-item]');
     expect(rows.length).toBeGreaterThan(0);
+  });
+});
+
+describe('search mode control placement', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('puts the rail in the modal palette', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    expect(document.querySelector('[data-testid="search-mode-rail"]')).not.toBeNull();
+  });
+
+  it('changes the manager mode from the modal rail', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    const radios = [...document.querySelectorAll('[data-testid="search-mode-rail"] input')] as HTMLInputElement[];
+    await user.click(radios.find((radio) => radio.value === 'ocr')!);
+
+    expect(m.mode).toBe('ocr');
+  });
+
+  it('puts the chip inside the inline search field, where the Cmd-K hint lives', () => {
+    const m = new GlobalSearchManager();
+    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+
+    expect(
+      container.querySelector(':scope [data-testid="cmdk-input-trigger"] [data-testid="search-mode-chip"]'),
+    ).not.toBeNull();
+  });
+
+  it('changes the manager mode from the inline chip', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const m = new GlobalSearchManager();
+    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+
+    await user.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
+    await user.click(container.querySelector('[data-testid="search-mode-option-description"]') as HTMLButtonElement);
+
+    expect(m.mode).toBe('description');
+  });
+
+  // Both the menu and the results panel are absolutely positioned under the field and
+  // overlap, and clicking the chip does not close the dropdown (the chip is inside the
+  // field's clickOutside wrapper). The panel is the later sibling, so at equal z-index it
+  // wins the paint and swallows the menu. Assert the menu outranks it.
+  it('paints the chip menu above the open results panel', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const m = new GlobalSearchManager();
+    m.open('dropdown');
+    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+
+    await user.click(container.querySelector('[data-testid="search-mode-chip-trigger"]') as HTMLButtonElement);
+
+    const zIndexOf = (element: Element | null) => Number(/z-(\d+)/.exec(element?.className ?? '')?.[1] ?? 0);
+    const panel = container.querySelector('[data-cmdk-dropdown-panel]');
+    const menu = container.querySelector(':scope [data-testid="search-mode-chip"] [role="menu"]');
+    expect(panel).not.toBeNull();
+    expect(menu).not.toBeNull();
+    expect(zIndexOf(menu)).toBeGreaterThan(zIndexOf(panel));
+  });
+
+  it('keeps the chip out of the modal, where the rail already carries the mode', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    expect(document.querySelector('[data-testid="search-mode-chip"]')).toBeNull();
+  });
+
+  it('keeps the rail out of the inline dropdown, where the chip already carries the mode', () => {
+    const m = new GlobalSearchManager();
+    const { container } = render(GlobalSearch, { props: { manager: m, variant: 'dropdown' } });
+
+    expect(container.querySelector('[data-testid="search-mode-rail"]')).toBeNull();
   });
 });
