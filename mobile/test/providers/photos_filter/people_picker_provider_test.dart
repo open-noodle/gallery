@@ -85,7 +85,7 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
-            (ref, key) async => key.filterBy == PeopleFilterBy.all ? [_d('a', 'Alice')] : <DriftPerson>[],
+            (ref, key) async => key.filterBy == PeopleFilterBy.all ? [_d('a', 'Alice')] : <Person>[],
           ),
         ],
       );
