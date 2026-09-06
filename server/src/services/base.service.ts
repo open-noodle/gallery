@@ -31,6 +31,7 @@ import { DownloadRepository } from 'src/repositories/download.repository';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository';
 import { EmailRepository } from 'src/repositories/email.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
@@ -117,6 +118,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FaceDissolveRepository,
   FaceIdentityRepository,
   FaceRepairRepository,
   FaceRepairScanRepository,
@@ -188,6 +190,7 @@ export class BaseService {
     protected duplicateRepository: DuplicateRepository,
     protected emailRepository: EmailRepository,
     protected eventRepository: EventRepository,
+    protected faceDissolveRepository: FaceDissolveRepository,
     protected faceIdentityRepository: FaceIdentityRepository,
     protected faceRepairRepository: FaceRepairRepository,
     protected faceRepairScanRepository: FaceRepairScanRepository,
@@ -280,6 +283,7 @@ export class BaseService {
       ctx.duplicateRepository,
       ctx.emailRepository,
       ctx.eventRepository,
+      ctx.faceDissolveRepository,
       ctx.faceIdentityRepository,
       ctx.faceRepairRepository,
       ctx.faceRepairScanRepository,

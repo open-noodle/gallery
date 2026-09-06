@@ -365,6 +365,18 @@ class ApiClient {
           return DatabaseBackupListResponseDto.fromJson(value);
         case 'DetachScopedPersonDto':
           return DetachScopedPersonDto.fromJson(value);
+        case 'DissolveOutcome':
+          return DissolveOutcomeTypeTransformer().decode(value);
+        case 'DissolveRequestDto':
+          return DissolveRequestDto.fromJson(value);
+        case 'DissolveResponseDto':
+          return DissolveResponseDto.fromJson(value);
+        case 'DissolveResponseDtoCounts':
+          return DissolveResponseDtoCounts.fromJson(value);
+        case 'DissolveResponseDtoWarningsInner':
+          return DissolveResponseDtoWarningsInner.fromJson(value);
+        case 'DissolveScope':
+          return DissolveScopeTypeTransformer().decode(value);
         case 'DownloadArchiveDto':
           return DownloadArchiveDto.fromJson(value);
         case 'DownloadArchiveInfo':
@@ -613,6 +625,10 @@ class ApiClient {
           return PartnerUpdateDto.fromJson(value);
         case 'PeopleFaceStatisticsResponseDto':
           return PeopleFaceStatisticsResponseDto.fromJson(value);
+        case 'PeopleHealthResponseDto':
+          return PeopleHealthResponseDto.fromJson(value);
+        case 'PeopleHealthResponseDtoPeopleInner':
+          return PeopleHealthResponseDtoPeopleInner.fromJson(value);
         case 'PeopleResponse':
           return PeopleResponse.fromJson(value);
         case 'PeopleResponseDto':

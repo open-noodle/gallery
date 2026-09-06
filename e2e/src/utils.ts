@@ -513,6 +513,7 @@ export const utils = {
     assetId,
     personId,
     sourceType = 'machine-learning',
+    withEmbedding = false,
   }: {
     assetId: string;
     personId: string;
@@ -526,8 +527,20 @@ export const utils = {
      * facial recognition enabled, `handleDetectFaces` treats an existing MachineLearning-sourced
      * face as a prior ML detection, re-runs detection, finds 0 real faces in these fixtures, and
      * deletes every face whose id was not re-confirmed — wiping the seeded face.
+     *
+     * Pass `'exif'` for a face imported from file metadata (a RegionInfo import) — combined with
+     * `withEmbedding: false` (the default), that is exactly what nothing else in the face-repair
+     * console can see: no embedding means the scan's inner join on `face_search` excludes it, and
+     * force-recognition only unassigns `machine-learning`-sourced faces. See face-dissolve.
      */
-    sourceType?: 'machine-learning' | 'manual';
+    sourceType?: 'machine-learning' | 'manual' | 'exif';
+    /**
+     * Additive option, defaults to `false` — today's behaviour for every existing caller is to leave
+     * the face with no `face_search` row at all, so this must stay opt-in rather than change what
+     * those nine specs' faces look like. Pass `true` to give the face an embedding, e.g. to exercise
+     * a dissolve scope (`without-embedding`) or console surface that discriminates on its presence.
+     */
+    withEmbedding?: boolean;
   }): Promise<string> => {
     if (!client) {
       throw new Error('Database client not connected');
@@ -573,7 +586,20 @@ export const utils = {
       `,
       [assetId, personId, sourceType],
     );
-    return result.rows[0].id as string;
+    const faceId = result.rows[0].id as string;
+
+    if (withEmbedding) {
+      // Same dummy-vector shape as utils.createPet's pet_search seed — the exact value is irrelevant here,
+      // only that a row exists so `face_search`-joining queries (scan eligibility, the `without-embedding`
+      // dissolve scope) see this face as having an embedding.
+      const embedding = `[${Array.from({ length: 512 }, () => '0.1').join(',')}]`;
+      await client.query(`INSERT INTO "face_search" ("faceId", "embedding") VALUES ($1, $2::vector)`, [
+        faceId,
+        embedding,
+      ]);
+    }
+
+    return faceId;
   },
 
   // Slice 3 — M2: PersonResponseDto does not expose `faceAssetId` (only `thumbnailPath`, which is

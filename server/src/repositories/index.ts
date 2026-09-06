@@ -17,6 +17,7 @@ import { DownloadRepository } from 'src/repositories/download.repository';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository';
 import { EmailRepository } from 'src/repositories/email.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
@@ -82,6 +83,7 @@ export const repositories = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FaceDissolveRepository,
   FaceIdentityRepository,
   FacePersonVerdictRepository,
   FaceRepairDeclineRepository,

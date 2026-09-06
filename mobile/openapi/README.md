@@ -174,17 +174,20 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**createFaceRepairOwnerPerson**](doc//FacesApi.md#createfacerepairownerperson) | **POST** /admin/face-repair/owner/{ownerId}/people | Create a person under an owner for the move-to-chosen-person picker
 *FacesApi* | [**declineFaceRepair**](doc//FacesApi.md#declinefacerepair) | **POST** /admin/face-repair/decline | Decline flagged faces / dismiss flagged persons
 *FacesApi* | [**deleteFace**](doc//FacesApi.md#deleteface) | **DELETE** /faces/{id} | Delete a face
+*FacesApi* | [**dissolvePerson**](doc//FacesApi.md#dissolveperson) | **POST** /admin/face-repair/person/{personId}/dissolve | Dissolve a person
 *FacesApi* | [**getFaceRepairClusterFaces**](doc//FacesApi.md#getfacerepairclusterfaces) | **POST** /admin/face-repair/scan/person/{personId}/cluster-faces | List a person's cluster faces (paginated, excluding the supplied flagged ids)
 *FacesApi* | [**getFaceRepairDeclines**](doc//FacesApi.md#getfacerepairdeclines) | **GET** /admin/face-repair/decline | List face-repair declines
 *FacesApi* | [**getFaceRepairFacePreview**](doc//FacesApi.md#getfacerepairfacepreview) | **GET** /admin/face-repair/faces/{assetFaceId}/preview | Get an admin face-repair source photo
 *FacesApi* | [**getFaceRepairFaceThumbnail**](doc//FacesApi.md#getfacerepairfacethumbnail) | **GET** /admin/face-repair/faces/{assetFaceId}/thumbnail | Get an admin face-repair face thumbnail
 *FacesApi* | [**getFaceRepairOwnerPeople**](doc//FacesApi.md#getfacerepairownerpeople) | **GET** /admin/face-repair/owner/{ownerId}/people | Search an owner's people for the move-to-chosen-person picker
+*FacesApi* | [**getFaceRepairPeopleHealth**](doc//FacesApi.md#getfacerepairpeoplehealth) | **GET** /admin/face-repair/people | List people with per-source face counts, to find a person worth dissolving
 *FacesApi* | [**getFaceRepairPersonFaces**](doc//FacesApi.md#getfacerepairpersonfaces) | **GET** /admin/face-repair/scan/person/{personId} | Get a person's flagged faces for review
 *FacesApi* | [**getFaceRepairPersonMetadata**](doc//FacesApi.md#getfacerepairpersonmetadata) | **GET** /admin/face-repair/person/{personId} | Get a person for manual review
 *FacesApi* | [**getFaceRepairResolutions**](doc//FacesApi.md#getfacerepairresolutions) | **GET** /admin/face-repair/resolutions | List face-repair resolutions (negative verdicts from both engines)
 *FacesApi* | [**getFaceRepairScanDefaults**](doc//FacesApi.md#getfacerepairscandefaults) | **GET** /admin/face-repair/scan/defaults | Get effective face-repair scan defaults
 *FacesApi* | [**getFaces**](doc//FacesApi.md#getfaces) | **GET** /faces | Retrieve faces for asset
 *FacesApi* | [**getLatestScan**](doc//FacesApi.md#getlatestscan) | **GET** /admin/face-repair/scan/latest | Get the latest face-repair scan
+*FacesApi* | [**previewDissolvePerson**](doc//FacesApi.md#previewdissolveperson) | **POST** /admin/face-repair/person/{personId}/dissolve/preview | Preview what dissolving a person would change
 *FacesApi* | [**reassignFacesById**](doc//FacesApi.md#reassignfacesbyid) | **PUT** /faces/{id} | Re-assign a face to another person
 *FacesApi* | [**removeFaceRepairDeclines**](doc//FacesApi.md#removefacerepairdeclines) | **DELETE** /admin/face-repair/decline | Remove face-repair declines
 *FacesApi* | [**removeFaceRepairResolutions**](doc//FacesApi.md#removefacerepairresolutions) | **POST** /admin/face-repair/resolutions/remove | Remove face-repair resolutions (undo)
@@ -542,6 +545,12 @@ Class | Method | HTTP request | Description
  - [DatabaseBackupDto](doc//DatabaseBackupDto.md)
  - [DatabaseBackupListResponseDto](doc//DatabaseBackupListResponseDto.md)
  - [DetachScopedPersonDto](doc//DetachScopedPersonDto.md)
+ - [DissolveOutcome](doc//DissolveOutcome.md)
+ - [DissolveRequestDto](doc//DissolveRequestDto.md)
+ - [DissolveResponseDto](doc//DissolveResponseDto.md)
+ - [DissolveResponseDtoCounts](doc//DissolveResponseDtoCounts.md)
+ - [DissolveResponseDtoWarningsInner](doc//DissolveResponseDtoWarningsInner.md)
+ - [DissolveScope](doc//DissolveScope.md)
  - [DownloadArchiveDto](doc//DownloadArchiveDto.md)
  - [DownloadArchiveInfo](doc//DownloadArchiveInfo.md)
  - [DownloadInfoDto](doc//DownloadInfoDto.md)
@@ -666,6 +675,8 @@ Class | Method | HTTP request | Description
  - [PartnerResponseDto](doc//PartnerResponseDto.md)
  - [PartnerUpdateDto](doc//PartnerUpdateDto.md)
  - [PeopleFaceStatisticsResponseDto](doc//PeopleFaceStatisticsResponseDto.md)
+ - [PeopleHealthResponseDto](doc//PeopleHealthResponseDto.md)
+ - [PeopleHealthResponseDtoPeopleInner](doc//PeopleHealthResponseDtoPeopleInner.md)
  - [PeopleResponse](doc//PeopleResponse.md)
  - [PeopleResponseDto](doc//PeopleResponseDto.md)
  - [PeopleStatisticsResponseDto](doc//PeopleStatisticsResponseDto.md)

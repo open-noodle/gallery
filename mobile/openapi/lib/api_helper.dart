@@ -109,6 +109,12 @@ String parameterToString(dynamic value) {
   if (value is Colorspace) {
     return ColorspaceTypeTransformer().encode(value).toString();
   }
+  if (value is DissolveOutcome) {
+    return DissolveOutcomeTypeTransformer().encode(value).toString();
+  }
+  if (value is DissolveScope) {
+    return DissolveScopeTypeTransformer().encode(value).toString();
+  }
   if (value is HlsVideoResolution) {
     return HlsVideoResolutionTypeTransformer().encode(value).toString();
   }

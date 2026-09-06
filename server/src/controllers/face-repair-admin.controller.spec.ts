@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller';
 import { CacheControl } from 'src/enum';
+import { FaceDissolveService } from 'src/services/face-dissolve.service';
 import { FaceRepairService } from 'src/services/face-repair.service';
 import { ImmichRedirectResponse } from 'src/utils/file';
 import request from 'supertest';
@@ -11,14 +12,19 @@ import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils'
 describe(FaceRepairAdminController.name, () => {
   let ctx: ControllerContext;
   const service = mockBaseService(FaceRepairService);
+  const dissolveService = mockBaseService(FaceDissolveService);
 
   beforeAll(async () => {
-    ctx = await controllerSetup(FaceRepairAdminController, [{ provide: FaceRepairService, useValue: service }]);
+    ctx = await controllerSetup(FaceRepairAdminController, [
+      { provide: FaceRepairService, useValue: service },
+      { provide: FaceDissolveService, useValue: dissolveService },
+    ]);
     return () => ctx.close();
   });
 
   beforeEach(() => {
     service.resetAllMocks();
+    dissolveService.resetAllMocks();
     ctx.reset();
   });
 
@@ -1018,6 +1024,120 @@ describe(FaceRepairAdminController.name, () => {
         .set('Authorization', 'Bearer token');
       expect(status).toBe(400);
       expect(service.getAdminFacePreview).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /admin/face-repair/person/:personId/dissolve', () => {
+    const body = { scope: 'exif', outcome: 'delete-faces', redetect: true, expectedFaceCount: 1 };
+
+    it('requires authentication', async () => {
+      // Matches this file's other "should be an authenticated route" checks: the AuthService mock is
+      // unconfigured by default (no reject/resolve), so it neither throws nor blocks the request — asserting
+      // a literal 401 here would fail for a harness reason (falls through to a 201), not because the route
+      // is unguarded. Assert the guard actually ran with admin metadata instead.
+      await request(ctx.getHttpServer()).post(`/admin/face-repair/person/${factory.uuid()}/dissolve`).send(body);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ adminRoute: true }),
+        }),
+      );
+    });
+
+    it('rejects a non-uuid person id', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post('/admin/face-repair/person/not-a-uuid/dissolve')
+        .send(body);
+      expect(status).toBe(400);
+    });
+
+    it('rejects an unknown scope', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/admin/face-repair/person/${factory.uuid()}/dissolve`)
+        .send({ ...body, scope: 'everything' });
+      expect(status).toBe(400);
+    });
+
+    it('rejects a missing expectedFaceCount', async () => {
+      const { scope, outcome, redetect } = body;
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/admin/face-repair/person/${factory.uuid()}/dissolve`)
+        .send({ scope, outcome, redetect });
+      expect(status).toBe(400);
+    });
+  });
+
+  describe('GET /admin/face-repair/people', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/admin/face-repair/people');
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ adminRoute: true }),
+        }),
+      );
+    });
+
+    it('is admin-only: a non-admin caller gets 403', async () => {
+      ctx.authenticate.mockRejectedValue(new ForbiddenException('Forbidden'));
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(403);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+
+    it('delegates to service.getPeopleHealth with ownerId, sort and page', async () => {
+      dissolveService.getPeopleHealth.mockResolvedValue({ people: [], total: 0, hasMore: false });
+      const ownerId = factory.uuid();
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId, sort: 'exifFaces', page: 2 })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(200);
+      expect(dissolveService.getPeopleHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId, sort: 'exifFaces', page: 2 }),
+      );
+      expect(body).toEqual({ people: [], total: 0, hasMore: false });
+    });
+
+    it('defaults sort to faceCount and page to 1 when omitted', async () => {
+      dissolveService.getPeopleHealth.mockResolvedValue({ people: [], total: 0, hasMore: false });
+      await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId: factory.uuid() })
+        .set('Authorization', 'Bearer token');
+      expect(dissolveService.getPeopleHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'faceCount', page: 1, size: 50 }),
+      );
+    });
+
+    it('rejects an unknown sort key with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId: factory.uuid(), sort: 'notARealSort' })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+
+    // Without an ownerId the aggregate spans every visible asset_face row on the instance, GROUPed BY
+    // person.id and ORDERed BY an aggregate alias, so LIMIT/OFFSET prune nothing and each page re-runs the
+    // whole thing. The only client always sends one, so the endpoint refuses the unbounded shape outright.
+    it('rejects a missing ownerId with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ sort: 'exifFaces' })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-uuid ownerId with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId: 'not-a-uuid' })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
     });
   });
 });

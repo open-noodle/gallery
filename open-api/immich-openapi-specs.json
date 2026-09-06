@@ -975,6 +975,109 @@
         ]
       }
     },
+    "/admin/face-repair/people": {
+      "get": {
+        "operationId": "getFaceRepairPeopleHealth",
+        "parameters": [
+          {
+            "name": "ownerId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Number of people per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "faceCount",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "exifFaces"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "facesWithoutEmbedding"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "faceCount"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeopleHealthResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List people with per-source face counts, to find a person worth dissolving",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/admin/face-repair/person/{personId}": {
       "get": {
         "operationId": "getFaceRepairPersonMetadata",
@@ -1012,6 +1115,124 @@
           }
         ],
         "summary": "Get a person for manual review",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
+    "/admin/face-repair/person/{personId}/dissolve": {
+      "post": {
+        "operationId": "dissolvePerson",
+        "parameters": [
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DissolveRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DissolveResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Dissolve a person",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
+    "/admin/face-repair/person/{personId}/dissolve/preview": {
+      "post": {
+        "operationId": "previewDissolvePerson",
+        "parameters": [
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DissolveRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DissolveResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Preview what dissolving a person would change",
         "tags": [
           "Faces"
         ],
@@ -26948,6 +27169,128 @@
         ],
         "type": "object"
       },
+      "DissolveOutcome": {
+        "description": "What a dissolve does with the faces it touches",
+        "enum": [
+          "unassign",
+          "delete-faces",
+          "delete-faces-and-person"
+        ],
+        "type": "string"
+      },
+      "DissolveRequestDto": {
+        "properties": {
+          "expectedFaceCount": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DissolveOutcome"
+          },
+          "redetect": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DissolveScope"
+          }
+        },
+        "required": [
+          "expectedFaceCount",
+          "outcome",
+          "redetect",
+          "scope"
+        ],
+        "type": "object"
+      },
+      "DissolveResponseDto": {
+        "properties": {
+          "counts": {
+            "properties": {
+              "assets": {
+                "type": "number"
+              },
+              "exif": {
+                "type": "number"
+              },
+              "faces": {
+                "type": "number"
+              },
+              "mlWithEmbedding": {
+                "type": "number"
+              },
+              "mlWithoutEmbedding": {
+                "type": "number"
+              },
+              "notRedetectable": {
+                "type": "number"
+              },
+              "remainingLiveFaces": {
+                "type": "number"
+              },
+              "sharedAssets": {
+                "type": "number"
+              },
+              "softDeleted": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "faces",
+              "exif",
+              "mlWithEmbedding",
+              "mlWithoutEmbedding",
+              "softDeleted",
+              "assets",
+              "sharedAssets",
+              "notRedetectable",
+              "remainingLiveFaces"
+            ],
+            "type": "object"
+          },
+          "expectedFaceCount": {
+            "type": "number"
+          },
+          "personId": {
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "code",
+                "count"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "counts",
+          "expectedFaceCount",
+          "personId",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "DissolveScope": {
+        "description": "Which faces a dissolve touches",
+        "enum": [
+          "all",
+          "exif",
+          "machine-learning",
+          "without-embedding"
+        ],
+        "type": "string"
+      },
       "DownloadArchiveDto": {
         "properties": {
           "assetIds": {
@@ -30470,6 +30813,64 @@
           "detectedFaceCount",
           "namedVisiblePersonCount",
           "unassignedFaceCount"
+        ],
+        "type": "object"
+      },
+      "PeopleHealthResponseDto": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "people": {
+            "items": {
+              "properties": {
+                "exif": {
+                  "type": "number"
+                },
+                "faceCount": {
+                  "type": "number"
+                },
+                "facesWithoutEmbedding": {
+                  "type": "number"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "machineLearning": {
+                  "type": "number"
+                },
+                "manual": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "ownerId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "ownerId",
+                "faceCount",
+                "machineLearning",
+                "exif",
+                "manual",
+                "facesWithoutEmbedding"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "hasMore",
+          "people",
+          "total"
         ],
         "type": "object"
       },

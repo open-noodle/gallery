@@ -172,12 +172,51 @@ export type FaceRepairOwnerPersonCreateRequestDto = {
 export type FaceRepairOwnerPersonCreatedResponseDto = {
     id: string;
 };
+export type PeopleHealthResponseDto = {
+    hasMore: boolean;
+    people: {
+        exif: number;
+        faceCount: number;
+        facesWithoutEmbedding: number;
+        id: string;
+        machineLearning: number;
+        manual: number;
+        name: string;
+        ownerId: string;
+    }[];
+    total: number;
+};
 export type FaceRepairPersonMetadataResponseDto = {
     faceCount: number;
     id: string;
     name: string;
     ownerId: string;
     thumbnailFaceId: string | null;
+};
+export type DissolveRequestDto = {
+    expectedFaceCount: number;
+    outcome: DissolveOutcome;
+    redetect: boolean;
+    scope: DissolveScope;
+};
+export type DissolveResponseDto = {
+    counts: {
+        assets: number;
+        exif: number;
+        faces: number;
+        mlWithEmbedding: number;
+        mlWithoutEmbedding: number;
+        notRedetectable: number;
+        remainingLiveFaces: number;
+        sharedAssets: number;
+        softDeleted: number;
+    };
+    expectedFaceCount: number;
+    personId: string;
+    warnings: {
+        code: string;
+        count: number;
+    }[];
 };
 export type FaceRepairResolutionsListDto = {
     resolutions: {
@@ -4837,6 +4876,27 @@ export function createFaceRepairOwnerPerson({ ownerId, faceRepairOwnerPersonCrea
     })));
 }
 /**
+ * List people with per-source face counts, to find a person worth dissolving
+ */
+export function getFaceRepairPeopleHealth({ ownerId, page, size, sort }: {
+    ownerId: string;
+    page?: number;
+    size?: number;
+    sort?: "exifFaces" | "facesWithoutEmbedding" | "faceCount";
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleHealthResponseDto;
+    }>(`/admin/face-repair/people${QS.query(QS.explode({
+        ownerId,
+        page,
+        size,
+        sort
+    }))}`, {
+        ...opts
+    }));
+}
+/**
  * Get a person for manual review
  */
 export function getFaceRepairPersonMetadata({ personId }: {
@@ -4848,6 +4908,38 @@ export function getFaceRepairPersonMetadata({ personId }: {
     }>(`/admin/face-repair/person/${encodeURIComponent(personId)}`, {
         ...opts
     }));
+}
+/**
+ * Dissolve a person
+ */
+export function dissolvePerson({ personId, dissolveRequestDto }: {
+    personId: string;
+    dissolveRequestDto: DissolveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: DissolveResponseDto;
+    }>(`/admin/face-repair/person/${encodeURIComponent(personId)}/dissolve`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: dissolveRequestDto
+    })));
+}
+/**
+ * Preview what dissolving a person would change
+ */
+export function previewDissolvePerson({ personId, dissolveRequestDto }: {
+    personId: string;
+    dissolveRequestDto: DissolveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: DissolveResponseDto;
+    }>(`/admin/face-repair/person/${encodeURIComponent(personId)}/dissolve/preview`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: dissolveRequestDto
+    })));
 }
 /**
  * List face-repair resolutions (negative verdicts from both engines)
@@ -10168,6 +10260,17 @@ export enum UserAvatarColor {
     Orange = "orange",
     Gray = "gray",
     Amber = "amber"
+}
+export enum DissolveOutcome {
+    Unassign = "unassign",
+    DeleteFaces = "delete-faces",
+    DeleteFacesAndPerson = "delete-faces-and-person"
+}
+export enum DissolveScope {
+    All = "all",
+    Exif = "exif",
+    MachineLearning = "machine-learning",
+    WithoutEmbedding = "without-embedding"
 }
 export enum IntegrityReport {
     UntrackedFile = "untracked_file",
