@@ -252,7 +252,8 @@ group by
   "person"."name",
   "person"."ownerId"
 order by
-  "exif" desc
+  "exif" desc,
+  "person"."id" asc
 limit
   $6
 offset
