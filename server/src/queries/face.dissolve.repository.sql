@@ -142,6 +142,25 @@ where
       and "other"."personId" is not null
       and "other"."personId" != $3
       and "other"."deletedAt" is null
+      and not (
+        exists (
+          select
+            1 as "one"
+          from
+            "pet_search"
+          where
+            "pet_search"."faceId" = "other"."id"
+        )
+        or exists (
+          select
+            1 as "one"
+          from
+            "person"
+          where
+            "person"."id" = "other"."personId"
+            and "person"."type" = $4
+        )
+      )
   )
 select
   count(*) as "count"
