@@ -11,7 +11,6 @@
     text: string;
     title?: string;
     onClick?: undefined | (() => unknown);
-    [key: string]: unknown;
   }
 
   let { text, title, onClick }: Props = $props();
