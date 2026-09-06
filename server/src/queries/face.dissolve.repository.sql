@@ -32,3 +32,161 @@ where
         )
       )
   )
+
+-- FaceDissolveRepository.getCounts
+select
+  count(*) as "faces",
+  count(*) filter (
+    where
+      "asset_face"."sourceType" = $1
+  ) as "exif",
+  count(*) filter (
+    where
+      "asset_face"."deletedAt" is not null
+  ) as "softDeleted",
+  count(*) filter (
+    where
+      (
+        "asset_face"."sourceType" = $2
+        and exists (
+          select
+            1 as "one"
+          from
+            "face_search"
+          where
+            "face_search"."faceId" = "asset_face"."id"
+        )
+      )
+  ) as "mlWithEmbedding",
+  count(*) filter (
+    where
+      (
+        "asset_face"."sourceType" = $3
+        and not exists (
+          select
+            1 as "one"
+          from
+            "face_search"
+          where
+            "face_search"."faceId" = "asset_face"."id"
+        )
+      )
+  ) as "mlWithoutEmbedding",
+  count(distinct "asset_face"."assetId") as "assets"
+from
+  "asset_face"
+where
+  (
+    "asset_face"."personId" = $4
+    and not (
+      exists (
+        select
+          1 as "one"
+        from
+          "pet_search"
+        where
+          "pet_search"."faceId" = "asset_face"."id"
+      )
+      or exists (
+        select
+          1 as "one"
+        from
+          "person"
+        where
+          "person"."id" = "asset_face"."personId"
+          and "person"."type" = $5
+      )
+    )
+  )
+select
+  count(*) as "count"
+from
+  "asset"
+where
+  "asset"."id" in (
+    select distinct
+      "asset_face"."assetId"
+    from
+      "asset_face"
+    where
+      (
+        "asset_face"."personId" = $1
+        and not (
+          exists (
+            select
+              1 as "one"
+            from
+              "pet_search"
+            where
+              "pet_search"."faceId" = "asset_face"."id"
+          )
+          or exists (
+            select
+              1 as "one"
+            from
+              "person"
+            where
+              "person"."id" = "asset_face"."personId"
+              and "person"."type" = $2
+          )
+        )
+      )
+  )
+  and exists (
+    select
+      1 as "one"
+    from
+      "asset_face" as "other"
+    where
+      "other"."assetId" = "asset"."id"
+      and "other"."personId" is not null
+      and "other"."personId" != $3
+      and "other"."deletedAt" is null
+  )
+select
+  count(*) as "count"
+from
+  "asset"
+where
+  "asset"."id" in (
+    select distinct
+      "asset_face"."assetId"
+    from
+      "asset_face"
+    where
+      (
+        "asset_face"."personId" = $1
+        and not (
+          exists (
+            select
+              1 as "one"
+            from
+              "pet_search"
+            where
+              "pet_search"."faceId" = "asset_face"."id"
+          )
+          or exists (
+            select
+              1 as "one"
+            from
+              "person"
+            where
+              "person"."id" = "asset_face"."personId"
+              and "person"."type" = $2
+          )
+        )
+      )
+  )
+  and (
+    "asset"."visibility" = $3
+    or "asset"."deletedAt" is not null
+    or not exists (
+      select
+        1 as "one"
+      from
+        "asset_file"
+      where
+        "asset_file"."assetId" = "asset"."id"
+        and "asset_file"."type" = $4
+    )
+  )
