@@ -1130,7 +1130,7 @@
         "parameters": [
           {
             "name": "ownerId",
-            "required": false,
+            "required": true,
             "in": "query",
             "schema": {
               "format": "uuid",
@@ -30128,13 +30128,7 @@
             "type": "boolean"
           },
           "scope": {
-            "enum": [
-              "all",
-              "exif",
-              "machine-learning",
-              "without-embedding"
-            ],
-            "type": "string"
+            "$ref": "#/components/schemas/DissolveScope"
           }
         },
         "required": [
@@ -30218,6 +30212,16 @@
           "warnings"
         ],
         "type": "object"
+      },
+      "DissolveScope": {
+        "description": "Which faces a dissolve touches",
+        "enum": [
+          "all",
+          "exif",
+          "machine-learning",
+          "without-embedding"
+        ],
+        "type": "string"
       },
       "DownloadArchiveDto": {
         "properties": {

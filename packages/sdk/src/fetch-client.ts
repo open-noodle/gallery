@@ -651,7 +651,7 @@ export type DissolveRequestDto = {
     expectedFaceCount: number;
     outcome: "unassign" | "delete-faces" | "delete-faces-and-person";
     redetect: boolean;
-    scope: Scope;
+    scope: DissolveScope;
 };
 export type DissolveResponseDto = {
     counts: {
@@ -5329,7 +5329,7 @@ export function createFaceRepairOwnerPerson({ ownerId, faceRepairOwnerPersonCrea
  * List people with per-source face counts, to find a person worth dissolving
  */
 export function getFaceRepairPeopleHealth({ ownerId, page, size, sort }: {
-    ownerId?: string;
+    ownerId: string;
     page?: number;
     size?: number;
     sort?: "exifFaces" | "facesWithoutEmbedding" | "faceCount";
@@ -10959,7 +10959,7 @@ export enum Status {
     Completed = "completed",
     Failed = "failed"
 }
-export enum Scope {
+export enum DissolveScope {
     All = "all",
     Exif = "exif",
     MachineLearning = "machine-learning",

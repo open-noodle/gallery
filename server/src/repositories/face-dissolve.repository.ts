@@ -4,7 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum';
 import { DB } from 'src/schema';
-import { DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve';
+import { dissolveFacePredicate, DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve';
 
 export interface DissolveWriteInput {
   personId: string;
@@ -99,8 +99,9 @@ export class FaceDissolveRepository {
    */
   @GenerateSql({ params: [DummyValue.UUID, DissolveScope.All] })
   async getCounts(personId: string, scope: DissolveScope): Promise<DissolveCounts> {
-    const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
-      eb.and([eb('asset_face.personId', '=', personId), dissolveScopePredicate(eb, scope)]);
+    // Shared with dissolve() below — see dissolveFacePredicate: the preview and the apply must never be
+    // able to drift apart.
+    const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personId, scope);
 
     const faceRow = await this.db
       .selectFrom('asset_face')
@@ -211,7 +212,7 @@ export class FaceDissolveRepository {
    */
   @GenerateSql({ params: [{ ownerId: DummyValue.UUID, sort: 'exifFaces', page: 1, size: 20 }] })
   async getPeopleHealth(options: {
-    ownerId?: string;
+    ownerId: string;
     sort: PersonHealthSort;
     page: number;
     size: number;
@@ -225,7 +226,9 @@ export class FaceDissolveRepository {
           .on('asset_face.isVisible', 'is', true),
       )
       .where('person.type', '!=', 'pet')
-      .$if(!!options.ownerId, (qb) => qb.where('person.ownerId', '=', options.ownerId!))
+      // ownerId is mandatory: an unfiltered aggregate spans every visible asset_face row on the instance and
+      // orders by an aggregate alias, so no page can be pruned and each page re-runs the whole GROUP BY.
+      .where('person.ownerId', '=', options.ownerId)
       .select((eb) => [
         'person.id',
         'person.name',
@@ -270,7 +273,7 @@ export class FaceDissolveRepository {
       .selectFrom('person')
       .select((eb) => eb.fn.countAll<number>().as('count'))
       .where('person.type', '!=', 'pet')
-      .$if(!!options.ownerId, (qb) => qb.where('person.ownerId', '=', options.ownerId!))
+      .where('person.ownerId', '=', options.ownerId)
       .executeTakeFirstOrThrow();
 
     return { people, total: Number(totalRow.count), hasMore };
@@ -287,8 +290,8 @@ export class FaceDissolveRepository {
     const { personId, scope, outcome, redetect } = input;
 
     return this.db.transaction().execute(async (trx) => {
-      const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
-        eb.and([eb('asset_face.personId', '=', personId), dissolveScopePredicate(eb, scope)]);
+      // The SAME predicate the preview counted with — see dissolveFacePredicate.
+      const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personId, scope);
 
       const spacePersonRows = await trx
         .selectFrom('shared_space_person_face')

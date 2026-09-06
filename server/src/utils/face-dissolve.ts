@@ -44,5 +44,24 @@ export const dissolveScopePredicate = (
         ),
       ]);
     }
+    // tsconfig has no `noImplicitReturns`, so without this a future fifth scope would fall through and
+    // return `undefined` straight into `eb.and([predicate, undefined])` — silently dropping the scope term
+    // from an irreversible delete. `satisfies never` makes that a compile error instead.
+    default: {
+      return scope satisfies never;
+    }
   }
 };
+
+/**
+ * The full "which faces does this dissolve touch" predicate: the target person AND the scope.
+ *
+ * Shared deliberately. The preview (`getCounts`) and the apply (`dissolve`) MUST describe the same face set
+ * — a one-sided edit would make the dialog promise one thing and the transaction do another, on an
+ * operation with no undo, and no test would catch it. One definition, two call sites.
+ */
+export const dissolveFacePredicate = (
+  eb: ExpressionBuilder<DB, 'asset_face'>,
+  personId: string,
+  scope: DissolveScope,
+): Expression<SqlBool> => eb.and([eb('asset_face.personId', '=', personId), dissolveScopePredicate(eb, scope)]);
