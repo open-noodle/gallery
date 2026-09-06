@@ -48,6 +48,10 @@ type ResolvedSmartSearch = {
     callerId?: string;
     authUserId: string;
     timelineSpaceIds?: string[];
+    // #763: the widened space scope the hasFavorites facet runs under — see the note where it is
+    // resolved in resolveSmartSearch. Declared here so it survives the trip to the repository
+    // instead of being dropped as an excess property.
+    favoriteSpaceIds?: string[];
     maxDistance?: number;
     orderDirection?: SmartSearchDto['order'];
     visibility?: AssetVisibility | 'not-locked';
@@ -191,7 +195,9 @@ export class SearchService extends BaseService {
 
     const page = dto.page ?? 1;
     const size = dto.size || 250;
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length);
+    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
+      favoriteScoped: dto.isFavorite === true,
+    });
     const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
     const { hasNextPage, items } = await this.searchRepository.searchMetadata(
       { page, size },
@@ -227,7 +233,9 @@ export class SearchService extends BaseService {
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
     }
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length);
+    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
+      favoriteScoped: dto.isFavorite === true,
+    });
     const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
 
     return await this.searchRepository.searchStatistics({
@@ -258,7 +266,9 @@ export class SearchService extends BaseService {
     }
 
     const userIds = await this.getUserIdsToSearch(auth, dto.visibility);
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length);
+    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
+      favoriteScoped: dto.isFavorite === true,
+    });
     const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
     const items = await this.searchRepository.searchRandom(dto.size || 250, {
       ...resolvedDto,
@@ -289,7 +299,9 @@ export class SearchService extends BaseService {
     }
 
     const userIds = await this.getUserIdsToSearch(auth, dto.visibility);
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length);
+    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
+      favoriteScoped: dto.isFavorite === true,
+    });
     const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
     const items = await this.searchRepository.searchLargeAssets(dto.size || 250, {
       ...resolvedDto,
@@ -446,16 +458,34 @@ export class SearchService extends BaseService {
     const userIds = await this.getUserIdsToSearch(auth);
 
     let timelineSpaceIds: string[] | undefined;
+    // #763: a SECOND list, for the hasFavorites probe only. Every other facet stays on
+    // `timelineSpaceIds` — widening those would pull a hidden space's cities/tags/people back into
+    // the panel — but "is the Favourites section worth offering" has to span the same spaces the
+    // favourites filter itself now searches, or the section is withheld for favourites the user can
+    // still reach. Only resolved for the withSharedSpaces panel; an album/space-scoped panel has a
+    // single explicit scope and no timeline hide to undo.
+    let favoriteSpaceIds: string[] | undefined;
     if (dto.withSharedSpaces || dto.albumId) {
       const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
       if (spaceRows.length > 0) {
         timelineSpaceIds = spaceRows.map((row) => row.spaceId);
       }
     }
+    if (dto.withSharedSpaces) {
+      const memberRows = await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id);
+      if (memberRows.length > 0) {
+        favoriteSpaceIds = memberRows.map((row) => row.spaceId);
+      }
+    }
 
     // See getSearchSuggestions above — same not-locked/elevated resolution (LOW #7).
     const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds, visibility });
+    const resolvedDto = await this.resolveScopedPersonFilters(auth, {
+      ...dto,
+      timelineSpaceIds,
+      favoriteSpaceIds,
+      visibility,
+    });
     return await this.searchRepository.getFilterSuggestions(userIds, resolvedDto);
   }
 
@@ -564,11 +594,26 @@ export class SearchService extends BaseService {
       throw new BadRequestException('Either `query` or `queryAssetId` must be set');
     }
 
+    // #763: a favourite-filtered smart search spans every space the caller belongs to, and the
+    // hasFavorites facet needs that same set even when the search itself is not favourite-filtered
+    // (the facet deliberately ignores its own isFavorite filter). One membership lookup serves both.
+    const favoriteFiltered = 'isFavorite' in dto && dto.isFavorite === true;
+    const memberSpaceRows =
+      dto.withSharedSpaces || favoriteFiltered
+        ? await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id)
+        : [];
+    const memberSpaceIds = memberSpaceRows.map((row) => row.spaceId);
+    const favoriteSpaceIds = dto.withSharedSpaces && memberSpaceIds.length > 0 ? memberSpaceIds : undefined;
+
     let timelineSpaceIds: string[] | undefined;
     if (dto.withSharedSpaces || !!('albumIds' in dto && dto.albumIds?.length)) {
-      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-      if (spaceRows.length > 0) {
-        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+      if (favoriteFiltered) {
+        timelineSpaceIds = memberSpaceIds.length > 0 ? memberSpaceIds : undefined;
+      } else {
+        const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+        if (spaceRows.length > 0) {
+          timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+        }
       }
     }
 
@@ -580,6 +625,7 @@ export class SearchService extends BaseService {
     const resolvedOptions = await this.resolveScopedPersonFilters(auth, {
       ...dto,
       timelineSpaceIds,
+      favoriteSpaceIds,
       // Undefined under an album scope — the AlbumRead check above is the boundary there, and
       // `albumSharedSpaceScope` in the query builder is what re-gates visibility and trash.
       userIds: albumScoped ? undefined : await this.getUserIdsToSearch(auth, visibility),
@@ -618,12 +664,26 @@ export class SearchService extends BaseService {
     return [auth.user.id, ...partnerIds];
   }
 
-  private async getTimelineSpaceIds(auth: AuthDto, withSharedSpaces?: boolean): Promise<string[] | undefined> {
+  /**
+   * #763: `favoriteScoped` resolves EVERY space the caller belongs to instead of only the ones they
+   * show in their timeline. Hiding a space from the home timeline is a browse preference, not a
+   * revocation — a favourite the caller placed inside it stays theirs and must stay findable, which
+   * is the same carve-out the timeline service makes for `isFavorite: true`. Safe only because a
+   * favourite-filtered query narrows to the caller's own `asset_favorite` rows; never pass it for
+   * an unfiltered browse.
+   */
+  private async getTimelineSpaceIds(
+    auth: AuthDto,
+    withSharedSpaces?: boolean,
+    { favoriteScoped = false }: { favoriteScoped?: boolean } = {},
+  ): Promise<string[] | undefined> {
     if (!withSharedSpaces) {
       return;
     }
 
-    const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+    const spaceRows = favoriteScoped
+      ? await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id)
+      : await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
     return spaceRows.length > 0 ? spaceRows.map((row) => row.spaceId) : undefined;
   }
 

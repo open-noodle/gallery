@@ -22,6 +22,10 @@ describe(SearchService.name, () => {
   beforeEach(() => {
     ({ sut, mocks } = newTestService(SearchService));
     mocks.partner.getAll.mockResolvedValue([]);
+    // #763: the favourites facet resolves its own wider space scope. Default it to "no memberships"
+    // so the many tests that do not care about spaces keep their previous behaviour; the tests that
+    // do assert on it override this.
+    mocks.sharedSpace.getAllMemberSpaceIds.mockResolvedValue([]);
     (mocks.faceIdentity as any).resolveScopedPersonTokens ??= vitest.fn();
     (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions ??= vitest.fn();
     (mocks.faceIdentity as any).searchAccessiblePeople ??= vitest.fn();
@@ -2049,6 +2053,37 @@ describe(SearchService.name, () => {
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
     };
+
+    // #763: the Favourites section is offered based on a WIDER space scope than every other facet.
+    // A favourite survives hiding its space from the timeline, so withholding the section for one
+    // would hide a filter that does have results. The other facets keep the timeline-visible scope —
+    // widening those would pull a hidden space's cities/tags/people back into the panel.
+    it('scopes the favourites probe to every membership while other facets stay timeline-visible (#763)', async () => {
+      const auth = AuthFactory.create();
+      const visibleSpaceId = newUuid();
+      const hiddenSpaceId = newUuid();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: visibleSpaceId }]);
+      mocks.sharedSpace.getAllMemberSpaceIds.mockResolvedValue([
+        { spaceId: visibleSpaceId },
+        { spaceId: hiddenSpaceId },
+      ]);
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+      (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
+        people: [],
+        hasUnnamedPeople: false,
+      });
+
+      await sut.getFilterSuggestions(auth, { withSharedSpaces: true });
+
+      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.objectContaining({
+          timelineSpaceIds: [visibleSpaceId],
+          favoriteSpaceIds: [visibleSpaceId, hiddenSpaceId],
+        }),
+      );
+    });
 
     it('should return filter suggestions', async () => {
       const auth = AuthFactory.create();

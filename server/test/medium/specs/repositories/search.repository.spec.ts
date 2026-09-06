@@ -968,6 +968,31 @@ describe(SearchRepository.name, () => {
         expect(result.hasFavorites).toBe(false);
       });
 
+      // #763: the probe accepts a SEPARATE, wider space scope so the Favourites section is still
+      // offered for a favourite whose space the caller hid from their timeline. `timelineSpaceIds`
+      // stays narrow here — that is the point: the two lists must be honoured independently, and a
+      // single-scope implementation cannot pass both this and the test below it.
+      it('reports hasFavorites from favoriteSpaceIds even when the space is outside timelineSpaceIds (#763)', async () => {
+        const { ctx, sut } = setup();
+        const { user: owner } = await ctx.newUser();
+        const { user: member } = await ctx.newUser();
+        const { asset } = await ctx.newAsset({ ownerId: owner.id });
+        await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+        const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+        // The space is hidden from the member's timeline, so it is absent from timelineSpaceIds...
+        const hidden = await sut.getFilterSuggestions([member.id], {});
+        expect(hidden.hasFavorites).toBe(false);
+
+        // ...but the favourites probe runs over the memberships instead, and still finds it.
+        const widened = await sut.getFilterSuggestions([member.id], { favoriteSpaceIds: [space.id] });
+        expect(widened.hasFavorites).toBe(true);
+      });
+
       it('sees a shared-space favourite only with timelineSpaceIds (#910)', async () => {
         const { ctx, sut } = setup();
         const { user: owner } = await ctx.newUser();
