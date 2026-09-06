@@ -1,8 +1,21 @@
 # Dissolve a person — design
 
-Status: proposed
+Status: implemented (see "What shipped, and what did not" below)
 Date: 2026-09-06
 Surface: admin face cleanup console (`/admin/face-cleanup`)
+
+## What shipped, and what did not
+
+The feature shipped. Two pieces described below were **cut during implementation** and are recorded here so
+the spec does not claim them:
+
+- **Preview sample crops (§2).** The preview returns counts and warnings only. Rendering crops via
+  `faces/:assetFaceId/thumbnail` was cut; the counts plus the typed-name confirmation carry the safety
+  argument on their own. Deliberate scope cut, not an oversight.
+- **The dashboard banner (§1).** No "Import faces from metadata is ON. N people have …" banner exists.
+  Discovery is the Health tab on `/admin/face-cleanup/people` and nothing else.
+
+Everything else in this document shipped as described, with the amendments marked **[shipped]** inline.
 
 ## Problem
 
@@ -75,15 +88,29 @@ Per person: `id`, `name`, `ownerId`, `faceCount`, `bySource: { machineLearning, 
 `deletedAt IS NULL AND isVisible`.
 
 Surfaced on the existing `/admin/face-cleanup/people` page (the #838 browse-people surface, which already
-renders a face count) as extra columns plus a sort — no new route. The dashboard gains a banner:
-_"Import faces from metadata is ON. 4 people have 3,180 metadata-imported faces with no matching detection."_
+renders a face count) as extra columns plus a sort — no new route. ~~The dashboard gains a banner:
+"Import faces from metadata is ON. 4 people have 3,180 metadata-imported faces with no matching detection."~~
+**[shipped]** The banner was cut; the Health tab is the whole of discovery.
+
+**[shipped]** `ownerId` is **required**, not optional. Unfiltered, the aggregate GROUPs BY `person.id` over
+every visible `asset_face` row on the instance and ORDERs BY an aggregate alias, so `LIMIT`/`OFFSET` prune
+nothing and each page re-runs the whole thing. The one client always sends an owner, so the unbounded shape
+is refused at the DTO with a 400 rather than left reachable from the API.
 
 ### 2. Preview
 
 `POST /admin/face-repair/person/:personId/dissolve/preview`, same body as apply. Returns the affected face
 count split by `sourceType` × has-embedding, affected asset count, **assets shared with other people**
-(see L3), **assets that cannot be re-detected** (see L11), sample crops via the existing
-`faces/:assetFaceId/thumbnail`, and `warnings[]`.
+(see L3), **assets that cannot be re-detected** (see L11), ~~sample crops via the existing
+`faces/:assetFaceId/thumbnail`~~ (**[shipped]** cut — counts and warnings only), and `warnings[]`.
+
+**[shipped] The displayed `faces` count is not the health row's face count, deliberately.** `getCounts`
+counts every in-scope row, soft-deleted and invisible faces included, because those are rows the apply will
+touch and an irreversible operation must show what it touches. `getPeopleHealth` excludes them
+(`deletedAt IS NULL AND isVisible IS TRUE`), because it is answering "how contaminated does this person look
+to a human". The two numbers can therefore disagree for the same person; that is intended, and the preview's
+number is the authoritative one for the operation. `expectedFaceCount` is `getCounts`'s number, so the
+concurrency guard is never compared against the health row's.
 
 Four warnings are load-bearing honesty rather than decoration:
 
@@ -92,7 +119,11 @@ Four warnings are load-bearing honesty rather than decoration:
 
 - Unassigning EXIF faces **strands** them — no embedding means `getAllFaces` never fans them out again.
 - Unassign leaves the person with zero faces; the nightly `PersonCleanup` will delete it regardless. We do
-  not trigger that ourselves (L2), but we must not imply the person survives.
+  not trigger that ourselves (L2), but we must not imply the person survives. **[shipped]** as the
+  `person-will-be-cleaned-up` warning, fired when the outcome is `unassign` and `remainingLiveFaces` — the
+  person's faces the dissolve does *not* touch, counted with `getAllWithoutFaces`'s own
+  `deletedAt IS NULL AND isVisible IS TRUE` — is zero. Counted that way on purpose: that query, not the
+  displayed face count, is what decides the person's fate.
 - Unassigned ML faces re-cluster from scratch, which changes the outcome **only** if recognition settings
   changed. Otherwise expect a similar grouping.
 
@@ -113,6 +144,13 @@ Four warnings are load-bearing honesty rather than decoration:
 unchanged. Because the operation is irreversible, an apply must never act on a different set than the one
 previewed. `redetect` is forced to `true` for both delete outcomes; an explicit `false` alongside a delete
 outcome is a 400 rather than a silent override, so a client can never believe it opted out.
+
+**[shipped] The guard is best-effort, not a lock.** It is a `getCounts` read compared *outside* the write
+transaction; nothing holds a lock between that read and the `DELETE`. So the edge-case row "concurrent
+dissolve of the same person → second gets 409" holds for anything slower than the gap between the two
+statements, and the L13 refusal covers the one racer that actually matters (a running recognition pass) —
+but two simultaneous applies can in principle both pass the guard. Accepted: the console is admin-only and
+single-operator, and the alternative is a `SELECT … FOR UPDATE` over every in-scope face row.
 
 - **unassign** — `personId = NULL` on matching faces, **plus** delete their `face_identity_face` rows. Skipping
   the second half is the exact bug documented at `person.repository.ts:327`: stale manual links make faces
@@ -151,9 +189,18 @@ nulled, and `AssetDetectFacesQueueAll { force: false }` when `redetect`.
 
 ### 5. Web
 
-`DissolvePersonModal.svelte` under `web/src/routes/admin/face-cleanup/[personId]/`, opened from the page
-header: scope/outcome controls, debounced preview, warnings, sample crops, typed confirmation (the person's
-name) before apply. Quick-select chips map the three original mental-model options onto the two axes:
+**[shipped]** The modal is `web/src/lib/modals/PersonDissolveModal.svelte` — shared, not route-local — and
+has **two** entry points, because discovery and the modal live on different pages and this spec originally
+connected neither:
+
+| Launcher                                                     | Why it exists                                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `routes/admin/face-cleanup/[personId]/+page.svelte`           | The original: the scan-result person page, opened from the header.                                     |
+| `routes/admin/face-cleanup/people/[personId]/+page.svelte`    | The manual-review page — **where the Health tab's rows actually link**. Without it, discovery dead-ends. |
+
+Contents: scope/outcome controls, debounced preview, warnings, ~~sample crops~~ (cut), typed confirmation
+(the person's name) before apply. Quick-select chips map the three original mental-model options onto the two
+axes:
 
 | Chip                            | scope   | outcome                   | redetect |
 | ------------------------------- | ------- | ------------------------- | -------- |
@@ -187,6 +234,16 @@ operation could reach data outside the target person. Every one has a named test
 | L11 | `streamForDetectFacesJob` runs through `assetsWithPreviews()` (`asset-job.repository.ts:181`), requiring `visibility != Hidden`, `deletedAt IS NULL` and an existing `Preview` `asset_file`; `handleDetectFaces` gates again on `files.length === 1` and skips Hidden. On such assets the junk is deleted and **nothing is recovered**. | Cannot be repaired here. Count them in the preview and warn explicitly. Never claim repair for assets that cannot be re-detected. |
 | L12 | `getForDetectFacesJob`'s faces subquery has **no `deletedAt` filter** (`asset-job.repository.ts:246`), so a soft-deleted face still matches a fresh detection at IoU > 0.5, absorbs the embedding and stays soft-deleted — swallowing the real face and creating no visible one. | Delete outcomes **hard-delete** soft-deleted faces in scope, so re-detection can create a fresh visible face. `unassign` leaves them alone. |
 | L13 | A dissolve deleting faces underneath a running recognition pass races it.                                                                                                                                                              | Refuse with `ConflictException`, mirroring `face-repair.service.ts:572`.                                                                          |
+
+**[shipped] L1 has a residue the row does not mention.** A `shared_space_person` that *survives* the dissolve
+(it still has other faces, so we correctly leave it alone) can nevertheless have pointed its
+`representativeFaceId` at one of the faces we deleted. That FK is `ON DELETE SET NULL`, so the space person
+is left alive with a null representative and drops out of `getSpacePersonsWithEmbeddings`, whose join on
+`face_search` is an INNER JOIN. Nothing in the dissolve path repairs it. It self-heals only on the space
+dedup job's next run, via `repairInvalidRepresentativeFaces` / `repairOrphanedRepresentativeFaces`
+(`shared-space.service.ts:3223-3224`) — the same mechanism that already covers the force-detection reset.
+Accepted rather than fixed here: repairing it inline would mean picking a new representative face inside the
+dissolve transaction, and the existing job already owns that decision.
 
 ## Implementation — TDD
 
@@ -266,7 +323,7 @@ Mocked repositories cannot see cascades or the re-detect gate, which are the who
 | `isolation-space-orphan` | The pre-existing orphaned space person still exists; only space persons orphaned **by this dissolve** are removed (L1).                            |
 | `identity-not-gc`        | `face_identity` rows referenced elsewhere survive; no global identity GC ran (L5).                                                                 |
 | `shared-asset-redetect`  | After re-detection of a shared asset, P2 faces that still match at IoU > 0.5 keep their identity and gain a refreshed embedding (L3).              |
-| `rollback`               | A forced failure after the face delete leaves **every** row intact (L10).                                                                          |
+| `rollback`               | A forced failure after the face delete leaves **every** row intact (L10) — **including `facesRecognizedAt`**: `dissolve()` passes `trx` into `clearFacesRecognizedAt`, and dropping that third argument silently moves the watermark clear outside the transaction. |
 | `not-redetectable`       | A hidden asset, a trashed asset and one with no `Preview` file are counted by the preview and **excluded** from any repair claim (L11).            |
 | `soft-deleted-hard-gone` | A soft-deleted face in scope is hard-deleted by delete outcomes, so re-detection yields a fresh **visible** face rather than reviving a tombstone (L12). |
 
@@ -288,7 +345,7 @@ Mocked repositories cannot see cascades or the re-detect gate, which are the who
 | `scope: 'exif'` on a person with only ML faces | 200, zero affected, preview says so                                          |
 | `redetect: false` with a delete outcome       | 400 — never a silent override                                                |
 | Non-admin caller                              | 403                                                                          |
-| Concurrent dissolve of the same person        | Second gets 409 via `expectedFaceCount`                                       |
+| Concurrent dissolve of the same person        | Second gets 409 via `expectedFaceCount` — **best-effort**: the guard is a read compared outside the write transaction, so two applies landing inside that gap can both pass it (see §3) |
 
 ### Unit / web / e2e
 
