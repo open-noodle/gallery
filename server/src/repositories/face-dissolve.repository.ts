@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ExpressionBuilder, Kysely, Transaction } from 'kysely';
+import { ExpressionBuilder, Kysely, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
+import { AssetFileType, AssetVisibility, SourceType } from 'src/enum';
 import { DB } from 'src/schema';
 import { DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve';
 
@@ -18,6 +19,25 @@ export interface DissolveWriteResult {
   orphanedSpacePersonIds: string[];
   deletedThumbnailPath: string | null;
 }
+
+export interface DissolveCounts {
+  faces: number;
+  exif: number;
+  mlWithEmbedding: number;
+  mlWithoutEmbedding: number;
+  softDeleted: number;
+  assets: number;
+  sharedAssets: number;
+  notRedetectable: number;
+}
+
+const hasEmbedding = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+  eb.exists(
+    eb
+      .selectFrom('face_search')
+      .select(sql`1`.as('one'))
+      .whereRef('face_search.faceId', '=', 'asset_face.id'),
+  );
 
 @Injectable()
 export class FaceDissolveRepository {
@@ -50,6 +70,98 @@ export class FaceDissolveRepository {
       .executeTakeFirst();
 
     return Number(result.numUpdatedRows ?? 0);
+  }
+
+  /**
+   * `notRedetectable` mirrors assetsWithPreviews() (asset-job.repository.ts:181) exactly: non-hidden,
+   * not trashed, carrying a Preview file. On anything else the dissolve deletes the junk and recovers
+   * nothing (L11), so the dialog must never promise a repair for those assets.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DissolveScope.All] })
+  async getCounts(personId: string, scope: DissolveScope): Promise<DissolveCounts> {
+    const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+      eb.and([eb('asset_face.personId', '=', personId), dissolveScopePredicate(eb, scope)]);
+
+    const faceRow = await this.db
+      .selectFrom('asset_face')
+      .select((eb) => [
+        eb.fn.countAll<number>().as('faces'),
+        eb.fn.countAll<number>().filterWhere('asset_face.sourceType', '=', SourceType.Exif).as('exif'),
+        eb.fn.countAll<number>().filterWhere('asset_face.deletedAt', 'is not', null).as('softDeleted'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((inner) =>
+            inner.and([inner('asset_face.sourceType', '=', SourceType.MachineLearning), hasEmbedding(inner)]),
+          )
+          .as('mlWithEmbedding'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((inner) =>
+            inner.and([
+              inner('asset_face.sourceType', '=', SourceType.MachineLearning),
+              inner.not(hasEmbedding(inner)),
+            ]),
+          )
+          .as('mlWithoutEmbedding'),
+        eb.fn.count<number>('asset_face.assetId').distinct().as('assets'),
+      ])
+      .where((eb) => inScope(eb))
+      .executeTakeFirstOrThrow();
+
+    const assetIds = this.db
+      .selectFrom('asset_face')
+      .select('asset_face.assetId')
+      .distinct()
+      .where((eb) => inScope(eb));
+
+    const sharedRow = await this.db
+      .selectFrom('asset')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('asset.id', 'in', assetIds)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face as other')
+            .select(sql`1`.as('one'))
+            .whereRef('other.assetId', '=', 'asset.id')
+            .where('other.personId', 'is not', null)
+            .where('other.personId', '!=', personId)
+            .where('other.deletedAt', 'is', null),
+        ),
+      )
+      .executeTakeFirstOrThrow();
+
+    const notRedetectableRow = await this.db
+      .selectFrom('asset')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('asset.id', 'in', assetIds)
+      .where((eb) =>
+        eb.or([
+          eb('asset.visibility', '=', AssetVisibility.Hidden),
+          eb('asset.deletedAt', 'is not', null),
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('asset_file')
+                .select(sql`1`.as('one'))
+                .whereRef('asset_file.assetId', '=', 'asset.id')
+                .where('asset_file.type', '=', AssetFileType.Preview),
+            ),
+          ),
+        ]),
+      )
+      .executeTakeFirstOrThrow();
+
+    return {
+      faces: Number(faceRow.faces),
+      exif: Number(faceRow.exif),
+      mlWithEmbedding: Number(faceRow.mlWithEmbedding),
+      mlWithoutEmbedding: Number(faceRow.mlWithoutEmbedding),
+      softDeleted: Number(faceRow.softDeleted),
+      assets: Number(faceRow.assets),
+      sharedAssets: Number(sharedRow.count),
+      notRedetectable: Number(notRedetectableRow.count),
+    };
   }
 
   /**
