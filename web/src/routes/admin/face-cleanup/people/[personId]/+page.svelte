@@ -21,6 +21,7 @@
   import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
   import FaceReviewDock from '$lib/components/face-cleanup/FaceReviewDock.svelte';
   import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
+  import PersonDissolveModal from '$lib/modals/PersonDissolveModal.svelte';
   import type { FaceActionId } from '$lib/components/face-cleanup/face-actions';
   import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
   import { faceCleanupBreadcrumbs, manualCrumb } from '../../breadcrumbs';
@@ -181,6 +182,31 @@
   };
 
   onMount(() => void loadPersonData());
+
+  // The Face health tab (people/+page.svelte) links a contaminated person to THIS page, and a person made
+  // entirely of faces imported from file metadata is one no scan can ever flag — so this, not the guided
+  // review page, is where discovery lands. It hands over `personName` — the server's own name, or this page's
+  // unnamed fallback when the person genuinely has none — because the modal gates its irreversible delete on
+  // the admin typing that string back, and a blank one would leave the gate permanently shut.
+  const handleDissolve = async () => {
+    if (!metadata) {
+      return;
+    }
+    const dissolved = await modalManager.show(PersonDissolveModal, {
+      personId,
+      personName,
+    });
+    if (!dissolved) {
+      return;
+    }
+    // Same refresh contract as a successful apply: `delete-faces-and-person` removes the person outright, and
+    // an emptied cluster that was never named is deleted server-side, so a 404 here means "it is gone", not
+    // "the load failed". Nothing is left to review either way.
+    const outcome = await loadPersonData({ allowMissing: true });
+    if (outcome === 'missing' || (outcome === 'ok' && vm.total === 0)) {
+      void goto(Route.faceCleanupPeople());
+    }
+  };
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) {
@@ -470,6 +496,18 @@
           </div>
         {/if}
       </div>
+      {#if metadata}
+        <div class="flex-1"></div>
+        <Button
+          color="danger"
+          variant="outline"
+          size="small"
+          onclick={handleDissolve}
+          data-testid="manual-review-dissolve"
+        >
+          {$t('admin.face_cleanup_dissolve')}
+        </Button>
+      {/if}
     </div>
 
     {#if loading}
