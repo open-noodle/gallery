@@ -82,9 +82,13 @@ _"Import faces from metadata is ON. 4 people have 3,180 metadata-imported faces 
 
 `POST /admin/face-repair/person/:personId/dissolve/preview`, same body as apply. Returns the affected face
 count split by `sourceType` × has-embedding, affected asset count, **assets shared with other people**
-(see L3), sample crops via the existing `faces/:assetFaceId/thumbnail`, and `warnings[]`.
+(see L3), **assets that cannot be re-detected** (see L11), sample crops via the existing
+`faces/:assetFaceId/thumbnail`, and `warnings[]`.
 
-Three warnings are load-bearing honesty rather than decoration:
+Four warnings are load-bearing honesty rather than decoration:
+
+- On N assets the junk will be deleted but **nothing will be recovered**, because they are hidden, trashed
+  or have no preview file (L11).
 
 - Unassigning EXIF faces **strands** them — no embedding means `getAllFaces` never fans them out again.
 - Unassign leaves the person with zero faces; the nightly `PersonCleanup` will delete it regardless. We do
@@ -180,6 +184,9 @@ operation could reach data outside the target person. Every one has a named test
 | L8  | Another user's people/faces.                                                                                                                                                                                                           | Scope by `personId` only; assert non-interference explicitly.                                                                                    |
 | L9  | `face_person_verdict` drain on unassign.                                                                                                                                                                                               | Scope to the affected face ids.                                                                                                                  |
 | L10 | Partial failure leaving faces deleted but the person alive (or vice versa).                                                                                                                                                            | One transaction; assert full rollback.                                                                                                           |
+| L11 | `streamForDetectFacesJob` runs through `assetsWithPreviews()` (`asset-job.repository.ts:181`), requiring `visibility != Hidden`, `deletedAt IS NULL` and an existing `Preview` `asset_file`; `handleDetectFaces` gates again on `files.length === 1` and skips Hidden. On such assets the junk is deleted and **nothing is recovered**. | Cannot be repaired here. Count them in the preview and warn explicitly. Never claim repair for assets that cannot be re-detected. |
+| L12 | `getForDetectFacesJob`'s faces subquery has **no `deletedAt` filter** (`asset-job.repository.ts:246`), so a soft-deleted face still matches a fresh detection at IoU > 0.5, absorbs the embedding and stays soft-deleted — swallowing the real face and creating no visible one. | Delete outcomes **hard-delete** soft-deleted faces in scope, so re-detection can create a fresh visible face. `unassign` leaves them alone. |
+| L13 | A dissolve deleting faces underneath a running recognition pass races it.                                                                                                                                                              | Refuse with `ConflictException`, mirroring `face-repair.service.ts:572`.                                                                          |
 
 ## Implementation — TDD
 
@@ -200,16 +207,31 @@ proves the feature works at all.
 **Slice 4 — cascade coverage.** Medium test asserting the six cascades fire and the three `SET NULL` columns
 null out.
 
-**Slice 5 — blast radius (L1–L10).** The isolation fixture below. Red before any scoping is applied.
+**Slice 5 — blast radius (L1–L13).** The isolation fixture below. Red before any scoping is applied.
 
 **Slice 6 — outcomes and follow-up jobs.** Unit tests for outcome branching, `expectedFaceCount` 409, pet
-rejection, empty-thumbnail skip, and exactly which jobs are queued (and that L1/L2/L5 are **not**).
+rejection, empty-thumbnail skip, the active-recognition refusal (L13), and exactly which jobs are queued
+(and that L1/L2/L5 are **not**).
 
-**Slice 7 — discovery endpoint.** Unit + medium for the aggregate and sort.
+**Slice 7 — preview endpoint.** Its own slice because for an irreversible operation the preview *is* the
+safety mechanism: counts by source × embedding, shared-asset count (L3), non-re-detectable count (L11), and
+each of the four warnings. A wrong preview is as harmful as a wrong delete. Red: endpoint does not exist.
 
-**Slice 8 — web modal.** Component tests for scope/outcome → preview payload and confirmation gating.
+**Slice 8 — discovery endpoint.** Unit + medium for the aggregate and sort.
 
-**Slice 9 — e2e.** One Playwright run dissolving an EXIF-contaminated person end to end.
+**Slice 9 — web modal.** Component tests for scope/outcome → preview payload, confirmation gating, and
+warning rendering.
+
+**Slice 10 — e2e.** One Playwright run dissolving an EXIF-contaminated person end to end.
+
+Codegen and gates, per slice rather than deferred to the end:
+
+- Touching `server/src/repositories/` means `mise sql` must be re-run — body edits drift the generated
+  queries too, not just signatures.
+- New endpoints mean `mise open-api` (not `make`), then the web SDK build.
+- Server lint is `--max-warnings 0`, and `prettier --check` runs over `src/` **and** `test/` separately;
+  eslint passing is not evidence prettier will.
+- i18n changes touch all nine locales in the same commit, then `npx prettier --write i18n/*.json`.
 
 ## Test matrix
 
@@ -245,6 +267,8 @@ Mocked repositories cannot see cascades or the re-detect gate, which are the who
 | `identity-not-gc`        | `face_identity` rows referenced elsewhere survive; no global identity GC ran (L5).                                                                 |
 | `shared-asset-redetect`  | After re-detection of a shared asset, P2 faces that still match at IoU > 0.5 keep their identity and gain a refreshed embedding (L3).              |
 | `rollback`               | A forced failure after the face delete leaves **every** row intact (L10).                                                                          |
+| `not-redetectable`       | A hidden asset, a trashed asset and one with no `Preview` file are counted by the preview and **excluded** from any repair claim (L11).            |
+| `soft-deleted-hard-gone` | A soft-deleted face in scope is hard-deleted by delete outcomes, so re-detection yields a fresh **visible** face rather than reviving a tombstone (L12). |
 
 ### Edge cases
 
@@ -255,8 +279,12 @@ Mocked repositories cannot see cascades or the re-detect gate, which are the who
 | Person not found / wrong id                   | 404                                                                          |
 | Person is a pet (`type='pet'`)                | 400 — pet re-detection is a separate pipeline; `facesRecognizedAt` would not repair it |
 | Empty `thumbnailPath` on person delete        | No `FileDelete` queued (L7)                                                   |
-| Soft-deleted faces (`deletedAt` not null)     | **Included** in delete outcomes (they are already junk), **excluded** from displayed counts |
+| Soft-deleted faces (`deletedAt` not null)     | **Hard-deleted** by delete outcomes — required, not tidiness (L12); left alone by `unassign`; excluded from displayed counts |
 | `isVisible = false` faces                     | Same as soft-deleted                                                          |
+| Facial recognition queue active               | 409 `ConflictException`, mirroring `face-repair.service.ts:572` (L13)          |
+| Every affected asset hidden / trashed / no preview | 200, but the preview states nothing will be recovered (L11)              |
+| `scope: 'without-embedding'` where all faces have embeddings | 200, zero affected                                             |
+| Admin dissolving another user's person        | Allowed (the console is cross-user by design); only that person's faces change |
 | `scope: 'exif'` on a person with only ML faces | 200, zero affected, preview says so                                          |
 | `redetect: false` with a delete outcome       | 400 — never a silent override                                                |
 | Non-admin caller                              | 403                                                                          |
