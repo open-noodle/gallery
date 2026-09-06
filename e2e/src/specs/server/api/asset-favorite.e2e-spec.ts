@@ -516,6 +516,47 @@ describe('favoriting a photo you do not own, by space role (#763)', () => {
     expect(await favoritedAssetIds(ivy.accessToken)).not.toContain(assetIvy.id);
   });
 
+  // Reported against pr-819-rc.2: favoriting from inside a Space that the member has hidden from
+  // their own timeline gave "Added to favorites" and then never appeared under Favorites, while the
+  // identical action on a space that IS shown in the timeline worked. The write is the same either
+  // way — what differs is the READ: `withSharedSpaces` resolves its scope through
+  // getSpaceIdsForTimeline, which filters `showInTimeline = true`, so a hidden space contributes no
+  // spaceId and the caller's own overlay row becomes unreachable.
+  //
+  // "Show in timeline" is a HOME-TIMELINE browse preference, not a visibility revocation: #1041
+  // already exempts Favorites (with Archive and Trash) from the personal-timeline hide for exactly
+  // this reason — they are curation/recovery surfaces where subtracting an asset strands it. The
+  // same argument applies here, and widening is safe because the favorite predicate still restricts
+  // to the CALLER's own asset_favorite rows and membership is re-resolved per request.
+  it('a favourite stays on the favorites page after hiding that space from your own timeline', async () => {
+    const assetHidden = await utils.createAsset(hank.accessToken);
+    await utils.addSpaceAssets(hank.accessToken, roleSpaceId, [assetHidden.id]);
+
+    const setShowInTimeline = (showInTimeline: boolean) =>
+      request(app)
+        .patch(`/shared-spaces/${roleSpaceId}/members/me/timeline`)
+        .set(asBearerAuth(jack.accessToken))
+        .send({ showInTimeline });
+
+    const hide = await setShowInTimeline(false);
+    expect(hide.status).toBe(200);
+
+    try {
+      const { status } = await putFavorites(jack.accessToken, { ids: [assetHidden.id], isFavorite: true });
+      expect(status).toBe(204);
+      // The write landed — this is the half that already worked, and why the toast was honest.
+      const info = await utils.getAssetInfo(jack.accessToken, assetHidden.id);
+      expect(info.isFavorite).toBe(true);
+
+      // ...and the favorites page must still list it.
+      expect(await favoritedAssetIds(jack.accessToken)).toContain(assetHidden.id);
+    } finally {
+      // In `finally` so a failure here cannot leave the space hidden and cascade into the tests
+      // below, which share this fixture and assume it is timeline-visible.
+      await setShowInTimeline(true);
+    }
+  });
+
   it('a non-owned favorite is only reachable while the request carries the cross-scope flag', async () => {
     // jack favorited assetHank above. Owner-scoped, the row is invisible — this is precisely the
     // query pr-819-rc.1's /favorites page sent, and precisely why the page looked empty.
