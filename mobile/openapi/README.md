@@ -545,6 +545,7 @@ Class | Method | HTTP request | Description
  - [DatabaseBackupDto](doc//DatabaseBackupDto.md)
  - [DatabaseBackupListResponseDto](doc//DatabaseBackupListResponseDto.md)
  - [DetachScopedPersonDto](doc//DetachScopedPersonDto.md)
+ - [DissolveOutcome](doc//DissolveOutcome.md)
  - [DissolveRequestDto](doc//DissolveRequestDto.md)
  - [DissolveResponseDto](doc//DissolveResponseDto.md)
  - [DissolveResponseDtoCounts](doc//DissolveResponseDtoCounts.md)

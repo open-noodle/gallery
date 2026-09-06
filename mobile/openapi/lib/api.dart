@@ -165,6 +165,7 @@ part 'model/database_backup_delete_dto.dart';
 part 'model/database_backup_dto.dart';
 part 'model/database_backup_list_response_dto.dart';
 part 'model/detach_scoped_person_dto.dart';
+part 'model/dissolve_outcome.dart';
 part 'model/dissolve_request_dto.dart';
 part 'model/dissolve_response_dto.dart';
 part 'model/dissolve_response_dto_counts.dart';

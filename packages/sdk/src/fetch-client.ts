@@ -195,7 +195,7 @@ export type FaceRepairPersonMetadataResponseDto = {
 };
 export type DissolveRequestDto = {
     expectedFaceCount: number;
-    outcome: "unassign" | "delete-faces" | "delete-faces-and-person";
+    outcome: DissolveOutcome;
     redetect: boolean;
     scope: DissolveScope;
 };
@@ -10260,6 +10260,11 @@ export enum UserAvatarColor {
     Orange = "orange",
     Gray = "gray",
     Amber = "amber"
+}
+export enum DissolveOutcome {
+    Unassign = "unassign",
+    DeleteFaces = "delete-faces",
+    DeleteFacesAndPerson = "delete-faces-and-person"
 }
 export enum DissolveScope {
     All = "all",

@@ -23,7 +23,7 @@ class DissolveRequestDto {
   /// Maximum value: 9007199254740991
   int expectedFaceCount;
 
-  OutcomeEnum outcome;
+  DissolveOutcome outcome;
 
   bool redetect;
 
@@ -66,7 +66,7 @@ class DissolveRequestDto {
 
       return DissolveRequestDto(
         expectedFaceCount: mapValueOfType<int>(json, r'expectedFaceCount')!,
-        outcome: OutcomeEnum.fromJson(json[r'outcome'])!,
+        outcome: DissolveOutcome.fromJson(json[r'outcome'])!,
         redetect: mapValueOfType<bool>(json, r'redetect')!,
         scope: DissolveScope.fromJson(json[r'scope'])!,
       );

@@ -365,6 +365,8 @@ class ApiClient {
           return DatabaseBackupListResponseDto.fromJson(value);
         case 'DetachScopedPersonDto':
           return DetachScopedPersonDto.fromJson(value);
+        case 'DissolveOutcome':
+          return DissolveOutcomeTypeTransformer().decode(value);
         case 'DissolveRequestDto':
           return DissolveRequestDto.fromJson(value);
         case 'DissolveResponseDto':
