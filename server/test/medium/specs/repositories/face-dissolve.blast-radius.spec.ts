@@ -46,7 +46,11 @@ const buildFixture = async () => {
 };
 
 describe('dissolve blast radius', () => {
-  it('leaves every neighbouring person, pet and user intact', async () => {
+  // Each of the following is split into its own it() (rather than one big test with five
+  // sequential assertions) so that one failing assertion cannot silently hide whether a LATER
+  // one would have failed too — that coupling is exactly what hid the fact that the old combined
+  // "pet person survives" assertion below was dead (see the dedicated L6 test further down).
+  it('leaves the other user and their face untouched (L8)', async () => {
     const repo = new FaceDissolveRepository(db);
     const f = await buildFixture();
 
@@ -57,24 +61,90 @@ describe('dissolve blast radius', () => {
       redetect: true,
     });
 
-    // L8 — the other user is untouched
     const p4Faces = await db.selectFrom('asset_face').select('id').where('personId', '=', f.p4.id).execute();
     expect(p4Faces.map((r) => r.id)).toEqual([f.p4Face.id]);
+  });
 
-    // P2 keeps every face, including the one on the SHARED asset, and its embedding
+  it('leaves a same-owner bystander person untouched, including the face on the SHARED asset and its embedding', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const f = await buildFixture();
+
+    await repo.dissolve({
+      personId: f.p1.id,
+      scope: DissolveScope.All,
+      outcome: 'delete-faces-and-person',
+      redetect: true,
+    });
+
     const p2Faces = await db.selectFrom('asset_face').select('id').where('personId', '=', f.p2.id).execute();
     expect(p2Faces.map((r) => r.id)).toEqual([f.p2Shared.id]);
     expect(
       await db.selectFrom('face_search').select('faceId').where('faceId', '=', f.p2Shared.id).execute(),
     ).toHaveLength(1);
+  });
 
-    // L6 — the pet person and its faces survive
+  // NOT an L6 test: P3's face already has personId = p3.id, so it is excluded by the personId
+  // equality in `inScope` alone — dissolveScopePredicate's pet exclusion is never consulted for
+  // it. This only proves the same "other person, same owner" guarantee as the bystander test
+  // above, for a person that happens to be typed 'pet'. The real pet-exclusion proof is below.
+  it('leaves an unrelated pet person untouched', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const f = await buildFixture();
+
+    await repo.dissolve({
+      personId: f.p1.id,
+      scope: DissolveScope.All,
+      outcome: 'delete-faces-and-person',
+      redetect: true,
+    });
+
     expect(await db.selectFrom('asset_face').select('id').where('personId', '=', f.p3.id).execute()).toHaveLength(1);
+  });
 
-    // L2 — the unrelated faceless person still exists: no library-wide cleanup ran
+  // L6, actually exercised: a pet-tagged face (carries a pet_search row) whose personId IS the
+  // target, so it is only excluded by dissolveScopePredicate's `notPet` term — the personId
+  // equality alone would include it.
+  it('spares a pet-tagged face even when it is owned by the target person itself (L6)', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const f = await buildFixture();
+
+    const petFace = await seedFace(db, { assetId: f.p1Solo.assetId, personId: f.p1.id, isPet: true });
+
+    await repo.dissolve({
+      personId: f.p1.id,
+      scope: DissolveScope.All,
+      outcome: 'delete-faces',
+      redetect: false,
+    });
+
+    expect(await db.selectFrom('asset_face').select('id').where('id', '=', petFace.id).execute()).toHaveLength(1);
+  });
+
+  it('leaves the unrelated faceless person untouched — no library-wide cleanup ran (L2)', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const f = await buildFixture();
+
+    await repo.dissolve({
+      personId: f.p1.id,
+      scope: DissolveScope.All,
+      outcome: 'delete-faces-and-person',
+      redetect: true,
+    });
+
     expect(await db.selectFrom('person').select('id').where('id', '=', f.p5.id).execute()).toHaveLength(1);
+  });
 
-    // the target is gone
+  it('deletes the target person itself', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const f = await buildFixture();
+
+    await repo.dissolve({
+      personId: f.p1.id,
+      scope: DissolveScope.All,
+      outcome: 'delete-faces-and-person',
+      redetect: true,
+    });
+
     expect(await db.selectFrom('person').select('id').where('id', '=', f.p1.id).execute()).toEqual([]);
   });
 
