@@ -65,6 +65,7 @@ import { VideoStreamRepository } from 'src/repositories/video-stream.repository.
 import { ViewRepository } from 'src/repositories/view-repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 
 export const repositories = [
   AccessRepository,
@@ -88,6 +89,7 @@ export const repositories = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FaceDissolveRepository,
   FaceIdentityRepository,
   FacePersonVerdictRepository,
   FaceRepairDeclineRepository,

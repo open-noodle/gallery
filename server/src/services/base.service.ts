@@ -93,6 +93,7 @@ import {
   requirePersonAccess,
 } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 import {
   ContentDisposition,
   ImmichFileResponse,
@@ -134,6 +135,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FaceDissolveRepository,
   FaceIdentityRepository,
   FaceRepairRepository,
   FaceRepairScanRepository,
@@ -209,6 +211,7 @@ export class BaseService {
     protected duplicateRepository: DuplicateRepository,
     protected emailRepository: EmailRepository,
     protected eventRepository: EventRepository,
+    protected faceDissolveRepository: FaceDissolveRepository,
     protected faceIdentityRepository: FaceIdentityRepository,
     protected faceRepairRepository: FaceRepairRepository,
     protected faceRepairScanRepository: FaceRepairScanRepository,
@@ -307,6 +310,7 @@ export class BaseService {
       ctx.duplicateRepository,
       ctx.emailRepository,
       ctx.eventRepository,
+      ctx.faceDissolveRepository,
       ctx.faceIdentityRepository,
       ctx.faceRepairRepository,
       ctx.faceRepairScanRepository,
