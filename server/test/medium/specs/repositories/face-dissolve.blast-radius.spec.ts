@@ -82,16 +82,16 @@ describe('dissolve blast radius', () => {
     const repo = new FaceDissolveRepository(db);
     const f = await buildFixture();
 
-    const space = mediumFactory.sharedSpaceInsert({ id: newUuid(), createdById: f.userA.id });
-    await db.insertInto('shared_space').values(space).execute();
+    const space = mediumFactory.sharedSpaceInsert({ createdById: f.userA.id });
+    const insertedSpace = await db.insertInto('shared_space').values(space).returningAll().executeTakeFirstOrThrow();
 
     const linkedId = newUuid();
     const preOrphanId = newUuid();
     await db
       .insertInto('shared_space_person')
       .values([
-        { id: linkedId, spaceId: space.id, name: 'linked' },
-        { id: preOrphanId, spaceId: space.id, name: 'pre-existing orphan' },
+        { id: linkedId, spaceId: insertedSpace.id, name: 'linked' },
+        { id: preOrphanId, spaceId: insertedSpace.id, name: 'pre-existing orphan' },
       ])
       .execute();
     await db.insertInto('shared_space_person_face').values({ personId: linkedId, assetFaceId: f.p1Solo.id }).execute();
