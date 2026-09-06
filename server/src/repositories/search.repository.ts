@@ -173,6 +173,15 @@ export interface SearchSpaceOptions {
   spaceId?: string;
   spacePersonIds?: string[];
   timelineSpaceIds?: string[];
+  /**
+   * #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
+   * to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
+   * stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
+   * the "is the Favourites section worth offering" answer has to span the same set the favourites
+   * filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
+   * OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
+   */
+  favoriteSpaceIds?: string[];
 }
 
 export interface SearchOrderOptions {
@@ -334,6 +343,15 @@ export interface SuggestionScopeOptions {
   albumId?: string;
   spaceId?: string;
   timelineSpaceIds?: string[];
+  /**
+   * #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
+   * to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
+   * stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
+   * the "is the Favourites section worth offering" answer has to span the same set the favourites
+   * filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
+   * OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
+   */
+  favoriteSpaceIds?: string[];
   takenAfter?: Date;
   takenBefore?: Date;
   /**
@@ -1115,7 +1133,17 @@ export class SearchRepository {
     const row = await trx
       .selectFrom('asset')
       .select('asset.id')
-      .where('asset.id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'favorites'))
+      // #763: same widening as getFilteredHasFavorites — the favourites facet spans every space the
+      // caller belongs to, while every other facet keeps the timeline-visible scope.
+      .where(
+        'asset.id',
+        'in',
+        this.buildSmartFacetFilteredAssetIds(
+          trx,
+          { ...options, timelineSpaceIds: options.favoriteSpaceIds ?? options.timelineSpaceIds },
+          'favorites',
+        ),
+      )
       .where((eb) => favoriteExistsFor(eb, callerId))
       .limit(1)
       .executeTakeFirst();
@@ -2220,7 +2248,17 @@ export class SearchRepository {
     const row = await this.db
       .selectFrom('asset')
       .select('asset.id')
-      .where('asset.id', 'in', this.buildFilteredAssetIds(userIds, options))
+      // #763: `favoriteSpaceIds` when the caller supplied it — a favourite survives hiding its
+      // space from the timeline, so the probe must span every membership. Falls back to the shared
+      // scope, which is what album/space-scoped panels (no favouriteSpaceIds) keep using.
+      .where(
+        'asset.id',
+        'in',
+        this.buildFilteredAssetIds(userIds, {
+          ...options,
+          timelineSpaceIds: options.favoriteSpaceIds ?? options.timelineSpaceIds,
+        }),
+      )
       // #763: per-caller overlay, not the dropped `asset.isFavorite` column. `userIds[0]` is the
       // caller on this path — same reasoning as `buildFilteredAssetIds`'s isFavorite branch.
       .where((eb) => favoriteExistsFor(eb, userIds[0]))
