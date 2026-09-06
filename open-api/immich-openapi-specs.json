@@ -30095,6 +30095,15 @@
         ],
         "type": "object"
       },
+      "DissolveOutcome": {
+        "description": "What a dissolve does with the faces it touches",
+        "enum": [
+          "unassign",
+          "delete-faces",
+          "delete-faces-and-person"
+        ],
+        "type": "string"
+      },
       "DissolveRequestDto": {
         "properties": {
           "expectedFaceCount": {
@@ -30103,26 +30112,7 @@
             "type": "integer"
           },
           "outcome": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "unassign"
-                ]
-              },
-              {
-                "type": "string",
-                "enum": [
-                  "delete-faces"
-                ]
-              },
-              {
-                "type": "string",
-                "enum": [
-                  "delete-faces-and-person"
-                ]
-              }
-            ]
+            "$ref": "#/components/schemas/DissolveOutcome"
           },
           "redetect": {
             "type": "boolean"

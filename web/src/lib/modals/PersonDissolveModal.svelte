@@ -6,12 +6,12 @@
   import { onDestroy, onMount } from 'svelte';
   import { t, type Translations } from 'svelte-i18n';
 
-  // `DissolveRequestDto['scope']` is the generated `DissolveScope` ENUM, whose members are exactly these strings at
-  // runtime; `${...}` widens it to that literal union. Deliberate: an enum is a runtime VALUE, so importing it
-  // would break any spec that stubs `@immich/sdk` with a factory mock of just the two endpoints. buildRequest
-  // is the single place the two representations meet. The outcome is already a literal union in the DTO.
+  // Both fields are generated ENUMS, whose members are exactly these strings at runtime; `${...}` widens each
+  // to that literal union. Deliberate: an enum is a runtime VALUE, so importing it would break any spec that
+  // stubs `@immich/sdk` with a factory mock of just the two endpoints. buildRequest is the single place the
+  // two representations meet.
   type DissolveScope = `${DissolveRequestDto['scope']}`;
-  type DissolveOutcome = DissolveRequestDto['outcome'];
+  type DissolveOutcome = `${DissolveRequestDto['outcome']}`;
 
   type Props = {
     personId: string;
@@ -111,7 +111,7 @@
 
   const buildRequest = (expectedFaceCount: number): DissolveRequestDto => ({
     scope: scope as DissolveRequestDto['scope'],
-    outcome,
+    outcome: outcome as DissolveRequestDto['outcome'],
     redetect,
     expectedFaceCount,
   });
