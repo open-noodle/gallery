@@ -483,6 +483,10 @@ describe(SearchRepository.name, () => {
 
       const result = await sut.getSmartSearchFacets({
         userIds: [user.id],
+        // #763: hasFavorites is per-caller, so the caller has to be named. Without it the facet
+        // fail-safes to false (pinned by the sibling test below) rather than answering for whoever
+        // happens to head `userIds`.
+        callerId: user.id,
         embedding: matchingEmbedding,
         isFavorite: false,
       });
@@ -634,7 +638,13 @@ describe(SearchRepository.name, () => {
       const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, plain.id);
 
-      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      // #763: `callerId` is what makes hasFavorites answerable — see the sibling test below, which
+      // pins that omitting it yields false rather than another user's favourite state.
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        callerId: user.id,
+        embedding: matchingEmbedding,
+      });
 
       expect(result.total).toBe(2);
       expect(result.hasFavorites).toBe(true);
@@ -962,7 +972,11 @@ describe(SearchRepository.name, () => {
         const { ctx, sut } = setup();
         const { user: owner } = await ctx.newUser();
         const { user: member } = await ctx.newUser();
-        const { asset } = await ctx.newAsset({ ownerId: owner.id, isFavorite: true });
+        const { asset } = await ctx.newAsset({ ownerId: owner.id });
+        // #763: favourites are per (user, asset), so the MEMBER — the caller in both assertions
+        // below — has to be the one who favourited it. Keying this to the owner instead would make
+        // the test assert that one member's favourite shows up in another's facets.
+        await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
         // A distinctive make so the second assertion can identify THIS asset specifically —
         // a `toBe(true)` non-emptiness check alone would also pass for an over-broad scope
         // that leaked in unrelated assets.
