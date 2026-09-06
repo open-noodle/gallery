@@ -183,6 +183,7 @@
     "face_cleanup_dismiss_error": "忽略失败。请重试。",
     "face_cleanup_dissolve": "解散人物",
     "face_cleanup_dissolve_confirm": "输入 {name} 以确认。此操作无法撤销。",
+    "face_cleanup_dissolve_count_not_redetectable": "无法重新检测",
     "face_cleanup_dissolve_outcome_delete": "删除人脸区域",
     "face_cleanup_dissolve_outcome_delete_person": "删除人脸区域和该人物",
     "face_cleanup_dissolve_outcome_unassign": "仅取消关联",

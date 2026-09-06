@@ -183,6 +183,7 @@
     "face_cleanup_dismiss_error": "No se pudo descartar. Inténtalo de nuevo.",
     "face_cleanup_dissolve": "Disolver persona",
     "face_cleanup_dissolve_confirm": "Escribe {name} para confirmar. Esto no se puede deshacer.",
+    "face_cleanup_dissolve_count_not_redetectable": "Nueva detección imposible",
     "face_cleanup_dissolve_outcome_delete": "Eliminar las regiones de cara",
     "face_cleanup_dissolve_outcome_delete_person": "Eliminar las regiones de cara y la persona",
     "face_cleanup_dissolve_outcome_unassign": "Solo quitar la asignación",

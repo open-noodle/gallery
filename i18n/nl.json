@@ -183,6 +183,7 @@
     "face_cleanup_dismiss_error": "Negeren mislukt. Probeer het opnieuw.",
     "face_cleanup_dissolve": "Persoon ontbinden",
     "face_cleanup_dissolve_confirm": "Typ {name} om te bevestigen. Dit kan niet ongedaan worden gemaakt.",
+    "face_cleanup_dissolve_count_not_redetectable": "Nieuwe detectie onmogelijk",
     "face_cleanup_dissolve_outcome_delete": "Gezichtsgebieden verwijderen",
     "face_cleanup_dissolve_outcome_delete_person": "Gezichtsgebieden en de persoon verwijderen",
     "face_cleanup_dissolve_outcome_unassign": "Alleen toewijzing opheffen",

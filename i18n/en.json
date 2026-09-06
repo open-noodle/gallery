@@ -183,6 +183,7 @@
     "face_cleanup_dismiss_error": "Failed to dismiss. Please try again.",
     "face_cleanup_dissolve": "Dissolve person",
     "face_cleanup_dissolve_confirm": "Type {name} to confirm. This cannot be undone.",
+    "face_cleanup_dissolve_count_not_redetectable": "Cannot be re-detected",
     "face_cleanup_dissolve_outcome_delete": "Delete the detections",
     "face_cleanup_dissolve_outcome_delete_person": "Delete the detections and the person",
     "face_cleanup_dissolve_outcome_unassign": "Unassign only",

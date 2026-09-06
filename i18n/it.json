@@ -183,6 +183,7 @@
     "face_cleanup_dismiss_error": "Impossibile ignorare. Riprova.",
     "face_cleanup_dissolve": "Dissolvi la persona",
     "face_cleanup_dissolve_confirm": "Digita {name} per confermare. L'operazione non può essere annullata.",
+    "face_cleanup_dissolve_count_not_redetectable": "Nuovo rilevamento impossibile",
     "face_cleanup_dissolve_outcome_delete": "Elimina le regioni di volto",
     "face_cleanup_dissolve_outcome_delete_person": "Elimina le regioni di volto e la persona",
     "face_cleanup_dissolve_outcome_unassign": "Rimuovi solo l'assegnazione",
