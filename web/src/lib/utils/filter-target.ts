@@ -66,7 +66,7 @@ export function resolveFilterTarget(url: URL): FilterTarget | null {
  * for them here would be speculative. Add one when a surface actually needs it.
  */
 function resolveImplicitFilterScope(url: URL): Partial<FilterState> | undefined {
-  const [root] = url.pathname.split('/').filter(Boolean);
+  const root = url.pathname.split('/').find(Boolean);
 
   return root === 'favorites' ? { isFavorite: true } : undefined;
 }
