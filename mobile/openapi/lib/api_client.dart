@@ -365,6 +365,14 @@ class ApiClient {
           return DatabaseBackupListResponseDto.fromJson(value);
         case 'DetachScopedPersonDto':
           return DetachScopedPersonDto.fromJson(value);
+        case 'DissolveRequestDto':
+          return DissolveRequestDto.fromJson(value);
+        case 'DissolveResponseDto':
+          return DissolveResponseDto.fromJson(value);
+        case 'DissolveResponseDtoCounts':
+          return DissolveResponseDtoCounts.fromJson(value);
+        case 'DissolveResponseDtoWarningsInner':
+          return DissolveResponseDtoWarningsInner.fromJson(value);
         case 'DownloadArchiveDto':
           return DownloadArchiveDto.fromJson(value);
         case 'DownloadArchiveInfo':

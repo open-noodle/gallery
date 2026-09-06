@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { DissolveRequestDto, DissolveResponseDto } from 'src/dtos/face-dissolve.dto';
 import {
   FaceRepairClusterFacesRequestDto,
   FaceRepairClusterFacesResponseDto,
@@ -34,6 +35,7 @@ import {
 import { ApiTag } from 'src/enum';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { FaceDissolveService } from 'src/services/face-dissolve.service';
 import { FaceRepairService } from 'src/services/face-repair.service';
 import { sendFile } from 'src/utils/file';
 
@@ -42,6 +44,7 @@ import { sendFile } from 'src/utils/file';
 export class FaceRepairAdminController {
   constructor(
     private service: FaceRepairService,
+    private dissolveService: FaceDissolveService,
     private logger: LoggingRepository,
   ) {}
 
@@ -240,5 +243,31 @@ export class FaceRepairAdminController {
     @Param('assetFaceId', new ParseUUIDPipe({ version: '4' })) assetFaceId: string,
   ): Promise<void> {
     await sendFile(res, next, () => this.service.getAdminFacePreview(assetFaceId), this.logger);
+  }
+
+  @Post('person/:personId/dissolve/preview')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Preview what dissolving a person would change',
+    history: new HistoryBuilder().added('v1'),
+  })
+  previewDissolvePerson(
+    @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
+    @Body() dto: DissolveRequestDto,
+  ): Promise<DissolveResponseDto> {
+    return this.dissolveService.preview(personId, dto) as Promise<DissolveResponseDto>;
+  }
+
+  @Post('person/:personId/dissolve')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Dissolve a person',
+    history: new HistoryBuilder().added('v1'),
+  })
+  dissolvePerson(
+    @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
+    @Body() dto: DissolveRequestDto,
+  ): Promise<DissolveResponseDto> {
+    return this.dissolveService.apply(personId, dto) as Promise<DissolveResponseDto>;
   }
 }

@@ -1024,6 +1024,124 @@
         ]
       }
     },
+    "/admin/face-repair/person/{personId}/dissolve": {
+      "post": {
+        "operationId": "dissolvePerson",
+        "parameters": [
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DissolveRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DissolveResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Dissolve a person",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
+    "/admin/face-repair/person/{personId}/dissolve/preview": {
+      "post": {
+        "operationId": "previewDissolvePerson",
+        "parameters": [
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DissolveRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DissolveResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Preview what dissolving a person would change",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/admin/face-repair/resolutions": {
       "get": {
         "operationId": "getFaceRepairResolutions",
@@ -26945,6 +27063,130 @@
         },
         "required": [
           "profile"
+        ],
+        "type": "object"
+      },
+      "DissolveRequestDto": {
+        "properties": {
+          "expectedFaceCount": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "unassign"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "delete-faces"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "delete-faces-and-person"
+                ]
+              }
+            ]
+          },
+          "redetect": {
+            "type": "boolean"
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "exif",
+              "machine-learning",
+              "without-embedding"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedFaceCount",
+          "outcome",
+          "redetect",
+          "scope"
+        ],
+        "type": "object"
+      },
+      "DissolveResponseDto": {
+        "properties": {
+          "counts": {
+            "properties": {
+              "assets": {
+                "type": "number"
+              },
+              "exif": {
+                "type": "number"
+              },
+              "faces": {
+                "type": "number"
+              },
+              "mlWithEmbedding": {
+                "type": "number"
+              },
+              "mlWithoutEmbedding": {
+                "type": "number"
+              },
+              "notRedetectable": {
+                "type": "number"
+              },
+              "sharedAssets": {
+                "type": "number"
+              },
+              "softDeleted": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "faces",
+              "exif",
+              "mlWithEmbedding",
+              "mlWithoutEmbedding",
+              "softDeleted",
+              "assets",
+              "sharedAssets",
+              "notRedetectable"
+            ],
+            "type": "object"
+          },
+          "expectedFaceCount": {
+            "type": "number"
+          },
+          "personId": {
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "code",
+                "count"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "counts",
+          "expectedFaceCount",
+          "personId",
+          "warnings"
         ],
         "type": "object"
       },
