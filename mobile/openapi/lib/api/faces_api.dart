@@ -574,7 +574,7 @@ class FacesApi {
   ///
   /// Parameters:
   ///
-  /// * [String] ownerId:
+  /// * [String] ownerId (required):
   ///
   /// * [int] page:
   ///   Page number
@@ -583,7 +583,7 @@ class FacesApi {
   ///   Number of people per page
   ///
   /// * [String] sort:
-  Future<Response> getFaceRepairPeopleHealthWithHttpInfo({ String? ownerId, int? page, int? size, String? sort, Future<void>? abortTrigger, }) async {
+  Future<Response> getFaceRepairPeopleHealthWithHttpInfo(String ownerId, { int? page, int? size, String? sort, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/admin/face-repair/people';
 
@@ -594,9 +594,7 @@ class FacesApi {
     final headerParams = <String, String>{};
     final formParams = <String, String>{};
 
-    if (ownerId != null) {
       queryParams.addAll(_queryParams('', 'ownerId', ownerId));
-    }
     if (page != null) {
       queryParams.addAll(_queryParams('', 'page', page));
     }
@@ -626,7 +624,7 @@ class FacesApi {
   ///
   /// Parameters:
   ///
-  /// * [String] ownerId:
+  /// * [String] ownerId (required):
   ///
   /// * [int] page:
   ///   Page number
@@ -635,8 +633,8 @@ class FacesApi {
   ///   Number of people per page
   ///
   /// * [String] sort:
-  Future<PeopleHealthResponseDto?> getFaceRepairPeopleHealth({ String? ownerId, int? page, int? size, String? sort, Future<void>? abortTrigger, }) async {
-    final response = await getFaceRepairPeopleHealthWithHttpInfo(ownerId: ownerId, page: page, size: size, sort: sort, abortTrigger: abortTrigger,);
+  Future<PeopleHealthResponseDto?> getFaceRepairPeopleHealth(String ownerId, { int? page, int? size, String? sort, Future<void>? abortTrigger, }) async {
+    final response = await getFaceRepairPeopleHealthWithHttpInfo(ownerId, page: page, size: size, sort: sort, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

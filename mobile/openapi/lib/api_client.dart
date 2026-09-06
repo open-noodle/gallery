@@ -373,6 +373,8 @@ class ApiClient {
           return DissolveResponseDtoCounts.fromJson(value);
         case 'DissolveResponseDtoWarningsInner':
           return DissolveResponseDtoWarningsInner.fromJson(value);
+        case 'DissolveScope':
+          return DissolveScopeTypeTransformer().decode(value);
         case 'DownloadArchiveDto':
           return DownloadArchiveDto.fromJson(value);
         case 'DownloadArchiveInfo':

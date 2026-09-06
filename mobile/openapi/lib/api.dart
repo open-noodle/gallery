@@ -169,6 +169,7 @@ part 'model/dissolve_request_dto.dart';
 part 'model/dissolve_response_dto.dart';
 part 'model/dissolve_response_dto_counts.dart';
 part 'model/dissolve_response_dto_warnings_inner.dart';
+part 'model/dissolve_scope.dart';
 part 'model/download_archive_dto.dart';
 part 'model/download_archive_info.dart';
 part 'model/download_info_dto.dart';

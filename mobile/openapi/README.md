@@ -549,6 +549,7 @@ Class | Method | HTTP request | Description
  - [DissolveResponseDto](doc//DissolveResponseDto.md)
  - [DissolveResponseDtoCounts](doc//DissolveResponseDtoCounts.md)
  - [DissolveResponseDtoWarningsInner](doc//DissolveResponseDtoWarningsInner.md)
+ - [DissolveScope](doc//DissolveScope.md)
  - [DownloadArchiveDto](doc//DownloadArchiveDto.md)
  - [DownloadArchiveInfo](doc//DownloadArchiveInfo.md)
  - [DownloadInfoDto](doc//DownloadInfoDto.md)

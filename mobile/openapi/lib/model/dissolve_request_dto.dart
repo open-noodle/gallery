@@ -27,7 +27,7 @@ class DissolveRequestDto {
 
   bool redetect;
 
-  DissolveRequestDtoScopeEnum scope;
+  DissolveScope scope;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is DissolveRequestDto &&
@@ -68,7 +68,7 @@ class DissolveRequestDto {
         expectedFaceCount: mapValueOfType<int>(json, r'expectedFaceCount')!,
         outcome: OutcomeEnum.fromJson(json[r'outcome'])!,
         redetect: mapValueOfType<bool>(json, r'redetect')!,
-        scope: DissolveRequestDtoScopeEnum.fromJson(json[r'scope'])!,
+        scope: DissolveScope.fromJson(json[r'scope'])!,
       );
     }
     return null;
@@ -122,86 +122,4 @@ class DissolveRequestDto {
     'scope',
   };
 }
-
-
-enum DissolveRequestDtoScopeEnum {
-  all._(r'all'),
-  exif._(r'exif'),
-  machineLearning._(r'machine-learning'),
-  withoutEmbedding._(r'without-embedding'),
-  ;
-
-  /// Instantiate a new enum with the provided value.
-  const DissolveRequestDtoScopeEnum._(this._value);
-
-  /// The underlying value of this enum member.
-  final String _value;
-
-  @override
-  String toString() => _value;
-
-  /// Encodes this enum as a value suitable for JSON.
-  String toJson() => _value;
-
-  /// Returns the instance of [DissolveRequestDtoScopeEnum] that was successfully decoded
-  /// from the passed [value] on success, null otherwise.
-  static DissolveRequestDtoScopeEnum? fromJson(dynamic value) => DissolveRequestDtoScopeEnumTypeTransformer().decode(value);
-
-  /// Returns a [List] containing instances of [DissolveRequestDtoScopeEnum]
-  /// that were successfully decoded from the passed [JSON][json].
-  static List<DissolveRequestDtoScopeEnum> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <DissolveRequestDtoScopeEnum>[];
-    if (json is List && json.isNotEmpty) {
-      for (final row in json) {
-        final value = DissolveRequestDtoScopeEnum.fromJson(row);
-        if (value != null) {
-          result.add(value);
-        }
-      }
-    }
-    return result.toList(growable: growable);
-  }
-}
-
-/// Transformation class that can [encode] an instance of [DissolveRequestDtoScopeEnum] to String,
-/// and [decode] dynamic data back to [DissolveRequestDtoScopeEnum].
-class DissolveRequestDtoScopeEnumTypeTransformer {
-  factory DissolveRequestDtoScopeEnumTypeTransformer() => _instance ??= const DissolveRequestDtoScopeEnumTypeTransformer._();
-
-  const DissolveRequestDtoScopeEnumTypeTransformer._();
-
-  String encode(DissolveRequestDtoScopeEnum data) => data._value;
-
-  /// Returns the instance of [DissolveRequestDtoScopeEnum] that was successfully decoded
-  /// from the passed [data] value on success, null otherwise.
-  ///
-  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
-  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
-  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
-  ///
-  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
-  /// and users are still using an old app with the old code.
-  DissolveRequestDtoScopeEnum? decode(dynamic data, {bool allowNull = true}) {
-    if (data is DissolveRequestDtoScopeEnum) {
-      return data;
-    }
-    if (data != null) {
-      switch (data) {
-        case r'all': return DissolveRequestDtoScopeEnum.all;
-        case r'exif': return DissolveRequestDtoScopeEnum.exif;
-        case r'machine-learning': return DissolveRequestDtoScopeEnum.machineLearning;
-        case r'without-embedding': return DissolveRequestDtoScopeEnum.withoutEmbedding;
-        default:
-          if (!allowNull) {
-            throw ArgumentError('Unknown enum value to decode: $data');
-          }
-      }
-    }
-    return null;
-  }
-
-  /// The singleton instance of this transformer.
-  static DissolveRequestDtoScopeEnumTypeTransformer? _instance;
-}
-
 

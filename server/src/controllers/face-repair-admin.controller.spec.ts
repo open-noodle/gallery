@@ -1101,7 +1101,10 @@ describe(FaceRepairAdminController.name, () => {
 
     it('defaults sort to faceCount and page to 1 when omitted', async () => {
       dissolveService.getPeopleHealth.mockResolvedValue({ people: [], total: 0, hasMore: false });
-      await request(ctx.getHttpServer()).get('/admin/face-repair/people').set('Authorization', 'Bearer token');
+      await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId: factory.uuid() })
+        .set('Authorization', 'Bearer token');
       expect(dissolveService.getPeopleHealth).toHaveBeenCalledWith(
         expect.objectContaining({ sort: 'faceCount', page: 1, size: 50 }),
       );
@@ -1110,7 +1113,19 @@ describe(FaceRepairAdminController.name, () => {
     it('rejects an unknown sort key with 400', async () => {
       const { status } = await request(ctx.getHttpServer())
         .get('/admin/face-repair/people')
-        .query({ sort: 'notARealSort' })
+        .query({ ownerId: factory.uuid(), sort: 'notARealSort' })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+
+    // Without an ownerId the aggregate spans every visible asset_face row on the instance, GROUPed BY
+    // person.id and ORDERed BY an aggregate alias, so LIMIT/OFFSET prune nothing and each page re-runs the
+    // whole thing. The only client always sends one, so the endpoint refuses the unbounded shape outright.
+    it('rejects a missing ownerId with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ sort: 'exifFaces' })
         .set('Authorization', 'Bearer token');
       expect(status).toBe(400);
       expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
