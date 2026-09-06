@@ -20,6 +20,7 @@ const counts = {
   assets: 2874,
   sharedAssets: 1861,
   notRedetectable: 44,
+  remainingLiveFaces: 0,
 };
 
 describe('PersonDissolveModal', () => {

@@ -661,6 +661,7 @@ export type DissolveResponseDto = {
         mlWithEmbedding: number;
         mlWithoutEmbedding: number;
         notRedetectable: number;
+        remainingLiveFaces: number;
         sharedAssets: number;
         softDeleted: number;
     };
