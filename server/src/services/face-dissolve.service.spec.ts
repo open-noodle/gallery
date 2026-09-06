@@ -91,6 +91,12 @@ describe(FaceDissolveService.name, () => {
     });
   });
 
+  it('does not regenerate the thumbnail when the person is deleted', async () => {
+    await sut.apply('person-1', dto({ outcome: 'delete-faces-and-person' }));
+    const queued = mocks.job.queue.mock.calls.map(([job]) => job.name);
+    expect(queued).not.toContain(JobName.PersonGenerateThumbnail);
+  });
+
   it('does not queue a file delete for an empty thumbnail path', async () => {
     mocks.faceDissolve.dissolve.mockResolvedValue({
       faces: 10,
@@ -117,6 +123,29 @@ describe(FaceDissolveService.name, () => {
   it('warns that some assets can never be re-detected', async () => {
     const result = await sut.preview('person-1', dto());
     expect(result.warnings).toContainEqual({ code: 'not-redetectable', count: 1 });
+  });
+
+  it('warns that unassigning may recluster faces with an embedding into someone else', async () => {
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, mlWithEmbedding: 5 });
+
+    const unassigning = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(unassigning.warnings).toContainEqual({ code: 'recluster-similar', count: 5 });
+
+    const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
+    expect(deleting.warnings).not.toContainEqual(expect.objectContaining({ code: 'recluster-similar' }));
+  });
+
+  it('warns that re-detection touches assets shared by other people', async () => {
+    const redetecting = await sut.preview('person-1', dto());
+    expect(redetecting.warnings).toContainEqual({ code: 'shared-assets', count: 3 });
+
+    const notRedetecting = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(notRedetecting.warnings).not.toContainEqual(expect.objectContaining({ code: 'shared-assets' }));
+  });
+
+  it('warns that metadata import will keep re-adding exif faces regardless of outcome', async () => {
+    const result = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(result.warnings).toContainEqual({ code: 'metadata-import-on', count: 10 });
   });
 
   it('preview never writes', async () => {
