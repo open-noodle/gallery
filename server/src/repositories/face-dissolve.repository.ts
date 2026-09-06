@@ -29,6 +29,13 @@ export interface DissolveCounts {
   assets: number;
   sharedAssets: number;
   notRedetectable: number;
+  /**
+   * The person's live faces this dissolve does NOT touch — counted with PersonCleanup's own definition of
+   * "has a face" (`getAllWithoutFaces`: `deletedAt IS NULL AND isVisible IS TRUE`). Zero means an `unassign`
+   * leaves the person faceless, so the nightly cleanup will delete it even though the admin chose the
+   * outcome that keeps it. We do not queue that job ourselves (L2), but the dialog must not imply survival.
+   */
+  remainingLiveFaces: number;
 }
 
 export interface PersonHealthRow {
@@ -194,6 +201,18 @@ export class FaceDissolveRepository {
       )
       .executeTakeFirstOrThrow();
 
+    // Deliberately NOT filtered by inScope — this is what the dissolve LEAVES BEHIND. Mirrors
+    // getAllWithoutFaces (person.repository.ts:669) exactly, because that is the query PersonCleanup uses
+    // to decide a person is faceless and delete it.
+    const remainingLiveRow = await this.db
+      .selectFrom('asset_face')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('asset_face.personId', '=', personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where((eb) => eb.not(dissolveScopePredicate(eb, scope)))
+      .executeTakeFirstOrThrow();
+
     return {
       faces: Number(faceRow.faces),
       exif: Number(faceRow.exif),
@@ -203,6 +222,7 @@ export class FaceDissolveRepository {
       assets: Number(faceRow.assets),
       sharedAssets: Number(sharedRow.count),
       notRedetectable: Number(notRedetectableRow.count),
+      remainingLiveFaces: Number(remainingLiveRow.count),
     };
   }
 

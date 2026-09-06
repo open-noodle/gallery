@@ -27,11 +27,16 @@ describe(FaceDissolveService.name, () => {
     assets: 8,
     sharedAssets: 3,
     notRedetectable: 1,
+    // Non-zero by default: the "this person will be cleaned up anyway" warning must NOT fire unless a test
+    // explicitly says the dissolve leaves the person faceless.
+    remainingLiveFaces: 4,
   };
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(FaceDissolveService));
     mocks.person.getById.mockResolvedValue(person as never);
+    // The metadata-import warning asserts the CURRENT setting, so every warning test has to say what it is.
+    mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
     mocks.faceDissolve.getCounts.mockResolvedValue(counts);
     mocks.faceDissolve.dissolve.mockResolvedValue({
       faces: 10,
@@ -161,6 +166,42 @@ describe(FaceDissolveService.name, () => {
     mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, exif: 0 });
     const noExif = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
     expect(noExif.warnings).not.toContainEqual(expect.objectContaining({ code: 'metadata-import-on' }));
+  });
+
+  // The copy is a factual claim about the CURRENT setting ("Import faces from metadata is on."). EXIF faces
+  // only prove it was on at import time, so an admin who already turned it off must not be told otherwise.
+  it('stays silent about metadata import when the setting is actually off', async () => {
+    mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: false } } });
+
+    const result = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(result.counts.exif).toBe(10);
+    expect(result.warnings).not.toContainEqual(expect.objectContaining({ code: 'metadata-import-on' }));
+    // The other warnings still fire, so this is the config gate and not a swallowed warning list.
+    expect(result.warnings).toContainEqual({ code: 'strands-faces', count: 10 });
+  });
+
+  // "Unassign only" is presented as the least destructive outcome, but it leaves the person faceless and the
+  // nightly PersonCleanup deletes a faceless person on its own schedule. We never queue that job (L2).
+  it('warns that an unassign leaves the person for the nightly cleanup to delete', async () => {
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, remainingLiveFaces: 0 });
+    const emptied = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(emptied.warnings).toContainEqual({ code: 'person-will-be-cleaned-up', count: 0 });
+
+    // A person keeping out-of-scope faces survives, so the warning would be a lie.
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, remainingLiveFaces: 2 });
+    const survives = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(survives.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
+
+    // The delete outcomes remove the faces outright; delete-faces-and-person removes the person itself, and
+    // delete-faces has its own honest story. Neither is the "you think you kept it" trap.
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, remainingLiveFaces: 0 });
+    const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
+    expect(deleting.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
+
+    // Nothing in scope means we caused nothing; the warning must not claim a consequence we did not cause.
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, faces: 0, remainingLiveFaces: 0 });
+    const noop = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false, expectedFaceCount: 0 }));
+    expect(noop.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
   });
 
   it('preview never writes', async () => {
