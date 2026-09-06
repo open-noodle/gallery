@@ -87,7 +87,16 @@ export class TimelineService extends BaseService {
       }
 
       if (dto.withSharedSpaces) {
-        const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+        // #763: an `isFavorite: true` browse is scoped by MY favourites, so it spans every space I
+        // belong to — including ones I've hidden from my home timeline. `showInTimeline` is a
+        // preference about this timeline, not about whether my own explicit favourite still counts;
+        // resolving it here is what made a favourite placed inside a hidden space vanish from
+        // /favorites despite the success toast. Safe because the favorite predicate narrows to the
+        // caller's own overlay rows — see getAllMemberSpaceIds. Every other browse keeps the hide.
+        const spaceRows =
+          dto.isFavorite === true
+            ? await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id)
+            : await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
         if (spaceRows.length > 0) {
           timelineSpaceIds = spaceRows.map((row) => row.spaceId);
         }

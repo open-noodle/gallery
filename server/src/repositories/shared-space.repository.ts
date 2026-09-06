@@ -441,6 +441,26 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  /**
+   * #763: every space the caller belongs to, WITHOUT the `showInTimeline` filter its sibling
+   * applies. `showInTimeline` is a preference about the personal HOME TIMELINE, not a revocation of
+   * access — the member still sees the space, and #1041 already exempts Favorites (with Archive and
+   * Trash) from the personal-timeline hide because those are curation/recovery surfaces where
+   * subtracting an asset strands it with no way back to it in the UI.
+   *
+   * Favoriting is that same kind of explicit, per-asset act, so a favorite must stay reachable on
+   * /favorites even when the space it lives in is hidden from the home timeline. Reported against
+   * pr-819-rc.2: the heart said "Added to favorites" and the page then never listed it.
+   *
+   * Widening the scope is safe here ONLY because every caller pairs it with `isFavorite: true`,
+   * which narrows to the caller's OWN `asset_favorite` rows — it can never surface another member's
+   * content. Do not reuse it for an unfiltered browse.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getAllMemberSpaceIds(userId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db.selectFrom('shared_space_member').where('userId', '=', userId).select('spaceId').execute();
+  }
+
   // #1041: own-row-only by construction — always a specific (spaceId, albumId, userId), never a
   // bulk/admin write. onConflict doNothing makes hiding an already-hidden album a no-op, not an error.
   async hideAlbumForUser(
