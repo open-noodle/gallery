@@ -453,7 +453,18 @@ describe('/timeline', () => {
       expect(ids.filter((id) => id === ctx.spaceAssetId)).toHaveLength(1);
     });
 
-    it('showInTimeline=false hides space favorites like any other space content', async () => {
+    // REVERSED 2026-09-06, deliberately. This test previously asserted that showInTimeline=false
+    // hides space favorites "like any other space content". A tester hit that on pr-819-rc.2 and
+    // reported it as a bug: favoriting inside a hidden space gave "Added to favorites" and the
+    // photo never appeared under Favorites, with no way to reach it.
+    //
+    // Favorites are now EXEMPT from the hide, which is the same carve-out #1041 already makes for
+    // Favorites/Archive/Trash: those are curation and recovery surfaces, where subtracting an asset
+    // strands it instead of merely decluttering a browse. `showInTimeline` keeps its meaning for
+    // every other query — the sibling test at ~:290 still pins that, and so does a unit test on
+    // which resolver each browse calls. Favoriting is an explicit, per-asset act; a browse
+    // preference should not silently annul it.
+    it('showInTimeline=false does NOT hide your own favorites — they stay reachable (#763)', async () => {
       // Mirror the toggle pattern of the existing 'toggling showInTimeline=false' test in this
       // file (~:290) — same endpoint, same restore-afterwards discipline (try/finally).
       try {
@@ -467,7 +478,9 @@ describe('/timeline', () => {
           .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true&isFavorite=true')
           .set(asBearerAuth(ctx.spaceViewer.token!));
         expect(status).toBe(200);
-        expect(total(body)).toBe(0);
+        // Still 1 — the same count the finally block asserts once the space is shown again, which
+        // is the point: the toggle no longer changes what the favorites surface returns.
+        expect(total(body)).toBe(1);
       } finally {
         const restore = await request(app)
           .patch(`/shared-spaces/${ctx.spaceId}/members/me/timeline`)
