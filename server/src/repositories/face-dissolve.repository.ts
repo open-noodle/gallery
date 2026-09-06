@@ -126,7 +126,28 @@ export class FaceDissolveRepository {
             .whereRef('other.assetId', '=', 'asset.id')
             .where('other.personId', 'is not', null)
             .where('other.personId', '!=', personId)
-            .where('other.deletedAt', 'is', null),
+            .where('other.deletedAt', 'is', null)
+            // Pet faces can never be lost to re-detection: handleDetectFaces keeps face.isPet out of
+            // faceIdsToRemove (person.service.ts:940-946), so a sibling pet carries no L3 risk (F1).
+            .where((inner) =>
+              inner.not(
+                inner.or([
+                  inner.exists(
+                    inner
+                      .selectFrom('pet_search')
+                      .select(sql`1`.as('one'))
+                      .whereRef('pet_search.faceId', '=', 'other.id'),
+                  ),
+                  inner.exists(
+                    inner
+                      .selectFrom('person')
+                      .select(sql`1`.as('one'))
+                      .whereRef('person.id', '=', 'other.personId')
+                      .where('person.type', '=', 'pet'),
+                  ),
+                ]),
+              ),
+            ),
         ),
       )
       .executeTakeFirstOrThrow();
