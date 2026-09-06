@@ -8,6 +8,9 @@ vi.mock('@immich/sdk', () => ({
   dissolvePerson: vi.fn(),
 }));
 
+// `expectedFaceCount` is deliberately NOT `counts.faces`: it is the server's authoritative concurrency guard,
+// and the component must round-trip THAT number rather than recompute one off the counts it happens to show.
+// With the two equal, a component sending `counts.faces` passed this suite unnoticed.
 const counts = {
   faces: 3180,
   exif: 3180,
@@ -24,13 +27,13 @@ describe('PersonDissolveModal', () => {
     vi.mocked(previewDissolvePerson).mockResolvedValue({
       personId: 'p1',
       counts,
-      expectedFaceCount: 3180,
+      expectedFaceCount: 3175,
       warnings: [{ code: 'not-redetectable', count: 44 }],
     } as never);
     vi.mocked(dissolvePerson).mockResolvedValue({
       personId: 'p1',
       counts,
-      expectedFaceCount: 3180,
+      expectedFaceCount: 3175,
       warnings: [],
     } as never);
   });
@@ -59,7 +62,7 @@ describe('PersonDissolveModal', () => {
     expect(dissolvePerson).toHaveBeenCalledWith(
       expect.objectContaining({
         personId: 'p1',
-        dissolveRequestDto: expect.objectContaining({ expectedFaceCount: 3180 }),
+        dissolveRequestDto: expect.objectContaining({ expectedFaceCount: 3175 }),
       }),
     );
   });
