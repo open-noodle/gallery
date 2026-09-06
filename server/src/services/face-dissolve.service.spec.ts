@@ -133,6 +133,10 @@ describe(FaceDissolveService.name, () => {
 
     const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
     expect(deleting.warnings).not.toContainEqual(expect.objectContaining({ code: 'recluster-similar' }));
+
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, mlWithEmbedding: 0 });
+    const noEmbedding = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(noEmbedding.warnings).not.toContainEqual(expect.objectContaining({ code: 'recluster-similar' }));
   });
 
   it('warns that re-detection touches assets shared by other people', async () => {
@@ -141,11 +145,22 @@ describe(FaceDissolveService.name, () => {
 
     const notRedetecting = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
     expect(notRedetecting.warnings).not.toContainEqual(expect.objectContaining({ code: 'shared-assets' }));
+
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, sharedAssets: 0 });
+    const noSharedAssets = await sut.preview('person-1', dto());
+    expect(noSharedAssets.warnings).not.toContainEqual(expect.objectContaining({ code: 'shared-assets' }));
   });
 
   it('warns that metadata import will keep re-adding exif faces regardless of outcome', async () => {
-    const result = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
-    expect(result.warnings).toContainEqual({ code: 'metadata-import-on', count: 10 });
+    const unassigning = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(unassigning.warnings).toContainEqual({ code: 'metadata-import-on', count: 10 });
+
+    const deletingPerson = await sut.preview('person-1', dto({ outcome: 'delete-faces-and-person' }));
+    expect(deletingPerson.warnings).toContainEqual({ code: 'metadata-import-on', count: 10 });
+
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, exif: 0 });
+    const noExif = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(noExif.warnings).not.toContainEqual(expect.objectContaining({ code: 'metadata-import-on' }));
   });
 
   it('preview never writes', async () => {
