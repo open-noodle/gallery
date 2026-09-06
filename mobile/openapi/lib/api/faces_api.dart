@@ -568,6 +568,88 @@ class FacesApi {
     return null;
   }
 
+  /// List people with per-source face counts, to find a person worth dissolving
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] ownerId:
+  ///
+  /// * [int] page:
+  ///   Page number
+  ///
+  /// * [int] size:
+  ///   Number of people per page
+  ///
+  /// * [String] sort:
+  Future<Response> getFaceRepairPeopleHealthWithHttpInfo({ String? ownerId, int? page, int? size, String? sort, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/admin/face-repair/people';
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (ownerId != null) {
+      queryParams.addAll(_queryParams('', 'ownerId', ownerId));
+    }
+    if (page != null) {
+      queryParams.addAll(_queryParams('', 'page', page));
+    }
+    if (size != null) {
+      queryParams.addAll(_queryParams('', 'size', size));
+    }
+    if (sort != null) {
+      queryParams.addAll(_queryParams('', 'sort', sort));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// List people with per-source face counts, to find a person worth dissolving
+  ///
+  /// Parameters:
+  ///
+  /// * [String] ownerId:
+  ///
+  /// * [int] page:
+  ///   Page number
+  ///
+  /// * [int] size:
+  ///   Number of people per page
+  ///
+  /// * [String] sort:
+  Future<PeopleHealthResponseDto?> getFaceRepairPeopleHealth({ String? ownerId, int? page, int? size, String? sort, Future<void>? abortTrigger, }) async {
+    final response = await getFaceRepairPeopleHealthWithHttpInfo(ownerId: ownerId, page: page, size: size, sort: sort, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'PeopleHealthResponseDto',) as PeopleHealthResponseDto;
+    
+    }
+    return null;
+  }
+
   /// Get a person's flagged faces for review
   ///
   /// Note: This method returns the HTTP [Response].

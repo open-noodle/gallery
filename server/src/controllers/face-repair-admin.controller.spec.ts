@@ -1065,4 +1065,64 @@ describe(FaceRepairAdminController.name, () => {
       expect(status).toBe(400);
     });
   });
+
+  describe('GET /admin/face-repair/people', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/admin/face-repair/people');
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ adminRoute: true }),
+        }),
+      );
+    });
+
+    it('is admin-only: a non-admin caller gets 403', async () => {
+      ctx.authenticate.mockRejectedValue(new ForbiddenException('Forbidden'));
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(403);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+
+    it('delegates to service.getPeopleHealth with ownerId, sort and page', async () => {
+      dissolveService.getPeopleHealth.mockResolvedValue({ people: [], total: 0, hasMore: false });
+      const ownerId = factory.uuid();
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId, sort: 'exifFaces', page: 2 })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(200);
+      expect(dissolveService.getPeopleHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId, sort: 'exifFaces', page: 2 }),
+      );
+      expect(body).toEqual({ people: [], total: 0, hasMore: false });
+    });
+
+    it('defaults sort to faceCount and page to 1 when omitted', async () => {
+      dissolveService.getPeopleHealth.mockResolvedValue({ people: [], total: 0, hasMore: false });
+      await request(ctx.getHttpServer()).get('/admin/face-repair/people').set('Authorization', 'Bearer token');
+      expect(dissolveService.getPeopleHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'faceCount', page: 1, size: 50 }),
+      );
+    });
+
+    it('rejects an unknown sort key with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ sort: 'notARealSort' })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-uuid ownerId with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/people')
+        .query({ ownerId: 'not-a-uuid' })
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(dissolveService.getPeopleHealth).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -180,6 +180,7 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**getFaceRepairFacePreview**](doc//FacesApi.md#getfacerepairfacepreview) | **GET** /admin/face-repair/faces/{assetFaceId}/preview | Get an admin face-repair source photo
 *FacesApi* | [**getFaceRepairFaceThumbnail**](doc//FacesApi.md#getfacerepairfacethumbnail) | **GET** /admin/face-repair/faces/{assetFaceId}/thumbnail | Get an admin face-repair face thumbnail
 *FacesApi* | [**getFaceRepairOwnerPeople**](doc//FacesApi.md#getfacerepairownerpeople) | **GET** /admin/face-repair/owner/{ownerId}/people | Search an owner's people for the move-to-chosen-person picker
+*FacesApi* | [**getFaceRepairPeopleHealth**](doc//FacesApi.md#getfacerepairpeoplehealth) | **GET** /admin/face-repair/people | List people with per-source face counts, to find a person worth dissolving
 *FacesApi* | [**getFaceRepairPersonFaces**](doc//FacesApi.md#getfacerepairpersonfaces) | **GET** /admin/face-repair/scan/person/{personId} | Get a person's flagged faces for review
 *FacesApi* | [**getFaceRepairPersonMetadata**](doc//FacesApi.md#getfacerepairpersonmetadata) | **GET** /admin/face-repair/person/{personId} | Get a person for manual review
 *FacesApi* | [**getFaceRepairResolutions**](doc//FacesApi.md#getfacerepairresolutions) | **GET** /admin/face-repair/resolutions | List face-repair resolutions (negative verdicts from both engines)
@@ -672,6 +673,8 @@ Class | Method | HTTP request | Description
  - [PartnerResponseDto](doc//PartnerResponseDto.md)
  - [PartnerUpdateDto](doc//PartnerUpdateDto.md)
  - [PeopleFaceStatisticsResponseDto](doc//PeopleFaceStatisticsResponseDto.md)
+ - [PeopleHealthResponseDto](doc//PeopleHealthResponseDto.md)
+ - [PeopleHealthResponseDtoPeopleInner](doc//PeopleHealthResponseDtoPeopleInner.md)
  - [PeopleResponse](doc//PeopleResponse.md)
  - [PeopleResponseDto](doc//PeopleResponseDto.md)
  - [PeopleStatisticsResponseDto](doc//PeopleStatisticsResponseDto.md)

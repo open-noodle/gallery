@@ -172,6 +172,20 @@ export type FaceRepairOwnerPersonCreateRequestDto = {
 export type FaceRepairOwnerPersonCreatedResponseDto = {
     id: string;
 };
+export type PeopleHealthResponseDto = {
+    hasMore: boolean;
+    people: {
+        exif: number;
+        faceCount: number;
+        facesWithoutEmbedding: number;
+        id: string;
+        machineLearning: number;
+        manual: number;
+        name: string;
+        ownerId: string;
+    }[];
+    total: number;
+};
 export type FaceRepairPersonMetadataResponseDto = {
     faceCount: number;
     id: string;
@@ -4859,6 +4873,27 @@ export function createFaceRepairOwnerPerson({ ownerId, faceRepairOwnerPersonCrea
         method: "POST",
         body: faceRepairOwnerPersonCreateRequestDto
     })));
+}
+/**
+ * List people with per-source face counts, to find a person worth dissolving
+ */
+export function getFaceRepairPeopleHealth({ ownerId, page, size, sort }: {
+    ownerId?: string;
+    page?: number;
+    size?: number;
+    sort?: "exifFaces" | "facesWithoutEmbedding" | "faceCount";
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleHealthResponseDto;
+    }>(`/admin/face-repair/people${QS.query(QS.explode({
+        ownerId,
+        page,
+        size,
+        sort
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Get a person for manual review

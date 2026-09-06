@@ -975,6 +975,109 @@
         ]
       }
     },
+    "/admin/face-repair/people": {
+      "get": {
+        "operationId": "getFaceRepairPeopleHealth",
+        "parameters": [
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Number of people per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "faceCount",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "exifFaces"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "facesWithoutEmbedding"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "faceCount"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeopleHealthResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List people with per-source face counts, to find a person worth dissolving",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/admin/face-repair/person/{personId}": {
       "get": {
         "operationId": "getFaceRepairPersonMetadata",
@@ -30712,6 +30815,64 @@
           "detectedFaceCount",
           "namedVisiblePersonCount",
           "unassignedFaceCount"
+        ],
+        "type": "object"
+      },
+      "PeopleHealthResponseDto": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "people": {
+            "items": {
+              "properties": {
+                "exif": {
+                  "type": "number"
+                },
+                "faceCount": {
+                  "type": "number"
+                },
+                "facesWithoutEmbedding": {
+                  "type": "number"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "machineLearning": {
+                  "type": "number"
+                },
+                "manual": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "ownerId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "ownerId",
+                "faceCount",
+                "machineLearning",
+                "exif",
+                "manual",
+                "facesWithoutEmbedding"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "hasMore",
+          "people",
+          "total"
         ],
         "type": "object"
       },

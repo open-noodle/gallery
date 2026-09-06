@@ -293,6 +293,8 @@ part 'model/partner_direction.dart';
 part 'model/partner_response_dto.dart';
 part 'model/partner_update_dto.dart';
 part 'model/people_face_statistics_response_dto.dart';
+part 'model/people_health_response_dto.dart';
+part 'model/people_health_response_dto_people_inner.dart';
 part 'model/people_response.dart';
 part 'model/people_response_dto.dart';
 part 'model/people_statistics_response_dto.dart';

@@ -621,6 +621,10 @@ class ApiClient {
           return PartnerUpdateDto.fromJson(value);
         case 'PeopleFaceStatisticsResponseDto':
           return PeopleFaceStatisticsResponseDto.fromJson(value);
+        case 'PeopleHealthResponseDto':
+          return PeopleHealthResponseDto.fromJson(value);
+        case 'PeopleHealthResponseDtoPeopleInner':
+          return PeopleHealthResponseDtoPeopleInner.fromJson(value);
         case 'PeopleResponse':
           return PeopleResponse.fromJson(value);
         case 'PeopleResponseDto':
