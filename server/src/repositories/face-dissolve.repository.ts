@@ -31,6 +31,26 @@ export interface DissolveCounts {
   notRedetectable: number;
 }
 
+export interface PersonHealthRow {
+  id: string;
+  name: string;
+  ownerId: string;
+  faceCount: number;
+  machineLearning: number;
+  exif: number;
+  manual: number;
+  facesWithoutEmbedding: number;
+}
+
+export type PersonHealthSort = 'exifFaces' | 'facesWithoutEmbedding' | 'faceCount';
+
+/** The sort key is an API-facing name; this maps it to the SELECT alias it actually orders by. */
+const HEALTH_SORT_COLUMN: Record<PersonHealthSort, string> = {
+  exifFaces: 'exif',
+  facesWithoutEmbedding: 'facesWithoutEmbedding',
+  faceCount: 'faceCount',
+};
+
 const hasEmbedding = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   eb.exists(
     eb
@@ -183,6 +203,71 @@ export class FaceDissolveRepository {
       sharedAssets: Number(sharedRow.count),
       notRedetectable: Number(notRedetectableRow.count),
     };
+  }
+
+  /**
+   * The contamination signal. Deliberately NOT the picker search (searchOwnerPeople) — this aggregate is what
+   * makes a person with only EXIF faces findable at all, since no scan will ever flag one.
+   */
+  @GenerateSql({ params: [{ ownerId: DummyValue.UUID, sort: 'exifFaces', page: 1, size: 20 }] })
+  async getPeopleHealth(options: {
+    ownerId?: string;
+    sort: PersonHealthSort;
+    page: number;
+    size: number;
+  }): Promise<{ people: PersonHealthRow[]; total: number; hasMore: boolean }> {
+    const rows = await this.db
+      .selectFrom('person')
+      .leftJoin('asset_face', (join) =>
+        join
+          .onRef('asset_face.personId', '=', 'person.id')
+          .on('asset_face.deletedAt', 'is', null)
+          .on('asset_face.isVisible', 'is', true),
+      )
+      .where('person.type', '!=', 'pet')
+      .$if(!!options.ownerId, (qb) => qb.where('person.ownerId', '=', options.ownerId!))
+      .select((eb) => [
+        'person.id',
+        'person.name',
+        'person.ownerId',
+        eb.fn.count<number>('asset_face.id').as('faceCount'),
+        eb.fn.count<number>('asset_face.id').filterWhere('asset_face.sourceType', '=', SourceType.Exif).as('exif'),
+        eb.fn
+          .count<number>('asset_face.id')
+          .filterWhere('asset_face.sourceType', '=', SourceType.MachineLearning)
+          .as('machineLearning'),
+        eb.fn.count<number>('asset_face.id').filterWhere('asset_face.sourceType', '=', SourceType.Manual).as('manual'),
+        eb.fn
+          .count<number>('asset_face.id')
+          .filterWhere((inner) => inner.not(hasEmbedding(inner)))
+          .as('facesWithoutEmbedding'),
+      ])
+      .groupBy(['person.id', 'person.name', 'person.ownerId'])
+      .orderBy(sql.ref(HEALTH_SORT_COLUMN[options.sort]), 'desc')
+      .limit(options.size + 1)
+      .offset((options.page - 1) * options.size)
+      .execute();
+
+    const hasMore = rows.length > options.size;
+    const people = rows.slice(0, options.size).map((row) => ({
+      id: row.id,
+      name: row.name,
+      ownerId: row.ownerId,
+      faceCount: Number(row.faceCount),
+      exif: Number(row.exif),
+      machineLearning: Number(row.machineLearning),
+      manual: Number(row.manual),
+      facesWithoutEmbedding: Number(row.facesWithoutEmbedding),
+    }));
+
+    const totalRow = await this.db
+      .selectFrom('person')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('person.type', '!=', 'pet')
+      .$if(!!options.ownerId, (qb) => qb.where('person.ownerId', '=', options.ownerId!))
+      .executeTakeFirstOrThrow();
+
+    return { people, total: Number(totalRow.count), hasMore };
   }
 
   /**

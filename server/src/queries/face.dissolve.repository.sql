@@ -209,3 +209,58 @@ where
         and "asset_file"."type" = $4
     )
   )
+
+-- FaceDissolveRepository.getPeopleHealth
+select
+  "person"."id",
+  "person"."name",
+  "person"."ownerId",
+  count("asset_face"."id") as "faceCount",
+  count("asset_face"."id") filter (
+    where
+      "asset_face"."sourceType" = $1
+  ) as "exif",
+  count("asset_face"."id") filter (
+    where
+      "asset_face"."sourceType" = $2
+  ) as "machineLearning",
+  count("asset_face"."id") filter (
+    where
+      "asset_face"."sourceType" = $3
+  ) as "manual",
+  count("asset_face"."id") filter (
+    where
+      not exists (
+        select
+          1 as "one"
+        from
+          "face_search"
+        where
+          "face_search"."faceId" = "asset_face"."id"
+      )
+  ) as "facesWithoutEmbedding"
+from
+  "person"
+  left join "asset_face" on "asset_face"."personId" = "person"."id"
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+where
+  "person"."type" != $4
+  and "person"."ownerId" = $5
+group by
+  "person"."id",
+  "person"."name",
+  "person"."ownerId"
+order by
+  "exif" desc
+limit
+  $6
+offset
+  $7
+select
+  count(*) as "count"
+from
+  "person"
+where
+  "person"."type" != $1
+  and "person"."ownerId" = $2
