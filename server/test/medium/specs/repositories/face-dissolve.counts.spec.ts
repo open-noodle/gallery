@@ -78,4 +78,33 @@ describe('FaceDissolveRepository.getCounts', () => {
     expect(counts.mlWithoutEmbedding).toBe(2);
     expect(counts.softDeleted).toBe(1);
   });
+
+  // Feeds the "the nightly cleanup deletes this person anyway" warning. Counted with PersonCleanup's own
+  // definition of "has a face" (getAllWithoutFaces: deletedAt IS NULL AND isVisible IS TRUE), because that
+  // is the query that decides the person's fate — not the displayed face count.
+  it('counts the live faces a dissolve would leave behind, PersonCleanup-style', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const target = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+
+    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personId: target.id, withEmbedding: true });
+    // Neither of these keeps a person alive: PersonCleanup's join excludes both.
+    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif, deletedAt: new Date() });
+    const invisible = await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    await db.updateTable('asset_face').set({ isVisible: false }).where('id', '=', invisible.id).execute();
+
+    // Dissolving only the EXIF faces leaves the live ML face behind — the person survives.
+    const exifScope = await repo.getCounts(target.id, DissolveScope.Exif);
+    expect(exifScope.remainingLiveFaces).toBe(1);
+
+    // Dissolving everything leaves nothing live behind, so the nightly cleanup takes the person.
+    const allScope = await repo.getCounts(target.id, DissolveScope.All);
+    expect(allScope.remainingLiveFaces).toBe(0);
+
+    // And the ML-only scope leaves the live EXIF face, so it is not a constant either.
+    const mlScope = await repo.getCounts(target.id, DissolveScope.MachineLearning);
+    expect(mlScope.remainingLiveFaces).toBe(1);
+  });
 });
