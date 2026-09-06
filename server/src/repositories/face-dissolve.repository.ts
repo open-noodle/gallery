@@ -244,6 +244,12 @@ export class FaceDissolveRepository {
       ])
       .groupBy(['person.id', 'person.name', 'person.ownerId'])
       .orderBy(sql.ref(HEALTH_SORT_COLUMN[options.sort]), 'desc')
+      // Stable tiebreaker: ties are the common case here (every uncontaminated person ties at 0 under
+      // exifFaces/facesWithoutEmbedding), and without one Postgres may order them differently per
+      // execution, so the health tab's page-concatenating pagination can show a person twice while
+      // silently skipping another. Same fix as face-repair.repository.ts:67 under the identical
+      // limit(size+1)/offset scheme.
+      .orderBy('person.id', 'asc')
       .limit(options.size + 1)
       .offset((options.page - 1) * options.size)
       .execute();
