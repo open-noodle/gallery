@@ -2,9 +2,16 @@ import { createZodDto } from 'nestjs-zod';
 import { DissolveScope } from 'src/utils/face-dissolve';
 import z from 'zod';
 
+// Named, not anonymous: without an id oazapfts emits a bare `enum Scope` into the SDK, squatting a generic
+// name (OAuth/permission scope) that a later endpoint will want — and a published SDK export cannot be
+// renamed without a breaking change.
+const DissolveScopeSchema = z.enum(DissolveScope).describe('Which faces a dissolve touches').meta({
+  id: 'DissolveScope',
+});
+
 export const DissolveRequestSchema = z
   .object({
-    scope: z.enum(DissolveScope),
+    scope: DissolveScopeSchema,
     // A literal union, not an inline z.enum — an anonymous enum gets renumbered by oazapfts on regeneration.
     outcome: z.union([z.literal('unassign'), z.literal('delete-faces'), z.literal('delete-faces-and-person')]),
     redetect: z.boolean(),
@@ -46,7 +53,11 @@ export type DissolveWarning = z.infer<typeof DissolveWarningSchema>;
 // ever flags one. This aggregate is what makes such a person findable at all.
 export const PeopleHealthQuerySchema = z
   .object({
-    ownerId: z.uuid().optional(),
+    // Required, not optional. Without it the aggregate GROUPs BY person.id over every visible asset_face row
+    // on the instance and ORDERs BY an aggregate alias, so LIMIT/OFFSET prune nothing and each page re-runs
+    // the whole thing. The only client always sends it, so requiring it costs nothing and removes the
+    // unbounded case from the API surface entirely.
+    ownerId: z.uuid(),
     // A literal union, not an inline z.enum — an anonymous enum gets renumbered by oazapfts on regeneration.
     sort: z
       .union([z.literal('exifFaces'), z.literal('facesWithoutEmbedding'), z.literal('faceCount')])
