@@ -98,6 +98,7 @@ import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
 import { factory, newDate, newEmbedding, newUuid } from 'test/small.factory.js';
 import { automock, wait } from 'test/utils.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 
 export const testAssetsDir = resolve(import.meta.dirname, '../../e2e/test-assets');
 
@@ -632,6 +633,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case ClusterGroupRepository:
     case DownloadRepository:
     case DuplicateRepository:
+    case FaceDissolveRepository:
     case FaceIdentityRepository:
     case FaceRepairDeclineRepository:
     case FaceRepairRepository:
@@ -723,6 +725,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case ClassificationRepository:
     case ConfigRepository:
     case CryptoRepository:
+    case FaceDissolveRepository:
     case FaceIdentityRepository:
     case FacePersonVerdictRepository:
     case LibraryRepository:

@@ -98,6 +98,7 @@ import { newMetadataRepositoryMock } from 'test/repositories/metadata.repository
 import { newStorageRepositoryMock } from 'test/repositories/storage.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 
 export type ControllerContext = {
   authenticate: Mock;
@@ -261,6 +262,7 @@ export type ServiceOverrides = {
   duplicateRepository: DuplicateRepository;
   email: EmailRepository;
   event: EventRepository;
+  faceDissolve: FaceDissolveRepository;
   faceIdentity: FaceIdentityRepository;
   faceRepair: FaceRepairRepository;
   faceRepairScan: FaceRepairScanRepository;
@@ -362,6 +364,7 @@ export const getMocks = () => {
     email: automock(EmailRepository, { args: [loggerMock] }),
     // eslint-disable-next-line no-sparse-arrays
     event: automock(EventRepository, { args: [, , loggerMock], strict: false }),
+    faceDissolve: automock(FaceDissolveRepository, { strict: false }),
     faceIdentity: automock(FaceIdentityRepository, { strict: false }),
     faceRepair: automock(FaceRepairRepository, { strict: false }),
     faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
@@ -446,6 +449,7 @@ export const newTestService = <T extends BaseService>(
     overrides.duplicateRepository || (mocks.duplicateRepository as As<DuplicateRepository>),
     overrides.email || (mocks.email as As<EmailRepository>),
     overrides.event || (mocks.event as As<EventRepository>),
+    overrides.faceDissolve || (mocks.faceDissolve as As<FaceDissolveRepository>),
     overrides.faceIdentity || (mocks.faceIdentity as As<FaceIdentityRepository>),
     overrides.faceRepair || (mocks.faceRepair as As<FaceRepairRepository>),
     overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
