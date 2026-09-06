@@ -30,7 +30,7 @@ export class FaceDissolveService extends BaseService {
       personId: person.id,
       counts,
       expectedFaceCount: counts.faces,
-      warnings: this.buildWarnings(dto, counts),
+      warnings: await this.buildWarnings(dto, counts),
     };
   }
 
@@ -75,7 +75,7 @@ export class FaceDissolveService extends BaseService {
         `${result.assetsCleared} assets requeued, outcome=${dto.outcome}, scope=${dto.scope}`,
     );
 
-    return { personId, counts, expectedFaceCount: counts.faces, warnings: this.buildWarnings(dto, counts) };
+    return { personId, counts, expectedFaceCount: counts.faces, warnings: await this.buildWarnings(dto, counts) };
   }
 
   private async requirePerson(personId: string) {
@@ -96,7 +96,7 @@ export class FaceDissolveService extends BaseService {
     }
   }
 
-  private buildWarnings(dto: DissolveRequest, counts: DissolveCounts): DissolveWarning[] {
+  private async buildWarnings(dto: DissolveRequest, counts: DissolveCounts): Promise<DissolveWarning[]> {
     const warnings: DissolveWarning[] = [];
     const strandable = counts.exif + counts.mlWithoutEmbedding;
 
@@ -106,14 +106,26 @@ export class FaceDissolveService extends BaseService {
     if (dto.outcome === 'unassign' && counts.mlWithEmbedding > 0) {
       warnings.push({ code: 'recluster-similar', count: counts.mlWithEmbedding });
     }
+    // "Unassign only" reads as the least destructive choice, but it leaves the person faceless and the
+    // nightly PersonCleanup deletes a faceless person on its own schedule. We never queue that job (L2) —
+    // which is exactly why the admin must be told it will still happen.
+    if (dto.outcome === 'unassign' && counts.faces > 0 && counts.remainingLiveFaces === 0) {
+      warnings.push({ code: 'person-will-be-cleaned-up', count: 0 });
+    }
     if (dto.redetect && counts.notRedetectable > 0) {
       warnings.push({ code: 'not-redetectable', count: counts.notRedetectable });
     }
     if (dto.redetect && counts.sharedAssets > 0) {
       warnings.push({ code: 'shared-assets', count: counts.sharedAssets });
     }
+    // EXIF faces prove the setting was on when the files were imported, NOT that it is on now. The copy is a
+    // factual claim about the current setting, so read the current setting: telling an admin who already
+    // turned it off that it is on, on the panel guarding an irreversible delete, is a lie in ten languages.
     if (counts.exif > 0) {
-      warnings.push({ code: 'metadata-import-on', count: counts.exif });
+      const { metadata } = await this.getConfig({ withCache: true });
+      if (metadata.faces.import) {
+        warnings.push({ code: 'metadata-import-on', count: counts.exif });
+      }
     }
     return warnings;
   }

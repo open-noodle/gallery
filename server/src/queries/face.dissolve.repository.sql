@@ -209,6 +209,33 @@ where
         and "asset_file"."type" = $4
     )
   )
+select
+  count(*) as "count"
+from
+  "asset_face"
+where
+  "asset_face"."personId" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  and not not (
+    exists (
+      select
+        1 as "one"
+      from
+        "pet_search"
+      where
+        "pet_search"."faceId" = "asset_face"."id"
+    )
+    or exists (
+      select
+        1 as "one"
+      from
+        "person"
+      where
+        "person"."id" = "asset_face"."personId"
+        and "person"."type" = $2
+    )
+  )
 
 -- FaceDissolveRepository.getPeopleHealth
 select

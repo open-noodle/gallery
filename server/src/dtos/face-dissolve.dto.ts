@@ -31,6 +31,7 @@ const DissolveCountsSchema = z.object({
   assets: z.number(),
   sharedAssets: z.number(),
   notRedetectable: z.number(),
+  remainingLiveFaces: z.number(),
 });
 
 const DissolveWarningSchema = z.object({ code: z.string(), count: z.number() });

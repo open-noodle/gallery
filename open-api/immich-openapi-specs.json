@@ -30161,6 +30161,9 @@
               "notRedetectable": {
                 "type": "number"
               },
+              "remainingLiveFaces": {
+                "type": "number"
+              },
               "sharedAssets": {
                 "type": "number"
               },
@@ -30176,7 +30179,8 @@
               "softDeleted",
               "assets",
               "sharedAssets",
-              "notRedetectable"
+              "notRedetectable",
+              "remainingLiveFaces"
             ],
             "type": "object"
           },
