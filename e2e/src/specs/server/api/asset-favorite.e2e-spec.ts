@@ -557,6 +557,42 @@ describe('favoriting a photo you do not own, by space role (#763)', () => {
     }
   });
 
+  // Reported against pr-819-rc.6: filtering by a camera value from the /favorites asset viewer
+  // returned 0 results. The click leaves /favorites (it has no filter panel, so it is not a filter
+  // target) and lands on /photos, which now carries `favorite=true` so the filter narrows the
+  // favourites instead of replacing them — see resolveImplicitFilterScope in web filter-target.ts.
+  //
+  // That destination query differs from the /favorites one in a load-bearing way: it states
+  // `userId`, the personal timeline's owner gate. The gate is OR-ed with the shared-space arm
+  // (asset.repository.ts), and the isFavorite carve-out above still widens the space scope to every
+  // space the caller belongs to — so a favourite on someone else's asset inside a space hidden from
+  // the caller's timeline has to come back. If either ever became an AND, the fix would silently
+  // return an empty page again, which is the failure this pins.
+  it('the /photos query the favorites filter navigates to still finds a hidden-space favourite', async () => {
+    const assetFiltered = await utils.createAsset(hank.accessToken);
+    await utils.addSpaceAssets(hank.accessToken, roleSpaceId, [assetFiltered.id]);
+
+    const setShowInTimeline = (showInTimeline: boolean) =>
+      request(app)
+        .patch(`/shared-spaces/${roleSpaceId}/members/me/timeline`)
+        .set(asBearerAuth(jack.accessToken))
+        .send({ showInTimeline });
+
+    const hide = await setShowInTimeline(false);
+    expect(hide.status).toBe(200);
+
+    try {
+      const { status } = await putFavorites(jack.accessToken, { ids: [assetFiltered.id], isFavorite: true });
+      expect(status).toBe(204);
+
+      // buildPhotosTimelineOptions + the favorite seed, as the contextual filter emits it.
+      const photosQuery = `userId=${jack.userId}&visibility=timeline&isFavorite=true&withStacked=true&withPartners=true&withSharedSpaces=true`;
+      expect(await favoritedAssetIds(jack.accessToken, photosQuery)).toContain(assetFiltered.id);
+    } finally {
+      await setShowInTimeline(true);
+    }
+  });
+
   it('a non-owned favorite is only reachable while the request carries the cross-scope flag', async () => {
     // jack favorited assetHank above. Owner-scoped, the row is invisible — this is precisely the
     // query pr-819-rc.1's /favorites page sent, and precisely why the page looked empty.
