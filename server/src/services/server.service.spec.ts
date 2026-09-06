@@ -157,6 +157,7 @@ describe(ServerService.name, () => {
         realtimeTranscoding: false,
         peopleStatistics: false,
         syncRequestTypes: Object.values(SyncRequestType),
+        s3Storage: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
@@ -165,6 +166,11 @@ describe(ServerService.name, () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ peopleStatistics: true }));
       const features = await sut.getFeatures();
       expect(features.peopleStatistics).toBe(true);
+    });
+
+    it('should report s3Storage when a bucket is configured', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { bucket: 'photos' } } } as never));
+      await expect(sut.getFeatures()).resolves.toEqual(expect.objectContaining({ s3Storage: true }));
     });
 
     // Regression guard: getFeatures is called on every web-app page load; must

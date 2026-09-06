@@ -1,5 +1,6 @@
 import { ShallowDehydrateObject } from 'kysely';
 import { OutputInfo } from 'sharp';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { SystemConfig } from 'src/config';
 import { StorageCore } from 'src/cores/storage.core';
 import { Exif } from 'src/database';
@@ -64,7 +65,12 @@ describe(MediaService.name, () => {
       vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
       mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
 
-      const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
+      const result = await (sut as any).persistFile(
+        '/local/out.jpg',
+        'thumbs/aa/bb/x.jpg',
+        StorageRoutingKind.Thumbnails,
+        'image/jpeg',
+      );
 
       expect(mocks.storage.createPlainReadStream).toHaveBeenCalledWith('/local/out.jpg');
       expect(put).toHaveBeenCalledWith('thumbs/aa/bb/x.jpg', stream, { contentType: 'image/jpeg' });
@@ -75,11 +81,114 @@ describe(MediaService.name, () => {
     it('returns the local path and deletes nothing (disk mode)', async () => {
       // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
       // returns undefined and persistFile takes its disk branch.
-      const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
+      const result = await (sut as any).persistFile(
+        '/local/out.jpg',
+        'thumbs/aa/bb/x.jpg',
+        StorageRoutingKind.Thumbnails,
+        'image/jpeg',
+      );
 
       expect(result).toBe('/local/out.jpg');
       expect(mocks.storage.createPlainReadStream).not.toHaveBeenCalled();
       expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('persistFile routing', () => {
+    afterEach(() => {
+      // Same leak hazard as the block above.
+      vi.restoreAllMocks();
+    });
+
+    it('passes the caller-supplied kind through to getWriteBackend', async () => {
+      const put = vi.fn().mockResolvedValue(void 0);
+      const stream = makeStream([Buffer.from('data')]);
+      const { StorageService } = await import('src/services/storage.service.js');
+      const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
+
+      await (sut as any).persistFile(
+        '/local/out.mp4',
+        'encoded-video/aa/bb/x.mp4',
+        StorageRoutingKind.EncodedVideo,
+        'video/mp4',
+      );
+
+      expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.EncodedVideo, expect.anything());
+    });
+
+    it('resolves the backend exactly once per call', async () => {
+      const put = vi.fn().mockResolvedValue(void 0);
+      const stream = makeStream([Buffer.from('data')]);
+      const { StorageService } = await import('src/services/storage.service.js');
+      const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
+
+      await (sut as any).persistFile(
+        '/local/out.jpg',
+        'thumbs/aa/bb/x.jpg',
+        StorageRoutingKind.Thumbnails,
+        'image/jpeg',
+      );
+
+      // Resolving twice would let a concurrent config save upload without unlinking
+      // (orphaned local file) or unlink without uploading (data loss).
+      expect(getWriteBackend).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes the disk branch when the resolved backend is the disk backend', async () => {
+      const { StorageService } = await import('src/services/storage.service.js');
+      const { DiskStorageBackend } = await import('src/backends/disk-storage.backend.js');
+      const diskBackend = Object.create(DiskStorageBackend.prototype);
+      vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue(diskBackend as any);
+
+      const result = await (sut as any).persistFile(
+        '/local/out.jpg',
+        'thumbs/aa/bb/x.jpg',
+        StorageRoutingKind.Thumbnails,
+        'image/jpeg',
+      );
+
+      // This is also spec test 10: a kind that resolves to s3 with no S3 backend gets the
+      // disk backend from getWriteBackend, and must not lose the file.
+      expect(result).toBe('/local/out.jpg');
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+
+    it('resolves the thumbnails kind for every file in a persistImageFiles batch', async () => {
+      const put = vi.fn().mockResolvedValue(void 0);
+      const stream = makeStream([Buffer.from('data')]);
+      const { StorageService } = await import('src/services/storage.service.js');
+      const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
+
+      const asset = { id: 'asset-1', ownerId: 'user-1' };
+      const files = [
+        {
+          assetId: 'asset-1',
+          type: AssetFileType.Thumbnail,
+          path: '/local/a.webp',
+          isEdited: false,
+          isProgressive: false,
+          isTransparent: false,
+        },
+        {
+          assetId: 'asset-1',
+          type: AssetFileType.Preview,
+          path: '/local/b.jpeg',
+          isEdited: false,
+          isProgressive: false,
+          isTransparent: false,
+        },
+      ];
+
+      await (sut as any).persistImageFiles(asset, files);
+
+      expect(getWriteBackend).toHaveBeenCalledTimes(2);
+      for (const call of getWriteBackend.mock.calls) {
+        expect(call[0]).toBe(StorageRoutingKind.Thumbnails);
+      }
+      expect(files.every((file) => !file.path.startsWith('/local/'))).toBe(true);
     });
   });
 
@@ -1913,6 +2022,32 @@ describe(MediaService.name, () => {
         );
       });
 
+      it('resolves the write backend with StorageRoutingKind.EncodedVideo for the edited video', async () => {
+        // Every other test in this block returns the same S3 stub regardless of the kind
+        // argument, so a call site that resolved the wrong kind (e.g. Thumbnails instead of
+        // EncodedVideo) would still upload successfully and go unnoticed. Assert the argument.
+        const put = vi.fn().mockResolvedValue(void 0);
+        const { StorageService } = await import('src/services/storage.service.js');
+        const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+        mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
+
+        const asset = AssetFactory.from({ type: AssetType.Video })
+          .exif()
+          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
+          .build();
+        mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.media.probe.mockResolvedValue({
+          ...videoInfoStub.noAudioStreams,
+          format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
+        });
+        mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
+        mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
+
+        await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
+
+        expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.EncodedVideo, expect.anything());
+      });
+
       it('does not commit the trimmed duration when persisting the video fails (S3)', async () => {
         // Upload fails part-way. The new duration must NOT already be committed, or the DB would
         // report the trimmed length while getForVideo still serves the full-length original.
@@ -2609,6 +2744,34 @@ describe(MediaService.name, () => {
         processInvalidImages: false,
       });
       expect(mocks.media.generateThumbnail).toHaveBeenCalled();
+    });
+
+    describe('routing', () => {
+      afterEach(() => {
+        // vitest.config.mjs sets no restoreMocks and there are no setupFiles, so a
+        // getWriteBackend spy would leak into every later test in this file.
+        vi.restoreAllMocks();
+      });
+
+      it('resolves the write backend with StorageRoutingKind.Thumbnails, not Originals', async () => {
+        // Every other test in this describe block calls through to the real disk-mode
+        // getWriteBackend, which returns the disk backend regardless of the kind argument
+        // passed to it, so a call site that resolved the wrong kind would go unnoticed.
+        const person = PersonFactory.create();
+
+        mocks.person.getDataForThumbnailGenerationJob.mockResolvedValue(personThumbnailStub.newThumbnailMiddle);
+        mocks.media.generateThumbnail.mockResolvedValue();
+        mocks.media.decodeImage.mockResolvedValue({
+          data: Buffer.from(''),
+          info: { width: 1000, height: 1000 } as OutputInfo,
+        });
+        const { StorageService } = await import('src/services/storage.service.js');
+        const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend');
+
+        await expect(sut.handleGeneratePersonThumbnail({ id: person.id })).resolves.toBe(JobStatus.Success);
+
+        expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.Thumbnails, expect.anything());
+      });
     });
   });
 

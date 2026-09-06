@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, InternalServerErrorException, NotFound
 import { createReadStream } from 'node:fs';
 import sanitize from 'sanitize-filename';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { StorageCore } from 'src/cores/storage.core';
 import { AuthSharedLink } from 'src/database';
 import {
@@ -393,7 +394,8 @@ export class AssetMediaService extends BaseService {
       });
 
       // If S3 backend, upload the file and update the path
-      writeBackend = StorageService.getWriteBackend();
+      const config = await this.getConfig({ withCache: true });
+      writeBackend = StorageService.getWriteBackend(StorageRoutingKind.Originals, config);
       if (!(writeBackend instanceof DiskStorageBackend)) {
         const relativeKey = StorageCore.getRelativeNestedPath(
           StorageFolder.Upload,

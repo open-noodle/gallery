@@ -5,6 +5,7 @@ import {
   StorageMigrationBatchParamDto,
   StorageMigrationEstimateQueryDto,
   StorageMigrationStartDto,
+  StorageRoutingStatusDto,
 } from 'src/dtos/storage-migration.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Authenticated } from 'src/middleware/auth.guard';
@@ -24,6 +25,18 @@ export class StorageMigrationController {
   })
   getEstimate(@Query() { direction }: StorageMigrationEstimateQueryDto) {
     return this.service.getEstimate(direction);
+  }
+
+  @Get('routing')
+  @Authenticated({ permission: Permission.JobRead, admin: true })
+  @Endpoint({
+    summary: 'Get storage routing status',
+    description:
+      'Report, per file kind, which backend new files are written to and how many existing files are on the other backend.',
+    history: new HistoryBuilder().added('v3.1.0').alpha('v3.1.0'),
+  })
+  getRoutingStatus(): Promise<StorageRoutingStatusDto> {
+    return this.service.getRoutingStatus();
   }
 
   @Post('start')

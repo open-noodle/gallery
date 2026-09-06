@@ -196,6 +196,9 @@ String parameterToString(dynamic value) {
   if (value is StorageMigrationDirection) {
     return StorageMigrationDirectionTypeTransformer().encode(value).toString();
   }
+  if (value is StorageRouting) {
+    return StorageRoutingTypeTransformer().encode(value).toString();
+  }
   if (value is SyncEntityType) {
     return SyncEntityTypeTypeTransformer().encode(value).toString();
   }

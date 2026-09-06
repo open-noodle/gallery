@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { createReadStream } from 'node:fs';
 import { basename } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { OnEvent, OnJob } from 'src/decorators';
@@ -124,7 +125,11 @@ export class UserService extends BaseService {
       throw new BadRequestException('Unable to process profile image', { cause: error });
     }
 
-    const writeBackend = StorageService.getWriteBackend();
+    // Cached: cheap to fetch again outside the try block above, which must keep scoping
+    // generateProfileImage failures into BadRequestException without also catching a
+    // getWriteBackend/config failure below.
+    const config = await this.getConfig({ withCache: true });
+    const writeBackend = StorageService.getWriteBackend(StorageRoutingKind.Thumbnails, config);
 
     if (!(writeBackend instanceof DiskStorageBackend)) {
       const filename = basename(profileImagePath);

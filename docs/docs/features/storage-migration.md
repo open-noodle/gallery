@@ -21,9 +21,41 @@ Noodle Gallery includes a built-in tool for migrating files between disk and S3-
    - To migrate **to S3**: set `IMMICH_STORAGE_BACKEND=s3`
    - To migrate **to disk**: set `IMMICH_STORAGE_BACKEND=disk`
 
-   This ensures that new uploads during migration go to the correct backend.
+   This ensures that new uploads during migration go to the correct backend. If you use [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored), the routing for the file types you're migrating must already point the same way as the migration direction — see [Storage Routing Compatibility](#storage-routing-compatibility) below.
 
 3. **Restart Gallery** after changing environment variables.
+
+## Storage Routing Compatibility
+
+If you use [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored), a migration can only move a file type in the direction its routing already points. This prevents a migration from immediately becoming stale — if thumbnails are pinned to S3, migrating thumbnails **to disk** would just have every newly generated thumbnail land straight back on S3.
+
+Starting a migration for a file type whose routing disagrees with the chosen direction is rejected. The error lists every offending knob, semicolon-separated, and says how each one resolved — adding `(via IMMICH_STORAGE_BACKEND)` when that knob is set to `auto` so it doesn't read as a mystery. For example, migrating to disk while thumbnails are pinned to S3 and following the `auto` default for encoded video (with `IMMICH_STORAGE_BACKEND=s3`) produces:
+
+```
+Cannot migrate to disk: thumbnails is routed to s3; encodedVideo is routed to s3 (via IMMICH_STORAGE_BACKEND). Change the storage routing for those kinds first.
+```
+
+To fix this, either change the routing for the affected file type(s) in **Administration > System Settings > Storage routing** first, or deselect those file types from the migration.
+
+The three routing knobs map onto the migration's file types as follows:
+
+| Knob                  | File types                                                                |
+| :-------------------- | :------------------------------------------------------------------------ |
+| **Original files**    | `originals`, `sidecars`                                                   |
+| **Thumbnails**        | `thumbnails`, `previews`, `fullsize`, `personThumbnails`, `profileImages` |
+| **Transcoded videos** | `encodedVideos`                                                           |
+
+### External Libraries Are Never Migrated
+
+Originals and sidecars belonging to an [external library](/features/libraries) are deliberately never included in a migration, regardless of which file types you select. Those files are scanned in place from a path outside Gallery's media location, and the library scanner matches assets against that exact path. Migrating them would rewrite the database path to an S3 key, detaching the asset from the file the scanner expects — effectively importing a file you configured the library to keep external.
+
+Thumbnails and transcoded videos generated for external-library assets are Gallery-generated files, not scanned originals, so they remain migratable as normal.
+
+:::warning This is a behaviour change
+Earlier versions of Gallery did not exclude external-library originals from migration. If you previously ran a disk-to-S3 migration before this exclusion existed, any external-library originals it moved are still on S3 today, but they are now **invisible** to both the migrator and the **Storage routing** settings page: `streamOriginals` skips them regardless of direction, so a to-disk migration can never select them, and the misplaced-file counts on the settings page are built from the same exclusion, so they report zero misplaced originals even though these files sit in S3 with a path the library scanner can no longer match.
+
+If you're affected, the only way back is [rollback](#rolling-back) — `POST /storage-migration/rollback/{batchId}` — using the batch ID of the original migration, and only while that batch's log rows still exist. A rollback deletes its log rows once every file in the batch rolls back successfully, so this stops being possible after that. If you no longer have the batch ID or the log rows are already gone, these files need to be moved back to disk manually.
+:::
 
 ## Using the Admin UI
 
@@ -36,6 +68,10 @@ Noodle Gallery includes a built-in tool for migrating files between disk and S3-
 5. Set the concurrency level (default: 5). Higher values migrate faster but use more resources.
 6. Choose whether to delete source files after successful migration.
 7. Click **Start Migration**.
+
+:::note
+If you leave **Delete source files** unchecked, each migrated file is copied to the new backend but the original is left in place — the file now exists on both backends until you separately remove the source. That leftover copy consumes real disk or S3 space (and cost) either way. It only shows up as double-counted in the storage usage figure users see if you've enabled `storageUsage.includeDerivatives`, since that setting is what makes usage walk actual files on disk and in S3 rather than sum database rows. With the default configuration, the reported per-user usage is unaffected — it's computed from one database row per file, and a migration updates that row's path without adding a row.
+:::
 
 ### Monitoring Progress
 
