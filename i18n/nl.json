@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "Zonder embedding",
     "face_cleanup_dissolve_warn_metadata_import_on": "'Gezichten importeren inschakelen' staat aan. Een geforceerde metadata-extractie of een nieuwe scan van de bibliotheek kan deze gebieden opnieuw aanmaken.",
     "face_cleanup_dissolve_warn_not_redetectable": "Bij {count} foto's wordt niets hersteld. Ze zijn verborgen, staan in de prullenbak of hebben geen voorbeeldbestand.",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "Hierdoor blijft de persoon zonder gezichten achter. De nachtelijke opruimtaak verwijdert de persoon toch, ook al koos je ervoor om deze te behouden.",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} gedetecteerde gezichten worden vanaf nul opnieuw geclusterd. Dat verandert de groepering alleen als de instellingen voor gezichtsherkenning zijn gewijzigd.",
     "face_cleanup_dissolve_warn_shared_assets": "{count} van deze foto's bevatten ook andere personen. De nieuwe detectie omvat ze ook.",
     "face_cleanup_dissolve_warn_strands_faces": "{count} van deze gezichten hebben geen embedding. Hun toewijzing opheffen laat ze verweesd achter — gezichtsherkenning kijkt er nooit meer naar.",

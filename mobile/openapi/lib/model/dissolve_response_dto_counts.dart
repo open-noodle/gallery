@@ -19,6 +19,7 @@ class DissolveResponseDtoCounts {
     required this.mlWithEmbedding,
     required this.mlWithoutEmbedding,
     required this.notRedetectable,
+    required this.remainingLiveFaces,
     required this.sharedAssets,
     required this.softDeleted,
   });
@@ -35,6 +36,8 @@ class DissolveResponseDtoCounts {
 
   num notRedetectable;
 
+  num remainingLiveFaces;
+
   num sharedAssets;
 
   num softDeleted;
@@ -47,6 +50,7 @@ class DissolveResponseDtoCounts {
     other.mlWithEmbedding == mlWithEmbedding &&
     other.mlWithoutEmbedding == mlWithoutEmbedding &&
     other.notRedetectable == notRedetectable &&
+    other.remainingLiveFaces == remainingLiveFaces &&
     other.sharedAssets == sharedAssets &&
     other.softDeleted == softDeleted;
 
@@ -59,11 +63,12 @@ class DissolveResponseDtoCounts {
     (mlWithEmbedding.hashCode) +
     (mlWithoutEmbedding.hashCode) +
     (notRedetectable.hashCode) +
+    (remainingLiveFaces.hashCode) +
     (sharedAssets.hashCode) +
     (softDeleted.hashCode);
 
   @override
-  String toString() => 'DissolveResponseDtoCounts[assets=$assets, exif=$exif, faces=$faces, mlWithEmbedding=$mlWithEmbedding, mlWithoutEmbedding=$mlWithoutEmbedding, notRedetectable=$notRedetectable, sharedAssets=$sharedAssets, softDeleted=$softDeleted]';
+  String toString() => 'DissolveResponseDtoCounts[assets=$assets, exif=$exif, faces=$faces, mlWithEmbedding=$mlWithEmbedding, mlWithoutEmbedding=$mlWithoutEmbedding, notRedetectable=$notRedetectable, remainingLiveFaces=$remainingLiveFaces, sharedAssets=$sharedAssets, softDeleted=$softDeleted]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -73,6 +78,7 @@ class DissolveResponseDtoCounts {
       json[r'mlWithEmbedding'] = this.mlWithEmbedding;
       json[r'mlWithoutEmbedding'] = this.mlWithoutEmbedding;
       json[r'notRedetectable'] = this.notRedetectable;
+      json[r'remainingLiveFaces'] = this.remainingLiveFaces;
       json[r'sharedAssets'] = this.sharedAssets;
       json[r'softDeleted'] = this.softDeleted;
     return json;
@@ -93,6 +99,7 @@ class DissolveResponseDtoCounts {
         mlWithEmbedding: num.parse('${json[r'mlWithEmbedding']}'),
         mlWithoutEmbedding: num.parse('${json[r'mlWithoutEmbedding']}'),
         notRedetectable: num.parse('${json[r'notRedetectable']}'),
+        remainingLiveFaces: num.parse('${json[r'remainingLiveFaces']}'),
         sharedAssets: num.parse('${json[r'sharedAssets']}'),
         softDeleted: num.parse('${json[r'softDeleted']}'),
       );
@@ -148,6 +155,7 @@ class DissolveResponseDtoCounts {
     'mlWithEmbedding',
     'mlWithoutEmbedding',
     'notRedetectable',
+    'remainingLiveFaces',
     'sharedAssets',
     'softDeleted',
   };

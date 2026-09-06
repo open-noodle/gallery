@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "Bez embeddingu",
     "face_cleanup_dissolve_warn_metadata_import_on": "„Włącz import twarzy” jest włączone. Wymuszone wyodrębnienie metadanych lub ponowne skanowanie biblioteki może odtworzyć te obszary.",
     "face_cleanup_dissolve_warn_not_redetectable": "W przypadku {count} zdjęć nic nie zostanie odzyskane. Są ukryte, w koszu albo nie mają pliku podglądu.",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "Osoba zostanie wtedy bez żadnych twarzy. Nocne zadanie porządkowe i tak ją usunie, mimo że chcesz ją zachować.",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} wykrytych twarzy zostanie pogrupowanych od nowa. Grupowanie zmieni się tylko wtedy, gdy zmieniły się ustawienia rozpoznawania twarzy.",
     "face_cleanup_dissolve_warn_shared_assets": "{count} z tych zdjęć zawiera także inne osoby. Ponowne wykrywanie obejmie również je.",
     "face_cleanup_dissolve_warn_strands_faces": "{count} z tych twarzy nie ma embeddingu. Usunięcie przypisania osieroci je — rozpoznawanie twarzy nigdy więcej na nie nie spojrzy.",

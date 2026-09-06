@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "无嵌入向量",
     "face_cleanup_dissolve_warn_metadata_import_on": "“启用人脸导入”已开启。强制提取元数据或重新扫描资源库会重新创建这些区域。",
     "face_cleanup_dissolve_warn_not_redetectable": "有 {count} 张照片什么也恢复不了。它们已隐藏、在回收站中，或没有预览文件。",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "这会让该人物完全没有人脸。即使你选择保留，夜间清理任务仍会将其删除。",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} 张检测到的人脸将从头重新聚类。只有在人脸识别设置发生变化时，分组才会改变。",
     "face_cleanup_dissolve_warn_shared_assets": "其中 {count} 张照片还包含其他人物。重新检测也会覆盖它们。",
     "face_cleanup_dissolve_warn_strands_faces": "其中 {count} 张人脸没有嵌入向量。取消关联会让它们被遗弃——人脸识别再也不会看它们一眼。",

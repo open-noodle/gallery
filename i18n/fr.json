@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "Sans embedding",
     "face_cleanup_dissolve_warn_metadata_import_on": "« Active l'importation des visages » est activé. Une extraction des métadonnées forcée ou une nouvelle analyse de la bibliothèque peut recréer ces zones.",
     "face_cleanup_dissolve_warn_not_redetectable": "Sur {count} photos, rien ne sera récupéré. Elles sont masquées, dans la corbeille ou sans fichier d'aperçu.",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "La personne se retrouve alors sans aucun visage. La tâche de nettoyage de nuit la supprimera quand même, même si vous avez choisi de la conserver.",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} visages détectés seront regroupés de zéro. Cela ne change le regroupement que si les paramètres de reconnaissance faciale ont changé.",
     "face_cleanup_dissolve_warn_shared_assets": "{count} de ces photos contiennent aussi d'autres personnes. La nouvelle détection les couvre également.",
     "face_cleanup_dissolve_warn_strands_faces": "{count} de ces visages n'ont pas d'embedding. Les dissocier les laisse orphelins — la reconnaissance faciale ne les regardera plus jamais.",

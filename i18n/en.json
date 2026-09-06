@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "No embedding",
     "face_cleanup_dissolve_warn_metadata_import_on": "Import faces from metadata is on. A forced metadata extraction or a library rescan can re-create these regions.",
     "face_cleanup_dissolve_warn_not_redetectable": "On {count} photos nothing will be recovered. They are hidden, trashed, or have no preview file.",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "This leaves the person with no faces at all. The nightly cleanup task will delete it anyway, even though you chose to keep it.",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} detected faces will be re-clustered from scratch. That changes the grouping only if recognition settings changed.",
     "face_cleanup_dissolve_warn_shared_assets": "{count} of these photos also contain other people. Re-detection covers them too.",
     "face_cleanup_dissolve_warn_strands_faces": "{count} of these faces have no embedding. Detaching them strands them — recognition will never look at them again.",

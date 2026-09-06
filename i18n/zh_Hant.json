@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "無嵌入向量",
     "face_cleanup_dissolve_warn_metadata_import_on": "「啟用臉孔匯入」已開啟。強制擷取詮釋資料或重新掃描媒體庫會重新建立這些區域。",
     "face_cleanup_dissolve_warn_not_redetectable": "有 {count} 張相片什麼也無法復原。它們已隱藏、在垃圾桶中，或沒有預覽檔案。",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "這會讓該人物完全沒有臉孔。即使你選擇保留，夜間清理作業仍會將其刪除。",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} 張偵測到的臉孔將從頭重新分群。只有在臉孔辨識設定變更時，分組才會改變。",
     "face_cleanup_dissolve_warn_shared_assets": "其中 {count} 張相片還包含其他人物。重新偵測也會涵蓋它們。",
     "face_cleanup_dissolve_warn_strands_faces": "其中 {count} 張臉孔沒有嵌入向量。取消關聯會讓它們被遺棄——臉孔辨識再也不會看它們一眼。",

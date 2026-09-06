@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "Ohne Embedding",
     "face_cleanup_dissolve_warn_metadata_import_on": "„Import von Gesichtern aktivieren“ ist eingeschaltet. Eine erzwungene Metadaten-Extraktion oder ein erneuter Scan der Bibliothek kann diese Bereiche neu anlegen.",
     "face_cleanup_dissolve_warn_not_redetectable": "Bei {count} Fotos wird nichts wiederhergestellt. Sie sind ausgeblendet, im Papierkorb oder haben keine Vorschaudatei.",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "Dadurch bleibt die Person ganz ohne Gesichter zurück. Die nächtliche Bereinigungsaufgabe löscht sie trotzdem, auch wenn du sie behalten wolltest.",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} erkannte Gesichter werden von Grund auf neu geclustert. Die Gruppierung ändert sich nur, wenn sich die Einstellungen der Gesichtserkennung geändert haben.",
     "face_cleanup_dissolve_warn_shared_assets": "{count} dieser Fotos enthalten auch andere Personen. Die erneute Erkennung erfasst sie ebenfalls.",
     "face_cleanup_dissolve_warn_strands_faces": "{count} dieser Gesichter haben kein Embedding. Wird ihre Zuordnung aufgehoben, bleiben sie verwaist – die Gesichtserkennung sieht sie nie wieder an.",

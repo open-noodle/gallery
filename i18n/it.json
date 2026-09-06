@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_no_embedding": "Senza embedding",
     "face_cleanup_dissolve_warn_metadata_import_on": "«Abilita l'importazione dei volti» è attivo. Un'estrazione dei metadati forzata o una nuova scansione della libreria può ricreare queste regioni.",
     "face_cleanup_dissolve_warn_not_redetectable": "Su {count} foto non verrà recuperato nulla. Sono nascoste, nel cestino o senza file di anteprima.",
+    "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "In questo modo la persona resta senza alcun volto. L'attività di pulizia notturna la eliminerà comunque, anche se hai scelto di conservarla.",
     "face_cleanup_dissolve_warn_recluster_similar": "{count} volti rilevati verranno raggruppati da zero. Il raggruppamento cambia solo se sono cambiate le impostazioni di riconoscimento facciale.",
     "face_cleanup_dissolve_warn_shared_assets": "{count} di queste foto contengono anche altre persone. Il nuovo rilevamento le include.",
     "face_cleanup_dissolve_warn_strands_faces": "{count} di questi volti non hanno un embedding. Rimuoverne l'assegnazione li lascia orfani: il riconoscimento facciale non li guarderà mai più.",
