@@ -46,6 +46,32 @@ export function resolveFilterTarget(url: URL): FilterTarget | null {
 }
 
 /**
+ * The filter a surface applies to ITSELF, for a surface that has no filter panel to express it in.
+ *
+ * `/favorites` is not a filter TARGET — it has no panel and no filter params, so `resolveFilterTarget`
+ * returns null for it and a contextual filter falls back to `/photos` (E3). But it is very much a
+ * filter: every asset on it is there because the viewer favourited it. Landing on a bare
+ * `/photos?make=…` therefore does not narrow what the user was looking at, it REPLACES it — "this
+ * camera, among my favourites" silently becomes "this camera, anywhere in my timeline".
+ *
+ * That is not merely a wider result set. #763's carve-out (timeline.service.ts: an `isFavorite`
+ * browse spans every space I belong to, including ones I have hidden from my home timeline) means
+ * /favorites can legitimately show an asset that /photos MUST NOT — so the widened query returns
+ * nothing at all, under the unfiltered "upload your first photo" placeholder. Seeding `favorite=true`
+ * keeps the destination a strict narrowing of the surface the click started from, and `/photos` can
+ * both express it (the Favorites filter section) and undo it (the chip's ×).
+ *
+ * Deliberately NOT a general "implicit scope" registry: `/people/:id` and `/tags/:id` are implicit
+ * filters in the same sense, but neither is broken today the way favorites is, and inventing seeds
+ * for them here would be speculative. Add one when a surface actually needs it.
+ */
+function resolveImplicitFilterScope(url: URL): Partial<FilterState> | undefined {
+  const [root] = url.pathname.split('/').filter(Boolean);
+
+  return root === 'favorites' ? { isFavorite: true } : undefined;
+}
+
+/**
  * Merge one metadata patch into the current URL's filters and return the URL to navigate to.
  *
  * The result targets the surface's BASE path, which excludes any open assetId — so a single
@@ -64,7 +90,15 @@ export function buildContextualFilterUrl(url: URL, patch: Partial<FilterState>, 
   // filters: "search everywhere for THIS camera" is a new search, not the old one plus a camera.
   // It also avoids dragging a Space's `space-person:<uuid>` scoped tokens onto /photos, where a
   // scoped token matches nothing.
+  //
+  // The fallback's one exception is the surface's OWN implicit filter (`implicitScope` below) —
+  // clean of the previous context, but not of what the surface itself meant.
   const carryOver = target !== null;
+
+  // `global` leaves every scope behind — including the surface's own implicit one (see
+  // resolveImplicitFilterScope). "Search everywhere" that quietly stayed inside my favourites would
+  // be the same lie in the other direction.
+  const implicitScope = opts?.global ? undefined : resolveImplicitFilterScope(url);
 
   const params = new URLSearchParams(carryOver ? url.searchParams : undefined);
 
@@ -75,7 +109,7 @@ export function buildContextualFilterUrl(url: URL, patch: Partial<FilterState>, 
 
   const current: FilterState = {
     ...createFilterState(),
-    ...(carryOver && decodeFilterParams(url)),
+    ...(carryOver ? decodeFilterParams(url) : implicitScope),
     ...patch,
   };
 
@@ -193,9 +227,10 @@ export function rememberContextualPersonName(destination: string, personId: stri
  * would land on the GLOBAL map carrying the album's filters but NOT its album scope — silently
  * widening "this album" to "the whole library". Callers must not render the pin when this is null.
  *
- * A non-filterable surface (`resolveFilterTarget` → null, e.g. /search) carries nothing over, exactly
- * like `buildContextualFilterUrl`'s fallback: there is no scope to preserve, so there is none to lie
- * about either.
+ * A non-filterable surface (`resolveFilterTarget` → null, e.g. /search) carries nothing over: there
+ * is no scope to preserve, so there is none to lie about either. Note this does NOT pick up
+ * `resolveImplicitFilterScope` the way `buildContextualFilterUrl` does — the pin says "on the FULL
+ * map", so widening is what it promises, and unlike a filter it cannot come back empty.
  */
 export function buildContextualMapUrl(url: URL, point?: { lat: number; lng: number; zoom?: number }): string | null {
   const target = resolveFilterTarget(url);
