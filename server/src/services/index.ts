@@ -62,6 +62,7 @@ import { VersionService } from 'src/services/version.service.js';
 import { ViewService } from 'src/services/view.service.js';
 import { WorkflowExecutionService } from 'src/services/workflow-execution.service.js';
 import { WorkflowService } from 'src/services/workflow.service.js';
+import { FaceDissolveService } from 'src/services/face-dissolve.service.js';
 
 export const services = [
   ApiKeyService,
@@ -80,6 +81,7 @@ export const services = [
   DatabaseService,
   DownloadService,
   DuplicateService,
+  FaceDissolveService,
   FaceRepairService,
   FaceSuggestionService,
   IntegrityService,
