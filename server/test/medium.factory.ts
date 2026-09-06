@@ -203,9 +203,23 @@ export class MediumTestContext<S extends BaseService = BaseService> {
     return { stack: { ...stack, primaryAssetId: assetIds[0] }, result };
   }
 
-  async newAsset(dto: Partial<Insertable<AssetTable>> = {}) {
-    const asset = mediumFactory.assetInsert(dto);
+  /**
+   * #763: `asset.isFavorite` is gone — a favorite is an `asset_favorite` row per (user, asset).
+   * Fixtures (upstream's and the fork's) still say `isFavorite: true` to mean "the OWNER has
+   * favorited this", so translate it here rather than rewriting every call site. Keeping the
+   * knob absorbs the idiom for tests that arrive from upstream later, too.
+   */
+  async newAsset(dto: Partial<Insertable<AssetTable>> & { isFavorite?: boolean } = {}) {
+    const { isFavorite, ...assetDto } = dto;
+    const asset = mediumFactory.assetInsert(assetDto);
     const result = await this.get(AssetRepository).create(asset);
+    if (isFavorite) {
+      await this.database
+        .insertInto('asset_favorite')
+        .values({ userId: asset.ownerId, assetId: asset.id })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    }
     return { asset, result };
   }
 

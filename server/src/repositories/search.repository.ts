@@ -2169,7 +2169,9 @@ export class SearchRepository {
       .selectFrom('asset')
       .select('asset.id')
       .where('asset.id', 'in', this.buildFilteredAssetIds(userIds, options))
-      .where('asset.isFavorite', '=', true)
+      // #763: per-caller overlay, not the dropped `asset.isFavorite` column. `userIds[0]` is the
+      // caller on this path — same reasoning as `buildFilteredAssetIds`'s isFavorite branch.
+      .where((eb) => favoriteExistsFor(eb, userIds[0]))
       .limit(1)
       .executeTakeFirst();
     return !!row;

@@ -262,11 +262,19 @@ order by
 select
   "asset"."id",
   "asset"."localDateTime",
-  "asset"."isFavorite",
   "asset"."type",
   "asset"."duration",
   "asset_exif"."country" as "country",
   "asset_exif"."city" as "city",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   extract(
     year
     from
@@ -276,15 +284,15 @@ from
   "asset"
   left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
 where
-  "asset"."ownerId" = $1
-  and "asset"."visibility" = $2
+  "asset"."ownerId" = $2
+  and "asset"."visibility" = $3
   and "asset"."deletedAt" is null
-  and "asset"."localDateTime" <= $3
+  and "asset"."localDateTime" <= $4
   and extract(
     month
     from
       (asset."localDateTime" at time zone 'UTC')
-  )::int in ($4)
+  )::int in ($5)
   and exists (
     select
       "asset_file"."assetId"
@@ -292,7 +300,7 @@ where
       "asset_file"
     where
       "asset_file"."assetId" = "asset"."id"
-      and "asset_file"."type" = $5
+      and "asset_file"."type" = $6
   )
 order by
   "asset"."localDateTime" asc

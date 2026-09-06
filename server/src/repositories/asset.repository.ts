@@ -1096,18 +1096,25 @@ export class AssetRepository {
     ownerId: string,
     { months, day, favoritesOnly, type, takenBefore }: MemoryPeriodOptions,
   ): Promise<MemoryPeriodAsset[]> {
+    // #763: favorites are a per-user overlay row, not a column on the asset. Memory generation is
+    // owner-scoped (`asset.ownerId = ownerId` below), so the owner's own overlay row is exactly what
+    // the dropped `asset.isFavorite` column used to carry here — both for the projection and for the
+    // `favoritesOnly` filter. `$narrowType` pins the EXISTS result to `boolean`: Kysely types it
+    // `SqlBool` (`boolean | number`), which does not satisfy `MemoryPeriodAsset.isFavorite`, but the
+    // pg driver only ever returns a boolean for it.
     return this.db
       .selectFrom('asset')
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select([
         'asset.id',
         'asset.localDateTime',
-        'asset.isFavorite',
         'asset.type',
         'asset.duration',
         'asset_exif.country as country',
         'asset_exif.city as city',
       ])
+      .select((eb) => favoriteExistsFor(eb, ownerId).as('isFavorite'))
+      .$narrowType<{ isFavorite: boolean }>()
       .select(sql<number>`extract(year from (asset."localDateTime" at time zone 'UTC'))::int`.as('year'))
       .where('asset.ownerId', '=', ownerId)
       .where('asset.visibility', '=', AssetVisibility.Timeline)
@@ -1117,7 +1124,7 @@ export class AssetRepository {
       .$if(day !== undefined, (qb) =>
         qb.where(sql<number>`extract(day from (asset."localDateTime" at time zone 'UTC'))::int`, '=', day!),
       )
-      .$if(favoritesOnly === true, (qb) => qb.where('asset.isFavorite', '=', true))
+      .$if(favoritesOnly === true, (qb) => qb.where((eb) => favoriteExistsFor(eb, ownerId)))
       .$if(type !== undefined, (qb) => qb.where('asset.type', '=', type!))
       .where((eb) =>
         eb.exists(

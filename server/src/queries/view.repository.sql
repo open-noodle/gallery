@@ -146,7 +146,7 @@ where
             where
               "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
               and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-              and "shared_space_album_hidden"."userId" = $5::uuid
+              and "shared_space_album_hidden"."userId" = $6::uuid
           )
       )
       or exists (
@@ -170,7 +170,7 @@ where
             where
               "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
               and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-              and "shared_space_album_hidden"."userId" = $7::uuid
+              and "shared_space_album_hidden"."userId" = $8::uuid
           )
       )
     )
