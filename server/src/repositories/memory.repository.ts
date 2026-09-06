@@ -257,12 +257,6 @@ export class MemoryRepository implements IBulkAsset {
                 ),
               ),
             )
-            // #763: userId here is the VIEWER (searchAccessible surfaces memories owned by
-            // others, reachable via partner/space share) — the overlay must be keyed to them,
-            // never to the memory's own ownerId. Gated on `.$if` (always true — userId is a
-            // required param) purely so Kysely infers `isFavoriteForUser` as optional, matching
-            // MapAsset and every other projection site instead of forcing it required here alone.
-            .$if(!!userId, (qb) => qb.select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser')))
             .orderBy('asset.localDateTime', 'asc'),
         ).as('assets'),
       )
@@ -327,6 +321,12 @@ export class MemoryRepository implements IBulkAsset {
                   ),
                 ),
               )
+              // #763: userId here is the VIEWER (searchAccessible surfaces memories owned by
+              // others, reachable via partner/space share) — the overlay must be keyed to them,
+              // never to the memory's own ownerId. Gated on `.$if` (always true — userId is a
+              // required param) purely so Kysely infers `isFavoriteForUser` as optional, matching
+              // MapAsset and every other projection site instead of forcing it required here alone.
+              .$if(!!userId, (qb) => qb.select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser')))
               .orderBy('asset.localDateTime', 'asc'),
           ).as('assets'),
         )

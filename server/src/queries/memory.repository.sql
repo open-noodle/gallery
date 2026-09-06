@@ -299,7 +299,7 @@ where
   "id" = $1
   and "deletedAt" is null
 
--- MemoryRepository.get (with authUserId)
+-- MemoryRepository.get (with viewerId)
 select
   "memory".*,
   (
