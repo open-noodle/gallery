@@ -701,11 +701,21 @@
               </div>
             {/if}
             {#snippet empty()}
-              <EmptyPlaceholder
-                text={$t('no_assets_message')}
-                onClick={() => openFileUploadDialog()}
-                class="mx-auto mt-10"
-              />
+              <!--
+                #763: an empty FILTERED timeline is not an empty library. Saying "click to upload
+                your first photo" to someone who just clicked a camera value on a photo they were
+                looking at denies the photo exists, and hides the one thing that would fix it —
+                clearing the filter. The upload call to action belongs to the unfiltered empty only.
+              -->
+              {#if hasActiveFilters}
+                <EmptyPlaceholder text={$t('no_results')} class="mx-auto mt-10" />
+              {:else}
+                <EmptyPlaceholder
+                  text={$t('no_assets_message')}
+                  onClick={() => openFileUploadDialog()}
+                  class="mx-auto mt-10"
+                />
+              {/if}
             {/snippet}
           </Timeline>
         {/key}
