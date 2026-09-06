@@ -9,11 +9,19 @@ const DissolveScopeSchema = z.enum(DissolveScope).describe('Which faces a dissol
   id: 'DissolveScope',
 });
 
+// Named for the same reason as the scope above, and additionally because the Dart generator cannot emit an
+// inline enum on a body property at all: it names the field's type `<Property>Enum` and then never generates
+// that class, so `mobile/openapi` stops compiling and takes the whole Flutter test suite down with it. A
+// `$ref` to a named schema is the only form both generators handle.
+const DissolveOutcomeSchema = z
+  .enum(['unassign', 'delete-faces', 'delete-faces-and-person'])
+  .describe('What a dissolve does with the faces it touches')
+  .meta({ id: 'DissolveOutcome' });
+
 export const DissolveRequestSchema = z
   .object({
     scope: DissolveScopeSchema,
-    // A literal union, not an inline z.enum — an anonymous enum gets renumbered by oazapfts on regeneration.
-    outcome: z.union([z.literal('unassign'), z.literal('delete-faces'), z.literal('delete-faces-and-person')]),
+    outcome: DissolveOutcomeSchema,
     redetect: z.boolean(),
     expectedFaceCount: z.number().int().min(0),
   })
