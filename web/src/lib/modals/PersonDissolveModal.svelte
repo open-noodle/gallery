@@ -47,7 +47,10 @@
 
   const PREVIEW_DEBOUNCE_MS = 250;
 
-  let scope = $state<DissolveScope>('all');
+  // `exif` by default, not `all`: the imported-metadata faces are the contamination this dialog exists for,
+  // and the broadest destructive selection is the wrong opening state for an operation with no undo. Widening
+  // to `all` is one click; a delete the admin did not intend is not undoable at all.
+  let scope = $state<DissolveScope>('exif');
   let outcome = $state<DissolveOutcome>('delete-faces');
   // The server REFUSES a delete outcome carrying redetect:false with a 400 rather than silently overriding it
   // (validate(), face-dissolve.service.ts), so the checkbox is forced on and locked for both deletes. This
@@ -98,7 +101,11 @@
       value: preview?.counts.softDeleted,
     },
     { key: 'assets', label: 'photos' as Translations, value: preview?.counts.assets },
-    { key: 'not-redetectable', label: 'asset_skipped' as Translations, value: preview?.counts.notRedetectable },
+    {
+      key: 'not-redetectable',
+      label: 'admin.face_cleanup_dissolve_count_not_redetectable' as Translations,
+      value: preview?.counts.notRedetectable,
+    },
   ]);
 
   const buildRequest = (expectedFaceCount: number): DissolveRequestDto => ({
