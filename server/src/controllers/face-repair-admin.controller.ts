@@ -17,6 +17,12 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { DissolveRequestDto, DissolveResponseDto } from 'src/dtos/face-dissolve.dto.js';
 import {
+  DissolveRequestDto,
+  DissolveResponseDto,
+  PeopleHealthQueryDto,
+  PeopleHealthResponseDto,
+} from 'src/dtos/face-dissolve.dto.js';
+import {
   FaceRepairClusterFacesRequestDto,
   FaceRepairClusterFacesResponseDto,
   FaceRepairDeclineCreatedDto,
@@ -266,6 +272,20 @@ export class FaceRepairAdminController {
     @Param('assetFaceId', new ParseUUIDPipe({ version: '4' })) assetFaceId: string,
   ): Promise<void> {
     await sendFile(res, next, () => this.service.getAdminFacePreview(assetFaceId), this.logger);
+  }
+
+  // Discovery (Task 8): the contamination signal a scan can never surface, since the scan requires an
+  // embedding and an EXIF-imported face never has one. Deliberately its own route, not the move-to-person
+  // picker above (`owner/:ownerId/people`) — that one is name-search only and was never meant to rank people
+  // by how contaminated they are.
+  @Get('people')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'List people with per-source face counts, to find a person worth dissolving',
+    history: new HistoryBuilder().added('v1'),
+  })
+  getFaceRepairPeopleHealth(@Query() dto: PeopleHealthQueryDto): Promise<PeopleHealthResponseDto> {
+    return this.dissolveService.getPeopleHealth(dto);
   }
 
   @Post('person/:personId/dissolve/preview')

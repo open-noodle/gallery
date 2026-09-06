@@ -168,4 +168,13 @@ describe(FaceDissolveService.name, () => {
     expect(mocks.faceDissolve.dissolve).not.toHaveBeenCalled();
     expect(mocks.job.queue).not.toHaveBeenCalled();
   });
+
+  it('getPeopleHealth passes through to the repository unchanged', async () => {
+    const result = { people: [], total: 0, hasMore: false };
+    mocks.faceDissolve.getPeopleHealth.mockResolvedValue(result);
+
+    const query = { ownerId: 'owner-1', sort: 'exifFaces' as const, page: 2, size: 20 };
+    await expect(sut.getPeopleHealth(query)).resolves.toBe(result);
+    expect(mocks.faceDissolve.getPeopleHealth).toHaveBeenCalledWith(query);
+  });
 });
