@@ -223,6 +223,36 @@ describe('/trash', () => {
       expect(after.isTrashed).toBe(false);
     });
 
+    // #763 slice 7 (E14): trash is a soft delete — it must never touch asset_favorite (grep
+    // confirms zero references in trash.service.ts / trash.repository.ts). No CASCADE fires
+    // until the asset is hard-deleted, so a favorite must survive a trash → restore round trip.
+    it('a favorited asset survives trash and restore (E14)', async () => {
+      const { id: assetId } = await utils.createAsset(admin.accessToken);
+
+      const fav = await request(app)
+        .put('/assets/favorites')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ ids: [assetId], isFavorite: true });
+      expect(fav.status).toBe(204);
+      const before = await utils.getAssetInfo(admin.accessToken, assetId);
+      expect(before.isFavorite).toBe(true);
+
+      await utils.deleteAssets(admin.accessToken, [assetId]);
+      const trashed = await utils.getAssetInfo(admin.accessToken, assetId);
+      expect(trashed.isTrashed).toBe(true);
+      expect(trashed.isFavorite).toBe(true);
+
+      const { status } = await request(app)
+        .post('/trash/restore/assets')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ ids: [assetId] });
+      expect(status).toBe(200);
+
+      const restored = await utils.getAssetInfo(admin.accessToken, assetId);
+      expect(restored.isTrashed).toBe(false);
+      expect(restored.isFavorite).toBe(true);
+    });
+
     it('should not restore an offline asset', async () => {
       const library = await utils.createLibrary(admin.accessToken, {
         ownerId: admin.userId,

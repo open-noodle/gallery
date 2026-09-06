@@ -221,9 +221,11 @@ describe(AssetRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const matching = await createTimelineAsset(ctx, user.id, new Date('2024-02-01T12:00:00.000Z'), {
-        isFavorite: true,
         thumbhash: Buffer.from('favorite'),
       });
+      // #763: isFavorite now filters against the asset_favorite overlay for the caller
+      // (authUserId), not the legacy asset.isFavorite column.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: matching.id }).execute();
       await ctx.newExif({
         assetId: matching.id,
         latitude: 52.5,
@@ -235,9 +237,7 @@ describe(AssetRepository.name, () => {
         rating: 4,
       });
 
-      const decoy = await createTimelineAsset(ctx, user.id, new Date('2024-02-02T12:00:00.000Z'), {
-        isFavorite: false,
-      });
+      const decoy = await createTimelineAsset(ctx, user.id, new Date('2024-02-02T12:00:00.000Z'));
       await ctx.newExif({
         assetId: decoy.id,
         latitude: 48.8,
@@ -251,6 +251,7 @@ describe(AssetRepository.name, () => {
 
       const result = await sut.getTimeBuckets({
         userIds: [user.id],
+        authUserId: user.id,
         visibility: AssetVisibility.Timeline,
         bucketSize: TimeBucketSize.Year,
         isFavorite: true,
@@ -1480,7 +1481,7 @@ describe(AssetRepository.name, () => {
       expect(JSON.parse(bucket.assets).id).toEqual([match.id]);
     });
 
-    it('projects owner-scoped isFavorite, isImage and ratio for matched assets', async () => {
+    it('projects isImage and ratio for matched assets', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user: { id: user.id } });
@@ -1488,7 +1489,6 @@ describe(AssetRepository.name, () => {
       const { asset } = await ctx.newAsset({
         ownerId: user.id,
         type: AssetType.Image,
-        isFavorite: true,
         fileCreatedAt: new Date('2026-03-08T12:00:00.000Z'),
         localDateTime: new Date('2026-03-08T12:00:00.000Z'),
       });
@@ -1502,7 +1502,64 @@ describe(AssetRepository.name, () => {
       const parsed = JSON.parse(bucket.assets);
       expect(parsed.id).toEqual([asset.id]);
       expect(parsed.isImage).toEqual([true]);
-      expect(parsed.isFavorite).toEqual([true]);
+    });
+
+    it('reports isFavorite from the asset_favorite overlay for the requesting user (#763, E24)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const { asset } = await ctx.newAsset({
+        ownerId: user.id,
+        type: AssetType.Image,
+        fileCreatedAt: new Date('2026-03-08T12:00:00.000Z'),
+        localDateTime: new Date('2026-03-08T12:00:00.000Z'),
+      });
+      await ctx.newExif({ assetId: asset.id, timeZone: 'UTC' });
+
+      // Insert the overlay row directly (bypassing the write path, which is unchanged in this
+      // slice) so the read is exercised against the overlay in isolation from asset.isFavorite,
+      // which is never set here and stays at its default `false`.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const withFavorite = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [user.id], visibility: AssetVisibility.Timeline },
+        auth,
+      );
+      expect(JSON.parse(withFavorite.assets).isFavorite).toEqual([true]);
+
+      // Flip via the overlay only, and confirm the projection follows it (not a stale column read).
+      await ctx.database
+        .deleteFrom('asset_favorite')
+        .where('userId', '=', user.id)
+        .where('assetId', '=', asset.id)
+        .execute();
+
+      const withoutFavorite = await sut.getTimeBucket(
+        '2026-03-01',
+        { userIds: [user.id], visibility: AssetVisibility.Timeline },
+        auth,
+      );
+      expect(JSON.parse(withoutFavorite.assets).isFavorite).toEqual([false]);
+    });
+  });
+
+  describe('getStatistics', () => {
+    it('counts only the callers own asset_favorite overlay rows (#763, E22)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: assetX } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: assetX.id }).execute();
+
+      const stats = await sut.getStatistics(user.id, { isFavorite: true });
+      expect(stats[AssetType.Image]).toEqual(1);
+
+      const nonFavoriteStats = await sut.getStatistics(user.id, { isFavorite: false });
+      expect(nonFavoriteStats[AssetType.Image]).toEqual(1);
     });
   });
 
@@ -2348,6 +2405,89 @@ describe(AssetRepository.name, () => {
       await ctx.newAsset({ ownerId: user.id });
 
       await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
+    });
+  });
+
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively (slice 1b Task 1).
+  // These queries must project the per-user asset_favorite overlay onto the returned row, keyed
+  // to the CALLER (authUserId), not to the asset owner.
+  describe('getById (#763)', () => {
+    it('projects isFavoriteForUser for the requesting user, independent of the owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asOwner = await sut.getById(asset.id, {}, owner.id);
+      expect(asOwner?.isFavoriteForUser).toBe(false);
+
+      const asViewer = await sut.getById(asset.id, {}, viewer.id);
+      expect(asViewer?.isFavoriteForUser).toBe(true);
+    });
+
+    it('leaves isFavoriteForUser unset when no authUserId is supplied (fail-safe)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const result = await sut.getById(asset.id);
+      expect(result?.isFavoriteForUser).toBeUndefined();
+    });
+  });
+
+  describe('getByIdsWithAllRelationsButStacks (#763)', () => {
+    it('projects isFavoriteForUser for the requesting user, independent of the owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const [asOwner] = await sut.getByIdsWithAllRelationsButStacks([asset.id], owner.id);
+      expect(asOwner.isFavoriteForUser).toBe(false);
+
+      const [asViewer] = await sut.getByIdsWithAllRelationsButStacks([asset.id], viewer.id);
+      expect(asViewer.isFavoriteForUser).toBe(true);
+    });
+
+    it('leaves isFavoriteForUser unset without an authUserId, matching background-job callers', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const [result] = await sut.getByIdsWithAllRelationsButStacks([asset.id]);
+      expect(result.isFavoriteForUser).toBeUndefined();
+    });
+  });
+
+  describe('update (#763)', () => {
+    it('projects isFavoriteForUser for the supplied authUserId after writing a column', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, isOffline: false });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asOwner = await sut.update({ id: asset.id, isOffline: false }, owner.id);
+      expect(asOwner?.isFavoriteForUser).toBe(false);
+
+      const asViewer = await sut.update({ id: asset.id, isOffline: false }, viewer.id);
+      expect(asViewer?.isFavoriteForUser).toBe(true);
+    });
+
+    it('projects isFavoriteForUser via the getById fallback when there is nothing to set', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      const result = await sut.update({ id: asset.id }, user.id);
+      expect(result?.isFavoriteForUser).toBe(true);
     });
   });
 });

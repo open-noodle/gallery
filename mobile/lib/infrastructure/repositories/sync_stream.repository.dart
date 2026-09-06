@@ -1547,6 +1547,54 @@ class SyncStreamRepository extends DriftDatabaseRepository {
     }
   }
 
+  // --- gallery-fork: per-user favorites sync (#763) ---
+  //
+  // No new Drift table: remote_asset.isFavorite is a valid per-account store
+  // because every asset payload is now recipient-resolved server-side.
+  // Handlers flip the column by assetId: upsert -> true, tombstone -> false.
+  // Batch-update idiom mirrors RemoteAssetRepository.updateFavorite.
+  //
+  // Ordering note (accepted, self-healing): a favorite event for a
+  // not-yet-synced asset updates zero rows here and self-heals when the
+  // recipient-resolved asset payload arrives; a stale-ordered asset payload
+  // overwriting a newer favorite self-heals on the next favorite event or a
+  // full resync — same eventual-consistency class as other cross-entity
+  // fields in this sync stream. batch.update on an unmatched id is a no-op,
+  // not a throw, so unknown assetIds are silently skipped.
+  Future<void> updateAssetFavoritesV1(Iterable<SyncAssetFavoriteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final favorite in data) {
+          batch.update(
+            _db.remoteAssetEntity,
+            const RemoteAssetEntityCompanion(isFavorite: Value(true)),
+            where: (row) => row.id.equals(favorite.assetId),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateAssetFavoritesV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAssetFavoritesV1(Iterable<SyncAssetFavoriteDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final favorite in data) {
+          batch.update(
+            _db.remoteAssetEntity,
+            const RemoteAssetEntityCompanion(isFavorite: Value(false)),
+            where: (row) => row.id.equals(favorite.assetId),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteAssetFavoritesV1', error, stack);
+      rethrow;
+    }
+  }
+
   Future<void> pruneAssets() async {
     try {
       await _db.transaction(() async {

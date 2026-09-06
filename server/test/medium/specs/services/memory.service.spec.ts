@@ -232,6 +232,32 @@ describe(MemoryService.name, () => {
         }),
       ]);
     });
+
+    // #763 slice 1b Task 2 — mapMemory feeds mapAsset, which now reads `isFavoriteForUser`
+    // exclusively; searchAccessible must project the overlay for the VIEWER, not the memory owner.
+    it('E1 — a space member sees their own favorite on a shared memory asset, independent of the owner', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { memory } = await ctx.newMemory({ ownerId: owner.id });
+      await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+      const memberResult = await sut.search(factory.auth({ user: member }), {});
+      expect(memberResult.flatMap((m) => m.assets)).toEqual([
+        expect.objectContaining({ id: asset.id, isFavorite: true }),
+      ]);
+
+      const ownerResult = await sut.search(factory.auth({ user: owner }), {});
+      expect(ownerResult.flatMap((m) => m.assets)).toEqual([
+        expect.objectContaining({ id: asset.id, isFavorite: false }),
+      ]);
+    });
   });
 
   describe('onMemoryCreate', () => {

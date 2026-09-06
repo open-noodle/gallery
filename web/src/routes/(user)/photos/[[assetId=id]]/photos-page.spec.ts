@@ -94,8 +94,10 @@ vi.mock('$lib/components/shared-components/context-menu/ButtonContextMenu.svelte
   return { default: MockComponent };
 });
 
+// Surfaces `text`/`onClick` instead of swallowing them: which empty state renders is the assertion
+// in the "#763" tests below, and a noop mock cannot tell them apart.
 vi.mock('$lib/components/shared-components/EmptyPlaceholder.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/empty-placeholder.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -488,7 +490,7 @@ describe('Photos page search URL state', () => {
     });
   });
 
-  it('narrows non-search dependent suggestions to favorites without shared spaces when selected', async () => {
+  it('narrows non-search dependent suggestions to favorites while keeping shared spaces in scope (#763 slice 4)', async () => {
     mockPage.url = new URL('https://gallery.test/photos');
 
     renderPage();
@@ -506,7 +508,7 @@ describe('Photos page search URL state', () => {
     });
 
     for (const [request] of sdkMock.getSearchSuggestions.mock.calls) {
-      expect(request).not.toHaveProperty('withSharedSpaces');
+      expect(request).toHaveProperty('withSharedSpaces', true);
     }
   });
 
@@ -579,7 +581,7 @@ describe('Photos page search URL state', () => {
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-language', 'de');
   });
 
-  it('narrows search results and smart facets to favorites without shared spaces when selected', async () => {
+  it('narrows search results and smart facets to favorites while keeping shared spaces in scope (#763 slice 4)', async () => {
     renderPage();
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
 
@@ -587,12 +589,12 @@ describe('Photos page search URL state', () => {
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-with-shared-spaces', 'false');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-with-shared-spaces', 'true');
     expect(sdkMock.searchSmartFacets.mock.calls[1][0].smartSearchFacetsDto).toMatchObject({
       query: 'nature',
       isFavorite: true,
+      withSharedSpaces: true,
     });
-    expect(sdkMock.searchSmartFacets.mock.calls[1][0].smartSearchFacetsDto).not.toHaveProperty('withSharedSpaces');
   });
 
   it('uses smart facet timeBuckets in search mode', async () => {
@@ -1409,5 +1411,65 @@ describe('Photos page — SpaceAddAssets timeline reload (#1041)', () => {
     await tick();
 
     expect(screen.getByTestId('timeline-mount-id').textContent).toBe(before);
+  });
+});
+
+// #763 — the second half of the bug report: a camera filter that matched nothing rendered the
+// EMPTY-LIBRARY placeholder ("Click to upload your first photo"), which reads as "you have no
+// photos at all" rather than "this filter matched none of them". The user had the photo open in
+// the viewer one click earlier, so the page was telling them something they could see was false.
+describe('Photos page — empty state under active filters (#763)', () => {
+  const timelineStubGlobals = globalThis as typeof globalThis & { __timelineStubAssetCount?: number };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    lang.set('en');
+    mockAssetMultiSelectManager.selectionActive = false;
+    mockAssetMultiSelectManager.assets = [];
+    mockMemoryManager.memories = [];
+    mockAuthManager.preferences.memories.enabled = false;
+    mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
+    sessionStorage.clear();
+    resetTimelineMountSeq();
+    sdkMock.getFilterSuggestions.mockResolvedValue({
+      people: [],
+      countries: [],
+      cameraMakes: [],
+      tags: [],
+      ratings: [],
+      mediaTypes: [],
+      hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
+    });
+    timelineStubGlobals.__timelineStubAssetCount = 0;
+  });
+
+  afterEach(() => {
+    timelineStubGlobals.__timelineStubAssetCount = undefined;
+  });
+
+  it('says there are no results when filters are active, and offers no upload affordance', async () => {
+    mockPage.reset('https://gallery.test/photos?make=Canon&model=Canon+EOS+R6', {
+      routeId: '/(user)/photos/[[assetId=id]]',
+    });
+
+    renderPage();
+
+    const placeholder = await screen.findByTestId('empty-placeholder');
+    expect(screen.getByTestId('empty-placeholder-text')).toHaveTextContent('no_results');
+    // "Click to upload your first photo" is a call to action; a filter that matched nothing is not.
+    expect(placeholder).toHaveAttribute('data-clickable', 'false');
+  });
+
+  it('still invites the first upload when the timeline is empty with no filters', async () => {
+    mockPage.reset('https://gallery.test/photos', { routeId: '/(user)/photos/[[assetId=id]]' });
+
+    renderPage();
+
+    const placeholder = await screen.findByTestId('empty-placeholder');
+    expect(screen.getByTestId('empty-placeholder-text')).toHaveTextContent('no_assets_message');
+    expect(placeholder).toHaveAttribute('data-clickable', 'true');
   });
 });

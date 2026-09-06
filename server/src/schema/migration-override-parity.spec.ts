@@ -31,6 +31,7 @@ vi.mock('kysely', async () => {
 import {
   album_soft_delete_shared_space_album,
   album_space_asset_delete_audit,
+  asset_favorite_delete_audit,
   shared_space_album_folder_delete_audit,
   shared_space_album_hidden_delete_audit,
   shared_space_member_after_insert_album,
@@ -44,6 +45,7 @@ import {
 import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger';
 import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit';
 import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId';
+import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1784000000000-AddAssetFavoriteTables';
 import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift';
 import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
 import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable';
@@ -205,6 +207,47 @@ describe('1793200000000-SharedSpaceAlbumFolderAuditTable override parity', () =>
     expect(parseOverrideValue(triggerOverrideInsert).sql).toBe(executedTriggerDdl);
     // Guards the shape the decorator has to reproduce: statement scope, an OLD transition table,
     // and NO `WHEN` guard (FK cascades run at trigger depth > 1 and must still be tombstoned).
+    expect(executedTriggerDdl).toContain('REFERENCING OLD TABLE AS "old"');
+    expect(executedTriggerDdl).toContain('FOR EACH STATEMENT');
+    expect(executedTriggerDdl).not.toContain('WHEN (');
+  });
+});
+
+// Same shape as 1783100000000 above: this migration creates asset_favorite_delete_audit (function +
+// statement AFTER DELETE trigger) and both override rows, so functions.ts / AssetFavoriteTable must
+// declare them or every DB that runs it reports FunctionDrop + two OverrideDrops — and
+// `migrations:generate` emits DROP TRIGGER + DROP FUNCTION, silently killing #763's favorite delete
+// sync stream.
+describe('1784000000000-AddAssetFavoriteTables override parity', () => {
+  beforeEach(() => {
+    capturedSql.length = 0;
+  });
+
+  it('executes and overrides the delete-audit function with DDL byte-identical to functions.ts', async () => {
+    await upAddAssetFavoriteTables({} as any);
+
+    const executedFunctionDdl = findSql('the delete-audit CREATE FUNCTION', (s) =>
+      s.startsWith('CREATE OR REPLACE FUNCTION asset_favorite_delete_audit()'),
+    );
+    expect(executedFunctionDdl).toBe(asset_favorite_delete_audit.expression);
+
+    const functionOverrideInsert = findSql('the delete-audit function override row', (s) =>
+      s.includes(`VALUES ('function_asset_favorite_delete_audit'`),
+    );
+    expect(parseOverrideValue(functionOverrideInsert).sql).toBe(asset_favorite_delete_audit.expression);
+  });
+
+  it('stores a trigger override row byte-identical to the trigger it executes', async () => {
+    await upAddAssetFavoriteTables({} as any);
+
+    const executedTriggerDdl = findSql('the delete-audit CREATE TRIGGER', (s) =>
+      s.startsWith('CREATE OR REPLACE TRIGGER "asset_favorite_delete_audit"'),
+    );
+    const triggerOverrideInsert = findSql('the delete-audit trigger override row', (s) =>
+      s.includes(`VALUES ('trigger_asset_favorite_delete_audit'`),
+    );
+
+    expect(parseOverrideValue(triggerOverrideInsert).sql).toBe(executedTriggerDdl);
     expect(executedTriggerDdl).toContain('REFERENCING OLD TABLE AS "old"');
     expect(executedTriggerDdl).toContain('FOR EACH STATEMENT');
     expect(executedTriggerDdl).not.toContain('WHEN (');

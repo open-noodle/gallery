@@ -1624,6 +1624,7 @@ describe(MemoryService.name, () => {
         }),
       ).resolves.toMatchObject({ assets: [] });
 
+      // #763: create threads the caller's id to project isFavoriteForUser.
       expect(mocks.memory.create).toHaveBeenCalledWith(
         {
           type: memory.type,
@@ -1633,6 +1634,7 @@ describe(MemoryService.name, () => {
           isSaved: memory.isSaved,
         },
         new Set(),
+        userId,
       );
     });
 
@@ -1653,9 +1655,11 @@ describe(MemoryService.name, () => {
         }),
       ).resolves.toBeDefined();
 
+      // #763: create threads the caller's id to project isFavoriteForUser.
       expect(mocks.memory.create).toHaveBeenCalledWith(
         expect.objectContaining({ ownerId: userId }),
         new Set([assetId]),
+        userId,
       );
     });
 
@@ -1692,6 +1696,7 @@ describe(MemoryService.name, () => {
         seenAt,
       });
 
+      // #763: create threads the caller's id to project isFavoriteForUser.
       expect(mocks.memory.create).toHaveBeenCalledWith(
         expect.objectContaining({
           ownerId: userId,
@@ -1701,6 +1706,7 @@ describe(MemoryService.name, () => {
           seenAt,
         }),
         new Set(),
+        userId,
       );
     });
   });
@@ -1716,37 +1722,47 @@ describe(MemoryService.name, () => {
 
     it('should update a memory', async () => {
       const memory = MemoryFactory.create();
+      const auth = factory.auth();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.memory.update.mockResolvedValue(getForMemory(memory));
 
-      await expect(sut.update(factory.auth(), memory.id, { isSaved: true })).resolves.toBeDefined();
+      await expect(sut.update(auth, memory.id, { isSaved: true })).resolves.toBeDefined();
 
-      expect(mocks.memory.update).toHaveBeenCalledWith(memory.id, expect.objectContaining({ isSaved: true }));
+      // #763: update threads the caller's id to project isFavoriteForUser.
+      expect(mocks.memory.update).toHaveBeenCalledWith(
+        memory.id,
+        expect.objectContaining({ isSaved: true }),
+        auth.user.id,
+      );
     });
 
     it('should update a memory with seenAt', async () => {
       const memory = MemoryFactory.create();
       const seenAt = new Date();
+      const auth = factory.auth();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.memory.update.mockResolvedValue(memory as any);
 
-      await sut.update(factory.auth(), memory.id, { seenAt });
+      await sut.update(auth, memory.id, { seenAt });
 
-      expect(mocks.memory.update).toHaveBeenCalledWith(memory.id, expect.objectContaining({ seenAt }));
+      // #763: update threads the caller's id to project isFavoriteForUser.
+      expect(mocks.memory.update).toHaveBeenCalledWith(memory.id, expect.objectContaining({ seenAt }), auth.user.id);
     });
 
     it('should update a memory with memoryAt', async () => {
       const memory = MemoryFactory.create();
       const memoryAt = new Date();
+      const auth = factory.auth();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.memory.update.mockResolvedValue(memory as any);
 
-      await sut.update(factory.auth(), memory.id, { memoryAt });
+      await sut.update(auth, memory.id, { memoryAt });
 
-      expect(mocks.memory.update).toHaveBeenCalledWith(memory.id, expect.objectContaining({ memoryAt }));
+      // #763: update threads the caller's id to project isFavoriteForUser.
+      expect(mocks.memory.update).toHaveBeenCalledWith(memory.id, expect.objectContaining({ memoryAt }), auth.user.id);
     });
   });
 

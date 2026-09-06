@@ -339,6 +339,12 @@ export class WorkflowExecutionService extends BaseService {
           return {
             read: async () => {
               const asset = await this.workflowRepository.getForAssetV1(assetId);
+              // #763: workflowAssetV1's `isFavorite` (database.ts / workflow.repository.ts's
+              // getForAssetV1) is resolved via favoriteExistsForOwner — the ASSET OWNER's
+              // favorite, not any particular viewer's. The workflow engine always acts AS the
+              // asset owner (authUserId below), which matches this field's pre-#763 semantics
+              // (the old raw `asset.isFavorite` column could only ever be true for the owner), so
+              // the query result needs no further per-user resolution here.
               return {
                 data: { asset } as any,
                 authUserId: asset.ownerId,

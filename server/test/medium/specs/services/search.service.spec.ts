@@ -396,6 +396,31 @@ describe(SearchService.name, () => {
     });
   });
 
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively; searchMetadata must
+  // project the per-user overlay for the CALLER, not the asset owner.
+  describe('isFavoriteForUser projection (#763)', () => {
+    it('E1 — a space member sees their own favorite in searchMetadata, independent of the owner', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+      const memberAuth = factory.auth({ user: { id: member.id } });
+      const memberResult = await sut.searchMetadata(memberAuth, { spaceId: space.id });
+      expect(memberResult.assets.items).toEqual([expect.objectContaining({ id: asset.id, isFavorite: true })]);
+
+      const ownerAuth = factory.auth({ user: { id: owner.id } });
+      const ownerResult = await sut.searchMetadata(ownerAuth, { spaceId: space.id });
+      expect(ownerResult.assets.items).toEqual([expect.objectContaining({ id: asset.id, isFavorite: false })]);
+    });
+  });
+
   describe('library-linked space assets', () => {
     it('should include library-linked assets in searchMetadata when filtering by spaceId', async () => {
       const { sut, ctx } = setup();

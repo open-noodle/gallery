@@ -6,6 +6,7 @@ import {
   AssetBulkDeleteDto,
   AssetBulkUpdateDto,
   AssetCopyDto,
+  AssetFavoriteUpdateDto,
   AssetJobsDto,
   AssetMetadataBulkDeleteDto,
   AssetMetadataBulkResponseDto,
@@ -141,6 +142,23 @@ export class AssetController {
   })
   deleteBulkAssetMetadata(@Auth() auth: AuthDto, @Body() dto: AssetMetadataBulkDeleteDto): Promise<void> {
     return this.service.deleteBulkMetadata(auth, dto);
+  }
+
+  // #763: this static 'favorites' path MUST be declared before @Put(':id') below — Nest matches
+  // routes in declaration order, so after ':id' this would 404 with a UUID-validation error
+  // ("favorites" is not a valid uuid) instead of reaching this handler.
+  @Put('favorites')
+  @Authenticated({ permission: Permission.AssetRead })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Set favorite state for the requesting user',
+    description:
+      'Favorites are per-user. Requires only read access to the assets; a space viewer may favorite an asset ' +
+      'they do not own. Never affects any other user.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateAssetFavorites(@Auth() auth: AuthDto, @Body() dto: AssetFavoriteUpdateDto): Promise<void> {
+    return this.service.updateFavorites(auth, dto);
   }
 
   @Put(':id')

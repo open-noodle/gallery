@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB, wait } from 'test/utils';
@@ -164,14 +165,23 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
       userId: auth.user.id,
       role: SharedSpaceRole.Owner,
     });
-    const { asset } = await ctx.newAsset({ ownerId: auth.user.id, isFavorite: false });
+    const { asset } = await ctx.newAsset({ ownerId: auth.user.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
     const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     await ctx.syncAckAll(auth, initial);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpaceAssetsV1]);
 
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    // #763: favoriting alone does not bump asset.updateId (asset_favorite is a separate overlay
+    // table — see design doc §4.3), so the unrelated column update below stands in for "some
+    // metadata changed" to trigger the re-emit; the actual isFavorite value comes from the
+    // overlay insert. asset."isFavorite" no longer exists (dropped in slice 3), hence originalFileName.
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1);
@@ -182,7 +192,7 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     });
   });
 
-  it('masks isFavorite for a foreign-owned asset shared into the space', async () => {
+  it("does not leak the peer's favorite for a foreign-owned asset shared into the space (#763)", async () => {
     const { auth, ctx } = await setup();
     const { user: peer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: peer.id });
@@ -196,8 +206,10 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
       userId: auth.user.id,
       role: SharedSpaceRole.Editor,
     });
-    const { asset } = await ctx.newAsset({ ownerId: peer.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: peer.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    // The peer (owner) favorites their own asset — must never leak to auth's stream.
+    await ctx.get(AssetFavoriteRepository).addAll(peer.id, [asset.id]);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     const assetEvents = response.filter(
@@ -208,6 +220,37 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
       id: asset.id,
       isFavorite: false,
+    });
+  });
+
+  it("syncs the recipient's own favorite for a foreign-owned asset shared into the space (#763, E25)", async () => {
+    const { auth, ctx } = await setup();
+    const { user: peer } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: peer.id });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: peer.id,
+      role: SharedSpaceRole.Owner,
+    });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Editor,
+    });
+    const { asset } = await ctx.newAsset({ ownerId: peer.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    // auth (not the owner) favorites the asset — their own stream must reflect it as true.
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    const assetEvents = response.filter(
+      (r: { type: string }) =>
+        r.type === SyncEntityType.SharedSpaceAssetCreateV1 || r.type === SyncEntityType.SharedSpaceAssetUpdateV1,
+    );
+    expect(assetEvents).toHaveLength(1);
+    expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: true,
     });
   });
 
@@ -219,8 +262,9 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
       userId: auth.user.id,
       role: SharedSpaceRole.Owner,
     });
-    const { asset } = await ctx.newAsset({ ownerId: auth.user.id, isFavorite: true });
+    const { asset } = await ctx.newAsset({ ownerId: auth.user.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     const assetEvents = response.filter(
@@ -234,7 +278,7 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     });
   });
 
-  it('masks isFavorite on the update path for a foreign-owned asset', async () => {
+  it("does not leak the peer's favorite on the update path for a foreign-owned asset (#763)", async () => {
     const { auth, ctx } = await setup();
     const { user: peer } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: peer.id });
@@ -248,14 +292,22 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
       userId: auth.user.id,
       role: SharedSpaceRole.Editor,
     });
-    const { asset } = await ctx.newAsset({ ownerId: peer.id, isFavorite: false });
+    const { asset } = await ctx.newAsset({ ownerId: peer.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
     const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     await ctx.syncAckAll(auth, initial);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpaceAssetsV1]);
 
-    await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    // The peer favorites the asset (via the overlay) AND a genuine metadata change bumps
+    // asset.updateId so the row re-flows through the update path — even so, auth's stream must
+    // never see the peer's favorite.
+    await ctx.get(AssetFavoriteRepository).addAll(peer.id, [asset.id]);
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-resync.jpg' })
+      .where('id', '=', asset.id)
+      .execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
     const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1);
@@ -263,6 +315,45 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     expect((updateEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
       id: asset.id,
       isFavorite: false,
+    });
+  });
+
+  it("syncs the recipient's own favorite on the update path for a foreign-owned asset (#763, E25)", async () => {
+    const { auth, ctx } = await setup();
+    const { user: peer } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: peer.id });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: peer.id,
+      role: SharedSpaceRole.Owner,
+    });
+    await ctx.newSharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Editor,
+    });
+    const { asset } = await ctx.newAsset({ ownerId: peer.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+    const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    await ctx.syncAckAll(auth, initial);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+
+    // auth favorites the foreign-owned asset AND a genuine metadata change bumps asset.updateId
+    // so the row re-flows through the update path with auth's own favorite state.
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
+    await defaultDatabase
+      .updateTable('asset')
+      .set({ originalFileName: 'renamed-for-update-path' })
+      .where('id', '=', asset.id)
+      .execute();
+
+    const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
+    const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1);
+    expect(updateEvents).toHaveLength(1);
+    expect((updateEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
+      id: asset.id,
+      isFavorite: true,
     });
   });
 });

@@ -262,11 +262,19 @@ order by
 select
   "asset"."id",
   "asset"."localDateTime",
-  "asset"."isFavorite",
   "asset"."type",
   "asset"."duration",
   "asset_exif"."country" as "country",
   "asset_exif"."city" as "city",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   extract(
     year
     from
@@ -276,15 +284,15 @@ from
   "asset"
   left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
 where
-  "asset"."ownerId" = $1
-  and "asset"."visibility" = $2
+  "asset"."ownerId" = $2
+  and "asset"."visibility" = $3
   and "asset"."deletedAt" is null
-  and "asset"."localDateTime" <= $3
+  and "asset"."localDateTime" <= $4
   and extract(
     month
     from
       (asset."localDateTime" at time zone 'UTC')
-  )::int in ($4)
+  )::int in ($5)
   and exists (
     select
       "asset_file"."assetId"
@@ -292,7 +300,7 @@ where
       "asset_file"
     where
       "asset_file"."assetId" = "asset"."id"
-      and "asset_file"."type" = $5
+      and "asset_file"."type" = $6
   )
 order by
   "asset"."localDateTime" asc
@@ -480,12 +488,92 @@ select
           "asset"."id" = "tag_asset"."assetId"
       ) as agg
   ) as "tags",
-  to_json("asset_exif") as "exifInfo"
+  to_json("asset_exif") as "exifInfo",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
   "asset"."id" = any ($1::uuid[])
+
+-- AssetRepository.getByIdsWithAllRelationsButStacks (with authUserId)
+select
+  "asset".*,
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "asset_face".*,
+          "person" as "person"
+        from
+          "asset_face"
+          left join lateral (
+            select
+              "person".*
+            from
+              "person"
+            where
+              "asset_face"."personId" = "person"."id"
+          ) as "person" on true
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+      ) as agg
+  ) as "faces",
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "tag"."id",
+          "tag"."value",
+          "tag"."createdAt",
+          "tag"."updatedAt",
+          "tag"."color",
+          "tag"."parentId"
+        from
+          "tag"
+          inner join "tag_asset" on "tag"."id" = "tag_asset"."tagId"
+        where
+          "asset"."id" = "tag_asset"."assetId"
+      ) as agg
+  ) as "tags",
+  to_json("asset_exif") as "exifInfo",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
+from
+  "asset"
+  left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+where
+  "asset"."id" = any ($2::uuid[])
 
 -- AssetRepository.deleteAll
 delete from "asset"
@@ -578,7 +666,15 @@ select
   "id",
   "stackId",
   "originalPath",
-  "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   (
     select
       coalesce(json_agg(agg), '[]')
@@ -598,19 +694,56 @@ select
 from
   "asset"
 where
-  "id" = $1::uuid
+  "id" = $2::uuid
 limit
-  $2
+  $3
 
 -- AssetRepository.getById
 select
-  "asset".*
+  "asset".*,
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite"
 from
   "asset"
 where
   "asset"."id" = $1::uuid
 limit
   $2
+
+-- AssetRepository.getById (with authUserId)
+select
+  "asset".*,
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
+from
+  "asset"
+where
+  "asset"."id" = $2::uuid
+limit
+  $3
 
 -- AssetRepository.updateAll
 update "asset"
@@ -814,8 +947,15 @@ with
       "asset"."duration",
       "asset"."id",
       "asset"."visibility",
-      asset."isFavorite"
-      and asset."ownerId" = $2 as "isFavorite",
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $2::uuid
+      ) as "isFavorite",
       asset.type = 'IMAGE' as "isImage",
       asset."deletedAt" is not null as "isTrashed",
       "asset"."livePhotoVideoId",
@@ -911,8 +1051,15 @@ with
       "asset"."duration",
       "asset"."id",
       "asset"."visibility",
-      asset."isFavorite"
-      and asset."ownerId" = $2 as "isFavorite",
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $2::uuid
+      ) as "isFavorite",
       asset.type = 'IMAGE' as "isImage",
       asset."deletedAt" is not null as "isTrashed",
       "asset"."livePhotoVideoId",
@@ -994,8 +1141,15 @@ with
       "asset"."duration",
       "asset"."id",
       "asset"."visibility",
-      asset."isFavorite"
-      and asset."ownerId" = $2 as "isFavorite",
+      exists (
+        select
+          1 as "exists"
+        from
+          "asset_favorite"
+        where
+          "asset_favorite"."assetId" = "asset"."id"
+          and "asset_favorite"."userId" = $2::uuid
+      ) as "isFavorite",
       asset.type = 'IMAGE' as "isImage",
       asset."deletedAt" is not null as "isTrashed",
       "asset"."livePhotoVideoId",

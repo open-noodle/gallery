@@ -41,7 +41,7 @@ class UpdateAssetDto {
   ///
   Optional<String?> description;
 
-  /// Mark as favorite
+  /// Mark as favorite. Deprecated: use PUT /assets/favorites instead (favorites are per-user).
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated

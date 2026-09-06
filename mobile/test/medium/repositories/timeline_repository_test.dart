@@ -423,4 +423,108 @@ void main() {
       expect(buckets.fold<int>(0, (sum, b) => sum + b.assetCount), 2);
     });
   });
+
+  // #763: favorite() dropped the ownerId-only filter in favor of the same viewer-visibility
+  // join/predicate the map favorite filter uses — a viewer's Favorites page must surface
+  // favorites on assets they can see via a shared space (direct, library, or album), not just
+  // assets they own.
+  group('favorite() viewer visibility (#763)', () {
+    Future<int> bucketTotal(TimelineQuery q) async {
+      final buckets = await q.bucketSource().first;
+      return buckets.fold<int>(0, (sum, b) => sum + b.assetCount);
+    }
+
+    test('owned favorited asset is visible; owned non-favorited asset is not', () async {
+      final user = await ctx.newUser();
+      final favorited = await ctx.newRemoteAsset(ownerId: user.id, isFavorite: true);
+      await ctx.newRemoteAsset(ownerId: user.id);
+
+      final assets = await sut.favorite(user.id, GroupAssetsBy.none).assetSource(0, 100);
+      final ids = assets.map((a) => (a as RemoteAsset).id).toSet();
+      expect(ids, {favorited.id});
+      expect(await bucketTotal(sut.favorite(user.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.favorite(user.id, GroupAssetsBy.day)), 1);
+    });
+
+    test('a favorited asset owned by an unrelated user (no shared visibility) is hidden', () async {
+      final viewer = await ctx.newUser();
+      final stranger = await ctx.newUser();
+      await ctx.newRemoteAsset(ownerId: stranger.id, isFavorite: true);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets, isEmpty);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 0);
+    });
+
+    test('a favorited asset shared directly (showInTimeline=true) is visible to the viewer', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: asset.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {asset.id});
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 1);
+    });
+
+    test('a favorited asset shared directly with showInTimeline=false stays hidden', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: false);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: asset.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets, isEmpty);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 0);
+    });
+
+    test('a favorited asset visible via a space-linked library is visible to the viewer', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final library = await ctx.newLibrary(ownerId: owner.id);
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true, libraryId: library.id);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: true);
+      await ctx.insertSharedSpaceLibrary(spaceId: space.id, libraryId: library.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {asset.id});
+    });
+
+    test('a favorited asset visible via a space-linked album (showInTimeline=true) is visible', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {asset.id});
+    });
+
+    test('a favorited asset visible through two spaces is counted once (assets + both bucket modes)', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final s1 = await ctx.newSharedSpace(createdById: owner.id);
+      final s2 = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: s1.id, userId: viewer.id, showInTimeline: true);
+      await ctx.newSharedSpaceMember(spaceId: s2.id, userId: viewer.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAsset(spaceId: s1.id, assetId: asset.id);
+      await ctx.insertSharedSpaceAsset(spaceId: s2.id, assetId: asset.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toList(), [asset.id]);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 1);
+    });
+  });
 }

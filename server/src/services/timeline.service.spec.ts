@@ -290,13 +290,52 @@ describe(TimelineService.name, () => {
         ).rejects.toThrow(BadRequestException);
       });
 
-      it('should throw when combined with isFavorite', async () => {
+      // #763: the favourite-filtered browse resolves its space scope from EVERY membership, not
+      // just the timeline-visible ones — a favourite placed inside a space the caller hid from
+      // their home timeline must still reach /favorites. Asserting which resolver is called (and
+      // that the timeline-filtered one is not) is the whole point: both return `{ spaceId }[]`, so
+      // a test that only checked `timelineSpaceIds` would pass against either.
+      it('resolves ALL member spaces — not just timeline-visible ones — when isFavorite is set (#763)', async () => {
+        mocks.sharedSpace.getAllMemberSpaceIds.mockResolvedValue([{ spaceId: 'space-1' }]);
+        mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
         await expect(
           sut.getTimeBuckets(authStub.admin, {
             withSharedSpaces: true,
+            visibility: AssetVisibility.Timeline,
             isFavorite: true,
           }),
-        ).rejects.toThrow(BadRequestException);
+        ).resolves.toEqual([]);
+
+        expect(mocks.sharedSpace.getAllMemberSpaceIds).toHaveBeenCalledWith(authStub.admin.user.id);
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isFavorite: true,
+            timelineSpaceIds: ['space-1'],
+            authUserId: authStub.admin.user.id,
+          }),
+        );
+      });
+
+      // The other direction, and the reason the widening above is scoped to `isFavorite: true`:
+      // an ordinary browse must keep honouring "don't show this space in my timeline".
+      it('keeps the timeline-visible-only scope for a browse that is not favourite-filtered (#763)', async () => {
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-visible' }]);
+        mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
+        await expect(
+          sut.getTimeBuckets(authStub.admin, {
+            withSharedSpaces: true,
+            visibility: AssetVisibility.Timeline,
+          }),
+        ).resolves.toEqual([]);
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.admin.user.id);
+        expect(mocks.sharedSpace.getAllMemberSpaceIds).not.toHaveBeenCalled();
+        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+          expect.objectContaining({ timelineSpaceIds: ['space-visible'] }),
+        );
       });
 
       it('should throw when combined with isTrashed', async () => {
@@ -571,26 +610,28 @@ describe(TimelineService.name, () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw an error if withParners is true and isFavorite is either true or false', async () => {
-      await expect(
-        sut.getTimeBucket(authStub.admin, {
-          timeBucket: '2024-01-01',
-          isFavorite: true,
-          bucketSize: TimeBucketSize.Day,
-          withPartners: true,
-          userId: authStub.admin.user.id,
-        }),
-      ).rejects.toThrow(BadRequestException);
+    it('passes isFavorite (true and false) through when combined with withPartners (#763 slice 4)', async () => {
+      mocks.asset.getTimeBucket.mockResolvedValue({ assets: '[]' });
+      mocks.partner.getAll.mockResolvedValue([]);
 
-      await expect(
-        sut.getTimeBucket(authStub.admin, {
-          timeBucket: '2024-01-01',
-          isFavorite: false,
-          bucketSize: TimeBucketSize.Day,
-          withPartners: true,
-          userId: authStub.admin.user.id,
-        }),
-      ).rejects.toThrow(BadRequestException);
+      for (const isFavorite of [true, false]) {
+        await expect(
+          sut.getTimeBucket(authStub.admin, {
+            timeBucket: '2024-01-01',
+            visibility: AssetVisibility.Timeline,
+            bucketSize: TimeBucketSize.Day,
+            withPartners: true,
+            userId: authStub.admin.user.id,
+            isFavorite,
+          }),
+        ).resolves.toBeDefined();
+      }
+
+      expect(mocks.asset.getTimeBucket).toHaveBeenLastCalledWith(
+        '2024-01-01',
+        expect.objectContaining({ isFavorite: false, authUserId: authStub.admin.user.id }),
+        authStub.admin,
+      );
     });
 
     it('should throw an error if withParners is true and isTrash is true', async () => {

@@ -855,6 +855,29 @@ export const album_space_asset_delete_audit = registerFunction({
     END`,
 });
 
+// --- gallery-fork: asset_favorite delete-audit (#763) ---
+//
+// Tombstones every deleted per-user favorite — explicit unfavorite AND every FK cascade (asset
+// delete, user delete) — driving the favorite delete sync stream. Statement-level AFTER DELETE so
+// cascades are captured too; see AssetFavoriteAuditTable.
+//
+// Created by migration 1784000000000; registered here so `migrations:generate` / schema-check see a
+// declarative counterpart, exactly like album_space_asset_delete_audit above. Without this the
+// function and both migration_overrides rows exist only in the database and every instance boots
+// with `Detected schema drift` (the class of bug #827 fixed). Keep byte-identical to that
+// migration's DDL — migration-override-parity.spec.ts pins it.
+export const asset_favorite_delete_audit = registerFunction({
+  name: 'asset_favorite_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO asset_favorite_audit ("userId", "assetId")
+      SELECT "userId", "assetId" FROM "old";
+      RETURN NULL;
+    END`,
+});
+
 // --- gallery-fork: library_user create-side trigger functions ---
 //
 // See specs/2026-04-11-library-user-access-backfill-design.md for the

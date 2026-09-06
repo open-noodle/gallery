@@ -430,6 +430,10 @@ export const columns = {
     'asset.height',
     'asset.isEdited',
   ],
+  // #763: isFavorite is intentionally NOT listed here — the search/city repository methods that
+  // use this list project it separately via favoriteExistsFor(eb, options.authUserId), the
+  // per-user asset_favorite overlay resolved for the CALLER, instead of the raw asset column
+  // (which was dropped in slice 3). Same pattern as syncAsset / workflowAssetV1 below.
   searchAsset: [
     'asset.id',
     'asset.updateId',
@@ -444,7 +448,6 @@ export const columns = {
     'asset.fileCreatedAt',
     'asset.fileModifiedAt',
     'asset.isExternal',
-    'asset.isFavorite',
     'asset.isOffline',
     'asset.isEdited',
     'asset.visibility',
@@ -481,10 +484,12 @@ export const columns = {
     'asset.originalPath',
     'asset.originalFileName',
     'asset.isOffline',
-    'asset.isFavorite',
+    // #763: isFavorite is intentionally NOT listed here — the sole consumer, workflow.repository.ts's
+    // getForAssetV1, projects it separately via favoriteExistsForOwner(eb), the per-user asset_favorite
+    // overlay resolved for the asset's OWNER (background workflow jobs have no auth user — see
+    // favorite.ts's doc comment for the owner-semantics rationale).
     'asset.isExternal',
     'asset.isEdited',
-    'asset.isFavorite',
   ],
   assetFiles: ['asset_file.id', 'asset_file.path', 'asset_file.type', 'asset_file.isEdited'],
   assetFilesForThumbnail: [
@@ -527,6 +532,9 @@ export const columns = {
     'plugin_method.allowedHosts',
     'plugin_method.uiHints',
   ],
+  // #763: isFavorite is intentionally NOT listed here — AssetSync.getUpserts (sync.repository.ts)
+  // projects it separately via favoriteExistsFor(eb, userId), the per-user asset_favorite overlay,
+  // instead of this raw asset column (same pattern as syncLibraryAsset below).
   syncAsset: [
     'asset.id',
     'asset.ownerId',
@@ -539,7 +547,6 @@ export const columns = {
     'asset.localDateTime',
     'asset.type',
     'asset.deletedAt',
-    'asset.isFavorite',
     'asset.visibility',
     'asset.duration',
     'asset.livePhotoVideoId',
@@ -612,9 +619,10 @@ export const columns = {
     'asset.height',
     'asset.isEdited',
   ],
-  // syncAsset minus isFavorite — LibraryAssetSync masks the favorite flag per row
-  // (owner keeps it, other library members see false), like the other shared-scope
-  // sync column sets above (issue #743 item 1).
+  // syncAsset minus isFavorite — LibraryAssetSync projects the favorite flag separately via
+  // favoriteExistsFor(eb, userId) (#763), the per-user asset_favorite overlay: each syncing user
+  // sees their OWN favorite state for the row, never another library member's, like the other
+  // shared-scope sync column sets above (issue #743 item 1).
   syncLibraryAsset: [
     'asset.id',
     'asset.ownerId',

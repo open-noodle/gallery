@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { Insertable } from 'kysely';
+import { Insertable, SqlBool } from 'kysely';
 import { DateTime, Duration } from 'luxon';
 import { Writable } from 'node:stream';
 import { OnJob } from 'src/decorators';
@@ -23,19 +23,26 @@ import { formatSecondsToDuration } from 'src/utils/duration';
 import { fromAck, serialize, SerializeOptions, toAck } from 'src/utils/sync';
 
 type CheckpointMap = Partial<Record<SyncEntityType, SyncAck>>;
-type AssetLike = Omit<SyncAssetV2, 'checksum' | 'thumbhash'> & {
+// #763: isFavorite is SqlBool (boolean | 0 | 1), not boolean, because every asset-payload stream
+// now projects it via favoriteExistsFor's eb.exists(...) (sync.repository.ts), whose driver-level
+// boolean representation Kysely can't narrow further than SqlBool — same reason
+// asset-response.dto.ts's MapAsset.isFavoriteForUser is typed SqlBool. Coerced to a strict
+// boolean below, in mapSyncAssetV2, mirroring that DTO's `!!entity.isFavoriteForUser`.
+type AssetLike = Omit<SyncAssetV2, 'checksum' | 'thumbhash' | 'isFavorite'> & {
   checksum: Buffer<ArrayBufferLike>;
   thumbhash: Buffer<ArrayBufferLike> | null;
+  isFavorite: SqlBool;
 };
 
 const COMPLETE_ID = 'complete';
 const MAX_DAYS = 30;
 const MAX_DURATION = Duration.fromObject({ days: MAX_DAYS });
 
-const mapSyncAssetV2 = ({ checksum, thumbhash, ...data }: AssetLike): SyncAssetV2 => ({
+const mapSyncAssetV2 = ({ checksum, thumbhash, isFavorite, ...data }: AssetLike): SyncAssetV2 => ({
   ...data,
   checksum: hexOrBufferToBase64(checksum),
   thumbhash: thumbhash ? hexOrBufferToBase64(thumbhash) : null,
+  isFavorite: !!isFavorite,
 });
 
 const mapSyncAssetV1 = (data: AssetLike): SyncAssetV1 => {
@@ -122,6 +129,11 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.SharedSpaceAlbumToAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetExifsV1,
+  // #763: favorites reference assets a viewer does not own, so this overlay stream sits after
+  // EVERY asset-delivering stream (own, partner, album, library, shared-space, space-album) —
+  // same delivering-stream-first pattern as PartnerAssetExifsV1. It stays BEFORE the memory types
+  // so main's "memories stream LAST" invariant below (guarded by sync.service.spec.ts) still holds.
+  SyncRequestType.AssetFavoritesV1,
   // Memories stream LAST, after every type that can deliver an asset row.
   //
   // Mobile's `memory_asset_entity` has real foreign keys (`assetId` → `remote_asset_entity.id`,
@@ -243,6 +255,7 @@ export class SyncService extends BaseService {
       [SyncRequestType.AssetsV2]: () => this.syncAssetsV2(options, response, checkpointMap),
       [SyncRequestType.AssetExifsV1]: () => this.syncAssetExifsV1(options, response, checkpointMap),
       [SyncRequestType.AssetEditsV1]: () => this.syncAssetEditsV1(options, response, checkpointMap),
+      [SyncRequestType.AssetFavoritesV1]: () => this.syncAssetFavoritesV1(options, response, checkpointMap),
       [SyncRequestType.PartnerAssetsV2]: () => this.syncPartnerAssetsV2(options, response, checkpointMap, session.id),
       [SyncRequestType.AssetMetadataV1]: () => this.syncAssetMetadataV1(options, response, checkpointMap, auth),
       [SyncRequestType.PartnerAssetExifsV1]: () =>
@@ -320,6 +333,7 @@ export class SyncService extends BaseService {
     await this.syncRepository.assetFace.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.assetMetadata.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.assetEdit.cleanupAuditTable(pruneThreshold);
+    await this.syncRepository.assetFavorite.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.memory.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.memoryToAsset.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.partner.cleanupAuditTable(pruneThreshold);
@@ -445,6 +459,7 @@ export class SyncService extends BaseService {
         const backfill = this.syncRepository.partnerAsset.getBackfill(
           { ...options, afterUpdateId: startId, beforeUpdateId: endId },
           partner.sharedById,
+          options.userId,
         );
 
         for await (const { updateId, ...data } of backfill) {
@@ -488,6 +503,24 @@ export class SyncService extends BaseService {
     }
     const upsertType = SyncEntityType.AssetEditV1;
     const upserts = this.syncRepository.assetEdit.getUpserts({ ...options, ack: checkpointMap[upsertType] });
+
+    for await (const { updateId, ...data } of upserts) {
+      send(response, { type: upsertType, ids: [updateId], data });
+    }
+  }
+
+  // #763: asset_favorite is its own synced entity (design doc §4.3) — mirrors syncAssetEditsV1
+  // (deletes before upserts) so a favorite/unfavorite converges the same way an edit does.
+  private async syncAssetFavoritesV1(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+    const deleteType = SyncEntityType.AssetFavoriteDeleteV1;
+    const deletes = this.syncRepository.assetFavorite.getDeletes({ ...options, ack: checkpointMap[deleteType] });
+
+    for await (const { id, ...data } of deletes) {
+      send(response, { type: deleteType, ids: [id], data });
+    }
+
+    const upsertType = SyncEntityType.AssetFavoriteV1;
+    const upserts = this.syncRepository.assetFavorite.getUpserts({ ...options, ack: checkpointMap[upsertType] });
 
     for await (const { updateId, ...data } of upserts) {
       send(response, { type: upsertType, ids: [updateId], data });

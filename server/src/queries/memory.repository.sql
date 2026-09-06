@@ -207,6 +207,42 @@ where
   "id" = $1
   and "deletedAt" is null
 
+-- MemoryRepository.get (with viewerId)
+select
+  "memory".*,
+  (
+    select
+      coalesce(json_agg(agg), '[]')
+    from
+      (
+        select
+          "asset".*,
+          exists (
+            select
+              1 as "exists"
+            from
+              "asset_favorite"
+            where
+              "asset_favorite"."assetId" = "asset"."id"
+              and "asset_favorite"."userId" = $1::uuid
+          ) as "isFavoriteForUser"
+        from
+          "asset"
+          inner join "memory_asset" on "asset"."id" = "memory_asset"."assetId"
+        where
+          "memory_asset"."memoriesId" = "memory"."id"
+          and "asset"."visibility" = 'timeline'
+          and "asset"."deletedAt" is null
+        order by
+          "asset"."localDateTime" asc
+      ) as agg
+  ) as "assets"
+from
+  "memory"
+where
+  "id" = $2
+  and "deletedAt" is null
+
 -- MemoryRepository.update
 update "memory"
 set

@@ -4,19 +4,24 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/asset_edit.model.dart' hide AssetEditAction;
 import 'package:immich_mobile/domain/models/stack.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/option.dart';
+import 'package:immich_mobile/utils/semver.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:openapi/api.dart' as api show AssetVisibility;
 import 'package:openapi/api.dart' hide AssetVisibility;
 
-final assetApiRepositoryProvider = Provider((ref) => AssetApiRepository(ref.watch(apiServiceProvider)));
+final assetApiRepositoryProvider = Provider(
+  (ref) => AssetApiRepository(ref.watch(apiServiceProvider), () => ref.read(serverInfoProvider).serverVersion),
+);
 
 class AssetApiRepository extends ApiRepository {
   final ApiService _apiService;
+  final SemVer Function() _getServerVersion;
 
-  AssetApiRepository(this._apiService);
+  AssetApiRepository(this._apiService, this._getServerVersion);
 
   AssetsApi get _api => _apiService.assetsApi;
   StacksApi get _stacksApi => _apiService.stacksApi;
@@ -89,6 +94,12 @@ class AssetApiRepository extends ApiRepository {
     await _api.removeAssetEdits(assetId);
   }
 
+  // #763: DO NOT pass `isFavorite` here. This posts an AssetBulkUpdateDto to the OWNER-ONLY
+  // `PUT /assets`, but favorites are now a per-user overlay (`asset_favorite`) that a read-only
+  // space Viewer may set on another member's asset — use `updateFavorite` below, which routes to
+  // `PUT /assets/favorites` (and handles the pre-5.2.0 server fallback). The parameter survives
+  // only because it is the upstream Immich shape; nothing passes it, and
+  // test/policy/favorite_overlay_policy_test.dart fails if anything starts to.
   Future<void> update(
     List<String> remoteIds, {
     Option<bool> isFavorite = const .none(),
@@ -109,8 +120,28 @@ class AssetApiRepository extends ApiRepository {
   }
 
   // TODO(shenlong): remove after action migration
+  // #763: favorites are per-user (not owner-gated), so they route through the dedicated
+  // /assets/favorites endpoint rather than the owner-only bulk-update endpoint — but that
+  // endpoint doesn't exist on fork servers <= 5.2.0 (mobile and server release independently, so
+  // a newer app can talk to an older server). There, the request falls through to `PUT
+  // /assets/:id` (id = "favorites") and 400s on UUID validation, breaking favoriting entirely,
+  // owned assets included. Gate on the SAME boundary the sync stream uses for the equivalent
+  // problem (sync_api.repository.dart): a fork server > 5.2.0 gets the canonical per-user
+  // endpoint; anything <= 5.2.0 falls back to the legacy bulk-update endpoint below, which the
+  // server still honours via a deprecated `isFavorite` alias that internally calls the same
+  // per-user write path for assets the caller owns (server asset.service.ts
+  // update/updateAll) — restoring pre-#763 owned-asset favoriting. A viewer favoriting someone
+  // else's asset on an old server gets the old 403 (that alias requires Permission.AssetUpdate,
+  // stricter than the canonical endpoint's AssetRead): an accepted degraded mode, since per-user
+  // favorites didn't exist on that server anyway. Remove this fallback once the minimum
+  // supported fork server version is > 5.2.0.
   Future<void> updateFavorite(List<String> ids, bool isFavorite) async {
-    return _api.updateAssets(AssetBulkUpdateDto(ids: ids, isFavorite: Optional.present(isFavorite)));
+    if (_getServerVersion() > const SemVer(major: 5, minor: 2, patch: 0)) {
+      await _api.updateAssetFavorites(AssetFavoriteUpdateDto(ids: ids, isFavorite: isFavorite));
+      return;
+    }
+
+    await _api.updateAssets(AssetBulkUpdateDto(ids: ids, isFavorite: Optional.present(isFavorite)));
   }
 
   Future<void> updateLocation(List<String> ids, LatLng location) async {

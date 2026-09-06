@@ -12,6 +12,7 @@ import {
   AssetBulkDeleteDto,
   AssetBulkUpdateDto,
   AssetCopyDto,
+  AssetFavoriteUpdateDto,
   AssetJobName,
   AssetJobsDto,
   AssetMetadataBulkDeleteDto,
@@ -75,14 +76,24 @@ export class AssetService extends BaseService {
   async get(auth: AuthDto, id: string, spaceId?: string): Promise<AssetResponseDto | SanitizedAssetResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [id] });
 
-    const asset = await this.assetRepository.getById(id, {
-      exifInfo: true,
-      owner: true,
-      faces: { person: true },
-      stack: { assets: true },
-      edits: true,
-      tags: true,
-    });
+    // #763: auth.user.id is the CALLER for the isFavoriteForUser overlay. For a shared-link
+    // session this is the link owner's own id (validateSharedLinkKey/Slug set `user: sharedLink.user`),
+    // so a metadata-enabled link visitor sees the OWNER's favorite flag here — unchanged from this
+    // endpoint's pre-#763 behavior (the old ownership check compared auth.user.id === entity.ownerId,
+    // which was also true in that case). This is distinct from mapSharedLink (shared-link.dto.ts),
+    // which has no auth object at all and must never project.
+    const asset = await this.assetRepository.getById(
+      id,
+      {
+        exifInfo: true,
+        owner: true,
+        faces: { person: true },
+        stack: { assets: true },
+        edits: true,
+        tags: true,
+      },
+      auth.user.id,
+    );
 
     if (!asset) {
       throw new BadRequestException('Asset not found');
@@ -208,6 +219,34 @@ export class AssetService extends BaseService {
     }
   }
 
+  /**
+   * #763 canonical write surface for per-user favorites (PUT /assets/favorites), also called by
+   * the deprecated `isFavorite` alias on `update`/`updateAll` (§8.1) — the alias keeps its own,
+   * STRICTER Permission.AssetUpdate route guard, so it can only ever be narrower than this method,
+   * never wider. See docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §5.1.
+   */
+  async updateFavorites(auth: AuthDto, dto: AssetFavoriteUpdateDto): Promise<void> {
+    // §5.1: a shared-link session's `auth.user` is the LINK OWNER's identity, not an authenticated
+    // caller (AuthDto.user is non-optional; sharedLink is the optional field that marks this case —
+    // see auth.dto.ts:16,18). Without this explicit guard, an anonymous visitor holding a share link
+    // would create asset_favorite rows attributed to the owner: an unauthenticated write in a real
+    // user's name. No route on this DTO declares `sharedLink: true`, but this guard is deliberately
+    // NOT relied on that route metadata alone — it must hold even if that ever changes.
+    if (auth.sharedLink) {
+      throw new BadRequestException('Shared link sessions cannot set favorites');
+    }
+
+    // The subject is ALWAYS the caller (E4/E7): nothing in AssetFavoriteUpdateDto can name another
+    // user, and elevated session permission (auth.session.hasElevatedPermission) never widens this —
+    // it only ever grants the CALLER extra read access (e.g. their own Locked assets), never lets
+    // them write on someone else's behalf.
+    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: dto.ids });
+
+    await (dto.isFavorite
+      ? this.assetFavoriteRepository.addAll(auth.user.id, dto.ids)
+      : this.assetFavoriteRepository.removeAll(auth.user.id, dto.ids));
+  }
+
   async update(auth: AuthDto, id: string, dto: UpdateAssetDto): Promise<AssetResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
 
@@ -223,7 +262,7 @@ export class AssetService extends BaseService {
       }
     }
 
-    const { description, dateTimeOriginal, latitude, longitude, rating, ...rest } = dto;
+    const { description, dateTimeOriginal, latitude, longitude, rating, isFavorite, ...rest } = dto;
     const repos = { asset: this.assetRepository, event: this.eventRepository };
 
     let previousMotion: { id: string } | null = null;
@@ -246,7 +285,17 @@ export class AssetService extends BaseService {
       priorVisibility = priorAsset?.visibility;
     }
 
-    const asset = await this.assetRepository.update({ id, ...rest });
+    // #763: isFavorite is the deprecated alias for PUT /assets/favorites (§8.1) — route it through
+    // the SAME updateFavorites logic so the alias can never be more permissive than the canonical
+    // endpoint. Written BEFORE the repository read below so the isFavoriteForUser it projects for
+    // the response reflects the caller's own just-written state, not the pre-write value.
+    if (isFavorite !== undefined) {
+      await this.updateFavorites(auth, { ids: [id], isFavorite });
+    }
+
+    // #763: auth.user.id is the CALLER — this endpoint requires Permission.AssetUpdate (never
+    // sharedLink: true, see asset.controller.ts), so auth.user.id is always a genuine caller here.
+    const asset = await this.assetRepository.update({ id, ...rest }, auth.user.id);
 
     if (previousMotion && asset) {
       await onAfterUnlink(repos, {
@@ -326,7 +375,14 @@ export class AssetService extends BaseService {
       }
     }
 
-    const assetDto = _.omitBy({ isFavorite, visibility, duplicateId }, _.isUndefined);
+    // #763: isFavorite is the deprecated alias for PUT /assets/favorites (§8.1) — it no longer goes
+    // into the plain column write (assetDto below). Routed through the SAME updateFavorites logic
+    // as the canonical endpoint, so the alias can never be more permissive.
+    if (isFavorite !== undefined) {
+      await this.updateFavorites(auth, { ids, isFavorite });
+    }
+
+    const assetDto = _.omitBy({ visibility, duplicateId }, _.isUndefined);
 
     // When latitude/longitude are updated in bulk, reverse-geocode once so country/state/city
     // stay in sync across all selected assets. See updateExif() for the rationale.
@@ -462,8 +518,10 @@ export class AssetService extends BaseService {
     }: AssetCopyDto,
   ) {
     await this.requireAccess({ auth, permission: Permission.AssetCopy, ids: [sourceId, targetId] });
-    const sourceAsset = await this.assetRepository.getForCopy(sourceId);
-    const targetAsset = await this.assetRepository.getForCopy(targetId);
+    // #763 (E20): `getForCopy`'s `isFavorite` is the ACTING user's overlay row, not the owner's —
+    // see asset.repository.ts. Copy carries only that, never every user who favorited the source.
+    const sourceAsset = await this.assetRepository.getForCopy(sourceId, auth.user.id);
+    const targetAsset = await this.assetRepository.getForCopy(targetId, auth.user.id);
 
     if (!sourceAsset || !targetAsset) {
       throw new BadRequestException('Both assets must exist');
@@ -486,7 +544,14 @@ export class AssetService extends BaseService {
     }
 
     if (favorite) {
-      await this.assetRepository.update({ id: targetId, isFavorite: sourceAsset.isFavorite });
+      // Semantic sharpening (#763, E20), not a translation of the old column-update: the old
+      // code copied the source asset's GLOBAL isFavorite column; this copies the ACTING user's
+      // own favorite of the source onto the target, mirroring the old "set to whatever the
+      // source's value is" overwrite behaviour but scoped to auth.user.id only. Another user who
+      // also favorited the source is untouched — they never had a say in this copy.
+      await (sourceAsset.isFavorite
+        ? this.assetFavoriteRepository.addAll(auth.user.id, [targetId])
+        : this.assetFavoriteRepository.removeAll(auth.user.id, [targetId]));
     }
 
     if (sidecar) {

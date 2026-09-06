@@ -1049,10 +1049,10 @@
             : undefined}
         />
         <ActionButton action={Actions.AddToAlbum} />
-        {#if assetMultiSelectManager.isAllUserOwned}
-          <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleBulkFavorite}
-          ></FavoriteAction>
-        {/if}
+        <!-- #763: no isAllUserOwned gate — a favorite is a per-user overlay row, so any asset the
+             viewer can read is favoritable, including another member's in a shared space. -->
+        <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleBulkFavorite}
+        ></FavoriteAction>
         <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')} offset={{ x: 175, y: 25 }}>
           <DownloadAction menuItem filename="{album.albumName}.zip" />
           {#if assetMultiSelectManager.isAllUserOwned}

@@ -106,6 +106,12 @@ class AssetService {
     await _apiRepository.unStack(stackIds);
   }
 
+  // #763: DO NOT pass `isFavorite` here. It forwards to the OWNER-ONLY bulk-update endpoint
+  // (`AssetApiRepository.update` -> `PUT /assets`), but favorites are now a per-user overlay
+  // (`asset_favorite`) that a read-only space Viewer may set on another member's asset — use
+  // `updateFavorite` below, which routes to `PUT /assets/favorites`. The parameter survives only
+  // because it is the upstream Immich shape; nothing passes it, and
+  // test/policy/favorite_overlay_policy_test.dart fails if anything starts to.
   Future<void> update(
     List<String> remoteIds, {
     Option<bool> isFavorite = const .none(),

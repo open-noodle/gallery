@@ -81,10 +81,21 @@ const createPhotosAlbumFixture = async (ctx: ReturnType<typeof setup>['ctx']) =>
   const { user: carol } = await ctx.newUser(); // in NO space of the viewer's
 
   const myAsset = await createTimelineAsset(ctx, viewer.id, SPACE_DATE);
-  const myFavoriteAsset = await createTimelineAsset(ctx, viewer.id, SPACE_DATE, { isFavorite: true });
+  const myFavoriteAsset = await createTimelineAsset(ctx, viewer.id, SPACE_DATE);
   // Album-only assets of another user: the co-member contributions the D3 bug leaked.
   const carolAsset = await createTimelineAsset(ctx, carol.id, SPACE_DATE);
-  const carolFavoriteAsset = await createTimelineAsset(ctx, carol.id, SPACE_DATE, { isFavorite: true });
+  const carolFavoriteAsset = await createTimelineAsset(ctx, carol.id, SPACE_DATE);
+
+  // #763: a favourite is an `asset_favorite` row per USER, not `asset.isFavorite` on the asset.
+  // Carol favourites hers, the viewer favourites theirs — which is exactly what the assertion
+  // below distinguishes.
+  await ctx.database
+    .insertInto('asset_favorite')
+    .values([
+      { userId: viewer.id, assetId: myFavoriteAsset.id },
+      { userId: carol.id, assetId: carolFavoriteAsset.id },
+    ])
+    .execute();
 
   const { album } = await ctx.newAlbum({ ownerId: viewer.id }, [
     myAsset.id,
@@ -210,12 +221,11 @@ describe(TimelineService.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'), {
-        isFavorite: true,
-      });
-      await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'), {
-        isFavorite: false,
-      });
+      const favorited = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'));
+      await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'));
+      // #763: isFavorite now filters against the asset_favorite overlay for the caller, not the
+      // legacy asset.isFavorite column.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, isFavorite: true })).resolves.toEqual([
         expect.objectContaining({ count: 1 }),
@@ -258,7 +268,9 @@ describe(TimelineService.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'), { isFavorite: false });
+      // Not favorited: no asset_favorite overlay row seeded (there is no raw column to default
+      // false anymore — dropped in slice 3).
+      await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'));
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Year, isFavorite: true })).resolves.toEqual(
         [],
@@ -292,31 +304,31 @@ describe(TimelineService.name, () => {
         });
         await expect(response1).rejects.toBeInstanceOf(BadRequestException);
         await expect(response1).rejects.toThrow(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
 
         const response2 = sut.getTimeBuckets(auth, { bucketSize, withPartners: true });
         await expect(response2).rejects.toBeInstanceOf(BadRequestException);
         await expect(response2).rejects.toThrow(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
       },
     );
 
-    it('should return error if time bucket is requested with partners asset and favorite', async () => {
+    // #763 slice 4: isFavorite no longer trips this guard — it composes with withPartners (the
+    // caller-scoped asset_favorite overlay resolves independently of the cross-user union). An
+    // explicit non-archived visibility is required so the request doesn't fall into the separate
+    // undefined-visibility-defaults-to-archived rejection exercised above.
+    it('resolves time buckets when partners is combined with isFavorite (true or false) (#763 slice 4)', async () => {
       const { sut } = setup();
       const auth = factory.auth();
-      const response1 = sut.getTimeBuckets(auth, { withPartners: true, isFavorite: false });
-      await expect(response1).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response1).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
-      );
 
-      const response2 = sut.getTimeBuckets(auth, { withPartners: true, isFavorite: true });
-      await expect(response2).rejects.toBeInstanceOf(BadRequestException);
-      await expect(response2).rejects.toThrow(
-        'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
-      );
+      await expect(
+        sut.getTimeBuckets(auth, { withPartners: true, isFavorite: false, visibility: AssetVisibility.Timeline }),
+      ).resolves.toEqual([]);
+      await expect(
+        sut.getTimeBuckets(auth, { withPartners: true, isFavorite: true, visibility: AssetVisibility.Timeline }),
+      ).resolves.toEqual([]);
     });
 
     it.each([TimeBucketSize.Year, TimeBucketSize.Month, TimeBucketSize.Day])(
@@ -327,7 +339,7 @@ describe(TimelineService.name, () => {
         const response = sut.getTimeBuckets(auth, { bucketSize, withPartners: true, isTrashed: true });
         await expect(response).rejects.toBeInstanceOf(BadRequestException);
         await expect(response).rejects.toThrow(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
       },
     );
@@ -449,7 +461,6 @@ describe(TimelineService.name, () => {
             ownerId: user.id,
             fileCreatedAt: new Date('1970-02-12'),
             localDateTime: new Date('1970-02-12'),
-            isFavorite: true,
           });
           await ctx.newExif({ assetId: result.asset.id, make: 'Canon' });
           return result;
@@ -460,12 +471,22 @@ describe(TimelineService.name, () => {
             ownerId: user.id,
             fileCreatedAt: new Date('1970-02-13'),
             localDateTime: new Date('1970-02-13'),
-            isFavorite: true,
           });
           await ctx.newExif({ assetId: result.asset.id, make: 'Canon' });
           return result;
         }),
       ]);
+
+      // #763: each owner has favorited only their own asset in the asset_favorite overlay — the
+      // legacy asset.isFavorite column is never set here, so this is exercised purely against the
+      // overlay, same as production once the (currently untouched) write path records a favorite.
+      await ctx.database
+        .insertInto('asset_favorite')
+        .values([
+          { userId: asset1.ownerId, assetId: asset1.id },
+          { userId: asset2.ownerId, assetId: asset2.id },
+        ])
+        .execute();
 
       await Promise.all([
         ctx.newPartner({ sharedById: asset1.ownerId, sharedWithId: asset2.ownerId }),
@@ -850,9 +871,9 @@ describe(TimelineService.name, () => {
       const { viewer, album, myFavoriteAsset, carolFavoriteAsset } = await createPhotosAlbumFixture(ctx);
       const auth = factory.auth({ user: viewer });
 
-      // `isFavorite` is the asset OWNER's flag, and /photos drops withPartners/withSharedSpaces for
-      // a favourites query (the server 400s that combination anyway) — so here `userId` is the ONLY
-      // thing standing between me and a co-member's favourites.
+      // #763: `isFavorite` resolves the per-user `asset_favorite` overlay for the CALLER, so a
+      // co-member's favourite on their own asset is not mine. `userId` still scopes the album
+      // query to my own timeline; the overlay is what makes the chip mean "mine".
       const ids = await photosBucketAssetIds(sut, auth, {
         userId: viewer.id,
         albumId: album.id,

@@ -6,6 +6,7 @@ import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName,
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { EventRepository } from 'src/repositories/event.repository';
@@ -34,6 +35,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [
       AssetRepository,
       AssetEditRepository,
+      AssetFavoriteRepository,
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
@@ -83,6 +85,29 @@ describe(AssetService.name, () => {
       await ctx.newExif({ assetId: asset.id, fileSizeInByte: 12_345 });
       const auth = factory.auth({ user: { id: user.id } });
       await expect(sut.getStatistics(auth, {})).resolves.toEqual({ images: 1, total: 1, videos: 0 });
+    });
+  });
+
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively (slice 1b Task 1);
+  // `get` must thread the CALLER's id (auth.user.id) into the repository projection, not the
+  // asset owner's.
+  describe('get (#763)', () => {
+    it('E1 — a space member sees their own favorite, independent of the owner', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+      const memberAuth = factory.auth({ user: { id: member.id } });
+      await expect(sut.get(memberAuth, asset.id)).resolves.toMatchObject({ isFavorite: true });
+
+      const ownerAuth = factory.auth({ user: { id: owner.id } });
+      await expect(sut.get(ownerAuth, asset.id)).resolves.toMatchObject({ isFavorite: false });
     });
   });
 
@@ -203,13 +228,18 @@ describe(AssetService.name, () => {
       expect(stack!.assets.length).toEqual(3);
     });
 
-    it('should copy favorite status', async () => {
+    // #763 slice 7 (E20): copy carries the ACTING user's own overlay row for the source, not the
+    // raw (now-legacy) asset.isFavorite column — `ctx.newAsset({ isFavorite: true })` only seeds
+    // that column for backfill-style fixtures, so the acting user must ALSO hold a real
+    // asset_favorite row on the source for it to transfer.
+    it('should copy favorite status for the acting user', async () => {
       const { sut, ctx } = setup();
-      const assetRepo = ctx.get(AssetRepository);
+      const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);
 
       const { user } = await ctx.newUser();
-      const { asset: oldAsset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset: oldAsset } = await ctx.newAsset({ ownerId: user.id });
       const { asset: newAsset } = await ctx.newAsset({ ownerId: user.id });
+      await assetFavoriteRepo.addAll(user.id, [oldAsset.id]);
 
       await ctx.newExif({ assetId: oldAsset.id, description: 'foo' });
       await ctx.newExif({ assetId: newAsset.id, description: 'bar' });
@@ -217,7 +247,35 @@ describe(AssetService.name, () => {
       const auth = factory.auth({ user: { id: user.id } });
       await sut.copy(auth, { sourceId: oldAsset.id, targetId: newAsset.id });
 
-      await expect(assetRepo.getById(newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: true }));
+      await expect(sut.get(auth, newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: true }));
+    });
+
+    it("should not copy another user's favorite of the source (E20)", async () => {
+      const { sut, ctx } = setup();
+      const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);
+
+      const { user: owner } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset: oldAsset } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: newAsset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: oldAsset.id, addedById: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: newAsset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: otherUser.id, role: 'viewer' });
+
+      // otherUser favorited the source; owner (the ACTOR performing the copy) did not.
+      await assetFavoriteRepo.addAll(otherUser.id, [oldAsset.id]);
+
+      await ctx.newExif({ assetId: oldAsset.id, description: 'foo' });
+      await ctx.newExif({ assetId: newAsset.id, description: 'bar' });
+
+      const ownerAuth = factory.auth({ user: { id: owner.id } });
+      await sut.copy(ownerAuth, { sourceId: oldAsset.id, targetId: newAsset.id });
+
+      await expect(sut.get(ownerAuth, newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: false }));
+
+      const otherAuth = factory.auth({ user: { id: otherUser.id } });
+      await expect(sut.get(otherAuth, newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: false }));
     });
 
     it('should copy sidecar file', async () => {
@@ -372,6 +430,22 @@ describe(AssetService.name, () => {
   });
 
   describe('update', () => {
+    // #763 slice 1b Task 2 — the update return path feeds mapAsset, which now reads
+    // `isFavoriteForUser` exclusively; `update` must thread auth.user.id into the repository
+    // projection so the response reflects the CALLER's own overlay, not the owner's.
+    it('projects isFavoriteForUser for the requesting user (#763)', async () => {
+      const { sut, ctx } = setup();
+      ctx.getMock(JobRepository).queue.mockResolvedValue();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+      await expect(sut.update(auth, asset.id, { description: 'updated' })).resolves.toMatchObject({
+        isFavorite: true,
+      });
+    });
+
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queue.mockResolvedValue();

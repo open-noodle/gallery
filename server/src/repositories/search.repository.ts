@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  ExpressionBuilder,
   expressionBuilder,
   Kysely,
   OrderByDirection,
@@ -32,6 +33,7 @@ import {
   withExifInner,
   withSearchOrder,
 } from 'src/utils/database';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import { without } from 'src/utils/filter-suggestions';
 import { paginationHelper } from 'src/utils/pagination';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
@@ -51,6 +53,14 @@ export interface SearchUserIdOptions {
    * userIds would widen the result set instead of narrowing it.
    */
   ownerId?: string;
+  /**
+   * #763: the caller making the request — NOT `userIds` (the timeline/search *target*, which
+   * differs from the caller on space/album scoped paths — e.g. `getFilteredMapMarkers`'s
+   * `userIds: dto.spaceId ? undefined : [auth.user.id]` leaves `userIds` unset entirely when
+   * browsing a specific space). Required by `searchAssetBuilder` and the smart-facet pipeline
+   * whenever `isFavorite` is set, so they resolve the `asset_favorite` overlay for the right user.
+   */
+  authUserId?: string;
 }
 
 export type SearchIdOptions = SearchAssetIdOptions & SearchUserIdOptions;
@@ -159,6 +169,15 @@ export interface SearchSpaceOptions {
   spaceId?: string;
   spacePersonIds?: string[];
   timelineSpaceIds?: string[];
+  /**
+   * #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
+   * to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
+   * stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
+   * the "is the Favourites section worth offering" answer has to span the same set the favourites
+   * filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
+   * OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
+   */
+  favoriteSpaceIds?: string[];
 }
 
 export interface SearchOrderOptions {
@@ -203,6 +222,12 @@ export interface AssetSearchBuilderV3Options {
   filter?: SearchFilter;
   /** Server-derived ownership scope. Never client-controlled. */
   userIds?: string[];
+  /**
+   * #763: the CALLER's id, used to resolve `filter.isFavorite` against the per-user
+   * `asset_favorite` overlay (the raw `asset.isFavorite` column is gone). Mirrors
+   * `AssetSearchBuilderOptions.authUserId` on the legacy path. Never client-controlled.
+   */
+  authUserId?: string;
   withExif?: boolean;
   withFaces?: boolean;
   withPeople?: boolean;
@@ -315,6 +340,15 @@ export interface SuggestionScopeOptions {
   albumId?: string;
   spaceId?: string;
   timelineSpaceIds?: string[];
+  /**
+   * #763: the space scope the FAVOURITES probe alone runs under — every space the caller belongs
+   * to, not just the ones they show in their timeline. A favourite is an explicit per-asset act and
+   * stays reachable when its space is hidden (see SharedSpaceRepository.getAllMemberSpaceIds), so
+   * the "is the Favourites section worth offering" answer has to span the same set the favourites
+   * filter itself will. Deliberately separate from `timelineSpaceIds`, which still scopes every
+   * OTHER facet — widening those would leak a hidden space's cities/tags/people back into the panel.
+   */
+  favoriteSpaceIds?: string[];
   takenAfter?: Date;
   takenBefore?: Date;
   /**
@@ -428,6 +462,7 @@ export class SearchRepository {
           withStacked: true,
           isFavorite: true,
           userIds: [DummyValue.UUID],
+          authUserId: DummyValue.UUID,
         },
       ],
     },
@@ -448,6 +483,12 @@ export class SearchRepository {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
     const items = await searchAssetBuilderLegacy(this.db, options)
       .select(columns.searchAsset)
+      // #763: project the per-user overlay onto the rows feeding mapAsset. Not folded into
+      // searchAssetBuilderLegacy itself — searchStatistics also builds on it with an aggregate
+      // countAll() and no GROUP BY, so an unconditional row-level SELECT there would break it.
+      .$if(!!options.authUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+      )
       .orderBy('asset.fileCreatedAt', orderDirection)
       .orderBy('asset.id', orderDirection)
       .limit(pagination.size + 1)
@@ -464,6 +505,7 @@ export class SearchRepository {
         lensModel: DummyValue.STRING,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
       },
     ],
   })
@@ -482,15 +524,22 @@ export class SearchRepository {
         withStacked: true,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
       },
     ],
   })
   async searchRandom(size: number, options: AssetSearchOptions) {
-    return searchAssetBuilderLegacy(this.db, options)
-      .select(columns.searchAsset)
-      .orderBy(sql`random()`)
-      .limit(size)
-      .execute();
+    return (
+      searchAssetBuilderLegacy(this.db, options)
+        .select(columns.searchAsset)
+        // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
+        .$if(!!options.authUserId, (qb) =>
+          qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+        )
+        .orderBy(sql`random()`)
+        .limit(size)
+        .execute()
+    );
   }
 
   @GenerateSql({
@@ -502,18 +551,25 @@ export class SearchRepository {
         withStacked: true,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
       },
     ],
   })
   searchLargeAssets(size: number, options: LargeAssetSearchOptions) {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
-    return searchAssetBuilderLegacy(this.db, options)
-      .select(columns.searchAsset)
-      .$call(withExifInner)
-      .where('asset_exif.fileSizeInByte', '>', options.minFileSize || 0)
-      .orderBy('asset_exif.fileSizeInByte', orderDirection)
-      .limit(size)
-      .execute();
+    return (
+      searchAssetBuilderLegacy(this.db, options)
+        .select(columns.searchAsset)
+        // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
+        .$if(!!options.authUserId, (qb) =>
+          qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+        )
+        .$call(withExifInner)
+        .where('asset_exif.fileSizeInByte', '>', options.minFileSize || 0)
+        .orderBy('asset_exif.fileSizeInByte', orderDirection)
+        .limit(size)
+        .execute()
+    );
   }
 
   private buildSearchSmartQueries(
@@ -530,6 +586,12 @@ export class SearchRepository {
       ratingIsMinimum: true,
     })
       .selectAll('asset')
+      // #763: project the per-user overlay onto the rows feeding mapAsset via searchSmart's
+      // mapResponse. Flows through both the 'cte' (candidates.selectAll()) and 'simple' outer
+      // query paths below since both select every column baseQuery projects.
+      .$if(!!options.authUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+      )
       .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
       .$if(hasDistanceThreshold, (qb) =>
@@ -612,6 +674,7 @@ export class SearchRepository {
         withStacked: true,
         isFavorite: true,
         userIds: [DummyValue.UUID],
+        authUserId: DummyValue.UUID,
         spacePersonIds: [DummyValue.UUID],
         timelineSpaceIds: [DummyValue.UUID, DummyValue.UUID],
         orderDirection: 'desc',
@@ -748,6 +811,12 @@ export class SearchRepository {
     const appliesModel = exclude !== 'camera' && exclude !== 'cameraModel' && options.model !== undefined;
     const appliesRating = exclude !== 'rating' && options.rating !== undefined;
     const needsExifJoin = !!(appliesCountry || appliesCity || appliesMake || appliesModel || appliesRating);
+    // #763: same caller resolution as getSmartFacetHasFavorites — `authUserId` and `callerId` are two
+    // names for the viewer on this path, and `userIds[0]` is deliberately not consulted (it is not the
+    // caller under an album scope). Only read when `isFavorite` is set, and the assertion holds for
+    // every production caller: SearchService.resolveSmartSearch is the only one, and it always sets
+    // both alongside any client-supplied `isFavorite`.
+    const facetCallerId = options.authUserId ?? options.callerId;
 
     return kysely
       .selectFrom('asset')
@@ -765,7 +834,9 @@ export class SearchRepository {
       )
       .$if(exclude !== 'media' && !!options.type, (qb) => qb.where('asset.type', '=', options.type!))
       .$if(exclude !== 'favorites' && options.isFavorite !== undefined, (qb) =>
-        qb.where('asset.isFavorite', '=', options.isFavorite!),
+        qb.where((eb) =>
+          options.isFavorite ? favoriteExistsFor(eb, facetCallerId!) : eb.not(favoriteExistsFor(eb, facetCallerId!)),
+        ),
       )
       .$if(exclude !== 'albums' && !!options.isNotInAlbum && !options.albumIds?.length, (qb) =>
         qb.where((eb) =>
@@ -1030,11 +1101,42 @@ export class SearchRepository {
   }
 
   private async getSmartFacetHasFavorites(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<boolean> {
+    // #763: "is the Favourites section worth offering" is a per-CALLER question — probe the
+    // caller's `asset_favorite` overlay, not the dropped `asset.isFavorite` column.
+    //
+    // The caller is `authUserId`/`callerId` — two names for the same value (`auth.user.id`, set by
+    // SearchService.resolveSmartSearch), one from this path's search-builder options and one from
+    // SearchEmbeddingOptions. Deliberately NOT `userIds[0]`: unlike the browse path, where
+    // getUserIdsToSearch guarantees `[auth.user.id, ...partnerIds]`, `userIds` here is left unset
+    // entirely under an album scope (see SearchEmbeddingOptions.userIds and the `callerId` note in
+    // getSmartFacetPeople). Probing `userIds[0]` there would answer for whichever owner happened to
+    // head an owner-scoping array — another user's favourite state, surfaced in my UI.
+    //
+    // With no caller in scope there is no per-user answer, so the section is simply not offered.
+    // That is the fail-safe direction — it can only hide a filter, never reveal someone else's
+    // favourites — and it is consistent with what the section would do if shown: the `isFavorite`
+    // filter behind it needs a caller too. Mirrors the `.$if(!!authUserId, ...)` fail-safe the
+    // overlay projections use in asset.repository.ts.
+    const callerId = options.authUserId ?? options.callerId;
+    if (!callerId) {
+      return false;
+    }
+
     const row = await trx
       .selectFrom('asset')
       .select('asset.id')
-      .where('asset.id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'favorites'))
-      .where('asset.isFavorite', '=', true)
+      // #763: same widening as getFilteredHasFavorites — the favourites facet spans every space the
+      // caller belongs to, while every other facet keeps the timeline-visible scope.
+      .where(
+        'asset.id',
+        'in',
+        this.buildSmartFacetFilteredAssetIds(
+          trx,
+          { ...options, timelineSpaceIds: options.favoriteSpaceIds ?? options.timelineSpaceIds },
+          'favorites',
+        ),
+      )
+      .where((eb) => favoriteExistsFor(eb, callerId))
       .limit(1)
       .executeTakeFirst();
     return !!row;
@@ -1250,8 +1352,11 @@ export class SearchRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [[DummyValue.UUID], [DummyValue.UUID]] })
-  getAssetsByCity(userIds: string[], timelineSpaceIds?: string[]) {
+  @GenerateSql(
+    { params: [[DummyValue.UUID], [DummyValue.UUID]] },
+    { name: 'with authUserId', params: [[DummyValue.UUID], [DummyValue.UUID], DummyValue.UUID] },
+  )
+  getAssetsByCity(userIds: string[], timelineSpaceIds?: string[], authUserId?: string) {
     // #867: the places page is the "view all" of the Explore strip, so it carries the same scope —
     // own (and partner) assets, plus anything reachable through a space the viewer kept on their
     // timeline. Built from a detached expression builder because the recursive `cte` widens the
@@ -1272,53 +1377,67 @@ export class SearchRepository {
       ]);
     };
 
-    return this.db
-      .withRecursive('cte', (qb) => {
-        const base = qb
-          .selectFrom('asset_exif')
-          .select(['city', 'assetId'])
-          .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-          .where(viewerScope())
-          .where('asset.visibility', '=', AssetVisibility.Timeline)
-          .where('asset.type', '=', AssetType.Image)
-          .where('asset.deletedAt', 'is', null)
-          .orderBy('city')
-          .limit(1);
+    return (
+      this.db
+        .withRecursive('cte', (qb) => {
+          const base = qb
+            .selectFrom('asset_exif')
+            .select(['city', 'assetId'])
+            .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+            .where(viewerScope())
+            .where('asset.visibility', '=', AssetVisibility.Timeline)
+            .where('asset.type', '=', AssetType.Image)
+            .where('asset.deletedAt', 'is', null)
+            .orderBy('city')
+            .limit(1);
 
-        const recursive = qb
-          .selectFrom('cte')
-          .select(['l.city', 'l.assetId'])
-          .innerJoinLateral(
-            (qb) =>
-              qb
-                .selectFrom('asset_exif')
-                .select(['city', 'assetId'])
-                .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-                .where(viewerScope())
-                .where('asset.visibility', '=', AssetVisibility.Timeline)
-                .where('asset.type', '=', AssetType.Image)
-                .where('asset.deletedAt', 'is', null)
-                .whereRef('asset_exif.city', '>', 'cte.city')
-                .orderBy('city')
-                .limit(1)
-                .as('l'),
-            (join) => join.onTrue(),
-          );
+          const recursive = qb
+            .selectFrom('cte')
+            .select(['l.city', 'l.assetId'])
+            .innerJoinLateral(
+              (qb) =>
+                qb
+                  .selectFrom('asset_exif')
+                  .select(['city', 'assetId'])
+                  .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+                  .where(viewerScope())
+                  .where('asset.visibility', '=', AssetVisibility.Timeline)
+                  .where('asset.type', '=', AssetType.Image)
+                  .where('asset.deletedAt', 'is', null)
+                  .whereRef('asset_exif.city', '>', 'cte.city')
+                  .orderBy('city')
+                  .limit(1)
+                  .as('l'),
+              (join) => join.onTrue(),
+            );
 
-        return sql<{ city: string; assetId: string }>`(${base} union all ${recursive})`;
-      })
-      .selectFrom('asset')
-      .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-      .innerJoin('cte', 'asset.id', 'cte.assetId')
-      .select(columns.searchAsset)
-      .select((eb) =>
-        eb
-          .fn('to_jsonb', [eb.table('asset_exif')])
-          .$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>()
-          .as('exifInfo'),
-      )
-      .orderBy('asset_exif.city')
-      .execute();
+          return sql<{ city: string; assetId: string }>`(${base} union all ${recursive})`;
+        })
+        .selectFrom('asset')
+        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+        .innerJoin('cte', 'asset.id', 'cte.assetId')
+        .select(columns.searchAsset)
+        .select((eb) =>
+          eb
+            .fn('to_jsonb', [eb.table('asset_exif')])
+            .$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>()
+            .as('exifInfo'),
+        )
+        // #763: project the per-user overlay for the CALLER onto the rows feeding
+        // search.service.ts's getAssetsByCity -> mapAsset. The `eb` here is scoped to
+        // `DB & { cte: ... }` (the `withRecursive('cte', ...)` above), which Kysely's
+        // ExpressionBuilder generics don't consider assignable to the plain
+        // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects, even though the
+        // 'asset_favorite' table it queries is unaffected by the extra CTE in scope. Safe cast
+        // (same mechanism as asset.repository.ts's getTimeBucket).
+        .$if(!!authUserId, (qb) =>
+          qb.select((eb) =>
+            favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, authUserId!).as('isFavoriteForUser'),
+          ),
+        )
+        .orderBy('asset_exif.city')
+        .execute()
+    );
   }
 
   async upsert(assetId: string, embedding: string): Promise<void> {
@@ -1769,7 +1888,13 @@ export class SearchRepository {
       )
       .$if(!!options.mediaType, (qb) => qb.where('asset.type', '=', options.mediaType!))
       .$if(options.isFavorite !== undefined && options.isFavorite !== null, (qb) =>
-        qb.where('asset.isFavorite', '=', options.isFavorite!),
+        qb.where((eb) =>
+          // #763: buildFilteredAssetIds has no dedicated authUserId param — userIds[0] is the
+          // caller here (every call path resolves userIds via SearchService.getUserIdsToSearch,
+          // which always returns `[auth.user.id, ...partnerIds]`; unlike searchAssetBuilder's
+          // options.userIds, this is never left unset or reordered on a space/album path).
+          options.isFavorite ? favoriteExistsFor(eb, userIds[0]) : eb.not(favoriteExistsFor(eb, userIds[0])),
+        ),
       );
   }
 
@@ -2071,8 +2196,20 @@ export class SearchRepository {
     const row = await this.db
       .selectFrom('asset')
       .select('asset.id')
-      .where('asset.id', 'in', this.buildFilteredAssetIds(userIds, options))
-      .where('asset.isFavorite', '=', true)
+      // #763: `favoriteSpaceIds` when the caller supplied it — a favourite survives hiding its
+      // space from the timeline, so the probe must span every membership. Falls back to the shared
+      // scope, which is what album/space-scoped panels (no favouriteSpaceIds) keep using.
+      .where(
+        'asset.id',
+        'in',
+        this.buildFilteredAssetIds(userIds, {
+          ...options,
+          timelineSpaceIds: options.favoriteSpaceIds ?? options.timelineSpaceIds,
+        }),
+      )
+      // #763: per-caller overlay, not the dropped `asset.isFavorite` column. `userIds[0]` is the
+      // caller on this path — same reasoning as `buildFilteredAssetIds`'s isFavorite branch.
+      .where((eb) => favoriteExistsFor(eb, userIds[0]))
       .limit(1)
       .executeTakeFirst();
     return !!row;

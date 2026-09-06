@@ -11,10 +11,12 @@ import { utils } from 'src/utils';
 // never render there — this page has no cover action (see the design doc's "Cover note").
 //
 // This is a single smoke case (not the full role x ownership matrix already covered by the
-// timeline spec): a space Viewer selecting a person's asset they don't own sees only the two
-// always-on actions (Select-all, Download); every ownership-gated action (Share, Add-to-album,
-// Favorite, edit, Delete) and the role-gated Remove-from-space are hidden, and Set-cover never
-// appears at all.
+// timeline spec): a space Viewer selecting a person's asset they don't own sees the two
+// always-on actions (Select-all, Download) plus Favorite; every ownership-gated action (Share,
+// Add-to-album, edit, Delete) and the role-gated Remove-from-space are hidden, and Set-cover never
+// appears at all. Favorite is deliberately NOT ownership-gated (#763): it writes a per-user
+// `asset_favorite` row rather than mutating the asset, so `canFavorite` is unconditionally true —
+// even a read-only space viewer gets the heart. Same expectation as the -album/-timeline siblings.
 
 // Navigates and waits for the initial `/timeline/buckets` fetch the destination page's Timeline
 // component fires on mount, so a subsequent selection/assertion isn't racing the load.
@@ -63,8 +65,9 @@ test.describe('Spaces — SelectionToolbar space-person control bar (Slice 5)', 
 
   // Case 8: a space Viewer selecting a person's asset that belongs to another member (`owner`).
   // isAllUserOwned is false and space.canWrite is false (Viewer role) — every ownership-gated AND
-  // every role-gated action is hidden, and Set-cover never appears (no onSetCover on this page).
-  test("viewer selecting a space person's asset (not theirs) sees only Select-all and Download", async ({
+  // every role-gated action is hidden (except Favorite, which is not on either axis — #763), and
+  // Set-cover never appears (no onSetCover on this page).
+  test("viewer selecting a space person's asset (not theirs) sees only Select-all, Favorite and Download", async ({
     context,
     page,
   }) => {
@@ -107,7 +110,8 @@ test.describe('Spaces — SelectionToolbar space-person control bar (Slice 5)', 
     // Ownership-gated, top-level: all hidden (viewer doesn't own the asset).
     await expect(controlBar.getByRole('button', { name: 'Share' })).toHaveCount(0);
     await expect(controlBar.getByRole('button', { name: 'Add to album or space' })).toHaveCount(0);
-    await expect(controlBar.getByRole('button', { name: /favorite/i })).toHaveCount(0);
+    // NOT ownership-gated (#763): the favorite lands in the viewer's own overlay row.
+    await expect(controlBar.getByRole('button', { name: /favorite/i })).toBeVisible();
 
     // Role-gated, top-level: hidden (Viewer has no write access to the space).
     await expect(controlBar.getByRole('button', { name: 'Remove from space' })).toHaveCount(0);

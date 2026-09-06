@@ -63,7 +63,6 @@ describe(SearchRepository.name, () => {
       const { asset: february } = await ctx.newAsset({
         ownerId: user.id,
         type: AssetType.Video,
-        isFavorite: true,
         fileCreatedAt: new Date('2024-02-20T10:00:00.000Z'),
         localDateTime: new Date('2024-02-20T10:00:00.000Z'),
       });
@@ -484,6 +483,10 @@ describe(SearchRepository.name, () => {
 
       const result = await sut.getSmartSearchFacets({
         userIds: [user.id],
+        // #763: hasFavorites is per-caller, so the caller has to be named. Without it the facet
+        // fail-safes to false (pinned by the sibling test below) rather than answering for whoever
+        // happens to head `userIds`.
+        callerId: user.id,
         embedding: matchingEmbedding,
         isFavorite: false,
       });
@@ -635,10 +638,169 @@ describe(SearchRepository.name, () => {
       const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, plain.id);
 
-      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      // #763: `callerId` is what makes hasFavorites answerable — see the sibling test below, which
+      // pins that omitting it yields false rather than another user's favourite state.
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        callerId: user.id,
+        embedding: matchingEmbedding,
+      });
 
       expect(result.total).toBe(2);
       expect(result.hasFavorites).toBe(true);
+    });
+
+    // #763: the same fixture as above, minus the caller. `hasFavorites` is a per-user question, so
+    // with no caller identity in the options there is no answer to give and the facet must stay
+    // false — the section is not offered rather than being answered for the wrong user.
+    //
+    // Seeding a real favourite is what makes this a pin rather than a tautology: the assertion can
+    // only pass because the caller is absent, not because the scope is empty. It also guards the
+    // reverse regression — resolving the caller from `userIds[0]` would report `true` here, which
+    // is another user's favourite state leaking into this viewer's facets.
+    it('reports hasFavorites false on the smart path when no caller identity is supplied (#763)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favourite } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favourite.id }).execute();
+      await addEmbedding(defaultDatabase, favourite.id);
+
+      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(result.total).toBe(1);
+      expect(result.hasFavorites).toBe(false);
+    });
+  });
+
+  // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay, not
+  // the (now-dropped, slice 3) ownership-masked asset.isFavorite column. Only a direct
+  // asset_favorite insert marks the caller's favorite.
+  describe('isFavorite overlay (#763)', () => {
+    it('searchMetadata filters isFavorite from the callers overlay, not asset.isFavorite', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const { items: favoriteItems } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [user.id], authUserId: user.id, isFavorite: true },
+      );
+      expect(favoriteItems.map((item) => item.id)).toEqual([favorited.id]);
+
+      const { items: nonFavoriteItems } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [user.id], authUserId: user.id, isFavorite: false },
+      );
+      expect(nonFavoriteItems.map((item) => item.id)).toEqual([notFavorited.id]);
+    });
+
+    it('getSmartSearchFacets scopes isFavorite totals to the callers overlay', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(ctx.database, favorited.id);
+      await addEmbedding(ctx.database, notFavorited.id);
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const result = await sut.getSmartSearchFacets({
+        embedding: matchingEmbedding,
+        userIds: [user.id],
+        authUserId: user.id,
+        maxDistance: 0.01,
+        isFavorite: true,
+      });
+
+      expect(result.total).toBe(1);
+    });
+
+    it('getFilterSuggestions (buildFilteredAssetIds) scopes isFavorite to the callers overlay', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: favorited.id, country: 'Germany' });
+      await ctx.newExif({ assetId: notFavorited.id, country: 'France' });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const result = await sut.getFilterSuggestions([user.id], { isFavorite: true });
+
+      expect(result.countries).toEqual(['Germany']);
+    });
+  });
+
+  // #763 slice 1b Task 2 — mapAsset now reads `isFavoriteForUser` exclusively (slice 1b Task 1),
+  // so every row-returning search path must project the per-user asset_favorite overlay keyed to
+  // the CALLER (authUserId) — never to userIds[0] or the asset owner (slice 1 proved that wrong
+  // for the space-browse path, where userIds can be undefined entirely).
+  describe('isFavoriteForUser projection (#763 slice 1b)', () => {
+    it('searchMetadata projects isFavoriteForUser from authUserId, not from userIds[0] or the owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const { items: asOwner } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [owner.id], authUserId: owner.id },
+      );
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+
+      const { items: asViewer } = await sut.searchMetadata(
+        { page: 1, size: 100 },
+        { userIds: [owner.id], authUserId: viewer.id },
+      );
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+    });
+
+    it('searchRandom projects isFavoriteForUser for the requesting user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asViewer = await sut.searchRandom(100, { userIds: [owner.id], authUserId: viewer.id });
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+
+      const asOwner = await sut.searchRandom(100, { userIds: [owner.id], authUserId: owner.id });
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+    });
+
+    it('searchLargeAssets projects isFavoriteForUser for the requesting user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, fileSizeInByte: 5000 });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asViewer = await sut.searchLargeAssets(100, { userIds: [owner.id], authUserId: viewer.id });
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+
+      const asOwner = await sut.searchLargeAssets(100, { userIds: [owner.id], authUserId: owner.id });
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+    });
+
+    it('getAssetsByCity projects isFavoriteForUser for the requesting user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, type: AssetType.Image });
+      await ctx.newExif({ assetId: asset.id, city: 'Berlin' });
+      await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
+
+      const asViewer = await sut.getAssetsByCity([owner.id], undefined, viewer.id);
+      expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
+
+      const asOwner = await sut.getAssetsByCity([owner.id], undefined, owner.id);
+      expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
+
+      const withoutAuthUserId = await sut.getAssetsByCity([owner.id]);
+      expect(withoutAuthUserId.find((item) => item.id === asset.id)?.isFavoriteForUser).toBeUndefined();
     });
   });
 
@@ -806,11 +968,40 @@ describe(SearchRepository.name, () => {
         expect(result.hasFavorites).toBe(false);
       });
 
+      // #763: the probe accepts a SEPARATE, wider space scope so the Favourites section is still
+      // offered for a favourite whose space the caller hid from their timeline. `timelineSpaceIds`
+      // stays narrow here — that is the point: the two lists must be honoured independently, and a
+      // single-scope implementation cannot pass both this and the test below it.
+      it('reports hasFavorites from favoriteSpaceIds even when the space is outside timelineSpaceIds (#763)', async () => {
+        const { ctx, sut } = setup();
+        const { user: owner } = await ctx.newUser();
+        const { user: member } = await ctx.newUser();
+        const { asset } = await ctx.newAsset({ ownerId: owner.id });
+        await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+        const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+        // The space is hidden from the member's timeline, so it is absent from timelineSpaceIds...
+        const hidden = await sut.getFilterSuggestions([member.id], {});
+        expect(hidden.hasFavorites).toBe(false);
+
+        // ...but the favourites probe runs over the memberships instead, and still finds it.
+        const widened = await sut.getFilterSuggestions([member.id], { favoriteSpaceIds: [space.id] });
+        expect(widened.hasFavorites).toBe(true);
+      });
+
       it('sees a shared-space favourite only with timelineSpaceIds (#910)', async () => {
         const { ctx, sut } = setup();
         const { user: owner } = await ctx.newUser();
         const { user: member } = await ctx.newUser();
-        const { asset } = await ctx.newAsset({ ownerId: owner.id, isFavorite: true });
+        const { asset } = await ctx.newAsset({ ownerId: owner.id });
+        // #763: favourites are per (user, asset), so the MEMBER — the caller in both assertions
+        // below — has to be the one who favourited it. Keying this to the owner instead would make
+        // the test assert that one member's favourite shows up in another's facets.
+        await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
         // A distinctive make so the second assertion can identify THIS asset specifically —
         // a `toBe(true)` non-emptiness check alone would also pass for an over-broad scope
         // that leaked in unrelated assets.
@@ -999,11 +1190,15 @@ describe(SearchRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
-      const { asset: r5 } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset: r5 } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: r5.id, make: 'Canon', model: 'Canon EOS R5' });
 
       const { asset: sevenD } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: sevenD.id, make: 'Canon', model: 'Canon EOS 7D' });
+
+      // #763: the dropped asset."isFavorite" column is replaced by the per-user overlay. The
+      // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: r5.id }).execute();
 
       const models = await sut.getCameraModels([user.id], { make: 'Canon', isFavorite: true });
 
@@ -1230,11 +1425,15 @@ describe(SearchRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
-      const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: canonAsset.id, make: 'Canon', rating: 5 });
 
       const { asset: nikonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: nikonAsset.id, make: 'Nikon', rating: 2 });
+
+      // #763: the dropped asset."isFavorite" column is replaced by the per-user overlay. The
+      // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: canonAsset.id }).execute();
 
       const makes = await sut.getCameraMakes([user.id], { rating: 4, isFavorite: true });
 

@@ -434,6 +434,11 @@ class SyncStreamService {
         return _syncStreamRepository.updateSharedSpaceAlbumHiddenV1(data.cast());
       case SyncEntityType.sharedSpaceAlbumHiddenDeleteV1:
         return _syncStreamRepository.deleteSharedSpaceAlbumHiddenV1(data.cast());
+      // --- gallery-fork: per-user favorites sync dispatch (#763) ---
+      case SyncEntityType.assetFavoriteV1:
+        return _syncStreamRepository.updateAssetFavoritesV1(data.cast());
+      case SyncEntityType.assetFavoriteDeleteV1:
+        return _syncStreamRepository.deleteAssetFavoritesV1(data.cast());
       // Forward-compat: openapi-generator v7.24 emits SyncEntityType as a real
       // exhaustive Dart enum, so upstream dropped the `default:` arm here (it is
       // now unreachable and trips `unreachable_switch_default`). The plan's

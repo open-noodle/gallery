@@ -14,7 +14,6 @@ import { isDuplicateDetectionEnabled } from 'src/utils/misc';
 
 type ResolveRequest = {
   assetUpdate: {
-    isFavorite?: boolean;
     visibility?: AssetVisibility;
   };
 
@@ -72,6 +71,10 @@ export class DuplicateService extends BaseService {
 
     const duplicates = await this.duplicateRepository.getAll(auth.user.id);
     return duplicates.map(({ duplicateId, assets }) => {
+      // #763: deliberately NOT projecting isFavoriteForUser — duplicateRepository.getAll doesn't
+      // project the overlay yet, so this stays `false` for now. Slice 7 covers merging favorite
+      // state across duplicate resolution (resolveGroup, below); wiring the overlay into this
+      // listing view remains open and is not part of that slice.
       const mappedAssets = assets.map((asset) => mapAsset(asset, { auth }));
       return {
         duplicateId,
@@ -201,6 +204,15 @@ export class DuplicateService extends BaseService {
         assetAlbumMap,
       );
 
+      // #763 (E21): per-user union of every trashed source's favorite rows onto the keeper, run
+      // BEFORE idsToTrash are marked deleted below. Duplicate detection is owner-scoped
+      // (all group assets share an owner), but OTHER users can have favorited these assets via
+      // space access — the old `assets.some((asset) => asset.isFavorite)` boolean-OR could only
+      // ever express the owner's favorite and silently dropped everyone else's. `onConflict do
+      // nothing` in mergeOnto absorbs both re-runs and a user who favorited more than one source
+      // (E8: exactly one keeper row, never a PK violation).
+      await this.assetFavoriteRepository.mergeOnto(idsToKeep[0], idsToTrash);
+
       if (mergedAlbumIds.length > 0) {
         const allowedAlbumIds = await this.checkAccess({
           auth,
@@ -301,8 +313,6 @@ export class DuplicateService extends BaseService {
       assetUpdate: {},
       exifUpdate: {},
     };
-
-    response.assetUpdate.isFavorite = assets.some((asset) => asset.isFavorite);
 
     // R1: `assets` always comes from duplicateRepository.get, which applies withDefaultVisibility
     // (Archive+Timeline only) — a duplicate group/keeper can never contain a Locked or Hidden asset, so

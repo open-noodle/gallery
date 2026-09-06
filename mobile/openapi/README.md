@@ -118,6 +118,7 @@ Class | Method | HTTP request | Description
 *AssetsApi* | [**removeAssetEdits**](doc//AssetsApi.md#removeassetedits) | **DELETE** /assets/{id}/edits | Remove edits from an existing asset
 *AssetsApi* | [**runAssetJobs**](doc//AssetsApi.md#runassetjobs) | **POST** /assets/jobs | Run an asset job
 *AssetsApi* | [**updateAsset**](doc//AssetsApi.md#updateasset) | **PUT** /assets/{id} | Update an asset
+*AssetsApi* | [**updateAssetFavorites**](doc//AssetsApi.md#updateassetfavorites) | **PUT** /assets/favorites | Set favorite state for the requesting user
 *AssetsApi* | [**updateAssetMetadata**](doc//AssetsApi.md#updateassetmetadata) | **PUT** /assets/{id}/metadata | Update asset metadata
 *AssetsApi* | [**updateAssets**](doc//AssetsApi.md#updateassets) | **PUT** /assets | Update assets
 *AssetsApi* | [**updateBulkAssetMetadata**](doc//AssetsApi.md#updatebulkassetmetadata) | **PUT** /assets/metadata | Upsert asset metadata
@@ -490,6 +491,7 @@ Class | Method | HTTP request | Description
  - [AssetFaceResponseDto](doc//AssetFaceResponseDto.md)
  - [AssetFaceUpdateDto](doc//AssetFaceUpdateDto.md)
  - [AssetFaceUpdateItem](doc//AssetFaceUpdateItem.md)
+ - [AssetFavoriteUpdateDto](doc//AssetFavoriteUpdateDto.md)
  - [AssetIdErrorReason](doc//AssetIdErrorReason.md)
  - [AssetIdsDto](doc//AssetIdsDto.md)
  - [AssetIdsResponseDto](doc//AssetIdsResponseDto.md)
@@ -815,6 +817,8 @@ Class | Method | HTTP request | Description
  - [SyncAssetFaceDeleteV1](doc//SyncAssetFaceDeleteV1.md)
  - [SyncAssetFaceV1](doc//SyncAssetFaceV1.md)
  - [SyncAssetFaceV2](doc//SyncAssetFaceV2.md)
+ - [SyncAssetFavoriteDeleteV1](doc//SyncAssetFavoriteDeleteV1.md)
+ - [SyncAssetFavoriteV1](doc//SyncAssetFavoriteV1.md)
  - [SyncAssetMetadataDeleteV1](doc//SyncAssetMetadataDeleteV1.md)
  - [SyncAssetMetadataV1](doc//SyncAssetMetadataV1.md)
  - [SyncAssetOcrDeleteV1](doc//SyncAssetOcrDeleteV1.md)

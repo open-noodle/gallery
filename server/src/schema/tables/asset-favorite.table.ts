@@ -1,0 +1,41 @@
+import { AfterDeleteTrigger, CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
+import { CreateIdColumn, UpdateIdColumn } from 'src/decorators';
+import { asset_favorite_delete_audit } from 'src/schema/functions';
+import { AssetTable } from 'src/schema/tables/asset.table';
+import { UserTable } from 'src/schema/tables/user.table';
+
+// Per-user favorites overlay (#763). A favorite is a fact about (user, asset), never about an
+// asset alone — see docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §3.
+// Carries its own createId/updateId watermarks (+ asset_favorite_audit) because favorites are a
+// separately-synced entity: a favorite write must NOT bump the owner's asset.updateId, which
+// would re-sync that asset to every space member (§4.3).
+//
+// PK is (userId, assetId), deliberately userId-leading — the dominant query is "my favorites".
+@Table('asset_favorite')
+// No `when` guard: FK cascades from asset/user deletes arrive at trigger depth > 1 and MUST still be
+// tombstoned, or those favorites linger on clients. Matches migration 1784000000000's DDL exactly.
+@AfterDeleteTrigger({
+  scope: 'statement',
+  function: asset_favorite_delete_audit,
+  referencingOldTableAs: 'old',
+})
+export class AssetFavoriteTable {
+  // index: false — userId is the leading column of the composite PK, so its btree already serves
+  // "my favorites" and a separate FK index would be redundant. The migration creates no such index;
+  // saying so here is what keeps the declarative schema and a migrated database in agreement
+  // (medium test `schema-drift.spec.ts`). Same shape as asset_duplicate_checksum.
+  @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true, index: false })
+  userId!: string;
+
+  @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true, index: true })
+  assetId!: string;
+
+  @CreateDateColumn()
+  createdAt!: Generated<Timestamp>;
+
+  @CreateIdColumn({ index: true })
+  createId!: Generated<string>;
+
+  @UpdateIdColumn({ index: true })
+  updateId!: Generated<string>;
+}

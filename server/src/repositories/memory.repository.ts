@@ -10,6 +10,7 @@ import { DB } from 'src/schema';
 import { MemoryTable } from 'src/schema/tables/memory.table';
 import { IBulkAsset } from 'src/types';
 import { asUuid } from 'src/utils/database';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import {
   hiddenFromOwnTimeline,
   spaceAlbumAssetExists,
@@ -276,6 +277,12 @@ export class MemoryRepository implements IBulkAsset {
                 ),
               ),
             )
+            // #763: userId here is the VIEWER (searchAccessible surfaces memories owned by
+            // others, reachable via partner/space share) — the overlay must be keyed to them,
+            // never to the memory's own ownerId. Gated on `.$if` (always true — userId is a
+            // required param) purely so Kysely infers `isFavoriteForUser` as optional, matching
+            // MapAsset and every other projection site instead of forcing it required here alone.
+            .$if(!!userId, (qb) => qb.select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser')))
             .orderBy('asset.localDateTime', 'asc'),
         ).as('assets'),
       )
@@ -292,12 +299,19 @@ export class MemoryRepository implements IBulkAsset {
   // #1041: `viewerId`/`hiddenScope` are optional — `create`/`update` below return the object right
   // after the caller's own action and pass neither, so their SQL is unchanged. `get()` is the
   // read surface and is the one MemoryService resolves a scope for.
-  @GenerateSql({ params: [DummyValue.UUID] })
+  //
+  // #763: `viewerId` is also the user the favorite overlay resolves for — the caller, not the
+  // memory owner. One id serves both, so the overlay projection keys off it rather than taking a
+  // second parameter that MemoryService would have to pass twice.
+  @GenerateSql({ params: [DummyValue.UUID] }, { name: 'with viewerId', params: [DummyValue.UUID, DummyValue.UUID] })
   get(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
     return this.getByIdBuilder(id, viewerId, hiddenScope, visibleSpaceIds).executeTakeFirst();
   }
 
-  async create(memory: Insertable<MemoryTable>, assetIds: Set<string>) {
+  // #763: authUserId is the CALLER's id, used only to project `isFavoriteForUser` onto each
+  // returned memory asset. Optional — memory.service.ts's addAssets/removeAssets call `update`
+  // purely for its side effect and never consume the returned assets, so they omit it.
+  async create(memory: Insertable<MemoryTable>, assetIds: Set<string>, authUserId?: string) {
     const id = await this.db.transaction().execute(async (tx) => {
       const { id } = await tx.insertInto('memory').values(memory).returning('id').executeTakeFirstOrThrow();
 
@@ -309,13 +323,13 @@ export class MemoryRepository implements IBulkAsset {
       return id;
     });
 
-    return this.getByIdBuilder(id).executeTakeFirstOrThrow();
+    return this.getByIdBuilder(id, authUserId).executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { ownerId: DummyValue.UUID, isSaved: true }] })
-  async update(id: string, memory: Updateable<MemoryTable>) {
+  async update(id: string, memory: Updateable<MemoryTable>, authUserId?: string) {
     await this.db.updateTable('memory').set(memory).where('id', '=', id).execute();
-    return this.getByIdBuilder(id).executeTakeFirstOrThrow();
+    return this.getByIdBuilder(id, authUserId).executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -426,7 +440,10 @@ export class MemoryRepository implements IBulkAsset {
                   hiddenFromOwnTimeline(eb, hiddenScope!, { kind: 'inline', visibleSpaceIds, viewerId: viewerId! })!,
                 ]),
               ),
-            ),
+            )
+            // #763: `viewerId` is the CALLER — the same id #1041 threads above. Optional, so a call
+            // that omits it (addAssets/removeAssets discard the result) simply skips the projection.
+            .$if(!!viewerId, (qb) => qb.select((eb) => favoriteExistsFor(eb, viewerId!).as('isFavoriteForUser'))),
         ).as('assets'),
       )
       .where('id', '=', id)

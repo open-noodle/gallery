@@ -24,6 +24,8 @@ void main() {
   RemoteAsset owned({bool isFavorite = false}) =>
       RemoteAssetFactory.create(ownerId: context.currentUser.id, isFavorite: isFavorite);
 
+  RemoteAsset notOwned({bool isFavorite = false}) => RemoteAssetFactory.create(isFavorite: isFavorite);
+
   group('FavoriteAction', () {
     testWidgets('favorites the eligible owned assets', (tester) async {
       final asset = owned();
@@ -41,13 +43,43 @@ void main() {
       verify(() => assetService.updateFavorite([asset.id], false)).called(1);
     });
 
-    testWidgets('ignores assets owned by someone else', (tester) async {
+    // #763: favorites are per-user, not owner-gated — read access to a shared-space asset
+    // (implied by it being in the local mirror) is sufficient to favorite it. This inverts the
+    // pre-#763 "ignores assets owned by someone else" expectation.
+    testWidgets('includes assets owned by someone else (un-gated)', (tester) async {
       final mine = owned();
-      final theirs = RemoteAssetFactory.create();
+      final theirs = notOwned();
 
       await tester.pumpTestAction(context, FavoriteAction(assets: [mine, theirs]));
 
-      verify(() => assetService.updateFavorite([mine.id], true)).called(1);
+      verify(() => assetService.updateFavorite([mine.id, theirs.id], true)).called(1);
+    });
+
+    testWidgets('is visible and actionable for a non-owned-only selection', (tester) async {
+      final theirs = notOwned();
+
+      await tester.pumpTestAction(context, FavoriteAction(assets: [theirs]));
+
+      verify(() => assetService.updateFavorite([theirs.id], true)).called(1);
+    });
+
+    // #763 (E32): the direction must derive from the SAME candidate set the action mutates.
+    // Before the fix, the direction flag was computed over the raw (unfiltered) selection while the
+    // mutation set was owner-filtered — a non-owned asset could flip the direction while being
+    // excluded from the mutation, leaving an empty mutation set sent to the service.
+    testWidgets('E32: mixed ownership keeps direction and mutation set coherent', (tester) async {
+      final mineFavorited = owned(isFavorite: true);
+      final theirsUnfavorited = notOwned();
+
+      final action = FavoriteAction(assets: [mineFavorited, theirsUnfavorited]);
+      // Direction: theirsUnfavorited is not favorited yet -> favorite.
+      expect(action.favorite, isTrue);
+
+      await tester.pumpTestAction(context, action);
+
+      // Mutation set: exactly the candidate not already in the target state (theirsUnfavorited).
+      // Pre-fix, the owner filter would have dropped it, sending an empty id list.
+      verify(() => assetService.updateFavorite([theirsUnfavorited.id], true)).called(1);
     });
 
     testWidgets('batches every eligible owned asset into a single call', (tester) async {

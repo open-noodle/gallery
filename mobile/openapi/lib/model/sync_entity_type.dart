@@ -25,6 +25,8 @@ enum SyncEntityType {
   assetMetadataDeleteV1._(r'AssetMetadataDeleteV1'),
   assetOcrV1._(r'AssetOcrV1'),
   assetOcrDeleteV1._(r'AssetOcrDeleteV1'),
+  assetFavoriteV1._(r'AssetFavoriteV1'),
+  assetFavoriteDeleteV1._(r'AssetFavoriteDeleteV1'),
   partnerV1._(r'PartnerV1'),
   partnerDeleteV1._(r'PartnerDeleteV1'),
   partnerAssetV1._(r'PartnerAssetV1'),
@@ -188,6 +190,8 @@ class SyncEntityTypeTypeTransformer {
         case r'AssetMetadataDeleteV1': return SyncEntityType.assetMetadataDeleteV1;
         case r'AssetOcrV1': return SyncEntityType.assetOcrV1;
         case r'AssetOcrDeleteV1': return SyncEntityType.assetOcrDeleteV1;
+        case r'AssetFavoriteV1': return SyncEntityType.assetFavoriteV1;
+        case r'AssetFavoriteDeleteV1': return SyncEntityType.assetFavoriteDeleteV1;
         case r'PartnerV1': return SyncEntityType.partnerV1;
         case r'PartnerDeleteV1': return SyncEntityType.partnerDeleteV1;
         case r'PartnerAssetV1': return SyncEntityType.partnerAssetV1;

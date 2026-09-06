@@ -95,6 +95,33 @@ describe(SharedLinkService.name, () => {
     });
   });
 
+  // #763 slice 1b — mapSharedLink calls mapAsset with NO auth at all (see shared-link.dto.ts), so
+  // `isFavorite` must stay `false` for an anonymous visitor even when the link owner has favorited
+  // the asset. This is the exact regression this slice exists to prevent (see slice 1b plan
+  // "Why this is its own slice").
+  it('never exposes isFavorite to an anonymous shared-link visitor, even when the owner favorited the asset (#763)', async () => {
+    const { sut, ctx } = setup();
+
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newExif({ assetId: asset.id, make: 'Canon' });
+    await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: asset.id }).execute();
+
+    const sharedLinkRepo = ctx.get(SharedLinkRepository);
+    const sharedLink = await sharedLinkRepo.create({
+      key: randomBytes(16),
+      id: factory.uuid(),
+      userId: user.id,
+      allowUpload: false,
+      type: SharedLinkType.Individual,
+      assetIds: [asset.id],
+    });
+
+    await expect(sut.getMine({ user, sharedLink }, [])).resolves.toMatchObject({
+      assets: [expect.objectContaining({ id: asset.id, isFavorite: false })],
+    });
+  });
+
   describe('getAll', () => {
     it('should return all shared links even when they share the same createdAt', async () => {
       const { sut, ctx } = setup();
