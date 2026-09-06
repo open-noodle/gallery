@@ -1,11 +1,26 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DissolveRequest, DissolveResponse, DissolveWarning } from 'src/dtos/face-dissolve.dto';
+import { DissolveRequest, DissolveResponse, DissolveWarning, PeopleHealthQuery } from 'src/dtos/face-dissolve.dto';
 import { JobName, QueueName } from 'src/enum';
-import { DissolveCounts } from 'src/repositories/face-dissolve.repository';
+import { DissolveCounts, PersonHealthRow } from 'src/repositories/face-dissolve.repository';
 import { BaseService } from 'src/services/base.service';
 
 @Injectable()
 export class FaceDissolveService extends BaseService {
+  /**
+   * The contamination signal. Deliberately NOT the picker search (searchOwnerPeople) — this aggregate is what
+   * makes a person with only EXIF faces findable at all, since no scan will ever flag one.
+   */
+  async getPeopleHealth(
+    dto: PeopleHealthQuery,
+  ): Promise<{ people: PersonHealthRow[]; total: number; hasMore: boolean }> {
+    return this.faceDissolveRepository.getPeopleHealth({
+      ownerId: dto.ownerId,
+      sort: dto.sort,
+      page: dto.page,
+      size: dto.size,
+    });
+  }
+
   async preview(personId: string, dto: DissolveRequest): Promise<DissolveResponse> {
     const person = await this.requirePerson(personId);
     this.validate(dto);
