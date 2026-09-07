@@ -165,9 +165,11 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
     expect(combinedIds).toEqual(expectedOrder);
   });
 
-  // Mutation-proof: seeds one active face plus one soft-deleted and one invisible face on the SAME person.
-  // If either join condition were dropped, faceCount would read 3 instead of 1.
-  it('excludes soft-deleted and invisible faces from every count', async () => {
+  // Counts soft-deleted and invisible faces, because a dissolve DELETES them: this aggregate exists to
+  // predict what the operation will remove, so anything it hides is a face an admin never agreed to lose.
+  // Excluding them (the original behaviour) made the Health tab under-report against the dissolve dialog
+  // for the same person, by exactly the number of non-live faces — reported from production.
+  it('counts soft-deleted and invisible faces, matching the face set a dissolve removes', async () => {
     const repo = new FaceDissolveRepository(db);
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'HasHiddenFaces' });
@@ -198,6 +200,8 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
 
     const { people } = await repo.getPeopleHealth({ ownerId: user.id, sort: 'faceCount', page: 1, size: 20 });
 
-    expect(people.find((p) => p.id === person.id)).toEqual(expect.objectContaining({ faceCount: 1 }));
+    // 3 = 1 active + 1 soft-deleted + 1 invisible, which is exactly what getCounts reports for this person
+    // and exactly what a scope=all dissolve would delete. Reading 1 here is the under-report bug.
+    expect(people.find((p) => p.id === person.id)).toEqual(expect.objectContaining({ faceCount: 3 }));
   });
 });

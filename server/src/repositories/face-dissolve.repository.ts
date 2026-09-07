@@ -239,12 +239,12 @@ export class FaceDissolveRepository {
   }): Promise<{ people: PersonHealthRow[]; total: number; hasMore: boolean }> {
     const rows = await this.db
       .selectFrom('person')
-      .leftJoin('asset_face', (join) =>
-        join
-          .onRef('asset_face.personId', '=', 'person.id')
-          .on('asset_face.deletedAt', 'is', null)
-          .on('asset_face.isVisible', 'is', true),
-      )
+      // Deliberately NOT filtered by deletedAt/isVisible. This aggregate's whole job is to predict what a
+      // dissolve would find and remove, and a dissolve touches every face of the person in scope regardless
+      // of visibility or soft-deletion (dissolveFacePredicate). Filtering them here made the Health tab
+      // under-report against the dialog for the same person — an admin comparing the two saw numbers that
+      // could not be reconciled, and the dissolve then deleted faces discovery never counted.
+      .leftJoin('asset_face', (join) => join.onRef('asset_face.personId', '=', 'person.id'))
       .where('person.type', '!=', 'pet')
       // ownerId is mandatory: an unfiltered aggregate spans every visible asset_face row on the instance and
       // orders by an aggregate alias, so no page can be pruned and each page re-runs the whole GROUP BY.
