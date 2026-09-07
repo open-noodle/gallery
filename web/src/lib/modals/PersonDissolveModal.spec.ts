@@ -1,5 +1,5 @@
 import { dissolvePerson, previewDissolvePerson } from '@immich/sdk';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import PersonDissolveModal from '$lib/modals/PersonDissolveModal.svelte';
 
@@ -82,5 +82,27 @@ describe('PersonDissolveModal', () => {
     const redetect = await screen.findByRole('checkbox');
     expect(redetect).toBeChecked();
     expect(redetect).toBeDisabled();
+  });
+
+  // Reported from production: the counts panel kept showing the PREVIOUS scope's numbers under the newly
+  // selected chip, so the dialog described a different face set than the button would delete. The component
+  // holds the last successful preview in `preview`, so a preview that never lands leaves those numbers on
+  // screen. Nothing may be rendered that does not describe the current selection.
+  it("never shows the previous scope's counts when the new scope's preview fails", async () => {
+    open();
+    // The `all` preview lands: its numbers are on screen.
+    await waitFor(() => expect(screen.getByTestId('dissolve-count-faces')).toHaveTextContent(/3\D?180/));
+    expect(screen.getByTestId('dissolve-warning-not-redetectable')).toBeVisible();
+
+    // Selecting another scope, whose preview then fails.
+    vi.mocked(previewDissolvePerson).mockRejectedValue(new Error('boom'));
+    const scopes = screen.getByTestId('dissolve-scopes');
+    await userEvent.click(within(scopes).getByRole('button', { name: /no_embedding/i }));
+
+    // The stale numbers must be gone rather than re-labelled under the new chip.
+    await waitFor(() => expect(screen.getByTestId('dissolve-count-faces')).toHaveTextContent('—'));
+    expect(screen.queryByTestId('dissolve-warning-not-redetectable')).not.toBeInTheDocument();
+    // And the irreversible action stays shut.
+    expect(screen.getByRole('button', { name: /delete/i })).toBeDisabled();
   });
 });
