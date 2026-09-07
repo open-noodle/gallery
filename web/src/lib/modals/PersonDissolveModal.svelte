@@ -74,10 +74,17 @@
   const nameConfirmed = $derived(expectedName.length > 0 && confirmation.trim().toLowerCase() === expectedName);
   const canApply = $derived(nameConfirmed && preview !== null && !previewing && !applying);
 
+  // Gated on `previewing`, which means "what is on screen does not describe the current selection" — it is
+  // set the moment a chip is clicked and only cleared by a preview that LANDS. A failed preview therefore
+  // leaves `preview` holding the PREVIOUS scope's response, and without this gate the panel renders those
+  // numbers under the newly highlighted chip: the dialog then confidently describes a different face set
+  // than the one the button would delete, on an operation with no undo. Blank beats wrong here.
   const warnings = $derived(
-    (preview?.warnings ?? [])
-      .map(({ code, count }) => ({ code, count, key: WARNING_KEY_BY_CODE[code] }))
-      .filter((warning): warning is { code: string; count: number; key: Translations } => !!warning.key),
+    previewing
+      ? []
+      : (preview?.warnings ?? [])
+          .map(({ code, count }) => ({ code, count, key: WARNING_KEY_BY_CODE[code] }))
+          .filter((warning): warning is { code: string; count: number; key: Translations } => !!warning.key),
   );
 
   // Face-level counts first, then photo-level ones. `notRedetectable` earns its cell even though its warning
@@ -215,7 +222,7 @@
         {#each countCells as cell (cell.key)}
           <div data-testid="dissolve-count-{cell.key}">
             <div class="text-lg font-semibold tabular-nums">
-              {cell.value === undefined ? '—' : cell.value.toLocaleString()}
+              {cell.value === undefined || previewing ? '—' : cell.value.toLocaleString()}
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400">{$t(cell.label)}</div>
           </div>

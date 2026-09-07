@@ -269,8 +269,6 @@ select
 from
   "person"
   left join "asset_face" on "asset_face"."personId" = "person"."id"
-  and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" is true
 where
   "person"."type" != $4
   and "person"."ownerId" = $5
