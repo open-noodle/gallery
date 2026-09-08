@@ -6,6 +6,8 @@ class ServerConfig {
   final String externalDomain;
   final String mapDarkStyleUrl;
   final String mapLightStyleUrl;
+  // Server-advertised chunk size (bytes) for the chunked-upload protocol. 0 means unsupported.
+  final int uploadChunkSize;
 
   const ServerConfig({
     required this.trashDays,
@@ -13,6 +15,7 @@ class ServerConfig {
     required this.externalDomain,
     required this.mapDarkStyleUrl,
     required this.mapLightStyleUrl,
+    this.uploadChunkSize = 0,
   });
 
   ServerConfig copyWith({int? trashDays, String? oauthButtonText, String? externalDomain}) {
@@ -22,19 +25,21 @@ class ServerConfig {
       externalDomain: externalDomain ?? this.externalDomain,
       mapDarkStyleUrl: mapDarkStyleUrl,
       mapLightStyleUrl: mapLightStyleUrl,
+      uploadChunkSize: uploadChunkSize,
     );
   }
 
   @override
   String toString() =>
-      'ServerConfig(trashDays: $trashDays, oauthButtonText: $oauthButtonText, externalDomain: $externalDomain)';
+      'ServerConfig(trashDays: $trashDays, oauthButtonText: $oauthButtonText, externalDomain: $externalDomain, uploadChunkSize: $uploadChunkSize)';
 
   ServerConfig.fromDto(ServerConfigDto dto)
     : trashDays = dto.trashDays,
       oauthButtonText = dto.oauthButtonText,
       externalDomain = dto.externalDomain,
       mapDarkStyleUrl = dto.mapDarkStyleUrl,
-      mapLightStyleUrl = dto.mapLightStyleUrl;
+      mapLightStyleUrl = dto.mapLightStyleUrl,
+      uploadChunkSize = dto.uploadChunkSize;
 
   @override
   bool operator ==(covariant ServerConfig other) {

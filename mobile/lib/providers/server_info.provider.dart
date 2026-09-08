@@ -1,5 +1,7 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/models/server_info/server_config.model.dart';
 import 'package:immich_mobile/models/server_info/server_disk_info.model.dart';
 import 'package:immich_mobile/models/server_info/server_features.model.dart';
@@ -94,6 +96,9 @@ class ServerInfoNotifier extends StateNotifier<ServerInfo> {
       return;
     }
     state = state.copyWith(serverConfig: serverConfig);
+    // Cached in the Store so the (potentially backgrounded) upload isolate can read it
+    // without a network round trip, mirroring how serverEndpoint/deviceId are shared today.
+    await Store.put(StoreKey.uploadChunkSize, serverConfig.uploadChunkSize);
   }
 }
 
