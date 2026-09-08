@@ -178,11 +178,39 @@ describe(UploadSessionService.name, () => {
       await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('throws 404 when the session belongs to another user', async () => {
+    it('throws 404 when the recorded owner differs from the caller (ownership-check branch)', async () => {
+      // Exercises the `state.userId !== auth.user.id` clause directly: readState is stubbed to
+      // return a "found" session regardless of path, with a mismatched recorded owner. See the
+      // companion test below for the realistic path-derivation case a genuine different user hits.
       const auth = factory.auth({ user: { id: 'me' } });
       vi.mocked(readState).mockResolvedValue(makeState({ userId: 'someone-else', sharedLinkId: null }));
 
       await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("does not find a session id looked up from another real user's folder", async () => {
+      // Unlike the test above (which forces readState to "find" a mismatched-owner session),
+      // this models what actually happens in production: the folder is derived from the
+      // CALLER's auth.user.id (StorageCore.getNestedFolder), so a different real user's lookup
+      // computes a DIFFERENT statePath than the one the session was written under. readState at
+      // that wrong path returns undefined, and the request 404s via the `!state` branch before
+      // any ownership field is even compared. A stray shared-link resolves auth.user.id to the
+      // LINK OWNER's id (see spec §8 row 44 tests), so this "wrong folder" case is specific to
+      // two distinct real user accounts, not to a shared link.
+      const ownerAuth = factory.auth({ user: { id: 'owner-1' } });
+      const strangerAuth = factory.auth({ user: { id: 'stranger-1' } });
+      const ownerFolder = StorageCore.getNestedFolder(StorageFolder.Upload, 'owner-1', 'session-1');
+      const ownerStatePath = sessionPaths(ownerFolder, 'session-1', '').state;
+      const ownerState = makeState({ userId: 'owner-1', sharedLinkId: null, size: 1024 });
+
+      vi.mocked(readState).mockImplementation((path) =>
+        Promise.resolve(path === ownerStatePath ? ownerState : undefined),
+      );
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      await expect(sut.getOffset(strangerAuth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+      // Sanity check: the mock does model a real, findable session — the owner themself can read it.
+      await expect(sut.getOffset(ownerAuth, 'session-1')).resolves.toEqual({ offset: 0, size: 1024 });
     });
 
     it('throws 404 for a shared-link session opened under a different link', async () => {
