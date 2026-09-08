@@ -248,8 +248,8 @@
         </div>
       </div>
 
-      <div class="flex h-14 w-40 place-items-center gap-4 sm:w-48 md:w-full">
-        <div class="md:w-96">
+      <div class="flex h-14 w-full place-items-center gap-2 md:gap-4">
+        <div class="min-w-0 grow md:w-96 md:grow-0">
           <SearchBar
             bind:name={searchName}
             {showLoadingSpinner}
@@ -275,10 +275,10 @@
       </div>
 
       <div
-        class="mt-6 immich-scrollbar overflow-y-auto rounded-3xl bg-gray-200 p-10 dark:bg-immich-dark-gray"
+        class="mt-4 immich-scrollbar overflow-y-auto rounded-3xl bg-gray-200 p-4 md:mt-6 md:p-10 dark:bg-immich-dark-gray"
         style:max-height={Math.max(screenHeight - 400, 200) + 'px'}
       >
-        <div class="grid-col-2 grid gap-8 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10">
+        <div class="grid grid-cols-3 gap-4 sm:grid-cols-4 md:gap-8 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10">
           {#each visiblePeople as mergePerson (mergePerson.id)}
             <button
               type="button"
