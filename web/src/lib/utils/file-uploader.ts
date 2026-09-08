@@ -11,11 +11,13 @@ import { tick } from 'svelte';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
 import { uploadManager } from '$lib/managers/upload-manager.svelte';
 import { addAssetsToAlbums } from '$lib/services/album.service';
 import { uploadAssetsStore } from '$lib/stores/upload';
 import { UploadState } from '$lib/types';
 import { uploadRequest } from '$lib/utils';
+import { shouldUploadChunked, uploadFileChunked } from '$lib/utils/chunked-upload';
 import { ExecutorQueue } from '$lib/utils/executor-queue';
 import { asQueryString } from '$lib/utils/shared-links';
 import { handleError } from './handle-error';
@@ -175,63 +177,92 @@ async function fileUploader({
   isLockedAssets = false,
 }: FileUploaderParams): Promise<string | undefined> {
   const fileCreatedAt = new Date(assetFile.lastModified).toISOString();
+  const fileModifiedAt = new Date(assetFile.lastModified).toISOString();
   const $t = get(t);
   const wasInitiallyLoggedIn = !!authManager.authenticated;
 
   uploadAssetsStore.markStarted(deviceAssetId);
 
   try {
-    const formData = new FormData();
-    for (const [key, value] of Object.entries({
-      fileCreatedAt,
-      fileModifiedAt: new Date(assetFile.lastModified).toISOString(),
-      isFavorite: 'false',
-      assetData: new File([assetFile], assetFile.name),
-    })) {
-      formData.append(key, value);
-    }
-
-    if (isLockedAssets) {
-      formData.append('visibility', AssetVisibility.Locked);
-    }
-
     let responseData: { id: string; status: AssetMediaStatus; isTrashed?: boolean } | undefined;
+    let checksum: string | undefined;
+
     if (!authManager.isSharedLink) {
       uploadAssetsStore.updateItem(deviceAssetId, { message: $t('asset_hashing') });
       await tick();
       try {
-        const checksum = await hashFile(assetFile);
-
-        const {
-          results: [checkUploadResult],
-        } = await checkBulkUpload({ assetBulkUploadCheckDto: { assets: [{ id: assetFile.name, checksum }] } });
-        if (checkUploadResult && checkUploadResult.action === AssetUploadAction.Reject && checkUploadResult.assetId) {
-          responseData = {
-            status: AssetMediaStatus.Duplicate,
-            id: checkUploadResult.assetId,
-            isTrashed: checkUploadResult.isTrashed,
-          };
-        }
+        checksum = await hashFile(assetFile);
       } catch (error) {
         console.error(`Error calculating sha1 file=${assetFile.name})`, error);
       }
     }
 
-    if (!responseData) {
-      const queryParams = asQueryString(authManager.params);
+    const uploadChunkSize = serverConfigManager.value.uploadChunkSize;
 
+    if (shouldUploadChunked(assetFile.size, uploadChunkSize)) {
       uploadAssetsStore.updateItem(deviceAssetId, { message: $t('asset_uploading') });
-      const response = await uploadRequest<AssetMediaResponseDto>({
-        url: getBaseUrl() + '/assets' + (queryParams ? `?${queryParams}` : ''),
-        data: formData,
-        onUploadProgress: (event) => uploadAssetsStore.updateProgress(deviceAssetId, event.loaded, event.total),
+      responseData = await uploadFileChunked({
+        file: assetFile,
+        chunkSize: uploadChunkSize,
+        checksum,
+        filename: assetFile.name,
+        fileCreatedAt,
+        fileModifiedAt,
+        isFavorite: false,
+        visibility: isLockedAssets ? AssetVisibility.Locked : undefined,
+        key: authManager.params.key,
+        slug: authManager.params.slug,
+        onUploadProgress: (loaded, total) => uploadAssetsStore.updateProgress(deviceAssetId, loaded, total),
       });
-
-      if (![200, 201].includes(response.status)) {
-        throw new Error($t('errors.unable_to_upload_file'));
+    } else {
+      // The duplicate shortcut for the single-shot path reuses the same checksum computed above.
+      if (checksum) {
+        try {
+          const {
+            results: [checkUploadResult],
+          } = await checkBulkUpload({ assetBulkUploadCheckDto: { assets: [{ id: assetFile.name, checksum }] } });
+          if (checkUploadResult && checkUploadResult.action === AssetUploadAction.Reject && checkUploadResult.assetId) {
+            responseData = {
+              status: AssetMediaStatus.Duplicate,
+              id: checkUploadResult.assetId,
+              isTrashed: checkUploadResult.isTrashed,
+            };
+          }
+        } catch (error) {
+          console.error(`Error checking duplicate file=${assetFile.name})`, error);
+        }
       }
 
-      responseData = response.data;
+      if (!responseData) {
+        const formData = new FormData();
+        for (const [key, value] of Object.entries({
+          fileCreatedAt,
+          fileModifiedAt,
+          isFavorite: 'false',
+          assetData: new File([assetFile], assetFile.name),
+        })) {
+          formData.append(key, value);
+        }
+
+        if (isLockedAssets) {
+          formData.append('visibility', AssetVisibility.Locked);
+        }
+
+        const queryParams = asQueryString(authManager.params);
+
+        uploadAssetsStore.updateItem(deviceAssetId, { message: $t('asset_uploading') });
+        const response = await uploadRequest<AssetMediaResponseDto>({
+          url: getBaseUrl() + '/assets' + (queryParams ? `?${queryParams}` : ''),
+          data: formData,
+          onUploadProgress: (event) => uploadAssetsStore.updateProgress(deviceAssetId, event.loaded, event.total),
+        });
+
+        if (![200, 201].includes(response.status)) {
+          throw new Error($t('errors.unable_to_upload_file'));
+        }
+
+        responseData = response.data;
+      }
     }
 
     if (responseData.status === AssetMediaStatus.Duplicate) {

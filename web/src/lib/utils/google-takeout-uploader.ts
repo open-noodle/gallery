@@ -8,8 +8,10 @@ import {
   type AssetMediaResponseDto,
 } from '@immich/sdk';
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
+import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
 import { uploadRequest } from '$lib/utils';
 import { createAlbum } from '$lib/utils/album-utils';
+import { shouldUploadChunked, uploadFileChunked } from '$lib/utils/chunked-upload';
 import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 
 export interface UploadResult {
@@ -30,43 +32,71 @@ export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportO
       ? item.metadata.dateTaken.toISOString()
       : new Date(item.lastModified).toISOString();
     const file = await item.getFile();
+    const isFavorite = options.importFavorites && item.metadata?.isFavorite === true;
 
-    // Duplicate check
+    // Checksum, used both for the single-shot duplicate-check shortcut below and (for a chunked
+    // upload) as the create call's checksum, so the server-side duplicate shortcut covers large
+    // takeout items too.
+    let checksum: string | undefined;
     if (options.skipDuplicates && crypto?.subtle) {
       try {
-        const checksum = await computeSha1(file);
-        const {
-          results: [checkResult],
-        } = await checkBulkUpload({
-          assetBulkUploadCheckDto: { assets: [{ id: item.name, checksum }] },
-        });
-        if (checkResult.action === AssetUploadAction.Reject && checkResult.assetId) {
-          return { assetId: checkResult.assetId, status: 'duplicate' };
-        }
+        checksum = await computeSha1(file);
       } catch (error) {
-        console.error('Error checking duplicate', error);
+        console.error('Error hashing file for duplicate check', error);
       }
     }
 
-    // Build FormData
-    const formData = new FormData();
-    formData.append('fileCreatedAt', fileCreatedAt);
-    formData.append('fileModifiedAt', fileCreatedAt);
-    formData.append('isFavorite', String(options.importFavorites && item.metadata?.isFavorite === true));
-    // Do not send `duration`: upstream #28003 changed the server DTO to a numeric (ms) field
-    // (z.coerce.number().int()), which rejects the old "0:00:00.000000" string as NaN -> 400.
-    // The canonical file-uploader omits duration entirely; the server probes it during processing.
-    formData.append('assetData', new File([file], item.name, { lastModified: item.lastModified }));
+    const uploadChunkSize = serverConfigManager.value.uploadChunkSize;
+    let assetMedia: AssetMediaResponseDto;
 
-    // Upload
-    const response = await uploadRequest<AssetMediaResponseDto>({
-      url: getBaseUrl() + '/assets',
-      data: formData,
-    });
+    if (shouldUploadChunked(file.size, uploadChunkSize)) {
+      assetMedia = await uploadFileChunked({
+        file,
+        chunkSize: uploadChunkSize,
+        checksum,
+        filename: item.name,
+        fileCreatedAt,
+        fileModifiedAt: fileCreatedAt,
+        isFavorite,
+      });
+    } else {
+      if (checksum) {
+        try {
+          const {
+            results: [checkResult],
+          } = await checkBulkUpload({
+            assetBulkUploadCheckDto: { assets: [{ id: item.name, checksum }] },
+          });
+          if (checkResult.action === AssetUploadAction.Reject && checkResult.assetId) {
+            return { assetId: checkResult.assetId, status: 'duplicate' };
+          }
+        } catch (error) {
+          console.error('Error checking duplicate', error);
+        }
+      }
 
-    const assetId = response.data.id;
+      // Build FormData
+      const formData = new FormData();
+      formData.append('fileCreatedAt', fileCreatedAt);
+      formData.append('fileModifiedAt', fileCreatedAt);
+      formData.append('isFavorite', String(isFavorite));
+      // Do not send `duration`: upstream #28003 changed the server DTO to a numeric (ms) field
+      // (z.coerce.number().int()), which rejects the old "0:00:00.000000" string as NaN -> 400.
+      // The canonical file-uploader omits duration entirely; the server probes it during processing.
+      formData.append('assetData', new File([file], item.name, { lastModified: item.lastModified }));
 
-    if (response.data.status === AssetMediaStatus.Duplicate) {
+      // Upload
+      const response = await uploadRequest<AssetMediaResponseDto>({
+        url: getBaseUrl() + '/assets',
+        data: formData,
+      });
+
+      assetMedia = response.data;
+    }
+
+    const assetId = assetMedia.id;
+
+    if (assetMedia.status === AssetMediaStatus.Duplicate) {
       return { assetId, status: 'duplicate' };
     }
 
