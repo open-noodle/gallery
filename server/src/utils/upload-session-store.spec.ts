@@ -47,7 +47,8 @@ describe('upload-session-store', () => {
     expect(await committedOffset(data)).toBe(5);
     await writeChunkAt(data, 5, Buffer.from('world'));
     expect(await committedOffset(data)).toBe(10);
-    expect((await readFile(data)).toString()).toBe('helloworld');
+    const written = await readFile(data);
+    expect(written.toString()).toBe('helloworld');
   });
 
   // Spec §5.4 — a replayed chunk rewrites identical bytes at the same position.
@@ -57,7 +58,8 @@ describe('upload-session-store', () => {
     await writeChunkAt(data, 0, Buffer.from('hello'));
     await writeChunkAt(data, 0, Buffer.from('hello'));
     expect(await committedOffset(data)).toBe(5);
-    expect((await readFile(data)).toString()).toBe('hello');
+    const written = await readFile(data);
+    expect(written.toString()).toBe('hello');
   });
 
   // Spec §5.4 — exactly one caller may finalize.

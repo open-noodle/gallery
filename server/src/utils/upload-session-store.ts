@@ -73,7 +73,8 @@ export const writeChunkAt = async (dataPath: string, offset: number, chunk: Buff
 
 export const committedOffset = async (dataPath: string): Promise<number> => {
   try {
-    return (await stat(dataPath)).size;
+    const stats = await stat(dataPath);
+    return stats.size;
   } catch (error) {
     if (isNotFound(error)) {
       return 0;
