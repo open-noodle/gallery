@@ -1,6 +1,7 @@
 import { constants } from 'node:fs';
 import { open, readFile, rename, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
+import sanitize from 'sanitize-filename';
 
 export type UploadSessionState = {
   userId: string;
@@ -16,9 +17,32 @@ export type UploadSessionState = {
 const isNotFound = (error: unknown): boolean =>
   !!error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT';
 
+/**
+ * Joins a single filename onto `folder` and proves the result stayed inside it.
+ *
+ * Two independent guards, because each covers what the other misses:
+ *  - `sanitize` strips traversal segments from the name, matching what
+ *    `AssetMediaService.getUploadFilename` already does on the single-shot path;
+ *  - the containment check then *proves* the resolved path is still under `folder`, so a future
+ *    edit that reintroduces an unsanitized component fails loudly instead of writing outside the
+ *    upload directory.
+ *
+ * The uuid is server-generated, but `extension` derives from the client-supplied filename, so an
+ * untrusted value does reach a filesystem path here.
+ */
+const withinFolder = (folder: string, name: string): string => {
+  const path = join(folder, sanitize(name));
+  const root = resolve(folder);
+  const resolved = resolve(path);
+  if (resolved !== root && !resolved.startsWith(root + sep)) {
+    throw new Error('Refusing to build an upload-session path outside its folder');
+  }
+  return resolved;
+};
+
 export const sessionPaths = (folder: string, uuid: string, extension: string) => ({
-  data: join(folder, `${uuid}${extension}`),
-  state: join(folder, `${uuid}.session.json`),
+  data: withinFolder(folder, `${uuid}${extension}`),
+  state: withinFolder(folder, `${uuid}.session.json`),
 });
 
 export const writeState = async (statePath: string, state: UploadSessionState): Promise<void> => {
