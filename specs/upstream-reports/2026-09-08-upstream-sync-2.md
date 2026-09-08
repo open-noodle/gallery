@@ -126,7 +126,44 @@ the change targets, is exercised by CI below.
 
 ## Remote CI Verification
 
-_(filled in after dispatch — see the follow-up commit)_
+- **Test branch**: `rebase/upstream-batch-229`
+- **Commit validated**: `dcb965cb28c` (confirmed via `headSha`)
+- **Result**: **10 / 10 GREEN on the first dispatch.** Ten workflows, staggered ~30s apart, zero
+  container-registry rate-limit failures.
+
+| Workflow                                  | Status | Run         |
+| ----------------------------------------- | ------ | ----------- |
+| `test.yml`                                | GREEN  | 34267916134 |
+| `docker.yml`                              | GREEN  | 34268083577 |
+| `static_analysis.yml`                     | GREEN  | 34267969527 |
+| `gallery-build-mobile.yml`                | GREEN  | 34268296467 |
+| `gallery-rebase-smoke.yml`                | GREEN  | 34268019783 |
+| `storage-migration-tests.yml`             | GREEN  | 34268132157 |
+| `storage-migration-e2e.yml`               | GREEN  | 34268246276 |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 34268185077 |
+| `gallery-ml-smoke.yml`                    | GREEN  | 34268347559 |
+| `gallery-mobile-smoke.yml`                | GREEN  | 34268401797 |
+
+### #1083 is demonstrated, not just assumed
+
+`Medium Tests (Server)` — the job that has been the sole red on this branch for the last two
+cycles — **passed**, and the before/after is a clean controlled comparison: same job, same branch,
+same suite size, one changed variable.
+
+|                       | Previous cycle (`f4a6aba8d3d`) | This cycle (`dcb965cb28c`) |
+| --------------------- | ------------------------------ | -------------------------- |
+| Test files            | **178 passed / 180**           | **180 passed / 180**       |
+| Tests                 | 3191 passed, **2 failed**      | **3193 passed**, 0 failed  |
+| `PostgresError 53300` | 2 occurrences                  | **none**                   |
+
+The two specs that failed last cycle (`face-repair.service.spec.ts`, `memory.service.spec.ts`) both
+pass. This is the evidence the PR itself could not produce: on `main` the suite sits under the
+connection ceiling and passes either way, so only the rolling branch — with 180 medium spec files
+against `main`'s 172 — actually exercises the fix.
+
+The remaining follow-ups from #1083 (closing the pools in the highest-pool specs, bounding vitest's
+medium parallelism) are still open, and still worth doing: this raised the ceiling from 97 to 197
+usable connections but did not stop the leak, and the spec count only grows.
 
 ## Post-Rebase Verification
 
