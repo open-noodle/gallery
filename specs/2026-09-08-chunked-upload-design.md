@@ -174,7 +174,19 @@ Three rules, and they remove the need for any lock:
 
 A client that is _behind_ (replaying an already-committed chunk) also gets 409 rather than an accepted rewrite, because the server cannot verify the replayed bytes are identical. The client re-syncs from the returned offset.
 
-**Finalize is claimed by `unlink`.** Whichever request successfully unlinks `<uuid>.session.json` owns finalization; a racing second finaliser gets `ENOENT` and returns 404. `unlink` is atomic, so this gives mutual exclusion across replicas with no database lock and no in-process mutex.
+**Finalize is claimed by `rename`.** Whichever request successfully renames `<uuid>.session.json` to `<uuid>.session.json.finalizing` owns finalization; a racing second finaliser gets `ENOENT` and returns 404. This gives mutual exclusion across replicas with no database lock and no in-process mutex. The winner owns the `.finalizing` file and removes it once the asset is created.
+
+> **Do not "simplify" this back to `unlink`.** An earlier draft of this spec claimed `unlink` was atomic enough to serve as the claim. That is false in practice. Measured on Node v24.15.0 / darwin, 200 runs of three concurrent claims on the same path:
+>
+> | Mechanism                          | Result                                                                                   |
+> | ---------------------------------- | ---------------------------------------------------------------------------------------- |
+> | `fsPromises.unlink`, concurrent    | `ok, ok, ok` — **all three win**, every time                                             |
+> | `fsPromises.rename`, concurrent    | `ok, ENOENT, ENOENT` — exactly one winner, every time                                    |
+> | `unlinkSync`, sequential (control) | `ok, ENOENT, ENOENT` — confirms the file existed once and `ENOENT` is reported correctly |
+>
+> With `unlink` as the claim, edge case 21 (two concurrent final chunks) would silently finalize twice. The §9.2 medium test asserting exactly one winner is what catches this, and it must never be weakened to "at least one".
+
+If the winner crashes between claiming and creating the asset, the session is left as `<uuid>.session.json.finalizing` with a complete data file. The Slice 2 sweeper must therefore reclaim `*.session.json.finalizing` as well as `*.session.json`.
 
 Three invariants fall out of the rules above. Each is load-bearing and each has a test in §9:
 
@@ -186,7 +198,7 @@ Three invariants fall out of the rules above. Each is load-bearing and each has 
 
 When `offset + chunkLength === size`:
 
-1. Claim finalization by unlinking the sidecar (§5.4). Lose the race, return 404.
+1. Claim finalization by renaming the sidecar aside (§5.4). Lose the race, return 404.
 2. Compute sha1 over the assembled file. (A running hash cannot be used: `node:crypto` hashes are not serializable across requests. Re-reading a local-disk file once is the cheap, correct option.)
 3. If the create call declared a `checksum` and it does not match, delete the data file and return 400.
 4. Build `UploadFile` — `{ uuid, checksum, originalPath, originalName, size }` (`server/src/types.ts:666`). Note `originalName` is taken verbatim from the create DTO; it must **not** go through the `Buffer.from(name, 'latin1').toString('utf8')` re-decode in `mapToUploadFile` (`server/src/utils/asset.util.ts:190`), which exists only to undo a multer artifact.
@@ -221,7 +233,7 @@ This is strictly better than today, where quota rejection happens only after the
 
 The fork already added `SharedSpaceAlbumGrantReconcileSweep` to that same block, so this is a paid-for pattern.
 
-The sweep walks the upload folder for `*.session.json` older than `UPLOAD_SESSION_TTL` (24 h) and deletes the sidecar and its data file. Grouping it under `nightlyTasks.databaseCleanup` matches the existing all-maintenance-off admin contract.
+The sweep walks the upload folder for `*.session.json` **and `*.session.json.finalizing`** older than `UPLOAD_SESSION_TTL` (24 h) and deletes the sidecar and its data file. The `.finalizing` variant matters because a finaliser that crashes after claiming (§5.4) leaves one behind, and nothing else would ever reclaim it. Grouping it under `nightlyTasks.databaseCleanup` matches the existing all-maintenance-off admin contract.
 
 ### 5.8 Capability advertisement
 
@@ -332,7 +344,7 @@ Every row is a required test (§9).
 | 18  | Zero-byte chunk                                             | 400, mirroring the existing "File is empty" check (`file-upload.interceptor.ts:133`)                                                                                                                                |
 | 19  | Body longer than `Content-Length` claims                    | stream capped at `size - offset`; excess aborts the request with 400                                                                                                                                                |
 | 20  | Two concurrent PATCHes at the same offset                   | Positional write makes it idempotent; the later one gets 409 once the first commits                                                                                                                                 |
-| 21  | Two concurrent _final_ chunks                               | Exactly one wins the `unlink` claim; the loser gets 404                                                                                                                                                             |
+| 21  | Two concurrent _final_ chunks                               | Exactly one wins the `rename` claim; the loser gets 404. `unlink` does NOT work here — see §5.4                                                                                                                     |
 | 22  | Declared checksum mismatch at finalize                      | 400, data file deleted                                                                                                                                                                                              |
 | 23  | `livePhotoVideoId` invalid                                  | `onBeforeLink` throws inside `uploadAsset`; `handleUploadError` cleans up                                                                                                                                           |
 | 24  | Quota consumed by other uploads between create and finalize | `uploadAsset`'s own `requireQuota` rejects; `handleUploadError` cleans up                                                                                                                                           |
