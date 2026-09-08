@@ -31,6 +31,13 @@ const globalSetup = async () => {
       'full_page_writes=off',
       '-c',
       'synchronous_commit=off',
+      // Each medium spec opens its own pool of up to 10 connections via getKyselyDB(), and most
+      // never destroy it, so pools accumulate for the lifetime of a file. At the image default of
+      // 100 (97 usable after superuser_reserved_connections) the suite sits close enough to the
+      // ceiling that crossing it depends on the runner rather than the code, surfacing as
+      // PostgresError 53300 "sorry, too many clients already" in whichever specs happen to run last.
+      '-c',
+      'max_connections=200',
       '-c',
       'config_file=/var/lib/postgresql/data/postgresql.conf',
     ])
