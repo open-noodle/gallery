@@ -383,9 +383,12 @@ Cases 43–49 were added during spec review and are numbered by discovery order,
 **Every slice is written test-first**, one edge case at a time:
 
 1. Write one failing test for one row of §8.
-2. Run it. **Confirm it fails for the reason the row describes** — not because of a typo, a missing import, or an unrelated throw. A test that fails for the wrong reason proves nothing.
-3. Implement the smallest change that makes it pass.
-4. Re-run the whole file before moving to the next row.
+2. **Red.** Run it and confirm it fails for the reason the row describes — not because of a typo, a missing import, or an unrelated throw. A test that fails for the wrong reason proves nothing. Record the failure message; it is the evidence that the test can fail.
+3. **Green.** Implement the smallest change that makes it pass. No speculative generality, no handling of rows not yet written.
+4. **Refactor.** With the test green, clean up what step 3 left behind — extract the duplicated offset and auth checks, name the magic numbers, collapse repeated setup into the shared fixture. Re-run to confirm still green. Refactoring is done under a green test or not at all.
+5. Re-run the whole file before moving to the next row, so an earlier row cannot silently regress.
+
+Record the red and green output for each step. A slice that reports "done" without a red-then-green transcript per behaviour has not followed this plan, and the §12 loop rejects it.
 
 Never write the implementation first and backfill tests against it: a test written against existing behaviour asserts what the code does, not what it should do, and every one of §8's 49 rows is a case where those differ.
 
