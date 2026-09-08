@@ -25,6 +25,7 @@ class ServerConfigDto {
     required this.oauthButtonText,
     required this.publicUsers,
     required this.trashDays,
+    required this.uploadChunkSize,
     required this.userDeleteDelay,
   });
 
@@ -70,6 +71,12 @@ class ServerConfigDto {
   /// Maximum value: 9007199254740991
   int trashDays;
 
+  /// Chunk size in bytes for resumable uploads; 0 if unsupported
+  ///
+  /// Minimum value: -9007199254740991
+  /// Maximum value: 9007199254740991
+  int uploadChunkSize;
+
   /// Delay in days before deleted users are permanently removed
   ///
   /// Minimum value: -9007199254740991
@@ -90,6 +97,7 @@ class ServerConfigDto {
     other.oauthButtonText == oauthButtonText &&
     other.publicUsers == publicUsers &&
     other.trashDays == trashDays &&
+    other.uploadChunkSize == uploadChunkSize &&
     other.userDeleteDelay == userDeleteDelay;
 
   @override
@@ -107,10 +115,11 @@ class ServerConfigDto {
     (oauthButtonText.hashCode) +
     (publicUsers.hashCode) +
     (trashDays.hashCode) +
+    (uploadChunkSize.hashCode) +
     (userDeleteDelay.hashCode);
 
   @override
-  String toString() => 'ServerConfigDto[availableMemoryTypes=$availableMemoryTypes, externalDomain=$externalDomain, isInitialized=$isInitialized, isOnboarded=$isOnboarded, loginPageMessage=$loginPageMessage, maintenanceMode=$maintenanceMode, mapDarkStyleUrl=$mapDarkStyleUrl, mapLightStyleUrl=$mapLightStyleUrl, minFaces=$minFaces, oauthButtonText=$oauthButtonText, publicUsers=$publicUsers, trashDays=$trashDays, userDeleteDelay=$userDeleteDelay]';
+  String toString() => 'ServerConfigDto[availableMemoryTypes=$availableMemoryTypes, externalDomain=$externalDomain, isInitialized=$isInitialized, isOnboarded=$isOnboarded, loginPageMessage=$loginPageMessage, maintenanceMode=$maintenanceMode, mapDarkStyleUrl=$mapDarkStyleUrl, mapLightStyleUrl=$mapLightStyleUrl, minFaces=$minFaces, oauthButtonText=$oauthButtonText, publicUsers=$publicUsers, trashDays=$trashDays, uploadChunkSize=$uploadChunkSize, userDeleteDelay=$userDeleteDelay]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -126,6 +135,7 @@ class ServerConfigDto {
       json[r'oauthButtonText'] = this.oauthButtonText;
       json[r'publicUsers'] = this.publicUsers;
       json[r'trashDays'] = this.trashDays;
+      json[r'uploadChunkSize'] = this.uploadChunkSize;
       json[r'userDeleteDelay'] = this.userDeleteDelay;
     return json;
   }
@@ -153,6 +163,7 @@ class ServerConfigDto {
         oauthButtonText: mapValueOfType<String>(json, r'oauthButtonText')!,
         publicUsers: mapValueOfType<bool>(json, r'publicUsers')!,
         trashDays: mapValueOfType<int>(json, r'trashDays')!,
+        uploadChunkSize: mapValueOfType<int>(json, r'uploadChunkSize')!,
         userDeleteDelay: mapValueOfType<int>(json, r'userDeleteDelay')!,
       );
     }
@@ -213,6 +224,7 @@ class ServerConfigDto {
     'oauthButtonText',
     'publicUsers',
     'trashDays',
+    'uploadChunkSize',
     'userDeleteDelay',
   };
 }

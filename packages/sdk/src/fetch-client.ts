@@ -1068,6 +1068,37 @@ export type AssetMetadataBulkResponseDto = {
         [key: string]: any;
     };
 };
+export type UploadSessionCreateDto = {
+    /** Base64 or hex encoded SHA1, for pre-upload duplicate detection */
+    checksum?: string;
+    /** Duration in milliseconds (for videos) */
+    duration?: number;
+    /** File creation date */
+    fileCreatedAt: string;
+    /** File modification date */
+    fileModifiedAt: string;
+    /** Original filename; the stored extension is derived from it */
+    filename: string;
+    /** Mark as favorite */
+    isFavorite?: boolean;
+    /** Live photo video ID */
+    livePhotoVideoId?: string;
+    /** Asset metadata items */
+    metadata?: AssetMetadataUpsertItemDto[];
+    /** Inline XMP sidecar content (UTF-8 text) */
+    sidecar?: string;
+    /** Total upload size in bytes (Upload-Length) */
+    size: number;
+    visibility?: AssetVisibility;
+};
+export type UploadSessionResponseDto = {
+    /** ISO timestamp after which the session may be reclaimed */
+    expiresAt: string;
+    /** Upload session ID */
+    id: string;
+    /** Bytes committed so far */
+    offset: number;
+};
 export type ExifResponseDto = {
     /** City name */
     city?: string | null;
@@ -2619,6 +2650,8 @@ export type ServerConfigDto = {
     publicUsers: boolean;
     /** Number of days before trashed assets are permanently deleted */
     trashDays: number;
+    /** Chunk size in bytes for resumable uploads; 0 if unsupported */
+    uploadChunkSize: number;
     /** Delay in days before deleted users are permanently removed */
     userDeleteDelay: number;
 };
@@ -5751,6 +5784,89 @@ export function getAssetStatistics({ isFavorite, isTrashed, visibility }: {
         visibility
     }))}`, {
         ...opts
+    }));
+}
+/**
+ * Create an upload session
+ */
+export function createUploadSession({ key, slug, uploadSessionCreateDto }: {
+    key?: string;
+    slug?: string;
+    uploadSessionCreateDto: UploadSessionCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetMediaResponseDto;
+    } | {
+        status: 201;
+        data: UploadSessionResponseDto;
+    }>(`/assets/upload-session${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: uploadSessionCreateDto
+    })));
+}
+/**
+ * Abort an upload session
+ */
+export function deleteUploadSession({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/upload-session/${encodeURIComponent(id)}${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get upload session offset
+ */
+export function getUploadSessionOffset({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/upload-session/${encodeURIComponent(id)}${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts,
+        method: "HEAD"
+    }));
+}
+/**
+ * Append an upload session chunk
+ */
+export function appendUploadSessionChunk({ uploadOffset, id, key, slug }: {
+    uploadOffset: string;
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetMediaResponseDto;
+    } | {
+        status: 201;
+        data: AssetMediaResponseDto;
+    } | {
+        status: 204;
+    }>(`/assets/upload-session/${encodeURIComponent(id)}${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts,
+        method: "PATCH",
+        headers: oazapfts.mergeHeaders(opts?.headers, {
+            "Upload-Offset": uploadOffset
+        })
     }));
 }
 /**
@@ -10585,6 +10701,7 @@ export enum JobName {
     LibrarySyncFiles = "LibrarySyncFiles",
     LibraryScanQueueAll = "LibraryScanQueueAll",
     HlsSessionCleanup = "HlsSessionCleanup",
+    UploadSessionCleanup = "UploadSessionCleanup",
     MemoryCleanup = "MemoryCleanup",
     MemoryGenerate = "MemoryGenerate",
     NotificationsCleanup = "NotificationsCleanup",

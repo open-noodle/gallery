@@ -16,6 +16,87 @@ class AssetsApi {
 
   final ApiClient apiClient;
 
+  /// Append an upload session chunk
+  ///
+  /// Appends a raw chunk at the given offset. The final chunk creates the asset.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] uploadOffset (required):
+  ///   Byte offset at which this chunk starts
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<Response> appendUploadSessionChunkWithHttpInfo(String uploadOffset, String id, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/assets/upload-session/{id}'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (key != null) {
+      queryParams.addAll(_queryParams('', 'key', key));
+    }
+    if (slug != null) {
+      queryParams.addAll(_queryParams('', 'slug', slug));
+    }
+
+    headerParams[r'Upload-Offset'] = parameterToString(uploadOffset);
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PATCH',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Append an upload session chunk
+  ///
+  /// Appends a raw chunk at the given offset. The final chunk creates the asset.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] uploadOffset (required):
+  ///   Byte offset at which this chunk starts
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<AssetMediaResponseDto?> appendUploadSessionChunk(String uploadOffset, String id, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    final response = await appendUploadSessionChunkWithHttpInfo(uploadOffset, id, key: key, slug: slug, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'AssetMediaResponseDto',) as AssetMediaResponseDto;
+    
+    }
+    return null;
+  }
+
   /// Check bulk upload
   ///
   /// Determine which assets have already been uploaded to the server based on their SHA1 checksums.
@@ -120,6 +201,78 @@ class AssetsApi {
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+  }
+
+  /// Create an upload session
+  ///
+  /// Creates a resumable upload session for a large asset, or returns a duplicate immediately.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [UploadSessionCreateDto] uploadSessionCreateDto (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<Response> createUploadSessionWithHttpInfo(UploadSessionCreateDto uploadSessionCreateDto, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/assets/upload-session';
+
+    // ignore: prefer_final_locals
+    Object? postBody = uploadSessionCreateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (key != null) {
+      queryParams.addAll(_queryParams('', 'key', key));
+    }
+    if (slug != null) {
+      queryParams.addAll(_queryParams('', 'slug', slug));
+    }
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Create an upload session
+  ///
+  /// Creates a resumable upload session for a large asset, or returns a duplicate immediately.
+  ///
+  /// Parameters:
+  ///
+  /// * [UploadSessionCreateDto] uploadSessionCreateDto (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<AssetMediaResponseDto?> createUploadSession(UploadSessionCreateDto uploadSessionCreateDto, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    final response = await createUploadSessionWithHttpInfo(uploadSessionCreateDto, key: key, slug: slug, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'AssetMediaResponseDto',) as AssetMediaResponseDto;
+    
+    }
+    return null;
   }
 
   /// Delete asset metadata by key
@@ -274,6 +427,71 @@ class AssetsApi {
   /// * [AssetMetadataBulkDeleteDto] assetMetadataBulkDeleteDto (required):
   Future<void> deleteBulkAssetMetadata(AssetMetadataBulkDeleteDto assetMetadataBulkDeleteDto, { Future<void>? abortTrigger, }) async {
     final response = await deleteBulkAssetMetadataWithHttpInfo(assetMetadataBulkDeleteDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Abort an upload session
+  ///
+  /// Deletes an in-progress upload session and its partial data.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<Response> deleteUploadSessionWithHttpInfo(String id, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/assets/upload-session/{id}'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (key != null) {
+      queryParams.addAll(_queryParams('', 'key', key));
+    }
+    if (slug != null) {
+      queryParams.addAll(_queryParams('', 'slug', slug));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Abort an upload session
+  ///
+  /// Deletes an in-progress upload session and its partial data.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<void> deleteUploadSession(String id, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    final response = await deleteUploadSessionWithHttpInfo(id, key: key, slug: slug, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -1166,6 +1384,71 @@ class AssetsApi {
     
     }
     return null;
+  }
+
+  /// Get upload session offset
+  ///
+  /// Reports the number of bytes committed so far and the declared total length.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<Response> getUploadSessionOffsetWithHttpInfo(String id, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/assets/upload-session/{id}'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (key != null) {
+      queryParams.addAll(_queryParams('', 'key', key));
+    }
+    if (slug != null) {
+      queryParams.addAll(_queryParams('', 'slug', slug));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'HEAD',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Get upload session offset
+  ///
+  /// Reports the number of bytes committed so far and the declared total length.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] key:
+  ///
+  /// * [String] slug:
+  Future<void> getUploadSessionOffset(String id, { String? key, String? slug, Future<void>? abortTrigger, }) async {
+    final response = await getUploadSessionOffsetWithHttpInfo(id, key: key, slug: slug, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
   }
 
   /// Play asset video

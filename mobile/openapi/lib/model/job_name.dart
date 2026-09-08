@@ -50,6 +50,7 @@ enum JobName {
   librarySyncFiles._(r'LibrarySyncFiles'),
   libraryScanQueueAll._(r'LibraryScanQueueAll'),
   hlsSessionCleanup._(r'HlsSessionCleanup'),
+  uploadSessionCleanup._(r'UploadSessionCleanup'),
   memoryCleanup._(r'MemoryCleanup'),
   memoryGenerate._(r'MemoryGenerate'),
   notificationsCleanup._(r'NotificationsCleanup'),
@@ -204,6 +205,7 @@ class JobNameTypeTransformer {
         case r'LibrarySyncFiles': return JobName.librarySyncFiles;
         case r'LibraryScanQueueAll': return JobName.libraryScanQueueAll;
         case r'HlsSessionCleanup': return JobName.hlsSessionCleanup;
+        case r'UploadSessionCleanup': return JobName.uploadSessionCleanup;
         case r'MemoryCleanup': return JobName.memoryCleanup;
         case r'MemoryGenerate': return JobName.memoryGenerate;
         case r'NotificationsCleanup': return JobName.notificationsCleanup;

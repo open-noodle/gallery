@@ -97,11 +97,14 @@ Class | Method | HTTP request | Description
 *AlbumsApi* | [**removeUserFromAlbum**](doc//AlbumsApi.md#removeuserfromalbum) | **DELETE** /albums/{id}/user/{userId} | Remove user from album
 *AlbumsApi* | [**updateAlbumInfo**](doc//AlbumsApi.md#updatealbuminfo) | **PATCH** /albums/{id} | Update an album
 *AlbumsApi* | [**updateAlbumUser**](doc//AlbumsApi.md#updatealbumuser) | **PUT** /albums/{id}/user/{userId} | Update user role
+*AssetsApi* | [**appendUploadSessionChunk**](doc//AssetsApi.md#appenduploadsessionchunk) | **PATCH** /assets/upload-session/{id} | Append an upload session chunk
 *AssetsApi* | [**checkBulkUpload**](doc//AssetsApi.md#checkbulkupload) | **POST** /assets/bulk-upload-check | Check bulk upload
 *AssetsApi* | [**copyAsset**](doc//AssetsApi.md#copyasset) | **PUT** /assets/copy | Copy asset
+*AssetsApi* | [**createUploadSession**](doc//AssetsApi.md#createuploadsession) | **POST** /assets/upload-session | Create an upload session
 *AssetsApi* | [**deleteAssetMetadata**](doc//AssetsApi.md#deleteassetmetadata) | **DELETE** /assets/{id}/metadata/{key} | Delete asset metadata by key
 *AssetsApi* | [**deleteAssets**](doc//AssetsApi.md#deleteassets) | **DELETE** /assets | Delete assets
 *AssetsApi* | [**deleteBulkAssetMetadata**](doc//AssetsApi.md#deletebulkassetmetadata) | **DELETE** /assets/metadata | Delete asset metadata
+*AssetsApi* | [**deleteUploadSession**](doc//AssetsApi.md#deleteuploadsession) | **DELETE** /assets/upload-session/{id} | Abort an upload session
 *AssetsApi* | [**downloadAsset**](doc//AssetsApi.md#downloadasset) | **GET** /assets/{id}/original | Download original asset
 *AssetsApi* | [**editAsset**](doc//AssetsApi.md#editasset) | **PUT** /assets/{id}/edits | Apply edits to an existing asset
 *AssetsApi* | [**endSession**](doc//AssetsApi.md#endsession) | **DELETE** /assets/{id}/video/stream/{sessionId} | End HLS streaming session
@@ -114,6 +117,7 @@ Class | Method | HTTP request | Description
 *AssetsApi* | [**getMainPlaylist**](doc//AssetsApi.md#getmainplaylist) | **GET** /assets/{id}/video/stream/main.m3u8 | Get HLS main playlist
 *AssetsApi* | [**getMediaPlaylist**](doc//AssetsApi.md#getmediaplaylist) | **GET** /assets/{id}/video/stream/{sessionId}/{variantIndex}/playlist.m3u8 | Get HLS media playlist
 *AssetsApi* | [**getSegment**](doc//AssetsApi.md#getsegment) | **GET** /assets/{id}/video/stream/{sessionId}/{variantIndex}/{filename} | Get HLS segment or init file
+*AssetsApi* | [**getUploadSessionOffset**](doc//AssetsApi.md#getuploadsessionoffset) | **HEAD** /assets/upload-session/{id} | Get upload session offset
 *AssetsApi* | [**playAssetVideo**](doc//AssetsApi.md#playassetvideo) | **GET** /assets/{id}/video/playback | Play asset video
 *AssetsApi* | [**removeAssetEdits**](doc//AssetsApi.md#removeassetedits) | **DELETE** /assets/{id}/edits | Remove edits from an existing asset
 *AssetsApi* | [**runAssetJobs**](doc//AssetsApi.md#runassetjobs) | **POST** /assets/jobs | Run an asset job
@@ -920,6 +924,8 @@ Class | Method | HTTP request | Description
  - [UpdateAlbumUserDto](doc//UpdateAlbumUserDto.md)
  - [UpdateAssetDto](doc//UpdateAssetDto.md)
  - [UpdateLibraryDto](doc//UpdateLibraryDto.md)
+ - [UploadSessionCreateDto](doc//UploadSessionCreateDto.md)
+ - [UploadSessionResponseDto](doc//UploadSessionResponseDto.md)
  - [UsageByUserDto](doc//UsageByUserDto.md)
  - [UserAdminCreateDto](doc//UserAdminCreateDto.md)
  - [UserAdminDeleteDto](doc//UserAdminDeleteDto.md)

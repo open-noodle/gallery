@@ -4843,6 +4843,312 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/upload-session": {
+      "post": {
+        "description": "Creates a resumable upload session for a large asset, or returns a duplicate immediately.",
+        "operationId": "createUploadSession",
+        "parameters": [
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadSessionCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetMediaResponseDto"
+                }
+              }
+            },
+            "description": "The declared checksum is already known; the asset is a duplicate and no session was created"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponseDto"
+                }
+              }
+            },
+            "description": "Upload session created"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create an upload session",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/assets/upload-session/{id}": {
+      "delete": {
+        "description": "Deletes an in-progress upload session and its partial data.",
+        "operationId": "deleteUploadSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Abort an upload session",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Beta"
+      },
+      "head": {
+        "description": "Reports the number of bytes committed so far and the declared total length.",
+        "operationId": "getUploadSessionOffset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload-Offset and Upload-Length headers describe session progress"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get upload session offset",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Beta"
+      },
+      "patch": {
+        "description": "Appends a raw chunk at the given offset. The final chunk creates the asset.",
+        "operationId": "appendUploadSessionChunk",
+        "parameters": [
+          {
+            "name": "Upload-Offset",
+            "in": "header",
+            "description": "Byte offset at which this chunk starts",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetMediaResponseDto"
+                }
+              }
+            },
+            "description": "Final chunk committed; the asset is a duplicate"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetMediaResponseDto"
+                }
+              }
+            },
+            "description": "Final chunk committed; the asset was created"
+          },
+          "204": {
+            "description": "Chunk committed; more chunks expected"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Append an upload session chunk",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}": {
       "get": {
         "description": "Retrieve detailed information about a specific asset.",
@@ -28719,6 +29025,7 @@
           "LibrarySyncFiles",
           "LibraryScanQueueAll",
           "HlsSessionCleanup",
+          "UploadSessionCleanup",
           "MemoryCleanup",
           "MemoryGenerate",
           "NotificationsCleanup",
@@ -32750,6 +33057,12 @@
             "minimum": -9007199254740991,
             "type": "integer"
           },
+          "uploadChunkSize": {
+            "description": "Chunk size in bytes for resumable uploads; 0 if unsupported",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
           "userDeleteDelay": {
             "description": "Delay in days before deleted users are permanently removed",
             "maximum": 9007199254740991,
@@ -32770,6 +33083,7 @@
           "oauthButtonText",
           "publicUsers",
           "trashDays",
+          "uploadChunkSize",
           "userDeleteDelay"
         ],
         "type": "object"
@@ -39623,6 +39937,102 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "UploadSessionCreateDto": {
+        "properties": {
+          "checksum": {
+            "description": "Base64 or hex encoded SHA1, for pre-upload duplicate detection",
+            "type": "string"
+          },
+          "duration": {
+            "description": "Duration in milliseconds (for videos)",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "fileCreatedAt": {
+            "description": "File creation date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "fileModifiedAt": {
+            "description": "File modification date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Original filename; the stored extension is derived from it",
+            "minLength": 1,
+            "type": "string"
+          },
+          "isFavorite": {
+            "description": "Mark as favorite",
+            "type": "boolean"
+          },
+          "livePhotoVideoId": {
+            "description": "Live photo video ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Asset metadata items",
+            "items": {
+              "$ref": "#/components/schemas/AssetMetadataUpsertItemDto"
+            },
+            "type": "array"
+          },
+          "sidecar": {
+            "description": "Inline XMP sidecar content (UTF-8 text)",
+            "maxLength": 1048576,
+            "type": "string"
+          },
+          "size": {
+            "description": "Total upload size in bytes (Upload-Length)",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/AssetVisibility"
+          }
+        },
+        "required": [
+          "fileCreatedAt",
+          "fileModifiedAt",
+          "filename",
+          "size"
+        ],
+        "type": "object"
+      },
+      "UploadSessionResponseDto": {
+        "properties": {
+          "expiresAt": {
+            "description": "ISO timestamp after which the session may be reclaimed",
+            "type": "string"
+          },
+          "id": {
+            "description": "Upload session ID",
+            "type": "string"
+          },
+          "offset": {
+            "description": "Bytes committed so far",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expiresAt",
+          "id",
+          "offset"
+        ],
         "type": "object"
       },
       "UsageByUserDto": {

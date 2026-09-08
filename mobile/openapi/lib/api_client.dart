@@ -1121,6 +1121,10 @@ class ApiClient {
           return UpdateAssetDto.fromJson(value);
         case 'UpdateLibraryDto':
           return UpdateLibraryDto.fromJson(value);
+        case 'UploadSessionCreateDto':
+          return UploadSessionCreateDto.fromJson(value);
+        case 'UploadSessionResponseDto':
+          return UploadSessionResponseDto.fromJson(value);
         case 'UsageByUserDto':
           return UsageByUserDto.fromJson(value);
         case 'UserAdminCreateDto':
