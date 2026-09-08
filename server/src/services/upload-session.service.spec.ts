@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { UPLOAD_SESSION_MAX_OPEN } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
@@ -6,7 +6,13 @@ import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto';
 import { StorageFolder } from 'src/enum';
 import { UploadSessionService } from 'src/services/upload-session.service';
 import { fromChecksum } from 'src/utils/request';
-import { sessionPaths, writeState } from 'src/utils/upload-session-store';
+import {
+  committedOffset,
+  readState,
+  sessionPaths,
+  UploadSessionState,
+  writeState,
+} from 'src/utils/upload-session-store';
 import { factory } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -35,12 +41,24 @@ const fakeDirent = (name: string, isDirectory = false) =>
     isDirectory: () => isDirectory,
   }) as any;
 
+const makeState = (overrides: Partial<UploadSessionState> = {}): UploadSessionState => ({
+  userId: 'user-1',
+  sharedLinkId: null,
+  size: 1024,
+  originalName: 'a.jpg',
+  createdAt: '2026-09-08T10:00:00.000Z',
+  dto: {},
+  ...overrides,
+});
+
 describe(UploadSessionService.name, () => {
   let sut: UploadSessionService;
   let mocks: ServiceMocks;
 
   beforeEach(() => {
     vi.mocked(writeState).mockReset();
+    vi.mocked(readState).mockReset();
+    vi.mocked(committedOffset).mockReset();
     ({ sut, mocks } = newTestService(UploadSessionService));
   });
 
@@ -149,6 +167,102 @@ describe(UploadSessionService.name, () => {
         offset: 0,
         expiresAt: new Date('2026-09-09T10:00:00.000Z').toISOString(),
       });
+    });
+  });
+
+  describe('getOffset', () => {
+    it('throws 404 for an unknown session', async () => {
+      const auth = factory.auth();
+      vi.mocked(readState).mockResolvedValue(undefined);
+
+      await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws 404 when the session belongs to another user', async () => {
+      const auth = factory.auth({ user: { id: 'me' } });
+      vi.mocked(readState).mockResolvedValue(makeState({ userId: 'someone-else', sharedLinkId: null }));
+
+      await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws 404 for a shared-link session opened under a different link', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' } });
+      vi.mocked(readState).mockResolvedValue(makeState({ userId: 'owner-1', sharedLinkId: 'link-A' }));
+
+      await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // Spec §8 row 44 — all four auth-kind combinations, not just the two failing directions.
+    it('succeeds for a user-token session continued with the same user token', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' } });
+      vi.mocked(readState).mockResolvedValue(makeState({ userId: 'owner-1', sharedLinkId: null, size: 2048 }));
+      vi.mocked(committedOffset).mockResolvedValue(512);
+
+      await expect(sut.getOffset(auth, 'session-1')).resolves.toEqual({ offset: 512, size: 2048 });
+    });
+
+    it('succeeds for a shared-link session continued under the same link', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' }, sharedLink: { id: 'link-A' } });
+      vi.mocked(readState).mockResolvedValue(makeState({ userId: 'owner-1', sharedLinkId: 'link-A', size: 2048 }));
+      vi.mocked(committedOffset).mockResolvedValue(256);
+
+      await expect(sut.getOffset(auth, 'session-1')).resolves.toEqual({ offset: 256, size: 2048 });
+    });
+
+    it('throws 404 when a user-token session is continued with a shared link', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' }, sharedLink: { id: 'link-A' } });
+      vi.mocked(readState).mockResolvedValue(makeState({ userId: 'owner-1', sharedLinkId: null }));
+
+      await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws 404 when a shared-link session is continued with a user token', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' } });
+      vi.mocked(readState).mockResolvedValue(makeState({ userId: 'owner-1', sharedLinkId: 'link-A' }));
+
+      await expect(sut.getOffset(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('reads the state and data paths derived from the caller folder and session id', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' } });
+      const state = makeState({ userId: 'owner-1', sharedLinkId: null, originalName: 'photo.png', size: 999 });
+      vi.mocked(readState).mockResolvedValue(state);
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      await sut.getOffset(auth, 'session-1');
+
+      const folder = StorageCore.getNestedFolder(StorageFolder.Upload, 'owner-1', 'session-1');
+      const expectedStatePath = sessionPaths(folder, 'session-1', '').state;
+      const expectedDataPath = sessionPaths(folder, 'session-1', '.png').data;
+
+      expect(readState).toHaveBeenCalledWith(expectedStatePath);
+      expect(committedOffset).toHaveBeenCalledWith(expectedDataPath);
+    });
+  });
+
+  describe('abort', () => {
+    it('throws 404 for an unknown or foreign session', async () => {
+      const auth = factory.auth();
+      vi.mocked(readState).mockResolvedValue(undefined);
+
+      await expect(sut.abort(auth, 'session-1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+
+    it('unlinks both the data file and the state file', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' } });
+      const state = makeState({ userId: 'owner-1', sharedLinkId: null, originalName: 'video.mp4' });
+      vi.mocked(readState).mockResolvedValue(state);
+
+      await sut.abort(auth, 'session-1');
+
+      const folder = StorageCore.getNestedFolder(StorageFolder.Upload, 'owner-1', 'session-1');
+      const expectedStatePath = sessionPaths(folder, 'session-1', '').state;
+      const expectedDataPath = sessionPaths(folder, 'session-1', '.mp4').data;
+
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(expectedDataPath);
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(expectedStatePath);
+      expect(mocks.storage.unlink).toHaveBeenCalledTimes(2);
     });
   });
 });
