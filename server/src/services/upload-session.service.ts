@@ -1,18 +1,22 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetMediaResponseDto } from 'src/dtos/asset-media-response.dto';
-import { UploadFieldName } from 'src/dtos/asset-media.dto';
+import { AssetMediaCreateDto, UploadFieldName } from 'src/dtos/asset-media.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { UploadSessionCreateDto, UploadSessionResponseDto } from 'src/dtos/upload-session.dto';
-import { StorageFolder } from 'src/enum';
+import { AssetVisibility, StorageFolder } from 'src/enum';
 import { AssetMediaService } from 'src/services/asset-media.service';
 import { BaseService } from 'src/services/base.service';
+import { UploadFile } from 'src/types';
 import { requireUploadAccess } from 'src/utils/access';
 import { getFilenameExtension } from 'src/utils/file';
+import { fromChecksum } from 'src/utils/request';
 import {
+  claimFinalize,
   committedOffset,
+  finalizeClaimPath,
   readState,
   sessionPaths,
   UploadSessionState,
@@ -99,7 +103,7 @@ export class UploadSessionService extends BaseService {
       throw new BadRequestException('Upload-Offset must be a non-negative integer');
     }
 
-    const { state, dataPath } = await this.loadOwnedSession(auth, id);
+    const { state, dataPath, statePath } = await this.loadOwnedSession(auth, id);
 
     // Rule: the declared offset MUST equal the true on-disk size, or 409 with the real offset.
     // This is the only thing preventing a sparse file (spec §5.4 invariant) — a client ahead of
@@ -122,11 +126,83 @@ export class UploadSessionService extends BaseService {
 
     const newOffset = offset + chunk.length;
     if (newOffset === state.size) {
-      // Finalize is implemented in the next commit (Task 6).
-      throw new NotFoundException('Upload session not found');
+      return this.finalizeUpload(auth, id, state, dataPath, statePath);
     }
 
     return { offset: newOffset };
+  }
+
+  /**
+   * Finalize a completed upload (spec §5.5). Claims exclusivity via `claimFinalize` (rename,
+   * NOT unlink — see spec §5.4, `unlink` is not exclusive under concurrency on this platform).
+   * A caller that loses the race gets 404.
+   */
+  private async finalizeUpload(
+    auth: AuthDto,
+    id: string,
+    state: UploadSessionState,
+    dataPath: string,
+    statePath: string,
+  ): Promise<AssetMediaResponseDto> {
+    const claimed = await claimFinalize(statePath);
+    if (!claimed) {
+      throw new NotFoundException('Upload session not found');
+    }
+
+    // A running hash cannot be carried across requests (node:crypto hashes are not
+    // serializable), so re-read the assembled file once and hash it here.
+    const checksum = await this.cryptoRepository.hashFile(dataPath);
+
+    if (state.checksum !== undefined && !checksum.equals(fromChecksum(state.checksum))) {
+      await this.storageRepository.unlink(dataPath);
+      throw new BadRequestException('Checksum does not match the declared value');
+    }
+
+    const file: UploadFile = {
+      uuid: id,
+      checksum,
+      originalPath: dataPath,
+      // Verbatim from the create DTO — do NOT run this through the latin1->utf8 re-decode in
+      // `mapToUploadFile`; that exists only to undo a multer artifact and would corrupt a
+      // non-ASCII filename here (spec §5.5 step 4).
+      originalName: state.originalName,
+      size: state.size,
+    };
+
+    const sessionDto = state.dto as Record<string, unknown>;
+    const sidecarContent = sessionDto.sidecar as string | undefined;
+
+    let sidecarFile: UploadFile | undefined;
+    if (sidecarContent !== undefined) {
+      const sidecarPath = join(dirname(dataPath), `${id}.xmp`);
+      const sidecarBuffer = Buffer.from(sidecarContent, 'utf8');
+      await this.storageRepository.createOrOverwriteFile(sidecarPath, sidecarBuffer);
+      sidecarFile = {
+        uuid: id,
+        checksum: this.cryptoRepository.hashSha1(sidecarBuffer),
+        originalPath: sidecarPath,
+        originalName: `${state.originalName}.xmp`,
+        size: sidecarBuffer.length,
+      };
+    }
+
+    const dto: AssetMediaCreateDto = {
+      fileCreatedAt: new Date(sessionDto.fileCreatedAt as string),
+      fileModifiedAt: new Date(sessionDto.fileModifiedAt as string),
+      duration: sessionDto.duration as number | undefined,
+      filename: sessionDto.filename as string | undefined,
+      isFavorite: sessionDto.isFavorite as boolean | undefined,
+      visibility: sessionDto.visibility as AssetVisibility | undefined,
+      livePhotoVideoId: sessionDto.livePhotoVideoId as string | undefined,
+      metadata: sessionDto.metadata as AssetMediaCreateDto['metadata'],
+    } as AssetMediaCreateDto;
+
+    const result = await this.assetMedia.uploadAsset(auth, dto, file, sidecarFile);
+
+    // Nothing else removes the `.finalizing` marker; leaving it behind is a disk leak.
+    await this.storageRepository.unlink(finalizeClaimPath(statePath));
+
+    return result;
   }
 
   async abort(auth: AuthDto, id: string): Promise<void> {
