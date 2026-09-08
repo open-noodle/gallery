@@ -43,13 +43,9 @@ class _NoOpHaptic extends HapticNotifier {
   @override
   dynamic selectionClick() => null;
   @override
-  dynamic lightImpact() => null;
-  @override
   dynamic mediumImpact() => null;
   @override
   dynamic heavyImpact() => null;
-  @override
-  dynamic vibrate() => null;
 }
 
 class _FakeRemoteAlbumNotifier extends RemoteAlbumNotifier {
