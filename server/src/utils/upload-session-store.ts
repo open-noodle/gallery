@@ -59,6 +59,9 @@ const withinFolder = (folder: string, name: string): string => {
 export const sessionPaths = (folder: string, uuid: string, extension: string) => ({
   data: withinFolder(folder, `${uuid}${extension}`),
   state: withinFolder(folder, `${uuid}.session.json`),
+  // The inline XMP sidecar is written beside the asset, and must go through the same guard —
+  // building it with a bare join() would reintroduce exactly the traversal this module prevents.
+  sidecar: withinFolder(folder, `${uuid}.xmp`),
 });
 
 export const writeState = async (statePath: string, state: UploadSessionState): Promise<void> => {
