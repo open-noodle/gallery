@@ -1,13 +1,19 @@
 import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { UPLOAD_SESSION_MAX_OPEN } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
 import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto';
 import { StorageFolder } from 'src/enum';
+import { AssetMediaService } from 'src/services/asset-media.service';
+import { StorageService } from 'src/services/storage.service';
 import { UploadSessionService } from 'src/services/upload-session.service';
+import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database';
 import { fromChecksum } from 'src/utils/request';
 import {
+  claimFinalize,
   committedOffset,
+  finalizeClaimPath,
   readState,
   sessionPaths,
   UploadSessionState,
@@ -56,10 +62,17 @@ describe(UploadSessionService.name, () => {
   let sut: UploadSessionService;
   let mocks: ServiceMocks;
 
+  beforeAll(() => {
+    // Initialize the disk backend for StorageService so that AssetMediaService.uploadAsset's
+    // internal writeBackend resolution works when finalize hands off to it for real.
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+  });
+
   beforeEach(() => {
     vi.mocked(writeState).mockReset();
     vi.mocked(readState).mockReset();
     vi.mocked(committedOffset).mockReset();
+    vi.mocked(claimFinalize).mockReset();
     vi.mocked(writeChunkAt).mockReset();
     ({ sut, mocks } = newTestService(UploadSessionService));
   });
@@ -443,6 +456,187 @@ describe(UploadSessionService.name, () => {
       await sut.appendChunk(auth, 'session-1', 3, Buffer.from('abcde'));
 
       expect(writeChunkAt).toHaveBeenCalledWith(dataPath, 3, Buffer.from('abcde'));
+    });
+  });
+
+  describe('appendChunk — finalize', () => {
+    const owner = 'owner-1';
+    let dataPath: string;
+    let statePath: string;
+
+    const finalizedAsset = Object.freeze({ id: 'asset-1' }) as any;
+
+    const setupSession = (overrides: Partial<UploadSessionState> = {}, dtoOverrides: Record<string, unknown> = {}) => {
+      const state = makeState({
+        userId: owner,
+        sharedLinkId: null,
+        originalName: 'a.jpg',
+        size: 10,
+        dto: {
+          filename: 'a.jpg',
+          fileCreatedAt: '2026-09-08T10:00:00.000Z',
+          fileModifiedAt: '2026-09-08T10:00:00.000Z',
+          ...dtoOverrides,
+        },
+        ...overrides,
+      });
+      vi.mocked(readState).mockResolvedValue(state);
+      return state;
+    };
+
+    beforeEach(() => {
+      const folder = StorageCore.getNestedFolder(StorageFolder.Upload, owner, 'session-1');
+      dataPath = sessionPaths(folder, 'session-1', '.jpg').data;
+      statePath = sessionPaths(folder, 'session-1', '').state;
+
+      vi.mocked(claimFinalize).mockResolvedValue(true);
+      mocks.crypto.hashFile.mockResolvedValue(Buffer.from('deadbeef', 'hex'));
+      mocks.asset.create.mockResolvedValue(finalizedAsset);
+    });
+
+    it('final chunk computes sha1, claims finalize, and calls uploadAsset with a verbatim originalName', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 5, originalName: 'ünïcödé 名前.jpg' }, { filename: 'ünïcödé 名前.jpg' });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      const spy = vi.spyOn(AssetMediaService.prototype, 'uploadAsset');
+
+      const result = await sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'));
+
+      expect(result).toEqual({ id: 'asset-1', status: AssetMediaStatus.CREATED });
+      expect(claimFinalize).toHaveBeenCalledWith(statePath);
+      expect(mocks.crypto.hashFile).toHaveBeenCalledWith(dataPath);
+
+      const uploadPath = sessionPaths(
+        StorageCore.getNestedFolder(StorageFolder.Upload, owner, 'session-1'),
+        'session-1',
+        '.jpg',
+      ).data;
+      expect(spy).toHaveBeenCalledWith(
+        auth,
+        expect.anything(),
+        expect.objectContaining({
+          uuid: 'session-1',
+          originalPath: uploadPath,
+          originalName: 'ünïcödé 名前.jpg',
+          size: 5,
+        }),
+        undefined,
+      );
+
+      // the .finalizing marker is removed once the asset is created
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(finalizeClaimPath(statePath));
+    });
+
+    it('writes the inline sidecar and passes it as the sidecarFile argument', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 5 }, { sidecar: '<xmp>hello</xmp>' });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      const spy = vi.spyOn(AssetMediaService.prototype, 'uploadAsset');
+
+      await sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'));
+
+      expect(mocks.storage.createOrOverwriteFile).toHaveBeenCalledWith(
+        expect.stringContaining('session-1.xmp'),
+        Buffer.from('<xmp>hello</xmp>', 'utf8'),
+      );
+      expect(spy).toHaveBeenCalledWith(
+        auth,
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          uuid: 'session-1',
+          originalName: 'a.jpg.xmp',
+          size: Buffer.from('<xmp>hello</xmp>', 'utf8').length,
+        }),
+      );
+    });
+
+    it('only one of two concurrent finalizers proceeds; the loser gets 404', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 5 });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+      vi.mocked(claimFinalize).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+      const [first, second] = await Promise.allSettled([
+        sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello')),
+        sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello')),
+      ]);
+
+      expect(first.status).toBe('fulfilled');
+      expect(second.status).toBe('rejected');
+      if (second.status === 'rejected') {
+        expect(second.reason).toBeInstanceOf(NotFoundException);
+      }
+    });
+
+    it('throws and deletes the data file when the declared checksum does not match', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 5, checksum: Buffer.from('cafebabe', 'hex').toString('hex') });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+      mocks.crypto.hashFile.mockResolvedValue(Buffer.from('deadbeef', 'hex'));
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(dataPath);
+      expect(mocks.asset.create).not.toHaveBeenCalled();
+    });
+
+    it('propagates the uploadAsset error when livePhotoVideoId is invalid', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 5 }, { livePhotoVideoId: 'not-a-real-asset' });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+      mocks.asset.getById.mockResolvedValue(undefined);
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.storage.unlink).not.toHaveBeenCalledWith(finalizeClaimPath(statePath));
+    });
+
+    it('propagates the uploadAsset quota rejection when quota was consumed between create and finalize', async () => {
+      const auth = factory.auth({ user: { id: owner, quotaSizeInBytes: 10, quotaUsageInBytes: 8 } });
+      setupSession({ size: 5 });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.asset.create).not.toHaveBeenCalled();
+    });
+
+    it('propagates the rejection when the admin lowers the user quota mid-upload', async () => {
+      const auth = factory.auth({ user: { id: owner, quotaSizeInBytes: 3, quotaUsageInBytes: 0 } });
+      setupSession({ size: 5 });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.asset.create).not.toHaveBeenCalled();
+    });
+
+    it('returns the DUPLICATE response uploadAsset produces for identical bytes', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 5 });
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      const constraintError = new Error('unique key violation') as Error & { constraint_name: string };
+      constraintError.constraint_name = ASSET_CHECKSUM_CONSTRAINT;
+      mocks.asset.create.mockRejectedValue(constraintError);
+      mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue('existing-asset-id');
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'))).resolves.toEqual({
+        id: 'existing-asset-id',
+        status: AssetMediaStatus.DUPLICATE,
+      });
+
+      // finalize resolved (even though it was a duplicate, not a new asset), so the marker
+      // should still be cleaned up.
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(finalizeClaimPath(statePath));
     });
   });
 });
