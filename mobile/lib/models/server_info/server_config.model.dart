@@ -11,6 +11,8 @@ abstract class ServerConfig with _$ServerConfig {
     required String externalDomain,
     required String mapDarkStyleUrl,
     required String mapLightStyleUrl,
+    // Server-advertised chunk size (bytes) for the chunked-upload protocol. 0 means unsupported.
+    @Default(0) int uploadChunkSize,
   }) = _ServerConfig;
 
   factory ServerConfig.fromDto(ServerConfigDto dto) => ServerConfig(
@@ -19,5 +21,6 @@ abstract class ServerConfig with _$ServerConfig {
     externalDomain: dto.externalDomain,
     mapDarkStyleUrl: dto.mapDarkStyleUrl,
     mapLightStyleUrl: dto.mapLightStyleUrl,
+    uploadChunkSize: dto.uploadChunkSize,
   );
 }

@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:background_downloader/background_downloader.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart';
+import 'package:http/http.dart' as http;
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
@@ -14,11 +17,9 @@ import 'package:logging/logging.dart';
 final uploadRepositoryProvider = Provider((ref) => UploadRepository());
 
 class UploadRepository {
-  final Logger logger = Logger('UploadRepository');
-  void Function(TaskStatusUpdate)? onUploadStatus;
-  void Function(TaskProgressUpdate)? onTaskProgress;
-
-  UploadRepository() {
+  /// [httpClient] is injectable for testing; production code falls back to the shared,
+  /// natively-authenticated client from [NetworkRepository].
+  UploadRepository({this.httpClient}) {
     FileDownloader().registerCallbacks(
       group: kBackupGroup,
       taskStatusCallback: (update) => onUploadStatus?.call(update),
@@ -34,6 +35,21 @@ class UploadRepository {
       taskStatusCallback: (update) => onUploadStatus?.call(update),
       taskProgressCallback: (update) => onTaskProgress?.call(update),
     );
+  }
+
+  final Logger logger = Logger('UploadRepository');
+  void Function(TaskStatusUpdate)? onUploadStatus;
+  void Function(TaskProgressUpdate)? onTaskProgress;
+
+  final Client? httpClient;
+  Client get _client => httpClient ?? NetworkRepository.client;
+
+  /// Server-advertised chunk size (bytes) for the chunked-upload protocol.
+  /// 0 (or unset, i.e. an older/unconfigured server) means clients must use the multipart path.
+  int get uploadChunkSize => Store.tryGet(StoreKey.uploadChunkSize) ?? 0;
+
+  Future<void> enqueueBackground(UploadTask task) {
+    return FileDownloader().enqueue(task);
   }
 
   Future<List<bool>> enqueueBackgroundAll(List<UploadTask> tasks) {
@@ -57,6 +73,10 @@ class UploadRepository {
     return FileDownloader().start();
   }
 
+  Future<List<TaskRecord>> getRecords(String group) {
+    return FileDownloader().database.allRecords(group: group);
+  }
+
   Future<UploadResult> uploadFile({
     required File file,
     required String originalFileName,
@@ -65,6 +85,43 @@ class UploadRepository {
     void Function(int bytes, int totalBytes)? onProgress,
     required String logContext,
     Client? httpClient,
+  }) async {
+    // Per-call override (upstream's test seam) wins over the constructor-injected one.
+    final client = httpClient ?? _client;
+    final chunkSize = uploadChunkSize;
+    final fileSize = file.lengthSync();
+    if (chunkSize > 0 && fileSize > chunkSize) {
+      return _uploadFileChunked(
+        file: file,
+        originalFileName: originalFileName,
+        fields: fields,
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+        logContext: logContext,
+        fileSize: fileSize,
+        chunkSize: chunkSize,
+        client: client,
+      );
+    }
+    return _uploadFileMultipart(
+      file: file,
+      originalFileName: originalFileName,
+      fields: fields,
+      cancelToken: cancelToken,
+      onProgress: onProgress,
+      logContext: logContext,
+      client: client,
+    );
+  }
+
+  Future<UploadResult> _uploadFileMultipart({
+    required File file,
+    required String originalFileName,
+    required Map<String, String> fields,
+    required Completer<void>? cancelToken,
+    void Function(int bytes, int totalBytes)? onProgress,
+    required String logContext,
+    required Client client,
   }) async {
     final String savedEndpoint = Store.get(StoreKey.serverEndpoint);
 
@@ -81,7 +138,6 @@ class UploadRepository {
     }
 
     try {
-      final client = httpClient ?? NetworkRepository.client;
       StreamedResponse response;
       try {
         response = await client.send(buildRequest());
@@ -95,23 +151,7 @@ class UploadRepository {
       final responseBodyString = await response.stream.bytesToString();
 
       if (![200, 201].contains(response.statusCode)) {
-        String? errorMessage;
-
-        if (response.statusCode == 413) {
-          errorMessage = 'Error(413) File is too large to upload';
-          return UploadResult.error(statusCode: response.statusCode, errorMessage: errorMessage);
-        }
-
-        try {
-          final error = jsonDecode(responseBodyString);
-          errorMessage = error['message'] ?? error['error'];
-        } catch (_) {
-          errorMessage = responseBodyString.isNotEmpty
-              ? responseBodyString
-              : 'Upload failed with status ${response.statusCode}';
-        }
-
-        return UploadResult.error(statusCode: response.statusCode, errorMessage: errorMessage);
+        return _errorResult(response.statusCode, responseBodyString);
       }
 
       try {
@@ -128,6 +168,224 @@ class UploadRepository {
       return UploadResult.error(errorMessage: error.toString());
     }
   }
+
+  UploadResult _errorResult(int statusCode, String responseBodyString) {
+    String? errorMessage;
+
+    if (statusCode == 413) {
+      return UploadResult.error(statusCode: statusCode, errorMessage: 'Error(413) File is too large to upload');
+    }
+
+    try {
+      final error = jsonDecode(responseBodyString);
+      errorMessage = error['message'] ?? error['error'];
+    } catch (_) {
+      errorMessage = responseBodyString.isNotEmpty ? responseBodyString : 'Upload failed with status $statusCode';
+    }
+
+    return UploadResult.error(statusCode: statusCode, errorMessage: errorMessage);
+  }
+
+  /// Creates an upload session, then PATCHes the file up in [chunkSize]-sized chunks.
+  /// See specs/2026-09-08-chunked-upload-design.md §7.2.
+  Future<UploadResult> _uploadFileChunked({
+    required File file,
+    required String originalFileName,
+    required Map<String, String> fields,
+    required Completer<void>? cancelToken,
+    void Function(int bytes, int totalBytes)? onProgress,
+    required String logContext,
+    required int fileSize,
+    required int chunkSize,
+    required Client client,
+  }) async {
+    final String savedEndpoint = Store.get(StoreKey.serverEndpoint);
+    String? sessionId;
+
+    try {
+      final createBody = _buildSessionCreateBody(fields: fields, filename: originalFileName, size: fileSize);
+      final createRequest = http.Request('POST', _sessionsUri(savedEndpoint))
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(createBody);
+
+      final createResponse = await Response.fromStream(await client.send(createRequest));
+
+      if (createResponse.statusCode == 200) {
+        // Duplicate detected by checksum at create time; no session was opened.
+        final body = jsonDecode(createResponse.body) as Map<String, dynamic>;
+        return UploadResult.success(remoteAssetId: body['id'] as String);
+      }
+      if (createResponse.statusCode != 201) {
+        return _errorResult(createResponse.statusCode, createResponse.body);
+      }
+
+      final session = jsonDecode(createResponse.body) as Map<String, dynamic>;
+      sessionId = session['id'] as String;
+      var offset = (session['offset'] as num?)?.toInt() ?? 0;
+
+      while (offset < fileSize) {
+        if (cancelToken != null && cancelToken.isCompleted) {
+          await deleteUploadSession(sessionId);
+          return UploadResult.cancelled();
+        }
+
+        final end = math.min(offset + chunkSize, fileSize);
+        final chunkBytes = await _readChunkBytes(file, offset, end);
+
+        final chunkRequest = ProgressByteRequest(
+          'PATCH',
+          _sessionUri(savedEndpoint, sessionId),
+          abortTrigger: cancelToken?.future,
+          onProgress: onProgress,
+          progressOffset: offset,
+          progressTotal: fileSize,
+        )
+          ..headers['Content-Type'] = 'application/offset+octet-stream'
+          ..headers['Upload-Offset'] = offset.toString()
+          ..bodyBytes = chunkBytes;
+
+        final chunkResponse = await Response.fromStream(await client.send(chunkRequest));
+
+        if (chunkResponse.statusCode == 204) {
+          offset = end;
+          continue;
+        }
+        if (chunkResponse.statusCode == 200 || chunkResponse.statusCode == 201) {
+          final body = jsonDecode(chunkResponse.body) as Map<String, dynamic>;
+          return UploadResult.success(remoteAssetId: body['id'] as String);
+        }
+
+        await deleteUploadSession(sessionId);
+        return _errorResult(chunkResponse.statusCode, chunkResponse.body);
+      }
+
+      // Every chunk offset was consumed without receiving a final (200/201) response.
+      await deleteUploadSession(sessionId);
+      return UploadResult.error(errorMessage: 'Upload session did not finalize');
+    } on RequestAbortedException {
+      if (sessionId != null) {
+        await deleteUploadSession(sessionId);
+      }
+      logger.warning("Upload $logContext was cancelled");
+      return UploadResult.cancelled();
+    } catch (error, stackTrace) {
+      if (sessionId != null) {
+        await deleteUploadSession(sessionId);
+      }
+      logger.warning("Error uploading $logContext: ${error.toString()}: $stackTrace");
+      return UploadResult.error(errorMessage: error.toString());
+    }
+  }
+
+  Uri _sessionsUri(String endpoint) => Uri.parse('$endpoint/assets/upload-session');
+  Uri _sessionUri(String endpoint, String sessionId) => Uri.parse('$endpoint/assets/upload-session/$sessionId');
+
+  Future<Uint8List> _readChunkBytes(File file, int start, int end) {
+    return ByteStream(file.openRead(start, end)).toBytes();
+  }
+
+  /// Builds the JSON body for `POST /assets/upload-session` from the existing string-typed
+  /// multipart [fields] map, so callers (foreground/background) don't need two field-building
+  /// code paths. See specs/2026-09-08-chunked-upload-design.md §4.3.
+  Map<String, dynamic> _buildSessionCreateBody({
+    required Map<String, String> fields,
+    required String filename,
+    required int size,
+  }) {
+    final body = <String, dynamic>{'filename': filename, 'size': size};
+    if (fields['fileCreatedAt'] != null) {
+      body['fileCreatedAt'] = fields['fileCreatedAt'];
+    }
+    if (fields['fileModifiedAt'] != null) {
+      body['fileModifiedAt'] = fields['fileModifiedAt'];
+    }
+    if (fields.containsKey('isFavorite')) {
+      body['isFavorite'] = fields['isFavorite'] == 'true';
+    }
+    if (fields.containsKey('duration')) {
+      final duration = int.tryParse(fields['duration'] ?? '');
+      if (duration != null) {
+        body['duration'] = duration;
+      }
+    }
+    if (fields.containsKey('visibility')) {
+      body['visibility'] = fields['visibility'];
+    }
+    if (fields.containsKey('livePhotoVideoId')) {
+      body['livePhotoVideoId'] = fields['livePhotoVideoId'];
+    }
+    if (fields.containsKey('metadata')) {
+      try {
+        body['metadata'] = jsonDecode(fields['metadata']!);
+      } catch (_) {
+        // Malformed metadata is dropped rather than failing the whole upload.
+      }
+    }
+    return body;
+  }
+
+  /// Opens a chunked-upload session. See specs/2026-09-08-chunked-upload-design.md §4.1.
+  Future<UploadSessionResult> createUploadSession({
+    required String filename,
+    required int size,
+    required Map<String, String> fields,
+  }) async {
+    final String savedEndpoint = Store.get(StoreKey.serverEndpoint);
+    try {
+      final createBody = _buildSessionCreateBody(fields: fields, filename: filename, size: size);
+      final request = http.Request('POST', _sessionsUri(savedEndpoint))
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(createBody);
+
+      final response = await Response.fromStream(await _client.send(request));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return UploadSessionResult(duplicateAssetId: body['id'] as String);
+      }
+      if (response.statusCode != 201) {
+        final errorResult = _errorResult(response.statusCode, response.body);
+        return UploadSessionResult(statusCode: response.statusCode, errorMessage: errorResult.errorMessage);
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return UploadSessionResult(sessionId: body['id'] as String, offset: (body['offset'] as num?)?.toInt() ?? 0);
+    } catch (error, stackTrace) {
+      logger.warning("Error creating upload session for $filename: ${error.toString()}: $stackTrace");
+      return UploadSessionResult(errorMessage: error.toString());
+    }
+  }
+
+  /// Aborts an in-progress upload session and deletes its partial data. Best-effort: a failure
+  /// here just leaves the session to be swept by the server's TTL.
+  Future<void> deleteUploadSession(String sessionId) async {
+    final String savedEndpoint = Store.get(StoreKey.serverEndpoint);
+    try {
+      await _client.send(http.Request('DELETE', _sessionUri(savedEndpoint, sessionId)));
+    } catch (error, stackTrace) {
+      logger.warning("Error deleting upload session $sessionId: ${error.toString()}: $stackTrace");
+    }
+  }
+}
+
+class UploadSessionResult {
+  final String? sessionId;
+  final int offset;
+  final String? duplicateAssetId;
+  final String? errorMessage;
+  final int? statusCode;
+
+  const UploadSessionResult({
+    this.sessionId,
+    this.offset = 0,
+    this.duplicateAssetId,
+    this.errorMessage,
+    this.statusCode,
+  });
+
+  bool get isSession => sessionId != null;
+  bool get isDuplicate => duplicateAssetId != null;
+  bool get isError => sessionId == null && duplicateAssetId == null;
 }
 
 class ProgressMultipartRequest extends MultipartRequest with Abortable {
@@ -152,6 +410,49 @@ class ProgressMultipartRequest extends MultipartRequest with Abortable {
         handleData: (List<int> data, EventSink<List<int>> sink) {
           bytes += data.length;
           onProgress!(bytes, total);
+          sink.add(data);
+        },
+      ),
+    );
+    return ByteStream(stream);
+  }
+}
+
+/// A single-chunk PATCH request that reports progress against the whole file, not just this
+/// chunk: [progressOffset] is the number of bytes already committed before this chunk started,
+/// and [progressTotal] is the whole file's size — together they keep the chunked path's
+/// `onProgress(bytes, totalBytes)` shape identical to the multipart path's.
+class ProgressByteRequest extends http.Request with Abortable {
+  ProgressByteRequest(
+    super.method,
+    super.url, {
+    this.abortTrigger,
+    this.onProgress,
+    this.progressOffset = 0,
+    required this.progressTotal,
+  });
+
+  @override
+  final Future<void>? abortTrigger;
+
+  final void Function(int bytes, int totalBytes)? onProgress;
+  final int progressOffset;
+  final int progressTotal;
+
+  @override
+  ByteStream finalize() {
+    final byteStream = super.finalize();
+    if (onProgress == null) {
+      return byteStream;
+    }
+
+    final total = progressTotal;
+    var bytes = 0;
+    final stream = byteStream.transform(
+      StreamTransformer.fromHandlers(
+        handleData: (List<int> data, EventSink<List<int>> sink) {
+          bytes += data.length;
+          onProgress!(progressOffset + bytes, total);
           sink.add(data);
         },
       ),
