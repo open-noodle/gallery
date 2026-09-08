@@ -177,7 +177,9 @@ class BackgroundUploadService {
     if (!_taskStatusController.isClosed) {
       _taskStatusController.add(update);
     }
-    handleTaskStatusUpdate(update);
+    // Fire-and-forget from the downloader's synchronous callback, but the method returns a
+    // Future so tests can await it deterministically instead of racing pumpEventQueue.
+    unawaited(handleTaskStatusUpdate(update));
   }
 
   void dispose() {
@@ -322,7 +324,7 @@ class BackgroundUploadService {
   }
 
   @visibleForTesting
-  void handleTaskStatusUpdate(TaskStatusUpdate update) async {
+  Future<void> handleTaskStatusUpdate(TaskStatusUpdate update) async {
     final metadata = _tryParseMetadata(update.task.metaData);
     final isMidChainChunk = metadata != null && metadata.isChunked && !metadata.isFinalChunk;
 
