@@ -10,8 +10,11 @@ import {
   AssetVisibility,
   checkBulkUpload,
   defaults,
+  getServerConfig,
   getSupportedMediaTypes,
+  ServerConfigDto,
 } from '@immich/sdk';
+import { SingleBar } from 'cli-progress';
 import createFetchMock from 'vitest-fetch-mock';
 
 import {
@@ -122,6 +125,200 @@ describe('uploadFiles', () => {
 
     const formData = fetchMocker.mock.calls[0]?.[1]?.body as FormData;
     expect(formData.get('visibility')).toBe('hidden');
+  });
+});
+
+describe('uploadFiles chunked upload', () => {
+  const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-chunked-'));
+  const baseUrl = 'https://example.com';
+  const apiKey = 'key';
+  const sessionId = 'session-1234';
+  const assetId = 'fc5621b1-86f6-44a1-9905-403e607df9f5';
+
+  const fetchMocker = createFetchMock(vi);
+
+  beforeEach(() => {
+    vi.mocked(defaults).baseUrl = baseUrl;
+    vi.mocked(defaults).headers = { 'x-api-key': apiKey };
+
+    fetchMocker.enableMocks();
+    fetchMocker.resetMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Mocks the create + N PATCH calls of the session protocol. The last PATCH resolves as the
+  // final chunk (201, AssetMediaResponseDto); every earlier PATCH resolves 204 (more expected).
+  const mockChunkedUploadEndpoints = (totalChunks: number) => {
+    let patchCalls = 0;
+    fetchMocker.doMockIf(new RegExp(`${baseUrl}/assets/upload-session`), (request) => {
+      if (request.method === 'POST') {
+        return {
+          status: 201,
+          body: JSON.stringify({
+            id: sessionId,
+            offset: 0,
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          }),
+        };
+      }
+
+      patchCalls++;
+      if (patchCalls < totalChunks) {
+        return { status: 204 };
+      }
+
+      return {
+        status: 201,
+        body: JSON.stringify({ id: assetId, status: 'created' }),
+      };
+    });
+  };
+
+  it('creates a session and PATCHes N parts for a file above the threshold', async () => {
+    const testFilePath = path.join(testDir, 'above-threshold.bin');
+    const fileContent = Buffer.from('0123456789'); // 10 bytes
+    fs.writeFileSync(testFilePath, fileContent);
+
+    vi.mocked(getServerConfig).mockResolvedValue({ uploadChunkSize: 3 } as ServerConfigDto);
+    mockChunkedUploadEndpoints(4);
+
+    await expect(uploadFiles([testFilePath], { concurrency: 1 })).resolves.toEqual([
+      { id: assetId, filepath: testFilePath },
+    ]);
+
+    const calls = fetchMocker.mock.calls;
+    expect(calls).toHaveLength(5); // 1 create + 4 chunks
+
+    const [sessionUrl, sessionInit] = calls[0];
+    expect(sessionUrl).toBe(`${baseUrl}/assets/upload-session`);
+    expect(sessionInit?.method?.toString().toUpperCase()).toBe('POST');
+    expect((sessionInit?.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+
+    const createBody = JSON.parse(sessionInit?.body as string);
+    expect(createBody).toMatchObject({
+      filename: 'above-threshold.bin',
+      size: 10,
+      isFavorite: false,
+    });
+
+    const expectedChunks = [
+      { offset: 0, bytes: fileContent.subarray(0, 3) },
+      { offset: 3, bytes: fileContent.subarray(3, 6) },
+      { offset: 6, bytes: fileContent.subarray(6, 9) },
+      { offset: 9, bytes: fileContent.subarray(9, 10) },
+    ];
+
+    for (const [index, expected] of expectedChunks.entries()) {
+      const [url, init] = calls[index + 1];
+      expect(url).toBe(`${baseUrl}/assets/upload-session/${sessionId}`);
+      expect(init?.method).toBe('PATCH');
+      expect((init?.headers as Record<string, string>)['Upload-Offset']).toBe(String(expected.offset));
+      expect((init?.headers as Record<string, string>)['Content-Type']).toBe('application/offset+octet-stream');
+      expect(Buffer.from(init?.body as Uint8Array).equals(expected.bytes)).toBe(true);
+    }
+  });
+
+  it('uses the existing single-shot path for a file below the threshold', async () => {
+    const testFilePath = path.join(testDir, 'below-threshold.png');
+    fs.writeFileSync(testFilePath, 'test');
+
+    vi.mocked(getServerConfig).mockResolvedValue({ uploadChunkSize: 1000 } as ServerConfigDto);
+    fetchMocker.doMockIf(new RegExp(`${baseUrl}/assets$`), function () {
+      return { status: 200, body: JSON.stringify({ id: assetId, status: 'created' }) };
+    });
+
+    await expect(uploadFiles([testFilePath], { concurrency: 1 })).resolves.toEqual([
+      { id: assetId, filepath: testFilePath },
+    ]);
+
+    const calls = fetchMocker.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe(`${baseUrl}/assets`);
+    expect(calls.some(([url]) => String(url).includes('upload-session'))).toBe(false);
+  });
+
+  it('forces single-shot when uploadChunkSize is 0', async () => {
+    const testFilePath = path.join(testDir, 'zero-chunk-size.png');
+    fs.writeFileSync(testFilePath, Buffer.alloc(50, 'a'));
+
+    vi.mocked(getServerConfig).mockResolvedValue({ uploadChunkSize: 0 } as ServerConfigDto);
+    fetchMocker.doMockIf(new RegExp(`${baseUrl}/assets$`), function () {
+      return { status: 200, body: JSON.stringify({ id: assetId, status: 'created' }) };
+    });
+
+    await expect(uploadFiles([testFilePath], { concurrency: 1 })).resolves.toEqual([
+      { id: assetId, filepath: testFilePath },
+    ]);
+
+    const calls = fetchMocker.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe(`${baseUrl}/assets`);
+  });
+
+  it('forces single-shot when uploadChunkSize is missing (old server)', async () => {
+    const testFilePath = path.join(testDir, 'missing-chunk-size.png');
+    fs.writeFileSync(testFilePath, Buffer.alloc(50, 'a'));
+
+    vi.mocked(getServerConfig).mockResolvedValue({} as ServerConfigDto);
+    fetchMocker.doMockIf(new RegExp(`${baseUrl}/assets$`), function () {
+      return { status: 200, body: JSON.stringify({ id: assetId, status: 'created' }) };
+    });
+
+    await expect(uploadFiles([testFilePath], { concurrency: 1 })).resolves.toEqual([
+      { id: assetId, filepath: testFilePath },
+    ]);
+
+    const calls = fetchMocker.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe(`${baseUrl}/assets`);
+  });
+
+  it('carries a sidecar on the create call, not as a second part', async () => {
+    const testFilePath = path.join(testDir, 'with-sidecar.jpg');
+    const fileContent = Buffer.from('0123456789'); // 10 bytes
+    fs.writeFileSync(testFilePath, fileContent);
+    const sidecarPath = path.join(testDir, 'with-sidecar.jpg.xmp');
+    const sidecarContent = '<xmp>example sidecar</xmp>';
+    fs.writeFileSync(sidecarPath, sidecarContent, 'utf8');
+
+    vi.mocked(getServerConfig).mockResolvedValue({ uploadChunkSize: 3 } as ServerConfigDto);
+    mockChunkedUploadEndpoints(4);
+
+    await uploadFiles([testFilePath], { concurrency: 1 });
+
+    const calls = fetchMocker.mock.calls;
+    const [, sessionInit] = calls[0];
+    const createBody = JSON.parse(sessionInit?.body as string);
+
+    expect(createBody.sidecar).toBe(sidecarContent);
+
+    // The sidecar must never be sent as a separate part/request of its own.
+    expect(calls).toHaveLength(5); // 1 create + 4 chunks, nothing extra for the sidecar
+    for (const [, init] of calls) {
+      expect(init?.body instanceof FormData).toBe(false);
+    }
+  });
+
+  it('progress totals match the file size exactly after a chunked upload', async () => {
+    const testFilePath = path.join(testDir, 'progress.bin');
+    const fileContent = Buffer.from('0123456789'); // 10 bytes
+    fs.writeFileSync(testFilePath, fileContent);
+
+    vi.mocked(getServerConfig).mockResolvedValue({ uploadChunkSize: 3 } as ServerConfigDto);
+    mockChunkedUploadEndpoints(4);
+
+    const incrementSpy = vi.spyOn(SingleBar.prototype, 'increment');
+
+    await uploadFiles([testFilePath], { concurrency: 1, progress: true });
+
+    const totalIncremented = incrementSpy.mock.calls.reduce(
+      (sum, call) => sum + (typeof call[0] === 'number' ? call[0] : 0),
+      0,
+    );
+    expect(totalIncremented).toBe(fileContent.byteLength);
   });
 });
 

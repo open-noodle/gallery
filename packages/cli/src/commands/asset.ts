@@ -6,11 +6,13 @@ import {
   AssetUploadAction,
   AssetVisibility,
   Permission,
+  UploadSessionResponseDto,
   addAssetsToAlbum,
   checkBulkUpload,
   createAlbum,
   defaults,
   getAllAlbums,
+  getServerConfig,
   getSupportedMediaTypes,
 } from '@immich/sdk';
 import byteSize from 'byte-size';
@@ -19,13 +21,15 @@ import { MultiBar, Presets, SingleBar } from 'cli-progress';
 import { chunk } from 'lodash-es';
 import micromatch from 'micromatch';
 import { Stats, createReadStream, existsSync } from 'node:fs';
-import { stat, unlink } from 'node:fs/promises';
+import { open, readFile, stat, unlink } from 'node:fs/promises';
 import path, { basename } from 'node:path';
 import { Queue } from 'src/queue';
 import { BaseOptions, Batcher, authenticate, crawl, requirePermissions, s, sha1 } from 'src/utils';
 
 const UPLOAD_WATCH_BATCH_SIZE = 100;
 const UPLOAD_WATCH_DEBOUNCE_TIME_MS = 10_000;
+// Inline XMP sidecars are capped at 1 MiB (spec §4.3 / §8 row 8).
+const MAX_INLINE_SIDECAR_BYTES = 1024 * 1024;
 
 // TODO figure out why `id` is missing
 type AssetBulkUploadCheckResults = Array<AssetBulkUploadCheckResult & { id: string }>;
@@ -349,6 +353,16 @@ export const uploadFiles = async (files: string[], options: UploadOptionsDto): P
   let duplicateSize = 0;
   let successCount = 0;
   let successSize = 0;
+  // Single source of truth for the bar's position, so a per-chunk advance (chunked path) and a
+  // per-file advance (single-shot path) can never double-count the same bytes.
+  let transferredSize = 0;
+  const reportTransferred = (bytes: number) => {
+    transferredSize += bytes;
+    uploadProgress?.increment(bytes, { value_formatted: byteSize(transferredSize + duplicateSize) });
+  };
+
+  const config = await getServerConfig();
+  const uploadChunkSize = config?.uploadChunkSize ?? 0;
 
   const newAssets: Asset[] = [];
 
@@ -359,7 +373,14 @@ export const uploadFiles = async (files: string[], options: UploadOptionsDto): P
         throw new Error(`Stats not found for ${filepath}`);
       }
 
-      const response = await uploadFile(filepath, stats, options);
+      let response: AssetMediaResponseDto;
+      if (uploadChunkSize > 0 && stats.size > uploadChunkSize) {
+        response = await uploadFileChunked(filepath, stats, options, uploadChunkSize, reportTransferred);
+      } else {
+        response = await uploadFile(filepath, stats, options);
+        reportTransferred(stats.size);
+      }
+
       newAssets.push({ id: response.id, filepath });
       if (response.status === AssetMediaStatus.Duplicate) {
         duplicateCount++;
@@ -368,8 +389,6 @@ export const uploadFiles = async (files: string[], options: UploadOptionsDto): P
         successCount++;
         successSize += stats.size ?? 0;
       }
-
-      uploadProgress?.update(successSize, { value_formatted: byteSize(successSize + duplicateSize) });
 
       return response;
     },
@@ -442,6 +461,135 @@ const uploadFile = async (
   }
 
   return response.json() as Promise<AssetMediaResponseDto>;
+};
+
+// Reads a sidecar as inline UTF-8 text for the create-session call (spec §4.3). Returns
+// `undefined` (skip the sidecar, do not fail the whole upload) if it is missing, over the 1 MiB
+// cap, or not valid UTF-8.
+const readInlineSidecar = async (sidecarPath: string): Promise<string | undefined> => {
+  try {
+    const buffer = await readFile(sidecarPath);
+    if (buffer.byteLength > MAX_INLINE_SIDECAR_BYTES) {
+      return undefined;
+    }
+    const text = buffer.toString('utf8');
+    // Round-trip check: re-encoding a truly UTF-8 buffer must reproduce it byte-for-byte. A
+    // buffer containing invalid UTF-8 sequences decodes with U+FFFD replacement characters,
+    // which breaks the round trip.
+    if (!Buffer.from(text, 'utf8').equals(buffer)) {
+      return undefined;
+    }
+    return text;
+  } catch {
+    return undefined;
+  }
+};
+
+const uploadFileChunked = async (
+  input: string,
+  stats: Stats,
+  { visibility }: UploadOptionsDto,
+  chunkSize: number,
+  onBytesUploaded?: (bytes: number) => void,
+): Promise<AssetMediaResponseDto> => {
+  const { baseUrl, headers } = defaults;
+
+  const sessionCreateDto: Record<string, unknown> = {
+    filename: basename(input),
+    size: stats.size,
+    fileCreatedAt: stats.mtime.toISOString(),
+    fileModifiedAt: stats.mtime.toISOString(),
+    isFavorite: false,
+  };
+  if (visibility) {
+    sessionCreateDto.visibility = visibility;
+  }
+
+  const sidecarPath = findSidecar(input);
+  if (sidecarPath) {
+    const sidecar = await readInlineSidecar(sidecarPath);
+    if (sidecar !== undefined) {
+      sessionCreateDto.sidecar = sidecar;
+    }
+  }
+
+  const sessionResponse = await fetch(`${baseUrl}/assets/upload-session`, {
+    method: 'POST',
+    redirect: 'error',
+    headers: { ...headers, 'Content-Type': 'application/json' } as Record<string, string>,
+    body: JSON.stringify(sessionCreateDto),
+    // eslint-disable-next-line unicorn/no-null
+    window: null,
+  });
+  if (sessionResponse.status !== 200 && sessionResponse.status !== 201) {
+    throw new Error(await sessionResponse.text());
+  }
+
+  const sessionResult: unknown = await sessionResponse.json();
+  if (sessionResponse.status === 200) {
+    // The supplied checksum was already known: a duplicate, no session was created, and no
+    // bytes were transferred.
+    return sessionResult as AssetMediaResponseDto;
+  }
+
+  const session = sessionResult as UploadSessionResponseDto;
+
+  let reportedBytes = 0;
+  const report = (bytes: number) => {
+    reportedBytes += bytes;
+    onBytesUploaded?.(bytes);
+  };
+
+  const fileHandle = await open(input, 'r');
+  try {
+    let offset = 0;
+    while (offset < stats.size) {
+      const length = Math.min(chunkSize, stats.size - offset);
+      const buffer = Buffer.alloc(length);
+      const { bytesRead } = await fileHandle.read(buffer, 0, length, offset);
+      if (bytesRead === 0) {
+        throw new Error(`Unexpected end of file while reading ${input} at offset ${offset}`);
+      }
+      const chunkBody = buffer.subarray(0, bytesRead);
+
+      const patchResponse = await fetch(`${baseUrl}/assets/upload-session/${session.id}`, {
+        method: 'PATCH',
+        redirect: 'error',
+        headers: {
+          ...headers,
+          'Upload-Offset': String(offset),
+          'Content-Type': 'application/offset+octet-stream',
+        } as Record<string, string>,
+        body: chunkBody,
+        // eslint-disable-next-line unicorn/no-null
+        window: null,
+      });
+
+      if (patchResponse.status === 200 || patchResponse.status === 201) {
+        report(bytesRead);
+        const finalBody: unknown = await patchResponse.json();
+        return finalBody as AssetMediaResponseDto;
+      }
+
+      if (patchResponse.status !== 204) {
+        throw new Error(await patchResponse.text());
+      }
+
+      report(bytesRead);
+      offset += bytesRead;
+    }
+
+    throw new Error(`Upload session ${session.id} ended without a final response from the server`);
+  } catch (error) {
+    // Undo whatever partial progress this (failed) attempt reported, so a queue retry that
+    // re-uploads the file from scratch cannot double-count bytes on the progress bar.
+    if (reportedBytes > 0) {
+      onBytesUploaded?.(-reportedBytes);
+    }
+    throw error;
+  } finally {
+    await fileHandle.close();
+  }
 };
 
 export const findSidecar = (filepath: string): string | undefined => {
