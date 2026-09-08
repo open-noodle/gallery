@@ -233,7 +233,42 @@ E2E `pnpm check` not run: the only `e2e/` change is `docker-compose.yml`; no `e2
 
 ## Remote CI Verification
 
-_(filled in after dispatch — see the follow-up commit)_
+- **Test branch**: `rebase/upstream-batch-228`
+- **Commit validated**: `f4a6aba8d3d` (confirmed via `headSha`, not branch name)
+- **Result**: **9 / 10 green on the first dispatch.** All ten were dispatched ~30s apart; no
+  container-registry rate-limit failures.
+
+| Workflow                                  | Status | Run         |
+| ----------------------------------------- | ------ | ----------- |
+| `test.yml`                                | RED    | 34259559965 |
+| `docker.yml`                              | GREEN  | 34259727315 |
+| `static_analysis.yml`                     | GREEN  | 34259619953 |
+| `gallery-build-mobile.yml`                | GREEN  | 34259951038 |
+| `gallery-rebase-smoke.yml`                | GREEN  | 34259672922 |
+| `storage-migration-tests.yml`             | GREEN  | 34259785682 |
+| `storage-migration-e2e.yml`               | GREEN  | 34259898067 |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 34259836754 |
+| `gallery-ml-smoke.yml`                    | GREEN  | 34260010819 |
+| `gallery-mobile-smoke.yml`                | GREEN  | 34260061899 |
+
+### The one red job: Medium Tests (Server) — PG 53300, again
+
+`test.yml` failed on **Medium Tests (Server) only**; every other job in the 22-job suite passed.
+**178 / 180 files and 3191 tests passed.** Both failures are
+`PostgresError: sorry, too many clients already` — a connection error, not an assertion:
+
+- `face-repair.service.spec.ts > FaceRepairService decline filter > a declined face is not flagged on the next scan`
+- `memory.service.spec.ts > MemoryService > onMemoriesCreate — overlap reconciliation (end-to-end) > makes no further changes on a second run`
+
+**Settled by a local-isolation run, not by re-running CI**: both specs together on the same tree give
+**79 / 79 passing**. Neither spec touches `asset-job.repository.ts`, the only server file this cycle
+changed, and neither failure is an assertion — so this is not a regression from batches 226–228.
+
+**This is the known, still-unfixed `medium tests connection exhaustion` issue on the rolling branch,
+and it is escalating** — the previous cycle lost only `face-repair.service.spec.ts`; this cycle it
+also took `memory.service.spec.ts`. It has now blocked a clean 10/10 on consecutive cycles. The
+standing remedy — adding `-c max_connections=200` to the Postgres service in `test.yml` — still needs
+its own PR against `main`; it is deliberately **not** bundled into this rebase.
 
 ## Post-Rebase Verification
 
