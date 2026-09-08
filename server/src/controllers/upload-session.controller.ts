@@ -49,7 +49,7 @@ const parseUploadOffset = (header: string | string[] | undefined): number => {
 };
 
 /**
- * Reads the raw chunk body off `req`, aborting the request with 400 the moment more than `cap`
+ * Reads the raw chunk body off `req`, deleteUploadSessioning the request with 400 the moment more than `cap`
  * bytes have arrived rather than buffering an unbounded body first (spec §8 row 19). `cap` is
  * `declared size - Upload-Offset`, computed by the caller from the session's declared length.
  */
@@ -118,7 +118,7 @@ export class UploadSessionController {
     description: 'Creates a resumable upload session for a large asset, or returns a duplicate immediately.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  async createSession(
+  async createUploadSession(
     @Auth() auth: AuthDto,
     @Body() dto: UploadSessionCreateDto,
     @Res({ passthrough: true }) res: Response,
@@ -138,7 +138,7 @@ export class UploadSessionController {
     description: 'Reports the number of bytes committed so far and the declared total length.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  async getOffset(
+  async getUploadSessionOffset(
     @Auth() auth: AuthDto,
     @Param() { id }: UUIDParamDto,
     @Res({ passthrough: true }) res: Response,
@@ -169,7 +169,7 @@ export class UploadSessionController {
     description: 'Appends a raw chunk at the given offset. The final chunk creates the asset.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  async appendChunk(
+  async appendUploadSessionChunk(
     @Auth() auth: AuthDto,
     @Param() { id }: UUIDParamDto,
     @Req() req: Request,
@@ -208,7 +208,7 @@ export class UploadSessionController {
     description: 'Deletes an in-progress upload session and its partial data.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  async abort(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
+  async deleteUploadSession(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
     await this.service.abort(auth, id);
   }
 }
