@@ -1,4 +1,4 @@
-import { AssetRejectReason, AssetUploadAction } from '@immich/sdk';
+import { AssetRejectReason, AssetUploadAction, type ServerConfigDto } from '@immich/sdk';
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
 import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 
@@ -14,10 +14,27 @@ vi.mock('@immich/sdk', () => ({
 
 vi.mock('$lib/utils', () => ({
   uploadRequest: vi.fn(),
+  // chunked-upload.ts imports these too; stubbed rather than pulling in the real utils.ts, which
+  // transitively imports @immich/ui and is unrelated to what this spec exercises.
+  AbortError: class AbortError extends Error {},
+  createUrl: vi.fn(() => 'http://localhost'),
+  sleep: vi.fn(() => Promise.resolve()),
+  trackUpload: vi.fn((unsubscribe: () => void) => unsubscribe),
 }));
 
 vi.mock('$lib/utils/album-utils', () => ({
   createAlbum: vi.fn(),
+}));
+
+// Large enough that every fixture file in this spec (a handful of bytes) stays on the
+// single-shot path; chunked-upload routing itself is covered by chunked-upload.spec.ts and
+// file-uploader.spec.ts.
+vi.mock('$lib/managers/server-config-manager.svelte', () => ({
+  serverConfigManager: {
+    value: { uploadChunkSize: 33_554_432 } as ServerConfigDto,
+    init: vi.fn(),
+    loadServerConfig: vi.fn(),
+  },
 }));
 
 function makeItem(overrides: Partial<TakeoutMediaItem> = {}): TakeoutMediaItem {
