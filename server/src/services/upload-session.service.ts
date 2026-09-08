@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { join } from 'node:path';
 import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
@@ -16,6 +16,7 @@ import {
   readState,
   sessionPaths,
   UploadSessionState,
+  writeChunkAt,
   writeState,
 } from 'src/utils/upload-session-store';
 
@@ -80,6 +81,52 @@ export class UploadSessionService extends BaseService {
     const { state, dataPath } = await this.loadOwnedSession(auth, id);
     const offset = await committedOffset(dataPath);
     return { offset, size: state.size };
+  }
+
+  /**
+   * Appends a chunk at `offset`. Returns `{ offset }` when more chunks are expected, or the
+   * `AssetMediaResponseDto` produced by `uploadAsset` when this chunk completes the upload
+   * (spec §5.4, §5.5). The two return shapes are deliberate — Task 7's controller branches on
+   * which one came back to choose 204 vs 201/200 — so this method must not narrow the union.
+   */
+  async appendChunk(
+    auth: AuthDto,
+    id: string,
+    offset: number,
+    chunk: Buffer,
+  ): Promise<AssetMediaResponseDto | { offset: number }> {
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      throw new BadRequestException('Upload-Offset must be a non-negative integer');
+    }
+
+    const { state, dataPath } = await this.loadOwnedSession(auth, id);
+
+    // Rule: the declared offset MUST equal the true on-disk size, or 409 with the real offset.
+    // This is the only thing preventing a sparse file (spec §5.4 invariant) — a client ahead of
+    // the committed offset and a client replaying an already-committed chunk both 409, because
+    // the server cannot verify replayed bytes are identical to what is already on disk.
+    const actualOffset = await committedOffset(dataPath);
+    if (offset !== actualOffset) {
+      throw new ConflictException({ offset: actualOffset });
+    }
+
+    if (chunk.length === 0) {
+      throw new BadRequestException('Chunk must not be empty');
+    }
+
+    if (offset + chunk.length > state.size) {
+      throw new BadRequestException('Chunk exceeds the declared Upload-Length');
+    }
+
+    await writeChunkAt(dataPath, offset, chunk);
+
+    const newOffset = offset + chunk.length;
+    if (newOffset === state.size) {
+      // Finalize is implemented in the next commit (Task 6).
+      throw new NotFoundException('Upload session not found');
+    }
+
+    return { offset: newOffset };
   }
 
   async abort(auth: AuthDto, id: string): Promise<void> {

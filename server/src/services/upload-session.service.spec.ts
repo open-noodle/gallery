@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { UPLOAD_SESSION_MAX_OPEN } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
@@ -11,6 +11,7 @@ import {
   readState,
   sessionPaths,
   UploadSessionState,
+  writeChunkAt,
   writeState,
 } from 'src/utils/upload-session-store';
 import { factory } from 'test/small.factory';
@@ -59,6 +60,7 @@ describe(UploadSessionService.name, () => {
     vi.mocked(writeState).mockReset();
     vi.mocked(readState).mockReset();
     vi.mocked(committedOffset).mockReset();
+    vi.mocked(writeChunkAt).mockReset();
     ({ sut, mocks } = newTestService(UploadSessionService));
   });
 
@@ -291,6 +293,156 @@ describe(UploadSessionService.name, () => {
       expect(mocks.storage.unlink).toHaveBeenCalledWith(expectedDataPath);
       expect(mocks.storage.unlink).toHaveBeenCalledWith(expectedStatePath);
       expect(mocks.storage.unlink).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('appendChunk', () => {
+    const owner = 'owner-1';
+    let dataPath: string;
+
+    beforeEach(() => {
+      const folder = StorageCore.getNestedFolder(StorageFolder.Upload, owner, 'session-1');
+      dataPath = sessionPaths(folder, 'session-1', '.jpg').data;
+    });
+
+    const setupSession = (overrides: Partial<UploadSessionState> = {}) => {
+      const state = makeState({ userId: owner, sharedLinkId: null, originalName: 'a.jpg', size: 10, ...overrides });
+      vi.mocked(readState).mockResolvedValue(state);
+      return state;
+    };
+
+    it('throws when Upload-Offset is missing', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession();
+
+      await expect(
+        sut.appendChunk(auth, 'session-1', undefined as unknown as number, Buffer.from('x')),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(readState).not.toHaveBeenCalled();
+    });
+
+    it.each([-1, 1.5, NaN])('throws for a negative or non-integer Upload-Offset (%s)', async (offset) => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession();
+
+      await expect(sut.appendChunk(auth, 'session-1', offset, Buffer.from('x'))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(readState).not.toHaveBeenCalled();
+    });
+
+    it('throws 409 carrying the actual offset when the client is ahead', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession();
+      vi.mocked(committedOffset).mockResolvedValue(2);
+
+      const error: ConflictException = await sut
+        .appendChunk(auth, 'session-1', 5, Buffer.from('hello'))
+        .catch((error_) => error_);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.getResponse()).toEqual(expect.objectContaining({ offset: 2 }));
+      expect(writeChunkAt).not.toHaveBeenCalled();
+    });
+
+    it('throws 409 carrying the actual offset when the client replays an already-committed chunk', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession();
+      vi.mocked(committedOffset).mockResolvedValue(5);
+
+      const error: ConflictException = await sut
+        .appendChunk(auth, 'session-1', 0, Buffer.from('hello'))
+        .catch((error_) => error_);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.getResponse()).toEqual(expect.objectContaining({ offset: 5 }));
+      expect(writeChunkAt).not.toHaveBeenCalled();
+    });
+
+    it('throws and writes nothing when the chunk would exceed Upload-Length', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 10 });
+      vi.mocked(committedOffset).mockResolvedValue(5);
+
+      await expect(sut.appendChunk(auth, 'session-1', 5, Buffer.alloc(6))).rejects.toBeInstanceOf(BadRequestException);
+      expect(writeChunkAt).not.toHaveBeenCalled();
+    });
+
+    it('throws for a zero-byte chunk', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession();
+      vi.mocked(committedOffset).mockResolvedValue(0);
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.alloc(0))).rejects.toBeInstanceOf(BadRequestException);
+      expect(writeChunkAt).not.toHaveBeenCalled();
+    });
+
+    it('rejects a body longer than the remaining length without writing it', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 10 });
+      vi.mocked(committedOffset).mockResolvedValue(8);
+
+      // The stream should have been capped at size - offset (2 bytes) by the controller; if a
+      // longer buffer reaches the service regardless, it must still be rejected rather than
+      // silently truncated.
+      await expect(sut.appendChunk(auth, 'session-1', 8, Buffer.alloc(20))).rejects.toBeInstanceOf(BadRequestException);
+      expect(writeChunkAt).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent for a duplicated chunk at the same offset: the later one gets 409 once the first commits', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 20 });
+      vi.mocked(committedOffset).mockResolvedValueOnce(0).mockResolvedValueOnce(5);
+
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.from('hello'))).resolves.toEqual({ offset: 5 });
+
+      const error: ConflictException = await sut
+        .appendChunk(auth, 'session-1', 0, Buffer.from('hello'))
+        .catch((error_) => error_);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.getResponse()).toEqual(expect.objectContaining({ offset: 5 }));
+    });
+
+    it('resumes from the true on-disk offset after a partial write', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 20 });
+      // The client believes it committed 10 bytes, but a crash mid-write only landed 7.
+      vi.mocked(committedOffset).mockResolvedValueOnce(7);
+
+      const error: ConflictException = await sut
+        .appendChunk(auth, 'session-1', 10, Buffer.from('rest-of-file'))
+        .catch((error_) => error_);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.getResponse()).toEqual(expect.objectContaining({ offset: 7 }));
+
+      vi.mocked(committedOffset).mockResolvedValueOnce(7);
+      await expect(sut.appendChunk(auth, 'session-1', 7, Buffer.from('rest'))).resolves.toEqual({ offset: 11 });
+      expect(writeChunkAt).toHaveBeenCalledWith(dataPath, 7, Buffer.from('rest'));
+    });
+
+    it('accepts chunks of unequal size', async () => {
+      // size is deliberately larger than the sum of both chunks so neither append finalizes —
+      // this test is purely about the offset/writeChunkAt bookkeeping across unequal chunk sizes.
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 16 });
+
+      vi.mocked(committedOffset).mockResolvedValueOnce(0);
+      await expect(sut.appendChunk(auth, 'session-1', 0, Buffer.alloc(10))).resolves.toEqual({ offset: 10 });
+      expect(writeChunkAt).toHaveBeenCalledWith(dataPath, 0, expect.any(Buffer));
+
+      vi.mocked(committedOffset).mockResolvedValueOnce(10);
+      await expect(sut.appendChunk(auth, 'session-1', 10, Buffer.alloc(5))).resolves.toEqual({ offset: 15 });
+      expect(writeChunkAt).toHaveBeenCalledWith(dataPath, 10, expect.any(Buffer));
+    });
+
+    it('writes with writeChunkAt positionally at the given offset', async () => {
+      const auth = factory.auth({ user: { id: owner } });
+      setupSession({ size: 20 });
+      vi.mocked(committedOffset).mockResolvedValue(3);
+
+      await sut.appendChunk(auth, 'session-1', 3, Buffer.from('abcde'));
+
+      expect(writeChunkAt).toHaveBeenCalledWith(dataPath, 3, Buffer.from('abcde'));
     });
   });
 });
