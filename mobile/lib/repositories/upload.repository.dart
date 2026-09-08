@@ -232,17 +232,18 @@ class UploadRepository {
         final end = math.min(offset + chunkSize, fileSize);
         final chunkBytes = await _readChunkBytes(file, offset, end);
 
-        final chunkRequest = ProgressByteRequest(
-          'PATCH',
-          _sessionUri(savedEndpoint, sessionId),
-          abortTrigger: cancelToken?.future,
-          onProgress: onProgress,
-          progressOffset: offset,
-          progressTotal: fileSize,
-        )
-          ..headers['Content-Type'] = 'application/offset+octet-stream'
-          ..headers['Upload-Offset'] = offset.toString()
-          ..bodyBytes = chunkBytes;
+        final chunkRequest =
+            ProgressByteRequest(
+                'PATCH',
+                _sessionUri(savedEndpoint, sessionId),
+                abortTrigger: cancelToken?.future,
+                onProgress: onProgress,
+                progressOffset: offset,
+                progressTotal: fileSize,
+              )
+              ..headers['Content-Type'] = 'application/offset+octet-stream'
+              ..headers['Upload-Offset'] = offset.toString()
+              ..bodyBytes = chunkBytes;
 
         final chunkResponse = await Response.fromStream(await client.send(chunkRequest));
 

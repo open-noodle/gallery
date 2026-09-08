@@ -659,7 +659,12 @@ class BackgroundUploadService {
       displayName: originalFileName,
       httpRequestMethod: 'PATCH',
       url: '$serverEndpoint/assets/upload-session/${session.sessionId}',
-      headers: {...headers, 'Upload-Offset': '0', 'Content-Type': 'application/offset+octet-stream', 'Range': 'bytes=0-$end'},
+      headers: {
+        ...headers,
+        'Upload-Offset': '0',
+        'Content-Type': 'application/offset+octet-stream',
+        'Range': 'bytes=0-$end',
+      },
       filename: filename,
       post: 'binary',
       baseDirectory: baseDirectory,
