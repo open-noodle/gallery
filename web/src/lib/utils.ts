@@ -83,7 +83,7 @@ export const sleep = (ms: number) => {
 let unsubscribeId = 0;
 const uploads: Record<number, () => void> = {};
 
-const trackUpload = (unsubscribe: () => void) => {
+export const trackUpload = (unsubscribe: () => void) => {
   const id = unsubscribeId++;
   uploads[id] = unsubscribe;
   return () => {
