@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gallery is a community fork of [Immich](https://github.com/immich-app/immich), a self-hosted photo and video management solution. The fork is currently based on **Immich v2.7.5** and regularly rebased onto upstream. Source package names are still `immich` / `immich-web` so the rebase path stays clean — only branding, Docker image names, and fork-only code diverge.
+Gallery is a community fork of [Immich](https://github.com/immich-app/immich), a self-hosted photo and video management solution. The fork tracks upstream closely via a regular rebase — check `git merge-base main upstream/main` for the exact upstream commit main is currently based on. Source package names are still `immich` / `immich-web` so the rebase path stays clean — only branding, Docker image names, and fork-only code diverge.
 
 Fork-specific features layered on top of upstream include: shared spaces, smart search & filters, user groups, S3-compatible storage, auto-classification, video duplicate detection, pet detection, Google Photos import, image editing & video trimming, and structured JSON logging. See `README.md` for the full list and docs links.
 
@@ -47,14 +47,14 @@ make build-cli          # Build CLI — depends on SDK
 # Server
 cd server
 pnpm test                                    # Run all unit tests (vitest)
-pnpm test -- --run src/services/album.service.spec.ts  # Run a single test file
+pnpm test --run src/services/album.service.spec.ts  # Run a single test file (NOT `pnpm test -- --run <path>` — pnpm keeps the literal `--`, so vitest never receives the path and silently runs the whole suite)
 pnpm test:cov                                # Unit tests with coverage
 pnpm test:medium                             # Medium tests (require DB via Docker)
 
 # Web
 cd web
 pnpm test                                    # Run all unit tests (vitest)
-pnpm test -- --run src/lib/components/MyComponent.spec.ts  # Single test file
+pnpm test --run src/lib/components/MyComponent.spec.ts  # Single test file
 
 # E2E
 cd e2e
