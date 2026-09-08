@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { OnJob } from 'src/decorators';
@@ -104,7 +104,7 @@ export class UploadSessionService extends BaseService {
       throw new BadRequestException('Upload-Offset must be a non-negative integer');
     }
 
-    const { state, dataPath, statePath } = await this.loadOwnedSession(auth, id);
+    const { state, dataPath, statePath, sidecarPath } = await this.loadOwnedSession(auth, id);
 
     // Rule: the declared offset MUST equal the true on-disk size, or 409 with the real offset.
     // This is the only thing preventing a sparse file (spec §5.4 invariant) — a client ahead of
@@ -127,7 +127,7 @@ export class UploadSessionService extends BaseService {
 
     const newOffset = offset + chunk.length;
     if (newOffset === state.size) {
-      return this.finalizeUpload(auth, id, state, dataPath, statePath);
+      return this.finalizeUpload(auth, id, state, dataPath, statePath, sidecarPath);
     }
 
     return { offset: newOffset };
@@ -144,6 +144,7 @@ export class UploadSessionService extends BaseService {
     state: UploadSessionState,
     dataPath: string,
     statePath: string,
+    sidecarPath: string,
   ): Promise<AssetMediaResponseDto> {
     const claimed = await claimFinalize(statePath);
     if (!claimed) {
@@ -175,7 +176,6 @@ export class UploadSessionService extends BaseService {
 
     let sidecarFile: UploadFile | undefined;
     if (sidecarContent !== undefined) {
-      const sidecarPath = join(dirname(dataPath), `${id}.xmp`);
       const sidecarBuffer = Buffer.from(sidecarContent, 'utf8');
       await this.storageRepository.createOrOverwriteFile(sidecarPath, sidecarBuffer);
       sidecarFile = {
@@ -300,7 +300,7 @@ export class UploadSessionService extends BaseService {
   private async loadOwnedSession(
     auth: AuthDto,
     id: string,
-  ): Promise<{ state: UploadSessionState; dataPath: string; statePath: string }> {
+  ): Promise<{ state: UploadSessionState; dataPath: string; statePath: string; sidecarPath: string }> {
     const folder = StorageCore.getNestedFolder(StorageFolder.Upload, auth.user.id, id);
     const { state: statePath } = sessionPaths(folder, id, '');
 
@@ -310,9 +310,9 @@ export class UploadSessionService extends BaseService {
       throw new NotFoundException('Upload session not found');
     }
 
-    const { data: dataPath } = sessionPaths(folder, id, getFilenameExtension(state.originalName));
+    const { data: dataPath, sidecar: sidecarPath } = sessionPaths(folder, id, getFilenameExtension(state.originalName));
 
-    return { state, dataPath, statePath };
+    return { state, dataPath, statePath, sidecarPath };
   }
 
   /** Duplicated from `AssetMediaService.requireQuota` (private, spec §5.6) rather than exported. */
