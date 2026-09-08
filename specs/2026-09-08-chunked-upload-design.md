@@ -428,7 +428,9 @@ Additionally `server/src/controllers/upload-session.controller.spec.ts`, followi
 
 > **Correction after implementation.** The three §5.4 invariants and the byte-identical round trip do **not** need a Docker-backed medium test. `server/src/utils/upload-session-store.spec.ts` already runs against a real filesystem via `mkdtemp`, so they live there and execute in milliseconds. The original assumption — that unit tests mock the filesystem — does not hold for the store. What genuinely needs this file is only the part requiring a database.
 
-Real filesystem plus a real database. Covers cases **25, 26, 47**:
+> **Not implemented — declared gap.** The existing medium harness mocks `StorageRepository` (see `server/test/medium/specs/services/asset-media.service.spec.ts`), so a medium test here would not exercise real filesystem behaviour anyway, and the behaviour it would add is already covered three ways: the unit test for row 21 (exactly one finalizer proceeds, the loser 404s), the store spec's three-concurrent-claim test against a real filesystem — proven load-bearing by mutation — and upstream's own asset-checksum uniqueness constraint. Building a real-`StorageRepository` medium harness was judged not to pay for itself against that, and the repo's medium tests have a known connection-exhaustion problem under load. Revisit if the finalize path grows database state of its own.
+
+Real filesystem plus a real database. Would cover cases **25, 26, 47**:
 
 - A 3-chunk round trip produces a file **byte-identical** to a single-shot upload of the same bytes.
 - A replayed middle chunk leaves the file byte-identical (idempotence).
