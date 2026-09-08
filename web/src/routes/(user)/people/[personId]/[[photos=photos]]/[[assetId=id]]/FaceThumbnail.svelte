@@ -24,13 +24,17 @@
   }: Props = $props();
 </script>
 
+<!-- Without an explicit `thumbnailSize` the tile fills its grid cell. It has to size itself off its
+     own width (`aspect-square`) rather than `height: 100%`: the grid rows are auto-sized from their
+     content, so a percentage height has nothing to resolve against and the square thumbnail inside
+     spills out the bottom of the tile (#1082). -->
 <button
   type="button"
-  class="relative rounded-lg transition-all"
+  class={['relative rounded-lg transition-all', !thumbnailSize && 'aspect-square w-full']}
   onclick={() => onClick(person)}
   disabled={!selectable}
-  style:width={thumbnailSize ? thumbnailSize + 'px' : '100%'}
-  style:height={thumbnailSize ? thumbnailSize + 'px' : '100%'}
+  style:width={thumbnailSize ? thumbnailSize + 'px' : undefined}
+  style:height={thumbnailSize ? thumbnailSize + 'px' : undefined}
 >
   <div
     class="size-full border-2 brightness-90 filter"
@@ -63,7 +67,7 @@
 
   {#if person.name}
     <span
-      class="text-white-shadow absolute inset-s-0 bottom-2 w-full px-1 text-center font-medium text-ellipsis text-white hover:cursor-pointer"
+      class="text-white-shadow absolute inset-s-0 bottom-1 w-full truncate px-1 text-center text-xs font-medium text-white hover:cursor-pointer md:bottom-2 md:text-sm"
     >
       {person.name}
     </span>
