@@ -11,7 +11,13 @@ If your reverse proxy uses the [Let's Encrypt](https://letsencrypt.org/) [http-0
 :::
 
 :::info
-Gallery uses [chunked/resumable upload](/features/chunked-upload) for files larger than 32 MiB, so your reverse proxy no longer needs to accept an entire multi-gigabyte file in a single request — large files arrive as a sequence of 32 MiB chunks instead. Only the single-shot upload endpoint, still used for files at or under the chunk size, has to fit under your body-size limit. That means `client_max_body_size` (or your proxy's equivalent) can be set much lower than before, as long as it comfortably exceeds one chunk plus request overhead — the example below uses `100M`. If you already have a much larger limit configured, there is no need to lower it; it just isn't required anymore.
+Gallery uses [chunked/resumable upload](/features/chunked-upload) for files larger than 32 MiB, so your reverse proxy no longer needs to accept an entire multi-gigabyte file in a single request — large files arrive as a sequence of 32 MiB chunks instead. Only the single-shot upload endpoint, still used for files at or under the chunk size, has to fit under your body-size limit. That means `client_max_body_size` (or your proxy's equivalent) can be set much lower than before, as long as it comfortably exceeds one chunk plus request overhead — the example below uses `100M`.
+:::
+
+:::warning
+**Lower this only once every client that uploads to your instance is up to date.** Chunked upload is a client-side behaviour: an older mobile app, an older CLI, or any third-party client that predates the feature will still send a large file as one request, and will fail with `413 Request Entity Too Large` against a tightened limit.
+
+If you are unsure — in particular if family members or other users may still be on an older mobile app — keep your existing larger limit. A generous `client_max_body_size` costs nothing and remains fully supported; the point of this section is that it is no longer _required_, not that it must be reduced.
 :::
 
 ### Nginx example config
