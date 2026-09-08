@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   claimFinalize,
   committedOffset,
+  finalizeClaimPath,
   readState,
   UploadSessionState,
   writeChunkAt,
@@ -70,5 +71,13 @@ describe('upload-session-store', () => {
 
   it('returns false when claiming a session that is already gone', async () => {
     await expect(claimFinalize(join(dir, 'gone.session.json'))).resolves.toBe(false);
+  });
+
+  it('renames the state file aside on a successful claim, leaving nothing at the original path', async () => {
+    const path = join(dir, 's.session.json');
+    await writeState(path, state);
+    await expect(claimFinalize(path)).resolves.toBe(true);
+    await expect(stat(path)).rejects.toThrow();
+    await expect(readState(finalizeClaimPath(path))).resolves.toEqual(state);
   });
 });
