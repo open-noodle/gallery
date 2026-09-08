@@ -132,12 +132,14 @@ void main() {
     final repo = PartnerApiRepository(apiService);
 
     when(() => apiService.partnersApi).thenReturn(newApi);
-    when(() => newApi.getPartners(PartnerDirection.sharedBy)).thenAnswer((_) async => []);
+    when(() => newApi.removePartner(any())).thenAnswer((_) async {});
 
-    await repo.getAll(Direction.sharedByMe);
+    // immich-31280 removed PartnerApiRepository.getAll; delete() is the surviving
+    // method that touches _api, and the lazy-resolution invariant is the same.
+    await repo.delete('partner-id');
 
-    verify(() => newApi.getPartners(PartnerDirection.sharedBy)).called(1);
-    verifyNever(() => oldApi.getPartners(any()));
+    verify(() => newApi.removePartner('partner-id')).called(1);
+    verifyNever(() => oldApi.removePartner(any()));
   });
 
   test('FolderApiRepository resolves viewApi lazily', () async {
