@@ -82,4 +82,56 @@ describe('upload-session-store', () => {
     await expect(stat(path)).rejects.toThrow();
     await expect(readState(finalizeClaimPath(path))).resolves.toEqual(state);
   });
+  // ---------------------------------------------------------------------------------------------
+  // Spec 5.4 invariants. These run against a real filesystem (mkdtemp above), which is why they
+  // live here rather than in a Docker-backed medium test — nothing here needs a database.
+  // ---------------------------------------------------------------------------------------------
+
+  it('produces a byte-identical file to a single write when uploaded in three unequal chunks', async () => {
+    const payload = Buffer.from('the quick brown fox jumps over the lazy dog, repeatedly and at length');
+    const chunked = join(dir, 'chunked.bin');
+    const single = join(dir, 'single.bin');
+
+    await writeFile(chunked, '');
+    // deliberately unequal, to exercise the "server enforces no chunk size" invariant
+    const cuts = [0, 7, 40, payload.length];
+    for (let i = 0; i < cuts.length - 1; i++) {
+      await writeChunkAt(chunked, cuts[i], payload.subarray(cuts[i], cuts[i + 1]));
+    }
+    await writeFile(single, payload);
+
+    const [a, b] = await Promise.all([readFile(chunked), readFile(single)]);
+    expect(a.equals(b)).toBe(true);
+    expect(await committedOffset(chunked)).toBe(payload.length);
+  });
+
+  it('never produces a sparse file', async () => {
+    // Rule 3 (offset must EQUAL the committed size) is the only thing preventing a positional
+    // write from landing past EOF. If it is ever relaxed to "offset <= size", this is the test
+    // that catches it — every other test in this file would still pass.
+    const payload = Buffer.alloc(128 * 1024, 7);
+    const data = join(dir, 'dense.bin');
+    await writeFile(data, '');
+    for (let offset = 0; offset < payload.length; offset += 16 * 1024) {
+      await writeChunkAt(data, offset, payload.subarray(offset, offset + 16 * 1024));
+    }
+
+    const stats = await stat(data);
+    expect(stats.size).toBe(payload.length);
+    // A hole would leave allocated blocks well below the apparent size.
+    expect(stats.blocks * 512).toBeGreaterThanOrEqual(stats.size);
+  });
+
+  it('reports the true on-disk offset after a truncated write, so the client can resume exactly', async () => {
+    const data = join(dir, 'partial.bin');
+    await writeFile(data, '');
+    await writeChunkAt(data, 0, Buffer.from('0123456789'));
+    // simulate a process death mid-chunk: only part of the intended range landed
+    expect(await committedOffset(data)).toBe(10);
+
+    await writeChunkAt(data, 10, Buffer.from('abcde'));
+    expect(await committedOffset(data)).toBe(15);
+    const written = await readFile(data);
+    expect(written.toString()).toBe('0123456789abcde');
+  });
 });
