@@ -18,25 +18,41 @@ const isNotFound = (error: unknown): boolean =>
   !!error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT';
 
 /**
- * Joins a single filename onto `folder` and proves the result stayed inside it.
+ * A session filename must be a single path component: no separators, and not a relative segment.
  *
- * Two independent guards, because each covers what the other misses:
- *  - `sanitize` strips traversal segments from the name, matching what
- *    `AssetMediaService.getUploadFilename` already does on the single-shot path;
- *  - the containment check then *proves* the resolved path is still under `folder`, so a future
- *    edit that reintroduces an unsanitized component fails loudly instead of writing outside the
- *    upload directory.
+ * Deliberately NOT an ASCII allowlist. `extname('photo.résumé')` is `.résumé`, and the single-shot
+ * upload path accepts it, so rejecting non-ASCII here would make the chunked path refuse uploads
+ * the multipart path allows — a behavioural divergence, not a security win.
+ */
+const isSinglePathComponent = (name: string): boolean =>
+  name.length > 0 && name !== '.' && name !== '..' && !name.includes('/') && !name.includes('\\');
+
+/**
+ * Builds one path inside `folder`, refusing anything that is not provably safe.
+ *
+ * Three layers, because each catches what the others miss:
+ *  1. `sanitize` strips traversal segments, matching what `AssetMediaService.getUploadFilename`
+ *     already does on the single-shot path;
+ *  2. the single-component check rejects anything that is still not a plain filename — the
+ *     barrier that makes an untrusted value unusable rather than merely reshaped;
+ *  3. the containment check proves the resolved path is still under `folder`, so a future edit
+ *     that drops either guard fails loudly instead of writing outside the upload directory.
  *
  * The uuid is server-generated, but `extension` derives from the client-supplied filename, so an
- * untrusted value does reach a filesystem path here.
+ * untrusted value genuinely does reach a filesystem path here.
  */
 const withinFolder = (folder: string, name: string): string => {
-  const path = join(folder, sanitize(name));
+  const safeName = sanitize(name);
+  if (!isSinglePathComponent(safeName)) {
+    throw new Error('Refusing to build an upload-session path from an unsafe filename');
+  }
+
   const root = resolve(folder);
-  const resolved = resolve(path);
-  if (resolved !== root && !resolved.startsWith(root + sep)) {
+  const resolved = resolve(join(root, safeName));
+  if (!resolved.startsWith(root + sep)) {
     throw new Error('Refusing to build an upload-session path outside its folder');
   }
+
   return resolved;
 };
 

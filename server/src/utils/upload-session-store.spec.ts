@@ -151,4 +151,16 @@ describe('upload-session-store', () => {
     const { data } = sessionPaths(dir, 'uuid', '.CR3');
     expect(data.endsWith('uuid.CR3')).toBe(true);
   });
+  it('accepts a non-ASCII extension, matching what the single-shot upload path allows', () => {
+    // Guards against tightening this into an ASCII allowlist: extname('photo.résumé') is
+    // '.résumé', and the multipart path accepts it. Rejecting it here would make the chunked
+    // path refuse uploads the multipart path allows.
+    const { data } = sessionPaths(dir, 'uuid', '.résumé');
+    expect(data.endsWith('uuid.résumé')).toBe(true);
+  });
+
+  it('refuses a name that is still not a single path component after sanitizing', () => {
+    // sanitize() leaves '..' intact, so the single-component check is what stops it.
+    expect(() => sessionPaths(dir, '', '..')).toThrow(/unsafe filename/);
+  });
 });
