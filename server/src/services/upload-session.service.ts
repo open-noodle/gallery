@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { join } from 'node:path';
 import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
@@ -11,7 +11,13 @@ import { AssetMediaService } from 'src/services/asset-media.service';
 import { BaseService } from 'src/services/base.service';
 import { requireUploadAccess } from 'src/utils/access';
 import { getFilenameExtension } from 'src/utils/file';
-import { sessionPaths, UploadSessionState, writeState } from 'src/utils/upload-session-store';
+import {
+  committedOffset,
+  readState,
+  sessionPaths,
+  UploadSessionState,
+  writeState,
+} from 'src/utils/upload-session-store';
 
 /**
  * A JS string can hold a lone surrogate (e.g. `\uD800` unpaired), which has no lossless UTF-8
@@ -68,6 +74,43 @@ export class UploadSessionService extends BaseService {
       offset: 0,
       expiresAt: new Date(Date.now() + UPLOAD_SESSION_TTL_MS).toISOString(),
     };
+  }
+
+  async getOffset(auth: AuthDto, id: string): Promise<{ offset: number; size: number }> {
+    const { state, dataPath } = await this.loadOwnedSession(auth, id);
+    const offset = await committedOffset(dataPath);
+    return { offset, size: state.size };
+  }
+
+  async abort(auth: AuthDto, id: string): Promise<void> {
+    const { dataPath, statePath } = await this.loadOwnedSession(auth, id);
+    await this.storageRepository.unlink(dataPath);
+    await this.storageRepository.unlink(statePath);
+  }
+
+  /**
+   * Loads the session state for `id` and confirms it belongs to `auth`. Ownership requires BOTH
+   * the user id and the shared-link id to match (both null, or both equal) — a user-token
+   * session may not be continued with a shared link, or vice versa (spec §8 row 44). An unknown
+   * or foreign session is reported as 404, never 403, so a caller cannot enumerate other users'
+   * session ids.
+   */
+  private async loadOwnedSession(
+    auth: AuthDto,
+    id: string,
+  ): Promise<{ state: UploadSessionState; dataPath: string; statePath: string }> {
+    const folder = StorageCore.getNestedFolder(StorageFolder.Upload, auth.user.id, id);
+    const { state: statePath } = sessionPaths(folder, id, '');
+
+    const state = await readState(statePath);
+    const sharedLinkId = auth.sharedLink?.id ?? null;
+    if (!state || state.userId !== auth.user.id || state.sharedLinkId !== sharedLinkId) {
+      throw new NotFoundException('Upload session not found');
+    }
+
+    const { data: dataPath } = sessionPaths(folder, id, getFilenameExtension(state.originalName));
+
+    return { state, dataPath, statePath };
   }
 
   /** Duplicated from `AssetMediaService.requireQuota` (private, spec §5.6) rather than exported. */
