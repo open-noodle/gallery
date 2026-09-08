@@ -410,7 +410,7 @@ export const utils = {
       assetData?: FileData;
       sidecarData?: FileData;
     },
-    options?: { allowDuplicate?: boolean },
+    options?: { allowDuplicate?: boolean; chunked?: boolean },
   ) => {
     const _dto = {
       fileCreatedAt: new Date().toISOString(),
@@ -423,6 +423,21 @@ export const utils = {
 
     if (dto?.assetData?.bytes) {
       console.log(`Uploading ${filename}`);
+    }
+
+    if (options?.chunked) {
+      const chunkedResponse = await utils.createAssetChunked(accessToken, {
+        assetData,
+        filename,
+        dto: _dto,
+        sidecar: dto?.sidecarData?.bytes?.toString('utf8'),
+      });
+
+      if (!options.allowDuplicate && chunkedResponse.status === AssetMediaStatus.Duplicate) {
+        return { ...chunkedResponse, status: AssetMediaStatus.Created };
+      }
+
+      return chunkedResponse;
     }
 
     const builder = request(app)
@@ -446,6 +461,67 @@ export const utils = {
     }
 
     return response;
+  },
+
+  /**
+   * Uploads through the chunked session protocol instead of the single-shot multipart endpoint.
+   *
+   * The test picks its own chunk size rather than reconfiguring the server: per the design, the
+   * server enforces no chunk size at all — it accepts any chunk whose offset matches and whose
+   * total stays within Upload-Length. So a few-KB fixture is uploaded as three deliberately
+   * UNEQUAL chunks, which also exercises the unequal-chunk case for free. `uploadChunkSize` is
+   * only ever advice to real clients about when to switch protocols.
+   */
+  createAssetChunked: async (
+    accessToken: string,
+    args: { assetData: Buffer; filename: string; dto: Record<string, unknown>; sidecar?: string },
+  ): Promise<AssetMediaResponseDto> => {
+    const { assetData, filename, dto, sidecar } = args;
+    const auth = { Authorization: `Bearer ${accessToken}` };
+
+    const { body: session, status: createStatus } = await request(app)
+      .post('/assets/upload-session')
+      .set(auth)
+      .send({
+        filename,
+        size: assetData.length,
+        // JSON-native types: the session endpoint rejects the multipart string forms
+        fileCreatedAt: dto.fileCreatedAt,
+        fileModifiedAt: dto.fileModifiedAt,
+        ...(dto.isFavorite !== undefined && { isFavorite: dto.isFavorite === true || dto.isFavorite === 'true' }),
+        ...(dto.visibility !== undefined && { visibility: dto.visibility }),
+        ...(sidecar !== undefined && { sidecar }),
+      });
+
+    // A known checksum short-circuits to a duplicate without ever creating a session.
+    if (createStatus === 200) {
+      return session as AssetMediaResponseDto;
+    }
+
+    const total = assetData.length;
+    const cuts = [0, Math.floor(total / 5), Math.floor((total * 3) / 5), total].filter(
+      (value, index, all) => index === 0 || value > all[index - 1],
+    );
+
+    let last: AssetMediaResponseDto | undefined;
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const start = cuts[i];
+      const end = cuts[i + 1];
+      const { body, status } = await request(app)
+        .patch(`/assets/upload-session/${session.id}`)
+        .set({ ...auth, 'Upload-Offset': String(start), 'Content-Type': 'application/offset+octet-stream' })
+        .send(assetData.subarray(start, end));
+
+      if (status === 200 || status === 201) {
+        last = body as AssetMediaResponseDto;
+      }
+    }
+
+    if (!last) {
+      throw new Error(`Chunked upload of ${filename} did not finalize`);
+    }
+
+    return last;
   },
 
   createImageFile: (path: string) => {
