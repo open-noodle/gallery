@@ -146,6 +146,7 @@ describe('/server', () => {
         mapDarkStyleUrl: 'https://tiles.openfreemap.org/styles/dark',
         mapLightStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
         minFaces: 3,
+        uploadChunkSize: 33_554_432,
         availableMemoryTypes: [
           'on_this_day',
           'birthday',
