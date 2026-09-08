@@ -2,11 +2,12 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { dirname, join } from 'node:path';
 import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
+import { OnJob } from 'src/decorators';
 import { AssetMediaResponseDto } from 'src/dtos/asset-media-response.dto';
 import { AssetMediaCreateDto, UploadFieldName } from 'src/dtos/asset-media.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { UploadSessionCreateDto, UploadSessionResponseDto } from 'src/dtos/upload-session.dto';
-import { AssetVisibility, StorageFolder } from 'src/enum';
+import { AssetVisibility, DatabaseLock, JobName, QueueName, StorageFolder } from 'src/enum';
 import { AssetMediaService } from 'src/services/asset-media.service';
 import { BaseService } from 'src/services/base.service';
 import { UploadFile } from 'src/types';
@@ -209,6 +210,79 @@ export class UploadSessionService extends BaseService {
     const { dataPath, statePath } = await this.loadOwnedSession(auth, id);
     await this.storageRepository.unlink(dataPath);
     await this.storageRepository.unlink(statePath);
+  }
+
+  /**
+   * Sweeps abandoned upload sessions (spec §5.7, §8 row 30). Walks the whole upload folder for
+   * `*.session.json` sidecars older than `UPLOAD_SESSION_TTL_MS` and deletes them along with
+   * their data file. Also reclaims `*.session.json.finalizing` sidecars: finalize is claimed by
+   * renaming the state file aside (spec §5.4, `claimFinalize`), and a finalizer that crashes
+   * after claiming but before creating the asset leaves one of these behind with a complete data
+   * file — nothing else in the system will ever reclaim it otherwise.
+   */
+  @OnJob({ name: JobName.UploadSessionCleanup, queue: QueueName.BackgroundTask })
+  async handleUploadSessionCleanup(): Promise<void> {
+    await this.databaseRepository.withLock(DatabaseLock.UploadSessionCleanup, async () => {
+      await this.sweepUploadSessionFolder(StorageCore.getBaseFolder(StorageFolder.Upload));
+    });
+  }
+
+  private async sweepUploadSessionFolder(folder: string): Promise<void> {
+    let entries: Awaited<ReturnType<typeof this.storageRepository.readdirWithTypes>>;
+    try {
+      entries = await this.storageRepository.readdirWithTypes(folder);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return;
+      }
+      throw error;
+    }
+
+    for (const entry of entries) {
+      const entryPath = join(folder, entry.name);
+
+      if (entry.isDirectory()) {
+        await this.sweepUploadSessionFolder(entryPath);
+        continue;
+      }
+
+      const suffix = entry.name.endsWith('.session.json.finalizing')
+        ? '.session.json.finalizing'
+        : entry.name.endsWith('.session.json')
+          ? '.session.json'
+          : undefined;
+
+      if (!suffix) {
+        continue;
+      }
+
+      await this.reclaimUploadSessionIfExpired(folder, entryPath, entry.name.slice(0, -suffix.length));
+    }
+  }
+
+  /**
+   * `sidecarPath` is whichever file is actually on disk — `<uuid>.session.json` or its
+   * `.finalizing` claim-marker variant. Both hold the same session JSON (rename doesn't touch
+   * content), so `readState` works unchanged against either path.
+   */
+  private async reclaimUploadSessionIfExpired(folder: string, sidecarPath: string, uuid: string): Promise<void> {
+    try {
+      const stats = await this.storageRepository.stat(sidecarPath);
+      if (Date.now() - stats.mtime.getTime() < UPLOAD_SESSION_TTL_MS) {
+        return;
+      }
+
+      const state = await readState(sidecarPath);
+
+      if (state) {
+        const { data: dataPath } = sessionPaths(folder, uuid, getFilenameExtension(state.originalName));
+        await this.storageRepository.unlink(dataPath);
+      }
+
+      await this.storageRepository.unlink(sidecarPath);
+    } catch (error) {
+      this.logger.error(`Failed to reclaim upload session ${sidecarPath}: ${error}`);
+    }
   }
 
   /**
