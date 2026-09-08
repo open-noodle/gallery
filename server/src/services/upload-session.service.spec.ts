@@ -1,10 +1,10 @@
 import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { UPLOAD_SESSION_MAX_OPEN } from 'src/constants';
+import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
 import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto';
-import { StorageFolder } from 'src/enum';
+import { DatabaseLock, StorageFolder } from 'src/enum';
 import { AssetMediaService } from 'src/services/asset-media.service';
 import { StorageService } from 'src/services/storage.service';
 import { UploadSessionService } from 'src/services/upload-session.service';
@@ -637,6 +637,91 @@ describe(UploadSessionService.name, () => {
       // finalize resolved (even though it was a duplicate, not a new asset), so the marker
       // should still be cleaned up.
       expect(mocks.storage.unlink).toHaveBeenCalledWith(finalizeClaimPath(statePath));
+    });
+  });
+
+  describe('handleUploadSessionCleanup', () => {
+    const oldMtime = new Date(Date.now() - UPLOAD_SESSION_TTL_MS - 1000);
+    const freshMtime = new Date(Date.now() - 1000);
+    let root: string;
+
+    beforeEach(() => {
+      root = StorageCore.getBaseFolder(StorageFolder.Upload);
+      mocks.database.withLock.mockImplementation(async (_lock, fn) => fn());
+    });
+
+    it('deletes a session older than the TTL along with its data file', async () => {
+      const statePath = sessionPaths(root, 'session-1', '').state;
+      const dataPath = sessionPaths(root, 'session-1', '.jpg').data;
+
+      mocks.storage.readdirWithTypes.mockImplementation((folder) =>
+        Promise.resolve(folder === root ? [fakeDirent('session-1.session.json')] : []),
+      );
+      mocks.storage.stat.mockResolvedValue({ mtime: oldMtime } as any);
+      vi.mocked(readState).mockResolvedValue(makeState({ originalName: 'photo.jpg' }));
+
+      await sut.handleUploadSessionCleanup();
+
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(statePath);
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(dataPath);
+    });
+
+    it('leaves a session younger than the TTL untouched', async () => {
+      mocks.storage.readdirWithTypes.mockImplementation((folder) =>
+        Promise.resolve(folder === root ? [fakeDirent('session-1.session.json')] : []),
+      );
+      mocks.storage.stat.mockResolvedValue({ mtime: freshMtime } as any);
+      vi.mocked(readState).mockResolvedValue(makeState({ originalName: 'photo.jpg' }));
+
+      await sut.handleUploadSessionCleanup();
+
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+
+    it('also reclaims a .finalizing session left by a crashed finalizer', async () => {
+      const finalizingPath = finalizeClaimPath(sessionPaths(root, 'session-2', '').state);
+      const dataPath = sessionPaths(root, 'session-2', '.mp4').data;
+
+      mocks.storage.readdirWithTypes.mockImplementation((folder) =>
+        Promise.resolve(folder === root ? [fakeDirent('session-2.session.json.finalizing')] : []),
+      );
+      mocks.storage.stat.mockResolvedValue({ mtime: oldMtime } as any);
+      vi.mocked(readState).mockResolvedValue(makeState({ originalName: 'clip.mp4' }));
+
+      await sut.handleUploadSessionCleanup();
+
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(finalizingPath);
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(dataPath);
+    });
+
+    it('runs under DatabaseLock.UploadSessionCleanup', async () => {
+      mocks.storage.readdirWithTypes.mockResolvedValue([]);
+
+      await sut.handleUploadSessionCleanup();
+
+      expect(mocks.database.withLock).toHaveBeenCalledWith(DatabaseLock.UploadSessionCleanup, expect.any(Function));
+    });
+
+    it('continues sweeping when one session fails to delete', async () => {
+      const dataPath1 = sessionPaths(root, 'session-1', '.jpg').data;
+      const statePath2 = sessionPaths(root, 'session-2', '').state;
+      const dataPath2 = sessionPaths(root, 'session-2', '.jpg').data;
+
+      mocks.storage.readdirWithTypes.mockImplementation((folder) =>
+        Promise.resolve(
+          folder === root ? [fakeDirent('session-1.session.json'), fakeDirent('session-2.session.json')] : [],
+        ),
+      );
+      mocks.storage.stat.mockResolvedValue({ mtime: oldMtime } as any);
+      vi.mocked(readState).mockResolvedValue(makeState({ originalName: 'photo.jpg' }));
+      mocks.storage.unlink.mockImplementation((path: string) =>
+        path === dataPath1 ? Promise.reject(new Error('disk error')) : Promise.resolve(),
+      );
+
+      await sut.handleUploadSessionCleanup();
+
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(statePath2);
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(dataPath2);
     });
   });
 });
