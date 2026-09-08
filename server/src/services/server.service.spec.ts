@@ -195,6 +195,7 @@ describe(ServerService.name, () => {
         mapLightStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
         maintenanceMode: false,
         minFaces: 3,
+        uploadChunkSize: 33_554_432,
         availableMemoryTypes: [
           'on_this_day',
           'birthday',
