@@ -98,6 +98,10 @@ Two further rules:
 
 At finalize the service constructs an object matching `AssetMediaCreateDto`'s **output** (post-transform) types — `Date`, `boolean`, parsed array — and passes it to `uploadAsset()`. The input schemas differ; the output shape is identical, which is what makes the hand-off in §5.5 work.
 
+> **Implementation note — the generated client covers create/HEAD/DELETE, not PATCH.** Confirmed while building the CLI: `appendUploadSessionChunk` comes out of oazapfts as `Promise<unknown>` and discards the HTTP status and headers, because the generator cannot express a union where one branch (204) has no body. Clients therefore cannot use it to tell 204 (continue) from 200/201 (final) from 409 (offset mismatch), and every client hand-rolls the PATCH with raw `fetch`/XHR/`UploadTask`.
+>
+> This does not undermine the §3 rationale for the hand-rolled-in-Nest approach: the value there was always a real DTO for **create** plus generated methods for create/HEAD/DELETE, and PATCH was always going to be a raw binary request with custom headers. It does mean the PATCH contract lives only in this document, so keep §4.1 accurate — there is no generated type enforcing it.
+
 ### 4.4 Why no S3 multipart
 
 `StorageRepository` is pure `node:fs`; `createWriteStream` (`server/src/repositories/storage.repository.ts:78`) writes to local disk. The S3 backend (`server/src/backends/s3-storage.backend.ts`) is only reached later, by the storage-template job. Uploads land on local disk in every configuration, so chunk assembly is a local-disk concern and the S3 path is untouched.
