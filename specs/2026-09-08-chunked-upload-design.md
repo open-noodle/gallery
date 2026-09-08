@@ -426,7 +426,9 @@ Additionally `server/src/controllers/upload-session.controller.spec.ts`, followi
 
 ### 9.2 Server medium — `server/test/medium/specs/services/upload-session.service.spec.ts`
 
-Real filesystem, no mocks. These are the tests that would catch a wrong `fd.write` offset, which unit tests with a mocked storage repository cannot. Covers cases **25, 26, 45, 47** plus the three §5.4 invariants:
+> **Correction after implementation.** The three §5.4 invariants and the byte-identical round trip do **not** need a Docker-backed medium test. `server/src/utils/upload-session-store.spec.ts` already runs against a real filesystem via `mkdtemp`, so they live there and execute in milliseconds. The original assumption — that unit tests mock the filesystem — does not hold for the store. What genuinely needs this file is only the part requiring a database.
+
+Real filesystem plus a real database. Covers cases **25, 26, 47**:
 
 - A 3-chunk round trip produces a file **byte-identical** to a single-shot upload of the same bytes.
 - A replayed middle chunk leaves the file byte-identical (idempotence).
