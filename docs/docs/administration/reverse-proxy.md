@@ -10,6 +10,10 @@ Gallery does not support being served on a sub-path such as `location /gallery {
 If your reverse proxy uses the [Let's Encrypt](https://letsencrypt.org/) [http-01 challenge](https://letsencrypt.org/docs/challenge-types/#http-01-challenge), you may want to verify that the Gallery well-known endpoint (`/.well-known/immich`) gets correctly routed to Gallery, otherwise it will likely be routed elsewhere and the mobile app may run into connection issues.
 :::
 
+:::info
+Gallery uses [chunked/resumable upload](/features/chunked-upload) for files larger than 32 MiB, so your reverse proxy no longer needs to accept an entire multi-gigabyte file in a single request — large files arrive as a sequence of 32 MiB chunks instead. Only the single-shot upload endpoint, still used for files at or under the chunk size, has to fit under your body-size limit. That means `client_max_body_size` (or your proxy's equivalent) can be set much lower than before, as long as it comfortably exceeds one chunk plus request overhead — the example below uses `100M`. If you already have a much larger limit configured, there is no need to lower it; it just isn't required anymore.
+:::
+
 ### Nginx example config
 
 Below is an example config for nginx. Make sure to set `public_url` to the front-facing URL of your instance, and `backend_url` to the path of the Gallery server.
@@ -18,8 +22,10 @@ Below is an example config for nginx. Make sure to set `public_url` to the front
 server {
     server_name <public_url>;
 
-    # allow large file uploads
-    client_max_body_size 50000M;
+    # Only the single-shot upload endpoint needs headroom here — files larger than
+    # 32 MiB upload in resumable chunks. 100M comfortably covers one chunk (32 MiB)
+    # plus request overhead.
+    client_max_body_size 100M;
 
     # disable buffering uploads to prevent OOM on reverse proxy server and make uploads twice as fast (no pause)
     proxy_request_buffering off;
