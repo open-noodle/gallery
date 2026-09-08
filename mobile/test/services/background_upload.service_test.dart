@@ -46,9 +46,7 @@ void main() {
     await Store.put(StoreKey.serverEndpoint, 'http://test-server.com');
     await Store.put(StoreKey.deviceId, 'test-device-id');
 
-    registerFallbackValue(
-      UploadTask(url: 'http://test-server.com/assets', filename: 'fallback', post: 'binary'),
-    );
+    registerFallbackValue(UploadTask(url: 'http://test-server.com/assets', filename: 'fallback', post: 'binary'));
     registerFallbackValue(LocalAssetStub.image1);
   });
 
@@ -451,31 +449,34 @@ void main() {
     }
 
     group('getUploadTask - chunk task shape', () {
-      test('builds a PATCH/binary task with empty fields and correct Range/Upload-Offset for a file above the threshold', () async {
-        final file = await writeFile('video.mov', 25);
-        final asset = assetFor(file);
-        stubEntity(isLivePhoto: false);
-        when(() => mockStorageRepository.getFileForAsset(asset.id)).thenAnswer((_) async => file);
-        when(() => mockAssetMediaRepository.getOriginalFilename(asset.id)).thenAnswer((_) async => 'video.mov');
-        when(() => mockUploadRepository.uploadChunkSize).thenReturn(10);
-        when(
-          () => mockUploadRepository.createUploadSession(
-            filename: any(named: 'filename'),
-            size: any(named: 'size'),
-            fields: any(named: 'fields'),
-          ),
-        ).thenAnswer((_) async => const UploadSessionResult(sessionId: 'session-1', offset: 0));
+      test(
+        'builds a PATCH/binary task with empty fields and correct Range/Upload-Offset for a file above the threshold',
+        () async {
+          final file = await writeFile('video.mov', 25);
+          final asset = assetFor(file);
+          stubEntity(isLivePhoto: false);
+          when(() => mockStorageRepository.getFileForAsset(asset.id)).thenAnswer((_) async => file);
+          when(() => mockAssetMediaRepository.getOriginalFilename(asset.id)).thenAnswer((_) async => 'video.mov');
+          when(() => mockUploadRepository.uploadChunkSize).thenReturn(10);
+          when(
+            () => mockUploadRepository.createUploadSession(
+              filename: any(named: 'filename'),
+              size: any(named: 'size'),
+              fields: any(named: 'fields'),
+            ),
+          ).thenAnswer((_) async => const UploadSessionResult(sessionId: 'session-1', offset: 0));
 
-        final task = await sut.getUploadTask(asset);
+          final task = await sut.getUploadTask(asset);
 
-        expect(task, isNotNull);
-        expect(task!.httpRequestMethod, equals('PATCH'));
-        expect(task.post, equals('binary'));
-        expect(task.fields, isEmpty);
-        expect(task.headers['Upload-Offset'], equals('0'));
-        expect(task.headers['Range'], equals('bytes=0-9'));
-        expect(task.headers['Content-Type'], equals('application/offset+octet-stream'));
-      });
+          expect(task, isNotNull);
+          expect(task!.httpRequestMethod, equals('PATCH'));
+          expect(task.post, equals('binary'));
+          expect(task.fields, isEmpty);
+          expect(task.headers['Upload-Offset'], equals('0'));
+          expect(task.headers['Range'], equals('bytes=0-9'));
+          expect(task.headers['Content-Type'], equals('application/offset+octet-stream'));
+        },
+      );
 
       test('taskId is "<deviceAssetId>#<chunkIndex>" for a chunked task', () async {
         final file = await writeFile('video.mov', 25);
@@ -587,7 +588,11 @@ void main() {
           filename: 'video.mov',
           post: 'binary',
           httpRequestMethod: 'PATCH',
-          headers: const {'Upload-Offset': '0', 'Range': 'bytes=0-9', 'Content-Type': 'application/offset+octet-stream'},
+          headers: const {
+            'Upload-Offset': '0',
+            'Range': 'bytes=0-9',
+            'Content-Type': 'application/offset+octet-stream',
+          },
           metaData: metadata.toJson(),
           group: kBackupGroup,
         );
@@ -597,7 +602,7 @@ void main() {
           captured = invocation.positionalArguments[0] as UploadTask;
         });
 
-        sut.handleTaskStatusUpdate(TaskStatusUpdate(chunkTask, TaskStatus.complete));
+        await sut.handleTaskStatusUpdate(TaskStatusUpdate(chunkTask, TaskStatus.complete));
         await pumpEventQueue();
 
         expect(captured, isNotNull);
@@ -656,7 +661,7 @@ void main() {
           return [true];
         });
 
-        sut.handleTaskStatusUpdate(
+        await sut.handleTaskStatusUpdate(
           TaskStatusUpdate(finalChunkTask, TaskStatus.complete, null, '{"id":"video-remote-id"}'),
         );
         await pumpEventQueue();
@@ -692,7 +697,7 @@ void main() {
 
         when(() => mockUploadRepository.deleteUploadSession(any())).thenAnswer((_) async {});
 
-        sut.handleTaskStatusUpdate(TaskStatusUpdate(failedTask, status));
+        await sut.handleTaskStatusUpdate(TaskStatusUpdate(failedTask, status));
         await pumpEventQueue();
 
         verify(() => mockUploadRepository.deleteUploadSession('session-failed')).called(1);
