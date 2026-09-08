@@ -26,4 +26,12 @@ class UserApiRepository extends ApiRepository {
     final res = await checkNull(_api.createProfileImage(MultipartFile.fromBytes('file', data, filename: name)));
     return res.profileImagePath;
   }
+
+  // gallery-fork: immich-31280 dropped this as unused upstream, but the fork's Space
+  // member picker (space_member_selection.page.dart) fetches candidates straight from
+  // the API so a fresh login can add members before the local sync has populated Drift.
+  Future<List<UserDto>> getAll() async {
+    final dto = await checkNull(_api.searchUsers());
+    return dto.map(UserConverter.fromSimpleUserDto).toList();
+  }
 }
