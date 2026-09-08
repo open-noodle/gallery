@@ -6,6 +6,7 @@ import {
   committedOffset,
   finalizeClaimPath,
   readState,
+  sessionPaths,
   UploadSessionState,
   writeChunkAt,
   writeState,
@@ -133,5 +134,21 @@ describe('upload-session-store', () => {
     expect(await committedOffset(data)).toBe(15);
     const written = await readFile(data);
     expect(written.toString()).toBe('0123456789abcde');
+  });
+  it('sanitizes a traversal attempt in the extension instead of escaping the folder', () => {
+    const { data, state } = sessionPaths(dir, 'uuid', '/../../etc/passwd');
+
+    // The security property is containment, not the absence of dots: sanitize strips the path
+    // SEPARATORS, so any remaining dots are inert characters in a single filename.
+    expect(data.startsWith(dir + '/')).toBe(true);
+    expect(state.startsWith(dir + '/')).toBe(true);
+    expect(data.slice(dir.length + 1)).not.toContain('/');
+    expect(state.slice(dir.length + 1)).not.toContain('/');
+    expect(data).not.toContain('/etc/passwd');
+  });
+
+  it('keeps a benign extension intact', () => {
+    const { data } = sessionPaths(dir, 'uuid', '.CR3');
+    expect(data.endsWith('uuid.CR3')).toBe(true);
   });
 });

@@ -25,12 +25,15 @@ const patch = (token: string, id: string, offset: number, chunk: Buffer) =>
     .send(chunk);
 
 const createSession = (token: string, body: Record<string, unknown>) =>
-  request(app).post('/assets/upload-session').set('Authorization', `Bearer ${token}`).send({
-    filename: 'chunked.png',
-    fileCreatedAt: iso(),
-    fileModifiedAt: iso(),
-    ...body,
-  });
+  request(app)
+    .post('/assets/upload-session')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      filename: 'chunked.png',
+      fileCreatedAt: iso(),
+      fileModifiedAt: iso(),
+      ...body,
+    });
 
 describe('/assets/upload-session', () => {
   let admin: LoginResponseDto;
