@@ -476,7 +476,11 @@ Rather than "a slice of the suite", name the specs that run both ways — chosen
 | `e2e/src/specs/server/cli/upload.e2e-spec.ts`      | CLI path end to end, including sidecars |
 | `e2e/src/specs/server/api/video-trim.e2e-spec.ts`  | A genuinely large-media path            |
 
-Note the chunked variant must force chunking on small fixtures — otherwise every case falls below the threshold and the flag silently tests nothing. Drive it by lowering `uploadChunkSize` for the e2e server, not by generating large fixtures.
+The chunked variant must actually chunk on small fixtures — otherwise every case falls below the threshold and the flag silently tests nothing. **The test picks the chunk size itself; it does not reconfigure the server.**
+
+`uploadChunkSize` is only ever _advice to clients_ about where to switch protocols and how big to make a chunk. Per the §5.4 invariant, the server enforces no chunk size at all — it accepts any chunk length whose offset matches and whose total stays within `Upload-Length`. So `createAsset({ chunked: true })` opens a session and PATCHes a 4 KB fixture as, say, three chunks of ~1.4 KB, and the server is perfectly happy.
+
+> An earlier draft of this section said to drive it by lowering `uploadChunkSize` on the e2e server. That was wrong twice over: it contradicted the §2 non-goal that keeps the chunk size a constant rather than env-tunable, and the e2e server (`e2e/docker-compose.yml`) is configurable only through environment variables, so it was not achievable without adding the very env plumbing §2 defers. Neither is necessary — the invariant already gives the test all the control it needs.
 
 New `e2e/src/specs/server/api/chunked-upload.e2e-spec.ts`: happy path, offset mismatch, abort, expiry, quota rejection at create, duplicate-by-checksum at create, sidecar, shared-link upload, cross-user 404, and the auth-kind mismatch matrix (case 44).
 
