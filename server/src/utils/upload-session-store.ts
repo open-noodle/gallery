@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { open, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { open, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export type UploadSessionState = {
@@ -36,13 +36,19 @@ export const readState = async (statePath: string): Promise<UploadSessionState |
   }
 };
 
+export const finalizeClaimPath = (statePath: string): string => `${statePath}.finalizing`;
+
 /**
- * Claim the right to finalize by removing the state file. `unlink` is atomic, so exactly one
- * concurrent caller succeeds — this is the cross-replica mutual exclusion described in spec §5.4.
+ * Claim the right to finalize by renaming the state file aside. `rename` is exclusive under
+ * concurrency where `unlink` is not (verified empirically on Node 24 / darwin: concurrent
+ * `unlink` on the same path returns success for every caller, while concurrent `rename` returns
+ * success for exactly one and `ENOENT` for the rest). This is the cross-replica mutual exclusion
+ * described in spec §5.4. The winner owns the `.finalizing` file and is responsible for removing
+ * it once finalize completes.
  */
 export const claimFinalize = async (statePath: string): Promise<boolean> => {
   try {
-    await unlink(statePath);
+    await rename(statePath, finalizeClaimPath(statePath));
     return true;
   } catch (error) {
     if (isNotFound(error)) {
