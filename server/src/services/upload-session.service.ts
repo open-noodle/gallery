@@ -196,7 +196,12 @@ export class UploadSessionService extends BaseService {
       visibility: sessionDto.visibility as AssetVisibility | undefined,
       livePhotoVideoId: sessionDto.livePhotoVideoId as string | undefined,
       metadata: sessionDto.metadata as AssetMediaCreateDto['metadata'],
-    } as AssetMediaCreateDto;
+      // `assetData` exists on the multipart schema purely so the OpenAPI docs and generated
+      // clients describe a binary body. On this path the bytes travel as the `UploadFile`
+      // argument instead, and `uploadAsset` never reads this field — but the type requires it,
+      // so state that explicitly rather than casting the whole literal and losing the check.
+      [UploadFieldName.ASSET_DATA]: undefined,
+    };
 
     const result = await this.assetMedia.uploadAsset(auth, dto, file, sidecarFile);
 
