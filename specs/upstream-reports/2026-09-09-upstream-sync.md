@@ -198,6 +198,48 @@ mask the mobile suite. Fixed with
 `dart run drift_dev schema generate --data-classes --companions drift_schemas/main/ test/drift/main/generated/`
 (39 files, now through `schema_v38`). This is the second consecutive cycle it has fired.
 
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-229`
+- **Commit validated**: `4e47fa6f0c3`
+- **Result**: **10/10 GREEN** (5 first-attempt, 5 after re-running environmental failures)
+
+| Workflow                                  | Status | Attempt | Notes                                       |
+| ----------------------------------------- | ------ | ------- | ------------------------------------------- |
+| `test.yml`                                | GREEN  | 2       | All 22 jobs success on attempt 2            |
+| `docker.yml`                              | GREEN  | 2       | Builds the shipped bundle incl. maplibre v6 |
+| `static_analysis.yml`                     | GREEN  | 1       |                                             |
+| `gallery-build-mobile.yml`                | GREEN  | 2       | iOS + Android compile                       |
+| `gallery-rebase-smoke.yml`                | GREEN  | 2       |                                             |
+| `storage-migration-tests.yml`             | GREEN  | 1       |                                             |
+| `storage-migration-e2e.yml`               | GREEN  | 1       |                                             |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 2       |                                             |
+| `gallery-ml-smoke.yml`                    | GREEN  | 1       |                                             |
+| `gallery-mobile-smoke.yml`                | GREEN  | 1       |                                             |
+
+**Every failure in the first round was environmental, in two families, and none reached an
+assertion.** Zero code-executing jobs failed at any point — on the very first attempt, `test.yml`
+already had Medium Tests (Server), Test & Lint Server, Test Web, Lint Web, Unit Test Mobile, SQL
+Schema Checks, OpenAPI Clients, Upstream Rebase Tooling, Unit Test ML/ML Training, Test i18n,
+ShellCheck, `.github` Files Formatting and both CLI suites green.
+
+1. **GHCR registry rate limit** — `toomanyrequests: allowed: 44000/minute`, always during an image
+   pull: `Gallery Rebase Smoke` at "Start e2e stack", `Gallery Revert-to-Immich Validation` at "Run
+   validation", `docker.yml` at a `base-server-dev` blob fetch (`429`), and `test.yml`'s two E2E
+   jobs at "Start Docker Compose" / "Docker build". **Dispatch was already staggered 30s apart in
+   two waves**, so staggering reduces but does not eliminate this — the runner pool is shared.
+2. **apt `Hash Sum mismatch` on the runner's Google Chrome repo** —
+   `E: Failed to fetch https://dl.google.com/linux/chrome-stable/.../Packages.gz`, hitting the two
+   jobs that apt-install during branding: `test.yml`'s Test Branding and
+   `gallery-build-mobile.yml`'s "Build and sign Android" (inside `./.github/actions/apply-branding`).
+   Nothing to do with fork code; it recurred on neither rerun.
+
+Classified as infra by two independent signals before any re-run was spent: the failing **step** was
+always a pull/fetch rather than an assertion, and `server`/`scripts`/`.github`/`e2e` were
+byte-identical to the last 10/10-green tip. For the revert gate the substantive half was
+additionally confirmed **locally** (step-7i migration-coverage detector, no gaps) rather than by
+re-running and hoping.
+
 ## Whole-tree accounting
 
 `git diff e2efbf69af6..HEAD` touches exactly 7 files, all attributable to the 4 upstream commits:
@@ -212,8 +254,34 @@ mask the mobile suite. Fixed with
   rolling cycles. It is on neither rolling nor `origin/main`. Upstream has now rewritten the same
   code differently: the `#queued` re-entry moved to the top of `load()` with an early `return`,
   `#loading = undefined` dropped from `clearCache()`, and the `loading` guard dropped from
-  `MemoryViewer`'s `$effect`. Whether that also fixes the reported hang is **unverified**. Rework
-  the branch against the new shape, or re-test the hang on this tip before discarding it.
+  `MemoryViewer`'s `$effect`.
+
+  **By inspection, upstream's change does not fix the escape hang — it removes the only brake.**
+  The bail-out effect on this tip is now:
+
+  ```svelte
+  $effect(() => {
+    if (current) {
+      return;
+    }
+    handlePromiseError(goto(memoryManager.memoriesHref, { replaceState: true, noScroll: true }));
+  });
+  ```
+
+  The diagnosed mechanism is untouched: Escape → `goto('/memories')` → that page's load →
+  `applyPreferences()` → `setFilters` → `clearCache()` → `memories = []`, so `current` goes
+  `undefined` while the viewer is **still mounted** (SvelteKit runs the load before swapping
+  components) → the effect fires → its `goto` aborts the very navigation it is reacting to → repeat.
+  Previously the `memoryManager.loading !== undefined` term could at least transiently suppress the
+  re-fire; that term is now gone, and `clearCache()` no longer resets `#loading` either. So the
+  fork's `navigating.to` gate is still required, and the `#generation` guard in `load()` is
+  orthogonal to upstream's `#queued` reordering (upstream still has no generation check, so a stale
+  load can still repopulate a cleared cache).
+
+  This is reasoned from the code, not from a live repro — treat the hang as **still live on this
+  tip** until reproduced. Rework `fix/memory-escape-hang` against the new shape rather than
+  discarding it.
+
 - **Release-line drift gate** (see the release-branch section above) — not implemented.
 - **`AGENTS.md` version line**: `main` says "based on **Immich v2.7.5**", two minors stale.
   A fix is staged on `docs/upstream-version-anchor` off `origin/main` (uncommitted at time of
