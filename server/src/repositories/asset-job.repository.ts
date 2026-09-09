@@ -251,6 +251,17 @@ export class AssetJobRepository {
               .whereRef('asset_face.assetId', '=', 'asset.id'),
           ).as('faces'),
         )
+        // Fork divergence from immich-31240, which orders `isEdited desc` to prefer the EDITED
+        // render. Detected boxes are stored verbatim as `asset_face.boundingBox*` +
+        // `imageWidth/imageHeight`, and every consumer treats that pair as ORIGINAL-image space:
+        // `checkFaceVisibility` (utils/editor.ts) scales the box into the asset's original
+        // dimensions before overlapping the crop, and `transformFaceBoundingBox` (utils/transform.ts)
+        // scales to original dimensions and THEN replays the edit chain. Detecting against the
+        // edited render would therefore have the crop applied twice on display, and would mis-file
+        // `isVisible`. Upstream's real fix here was selecting exactly ONE preview row (before it,
+        // an edited asset matched two and the job bailed out); we keep that and pin the unedited
+        // render, matching `getForOcr` and `getForPetDetection`, which both use
+        // `withFilePath(..., isEdited = false)`.
         .select((eb) =>
           jsonObjectFrom(
             eb
@@ -258,7 +269,7 @@ export class AssetJobRepository {
               .select(columns.assetFiles)
               .whereRef('asset_file.assetId', '=', 'asset.id')
               .where('asset_file.type', '=', sql.lit(AssetFileType.Preview))
-              .orderBy('asset_file.isEdited', 'desc')
+              .where('asset_file.isEdited', '=', sql.lit(false))
               .limit(sql.lit(1)),
           ).as('previewFile'),
         )
