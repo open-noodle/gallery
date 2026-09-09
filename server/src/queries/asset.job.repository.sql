@@ -504,8 +504,7 @@ select
         where
           "asset_file"."assetId" = "asset"."id"
           and "asset_file"."type" = 'preview'
-        order by
-          "asset_file"."isEdited" desc
+          and "asset_file"."isEdited" = false
         limit
           1
       ) as obj
