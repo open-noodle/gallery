@@ -61,6 +61,11 @@ branding/scripts/test-i18n-branding.sh
 echo "--- Checking OAuth mobile callback branding (dual-scheme regression) ---"
 branding/scripts/test-oauth-callback-branding.sh
 
+# Runs BEFORE apply-branding on purpose: docs prose is branded in source, not by the
+# overlay, so the assertion is about the committed tree.
+echo "--- Checking docs prose for inherited upstream branding ---"
+branding/scripts/test-docs-branding.sh
+
 echo "--- Applying branding overlay ---"
 branding/scripts/apply-branding.sh
 
