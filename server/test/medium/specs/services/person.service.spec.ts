@@ -17,6 +17,7 @@ import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { CryptoRepository } from 'src/repositories/crypto.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
@@ -77,6 +78,9 @@ const setupFaceDetection = (db?: Kysely<DB>) => {
       AssetRepository,
       AssetJobRepository,
       ConfigRepository,
+      // handleDetectFaces mints an id per newly detected face; unregistered, the service field is
+      // undefined and the call throws at `cryptoRepository.randomUUID()`.
+      CryptoRepository,
       DatabaseRepository,
       FaceIdentityRepository,
       // handleQueueRecognizeFaces collects orphaned verdicts (Slice 8), so this setup needs the repository
@@ -1071,7 +1075,12 @@ describe(PersonService.name, () => {
   });
 
   describe('handleDetectFaces', () => {
-    it('should prefer an edited preview file', async () => {
+    // Fork divergence from immich-31240, which prefers the EDITED render. `asset_face` bounding
+    // boxes are stored in ORIGINAL-image space — `checkFaceVisibility` scales them into the asset's
+    // original dimensions to test them against the crop, and `transformFaceBoundingBox` scales to
+    // original dimensions and then replays the edit chain. Detecting against the edited render puts
+    // the boxes one crop ahead, so display applies the crop twice. See asset-job.repository.ts.
+    it('should detect against the unedited preview, not the edited render', async () => {
       const { sut, ctx } = setup();
       const config = await ctx.getConfig();
       const { user } = await ctx.newUser();
@@ -1096,9 +1105,87 @@ describe(PersonService.name, () => {
       await sut.handleDetectFaces({ id: asset.id });
 
       expect(ctx.getMock(MachineLearningRepository).detectFaces).toHaveBeenCalledWith(
-        'edited_file.jpg',
+        'unedited_file.jpg',
         config.machineLearning.facialRecognition,
       );
+    });
+
+    it('should store boxes in original-image space for a cropped asset, so display transforms exactly once', async () => {
+      // setupFaceDetection (not setup): this one actually writes a face, so it needs the
+      // facial-recognition config, the mocked job queue and a real CryptoRepository.
+      const { sut, ctx } = setupFaceDetection();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ id: factory.uuid(), ownerId: user.id, width: 200, height: 200 });
+      await ctx.newExif({ assetId: asset.id, exifImageHeight: 200, exifImageWidth: 200, description: '' });
+      ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+
+      await ctx.newAssetFile({
+        assetId: asset.id,
+        type: AssetFileType.Preview,
+        isEdited: false,
+        path: 'unedited_file.jpg',
+      });
+      await ctx.newAssetFile({
+        assetId: asset.id,
+        type: AssetFileType.Preview,
+        isEdited: true,
+        path: 'edited_file.jpg',
+      });
+
+      // A crop that keeps the 100x100 region at (50,50).
+      await ctx.newEdits(asset.id, {
+        edits: [{ action: AssetEditAction.Crop, parameters: { x: 50, y: 50, width: 100, height: 100 } }],
+      });
+
+      // Path-aware on purpose: the two renders disagree about where the same face is, so this test
+      // goes red if detection ever runs against the edited render again.
+      ctx.getMock(MachineLearningRepository).detectFaces.mockImplementation((path: string) =>
+        Promise.resolve(
+          path === 'unedited_file.jpg'
+            ? {
+                imageWidth: 200,
+                imageHeight: 200,
+                faces: [{ boundingBox: { x1: 60, y1: 60, x2: 100, y2: 100 }, embedding: newEmbedding(), score: 0.9 }],
+              }
+            : {
+                imageWidth: 100,
+                imageHeight: 100,
+                faces: [{ boundingBox: { x1: 10, y1: 10, x2: 50, y2: 50 }, embedding: newEmbedding(), score: 0.9 }],
+              },
+        ),
+      );
+
+      await sut.handleDetectFaces({ id: asset.id });
+
+      // Stored verbatim in the unedited render's space.
+      const stored = await ctx.database
+        .selectFrom('asset_face')
+        .select(['imageWidth', 'imageHeight', 'boundingBoxX1', 'boundingBoxY1', 'boundingBoxX2', 'boundingBoxY2'])
+        .where('assetId', '=', asset.id)
+        .execute();
+
+      expect(stored).toEqual([
+        {
+          imageWidth: 200,
+          imageHeight: 200,
+          boundingBoxX1: 60,
+          boundingBoxY1: 60,
+          boundingBoxX2: 100,
+          boundingBoxY2: 100,
+        },
+      ]);
+
+      // Read back through the display path, the crop is applied exactly once: (60,60)-(100,100) in
+      // the original becomes (10,10)-(50,50) in the cropped render.
+      const auth = factory.auth({ user });
+      await expect(sut.getFacesById(auth, { id: asset.id })).resolves.toEqual([
+        expect.objectContaining({
+          boundingBoxX1: 10,
+          boundingBoxY1: 10,
+          boundingBoxX2: 50,
+          boundingBoxY2: 50,
+        }),
+      ]);
     });
   });
 
