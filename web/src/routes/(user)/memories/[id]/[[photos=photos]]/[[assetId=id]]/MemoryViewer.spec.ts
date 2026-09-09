@@ -2,6 +2,7 @@ import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
+import { goto } from '$app/navigation';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { memoryManager } from '$lib/managers/memory-manager.svelte';
 import { assetFactory } from '@test-data/factories/asset-factory';
@@ -40,7 +41,11 @@ const { mockAssetMultiSelectManager, mockAssetViewerManager, mockAuthManager, mo
   mockGetAssetInfo: vi.fn(),
 }));
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+// Must RESOLVE, not return undefined. The bail-out $effect below wraps its `goto` in
+// `handlePromiseError(...)`, which calls `.catch()` on the return value -- so a bare `vi.fn()`
+// makes any test that reaches that path die with "Cannot read properties of undefined (reading
+// 'catch')" instead of asserting. That is why the effect had no coverage at all.
+vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 
 // A REACTIVE stand-in for $app/state's `page` -- memoryManager's `current` is `$derived.by(...)`
 // off `page.params.id` / `page.url.searchParams`, so a non-reactive plain object would not
@@ -425,5 +430,58 @@ describe('MemoryViewer date overlay for a memory spanning years (#1029)', () => 
     expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
     expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
     expect(screen.queryByText(/March 14, 2019/)).not.toBeInTheDocument();
+  });
+});
+
+// The bail-out $effect: when the viewer has no `current` memory to show, it redirects back to the
+// memories index. Upstream immich-31334 reduced its guard from
+// `current || memoryManager.loading !== undefined` to a bare `if (current)`, which also removed
+// the effect's only reactive dependency besides `current`. These tests pin the half that is
+// unambiguously correct -- a mounted viewer with a resolvable memory must never navigate away --
+// so a future rewrite cannot quietly reintroduce a redirect on the happy path.
+//
+// NOTE: the `clearCache()`-window ejection (an hourly refresh empties `memories` mid-session and
+// the effect fires before the refetch returns) is a REAL open defect and is deliberately NOT
+// asserted here; enshrining it would make the eventual fix look like a regression. Its regression
+// test belongs with that fix.
+describe('MemoryViewer bail-out effect', () => {
+  beforeEach(() => {
+    memoryManager.memories = [memory('memory-1', ['memory-asset-1', 'memory-asset-2'])];
+    mockPage.reset('https://gallery.test/memories/memory-1?assetId=memory-asset-1', {
+      routeId: '/(user)/memories/[id]/[[photos=photos]]/[[assetId=id]]',
+      params: { id: 'memory-1' },
+    });
+    mockGetAssetInfo.mockResolvedValue(memoryManager.memories[0].assets[0]);
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it('does not navigate away while the memory resolves', async () => {
+    renderViewer();
+
+    await screen.findByTestId('gallery-viewer');
+
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('redirects to the memories index when the url names a memory that does not exist', async () => {
+    mockPage.reset('https://gallery.test/memories/does-not-exist?assetId=memory-asset-1', {
+      routeId: '/(user)/memories/[id]/[[photos=photos]]/[[assetId=id]]',
+      params: { id: 'does-not-exist' },
+    });
+
+    renderViewer();
+
+    await waitFor(() =>
+      expect(goto).toHaveBeenCalledWith(
+        memoryManager.memoriesHref,
+        expect.objectContaining({ replaceState: true, noScroll: true }),
+      ),
+    );
   });
 });
