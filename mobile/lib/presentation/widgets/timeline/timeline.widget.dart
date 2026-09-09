@@ -835,9 +835,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                           topPadding: topPadding,
                           bottomPadding: scrubberBottomPadding,
                           monthSegmentSnappingOffset: timelineScrubberSnappingOffset(
-                          topSliverWidgetHeight: widget.topSliverWidgetHeight,
-                          appBarExpandedHeight: appBarExpandedHeight,
-                        ),
+                            topSliverWidgetHeight: widget.topSliverWidgetHeight,
+                            appBarExpandedHeight: appBarExpandedHeight,
+                          ),
                           hasAppBar: widget.appBar != null,
                           child: grid,
                         );
