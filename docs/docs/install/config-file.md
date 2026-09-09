@@ -164,8 +164,8 @@ The default configuration looks like this:
     },
     "petDetection": {
       "enabled": false,
-      "minScore": 0.6,
-      "modelName": "yolo11s"
+      "minScore": 0.3,
+      "modelName": "rfdetr-nano"
     },
     "petRecognition": {
       "enabled": false,
@@ -333,7 +333,11 @@ See the [Auto-Classification docs](/features/auto-classification) for the full f
 :::danger Pet recognition model changes bypass the confirmation dialog
 `machineLearning.petRecognition.modelName` is destructive to change: every model has its own embedding space, so switching it **deletes all pet people and their embeddings and reprocesses the library**. The admin UI asks you to confirm first — editing this file does not, so the purge simply happens on the next start.
 
-If pet detection is disabled at that moment, nothing is rebuilt: the reprocess is deferred until detection is enabled again. Species buckets (bird, horse, ...) are pure detector output and survive a model switch either way. See [Pet Recognition](/features/pet-recognition).
+If pet detection is disabled at that moment, nothing is rebuilt: the reprocess is deferred until detection is enabled again. See [Pet Recognition](/features/pet-recognition).
+:::
+
+:::note Legacy `petDetection.modelName` values
+Pet detection moved from YOLO to RF-DETR, and only cats and dogs are recorded. A legacy `yolo*` value in `machineLearning.petDetection.modelName` is silently rewritten to `rfdetr-nano` on read, so the value the server uses will not match what you wrote here. Set `rfdetr-nano` explicitly to keep the file honest. See [Pet Detection](/features/pet-detection).
 :::
 
 :::info Memories
