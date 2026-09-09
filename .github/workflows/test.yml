@@ -837,6 +837,16 @@ jobs:
       - name: Install server dependencies
         run: pnpm install --frozen-lockfile
 
+      # Duplicated from migration-order.yml on purpose. That workflow triggers on
+      # `push: [main, release/*]` / `pull_request` only, so it never runs on the rolling rebase
+      # branch, which sits off `main` for weeks at a time and is validated by dispatching this
+      # workflow set. The manifest silently drifted there for a whole cycle (six migrations missing,
+      # one stale entry) because no dispatched workflow checked it. This step needs no DB and no
+      # build, so it fails fast and cannot be forgotten. Consistency only -- the append-only
+      # invariant still lives in migration-order.yml, which has the base-commit baseline.
+      - name: Verify Gallery migration ORDER
+        run: pnpm --filter immich migrations:verify-order:gallery
+
       - name: Build plugins
         run: mise //:plugins
 
