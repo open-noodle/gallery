@@ -342,7 +342,7 @@ BEGIN
   END IF;
 END $$;
 
--- 7. Undo post-v3.0.1 upstream migrations that Gallery pulled in via rebase.
+-- 7. Undo post-tag upstream migrations that Gallery pulled in via rebase, plus
 --
 -- Gallery regularly rebases onto `upstream/main`, which sits ahead of the
 -- latest tagged Immich release (the one in `branding/config.json` under
@@ -373,14 +373,6 @@ END $$;
 -- skill covers this under "Post-rebase: revert-to-immich.sql maintenance".
 -- -----------------------------------------------------------------------------
 
--- 1784647658615-AddOAuthBearerTokenToSession (upstream #29720) added
--- session."oauthBearerToken" so the server can send id_token_hint on OIDC
--- logout. The tagged upstream release in branding/config.json does not ship
--- this migration, so the column has to go back for its schema-check to match.
--- IF EXISTS because this script also runs against a tagged :main image whose
--- database never had the column; the migration's own down() assumes it does.
-ALTER TABLE "session" DROP COLUMN IF EXISTS "oauthBearerToken";
-
 -- 1782000000000-AddAssetExifDescriptionTrigramIndex added a fork-only GIN
 -- trigram index on asset_exif.description (for timeline description filtering)
 -- that v2.7.5 does not have, plus its migration_overrides registration row.
@@ -392,195 +384,39 @@ DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_descripti
 -- planner tuning.
 ALTER ROLE CURRENT_USER RESET jit;
 
--- 1784836013770-MinFacePreferenceMigration (upstream #30177) is data-only: it
--- backfills each user's user_metadata 'preferences' with people.minimumFaces
--- from the old system-config machineLearning.facialRecognition.minFaces. Its
--- down() is a no-op, there is no schema change to reverse, and the extra JSONB
--- key is inert for the tagged release's schema-check and boot — only its
--- kysely_migrations row must go (step 8).
-
--- 1784986754474-AlbumDescriptionNullable (upstream #30123, re-timestamped by #30424
--- from 1784664555996 so it sorts after ConvertUserPasswordEmptyStringToNull) made
--- album.description
--- nullable and rewrote '' to NULL. The tagged release still declares the column
--- NOT NULL DEFAULT '', so both the data and the constraint have to go back or its
--- schema-check fails. The UPDATE must run BEFORE the SET NOT NULL or rows written
--- since the migration would violate it. All three statements are idempotent, and
--- the column exists in both schemas (only its nullability differs), so no guard is
--- needed — unlike the DROP COLUMN cases above.
-UPDATE "album" SET "description" = '' WHERE "description" IS NULL;
-ALTER TABLE "album" ALTER COLUMN "description" SET DEFAULT ''::text;
-ALTER TABLE "album" ALTER COLUMN "description" SET NOT NULL;
-
--- 1784986754473-ConvertUserPasswordEmptyStringToNull (upstream #30223) did the
--- same for user.password. Same reasoning and same ordering constraint: OAuth-only
--- users created after the migration carry NULL and must be rewritten to '' before
--- the NOT NULL goes back.
-UPDATE "user" SET "password" = '' WHERE "password" IS NULL;
-ALTER TABLE "user" ALTER COLUMN "password" SET DEFAULT '';
-ALTER TABLE "user" ALTER COLUMN "password" SET NOT NULL;
-
--- 1786385711807-AlbumOwnerDeleteTrigger (upstream #30692) added an AFTER DELETE
--- row trigger on album_user that deletes an album once its last 'owner'-role
--- album_user row is gone, plus the function it calls and two migration_overrides
--- rows registering both. The tagged release ships none of them, so its
--- schema-check reports the function, the trigger and both override rows as extra.
--- Guarded with IF EXISTS because this script also runs against a tagged-release DB
--- where they were never created; album_user itself exists in both schemas.
+-- No post-tag upstream migration needs reversing right now. `upstream.version` is
+-- 3.2.0 and this branch's `server/src/schema/migrations/` is identical to upstream
+-- v3.2.0's (same 96 files), so every upstream migration Gallery carries is one the
+-- tagged release also ships.
 --
--- The migration's leading `DELETE FROM "album" WHERE NOT EXISTS (... 'owner')` is
--- a one-way data cleanup and cannot be undone here. It only removes albums that
--- already had no owner, which Gallery's single album-creation path (album.repository
--- createWithAssets, which inserts the owner album_user row in the same CTE) does
--- not produce.
-DROP TRIGGER IF EXISTS "album_user_delete" ON "album_user";
-DROP FUNCTION IF EXISTS album_user_delete();
-DELETE FROM "migration_overrides"
- WHERE "name" IN ('function_album_user_delete', 'trigger_album_user_delete');
-
--- 1786741078327-AddWorkflowLogsTable (upstream #29878, re-timestamped by #30774)
--- added the workflow_log table with its two indexes and two foreign keys, plus a
--- workflow.logging boolean column. The tagged release ships neither, so its
--- schema-check reports the table and the column as extra. Dropping the table takes
--- its indexes and constraints with it. Guarded with IF EXISTS because this script
--- also runs against a tagged-release DB where they were never created.
-DROP TABLE IF EXISTS "workflow_log";
-ALTER TABLE "workflow" DROP COLUMN IF EXISTS "logging";
-
--- 1786972746371-AssetOcrUpdatedAtTrigger (upstream #29303) added an updatedAt column
--- to asset_ocr, an updated_at() trigger on it, and the matching migration_overrides
--- row. The tagged release has none of the three, so it reports the column and the
--- trigger as extra. Everything is guarded because this script also runs against a
--- tagged-release DB where asset_ocr itself may predate none of this — and DROP COLUMN
--- IF EXISTS still errors when the TABLE is absent, hence the to_regclass guard.
-DO $$
-BEGIN
-  IF to_regclass('public.asset_ocr') IS NOT NULL THEN
-    DROP TRIGGER IF EXISTS "asset_ocr_updatedAt" ON "asset_ocr";
-    ALTER TABLE "asset_ocr" DROP COLUMN IF EXISTS "updatedAt";
-  END IF;
-END $$;
-DELETE FROM "migration_overrides" WHERE "name" = 'trigger_asset_ocr_updatedAt';
-
--- 1786972746372-AssetOcrSyncReset (upstream #29303) is data-only: it deletes the
--- AssetOcrV1 sync checkpoints so clients re-sync OCR rows that were missed before the
--- trigger above existed. There is no schema to reverse, and re-adding checkpoints
--- would be wrong, so only its kysely_migrations row is removed in step 8.
-
--- 1787148183730-DeleteMismatchedMemoryAssets (upstream #28950) is data-only: it deletes
--- memory_asset rows whose memory and asset have different owners. There is no schema to
--- reverse, and the deleted rows cannot be reconstructed, so only its kysely_migrations row
--- is removed in step 8.
-
--- 1787148183729-ClusterGroups (upstream #30739) is the largest post-tag migration Gallery carries.
--- It re-keys people: `person.id` is replaced by the composite primary key (ownerId, personGroupId),
--- `asset_face.personId` becomes `personGroupId`, and four new tables appear (cluster_group,
--- cluster_group_request, person_group, person_group_audit) along with user.clusterGroupId.
+-- That direction matters: reversing a migration the tagged release DOES ship is
+-- actively wrong. Its kysely_migrations row is then missing while its file is
+-- present, so the tagged migrator re-runs it against a schema this script has
+-- already half-reverted. So the 3.1.0 -> 3.2.0 bump REMOVED ten entries from here
+-- and from step 8 rather than adding any:
 --
--- Gallery adopts that schema but never mounts the feature (option M — see
--- docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md), so a reverted database still
--- has to be handed back to the tagged release with `person.id` restored. This mirrors the
--- migration's own down(), made idempotent because the script also runs against a tagged-release DB
--- where none of it was ever created.
+--   1784647658615-AddOAuthBearerTokenToSession
+--   1784836013770-MinFacePreferenceMigration
+--   1784986754473-ConvertUserPasswordEmptyStringToNull
+--   1784986754474-AlbumDescriptionNullable
+--   1786385711807-AlbumOwnerDeleteTrigger
+--   1786741078327-AddWorkflowLogsTable
+--   1786972746371-AssetOcrUpdatedAtTrigger
+--   1786972746372-AssetOcrSyncReset
+--   1787148183729-ClusterGroups
+--   1787148183730-DeleteMismatchedMemoryAssets
 --
--- Ordering note: person_group must outlive the asset_face repoint below, so the tables are dropped
--- last. The Gallery-only face-review tables that 1787100000000 / 1791000000000 touched are already
--- gone (section 2, CASCADE), which is why neither fork migration needs anything here beyond the
--- unique index dropped in section 4.
-DO $$
-BEGIN
-  IF to_regclass('public.person_group') IS NULL THEN
-    RETURN;  -- the migration never ran on this database
-  END IF;
-
-  -- person: composite key back to a plain id
-  ALTER TABLE "person" DROP CONSTRAINT IF EXISTS "person_pkey";
-  ALTER TABLE "person" ADD COLUMN IF NOT EXISTS "id" uuid NOT NULL DEFAULT uuid_generate_v4();
-  UPDATE "person" SET "id" = "personGroupId";
-  ALTER TABLE "person" ADD CONSTRAINT "person_pkey" PRIMARY KEY ("id");
-  CREATE INDEX IF NOT EXISTS "person_ownerId_idx" ON "person" ("ownerId");
-
-  -- asset_face: personGroupId back to personId, repointed at person.id
-  DROP INDEX IF EXISTS "asset_face_assetId_personGroupId_idx";
-  DROP INDEX IF EXISTS "asset_face_personGroupId_assetId_notDeleted_isVisible_idx";
-  DROP INDEX IF EXISTS "asset_face_personGroupId_assetId_idx";
-  ALTER TABLE "asset_face" DROP CONSTRAINT IF EXISTS "asset_face_personGroupId_fkey";
-  ALTER TABLE "asset_face" RENAME COLUMN "personGroupId" TO "personId";
-  UPDATE "asset_face" SET "personId" = "person"."id"
-    FROM "person" WHERE "asset_face"."personId" = "person"."personGroupId";
-  ALTER TABLE "asset_face" ADD CONSTRAINT "asset_face_personId_fkey"
-    FOREIGN KEY ("personId") REFERENCES "person" ("id") ON UPDATE CASCADE ON DELETE SET NULL;
-  CREATE INDEX IF NOT EXISTS "asset_face_assetId_personId_idx" ON "asset_face" ("assetId", "personId");
-  CREATE INDEX IF NOT EXISTS "asset_face_personId_assetId_idx" ON "asset_face" ("personId", "assetId");
-  CREATE INDEX IF NOT EXISTS "asset_face_personId_assetId_notDeleted_isVisible_idx"
-    ON "asset_face" ("personId", "assetId") WHERE ("deletedAt" IS NULL AND "isVisible" IS TRUE);
-
-  -- person_audit
-  ALTER TABLE "person_audit" ADD COLUMN IF NOT EXISTS "personId" uuid;
-  UPDATE "person_audit" SET "personId" = "personGroupId";
-  ALTER TABLE "person_audit" ALTER COLUMN "personId" SET NOT NULL;
-  CREATE INDEX IF NOT EXISTS "person_audit_personId_idx" ON "person_audit" ("personId");
-  DROP INDEX IF EXISTS "person_audit_personGroupId_idx";
-  ALTER TABLE "person_audit" DROP COLUMN IF EXISTS "personGroupId";
-
-  -- person / user back-references, then the new tables
-  ALTER TABLE "person" DROP CONSTRAINT IF EXISTS "person_personGroupId_fkey";
-  DROP INDEX IF EXISTS "person_personGroupId_idx";
-  ALTER TABLE "person" DROP COLUMN IF EXISTS "personGroupId";
-  ALTER TABLE "user" DROP CONSTRAINT IF EXISTS "user_clusterGroupId_fkey";
-  DROP INDEX IF EXISTS "user_clusterGroupId_idx";
-  ALTER TABLE "user" DROP COLUMN IF EXISTS "clusterGroupId";
-  DROP TABLE IF EXISTS "cluster_group_request";
-  DROP TABLE IF EXISTS "person_group_audit";
-  DROP TABLE IF EXISTS "person_group";
-  DROP TABLE IF EXISTS "cluster_group";
-END $$;
-
--- person_delete_audit went back to writing personId when person.id returned above; restore the
--- function, its trigger and the two migration_overrides payloads to the tagged release's spelling.
-DO $$
-BEGIN
-  IF to_regclass('public.person_audit') IS NOT NULL THEN
-    CREATE OR REPLACE FUNCTION person_delete_audit()
-      RETURNS TRIGGER
-      LANGUAGE PLPGSQL
-      AS $func$
-        BEGIN
-          INSERT INTO person_audit ("personId", "ownerId")
-          SELECT "id", "ownerId"
-          FROM OLD;
-          RETURN NULL;
-        END
-      $func$;
-    CREATE OR REPLACE TRIGGER "person_delete_audit"
-      AFTER DELETE ON "person"
-      REFERENCING OLD TABLE AS "old"
-      FOR EACH STATEMENT
-      WHEN (pg_trigger_depth() = 0)
-      EXECUTE FUNCTION person_delete_audit();
-  END IF;
-END $$;
-DROP FUNCTION IF EXISTS person_group_delete_audit;
-
-UPDATE "migration_overrides"
-SET "value" = '{"type":"function","name":"person_delete_audit","sql":"CREATE OR REPLACE FUNCTION person_delete_audit()\n  RETURNS TRIGGER\n  LANGUAGE PLPGSQL\n  AS $$\n    BEGIN\n      INSERT INTO person_audit (\"personId\", \"ownerId\")\n      SELECT \"id\", \"ownerId\"\n      FROM OLD;\n      RETURN NULL;\n    END\n  $$;"}'::jsonb
-WHERE "name" = 'function_person_delete_audit';
-
-UPDATE "migration_overrides"
-SET "value" = '{"type":"trigger","name":"person_delete_audit","sql":"CREATE OR REPLACE TRIGGER \"person_delete_audit\"\n  AFTER DELETE ON \"person\"\n  REFERENCING OLD TABLE AS \"old\"\n  FOR EACH STATEMENT\n  WHEN (pg_trigger_depth() = 0)\n  EXECUTE FUNCTION person_delete_audit();"}'::jsonb
-WHERE "name" = 'trigger_person_delete_audit';
-
-DELETE FROM "migration_overrides" WHERE "name" IN (
-  'function_person_group_delete_audit',
-  'trigger_cluster_group_updatedAt',
-  'trigger_person_group_delete_audit',
-  'trigger_person_group_updatedAt',
-  'index_asset_face_personGroupId_assetId_notDeleted_isVisible_idx'
-);
-
-INSERT INTO "migration_overrides" ("name", "value")
-VALUES ('index_asset_face_personId_assetId_notDeleted_isVisible_idx', '{"type":"index","name":"asset_face_personId_assetId_notDeleted_isVisible_idx","sql":"CREATE INDEX \"asset_face_personId_assetId_notDeleted_isVisible_idx\" ON \"asset_face\" (\"personId\", \"assetId\") WHERE (\"deletedAt\" IS NULL AND \"isVisible\" IS TRUE);"}'::jsonb)
-ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
+-- The first two were already stale BEFORE this bump — both ship in v3.1.0 as well,
+-- so the group had been over-reverting since the v3.0.3 -> v3.1.0 bump, which added
+-- no migrations and so was done without pruning. The coverage gate only reports
+-- MISSING entries, never extra ones, which is why it stayed green. When bumping
+-- `upstream.version`, run the diff in BOTH directions.
+--
+-- ClusterGroups was the largest removal: its reversal un-re-keyed `person` back to a
+-- plain `id`, renamed `asset_face.personGroupId` to `personId`, dropped the four new
+-- tables, restored the pre-ClusterGroups `person_delete_audit` function/trigger and
+-- rewrote three `migration_overrides` payloads. v3.2.0 ships all of it, so none of
+-- that may run. Recover it from git history if a future tag ever drops back below it.
 
 -- 1787100000000-DropPersonFksBeforeClusterGroups and 1791000000000-RepointFaceReviewToPersonGroup
 -- are Gallery-only and act entirely on face_person_verdict / face_repair_decline /
@@ -689,26 +525,20 @@ DELETE FROM "kysely_migrations"
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
    -- upstream name (1777667825574) and its pre-rename name (1776735180298), so
    -- already-deployed DBs that ran the migration under the pre-rename name keep
-   -- booting. Upstream Immich v3.0.1 ships only 1777667825574, so on a reverted
+   -- booting. The tagged upstream release ships only 1777667825574, so on a reverted
    -- DB the pre-rename alias row is an orphan and upstream's migrator aborts with
    -- "corrupted migrations: previously executed migration
    -- 1776735180298-ChangeDurationToInteger is missing". Drop the alias row here;
    -- the real 1777667825574 row is always present by revert time and matches the
    -- upstream file, so it stays.
-   '1776735180298-ChangeDurationToInteger',
+   '1776735180298-ChangeDurationToInteger'
 
-   -- Post-tag upstream migrations pulled in by rebase, paired with the schema
-   -- rollbacks in step 7. Keep timestamp-sorted.
-   '1784647658615-AddOAuthBearerTokenToSession',
-   '1784836013770-MinFacePreferenceMigration',
-   '1784986754473-ConvertUserPasswordEmptyStringToNull',
-   '1784986754474-AlbumDescriptionNullable',
-   '1786385711807-AlbumOwnerDeleteTrigger',
-   '1786741078327-AddWorkflowLogsTable',
-   '1786972746371-AssetOcrUpdatedAtTrigger',
-   '1786972746372-AssetOcrSyncReset',
-  '1787148183729-ClusterGroups',
-  '1787148183730-DeleteMismatchedMemoryAssets'
+-- Post-tag upstream migrations pulled in by rebase, paired with the schema
+-- rollbacks in step 7. Keep timestamp-sorted.
+--
+-- Currently EMPTY — see the note in step 7. `upstream.version` is 3.2.0 and this
+-- branch carries no upstream migration the tagged release lacks. Re-populate from
+-- the step 7 diff on the next rebase that pulls upstream ahead of the tag.
  );
 
 -- -----------------------------------------------------------------------------
