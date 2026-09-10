@@ -90,6 +90,23 @@ jobs:
             fi
           done < <(find server/src/schema/migrations -maxdepth 1 -type f -name '*.ts' | sort)
 
+          # Reverse direction: an entry for a migration the TAGGED release SHIPS is just as
+          # broken as a missing one, and nothing above can see it. Deleting that row leaves the
+          # file present with no recorded row, so the tagged migrator re-runs the migration —
+          # against a schema step 7 may have already half-reverted.
+          #
+          # This is not hypothetical: AddOAuthBearerTokenToSession and MinFacePreferenceMigration
+          # sat here for a whole version line because the v3.0.3 -> v3.1.0 bump added no
+          # migrations and so was done without pruning, and only the forward check existed.
+          # When bumping upstream.version, the diff must be read in BOTH directions.
+          while IFS= read -r name; do
+            if grep -qxF "${name}.ts" "$upstream_migrations"; then
+              echo "::error file=scripts/revert-to-immich.sql::Stale cleanup entry: ${name} is shipped by ${UPSTREAM_TAG}, so its kysely_migrations row must NOT be deleted"
+              missing=1
+            fi
+          done < <(sed -n '/^DELETE FROM "kysely_migrations"/,/^ *);/p' scripts/revert-to-immich.sql |
+            grep -oE "'[0-9]+-[A-Za-z0-9_.]+'" | tr -d "'" | sort -u)
+
           exit "$missing"
 
       - name: Log in to GitHub Container Registry
