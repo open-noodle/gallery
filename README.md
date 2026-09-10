@@ -29,7 +29,7 @@
 </p>
 
 > [!NOTE]
-> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.1.0**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
+> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v3.2.0**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
 
 > [!TIP]
 > **Already running Immich?** Switching to Gallery is a three-line config change — two image names in your `docker-compose.yml` and `IMMICH_VERSION=v5` in your `.env`. Your library and database are fully compatible. See the [install guide](https://opennoodle.de/install/#migrate-from-immich).
