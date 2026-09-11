@@ -379,7 +379,7 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
       );
       expect(result.acted).toBe(true);
 
-      // §6.3.1 row 1: `personId IS NULL` -> ordinary path, the identity IS written.
+      // §6.3.1 row 1: `personGroupId IS NULL` -> ordinary path, the identity IS written.
       await expect(utils.getFaceIdentityId(faceId)).resolves.toBeDefined();
     });
 
@@ -387,15 +387,15 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
       const bobPerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Grandma' });
       // The first face under a fresh owner person creates their identity; every subsequent face
       // under the same person resolves to that SAME identity (utils.createFace's COALESCE).
-      await utils.createFace({ assetId: ctx.spaceAssetId, personId: bobPerson.id, sourceType: 'manual' });
+      await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: bobPerson.id, sourceType: 'manual' });
       const targetSeedFaceId = await utils.createFace({
         assetId: ctx.spaceAssetId,
-        personId: bobPerson.id,
+        personGroupId: bobPerson.id,
         sourceType: 'manual',
       });
       const faceId = await utils.createFace({
         assetId: ctx.spaceAssetId,
-        personId: bobPerson.id,
+        personGroupId: bobPerson.id,
         sourceType: 'manual',
       });
 
@@ -422,7 +422,7 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
       const bobPerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Dad' });
       const faceId = await utils.createFace({
         assetId: ctx.spaceAssetId,
-        personId: bobPerson.id,
+        personGroupId: bobPerson.id,
         sourceType: 'manual',
       });
       const bobIdentityBefore = await utils.getFaceIdentityId(faceId);
@@ -478,7 +478,7 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
       expect((after.people ?? []).map((person) => person.name)).toContain('Uncle Tom');
 
       // The identity follows the person rather than staying pinned. Keeping `face_identity_face`
-      // on Bob's old identity while `asset_face.personId` moved would leave Bob's own two layers
+      // on Bob's old identity while `asset_face.personGroupId` moved would leave Bob's own two layers
       // disagreeing about this one face -- and `applyResolvedPersonMetadata` resolves his names and
       // birthdays through the identity, so that split is exactly what the original §6.3.1 was
       // written to prevent. Both move together now.

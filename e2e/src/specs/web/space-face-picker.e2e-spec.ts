@@ -71,7 +71,7 @@ test.describe("Space editor's face picker — the shared panel in its other call
     const targetAsset = await utils.createAsset(bob.accessToken);
     await utils.addSpaceAssets(bob.accessToken, space.id, [targetAsset.id]);
     const bobPerson = await utils.createPerson(bob.accessToken, {});
-    await utils.createFace({ assetId: targetAsset.id, personId: bobPerson.id });
+    await utils.createFace({ assetId: targetAsset.id, personGroupId: bobPerson.id });
     targetAssetId = targetAsset.id;
   });
 
