@@ -61,7 +61,7 @@ class RoundReveal extends StatelessWidget {
     final lon = answer?.lon;
     return RevealMap(
       key: const Key('round-reveal-map'),
-      answer: lat != null && lon != null ? (lat: lat.toDouble(), lon: lon.toDouble()) : null,
+      answer: lat != null && lon != null ? (lat: lat, lon: lon) : null,
       guess: result.guess,
     );
   }

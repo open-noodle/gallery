@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:immich_mobile/utils/game_format.dart';
@@ -48,11 +50,11 @@ class RoundResult {
 
     return RoundResult(
       type: round.type,
-      score: round.score.orElse(null)?.toInt() ?? 0,
-      distanceKm: guess?.distanceKm?.toDouble(),
-      offsetDays: guess?.offsetDays?.toInt(),
+      score: round.score.orElse(null) ?? 0,
+      distanceKm: guess?.distanceKm,
+      offsetDays: guess?.offsetDays,
       answer: round.answer.orElse(null),
-      guess: lat != null && lon != null ? (lat: lat.toDouble(), lon: lon.toDouble()) : null,
+      guess: lat != null && lon != null ? (lat: lat, lon: lon) : null,
       guessDate: guess?.date,
     );
   }
@@ -91,7 +93,9 @@ class GameSessionState {
   /// rounds.length - 1` would re-render the guessing surface for the round just answered.
   GameRoundDetailResponseDto? get currentRound {
     for (final round in challenge.rounds) {
-      if (round.index.toInt() == currentIndex) return round;
+      if (round.index == currentIndex) {
+        return round;
+      }
     }
     return null;
   }
@@ -183,7 +187,9 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     final current = state.valueOrNull;
     // A real guard, not styling: a double tap's second guess would 409 and overwrite a complete
     // reveal with a degraded one.
-    if (current == null || current.submitting || current.phase != GamePhase.guessing) return;
+    if (current == null || current.submitting || current.phase != GamePhase.guessing) {
+      return;
+    }
     // `phase == guessing` guarantees a round to guess, so this is never null here.
     final type = current.currentRound!.type;
 
@@ -192,9 +198,9 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
       final response = await send(current.currentIndex);
       await _reveal(
         type: type,
-        score: response.score.toInt(),
-        distanceKm: response.distanceKm?.toDouble(),
-        offsetDays: response.offsetDays?.toInt(),
+        score: response.score,
+        distanceKm: response.distanceKm,
+        offsetDays: response.offsetDays,
         guess: guess,
         guessDate: response.guessDate ?? guessDate,
       );
@@ -261,7 +267,9 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
   void next() {
     final current = state.valueOrNull;
     // Guarding on `revealing` is what makes a double tap advance exactly one round.
-    if (current == null || current.phase != GamePhase.revealing) return;
+    if (current == null || current.phase != GamePhase.revealing) {
+      return;
+    }
 
     final nextIndex = current.currentIndex + 1;
     if (nextIndex < current.challenge.rounds.length) {
@@ -275,7 +283,7 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     state = AsyncData(
       current.copyWith(currentIndex: current.challenge.rounds.length, phase: GamePhase.finished, clearResult: true),
     );
-    _finish(current.challenge);
+    unawaited(_finish(current.challenge));
   }
 
   Future<void> _finish(GameChallengeDetailResponseDto challenge) async {

@@ -185,7 +185,9 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
   /// app was running or launched it from cold. A reminder that opens the timeline is a reminder
   /// about nothing, so only the daily-reminder payload is routed at all.
   void _onNotificationResponse(NotificationResponse? response) {
-    if (response?.payload != kDailyReminderPayload) return;
+    if (response?.payload != kDailyReminderPayload) {
+      return;
+    }
     unawaited(_openDailyChallenge());
   }
 

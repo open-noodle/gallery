@@ -86,7 +86,9 @@ class PhotoGuesserPage extends HookConsumerWidget {
 
     Future<void> play(String challengeId) async {
       await context.pushRoute(GamePlayRoute(challengeId: challengeId));
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
       invalidateSoloGames(ref);
       // The appended pages were cut from a list that no longer starts where it did: the game just
       // played is history's newest row now, so every page after the first shifts by one and the
@@ -97,7 +99,9 @@ class PhotoGuesserPage extends HookConsumerWidget {
 
     Future<void> startFreePlay() async {
       final choice = await ChallengeCreateSheet.show(context);
-      if (choice == null || !context.mounted) return;
+      if (choice == null || !context.mounted) {
+        return;
+      }
 
       creating.value = true;
       String? challengeId;
@@ -137,20 +141,28 @@ class PhotoGuesserPage extends HookConsumerWidget {
         // Cleared BEFORE the play route is pushed, not after it pops: the control would otherwise
         // sit disabled for the whole game and read as broken on the way back. Guarded because the
         // page can be popped mid-create, and writing to a disposed hook's notifier throws.
-        if (context.mounted) creating.value = false;
+        if (context.mounted) {
+          creating.value = false;
+        }
       }
 
-      if (challengeId != null && context.mounted) await play(challengeId);
+      if (challengeId != null && context.mounted) {
+        await play(challengeId);
+      }
     }
 
     Future<void> loadMoreHistory() async {
-      if (loadingMore.value) return;
+      if (loadingMore.value) {
+        return;
+      }
       loadingMore.value = true;
       try {
         final next = await ref
             .read(soloGameApiRepositoryProvider)
             .getHistory(page: nextHistoryPage.value, size: kSoloHistoryPageSize);
-        if (!context.mounted) return;
+        if (!context.mounted) {
+          return;
+        }
         extraHistory.value = [...extraHistory.value, ...next.items];
         moreAfterExtras.value = next.hasNextPage;
         nextHistoryPage.value += 1;
@@ -163,7 +175,9 @@ class PhotoGuesserPage extends HookConsumerWidget {
           );
         }
       } finally {
-        if (context.mounted) loadingMore.value = false;
+        if (context.mounted) {
+          loadingMore.value = false;
+        }
       }
     }
 
@@ -318,8 +332,8 @@ class _SoloDailyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final answered = challenge.answered.toInt();
-    final total = challenge.roundCount.toInt();
+    final answered = challenge.answered;
+    final total = challenge.roundCount;
     final played = answered >= total;
 
     return Card(

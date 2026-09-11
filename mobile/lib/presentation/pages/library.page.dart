@@ -144,12 +144,12 @@ class _CollectionCards extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _SpacesCollectionCard(),
-            _PeopleCollectionCard(),
-            _PlacesCollectionCard(),
-            _LocalAlbumsCollectionCard(),
-            AlbumsCollectionCard(),
-            _MemoriesCollectionCard(),
+            const _SpacesCollectionCard(),
+            const _PeopleCollectionCard(),
+            const _PlacesCollectionCard(),
+            const _LocalAlbumsCollectionCard(),
+            const AlbumsCollectionCard(),
+            const _MemoriesCollectionCard(),
             // The push lives here rather than inside PhotoGuesserCard: a widget test has no
             // auto_route Router, so `context.pushRoute` cannot be driven from one, and keeping it
             // out of the card is what leaves the card testable.

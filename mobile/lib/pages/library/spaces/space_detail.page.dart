@@ -414,7 +414,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   void _navigateToChallenges() {
-    context.pushRoute(SpaceGamesRoute(spaceId: widget.spaceId, canEdit: _canEdit));
+    unawaited(context.pushRoute(SpaceGamesRoute(spaceId: widget.spaceId, canEdit: _canEdit)));
   }
 
   /// Plays today's daily, then refreshes what the pop lands back on.
@@ -425,9 +425,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   /// month's standings.
   Future<void> _playDaily() async {
     final daily = ref.read(gameDailyProvider(widget.spaceId)).valueOrNull;
-    if (daily == null) return;
+    if (daily == null) {
+      return;
+    }
     await context.pushRoute(GamePlayRoute(challengeId: daily.id));
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     invalidateSpaceGames(ref, widget.spaceId);
   }
 
@@ -444,12 +448,8 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       }
       ref.invalidate(gameDailyProvider(widget.spaceId));
     } catch (e) {
-      if (context.mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'game_daily_toggle_failed'.t(context: context),
-          toastType: ToastType.error,
-        );
+      if (mounted) {
+        ImmichToast.show(context: context, msg: context.t.game_daily_toggle_failed, toastType: ToastType.error);
       }
     }
   }

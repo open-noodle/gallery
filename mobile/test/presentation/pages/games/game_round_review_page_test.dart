@@ -68,7 +68,13 @@ GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailRespon
       score: const Optional.present(3640),
       answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2024, 6, 4), lat: null, lon: null)),
       guess: Optional.present(
-        GameRoundDetailResponseDtoGuess(lat: null, lon: null, date: DateTime.utc(2024, 6, 1), distanceKm: null, offsetDays: 3),
+        GameRoundDetailResponseDtoGuess(
+          lat: null,
+          lon: null,
+          date: DateTime.utc(2024, 6, 1),
+          distanceKm: null,
+          offsetDays: 3,
+        ),
       ),
     ),
   ],
@@ -86,7 +92,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
     await SettingsRepository.ensureInitialized(db);
   });
 
@@ -147,7 +153,9 @@ void main() {
     var calls = 0;
     when(() => repository.getChallenge('c1')).thenAnswer((_) async {
       calls++;
-      if (calls == 1) throw Exception('offline');
+      if (calls == 1) {
+        throw Exception('offline');
+      }
       return _finishedChallenge();
     });
 

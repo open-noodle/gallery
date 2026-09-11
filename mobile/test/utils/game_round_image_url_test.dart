@@ -16,7 +16,7 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -46,8 +46,12 @@ void main() {
   test('no source file outside image_url_builder.dart constructs a game round image path', () {
     final offenders = <String>[];
     for (final entity in Directory('lib').listSync(recursive: true)) {
-      if (entity is! File || !entity.path.endsWith('.dart')) continue;
-      if (entity.path.endsWith('utils/image_url_builder.dart')) continue;
+      if (entity is! File || !entity.path.endsWith('.dart')) {
+        continue;
+      }
+      if (entity.path.endsWith('utils/image_url_builder.dart')) {
+        continue;
+      }
       if (entity.readAsStringSync().contains('/rounds/')) {
         offenders.add(entity.path);
       }

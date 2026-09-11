@@ -13,7 +13,7 @@ import 'package:openapi/api.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-GameChallengeListItemResponseDto _challenge({num answered = 0, DateTime? dailyOn}) => GameChallengeListItemResponseDto(
+GameChallengeListItemResponseDto _challenge({int answered = 0, DateTime? dailyOn}) => GameChallengeListItemResponseDto(
   id: 'c1',
   spaceId: 's1',
   ownerId: null,
@@ -38,7 +38,7 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -141,7 +141,7 @@ void main() {
         final decorated = tester.widget<Container>(
           find.descendant(of: find.byWidget(pip), matching: find.byType(Container)),
         );
-        return ((decorated.decoration! as BoxDecoration).color)!;
+        return (decorated.decoration! as BoxDecoration).color!;
       }
 
       // The unfilled pip was surfaceContainerHighest — near-white on a light theme, so it vanished

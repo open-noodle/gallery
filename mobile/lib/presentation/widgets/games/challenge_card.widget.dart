@@ -63,13 +63,15 @@ class ChallengeCard extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed ?? false) onDelete();
+    if (confirmed ?? false) {
+      onDelete();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final answered = challenge.answered.toInt();
-    final total = challenge.roundCount.toInt();
+    final answered = challenge.answered;
+    final total = challenge.roundCount;
 
     return InkWell(
       key: Key('challenge-card-${challenge.id}'),
