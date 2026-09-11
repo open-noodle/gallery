@@ -7872,15 +7872,15 @@ describe(SharedSpaceService.name, () => {
       );
 
       // §6.3.1 (revised): the ordinary path propagates too. The owner has never named this face
-      // (personId null), so the resolve must run against the ASSET OWNER -- not the acting editor --
-      // and create the person under the owner's id. Getting that wrong would file the new person in
-      // the editor's own library, where the owner would never see it.
+      // (personGroupId null), so the resolve must run against the ASSET OWNER -- not the acting
+      // editor -- and create the person under the owner's id. Getting that wrong would file the new
+      // person in the editor's own library, where the owner would never see it.
       expect(mocks.person.getOrCreateOwnerPersonForIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ ownerId: 'default-asset-owner', identityId: 'space-identity-1' }),
         mocks.database,
       );
       expect(mocks.person.setFaceOwnerPerson).toHaveBeenCalledWith(
-        { assetFaceId: 'face-1', personId: 'owner-person-1' },
+        { assetFaceId: 'face-1', personGroupId: 'owner-person-1' },
         mocks.database,
       );
     });

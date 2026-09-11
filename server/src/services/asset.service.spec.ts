@@ -3334,6 +3334,13 @@ describe(AssetService.name, () => {
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(getForAsset(asset));
       mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      // v3.2.0: `update()` now answers with `this.get(auth, id)` rather than mapping the written
+      // row, so the response path re-checks AssetRead and resolves the space's people. A space
+      // editor genuinely holds that read through `checkSpaceAccess`, so grant it here — without it
+      // the fixture denies the actor a read they really have and the test never reaches its
+      // assertion.
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(new Map());
 
       await sut.update(auth, asset.id, { description: 'fixed' });
 
@@ -3368,6 +3375,7 @@ describe(AssetService.name, () => {
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(getForAsset(asset));
       mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(null as any);
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
 
       await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
       expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
@@ -3382,6 +3390,8 @@ describe(AssetService.name, () => {
       mocks.asset.update.mockResolvedValue(getForAsset(asset));
       mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
       mocks.sharedSpace.logActivity.mockRejectedValue(new Error('activity insert failed'));
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(new Map());
 
       await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
     });
@@ -3469,6 +3479,10 @@ describe(AssetService.name, () => {
         .mockResolvedValueOnce(new Set([asset.id])) // requireAccess(AssetUpdate): Timeline, owned
         .mockResolvedValueOnce(new Set([asset.id])) // rbac-3 guard: Timeline, owned
         .mockResolvedValueOnce(new Set()); // would-be post-write logCrossOwnerEdit check: Locked, not-owned
+      // v3.2.0: the response is now `this.get(auth, id)`, which re-checks AssetRead AFTER the write.
+      // Granted through the space arm on purpose: it leaves the checkOwnerAccess sequence above
+      // untouched, so a mutant that runs logCrossOwnerEdit still consumes the not-owned third value.
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Locked });
       mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
