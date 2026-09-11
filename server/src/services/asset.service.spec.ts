@@ -689,7 +689,7 @@ describe(AssetService.name, () => {
       it('carries a label for a person embedded in the asset response', async () => {
         const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
           .exif()
-          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
           .build();
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
         mocks.asset.getById.mockResolvedValue(asset as any);
@@ -707,7 +707,7 @@ describe(AssetService.name, () => {
       it('omits the field entirely for a viewer with no family access', async () => {
         const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
           .exif()
-          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
           .build();
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
         mocks.asset.getById.mockResolvedValue(asset as any);
@@ -726,7 +726,7 @@ describe(AssetService.name, () => {
       it('still labels a person reached through a shared space', async () => {
         const asset = AssetFactory.from({ ownerId: newUuid() })
           .exif()
-          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
           .build();
         mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
         mocks.asset.getById.mockResolvedValue(asset as any);
@@ -749,7 +749,7 @@ describe(AssetService.name, () => {
       it('reports no label when the viewer has access but no root set', async () => {
         const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
           .exif()
-          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
           .build();
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
         mocks.asset.getById.mockResolvedValue(asset as any);
@@ -768,9 +768,9 @@ describe(AssetService.name, () => {
       it('issues one graph load for an asset with several people, not one per person', async () => {
         const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
           .exif()
-          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid 1', identityId: PERSON_IDENTITY_ID }))
-          .face({}, (f) => f.person({ id: 'person-2', name: 'Kid 2', identityId: 'person-identity-2' }))
-          .face({}, (f) => f.person({ id: 'person-3', name: 'Kid 3', identityId: 'person-identity-3' }))
+          .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Kid 1', identityId: PERSON_IDENTITY_ID }))
+          .face({}, (f) => f.person({ personGroupId: 'person-2', name: 'Kid 2', identityId: 'person-identity-2' }))
+          .face({}, (f) => f.person({ personGroupId: 'person-3', name: 'Kid 3', identityId: 'person-identity-3' }))
           .build();
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
         mocks.asset.getById.mockResolvedValue(asset as any);

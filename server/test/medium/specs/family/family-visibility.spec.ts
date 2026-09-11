@@ -8,7 +8,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { FamilyService } from 'src/services/family.service';
 import { ProjectedFamilyParticipant } from 'src/utils/family-labels';
-import { newMediumService } from 'test/medium.factory';
+import { insertClusterGroup, newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +31,11 @@ const newIdentity = async (input: { type?: 'person' | 'pet'; gender?: string | n
 const newUser = async () => {
   const row = await db
     .insertInto('user')
-    .values({ email: `${randomUUID()}@family-visibility.test`, name: 'Family Visibility Test' })
+    .values({
+      email: `${randomUUID()}@family-visibility.test`,
+      name: 'Family Visibility Test',
+      clusterGroupId: await insertClusterGroup(db),
+    })
     .returning('id')
     .executeTakeFirstOrThrow();
   return row.id;

@@ -17,6 +17,8 @@ const CHILD_B = '00000000-0000-4000-a000-000000000202';
 const PET_A = '00000000-0000-4000-a000-000000000301';
 const UNION_ID = '00000000-0000-4000-a000-000000000401';
 const UNION_ID_2 = '00000000-0000-4000-a000-000000000402';
+// Upstream dropped `authStub.user2`; these tests only need a creator id that is NOT the caller.
+const OTHER_USER_ID = 'user-2';
 
 // Grants contribute access unconditionally, so each test using it exercises only the
 // validation rule it names rather than re-proving write authority (already covered above).
@@ -317,7 +319,7 @@ describe(FamilyService.name, () => {
       giveContributeAccess(sut, mocks);
       mocks.family.getUnion.mockResolvedValue({
         id: UNION_ID,
-        createdById: authStub.user2.user.id,
+        createdById: OTHER_USER_ID,
         startDate: null,
         endDate: null,
       } as any);
@@ -332,7 +334,7 @@ describe(FamilyService.name, () => {
       giveContributeAccess(sut, mocks);
       mocks.family.getUnion.mockResolvedValue({
         id: UNION_ID,
-        createdById: authStub.user2.user.id,
+        createdById: OTHER_USER_ID,
         startDate: null,
         endDate: null,
       } as any);
@@ -730,7 +732,7 @@ describe(FamilyService.name, () => {
       giveViewOnlyAccess(sut, mocks);
       setUpGraphMocks();
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
-      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
 
       const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
       const byPersonId = new Map(relations.filter((entry) => entry.person).map((entry) => [entry.person!.id, entry]));
@@ -750,7 +752,7 @@ describe(FamilyService.name, () => {
       giveViewOnlyAccess(sut, mocks);
       setUpGraphMocks();
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
-      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
 
       const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
       const anonymousEntry = relations.find((entry) => entry.person === null);
@@ -765,7 +767,7 @@ describe(FamilyService.name, () => {
       giveViewOnlyAccess(sut, mocks);
       setUpGraphMocks();
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
-      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
 
       const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
 
@@ -780,7 +782,7 @@ describe(FamilyService.name, () => {
     it('returns no relations for an accessible person never linked to a family identity', async () => {
       giveViewOnlyAccess(sut, mocks);
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
-      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: null } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: null } as any);
 
       await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).resolves.toEqual([]);
       expect(mocks.family.getAllUnionsWithParticipants).not.toHaveBeenCalled();
@@ -832,7 +834,7 @@ describe('creating relationships from person ids', () => {
     mocks.access.person.checkOwnerAccess.mockImplementation((_userId: string, ids: Set<string>) =>
       Promise.resolve(new Set(ids)),
     );
-    mocks.person.getById.mockImplementation((id: string) =>
+    mocks.person.getByGroupIdOnly.mockImplementation((id: string) =>
       Promise.resolve(
         (
           {

@@ -1053,10 +1053,10 @@ describe(PersonService.name, () => {
       enableFamilyFeature(sut);
       setUpGraph();
       mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      const response = await sut.getById(auth, person.id);
+      const response = await sut.getById(auth, person.personGroupId);
 
       expect(response.familyRelationLabel).toBe('your child');
     });
@@ -1067,10 +1067,10 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ ownerId: auth.user.id, identityId: PERSON_IDENTITY_ID });
       enableFamilyFeature(sut);
       mocks.family.getAccess.mockResolvedValue({ level: 'none' } as any);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      const response = await sut.getById(auth, person.id);
+      const response = await sut.getById(auth, person.personGroupId);
 
       expect('familyRelationLabel' in response).toBe(false);
       expect(mocks.family.getAllUnionsWithParticipants).not.toHaveBeenCalled();
@@ -1083,10 +1083,10 @@ describe(PersonService.name, () => {
       setUpGraph();
       mocks.user.getMetadata.mockResolvedValue([]);
       mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      const response = await sut.getById(auth, person.id);
+      const response = await sut.getById(auth, person.personGroupId);
 
       expect(response.familyRelationLabel).toBeNull();
     });
