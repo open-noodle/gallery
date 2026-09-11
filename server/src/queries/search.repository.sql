@@ -2890,7 +2890,15 @@ where
     or "asset"."ownerId" = $3
   )
   and (
-    "asset"."isFavorite" = $4
+    exists (
+      select
+        1 as "exists"
+      from
+        "asset_favorite"
+      where
+        "asset_favorite"."assetId" = "asset"."id"
+        and "asset_favorite"."userId" = $4::uuid
+    )
     or exists (
       select
       from
@@ -2952,7 +2960,15 @@ where
     and "asset"."fileCreatedAt" >= $4
     and (
       (
-        "asset"."isFavorite" = $5
+        exists (
+          select
+            1 as "exists"
+          from
+            "asset_favorite"
+          where
+            "asset_favorite"."assetId" = "asset"."id"
+            and "asset_favorite"."userId" = $5::uuid
+        )
         and "asset"."ownerId" = any ($6::uuid[])
       )
       or exists (
@@ -2988,7 +3004,6 @@ select
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
-  "asset"."isFavorite",
   "asset"."isOffline",
   "asset"."isEdited",
   "asset"."visibility",
@@ -3012,7 +3027,15 @@ where
     "asset"."visibility" != $2
     or "asset"."ownerId" = $3
   )
-  and "asset"."isFavorite" = $4
+  and exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $4::uuid
+  )
 order by
   "asset"."fileCreatedAt" desc,
   "asset"."id" desc
@@ -3036,7 +3059,6 @@ select
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
-  "asset"."isFavorite",
   "asset"."isOffline",
   "asset"."isEdited",
   "asset"."visibility",
@@ -3081,7 +3103,6 @@ select
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
-  "asset"."isFavorite",
   "asset"."isOffline",
   "asset"."isEdited",
   "asset"."visibility",
@@ -3105,7 +3126,15 @@ where
     "asset"."visibility" != $2
     or "asset"."ownerId" = $3
   )
-  and "asset"."isFavorite" = $4
+  and exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $4::uuid
+  )
 order by
   random()
 limit
@@ -3129,7 +3158,6 @@ select
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
-  "asset"."isFavorite",
   "asset"."isOffline",
   "asset"."isEdited",
   "asset"."visibility",
@@ -3182,7 +3210,6 @@ select
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
-  "asset"."isFavorite",
   "asset"."isOffline",
   "asset"."isEdited",
   "asset"."visibility",
@@ -3238,7 +3265,6 @@ select
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
-  "asset"."isFavorite",
   "asset"."isOffline",
   "asset"."isEdited",
   "asset"."visibility",
@@ -3318,7 +3344,15 @@ where
     or "asset"."ownerId" = $3
   )
   and (
-    "asset"."isFavorite" = $4
+    exists (
+      select
+        1 as "exists"
+      from
+        "asset_favorite"
+      where
+        "asset_favorite"."assetId" = "asset"."id"
+        and "asset_favorite"."userId" = $4::uuid
+    )
     or not exists (
       select
       from

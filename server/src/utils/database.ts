@@ -1569,7 +1569,14 @@ export const searchMetadataV3Examples: GenerateSqlQueries[] = [
   },
   {
     name: 'cursor-offset',
-    params: [{ take: 100, skip: 100 }, { filter: { isFavorite: { eq: true } } }, scopeExample],
+    // #763: `authUserId` is required by any example whose filter uses `isFavorite` -- the predicate
+    // resolves against the per-user `asset_favorite` overlay, so omitting it binds `undefined` and
+    // sync-sql logs `UNDEFINED_VALUE` instead of failing, which is easy to miss.
+    params: [
+      { take: 100, skip: 100 },
+      { authUserId: DummyValue.UUID, filter: { isFavorite: { eq: true } } },
+      scopeExample,
+    ],
   },
 ];
 
@@ -1577,7 +1584,7 @@ export const searchRandomV3Examples: GenerateSqlQueries[] = [
   { name: 'baseline', params: [100, {}, scopeExample] },
   {
     name: 'with-filter',
-    params: [100, { filter: { isFavorite: { eq: true } } }, scopeExample],
+    params: [100, { authUserId: DummyValue.UUID, filter: { isFavorite: { eq: true } } }, scopeExample],
   },
 ];
 

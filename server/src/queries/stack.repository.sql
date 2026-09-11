@@ -126,6 +126,8 @@ select
           "asset"."deletedAt" is null
           and "asset"."stackId" = "stack"."id"
           and "asset"."visibility" in ('archive', 'timeline')
+        order by
+          "asset"."fileCreatedAt" asc
       ) as agg
   ) as "assets"
 from
@@ -302,6 +304,8 @@ select
           "asset"."deletedAt" is null
           and "asset"."stackId" = "stack"."id"
           and "asset"."visibility" in ('archive', 'timeline')
+        order by
+          "asset"."fileCreatedAt" asc
       ) as agg
   ) as "assets"
 from
