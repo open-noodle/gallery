@@ -2068,10 +2068,7 @@ export class SharedSpaceService extends BaseService {
         },
         trx,
       );
-      await this.personRepository.setFaceOwnerPerson(
-        { assetFaceId, personGroupId: ownerPerson.personGroupId },
-        trx,
-      );
+      await this.personRepository.setFaceOwnerPerson({ assetFaceId, personGroupId: ownerPerson.personGroupId }, trx);
     }
   }
 
@@ -2403,7 +2400,7 @@ export class SharedSpaceService extends BaseService {
       const faceId = await this.personRepository.createAssetFace(
         {
           assetId,
-          personId: null,
+          personGroupId: null,
           imageHeight,
           imageWidth,
           boundingBoxX1,

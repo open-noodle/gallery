@@ -581,7 +581,7 @@ describe(AssetService.name, () => {
     it('should report resolvedSpaceId when the space is given explicitly', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);

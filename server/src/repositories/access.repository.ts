@@ -561,14 +561,14 @@ class AssetAccess {
               .where((eb) =>
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
               )
-              // The album leg. `spaceIdRef` correlates the album's space to the actor's OWN
-              // membership row, which is what makes the owner-is-member check below bind to the
-              // same space (spec §2.4). Deliberately NO requireShowInTimeline: editability must
-              // not depend on a timeline display toggle.
+              // The album leg. `spaceIdRef` correlates the album's space to the actor's OWN membership
+              // row, which is what makes the owner-is-member check below bind to the same space (spec
+              // §2.4). Gate 'none' on purpose: editability must not follow a timeline display toggle.
               .where((eb) =>
                 spaceAlbumAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceIdRef: 'shared_space_member.spaceId' },
+                  albumTimelineGate: 'none',
                 }),
               )
               .where((eb) =>

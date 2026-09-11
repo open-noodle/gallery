@@ -864,7 +864,7 @@ export class PersonRepository {
           // Resemblance is NULL for every person whose representative face has no embedding, and
           // NULL for all of them when the edited face has none — leaving the order unspecified
           // and OFFSET paging free to repeat or skip a row. The id makes it total.
-          .orderBy('person.id'),
+          .orderBy('person.personGroupId'),
       )
       .$if(!options?.closestFaceAssetId, (qb) =>
         qb

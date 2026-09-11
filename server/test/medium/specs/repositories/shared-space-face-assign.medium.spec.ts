@@ -129,12 +129,16 @@ describe('isFaceAssignableInSpace', () => {
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: person } = await ctx.newPerson({ ownerId: bob.id, isHidden: true });
-    const { result: faceId } = await ctx.newAssetFace({ assetId, personId: person.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId: person.personGroupId });
 
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(false);
 
     // Non-vacuous: un-hide the same person and the same face becomes assignable.
-    await defaultDatabase.updateTable('person').set({ isHidden: false }).where('id', '=', person.id).execute();
+    await defaultDatabase
+      .updateTable('person')
+      .set({ isHidden: false })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(true);
   });
 
@@ -247,8 +251,8 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
 
     // Bob already named this face himself, under HIS OWN identity.
     const { result: bobPerson } = await ctx.newPerson({ ownerId: bob.id, name: 'Dad' });
-    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.id);
-    const { result: faceId } = await ctx.newAssetFace({ assetId, personId: bobPerson.id });
+    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.personGroupId);
+    const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId: bobPerson.personGroupId });
     await faceIdentityRepo.linkFace({ assetFaceId: faceId, identityId: bobIdentity.id, source: 'owner-person' });
 
     // A SECOND face Bob filed under Dad, on a different asset, which Anna never touches. Without it
@@ -256,7 +260,10 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
     // with no faces at all, which is a different scenario (a person emptied out) than the one this
     // case is about.
     const { assetId: otherAssetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
-    const { result: otherFaceId } = await ctx.newAssetFace({ assetId: otherAssetId, personId: bobPerson.id });
+    const { result: otherFaceId } = await ctx.newAssetFace({
+      assetId: otherAssetId,
+      personGroupId: bobPerson.personGroupId,
+    });
     await faceIdentityRepo.linkFace({
       assetFaceId: otherFaceId,
       identityId: bobIdentity.id,
@@ -287,18 +294,19 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
     expect(identityLink.identityId).not.toBe(bobIdentity.id);
 
     // F-40 (revised): Bob's own copy of the photo moves too -- off 'Dad' and onto a person carrying
-    // Anna's name. Asserting it is no longer bobPerson.id would pass even if the column were nulled,
+    // Anna's name. Asserting it is no longer bobPerson's group would pass even if the column were
+    // nulled,
     // so pin the row it actually lands on.
     const face = await defaultDatabase
       .selectFrom('asset_face')
       .selectAll()
       .where('id', '=', faceId)
       .executeTakeFirstOrThrow();
-    expect(face.personId).not.toBe(bobPerson.id);
+    expect(face.personGroupId).not.toBe(bobPerson.personGroupId);
     const landedOn = await defaultDatabase
       .selectFrom('person')
       .selectAll()
-      .where('id', '=', face.personId!)
+      .where('personGroupId', '=', face.personGroupId!)
       .executeTakeFirstOrThrow();
     expect(landedOn.ownerId).toBe(bob.id);
     expect(landedOn.name).toBe('Uncle Tom');
@@ -309,7 +317,7 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
     const person = await defaultDatabase
       .selectFrom('person')
       .selectAll()
-      .where('id', '=', bobPerson.id)
+      .where('personGroupId', '=', bobPerson.personGroupId)
       .executeTakeFirstOrThrow();
     expect(person.name).toBe('Dad');
     expect(person.identityId).toBe(bobIdentity.id);
@@ -320,7 +328,7 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
       .selectAll()
       .where('id', '=', otherFaceId)
       .executeTakeFirstOrThrow();
-    expect(otherFace.personId).toBe(bobPerson.id);
+    expect(otherFace.personGroupId).toBe(bobPerson.personGroupId);
 
     const resolved = await faceIdentityRepo.getResolvedPersonByIdentityId(bob.id, bobIdentity.id);
     expect(resolved?.name).toBe('Dad');
@@ -396,11 +404,15 @@ describe('getAssetFacesForSpace', () => {
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: person } = await ctx.newPerson({ ownerId: bob.id, isHidden: true });
-    const { result: faceId } = await ctx.newAssetFace({ assetId, personId: person.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId: person.personGroupId });
 
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toEqual([]);
 
-    await defaultDatabase.updateTable('person').set({ isHidden: false }).where('id', '=', person.id).execute();
+    await defaultDatabase
+      .updateTable('person')
+      .set({ isHidden: false })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
     const shown = await spaceRepo.getAssetFacesForSpace(space.id, assetId);
     expect(shown.map((f) => f.id)).toEqual([faceId]);
   });
@@ -586,10 +598,10 @@ describe('detach', () => {
     const ownerPersonIdOf = async () =>
       defaultDatabase
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', faceId)
         .executeTakeFirstOrThrow()
-        .then((row) => row.personId);
+        .then((row) => row.personGroupId);
 
     // Anna names the face, which files it under a person in Bob's own library (§6.3.1 revised).
     const named = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
@@ -907,10 +919,10 @@ describe('attach propagates to the owner, but only for the attached identity (F-
     // Non-vacuous baseline.
     const faceBefore = await defaultDatabase
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', faceId)
       .executeTakeFirstOrThrow();
-    expect(faceBefore.personId).toBeNull();
+    expect(faceBefore.personGroupId).toBeNull();
     await expect(
       defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute(),
     ).resolves.toEqual([]);
@@ -919,17 +931,17 @@ describe('attach propagates to the owner, but only for the attached identity (F-
 
     const faceAfter = await defaultDatabase
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', faceId)
       .executeTakeFirstOrThrow();
-    expect(faceAfter.personId).not.toBeNull();
+    expect(faceAfter.personGroupId).not.toBeNull();
 
     // Bob had never named this human, so the propagation had to CREATE the person, carrying Anna's
     // name across -- and the face must point at exactly that new row, not merely at "some" person.
     const bobPeople = await defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute();
     expect(bobPeople).toHaveLength(1);
     expect(bobPeople[0].name).toBe('Aurelia');
-    expect(faceAfter.personId).toBe(bobPeople[0].id);
+    expect(faceAfter.personGroupId).toBe(bobPeople[0].personGroupId);
   });
 
   // F-39: the resolved view. An attach happening anywhere in a space Bob's asset is reachable through
@@ -952,9 +964,12 @@ describe('attach propagates to the owner, but only for the attached identity (F-
 
     // Bob has a named, dated person under HIS OWN identity.
     const { result: bobPerson } = await ctx.newPerson({ ownerId: bob.id, name: 'Dad', birthDate: '1970-06-15' });
-    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.id);
+    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.personGroupId);
     const { assetId: bobAssetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
-    const { result: bobFaceId } = await ctx.newAssetFace({ assetId: bobAssetId, personId: bobPerson.id });
+    const { result: bobFaceId } = await ctx.newAssetFace({
+      assetId: bobAssetId,
+      personGroupId: bobPerson.personGroupId,
+    });
     await faceIdentityRepo.linkFace({ assetFaceId: bobFaceId, identityId: bobIdentity.id, source: 'owner-person' });
 
     // A completely DIFFERENT, unrelated face -- no connection to Bob's identity at all.
@@ -1049,15 +1064,16 @@ describe('createSpaceAssetFace', () => {
     expect(face.imageWidth).toBe(1000);
     expect(face.imageHeight).toBe(800);
     // Editor-drawn: sourceType Manual and createdBy is Anna. Since §6.3.1 was revised (2026-08-25)
-    // the box Anna draws AND names propagates, so personId lands on a person in Bob's own library
+    // the box Anna draws AND names propagates, so personGroupId lands on a person in Bob's own
+    // library
     // carrying her name -- this used to assert null.
     expect(face.sourceType).toBe(SourceType.Manual);
     expect(face.createdBy).toBe(anna.id);
-    expect(face.personId).not.toBeNull();
+    expect(face.personGroupId).not.toBeNull();
     const ownerPerson = await defaultDatabase
       .selectFrom('person')
       .selectAll()
-      .where('id', '=', face.personId!)
+      .where('personGroupId', '=', face.personGroupId!)
       .executeTakeFirstOrThrow();
     expect(ownerPerson.ownerId).toBe(bob.id);
     expect(ownerPerson.name).toBe('Aurelia');
