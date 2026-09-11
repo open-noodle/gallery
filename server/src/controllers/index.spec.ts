@@ -26,6 +26,7 @@ const ADMIN_ROUTES = new Set([
   'GET server/statistics',
   // fork-only: storage migration is an admin operation
   'GET storage-migration/estimate',
+  'GET storage-migration/routing',
   'GET storage-migration/status',
   'GET system-config',
   'GET system-config/defaults',

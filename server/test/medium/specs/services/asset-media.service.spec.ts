@@ -7,11 +7,13 @@ import { AssetFileType, SharedLinkType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
+import { ConfigRepository } from 'src/repositories/config.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
 import { AssetMediaService } from 'src/services/asset-media.service';
@@ -27,7 +29,17 @@ let defaultDatabase: Kysely<DB>;
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(AssetMediaService, {
     database: db || defaultDatabase,
-    real: [AccessRepository, AlbumRepository, AssetRepository, SharedLinkRepository, UserRepository],
+    // ConfigRepository + SystemMetadataRepository are required because `create` now resolves the
+    // write backend per file kind, which reads SystemConfig via getConfig() -> buildConfig().
+    real: [
+      AccessRepository,
+      AlbumRepository,
+      AssetRepository,
+      ConfigRepository,
+      SharedLinkRepository,
+      SystemMetadataRepository,
+      UserRepository,
+    ],
     mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
   });
 };
