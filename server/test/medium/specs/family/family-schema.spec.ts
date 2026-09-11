@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { DB } from 'src/schema';
+import { insertClusterGroup } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -19,7 +20,7 @@ const newIdentity = async () => {
 const newUser = async () => {
   const row = await db
     .insertInto('user')
-    .values({ email: `${randomUUID()}@family.test`, name: 'Family Test' })
+    .values({ email: `${randomUUID()}@family.test`, name: 'Family Test', clusterGroupId: await insertClusterGroup(db) })
     .returning('id')
     .executeTakeFirstOrThrow();
   return row.id;

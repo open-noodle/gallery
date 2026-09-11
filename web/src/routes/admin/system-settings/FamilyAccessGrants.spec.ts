@@ -1,7 +1,7 @@
 import {
   FamilyAccessLevel,
   type FamilyAccessGrantResponseDto,
-  type SystemConfigDto,
+  type AdminConfigDto,
   type UserAdminResponseDto,
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
@@ -15,7 +15,7 @@ import FamilyAccessGrants from './FamilyAccessGrants.svelte';
 // default, and that must render (and behave) differently from a user who was explicitly granted
 // `none`. Both end up denied, but only the explicit grant survives a change of default (E19).
 const mocks = vi.hoisted(() => ({
-  systemConfig: {} as SystemConfigDto,
+  systemConfig: {} as AdminConfigDto,
   searchUsersAdmin: vi.fn(),
   getAllAccess: vi.fn(),
   setAccess: vi.fn(),
@@ -43,8 +43,8 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-const makeConfig = (enabled = true, defaultAccess: FamilyAccessLevel = FamilyAccessLevel.None): SystemConfigDto =>
-  ({ familyTree: { enabled, defaultAccess } }) as unknown as SystemConfigDto;
+const makeConfig = (enabled = true, defaultAccess: FamilyAccessLevel = FamilyAccessLevel.None): AdminConfigDto =>
+  ({ familyTree: { enabled, defaultAccess } }) as unknown as AdminConfigDto;
 
 const makeUser = (overrides: Partial<UserAdminResponseDto> = {}): UserAdminResponseDto =>
   ({ id: 'user-1', name: 'Alex', email: 'alex@example.com', ...overrides }) as UserAdminResponseDto;

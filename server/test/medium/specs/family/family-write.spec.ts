@@ -6,7 +6,7 @@ import { FamilyRepository } from 'src/repositories/family.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { FamilyService } from 'src/services/family.service';
-import { newMediumService } from 'test/medium.factory';
+import { insertClusterGroup, newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -25,7 +25,7 @@ const newIdentity = async (type: 'person' | 'pet' = 'person') => {
 const newUser = async () => {
   const row = await db
     .insertInto('user')
-    .values({ email: `${randomUUID()}@family.test`, name: 'Family Test' })
+    .values({ email: `${randomUUID()}@family.test`, name: 'Family Test', clusterGroupId: await insertClusterGroup(db) })
     .returning('id')
     .executeTakeFirstOrThrow();
   return row.id;

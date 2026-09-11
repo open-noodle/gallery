@@ -349,7 +349,7 @@ export class FamilyService extends BaseService {
   private async resolvePersonIdentityId(auth: AuthDto, personId: string): Promise<string | null> {
     const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonRead, ids: [personId] });
     if (allowedIds.has(personId)) {
-      const person = await this.personRepository.getById(personId);
+      const person = await this.personRepository.getByGroupIdOnly(personId);
       if (!person) {
         throw new NotFoundException('Person not found');
       }

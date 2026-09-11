@@ -60,8 +60,10 @@ async function mintIdentity(
   // on the (fake) asset, finds 0 real faces, and DELETES the seeded face shortly afterward —
   // silently wiping the identity out from under the test a few seconds into the run. See the
   // comment on utils.createFace itself for the same warning.
-  await utils.createFace({ assetId: asset.id, personId: person.id, sourceType: 'manual' });
-  const row = await db.query<{ identityId: string }>(`SELECT "identityId" FROM "person" WHERE id = $1`, [person.id]);
+  await utils.createFace({ assetId: asset.id, personGroupId: person.id, sourceType: 'manual' });
+  const row = await db.query<{ identityId: string }>(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
+    person.id,
+  ]);
   return { personId: person.id, identityId: row.rows[0].identityId };
 }
 
@@ -98,7 +100,7 @@ test.describe('Family relationships (web)', () => {
     // below grants (or deliberately withholds) access explicitly per user, on top of this floor.
     const config = await utils.getSystemConfig(admin.accessToken);
     config.familyTree = { enabled: true, defaultAccess: DefaultAccess.None };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   test('records a family and shows a derived relationship on the person page', async ({ context, page }) => {
@@ -264,10 +266,11 @@ test.describe('Family relationships (web)', () => {
     const hiddenPerson = await utils.createPerson(owner.accessToken, { name: 'E2E Redaction Hidden Child' });
     const privateAsset = await utils.createAsset(owner.accessToken);
     // sourceType: 'manual' — see the note on mintIdentity above.
-    await utils.createFace({ assetId: privateAsset.id, personId: hiddenPerson.id, sourceType: 'manual' });
-    const hiddenRow = await db.query<{ identityId: string }>(`SELECT "identityId" FROM "person" WHERE id = $1`, [
-      hiddenPerson.id,
-    ]);
+    await utils.createFace({ assetId: privateAsset.id, personGroupId: hiddenPerson.id, sourceType: 'manual' });
+    const hiddenRow = await db.query<{ identityId: string }>(
+      `SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`,
+      [hiddenPerson.id],
+    );
     const hiddenIdentityId = hiddenRow.rows[0].identityId;
 
     await createUnion(
@@ -307,7 +310,7 @@ test.describe('Family relationships (web)', () => {
     // sourceType: 'manual' — see the note on mintIdentity above.
     const hiddenFaceId = await utils.createFace({
       assetId: secondSharedAsset.id,
-      personId: hiddenPerson.id,
+      personGroupId: hiddenPerson.id,
       sourceType: 'manual',
     });
 

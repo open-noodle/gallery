@@ -13,7 +13,6 @@ import { asDateString } from 'src/utils/date';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import type { Mocked } from 'vitest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
@@ -33,7 +32,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     real: [DatabaseRepository, FaceIdentityRepository, FamilyRepository, PersonRepository, SharedSpaceRepository],
     mock: [JobRepository, LoggingRepository],
   });
-  const jobRepository = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobRepository = ctx.getMock(JobRepository);
   jobRepository.queue.mockResolvedValue();
 
   const sut = new IdentityMergePropagationService({
@@ -41,7 +40,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
     familyRepository: ctx.get(FamilyRepository),
     jobRepository,
-    logger: ctx.getMock<LoggingRepository, Mocked<LoggingRepository>>(LoggingRepository),
+    logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),
     sharedSpaceRepository: ctx.get(SharedSpaceRepository),
   });
@@ -58,7 +57,11 @@ const createPersonProfile = async (
   input: { ownerId: string; identityId: string; name?: string },
 ) => {
   const { person } = await ctx.newPerson({ ownerId: input.ownerId, name: input.name ?? 'Person' });
-  await ctx.database.updateTable('person').set({ identityId: input.identityId }).where('id', '=', person.id).execute();
+  await ctx.database
+    .updateTable('person')
+    .set({ identityId: input.identityId })
+    .where('personGroupId', '=', person.personGroupId)
+    .execute();
   return person;
 };
 
@@ -114,7 +117,9 @@ describe('family relationships under identity merge', () => {
     await addPartner(ctx.database, union.id, sourceIdentity.id);
     await addChild(ctx.database, union.id, child.id);
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), target.id, [source.id])).resolves.toBeDefined();
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId]),
+    ).resolves.toBeDefined();
 
     await expect(getPartnerIds(ctx.database, union.id)).resolves.toEqual([targetIdentity.id]);
     await expect(getChildIds(ctx.database, union.id)).resolves.toEqual([child.id]);
@@ -136,7 +141,7 @@ describe('family relationships under identity merge', () => {
     const union = await newUnion(ctx.database);
     await addPartner(ctx.database, union.id, sourceIdentity.id);
 
-    await sut.mergePersonalPeople(factory.auth({ user }), target.id, [source.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId]);
 
     const identities = await ctx.database
       .selectFrom('face_identity')
@@ -175,7 +180,9 @@ describe('family relationships under identity merge', () => {
     await addPartner(ctx.database, unionBC.id, identityB.id);
     await addPartner(ctx.database, unionBC.id, identityC.id);
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), personA.id, [personB.id])).resolves.toBeDefined();
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), personA.personGroupId, [personB.personGroupId]),
+    ).resolves.toBeDefined();
 
     const survivingUnions = await ctx.database
       .selectFrom('family_union')
@@ -217,7 +224,7 @@ describe('family relationships under identity merge', () => {
     await addPartner(ctx.database, unionBC.id, identityB.id);
     await addPartner(ctx.database, unionBC.id, identityC.id);
 
-    await sut.mergePersonalPeople(factory.auth({ user }), personA.id, [personB.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), personA.personGroupId, [personB.personGroupId]);
 
     const survivor = await ctx.database
       .selectFrom('family_union')
@@ -241,7 +248,9 @@ describe('family relationships under identity merge', () => {
     await addPartner(ctx.database, union.id, identityA.id);
     await addPartner(ctx.database, union.id, identityB.id);
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), personA.id, [personB.id])).resolves.toBeDefined();
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), personA.personGroupId, [personB.personGroupId]),
+    ).resolves.toBeDefined();
 
     const remaining = await ctx.database.selectFrom('family_union').select('id').where('id', '=', union.id).execute();
     expect(remaining).toHaveLength(0);
@@ -286,7 +295,7 @@ describe('family relationships under identity merge', () => {
     // have refused outright (E7). The merge path never runs that validation, so it must repair
     // the graph instead — and must not fail while doing it.
     await expect(
-      sut.mergePersonalPeople(factory.auth({ user }), personTarget.id, [personSource.id]),
+      sut.mergePersonalPeople(factory.auth({ user }), personTarget.personGroupId, [personSource.personGroupId]),
     ).resolves.toBeDefined();
 
     // The unrelated membership was re-pointed, not lost to cascade.
