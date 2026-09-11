@@ -530,7 +530,7 @@ const setupSpaceReassignFixture = async (
   const misassignedInSpace = options.misassignedInSpace ?? true;
   const { ctx, sut, faceIdentityRepository } = setup();
   const { sut: sharedSpaceService } = setupSharedSpace();
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   const { user: owner } = await ctx.newUser();
   const { user: actor } = await ctx.newUser({ isAdmin: options.actorIsAdmin ?? false });
   const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -567,7 +567,7 @@ const setupSpaceReassignFixture = async (
 const setupCrossSpaceReassignFixture = async (options: { actorEditsFaceSpace: boolean }) => {
   const { ctx, sut, faceIdentityRepository } = setup();
   const { sut: sharedSpaceService } = setupSharedSpace();
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   const { user: targetOwner } = await ctx.newUser();
   const { user: faceOwner } = await ctx.newUser();
   const { user: actor } = await ctx.newUser();
@@ -608,10 +608,10 @@ const bulkFor = (assetId: string, sourcePersonId: string) => ({
 const facePersonIdFor = (ctx: ReturnType<typeof setup>['ctx'], assetFaceId: string) =>
   ctx.database
     .selectFrom('asset_face')
-    .select('personId')
+    .select('personGroupId')
     .where('id', '=', assetFaceId)
     .executeTakeFirstOrThrow()
-    .then((row) => row.personId);
+    .then((row) => row.personGroupId);
 
 describe('People identity RBAC projection', () => {
   it('returns one row per accessible identity for a member of multiple spaces', async () => {
@@ -4123,7 +4123,7 @@ describe('People identity RBAC projection', () => {
       const before = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
       expect(before).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
 
-      await fx.sut.reassignFacesById(authFor(fx.owner), fx.correct.person.id, { id: fx.wrong.faceId });
+      await fx.sut.reassignFacesById(authFor(fx.owner), fx.correct.person.personGroupId, { id: fx.wrong.faceId });
 
       // Synchronous eviction: the face must have left the wrong space person before any job runs.
       const afterCall = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
@@ -4143,15 +4143,15 @@ describe('People identity RBAC projection', () => {
       const fx = await setupSpaceReassignFixture(SharedSpaceRole.Editor);
 
       await expect(
-        fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
-      ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.id }));
+        fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
+      ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.personGroupId }));
 
       const face = await fx.ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', fx.wrong.faceId)
         .executeTakeFirstOrThrow();
-      expect(face.personId).toBe(fx.correct.person.id);
+      expect(face.personGroupId).toBe(fx.correct.person.personGroupId);
 
       await drainReassignFaceMatchJobs(fx.sharedSpaceService, fx.jobs);
 
@@ -4163,15 +4163,15 @@ describe('People identity RBAC projection', () => {
       const fx = await setupSpaceReassignFixture(SharedSpaceRole.Viewer);
 
       await expect(
-        fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+        fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
       const face = await fx.ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', fx.wrong.faceId)
         .executeTakeFirstOrThrow();
-      expect(face.personId).toBe(fx.wrong.person.id);
+      expect(face.personGroupId).toBe(fx.wrong.person.personGroupId);
 
       const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
       expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
@@ -4179,7 +4179,7 @@ describe('People identity RBAC projection', () => {
 
     it('reassigns a face on an asset in no space without touching any projection', async () => {
       const { ctx, sut, faceIdentityRepository } = setup();
-      const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const jobs = ctx.getMock(JobRepository);
       const { user: owner } = await ctx.newUser();
       const wrong = await createIdentityBackedFace(ctx, faceIdentityRepository, {
         ownerId: owner.id,
@@ -4191,14 +4191,14 @@ describe('People identity RBAC projection', () => {
       });
       jobs.queue.mockClear();
 
-      await sut.reassignFacesById(authFor(owner), correct.person.id, { id: wrong.faceId });
+      await sut.reassignFacesById(authFor(owner), correct.person.personGroupId, { id: wrong.faceId });
 
       const face = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', wrong.faceId)
         .executeTakeFirstOrThrow();
-      expect(face.personId).toBe(correct.person.id);
+      expect(face.personGroupId).toBe(correct.person.personGroupId);
 
       const projected = await ctx.database
         .selectFrom('shared_space_person_face')
@@ -4225,10 +4225,10 @@ describe('People identity RBAC projection', () => {
           const fx = await setupSpaceReassignFixture(actorRole);
 
           await expect(
-            fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
-          ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.id }));
+            fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
+          ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.personGroupId }));
 
-          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.id);
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.personGroupId);
         },
       );
 
@@ -4240,12 +4240,12 @@ describe('People identity RBAC projection', () => {
           await expect(
             fx.sut.reassignFaces(
               authFor(fx.actor),
-              fx.correct.person.id,
-              bulkFor(fx.wrong.asset.id, fx.wrong.person.id),
+              fx.correct.person.personGroupId,
+              bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
             ),
-          ).resolves.toEqual([expect.objectContaining({ id: fx.correct.person.id })]);
+          ).resolves.toEqual([expect.objectContaining({ id: fx.correct.person.personGroupId })]);
 
-          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.id);
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.personGroupId);
         },
       );
 
@@ -4258,10 +4258,10 @@ describe('People identity RBAC projection', () => {
           const fx = await setupSpaceReassignFixture(actorRole);
 
           await expect(
-            fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+            fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
           ).rejects.toThrow('Not found or no person.update access');
 
-          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
           const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
           expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
         },
@@ -4275,12 +4275,12 @@ describe('People identity RBAC projection', () => {
           await expect(
             fx.sut.reassignFaces(
               authFor(fx.actor),
-              fx.correct.person.id,
-              bulkFor(fx.wrong.asset.id, fx.wrong.person.id),
+              fx.correct.person.personGroupId,
+              bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
             ),
           ).rejects.toThrow('Not found or no person.update access');
 
-          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+          await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
           const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
           expect(projected).toEqual([expect.objectContaining({ identityId: fx.wrong.identity.id })]);
         },
@@ -4293,13 +4293,17 @@ describe('People identity RBAC projection', () => {
 
         expect(fx.actor.isAdmin).toBe(true);
         await expect(
-          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
         ).rejects.toThrow('Not found or no person.update access');
         await expect(
-          fx.sut.reassignFaces(authFor(fx.actor), fx.correct.person.id, bulkFor(fx.wrong.asset.id, fx.wrong.person.id)),
+          fx.sut.reassignFaces(
+            authFor(fx.actor),
+            fx.correct.person.personGroupId,
+            bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
+          ),
         ).rejects.toThrow('Not found or no person.update access');
 
-        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
       });
 
       // The Editor grant on the target person must not carry over to the face: the misassigned asset is
@@ -4309,26 +4313,34 @@ describe('People identity RBAC projection', () => {
         const fx = await setupSpaceReassignFixture(SharedSpaceRole.Editor, { misassignedInSpace: false });
 
         await expect(
-          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
         ).rejects.toThrow('Not found or no asset.update access');
         await expect(
-          fx.sut.reassignFaces(authFor(fx.actor), fx.correct.person.id, bulkFor(fx.wrong.asset.id, fx.wrong.person.id)),
+          fx.sut.reassignFaces(
+            authFor(fx.actor),
+            fx.correct.person.personGroupId,
+            bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
+          ),
         ).rejects.toThrow('Not found or no asset.update access');
 
-        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
       });
 
       it('refuses a face in a different space the actor is not a member of', async () => {
         const fx = await setupCrossSpaceReassignFixture({ actorEditsFaceSpace: false });
 
         await expect(
-          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
         ).rejects.toThrow('Not found or no asset.update access');
         await expect(
-          fx.sut.reassignFaces(authFor(fx.actor), fx.correct.person.id, bulkFor(fx.wrong.asset.id, fx.wrong.person.id)),
+          fx.sut.reassignFaces(
+            authFor(fx.actor),
+            fx.correct.person.personGroupId,
+            bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
+          ),
         ).rejects.toThrow('Not found or no asset.update access');
 
-        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
         const projected = await spacePersonFacesFor(fx.ctx, {
           spaceId: fx.faceSpace.id,
           assetFaceId: fx.wrong.faceId,
@@ -4347,10 +4359,10 @@ describe('People identity RBAC projection', () => {
         const fx = await setupCrossSpaceReassignFixture({ actorEditsFaceSpace: true });
 
         await expect(
-          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.id, { id: fx.wrong.faceId }),
-        ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.id }));
+          fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
+        ).resolves.toEqual(expect.objectContaining({ id: fx.correct.person.personGroupId }));
 
-        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.id);
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.correct.person.personGroupId);
       });
 
       // The owner fast path, on the bulk entry point (the by-id one is covered by 'reassigns a face on
@@ -4369,12 +4381,12 @@ describe('People identity RBAC projection', () => {
         });
 
         await expect(
-          sut.reassignFaces(authFor(owner), correct.person.id, {
-            data: [{ personId: wrong.person.id, assetId: wrong.asset.id }],
+          sut.reassignFaces(authFor(owner), correct.person.personGroupId, {
+            data: [{ personId: wrong.person.personGroupId, assetId: wrong.asset.id }],
           }),
-        ).resolves.toEqual([expect.objectContaining({ id: correct.person.id })]);
+        ).resolves.toEqual([expect.objectContaining({ id: correct.person.personGroupId })]);
 
-        await expect(facePersonIdFor(ctx, wrong.faceId)).resolves.toBe(correct.person.id);
+        await expect(facePersonIdFor(ctx, wrong.faceId)).resolves.toBe(correct.person.personGroupId);
       });
 
       // The deep-link resolution the branch added (hydrateAccessiblePeople's preferProfileId) is what
@@ -4404,10 +4416,10 @@ describe('People identity RBAC projection', () => {
         const { user: stranger } = await fx.ctx.newUser();
 
         await expect(
-          fx.sut.reassignFacesById(authFor(stranger), fx.correct.person.id, { id: fx.wrong.faceId }),
+          fx.sut.reassignFacesById(authFor(stranger), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
         ).rejects.toThrow('Not found or no person.update access');
 
-        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.id);
+        await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
       });
     });
   });

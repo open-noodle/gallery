@@ -133,6 +133,12 @@ function renderSelector({
   return { onConfirm, onClose };
 }
 
+// #1082 moved the two action buttons into a SECOND, bottom-bar copy below `sm`, so both copies sit
+// in the DOM at once (they differ only by a CSS breakpoint) and a bare getByText now matches twice.
+// Both render the same `actions()` snippet bound to the same handlers, so clicking either exercises
+// the identical path — these tests pin routing and toasts, not which breakpoint's copy was hit.
+const clickAction = (label: string) => userEvent.click(screen.getAllByText(label)[0]);
+
 describe('UnmergeFaceSelector', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -186,7 +192,7 @@ describe('UnmergeFaceSelector', () => {
       personAssets: makeSpacePerson(),
     });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalled());
     expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalledWith({
@@ -206,7 +212,7 @@ describe('UnmergeFaceSelector', () => {
     renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
     await userEvent.click(await screen.findByText('Bob'));
-    await userEvent.click(screen.getByText('reassign'));
+    await clickAction('reassign');
 
     await waitFor(() =>
       expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalledWith({
@@ -241,7 +247,7 @@ describe('UnmergeFaceSelector', () => {
     const personalPerson = makePerson({ id: 'person-1' });
     const { onConfirm } = renderSelector({ assetIds: ['asset-1', 'asset-2'], personAssets: personalPerson });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(sdkMock.createPerson).toHaveBeenCalledWith({ personCreateDto: {} }));
     expect(sdkMock.reassignFaces).toHaveBeenCalledWith({
@@ -263,7 +269,7 @@ describe('UnmergeFaceSelector', () => {
 
     const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalled());
     expect(toastManager.primary).not.toHaveBeenCalled();
@@ -279,7 +285,7 @@ describe('UnmergeFaceSelector', () => {
 
     const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   });
@@ -291,7 +297,7 @@ describe('UnmergeFaceSelector', () => {
     const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
     await userEvent.click(await screen.findByText('Bob'));
-    await userEvent.click(screen.getByText('reassign'));
+    await clickAction('reassign');
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalled());
     expect(toastManager.primary).not.toHaveBeenCalled();
@@ -307,7 +313,7 @@ describe('UnmergeFaceSelector', () => {
 
     renderSelector({ assetIds: ['asset-1', 'asset-2', 'asset-3'], personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalled());
     expect(toastManager.danger).not.toHaveBeenCalled();
@@ -321,7 +327,7 @@ describe('UnmergeFaceSelector', () => {
 
     const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
     // A rejection means nothing we can rely on moved. Firing onConfirm would drive the caller's
@@ -339,7 +345,7 @@ describe('UnmergeFaceSelector', () => {
     const { onConfirm } = renderSelector({ assetIds: ['asset-1'], personAssets: makeSpacePerson() });
 
     await userEvent.click(await screen.findByText('Bob'));
-    await userEvent.click(screen.getByText('reassign'));
+    await clickAction('reassign');
 
     await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
     expect(onConfirm).not.toHaveBeenCalled();
@@ -357,7 +363,7 @@ describe('UnmergeFaceSelector', () => {
 
     renderSelector({ assetIds, personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalledTimes(3));
     const batches = sdkMock.reassignSpacePersonFaces.mock.calls.map(
@@ -380,7 +386,7 @@ describe('UnmergeFaceSelector', () => {
 
     const { onConfirm } = renderSelector({ assetIds, personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(sdkMock.reassignSpacePersonFaces).toHaveBeenCalledTimes(2));
     expect(toastManager.danger).toHaveBeenCalled();
@@ -393,7 +399,7 @@ describe('UnmergeFaceSelector', () => {
 
     const { onConfirm } = renderSelector({ assetIds: ['asset-1', 'asset-2'], personAssets: makeSpacePerson() });
 
-    await userEvent.click(screen.getByText('create_new_person'));
+    await clickAction('create_new_person');
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
     // The component delegates any "source now empty" cleanup/navigation to the caller via

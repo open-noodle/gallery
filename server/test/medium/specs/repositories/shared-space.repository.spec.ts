@@ -4891,7 +4891,7 @@ describe(SharedSpaceRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: U.id });
       const { asset: A1 } = await ctx.newAsset({ ownerId: U.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: A1.id });
-      const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id, personId: person.id });
+      const { assetFace: F1 } = await ctx.newAssetFace({ assetId: A1.id, personGroupId: person.personGroupId });
       const { asset: A2 } = await ctx.newAsset({ ownerId: U.id });
       await ctx.newAssetFace({ assetId: A2.id });
       const SP = await sut.createPerson({ spaceId: space.id, type: 'person' });
@@ -4899,7 +4899,9 @@ describe(SharedSpaceRepository.name, () => {
 
       const rows = await sut.getSourceFacesForSpacePersonAssets(SP.id, [A1.id, A2.id]);
 
-      expect(rows).toEqual([{ assetFaceId: F1.id, assetId: A1.id, personId: person.id, assetOwnerId: U.id }]);
+      expect(rows).toEqual([
+        { assetFaceId: F1.id, assetId: A1.id, personGroupId: person.personGroupId, assetOwnerId: U.id },
+      ]);
       await expect(sut.getSourceFacesForSpacePersonAssets(SP.id, [])).resolves.toEqual([]);
     });
 
