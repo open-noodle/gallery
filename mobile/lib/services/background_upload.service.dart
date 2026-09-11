@@ -621,7 +621,7 @@ class BackgroundUploadService {
       'fileCreatedAt': asset.createdAt.toUtc().toIso8601String(),
       'fileModifiedAt': asset.updatedAt.toUtc().toIso8601String(),
       'isFavorite': asset.isFavorite.toString(),
-      if (fields != null) ...fields,
+      ...?fields,
     };
 
     final session = await _uploadRepository.createUploadSession(
