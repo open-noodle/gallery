@@ -273,7 +273,7 @@ class UploadRepository {
       if (sessionId != null) {
         await deleteUploadSession(sessionId);
       }
-      logger.warning("Error uploading $logContext: ${error.toString()}: $stackTrace");
+      logger.warning("Error uploading $logContext: $error: $stackTrace");
       return UploadResult.error(errorMessage: error.toString());
     }
   }
@@ -352,7 +352,7 @@ class UploadRepository {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return UploadSessionResult(sessionId: body['id'] as String, offset: (body['offset'] as num?)?.toInt() ?? 0);
     } catch (error, stackTrace) {
-      logger.warning("Error creating upload session for $filename: ${error.toString()}: $stackTrace");
+      logger.warning("Error creating upload session for $filename: $error: $stackTrace");
       return UploadSessionResult(errorMessage: error.toString());
     }
   }
@@ -364,7 +364,7 @@ class UploadRepository {
     try {
       await _client.send(http.Request('DELETE', _sessionUri(savedEndpoint, sessionId)));
     } catch (error, stackTrace) {
-      logger.warning("Error deleting upload session $sessionId: ${error.toString()}: $stackTrace");
+      logger.warning("Error deleting upload session $sessionId: $error: $stackTrace");
     }
   }
 }
