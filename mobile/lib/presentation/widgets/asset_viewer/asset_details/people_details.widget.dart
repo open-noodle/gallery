@@ -182,7 +182,7 @@ class _Avatar extends StatelessWidget {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        person.familyRelationLabel ?? "family_mobile_relation_none".t(context: context),
+                        person.familyRelationLabel ?? context.t.family_mobile_relation_none,
                         key: Key('family-relation-label-${person.id}'),
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
