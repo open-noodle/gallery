@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/constants/errors.dart';
+import 'package:immich_mobile/data/server/errors.dart';
 import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
