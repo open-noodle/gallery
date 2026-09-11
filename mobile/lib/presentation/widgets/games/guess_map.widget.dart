@@ -61,7 +61,9 @@ class _GuessMapState extends State<GuessMap> {
           onStyleLoadedCallback: () => unawaited(_onStyleLoaded()),
           onMapClick: (_, coordinates) async {
             widget.onTap(coordinates.latitude, coordinates.longitude);
-            if (!_styleLoaded) return;
+            if (!_styleLoaded) {
+              return;
+            }
             if (_marker == null) {
               _marker = await _controller?.addSymbol(
                 SymbolOptions(geometry: coordinates, iconImage: 'mapMarker', iconSize: 0.15, iconAnchor: 'bottom'),

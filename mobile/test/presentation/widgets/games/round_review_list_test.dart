@@ -16,7 +16,7 @@ import '../../../widget_tester_extensions.dart';
 
 /// A guessed location round. Defaults land on a 412 km miss so the default call reads the same
 /// number the "shows the distance" test asserts against.
-GameRoundDetailResponseDto _guessedLocation(int index, {num score = 4182, double? distanceKm = 412.3}) =>
+GameRoundDetailResponseDto _guessedLocation(int index, {int score = 4182, double? distanceKm = 412.3}) =>
     GameRoundDetailResponseDto(
       index: index,
       type: GameRoundType.location,
@@ -29,19 +29,27 @@ GameRoundDetailResponseDto _guessedLocation(int index, {num score = 4182, double
     );
 
 /// A guessed date round. Defaults land on a 3-day miss.
-GameRoundDetailResponseDto _guessedDate(int index, {num score = 3640, int? offsetDays = 3}) => GameRoundDetailResponseDto(
-  index: index,
-  type: GameRoundType.date,
-  assetId: const Optional.present('asset-2'),
-  score: Optional.present(score),
-  answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2024, 6, 4), lat: null, lon: null)),
-  guess: Optional.present(
-    GameRoundDetailResponseDtoGuess(lat: null, lon: null, date: DateTime.utc(2024, 6, 1), distanceKm: null, offsetDays: offsetDays),
-  ),
-);
+GameRoundDetailResponseDto _guessedDate(int index, {int score = 3640, int? offsetDays = 3}) =>
+    GameRoundDetailResponseDto(
+      index: index,
+      type: GameRoundType.date,
+      assetId: const Optional.present('asset-2'),
+      score: Optional.present(score),
+      answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2024, 6, 4), lat: null, lon: null)),
+      guess: Optional.present(
+        GameRoundDetailResponseDtoGuess(
+          lat: null,
+          lon: null,
+          date: DateTime.utc(2024, 6, 1),
+          distanceKm: null,
+          offsetDays: offsetDays,
+        ),
+      ),
+    );
 
 /// A round the caller has not guessed yet — no score, no guess, no answer.
-GameRoundDetailResponseDto _unguessed(int index) => GameRoundDetailResponseDto(index: index, type: GameRoundType.location);
+GameRoundDetailResponseDto _unguessed(int index) =>
+    GameRoundDetailResponseDto(index: index, type: GameRoundType.location);
 
 /// A guessed round from a server predating this change: `score`/`answer` are real (the caller DID
 /// play it) but the response carries no `guess` object at all — omitting the `guess:` argument
@@ -71,7 +79,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -88,9 +96,7 @@ void main() {
     WidgetTester tester, {
     required List<GameRoundDetailResponseDto> rounds,
     void Function(int index)? onRoundTap,
-  }) => tester.pumpConsumerWidget(
-    RoundReviewList(challengeId: 'c1', rounds: rounds, onRoundTap: onRoundTap ?? (_) {}),
-  );
+  }) => tester.pumpConsumerWidget(RoundReviewList(challengeId: 'c1', rounds: rounds, onRoundTap: onRoundTap ?? (_) {}));
 
   testWidgets('renders one row per guessed round', (tester) async {
     await pump(tester, rounds: [_guessedLocation(0), _guessedDate(1)]);
@@ -137,7 +143,10 @@ void main() {
   testWidgets('renders no miss line when the guess is missing entirely', (tester) async {
     await pump(
       tester,
-      rounds: [_guessedWithoutGuessField(0), _guessedWithoutGuessField(1, type: GameRoundType.date)],
+      rounds: [
+        _guessedWithoutGuessField(0),
+        _guessedWithoutGuessField(1, type: GameRoundType.date),
+      ],
     );
 
     expect(find.textContaining('off'), findsNothing);

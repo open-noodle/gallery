@@ -109,7 +109,9 @@ class NotificationSetting extends HookConsumerWidget {
             context: context,
             initialTime: TimeOfDay(hour: reminderMinute.value ~/ 60, minute: reminderMinute.value % 60),
           );
-          if (picked == null) return;
+          if (picked == null) {
+            return;
+          }
           reminderMinute.value = picked.hour * 60 + picked.minute;
           await ref.read(settingsProvider).write(SettingsKey.gameDailyReminderMinuteOfDay, reminderMinute.value);
           ref.invalidate(settingsProvider);

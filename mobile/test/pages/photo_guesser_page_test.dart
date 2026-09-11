@@ -47,7 +47,7 @@ GameChallengeListItemResponseDto _daily({required int answered, int roundCount =
 
 /// What `createSoloChallenge` returns. `roundCount` is the number of rounds ACTUALLY built, which
 /// can be fewer than requested: a thin pool builds a shorter game rather than failing.
-GameChallengeResponseDto _created({required num roundCount}) => GameChallengeResponseDto(
+GameChallengeResponseDto _created({required int roundCount}) => GameChallengeResponseDto(
   id: 'new-1',
   spaceId: null,
   ownerId: 'u1',
@@ -60,11 +60,11 @@ GameChallengeResponseDto _created({required num roundCount}) => GameChallengeRes
 );
 
 GameSoloStatsResponseDto _stats({
-  num currentStreak = 0,
-  num bestStreak = 0,
-  num bestScore = 0,
-  num averageScore = 0,
-  num gamesPlayed = 0,
+  int currentStreak = 0,
+  int bestStreak = 0,
+  int bestScore = 0,
+  int averageScore = 0,
+  int gamesPlayed = 0,
 }) => GameSoloStatsResponseDto(
   currentStreak: currentStreak,
   bestStreak: bestStreak,
@@ -77,9 +77,9 @@ GameSoloHistoryItemResponseDto _historyItem({
   required String id,
   String name = 'Mixed',
   DateTime? dailyOn,
-  num total = 4200,
-  num answered = 5,
-  num roundCount = 5,
+  int total = 4200,
+  int answered = 5,
+  int roundCount = 5,
 }) => GameSoloHistoryItemResponseDto(
   id: id,
   name: name,
@@ -103,7 +103,7 @@ void main() {
     // stand in for it.
     registerFallbackValue(GameChallengeType.mixed);
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -134,10 +134,10 @@ void main() {
   Future<void> pump(
     WidgetTester tester, {
     GameChallengeListItemResponseDto? daily,
-    Object? dailyError,
+    Exception? dailyError,
     GameSoloStatsResponseDto? stats,
     GameSoloHistoryResponseDto? history,
-    Object? historyError,
+    Exception? historyError,
     List<Override> extraOverrides = const [],
     FakeStackRouter? router,
   }) {
@@ -291,7 +291,9 @@ void main() {
         overrides: [
           soloDailyProvider.overrideWith((ref) async {
             fetches++;
-            if (fetches == 1) return null;
+            if (fetches == 1) {
+              return null;
+            }
             throw Exception('offline');
           }),
           soloStatsProvider.overrideWith((ref) async => _stats()),
@@ -554,11 +556,7 @@ void main() {
         ),
       ).thenAnswer((_) async => _created(roundCount: 3));
 
-      await pump(
-        tester,
-        extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(repository)],
-        router: router,
-      );
+      await pump(tester, extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(repository)], router: router);
 
       await tester.tap(find.byKey(const Key('solo-start-free-play')));
       await tester.pumpAndSettle();
@@ -590,11 +588,7 @@ void main() {
         ),
       ).thenAnswer((_) async => _created(roundCount: 5));
 
-      await pump(
-        tester,
-        extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(repository)],
-        router: router,
-      );
+      await pump(tester, extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(repository)], router: router);
 
       await tester.tap(find.byKey(const Key('solo-start-free-play')));
       await tester.pumpAndSettle();

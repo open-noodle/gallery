@@ -97,7 +97,7 @@ void main() {
     // GameChallengeType before it can be used in a `when()` stub.
     registerFallbackValue(GameChallengeType.mixed);
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -114,7 +114,7 @@ void main() {
     WidgetTester tester, {
     required bool canEdit,
     List<GameChallengeListItemResponseDto> challenges = const [],
-    Object? challengesError,
+    Exception? challengesError,
     List<Override> extraOverrides = const [],
   }) => tester.pumpConsumerWidget(
     SpaceGamesPage(spaceId: 's1', canEdit: canEdit),

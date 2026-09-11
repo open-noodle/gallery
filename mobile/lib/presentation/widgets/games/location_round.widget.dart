@@ -40,7 +40,9 @@ class LocationRoundState extends State<LocationRound> {
 
   void _guess() {
     final pin = _pin;
-    if (pin == null) return;
+    if (pin == null) {
+      return;
+    }
     // maplibre does not wrap the longitude it reports; the server 400s outside +/-180.
     widget.onGuess(lat: pin.lat, lon: wrapLongitude(pin.lon));
   }

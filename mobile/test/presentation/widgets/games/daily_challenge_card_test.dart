@@ -20,7 +20,7 @@ import 'package:openapi/api.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
-GameChallengeListItemResponseDto _daily({num answered = 0}) => GameChallengeListItemResponseDto(
+GameChallengeListItemResponseDto _daily({int answered = 0}) => GameChallengeListItemResponseDto(
   id: 'daily-1',
   spaceId: 's1',
   ownerId: null,
@@ -58,7 +58,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -241,7 +241,9 @@ void main() {
 
   String? backdropUrl(WidgetTester tester) {
     final images = tester.widgetList<Image>(find.byKey(const Key('daily-card-cover')));
-    if (images.isEmpty) return null;
+    if (images.isEmpty) {
+      return null;
+    }
     return (images.first.image as RemoteImageProvider).url;
   }
 
