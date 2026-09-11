@@ -22,13 +22,7 @@
   import { applyContextualFilter, buildContextualMapUrl, resolveFilterTarget } from '$lib/utils/filter-target';
   import { handleError } from '$lib/utils/handle-error';
   import { getParentPath } from '$lib/utils/tree-utils';
-  import {
-    AssetMediaSize,
-    getAllAlbums,
-    getAssetInfo,
-    type AlbumResponseDto,
-    type AssetResponseDto,
-  } from '@immich/sdk';
+  import { AssetMediaSize, getAllAlbums, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
   import { Icon, IconButton, Link, Text } from '@immich/ui';
   import {
     mdiCamera,
@@ -48,7 +42,6 @@
   import UserAvatar from '../shared-components/UserAvatar.svelte';
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
   import DetailPanelPeople from '$lib/components/asset-viewer/DetailPanelPeople.svelte';
-  import { faceManager } from '$lib/stores/face.svelte';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
