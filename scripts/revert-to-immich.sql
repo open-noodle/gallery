@@ -215,7 +215,7 @@ ALTER TABLE "person"            DROP COLUMN IF EXISTS "identityId";
 -- shared_link_spaceId_idx; the links themselves survive as owner-only links.
 ALTER TABLE "shared_link"       DROP COLUMN IF EXISTS "spaceId";
 -- Records which user drew a face box, so a space editor may delete their own and never the
--- owner's (1791000000000-AddAssetFaceCreatedBy). Upstream has no such column; the FK to "user"
+-- owner's (1796000000000-AddAssetFaceCreatedBy). Upstream has no such column; the FK to "user"
 -- goes with it.
 ALTER TABLE "asset_face"        DROP COLUMN IF EXISTS "createdBy";
 
@@ -503,13 +503,13 @@ DELETE FROM "kysely_migrations"
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
   '1787100000000-DropPersonFksBeforeClusterGroups',
   '1790000000000-FixFaceRepairScanInFlightIndex',
-  '1791000000000-AddAssetFaceCreatedBy',
   '1791000000000-RepointFaceReviewToPersonGroup',
   '1792123120451-AddSharedLinkSpaceId',
   '1793000000000-AddSharedSpaceAlbumHidden',
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  '1796000000000-AddAssetFaceCreatedBy',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
