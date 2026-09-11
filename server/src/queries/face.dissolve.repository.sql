@@ -11,7 +11,7 @@ where
     from
       "asset_face"
     where
-      "asset_face"."personId" = $2
+      "asset_face"."personGroupId" = $2
       and not (
         exists (
           select
@@ -27,7 +27,7 @@ where
           from
             "person"
           where
-            "person"."id" = "asset_face"."personId"
+            "person"."personGroupId" = "asset_face"."personGroupId"
             and "person"."type" = $3
         )
       )
@@ -77,7 +77,7 @@ from
   "asset_face"
 where
   (
-    "asset_face"."personId" = $4
+    "asset_face"."personGroupId" = $4
     and not (
       exists (
         select
@@ -93,7 +93,7 @@ where
         from
           "person"
         where
-          "person"."id" = "asset_face"."personId"
+          "person"."personGroupId" = "asset_face"."personGroupId"
           and "person"."type" = $5
       )
     )
@@ -110,7 +110,7 @@ where
       "asset_face"
     where
       (
-        "asset_face"."personId" = $1
+        "asset_face"."personGroupId" = $1
         and not (
           exists (
             select
@@ -126,7 +126,7 @@ where
             from
               "person"
             where
-              "person"."id" = "asset_face"."personId"
+              "person"."personGroupId" = "asset_face"."personGroupId"
               and "person"."type" = $2
           )
         )
@@ -139,8 +139,8 @@ where
       "asset_face" as "other"
     where
       "other"."assetId" = "asset"."id"
-      and "other"."personId" is not null
-      and "other"."personId" != $3
+      and "other"."personGroupId" is not null
+      and "other"."personGroupId" != $3
       and "other"."deletedAt" is null
       and not (
         exists (
@@ -157,7 +157,7 @@ where
           from
             "person"
           where
-            "person"."id" = "other"."personId"
+            "person"."personGroupId" = "other"."personGroupId"
             and "person"."type" = $4
         )
       )
@@ -174,7 +174,7 @@ where
       "asset_face"
     where
       (
-        "asset_face"."personId" = $1
+        "asset_face"."personGroupId" = $1
         and not (
           exists (
             select
@@ -190,7 +190,7 @@ where
             from
               "person"
             where
-              "person"."id" = "asset_face"."personId"
+              "person"."personGroupId" = "asset_face"."personGroupId"
               and "person"."type" = $2
           )
         )
@@ -214,7 +214,7 @@ select
 from
   "asset_face"
 where
-  "asset_face"."personId" = $1
+  "asset_face"."personGroupId" = $1
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
   and not not (
@@ -232,14 +232,14 @@ where
       from
         "person"
       where
-        "person"."id" = "asset_face"."personId"
+        "person"."personGroupId" = "asset_face"."personGroupId"
         and "person"."type" = $2
     )
   )
 
 -- FaceDissolveRepository.getPeopleHealth
 select
-  "person"."id",
+  "person"."personGroupId" as "id",
   "person"."name",
   "person"."ownerId",
   count("asset_face"."id") as "faceCount",
@@ -268,17 +268,17 @@ select
   ) as "facesWithoutEmbedding"
 from
   "person"
-  left join "asset_face" on "asset_face"."personId" = "person"."id"
+  left join "asset_face" on "asset_face"."personGroupId" = "person"."personGroupId"
 where
   "person"."type" != $4
   and "person"."ownerId" = $5
 group by
-  "person"."id",
+  "person"."personGroupId",
   "person"."name",
   "person"."ownerId"
 order by
   "exif" desc,
-  "person"."id" asc
+  "person"."personGroupId" asc
 limit
   $6
 offset

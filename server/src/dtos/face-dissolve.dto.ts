@@ -30,25 +30,28 @@ export const DissolveRequestSchema = z
 export class DissolveRequestDto extends createZodDto(DissolveRequestSchema) {}
 export type DissolveRequest = z.infer<typeof DissolveRequestSchema>;
 
+// Every field here is a row count. `.int()` rather than a bare `z.number()`: patchOpenAPI rejects a
+// `type: number` property that carries no format, on the grounds that an unformatted number is almost
+// always an integer someone forgot to declare — and these are.
 const DissolveCountsSchema = z.object({
-  faces: z.number(),
-  exif: z.number(),
-  mlWithEmbedding: z.number(),
-  mlWithoutEmbedding: z.number(),
-  softDeleted: z.number(),
-  assets: z.number(),
-  sharedAssets: z.number(),
-  notRedetectable: z.number(),
-  remainingLiveFaces: z.number(),
+  faces: z.number().int(),
+  exif: z.number().int(),
+  mlWithEmbedding: z.number().int(),
+  mlWithoutEmbedding: z.number().int(),
+  softDeleted: z.number().int(),
+  assets: z.number().int(),
+  sharedAssets: z.number().int(),
+  notRedetectable: z.number().int(),
+  remainingLiveFaces: z.number().int(),
 });
 
-const DissolveWarningSchema = z.object({ code: z.string(), count: z.number() });
+const DissolveWarningSchema = z.object({ code: z.string(), count: z.number().int() });
 
 export const DissolveResponseSchema = z
   .object({
     personId: z.string(),
     counts: DissolveCountsSchema,
-    expectedFaceCount: z.number(),
+    expectedFaceCount: z.number().int(),
     warnings: z.array(DissolveWarningSchema),
   })
   .meta({ id: 'DissolveResponseDto' });
@@ -82,17 +85,17 @@ const PersonHealthRowSchema = z.object({
   id: z.string(),
   name: z.string(),
   ownerId: z.string(),
-  faceCount: z.number(),
-  machineLearning: z.number(),
-  exif: z.number(),
-  manual: z.number(),
-  facesWithoutEmbedding: z.number(),
+  faceCount: z.number().int(),
+  machineLearning: z.number().int(),
+  exif: z.number().int(),
+  manual: z.number().int(),
+  facesWithoutEmbedding: z.number().int(),
 });
 
 export const PeopleHealthResponseSchema = z
   .object({
     people: z.array(PersonHealthRowSchema),
-    total: z.number(),
+    total: z.number().int(),
     hasMore: z.boolean(),
   })
   .meta({ id: 'PeopleHealthResponseDto' });
