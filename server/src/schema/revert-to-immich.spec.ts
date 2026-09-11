@@ -61,7 +61,14 @@ for (const file of migrationFiles) {
 // Every `DELETE FROM "migration_overrides" ...;` statement in the script, concatenated. Not just
 // the step-6 IN-list: a couple of overrides are cleaned up next to the schema change that owns
 // them (step 7's trigram index), and those count.
-const overrideDeleteStatements = sql
+//
+// Line comments are stripped first. A `;` inside a `--` comment is not a statement terminator, but
+// the non-greedy match below cannot tell the difference: the renumber note sitting in the middle of
+// the step-6 IN-list contains one, and matching against the raw text truncates that statement
+// two thirds of the way through, reporting 46 names as uncovered that are listed right there.
+const sqlStatementsOnly = sql.replaceAll(/--[^\n]*/g, '');
+
+const overrideDeleteStatements = sqlStatementsOnly
   .matchAll(/DELETE FROM "migration_overrides"[\S\s]*?;/g)
   .map((m) => m[0])
   .toArray()
