@@ -20,7 +20,7 @@ void main() {
     });
 
     test('locationPresence alone is not empty', () {
-      final f = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+      final f = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
       expect(f.isEmpty, false);
     });
   });

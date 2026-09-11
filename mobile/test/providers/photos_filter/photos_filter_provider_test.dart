@@ -109,7 +109,7 @@ void main() {
     test('setLocation(null) clears locationPresence', () {
       final notifier = container.read(photosFilterProvider.notifier);
 
-      notifier.setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      notifier.setLocation(const SearchLocationFilter(locationPresence: 'noGps'));
       notifier.setLocation(null);
 
       expect(container.read(photosFilterProvider).location.locationPresence, isNull);
@@ -119,8 +119,8 @@ void main() {
     test('choosing a country replaces the group and drops locationPresence', () {
       final notifier = container.read(photosFilterProvider.notifier);
 
-      notifier.setLocation(SearchLocationFilter(locationPresence: 'noGps'));
-      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.setLocation(const SearchLocationFilter(locationPresence: 'noGps'));
+      notifier.setLocation(const SearchLocationFilter(country: 'France'));
 
       final location = container.read(photosFilterProvider).location;
       expect(location.locationPresence, isNull);

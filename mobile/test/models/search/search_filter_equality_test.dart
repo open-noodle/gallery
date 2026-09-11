@@ -35,15 +35,15 @@ void main() {
     });
 
     test('filters differing only by locationPresence are unequal', () {
-      final a = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
-      final b = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
+      final a = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
+      final b = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noPlaceName'));
 
       expect(a == b, false);
       expect(a.hashCode == b.hashCode, false);
     });
 
     test('locationPresence round-trips through toMap/fromMap', () {
-      final original = SearchLocationFilter(locationPresence: 'noGps');
+      const original = SearchLocationFilter(locationPresence: 'noGps');
 
       expect(SearchLocationFilter.fromMap(original.toMap()).locationPresence, 'noGps');
     });

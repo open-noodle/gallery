@@ -45,7 +45,7 @@ class SearchApiRepository extends ApiRepository {
         city: filter.location.city == null ? const Optional.absent() : Optional.present(filter.location.city),
         locationPresence: filter.location.locationPresence == null
             ? const Optional.absent()
-            : Optional.present(SmartSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence!)!),
+            : Optional.present(SmartSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence)),
         make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make),
         model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model),
         takenAfter: filter.date.takenAfter == null
@@ -85,7 +85,7 @@ class SearchApiRepository extends ApiRepository {
       city: filter.location.city == null ? const Optional.absent() : Optional.present(filter.location.city),
       locationPresence: filter.location.locationPresence == null
           ? const Optional.absent()
-          : Optional.present(MetadataSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence!)!),
+          : Optional.present(MetadataSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence)),
       make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make),
       model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model),
       takenAfter: filter.date.takenAfter == null

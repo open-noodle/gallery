@@ -158,7 +158,7 @@ class _CountryWrap extends ConsumerWidget {
             label: Text(entry.labelKey.tr()),
             selected: selectedPresence == entry.value,
             onSelected: (_) {
-              HapticFeedback.selectionClick();
+              unawaited(HapticFeedback.selectionClick());
               // Replaces the whole location group — a fresh SearchLocationFilter, never
               // copyWith (copyWith's `x ?? this.x` can't clear a field it doesn't set).
               ref
