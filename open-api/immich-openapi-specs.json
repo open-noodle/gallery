@@ -40871,19 +40871,27 @@
         "properties": {
           "boundingBoxX1": {
             "description": "Bounding box X1",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "boundingBoxX2": {
             "description": "Bounding box X2",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "boundingBoxY1": {
             "description": "Bounding box Y1",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "boundingBoxY2": {
             "description": "Bounding box Y2",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "id": {
             "description": "Asset face ID",
@@ -40893,11 +40901,15 @@
           },
           "imageHeight": {
             "description": "Original image height",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "imageWidth": {
             "description": "Original image width",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "isEditorDrawn": {
             "description": "Whether this face box was drawn by a space Owner/Editor, and so may be deleted by one",

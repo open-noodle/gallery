@@ -3317,7 +3317,7 @@ select
 from
   "asset_face"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
-  left join "person" on "person"."id" = "asset_face"."personId"
+  left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
   left join (
     select
       "shared_space_person_face"."assetFaceId",
@@ -3338,7 +3338,7 @@ where
   and "asset"."deletedAt" is null
   and "asset"."isOffline" = $6
   and (
-    "person"."id" is null
+    "person"."personGroupId" is null
     or "person"."isHidden" = $7
   )
   and (

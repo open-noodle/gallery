@@ -147,12 +147,15 @@ const SharedSpacePersonResponseSchema = z
 const SpaceAssetFaceResponseSchema = z
   .object({
     id: z.uuidv4().describe('Asset face ID'),
-    boundingBoxX1: z.number().describe('Bounding box X1'),
-    boundingBoxY1: z.number().describe('Bounding box Y1'),
-    boundingBoxX2: z.number().describe('Bounding box X2'),
-    boundingBoxY2: z.number().describe('Bounding box Y2'),
-    imageWidth: z.number().describe('Original image width'),
-    imageHeight: z.number().describe('Original image height'),
+    // `z.int()`, not `z.number()`: these are `integer` columns on `asset_face`, and v3.2.0's
+    // patchOpenAPI refuses a bare `number` without an explicit format. Matches every sibling face
+    // DTO (person.dto.ts, sync.dto.ts).
+    boundingBoxX1: z.int().describe('Bounding box X1'),
+    boundingBoxY1: z.int().describe('Bounding box Y1'),
+    boundingBoxX2: z.int().describe('Bounding box X2'),
+    boundingBoxY2: z.int().describe('Bounding box Y2'),
+    imageWidth: z.int().describe('Original image width'),
+    imageHeight: z.int().describe('Original image height'),
     spacePersonId: z.uuidv4().nullable().describe('Space person ID this face is attached to, if any'),
     spacePersonName: z.string().nullable().describe('Space person name this face is attached to, if any'),
     isEditorDrawn: z
