@@ -6,13 +6,13 @@ import 'package:openapi/api.dart';
 
 import '../test_helpers/wire_dates.dart';
 
-GameRoundDetailResponseDto _round(int index, {num? score}) => GameRoundDetailResponseDto(
+GameRoundDetailResponseDto _round(int index, {int? score}) => GameRoundDetailResponseDto(
   index: index,
   type: GameRoundType.location,
   score: score == null ? const Optional.absent() : Optional.present(score),
 );
 
-GameRoundDetailResponseDto _dateRound(int index, {num? score}) => GameRoundDetailResponseDto(
+GameRoundDetailResponseDto _dateRound(int index, {int? score}) => GameRoundDetailResponseDto(
   index: index,
   type: GameRoundType.date,
   score: score == null ? const Optional.absent() : Optional.present(score),
@@ -220,7 +220,7 @@ void main() {
     });
 
     test('counts an unanswered round as zero rather than skipping it', () {
-      // `score` is Optional<num?> and `Absent.value` THROWS, so this also pins the `.orElse(null)`.
+      // `score` is Optional<int?> and `Absent.value` THROWS, so this also pins the `.orElse(null)`.
       // A game abandoned halfway is not worth more per round than one played out.
       expect(soloTotal([_round(0, score: 4200), _round(1)]), 4200);
     });
@@ -262,10 +262,7 @@ void main() {
       // a stuck mobile player sees would point at a control that does not exist on their device,
       // which is the same defect already ruled must-fix on the daily card (game_solo_daily_
       // unavailable exists for exactly this reason).
-      expect(
-        soloCreateFailureKey(ApiException(400, '{"message":"no candidates"}')),
-        'game_solo_no_photos_in_library',
-      );
+      expect(soloCreateFailureKey(ApiException(400, '{"message":"no candidates"}')), 'game_solo_no_photos_in_library');
     });
 
     test('an offline 400 does not blame the library', () {

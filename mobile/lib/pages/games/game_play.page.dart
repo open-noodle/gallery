@@ -219,7 +219,9 @@ class _SoloCompletedState extends ConsumerState<_SoloCompleted> {
   bool _startingAgain = false;
 
   Future<void> _playAgain() async {
-    if (_startingAgain) return;
+    if (_startingAgain) {
+      return;
+    }
     setState(() => _startingAgain = true);
 
     String? nextId;
@@ -229,10 +231,10 @@ class _SoloCompletedState extends ConsumerState<_SoloCompleted> {
       // rematch draws from. Mobile never sends an override at all (see SoloGameApiRepository).
       final next = await ref
           .read(soloGameApiRepositoryProvider)
-          .create(roundCount: widget.challenge.roundCount.toInt(), type: challengeTypeOf(widget.challenge.rounds));
+          .create(roundCount: widget.challenge.roundCount, type: challengeTypeOf(widget.challenge.rounds));
       nextId = next.id;
     } catch (error) {
-      if (context.mounted) {
+      if (mounted) {
         ImmichToast.show(
           context: context,
           msg: soloCreateFailureKey(error).t(context: context),
@@ -243,13 +245,17 @@ class _SoloCompletedState extends ConsumerState<_SoloCompleted> {
       // Cleared BEFORE the push, not after it: `pushRoute` does not complete until the pushed route
       // POPS, so clearing it afterwards would leave this button disabled for the whole next game
       // and dead on the way back. Same shape as PhotoGuesserPage's create.
-      if (mounted) setState(() => _startingAgain = false);
+      if (mounted) {
+        setState(() => _startingAgain = false);
+      }
     }
 
     // Pushed rather than replaced, matching web's `goto`: PhotoGuesserPage awaits the FIRST push
     // and refreshes its stats and history when it completes, so replacing this route would report
     // that the game was over while the rematch was still being played.
-    if (nextId != null && context.mounted) await context.pushRoute(GamePlayRoute(challengeId: nextId));
+    if (nextId != null && mounted) {
+      await context.pushRoute(GamePlayRoute(challengeId: nextId));
+    }
   }
 
   @override

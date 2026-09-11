@@ -52,9 +52,6 @@ void main() {
     return route.type ?? router.defaultRouteType;
   }
 
-  List<AutoRouteGuard> guardsOf(String routeName) =>
-      router.routes.firstWhere((route) => route.name == routeName).guards;
-
   group('AppRouter page transitions', () {
     // A CustomRouteType renders its own transitionsBuilder instead of
     // delegating to the platform PageTransitionsTheme, so iOS never wraps the

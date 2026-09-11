@@ -48,7 +48,9 @@ class SpaceGamesPage extends HookConsumerWidget {
   /// a second challenge.
   Future<void> _create(BuildContext context, WidgetRef ref, ValueNotifier<bool> creating) async {
     final choice = await ChallengeCreateSheet.show(context);
-    if (choice == null) return;
+    if (choice == null) {
+      return;
+    }
     creating.value = true;
     try {
       await ref
@@ -123,7 +125,9 @@ class SpaceGamesPage extends HookConsumerWidget {
     // this refresh the page redraws the pre-play snapshot.
     Future<void> play(String challengeId) async {
       await context.pushRoute(GamePlayRoute(challengeId: challengeId));
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
       invalidateSpaceGames(ref, spaceId);
     }
 
@@ -218,7 +222,7 @@ class SpaceGamesPage extends HookConsumerWidget {
                 ),
                 data: (month) => StandingsSection(
                   today: todayBoard?.valueOrNull,
-                  todayRoundCount: dailyChallenge?.roundCount.toInt() ?? 0,
+                  todayRoundCount: dailyChallenge?.roundCount ?? 0,
                   month: month,
                   currentUserId: currentUserId,
                 ),

@@ -26,7 +26,7 @@ class GameRoundReviewPage extends ConsumerWidget {
     // `GameSessionState.currentRound` does (see its doc comment): correct either way only because
     // the server orders rounds over a contiguous 0..N-1 set, and looking it up keeps that
     // invariant local rather than leaning on it silently here too.
-    final round = session.valueOrNull?.challenge.rounds.firstWhereOrNull((r) => r.index.toInt() == index);
+    final round = session.valueOrNull?.challenge.rounds.firstWhereOrNull((r) => r.index == index);
 
     // `hasError` is checked separately from `round == null`: a failed load would otherwise spin
     // forever, which is the same dead-end the play page gives a retry for.

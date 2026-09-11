@@ -31,7 +31,7 @@
   // "game_you_were_away" taking a pre-formatted {distance} via formatDistanceKm), so the day unit
   // is localised here via the existing generic day/days pluraliser rather than a new key.
   let offsetLabel = $derived(
-    offsetDays == null ? undefined : `${offsetDays} ${$t('cutoff_day', { values: { count: offsetDays } })}`,
+    offsetDays === undefined ? undefined : `${offsetDays} ${$t('cutoff_day', { values: { count: offsetDays } })}`,
   );
 
   let formattedAnswerDate = $derived(
@@ -58,7 +58,7 @@
   // reached the server. Render the answer alone rather than an empty map in that case — the reveal
   // is still informative without a guess pin to compare it against.
   let mapMarkers = $derived(
-    type === 'location' && answer?.lat != null && answer?.lon != null
+    type === 'location' && answer !== undefined && answer.lat !== null && answer.lon !== null
       ? ([
           ...(guess ? [{ id: 'guess', lat: guess.lat, lon: guess.lon, city: null, state: null, country: null }] : []),
           { id: 'answer', lat: answer.lat, lon: answer.lon, city: null, state: null, country: null },
@@ -91,7 +91,7 @@
       ></div>
     </div>
 
-    {#if type === 'location' && distanceKm != null}
+    {#if type === 'location' && distanceKm !== undefined}
       <p data-testid="round-result-distance">
         {$t('game_you_were_away', { values: { distance: formatDistanceKm(distanceKm) } })}
       </p>

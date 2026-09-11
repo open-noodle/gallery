@@ -120,7 +120,7 @@ bool shouldShowStandings(bool? enabled, List<num> daysPlayed) {
 int? firstUnansweredIndex(List<GameRoundDetailResponseDto> rounds) {
   for (final round in rounds) {
     if (round.score.orElse(null) == null) {
-      return round.index.toInt();
+      return round.index;
     }
   }
   return null;

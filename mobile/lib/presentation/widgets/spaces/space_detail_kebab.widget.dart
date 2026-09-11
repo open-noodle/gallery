@@ -82,7 +82,7 @@ class SpaceDetailKebab extends StatelessWidget {
         PopupMenuItem<_KebabAction>(
           key: const Key('space-detail-kebab-challenges'),
           value: _KebabAction.challenges,
-          child: Text('game_challenges'.t(context: context)),
+          child: Text(context.t.game_challenges),
         ),
         if (canEdit)
           PopupMenuItem<_KebabAction>(

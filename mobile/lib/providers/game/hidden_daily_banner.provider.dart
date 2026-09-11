@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -12,7 +14,9 @@ String encodeHiddenDailyBanners(Set<String> spaceIds) => jsonEncode(spaceIds.toL
 Set<String> decodeHiddenDailyBanners(String json) {
   try {
     final raw = jsonDecode(json);
-    if (raw is! List) return {};
+    if (raw is! List) {
+      return {};
+    }
     return raw.whereType<String>().toSet();
   } catch (_) {
     return {};
@@ -63,6 +67,6 @@ class HiddenDailyBannerNotifier extends Notifier<Set<String>> {
       next.remove(spaceId);
     }
     state = next;
-    ref.read(hiddenDailyBannerPrefsProvider).saveHidden(next);
+    unawaited(ref.read(hiddenDailyBannerPrefsProvider).saveHidden(next));
   }
 }

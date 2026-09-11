@@ -24,7 +24,9 @@ class RoundReviewList extends StatelessWidget {
     // `score` is the answered marker and is `Optional<num?>` — `.value` THROWS, so this must stay
     // `.orElse(null)`. A score of 0 is a real result and counts as guessed.
     final played = rounds.where((round) => round.score.orElse(null) != null).toList();
-    if (played.isEmpty) return const SizedBox.shrink();
+    if (played.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       key: const Key('round-review-list'),
@@ -36,10 +38,10 @@ class RoundReviewList extends StatelessWidget {
         ),
         for (final round in played)
           _ReviewRow(
-            key: Key('round-review-row-${round.index.toInt()}'),
+            key: Key('round-review-row-${round.index}'),
             challengeId: challengeId,
             round: round,
-            onTap: () => onRoundTap(round.index.toInt()),
+            onTap: () => onRoundTap(round.index),
           ),
       ],
     );
@@ -55,7 +57,7 @@ class _ReviewRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final index = round.index.toInt();
+    final index = round.index;
     final result = RoundResult.fromRound(round);
     final isLocation = result.type == GameRoundType.location;
 

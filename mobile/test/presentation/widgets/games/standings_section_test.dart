@@ -115,11 +115,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final monthRows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
-    expect(
-      monthRows.map((row) => row.userId),
-      ['a', 'b', 'c', 'd'],
-      reason: 'An inverted showToday computation would still show the 1-row daily board here',
-    );
+    expect(monthRows.map((row) => row.userId), [
+      'a',
+      'b',
+      'c',
+      'd',
+    ], reason: 'An inverted showToday computation would still show the 1-row daily board here');
 
     await tester.tap(find.byKey(const Key('standings-tab-today')));
     await tester.pumpAndSettle();
@@ -155,11 +156,10 @@ void main() {
       );
 
       final rows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
-      expect(
-        rows.map((row) => row.userId),
-        ['x', 'y'],
-        reason: 'A descending-total sort would swap these — the widget must trust array order unconditionally',
-      );
+      expect(rows.map((row) => row.userId), [
+        'x',
+        'y',
+      ], reason: 'A descending-total sort would swap these — the widget must trust array order unconditionally');
     },
   );
 

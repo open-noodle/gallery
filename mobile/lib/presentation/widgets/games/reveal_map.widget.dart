@@ -36,7 +36,9 @@ class _RevealMapState extends State<RevealMap> {
   /// `_ensureManagerInitialized`, which throws while the style is still loading.
   Future<void> _draw() async {
     final controller = _controller;
-    if (controller == null) return;
+    if (controller == null) {
+      return;
+    }
     final answer = widget.answer;
     final guess = widget.guess;
 

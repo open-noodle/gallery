@@ -7,7 +7,7 @@ import 'package:openapi/api.dart';
 
 class _MockGameApiRepository extends Mock implements GameApiRepository {}
 
-GameRoundDetailResponseDto _round(int index, {GameRoundType type = GameRoundType.location, num? score, num? lat}) =>
+GameRoundDetailResponseDto _round(int index, {GameRoundType type = GameRoundType.location, int? score, double? lat}) =>
     GameRoundDetailResponseDto(
       index: index,
       type: type,
@@ -38,7 +38,7 @@ GameChallengeDetailResponseDto _challenge(
 // GameGuessResponseDto has several other required-but-nullable fields (guessDate, guessLat,
 // guessLon, offsetDays) that the individual tests below do not care about — this fills them with
 // null so each call site can stay focused on the fields the assertions actually check.
-GameGuessResponseDto _guessResponse({required num score, num? distanceKm, num? offsetDays}) => GameGuessResponseDto(
+GameGuessResponseDto _guessResponse({required int score, double? distanceKm, int? offsetDays}) => GameGuessResponseDto(
   roundId: 'r0',
   userId: 'u',
   score: score,
@@ -61,7 +61,7 @@ GameGuessResponseDto _guessResponse({required num score, num? distanceKm, num? o
 ProviderContainer _container(GameApiRepository repository) {
   final container = ProviderContainer(overrides: [gameApiRepositoryProvider.overrideWithValue(repository)]);
   addTearDown(container.dispose);
-  container.listen(gameSessionProvider('challenge-1'), (_, __) {});
+  container.listen(gameSessionProvider('challenge-1'), (_, _) {});
   return container;
 }
 
@@ -256,7 +256,8 @@ void main() {
     expect(
       state.result!.guess,
       isNull,
-      reason: "The _round fixture has no way to attach a guess to the refetched round — the test below "
+      reason:
+          "The _round fixture has no way to attach a guess to the refetched round — the test below "
           'proves a refetch CAN carry the guess the server already had on file, so this is not, by '
           'itself, evidence the request never reached the server',
     );
@@ -278,13 +279,7 @@ void main() {
             score: const Optional.present(900),
             answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: null, lat: 10, lon: 2)),
             guess: Optional.present(
-              GameRoundDetailResponseDtoGuess(
-                lat: 38.72,
-                lon: -9.14,
-                date: null,
-                distanceKm: 412.3,
-                offsetDays: null,
-              ),
+              GameRoundDetailResponseDtoGuess(lat: 38.72, lon: -9.14, date: null, distanceKm: 412.3, offsetDays: null),
             ),
           ),
         _round(1),
@@ -622,9 +617,7 @@ void main() {
     // errors here instead of failing an assertion.
     test('tolerates an unguessed round, whose fields are absent', () {
       // NOT `const`: the generated constructor is not a const constructor.
-      final result = RoundResult.fromRound(
-        GameRoundDetailResponseDto(index: 2, type: GameRoundType.location),
-      );
+      final result = RoundResult.fromRound(GameRoundDetailResponseDto(index: 2, type: GameRoundType.location));
 
       expect(result.score, 0);
       expect(result.guess, isNull);
@@ -636,7 +629,9 @@ void main() {
     var fetches = 0;
     when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
       fetches++;
-      if (fetches > 1) throw Exception('offline');
+      if (fetches > 1) {
+        throw Exception('offline');
+      }
       return _challenge([_round(0), _round(1)]);
     });
     when(

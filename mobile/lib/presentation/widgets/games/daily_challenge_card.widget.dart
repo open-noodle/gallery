@@ -88,7 +88,9 @@ class DailySlot extends ConsumerWidget {
   /// the caller drops the slot entirely, so reserving anything would leave a band of empty space
   /// and shift every scrubber offset below it.
   static double reservedHeight({required bool? dailyChallengeEnabled, bool hidden = false}) {
-    if (hidden || !showsOnTimeline(dailyChallengeEnabled: dailyChallengeEnabled)) return 0;
+    if (hidden || !showsOnTimeline(dailyChallengeEnabled: dailyChallengeEnabled)) {
+      return 0;
+    }
     return kDailyCardHeight;
   }
 
@@ -99,7 +101,9 @@ class DailySlot extends ConsumerWidget {
       // so it sizes to its content in every locale and at every text scale. See the class doc.
       return allowPrompt && canEdit ? DailyChallengePrompt(onDecide: onDecide) : const SizedBox.shrink();
     }
-    if (!dailyChallengeEnabled!) return const SizedBox.shrink();
+    if (!dailyChallengeEnabled!) {
+      return const SizedBox.shrink();
+    }
 
     // Only reached for an opted-in space: reading this generates the daily server-side.
     final daily = ref.watch(gameDailyProvider(spaceId));
