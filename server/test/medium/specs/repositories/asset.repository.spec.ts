@@ -2842,10 +2842,10 @@ describe(AssetRepository.name, () => {
 
       await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
 
-      const [asOwner] = await sut.getByIdsWithAllRelationsButStacks([asset.id], owner.id);
+      const [asOwner] = await sut.getByIdsWithAllRelationsButStacks([asset.id], owner.id, owner.id);
       expect(asOwner.isFavoriteForUser).toBe(false);
 
-      const [asViewer] = await sut.getByIdsWithAllRelationsButStacks([asset.id], viewer.id);
+      const [asViewer] = await sut.getByIdsWithAllRelationsButStacks([asset.id], viewer.id, viewer.id);
       expect(asViewer.isFavoriteForUser).toBe(true);
     });
 

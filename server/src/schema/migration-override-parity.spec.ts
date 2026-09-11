@@ -45,10 +45,10 @@ import {
 import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger';
 import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit';
 import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId';
-import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables';
 import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift';
 import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
 import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable';
+import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables';
 
 describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parity', () => {
   beforeEach(() => {
