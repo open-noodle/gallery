@@ -1,13 +1,13 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_details/people_details.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
@@ -22,7 +22,7 @@ import '../../../widget_tester_extensions.dart';
 // (`DetailPanelPeople.svelte`, slice 9). The label is server-derived on
 // `PersonResponseDto.familyRelationLabel` (never computed client-side) — an absent field means
 // no family access at all (`A12`), a present-but-null value means access is granted but no
-// relationship is recorded, and a present string is the relation itself. `DriftPerson` mirrors
+// relationship is recorded, and a present string is the relation itself. `Person` mirrors
 // that split as `hasFamilyAccess` + `familyRelationLabel`.
 //
 // `A12`: with no family access the strip must render exactly as it does today, so the
@@ -37,15 +37,11 @@ class _StubCurrentUserNotifier extends CurrentUserProvider {
   }
 }
 
-DriftPerson _person(String id, String name, {bool hasFamilyAccess = false, String? familyRelationLabel}) => DriftPerson(
+Person _person(String id, String name, {bool hasFamilyAccess = false, String? familyRelationLabel}) => Person(
   id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'admin',
   name: name,
+  updatedAt: DateTime(2024, 1, 1),
   isFavorite: false,
-  isHidden: false,
-  color: null,
   hasFamilyAccess: hasFamilyAccess,
   familyRelationLabel: familyRelationLabel,
 );
@@ -58,7 +54,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -76,12 +72,12 @@ void main() {
     await db.close();
   });
 
-  Future<void> pumpStrip(WidgetTester tester, List<DriftPerson> people) async {
+  Future<void> pumpStrip(WidgetTester tester, List<Person> people) async {
     final asset = TestUtils.createRemoteAsset(id: 'asset-1', ownerId: 'admin');
     await tester.pumpConsumerWidget(
       PeopleDetails(asset: asset),
       overrides: [
-        driftPeopleAssetProvider.overrideWith((ref, key) async => people),
+        peopleAssetProvider.overrideWith((ref, key) async => people),
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith(
           (ref) => _StubCurrentUserNotifier(
