@@ -18,6 +18,7 @@ import { clearConfigCache } from 'src/utils/config.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -28,6 +29,11 @@ const setup = (db?: Kysely<DB>) => {
       AccessRepository,
       AlbumRepository,
       AssetRepository,
+      // gallery-fork (#763): per-user favorites live in their own overlay table, so the keeper's
+      // merged favorite is written by AssetFavoriteRepository.mergeOnto rather than an
+      // asset."isFavorite" column. Real rather than mocked: 'should merge isFavorite into the
+      // keeper' asserts the merged row is readable back through AssetRepository.getById.
+      AssetFavoriteRepository,
       ConfigRepository,
       DuplicateRepository,
       // gallery-fork: resolveGroup carries the keeper's shared-space membership (#317), so it
