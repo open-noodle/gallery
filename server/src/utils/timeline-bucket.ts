@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { TimeBucketSize } from 'src/enum';
 
-const TIME_BUCKET_PATTERN = /^([+]?\d{4,6})-(\d{2})-(\d{2})$/;
+const TIME_BUCKET_PATTERN = /^([+]?\d{4,6})-(\d{2})-(\d{2})(?:T00:00:00(?:\.000)?Z)?$/;
 
 export function dateTruncUnitForTimeBucketSize(bucketSize: TimeBucketSize) {
   return {
