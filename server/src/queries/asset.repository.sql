@@ -530,7 +530,15 @@ select
             from
               "person"
             where
-              "asset_face"."personId" = "person"."id"
+              "person"."personGroupId" = "asset_face"."personGroupId"
+            order by
+              case
+                when "person"."ownerId" = $1 then 0
+                when "person"."ownerId" = "asset"."ownerId" then 1
+                else 2
+              end
+            limit
+              $2
           ) as "person" on true
         where
           "asset_face"."assetId" = "asset"."id"
@@ -574,13 +582,13 @@ select
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $1::uuid
+      and "asset_favorite"."userId" = $3::uuid
   ) as "isFavoriteForUser"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."id" = any ($2::uuid[])
+  "asset"."id" = any ($4::uuid[])
 
 -- AssetRepository.deleteAll
 delete from "asset"
