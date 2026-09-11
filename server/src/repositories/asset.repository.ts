@@ -321,7 +321,10 @@ const withBoundingBox = <T>(qb: SelectQueryBuilder<DB, 'asset' | 'asset_exif', T
   );
 };
 
-const formatUtcDate = (date: Date) => date.toISOString().slice(0, 10);
+// Postgres writes years past 9999 unsigned (`12345-01-01`), while `toISOString()` uses the ISO 8601
+// expanded-year form (`+012346-01-01`) — six digits plus a sign, so a fixed 10-character slice cuts
+// the day off. Take the whole date part and drop the sign to land back on Postgres's own spelling.
+const formatUtcDate = (date: Date) => date.toISOString().split('T', 1)[0].replace(/^\+0*/, '');
 
 // Advance a YYYY-MM-DD bucket-start date by one bucket interval (the exclusive
 // upper bound of the requested range).
@@ -1708,9 +1711,12 @@ export class AssetRepository {
     const maxStart = sorted.at(-1)!;
     const maxEnd = addBucketInterval(maxStart, bucketSize);
 
-    // The CTE `timeBucket` is the truncated timestamptz at UTC midnight; the
-    // requested YYYY-MM-DD strings correspond to those exact values.
-    const requestedBucketDates = requestedBuckets.map((tb) => new Date(`${tb}T00:00:00Z`));
+    // The CTE `timeBucket` is the truncated timestamptz at UTC midnight; the requested YYYY-MM-DD
+    // strings correspond to those exact values. Bound as text and cast in SQL, never as a `Date`: a bucket
+    // past year 9999 is unparseable by `Date` in Postgres's unsigned spelling, and the signed
+    // spelling `Date` does emit is rejected by Postgres as a timezone displacement — so the
+    // round-trip is lossy in both directions. The explicit `Z` keeps the comparison pinned to UTC.
+    const requestedBucketStarts = requestedBuckets.map((tb) => sql<Date>`${`${tb}T00:00:00Z`}::timestamptz`);
 
     // Narrow on the same column the buckets are derived from (createdAt for the
     // "date added" timeline, localDateTime otherwise) so createdAt-grouped covers
@@ -1750,7 +1756,7 @@ export class AssetRepository {
       )
       .selectFrom('asset')
       .distinctOn('timeBucket')
-      .where('timeBucket', 'in', requestedBucketDates)
+      .where('timeBucket', 'in', requestedBucketStarts)
       .select([
         sql<string>`("timeBucket" AT TIME ZONE 'UTC')::date::text`.as('timeBucket'),
         'id as representativeAssetId',
