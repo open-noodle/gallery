@@ -231,6 +231,22 @@ describe('space-album-folders', () => {
 
       expect(getFolderPreviewAssetIds(tripsTree(), albums, 'trips')).toEqual(['asset-a2']);
     });
+
+    // 1091: getLinkedAlbums resolves a null cover to the newest space-visible asset in the
+    // album, so two different albums can legitimately resolve to the same cover asset (e.g. a
+    // photo added to both). SpaceCollage keys its `{#each}` on asset id — emitting that id twice
+    // throws Svelte's each_key_duplicate and aborts the whole tab render.
+    it('1091: does not repeat a cover asset id when two albums resolve to the same cover', () => {
+      const albums = [
+        album('a1', 'One', 'trips', { albumThumbnailAssetId: 'shared-asset', endDate: '2026-01-01T00:00:00.000Z' }),
+        album('a2', 'Two', 'trips', { albumThumbnailAssetId: 'shared-asset', endDate: '2026-02-01T00:00:00.000Z' }),
+        album('a3', 'Three', 'trips', { endDate: '2026-03-01T00:00:00.000Z' }),
+      ];
+
+      const previewAssetIds = getFolderPreviewAssetIds(tripsTree(), albums, 'trips');
+
+      expect(previewAssetIds).toEqual(['asset-a3', 'shared-asset']);
+    });
   });
 
   describe('isDescendant', () => {
@@ -371,6 +387,21 @@ describe('space-album-folders', () => {
       // Exactly one bucketing pass, one read per album. The per-card shape this replaced read
       // folderId once per album PER FOLDER, twice over (count + previews) — 200 x 200 x 2.
       expect(folderIdReads).toBe(albums.length);
+    });
+
+    // 1091: same case as getFolderPreviewAssetIds above, against the batch pass the components
+    // actually call.
+    it('1091: does not repeat a cover asset id when two albums resolve to the same cover', () => {
+      const folders = [folder('trips', 'Trips')];
+      const albums = [
+        album('a1', 'One', 'trips', { albumThumbnailAssetId: 'shared-asset', endDate: '2026-01-01T00:00:00.000Z' }),
+        album('a2', 'Two', 'trips', { albumThumbnailAssetId: 'shared-asset', endDate: '2026-02-01T00:00:00.000Z' }),
+        album('a3', 'Three', 'trips', { endDate: '2026-03-01T00:00:00.000Z' }),
+      ];
+
+      const summaries = buildFolderSummaries(folders, albums);
+
+      expect(summaries.get('trips')?.previewAssetIds).toEqual(['asset-a3', 'shared-asset']);
     });
   });
 });
