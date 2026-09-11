@@ -257,9 +257,7 @@ void main() {
     // path itself. Any second entry is a new caller. (The sibling local-mirror forward is
     // `_remoteRepository.updateAssets`, renamed upstream from `update`, so the `.update(` regex no
     // longer sees it — no loss: that one writes Drift, never the owner-only endpoint.)
-    const expected = <String>[
-      'lib/domain/services/asset.service.dart -> update() -> _apiRepository.update',
-    ];
+    const expected = <String>['lib/domain/services/asset.service.dart -> update() -> _apiRepository.update'];
 
     expect(
       findIsFavoriteCallSites(RegExp(r'\b([A-Za-z0-9_$]+(?:\.[A-Za-z0-9_$]+)*\.update)\s*\(')),
