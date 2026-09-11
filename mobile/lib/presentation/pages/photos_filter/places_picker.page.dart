@@ -212,7 +212,9 @@ class _PresenceRows extends ConsumerWidget {
       if ((suggestions?.hasNoPlaceNameAssets ?? false) || selectedPresence == 'noPlaceName')
         _PresenceEntry('noPlaceName', context.t.filter_location_no_place_name),
     ];
-    if (entries.isEmpty) return const SizedBox.shrink();
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,

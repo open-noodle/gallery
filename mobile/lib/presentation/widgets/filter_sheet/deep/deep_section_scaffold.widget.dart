@@ -68,8 +68,10 @@ class _DeepSectionScaffoldState<T> extends State<DeepSectionScaffold<T>> {
       // Body is hidden by CollapsibleSection when empty; isEmpty drives the "(0)" + disabled header.
       // widget.emptyCaptionKey is kept on the constructor for callers, but its caption is
       // unreachable while isEmpty is true, so we skip building it here.
-      // `hasExtraEntries` (folded into `isEmpty` above) opts out of the collapse — see its field doc.
-      body = (cache.isEmpty && !widget.hasExtraEntries)
+      // `hasExtraEntries` (folded into `isEmpty` above) opts out of the collapse — see its field
+      // doc. Inside this `cache != null` branch `isEmpty` IS `cache.isEmpty && !hasExtraEntries`,
+      // so reuse it rather than restating the predicate.
+      body = isEmpty
           ? const SizedBox.shrink()
           : Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: widget.childBuilder(cache));
     } else if (items is AsyncError) {
