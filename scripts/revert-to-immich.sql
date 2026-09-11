@@ -509,16 +509,16 @@ DELETE FROM "kysely_migrations"
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
   '1787100000000-DropPersonFksBeforeClusterGroups',
   '1790000000000-FixFaceRepairScanInFlightIndex',
-  '1791000000000-AddPhotoGuessingGame',
   '1791000000000-RepointFaceReviewToPersonGroup',
-  '1792000000000-AddDailyGameChallenge',
   '1792123120451-AddSharedLinkSpaceId',
   '1793000000000-AddSharedSpaceAlbumHidden',
-  '1793000000000-AddSpaceDailyChallengeEnabled',
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
-  '1794000000000-AddSoloGameChallenge',
+  '1797000000000-AddPhotoGuessingGame',
+  '1797100000000-AddDailyGameChallenge',
+  '1797200000000-AddSpaceDailyChallengeEnabled',
+  '1797300000000-AddSoloGameChallenge',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -597,7 +597,9 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
       OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
       OR "name" LIKE '%AddPhotoGuessingGame%'
-      OR "name" LIKE '%AddDailyGameChallenge%';
+      OR "name" LIKE '%AddDailyGameChallenge%'
+      OR "name" LIKE '%AddSpaceDailyChallengeEnabled%'
+      OR "name" LIKE '%AddSoloGameChallenge%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;

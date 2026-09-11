@@ -46,7 +46,7 @@
 
 | File                                                                  | Responsibility                                                           |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts` | Nullable scope, ownerId, frozen source flags, CHECK, two partial indexes |
+| `src/schema/migrations-gallery/1797300000000-AddSoloGameChallenge.ts` | Nullable scope, ownerId, frozen source flags, CHECK, two partial indexes |
 | `src/services/game/challenge-pool.ts`                                 | The `ChallengePool` interface and its shared types                       |
 | `src/services/game/space-pool.ts`                                     | `SpacePool` — membership scope, wraps the existing repository methods    |
 | `src/services/game/personal-pool.ts`                                  | `PersonalPool` — own + optional partner + optional space arms            |
@@ -71,7 +71,7 @@
 
 **Files:**
 
-- Create: `server/src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts`
+- Create: `server/src/schema/migrations-gallery/1797300000000-AddSoloGameChallenge.ts`
 - Modify: `server/src/schema/tables/game-challenge.table.ts`
 - Test: `server/test/medium/specs/migrations/game-challenge-scope.migration.spec.ts` (create)
 
@@ -201,7 +201,7 @@ export class GameChallengeTable {
 
 - [x] **Step 4: Write the migration**
 
-Create `server/src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts`:
+Create `server/src/schema/migrations-gallery/1797300000000-AddSoloGameChallenge.ts`:
 
 ```ts
 import { Kysely, sql } from 'kysely';
@@ -285,7 +285,7 @@ Start the server against a migrated database and confirm the boot log contains n
 
 ```bash
 git add server/src/schema/tables/game-challenge.table.ts \
-        server/src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts \
+        server/src/schema/migrations-gallery/1797300000000-AddSoloGameChallenge.ts \
         server/test/medium/specs/migrations/game-challenge-scope.migration.spec.ts
 git commit -m "feat(game): let a challenge belong to a user instead of a space
 
