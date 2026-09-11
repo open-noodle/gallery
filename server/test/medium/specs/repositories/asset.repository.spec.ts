@@ -1,4 +1,4 @@
-import { Insertable, Kysely } from 'kysely';
+import { Insertable, Kysely, sql } from 'kysely';
 import {
   AssetFileType,
   AssetOrder,
@@ -812,6 +812,51 @@ describe(AssetRepository.name, () => {
           timeBuckets: ['2023-12-01'],
         }),
       ).resolves.toEqual([expect.objectContaining({ timeBucket: '2023-12-01', representativeAssetId: decAsset.id })]);
+    });
+
+    // A corrupt EXIF date puts an asset past year 9999 — Postgres timestamps run to 294276, and
+    // getTimeBuckets hands the client that bucket as `12345-01-01`, UNSIGNED, because that is how
+    // Postgres renders it. The web then asks for its cover with the same string. JS is the odd one
+    // out: `Date` demands the ISO 8601 expanded-year sign to parse it and emits that sign back,
+    // which Postgres reads as a timezone displacement and rejects. So nothing on this path may
+    // round-trip a bucket start through `Date`.
+    // Every bucket size, because each takes a different branch of addBucketInterval to build the
+    // range bound and they must all come back through formatUtcDate intact.
+    it.each([
+      [TimeBucketSize.Year, '12345-01-01'],
+      [TimeBucketSize.Month, '12345-06-01'],
+      [TimeBucketSize.Day, '12345-06-01'],
+    ])('resolves %s covers for expanded-year buckets, which Postgres renders unsigned', async (bucketSize, bucket) => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const asset = await createTimelineAsset(ctx, user.id, new Date('2024-06-01T12:00:00.000Z'), {
+        thumbhash: Buffer.from('far-future'),
+      });
+      // Seeded through SQL on purpose: passing a year-12345 `Date` to the driver would fail here
+      // too, for the very reason this test pins.
+      await defaultDatabase
+        .updateTable('asset')
+        .set({ localDateTime: sql<Date>`timestamptz '12345-06-01 12:00:00+00'` })
+        .where('id', '=', asset.id)
+        .execute();
+
+      await expect(
+        sut.getTimeBucketCovers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          bucketSize,
+          order: AssetOrder.Desc,
+          timeBuckets: [bucket],
+        }),
+      ).resolves.toEqual([
+        {
+          timeBucket: bucket,
+          representativeAssetId: asset.id,
+          representativeThumbhash: Buffer.from('far-future').toString('base64'),
+          representativeRatio: 2,
+        },
+      ]);
     });
   });
 
