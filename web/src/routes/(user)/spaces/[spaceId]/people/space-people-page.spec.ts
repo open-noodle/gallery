@@ -124,6 +124,10 @@ function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: S
       members,
       people,
       peopleStatistics,
+      // v3.2.0 added this to the loader's payload, and `canManageVisibility` gates the
+      // show-and-hide affordance on it. Computed the way `+page.ts` computes it, so a fixture with
+      // people keeps offering the visibility manager these tests drive.
+      hasSpacePeople: people.length > 0 || (peopleStatistics?.total ?? 0) > 0,
       meta: { title: 'Test Space - People' },
     },
   };
