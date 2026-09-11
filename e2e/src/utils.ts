@@ -602,7 +602,7 @@ export const utils = {
   },
 
   /**
-   * Seeds a bare, UNASSIGNED asset_face (`personId IS NULL`) directly via SQL — there is no HTTP
+   * Seeds a bare, UNASSIGNED asset_face (`personGroupId IS NULL`) directly via SQL — there is no HTTP
    * path that leaves a face unassigned: `POST /faces` (owner) requires `personId`, and the space
    * draw endpoint (`POST /shared-spaces/:id/assets/:assetId/faces`) always attaches on creation.
    * In production an unassigned face comes from ML detection, which does not run in this stack.
@@ -614,7 +614,7 @@ export const utils = {
     }
 
     const result = await client.query(
-      `INSERT INTO asset_face ("assetId", "personId", "sourceType") VALUES ($1, NULL, 'machine-learning') RETURNING id`,
+      `INSERT INTO asset_face ("assetId", "personGroupId", "sourceType") VALUES ($1, NULL, 'machine-learning') RETURNING id`,
       [assetId],
     );
     return result.rows[0].id as string;
@@ -639,7 +639,7 @@ export const utils = {
   },
 
   /**
-   * Spec §6.3.1 (revised): the OWNER-side `asset_face.personId` for one face, plus the owning
+   * Spec §6.3.1 (revised): the OWNER-side `asset_face.personGroupId` for one face, plus the owning
    * `person`'s name when it is set.
    *
    * This is the column a space-editor face edit now propagates onto, and it is the column the
@@ -654,14 +654,16 @@ export const utils = {
     }
 
     const result = await client.query(
-      `SELECT af."personId", p."name"
+      `SELECT af."personGroupId", p."name"
          FROM "asset_face" af
-         LEFT JOIN "person" p ON p."id" = af."personId"
+         LEFT JOIN "person" p ON p."personGroupId" = af."personGroupId"
         WHERE af."id" = $1`,
       [assetFaceId],
     );
     return {
-      personId: (result.rows[0]?.personId as string | null) ?? null,
+      // Still spelled `personId`: under the person_group re-key `personGroupId` IS the person id the
+      // HTTP API hands back (`PersonResponseDto.id`), which is what callers compare this against.
+      personId: (result.rows[0]?.personGroupId as string | null) ?? null,
       name: (result.rows[0]?.name as string | null) ?? null,
     };
   },

@@ -61,14 +61,14 @@ test.describe("Owner's face picker — named people first, search in plain sight
     // this anchor never competes with the two candidates below.
     const anchorAsset = await utils.createAsset(owner.accessToken);
     const anchor = await utils.createPerson(owner.accessToken, {});
-    await utils.createFace({ assetId: anchorAsset.id, personId: anchor.id });
+    await utils.createFace({ assetId: anchorAsset.id, personGroupId: anchor.id });
     assetId = anchorAsset.id;
 
     // Created in REVERSE alphabetical order, so creation order cannot masquerade as sorted.
     for (const name of [namedPerson, firstAlphabetically]) {
       const named = await utils.createPerson(owner.accessToken, { name });
       const namedAsset = await utils.createAsset(owner.accessToken);
-      await utils.createFace({ assetId: namedAsset.id, personId: named.id });
+      await utils.createFace({ assetId: namedAsset.id, personGroupId: named.id });
     }
 
     // Unnamed, so it needs three faces to clear the minimum-faces floor, and favourited so the
@@ -76,7 +76,7 @@ test.describe("Owner's face picker — named people first, search in plain sight
     const cluster = await utils.createPerson(owner.accessToken, { isFavorite: true });
     const clusterAsset = await utils.createAsset(owner.accessToken);
     for (let index = 0; index < 3; index++) {
-      await utils.createFace({ assetId: clusterAsset.id, personId: cluster.id });
+      await utils.createFace({ assetId: clusterAsset.id, personGroupId: cluster.id });
     }
   });
 
