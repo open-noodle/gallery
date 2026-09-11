@@ -264,7 +264,9 @@ void main() {
         ),
       ).thenAnswer((_) async => emptySuggestions());
 
-      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
+      final filter = SearchFilter.empty().copyWith(
+        location: const SearchLocationFilter(locationPresence: 'noPlaceName'),
+      );
 
       await container.read(photosFilterSuggestionsProvider(filter).future);
 

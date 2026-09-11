@@ -117,7 +117,7 @@ void main() {
     // An active locationPresence selection must pin the section open, or clearing it becomes
     // unreachable the moment the filter empties every other location facet.
     test('keeps places available while a locationPresence filter is active', () {
-      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+      final filter = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
 
       final available = availableSections(emptySuggestions(), emptySuggestions(), filter);
 

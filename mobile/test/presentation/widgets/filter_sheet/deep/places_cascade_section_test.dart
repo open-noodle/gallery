@@ -358,7 +358,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(state: 'California'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(state: 'California'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()));
@@ -382,7 +382,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(locationPresence: 'noGps'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()));
@@ -402,7 +402,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(locationPresence: 'noGps'));
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);

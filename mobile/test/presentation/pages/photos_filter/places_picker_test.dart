@@ -241,7 +241,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerPage)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'France'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(InkWell, StaticTranslations.instance.filter_location_no_gps));
@@ -260,7 +260,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerPage)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(locationPresence: 'noGps'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(InkWell, StaticTranslations.instance.filter_location_no_gps));
@@ -274,7 +274,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerPage)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(locationPresence: 'noGps'));
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(InkWell, StaticTranslations.instance.filter_location_no_gps), findsOneWidget);
