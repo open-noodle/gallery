@@ -155,8 +155,8 @@ const seedIdentityInTwoSpaces = async (ctx: ReturnType<typeof setup>['ctx'], sut
 
   const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Bob' });
   const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-  const identity = await sut.ensurePersonIdentity(person.id);
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+  const identity = await sut.ensurePersonIdentity(person.personGroupId);
   await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
   const addSpace = async (profileName: string) => {
