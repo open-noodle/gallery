@@ -65,7 +65,7 @@ void main() {
   });
 
   test('forwards locationPresence to getTimeBuckets', () async {
-    final filter = SearchFilter.empty()..location = SearchLocationFilter(locationPresence: 'noGps');
+    final filter = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
 
     when(
       () => mockTimelineApi.getTimeBuckets(

@@ -120,7 +120,7 @@ void main() {
 
     test('metadata search forwards locationPresence as the DTO-specific enum', () async {
       when(() => searchApi.searchAssets(any())).thenAnswer((_) async => null);
-      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+      final filter = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchAssets(captureAny())).captured.single as MetadataSearchDto;
       expect(dto.locationPresence.value, MetadataSearchDtoLocationPresenceEnum.noGps);
@@ -137,7 +137,7 @@ void main() {
       when(() => searchApi.searchSmart(any())).thenAnswer((_) async => null);
       final filter = SearchFilter.empty().copyWith(
         context: 'beach',
-        location: SearchLocationFilter(locationPresence: 'noPlaceName'),
+        location: const SearchLocationFilter(locationPresence: 'noPlaceName'),
       );
       await sut.search(filter, 1);
       final dto = verify(() => searchApi.searchSmart(captureAny())).captured.single as SmartSearchDto;

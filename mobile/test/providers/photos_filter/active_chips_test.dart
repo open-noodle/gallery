@@ -158,7 +158,7 @@ void main() {
     });
 
     test('renders exactly one location chip for locationPresence', () {
-      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+      final filter = SearchFilter.empty().copyWith(location: const SearchLocationFilter(locationPresence: 'noGps'));
 
       final chips = activeChipsFromFilter(filter);
 
@@ -169,7 +169,9 @@ void main() {
     });
 
     test('renders the no-place-name label for locationPresence noPlaceName', () {
-      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
+      final filter = SearchFilter.empty().copyWith(
+        location: const SearchLocationFilter(locationPresence: 'noPlaceName'),
+      );
 
       final chips = activeChipsFromFilter(filter);
 
