@@ -12,11 +12,11 @@ beforeAll(async () => {
   db = await getKyselyDB();
 });
 
-const select = (personId: string, scope: DissolveScope) =>
+const select = (personGroupId: string, scope: DissolveScope) =>
   db
     .selectFrom('asset_face')
     .select('asset_face.id')
-    .where('asset_face.personId', '=', personId)
+    .where('asset_face.personGroupId', '=', personGroupId)
     .where((eb) => dissolveScopePredicate(eb, scope))
     .execute()
     .then((rows) => rows.map((r) => r.id).sort());
@@ -28,18 +28,32 @@ describe('dissolveScopePredicate', () => {
     const pet = await seedPerson(db, { ownerId: user.id, name: 'Rex', type: 'pet' });
     const asset = await seedAsset(db, { ownerId: user.id });
 
-    const exif = await seedFace(db, { assetId: asset.id, personId: person.id, sourceType: SourceType.Exif });
-    const mlEmbedded = await seedFace(db, { assetId: asset.id, personId: person.id, withEmbedding: true });
-    const mlBare = await seedFace(db, { assetId: asset.id, personId: person.id });
-    await seedFace(db, { assetId: asset.id, personId: pet.id, isPet: true });
+    const exif = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.Exif,
+    });
+    const mlEmbedded = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      withEmbedding: true,
+    });
+    const mlBare = await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId });
+    await seedFace(db, { assetId: asset.id, personGroupId: pet.personGroupId, isPet: true });
 
-    await expect(select(person.id, DissolveScope.All)).resolves.toEqual([exif.id, mlEmbedded.id, mlBare.id].sort());
-    await expect(select(person.id, DissolveScope.Exif)).resolves.toEqual([exif.id]);
-    await expect(select(person.id, DissolveScope.MachineLearning)).resolves.toEqual([mlEmbedded.id, mlBare.id].sort());
-    await expect(select(person.id, DissolveScope.WithoutEmbedding)).resolves.toEqual([exif.id, mlBare.id].sort());
+    await expect(select(person.personGroupId, DissolveScope.All)).resolves.toEqual(
+      [exif.id, mlEmbedded.id, mlBare.id].sort(),
+    );
+    await expect(select(person.personGroupId, DissolveScope.Exif)).resolves.toEqual([exif.id]);
+    await expect(select(person.personGroupId, DissolveScope.MachineLearning)).resolves.toEqual(
+      [mlEmbedded.id, mlBare.id].sort(),
+    );
+    await expect(select(person.personGroupId, DissolveScope.WithoutEmbedding)).resolves.toEqual(
+      [exif.id, mlBare.id].sort(),
+    );
 
     for (const scope of Object.values(DissolveScope)) {
-      await expect(select(pet.id, scope)).resolves.toEqual([]);
+      await expect(select(pet.personGroupId, scope)).resolves.toEqual([]);
     }
   });
 });

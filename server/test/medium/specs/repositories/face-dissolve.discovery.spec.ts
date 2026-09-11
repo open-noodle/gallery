@@ -23,22 +23,28 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
 
     for (let i = 0; i < 3; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personId: dirty.id, sourceType: SourceType.Exif });
+      await seedFace(db, { assetId: asset.id, personGroupId: dirty.personGroupId, sourceType: SourceType.Exif });
     }
     const cleanAsset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: cleanAsset.id, personId: clean.id, withEmbedding: true });
-    await seedFace(db, { assetId: cleanAsset.id, personId: pet.id, isPet: true });
+    await seedFace(db, { assetId: cleanAsset.id, personGroupId: clean.personGroupId, withEmbedding: true });
+    await seedFace(db, { assetId: cleanAsset.id, personGroupId: pet.personGroupId, isPet: true });
 
     const { people } = await repo.getPeopleHealth({ ownerId: user.id, sort: 'exifFaces', page: 1, size: 20 });
 
     expect(people[0]).toEqual(
-      expect.objectContaining({ id: dirty.id, faceCount: 3, exif: 3, machineLearning: 0, facesWithoutEmbedding: 3 }),
+      expect.objectContaining({
+        id: dirty.personGroupId,
+        faceCount: 3,
+        exif: 3,
+        machineLearning: 0,
+        facesWithoutEmbedding: 3,
+      }),
     );
-    expect(people.find((p) => p.id === clean.id)).toEqual(
+    expect(people.find((p) => p.id === clean.personGroupId)).toEqual(
       expect.objectContaining({ exif: 0, machineLearning: 1, facesWithoutEmbedding: 0 }),
     );
     // pets are not people the admin can dissolve, so they must not appear at all
-    expect(people.find((p) => p.id === pet.id)).toBeUndefined();
+    expect(people.find((p) => p.id === pet.personGroupId)).toBeUndefined();
   });
 
   // Mutation-proof: every count below is pairwise distinct (7, 2, 4, 1, 6), so if facesWithoutEmbedding
@@ -51,26 +57,30 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
 
     for (let i = 0; i < 2; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personId: person.id, sourceType: SourceType.Exif });
+      await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
     }
     const manualAsset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: manualAsset.id, personId: person.id, sourceType: SourceType.Manual });
+    await seedFace(db, { assetId: manualAsset.id, personGroupId: person.personGroupId, sourceType: SourceType.Manual });
 
     const embeddedAsset = await seedAsset(db, { ownerId: user.id });
     await seedFace(db, {
       assetId: embeddedAsset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
       withEmbedding: true,
     });
     for (let i = 0; i < 3; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personId: person.id, sourceType: SourceType.MachineLearning });
+      await seedFace(db, {
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+        sourceType: SourceType.MachineLearning,
+      });
     }
 
     const { people } = await repo.getPeopleHealth({ ownerId: user.id, sort: 'faceCount', page: 1, size: 20 });
 
-    expect(people.find((p) => p.id === person.id)).toEqual(
+    expect(people.find((p) => p.id === person.personGroupId)).toEqual(
       expect.objectContaining({
         faceCount: 7,
         exif: 2,
@@ -97,17 +107,21 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
 
     for (let i = 0; i < 5; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personId: personA.id, sourceType: SourceType.MachineLearning });
+      await seedFace(db, {
+        assetId: asset.id,
+        personGroupId: personA.personGroupId,
+        sourceType: SourceType.MachineLearning,
+      });
     }
     for (let i = 0; i < 2; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personId: personB.id, sourceType: SourceType.Exif });
+      await seedFace(db, { assetId: asset.id, personGroupId: personB.personGroupId, sourceType: SourceType.Exif });
     }
     for (let i = 0; i < 4; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
       await seedFace(db, {
         assetId: asset.id,
-        personId: personC.id,
+        personGroupId: personC.personGroupId,
         sourceType: SourceType.MachineLearning,
         withEmbedding: true,
       });
@@ -115,11 +129,15 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
 
     // faceCount: A(5) > C(4) > B(2) — an unambiguous total ordering.
     const byFaceCount = await repo.getPeopleHealth({ ownerId: user.id, sort: 'faceCount', page: 1, size: 20 });
-    expect(byFaceCount.people.map((p) => p.id)).toEqual([personA.id, personC.id, personB.id]);
+    expect(byFaceCount.people.map((p) => p.id)).toEqual([
+      personA.personGroupId,
+      personC.personGroupId,
+      personB.personGroupId,
+    ]);
 
     // exifFaces: B(2) is unambiguously first; A and C both tie at 0.
     const byExif = await repo.getPeopleHealth({ ownerId: user.id, sort: 'exifFaces', page: 1, size: 20 });
-    expect(byExif.people[0].id).toBe(personB.id);
+    expect(byExif.people[0].id).toBe(personB.personGroupId);
 
     // facesWithoutEmbedding: A(5, no embeddings at all) > B(2, exif never gets one) > C(0, all embedded).
     // This differs from BOTH orderings above — proof facesWithoutEmbedding is its own sort column, not an
@@ -130,7 +148,11 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
       page: 1,
       size: 20,
     });
-    expect(byMissingEmbedding.people.map((p) => p.id)).toEqual([personA.id, personB.id, personC.id]);
+    expect(byMissingEmbedding.people.map((p) => p.id)).toEqual([
+      personA.personGroupId,
+      personB.personGroupId,
+      personC.personGroupId,
+    ]);
   });
 
   // FIX 1 (review round 1, Finding 1): ties are the common case for this aggregate — every uncontaminated
@@ -141,8 +163,8 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
   // A single test run cannot reliably PROVE Postgres would reorder a tied HashAggregate's output between
   // two back-to-back, unmodified-table queries in the same process — that nondeterminism is a property
   // Postgres reserves the right to exhibit, not one guaranteed to manifest on every invocation. So per the
-  // review's own fallback instruction, this asserts the ordering IS `person.id` ascending within the tied
-  // group — a deterministic outcome that only holds with the `.orderBy('person.id', 'asc')` tiebreaker in
+  // review's own fallback instruction, this asserts the ordering IS `person.personGroupId` ascending within the tied
+  // group — a deterministic outcome that only holds with the `.orderBy('person.personGroupId', 'asc')` tiebreaker in
   // place, and that (confirmed by hand, see the task report's mutation section) fails immediately if that
   // tiebreaker is removed, because the tied group is then returned in an order this assertion does not
   // control or predict.
@@ -153,7 +175,7 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
     const tiedA = await seedPerson(db, { ownerId: user.id, name: 'Tied A' });
     const tiedB = await seedPerson(db, { ownerId: user.id, name: 'Tied B' });
     const tiedC = await seedPerson(db, { ownerId: user.id, name: 'Tied C' });
-    const expectedOrder = [tiedA.id, tiedB.id, tiedC.id].toSorted();
+    const expectedOrder = [tiedA.personGroupId, tiedB.personGroupId, tiedC.personGroupId].toSorted();
 
     const page1 = await repo.getPeopleHealth({ ownerId: user.id, sort: 'exifFaces', page: 1, size: 2 });
     const page2 = await repo.getPeopleHealth({ ownerId: user.id, sort: 'exifFaces', page: 2, size: 2 });
@@ -175,12 +197,16 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
     const person = await seedPerson(db, { ownerId: user.id, name: 'HasHiddenFaces' });
 
     const activeAsset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: activeAsset.id, personId: person.id, sourceType: SourceType.MachineLearning });
+    await seedFace(db, {
+      assetId: activeAsset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.MachineLearning,
+    });
 
     const deletedAsset = await seedAsset(db, { ownerId: user.id });
     await seedFace(db, {
       assetId: deletedAsset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
       deletedAt: new Date(),
     });
@@ -191,7 +217,7 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
       .values(
         mediumFactory.assetFaceInsert({
           assetId: invisibleAsset.id,
-          personId: person.id,
+          personGroupId: person.personGroupId,
           sourceType: SourceType.MachineLearning,
           isVisible: false,
         }),
@@ -202,6 +228,6 @@ describe('FaceDissolveRepository.getPeopleHealth', () => {
 
     // 3 = 1 active + 1 soft-deleted + 1 invisible, which is exactly what getCounts reports for this person
     // and exactly what a scope=all dissolve would delete. Reading 1 here is the under-report bug.
-    expect(people.find((p) => p.id === person.id)).toEqual(expect.objectContaining({ faceCount: 3 }));
+    expect(people.find((p) => p.id === person.personGroupId)).toEqual(expect.objectContaining({ faceCount: 3 }));
   });
 });
