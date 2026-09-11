@@ -121,7 +121,7 @@ const favoriteBucketAssets = (sut: TimelineService, auth: AuthDto) =>
   sut.getTimeBucket(auth, { ...FAVORITE_FILTER, timeBucket: BUCKET });
 
 const favoriteSearchIds = async (sut: SearchService, auth: AuthDto) => {
-  const response = await sut.searchMetadata(auth, { ...FAVORITE_FILTER });
+  const response = await sut.searchMetadata(auth, { size: 250, ...FAVORITE_FILTER });
   return response.assets.items.map((item) => item.id);
 };
 

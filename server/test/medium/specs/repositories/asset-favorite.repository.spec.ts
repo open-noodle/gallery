@@ -202,9 +202,9 @@ describe('asset_favorite schema', () => {
   });
 
   // #763 slice 3: the two "backfills from asset.isFavorite" tests that lived here exercised
-  // 1784000000000-AddAssetFavoriteTables's up() backfill SQL against a live DB — that only made
+  // 1794000000000-AddAssetFavoriteTables's up() backfill SQL against a live DB — that only made
   // sense while asset."isFavorite" still existed (slices 0-2). Slice 3
-  // (1784100000000-DropAssetIsFavoriteColumn) has now dropped the column outright, so there is no
+  // (1794100000000-DropAssetIsFavoriteColumn) has now dropped the column outright, so there is no
   // live schema left to run that historical backfill query against; the migration file itself
   // (and its own historical correctness) is unaffected and untouched.
 });
