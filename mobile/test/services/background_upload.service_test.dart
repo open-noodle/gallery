@@ -628,7 +628,7 @@ void main() {
 
     group('status callback chunk chaining', () {
       test('enqueues chunk k+1 when chunk k completes (mid-chain)', () async {
-        final metadata = const UploadTaskMetadata(
+        const metadata = UploadTaskMetadata(
           localAssetId: 'chain-asset',
           isLivePhotos: false,
           livePhotoVideoId: '',
@@ -682,7 +682,7 @@ void main() {
         );
         final stillFile = await writeFile('still.heic', 5);
 
-        final metadata = const UploadTaskMetadata(
+        const metadata = UploadTaskMetadata(
           localAssetId: 'live-asset',
           isLivePhotos: true,
           livePhotoVideoId: '',
@@ -730,7 +730,7 @@ void main() {
 
     group('chunk failure handling', () {
       Future<void> expectDeletesSessionOn(TaskStatus status) async {
-        final metadata = const UploadTaskMetadata(
+        const metadata = UploadTaskMetadata(
           localAssetId: 'failed-asset',
           isLivePhotos: false,
           livePhotoVideoId: '',
@@ -770,7 +770,7 @@ void main() {
 
     group('restart reconciliation (case 40)', () {
       test('re-enqueues the correct next chunk for a chain with no successor', () async {
-        final metadata = const UploadTaskMetadata(
+        const metadata = UploadTaskMetadata(
           localAssetId: 'restart-asset',
           isLivePhotos: false,
           livePhotoVideoId: '',
@@ -805,7 +805,7 @@ void main() {
       });
 
       test('does nothing when the next chunk already exists (steady state)', () async {
-        final metadata = const UploadTaskMetadata(
+        const metadata = UploadTaskMetadata(
           localAssetId: 'steady-asset',
           isLivePhotos: false,
           livePhotoVideoId: '',
@@ -849,7 +849,7 @@ void main() {
       test('resume() runs reconciliation after starting the downloader', () async {
         when(() => mockUploadRepository.start()).thenAnswer((_) async {});
 
-        final metadata = const UploadTaskMetadata(
+        const metadata = UploadTaskMetadata(
           localAssetId: 'resume-asset',
           isLivePhotos: false,
           livePhotoVideoId: '',
