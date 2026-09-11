@@ -27,7 +27,7 @@ export class FaceDissolveService extends BaseService {
 
     const counts = await this.faceDissolveRepository.getCounts(personId, dto.scope);
     return {
-      personId: person.id,
+      personId: person.personGroupId,
       counts,
       expectedFaceCount: counts.faces,
       warnings: await this.buildWarnings(dto, counts),
@@ -49,7 +49,7 @@ export class FaceDissolveService extends BaseService {
     }
 
     const result = await this.faceDissolveRepository.dissolve({
-      personId,
+      personGroupId: personId,
       scope: dto.scope,
       outcome: dto.outcome,
       redetect: dto.redetect,
@@ -61,7 +61,10 @@ export class FaceDissolveService extends BaseService {
 
     // person.faceAssetId was SET NULL by the cascade; only a surviving person needs a new thumbnail.
     if (dto.outcome !== 'delete-faces-and-person') {
-      await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
+      await this.jobRepository.queue({
+        name: JobName.PersonGenerateThumbnail,
+        data: { ownerId: person.ownerId, personGroupId: personId },
+      });
     }
 
     // The repair. NOT PersonCleanup (L2), NOT deleteUnreferencedIdentities (L5),
@@ -79,7 +82,9 @@ export class FaceDissolveService extends BaseService {
   }
 
   private async requirePerson(personId: string) {
-    const person = await this.personRepository.getById(personId);
+    // `personId` here is the person's public id, which upstream's person_group repointing made
+    // `person.personGroupId`; getByGroupIdOnly is the fork's accessor for call sites that only carry it.
+    const person = await this.personRepository.getByGroupIdOnly(personId);
     if (!person) {
       throw new NotFoundException('Person not found');
     }
