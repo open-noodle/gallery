@@ -71,7 +71,7 @@ const setup = (db?: Kysely<DB>) => {
   // without ever touching `familyRepository`/`faceIdentityRepository`. Enabling the feature in a
   // test here would need those two added to `real` as well. Same shape as `person.service.spec.ts`.
   ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .getMock(SystemMetadataRepository)
     .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
 
   return { sut, ctx };

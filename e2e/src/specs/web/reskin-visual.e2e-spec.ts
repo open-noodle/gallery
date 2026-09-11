@@ -56,7 +56,7 @@ test.describe('re-skin hardening', () => {
     // per-user grant.
     const defaults = await getConfigDefaults({ headers: asBearerAuth(admin.accessToken) });
     await updateConfig(
-      { systemConfigDto: { ...defaults, familyTree: { enabled: true, defaultAccess: DefaultAccess.Contribute } } },
+      { adminConfigDto: { ...defaults, familyTree: { enabled: true, defaultAccess: DefaultAccess.Contribute } } },
       { headers: asBearerAuth(admin.accessToken) },
     );
   });

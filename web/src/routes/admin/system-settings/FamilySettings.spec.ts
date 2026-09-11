@@ -1,4 +1,4 @@
-import { DefaultAccess, type SystemConfigDto } from '@immich/sdk';
+import { DefaultAccess, type AdminConfigDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -21,15 +21,15 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
-const makeConfig = (enabled = false, defaultAccess: DefaultAccess = DefaultAccess.None): SystemConfigDto =>
+const makeConfig = (enabled = false, defaultAccess: DefaultAccess = DefaultAccess.None): AdminConfigDto =>
   ({
     familyTree: { enabled, defaultAccess },
-  }) as unknown as SystemConfigDto;
+  }) as unknown as AdminConfigDto;
 
 const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false },
-  systemConfig: {} as SystemConfigDto,
-  defaultSystemConfig: {} as SystemConfigDto,
+  systemConfig: {} as AdminConfigDto,
+  defaultSystemConfig: {} as AdminConfigDto,
   cloneValue: vi.fn(),
   cloneDefaultValue: vi.fn(),
 }));
@@ -45,10 +45,10 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
 vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
   systemConfigManager: {
     get value() {
-      return mocks.systemConfig as SystemConfigDto;
+      return mocks.systemConfig as AdminConfigDto;
     },
     get defaultValue() {
-      return mocks.defaultSystemConfig as SystemConfigDto;
+      return mocks.defaultSystemConfig as AdminConfigDto;
     },
     cloneValue: mocks.cloneValue,
     cloneDefaultValue: mocks.cloneDefaultValue,

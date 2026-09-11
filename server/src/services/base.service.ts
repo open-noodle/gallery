@@ -357,6 +357,7 @@ export class BaseService {
       ctx.viewRepository,
       ctx.websocketRepository,
       ctx.workflowRepository,
+      ctx.familyRepository,
     );
 
     service.logger.setContext(BaseService.name);
