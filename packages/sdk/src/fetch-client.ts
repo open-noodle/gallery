@@ -11355,16 +11355,6 @@ export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
 }
-export enum Recommendation {
-    Confident = "confident",
-    ReviewFirst = "review-first"
-}
-export enum Status {
-    Pending = "pending",
-    Running = "running",
-    Completed = "completed",
-    Failed = "failed"
-}
 export enum DissolveOutcome {
     Unassign = "unassign",
     DeleteFaces = "delete-faces",
@@ -11375,6 +11365,16 @@ export enum DissolveScope {
     Exif = "exif",
     MachineLearning = "machine-learning",
     WithoutEmbedding = "without-embedding"
+}
+export enum Recommendation {
+    Confident = "confident",
+    ReviewFirst = "review-first"
+}
+export enum Status {
+    Pending = "pending",
+    Running = "running",
+    Completed = "completed",
+    Failed = "failed"
 }
 export enum IntegrityReport {
     UntrackedFile = "untracked_file",
