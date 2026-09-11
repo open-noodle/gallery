@@ -416,11 +416,11 @@ describe(SearchService.name, () => {
       await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
 
       const memberAuth = factory.auth({ user: { id: member.id } });
-      const memberResult = await sut.searchMetadata(memberAuth, { spaceId: space.id });
+      const memberResult = await sut.searchMetadata(memberAuth, { size: 250, spaceId: space.id });
       expect(memberResult.assets.items).toEqual([expect.objectContaining({ id: asset.id, isFavorite: true })]);
 
       const ownerAuth = factory.auth({ user: { id: owner.id } });
-      const ownerResult = await sut.searchMetadata(ownerAuth, { spaceId: space.id });
+      const ownerResult = await sut.searchMetadata(ownerAuth, { size: 250, spaceId: space.id });
       expect(ownerResult.assets.items).toEqual([expect.objectContaining({ id: asset.id, isFavorite: false })]);
     });
   });

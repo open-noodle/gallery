@@ -105,7 +105,7 @@ DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
 -- LOSSY: favorites belonging to non-owners (space members who favorited someone
 -- else's photo) have nowhere to live in plain Immich and are discarded.
 --
--- IF NOT EXISTS: slice 3 (1784100000000-DropAssetIsFavoriteColumn) has now dropped
+-- IF NOT EXISTS: slice 3 (1794100000000-DropAssetIsFavoriteColumn) has now dropped
 -- asset."isFavorite" from the live schema, but a Gallery DB that has not yet applied that
 -- migration still has the column, and a bare ADD COLUMN would fail with "column already exists"
 -- against it. IF NOT EXISTS keeps the script correct in both states.
@@ -528,9 +528,7 @@ DELETE FROM "kysely_migrations"
    '1783100000000-AddAlbumSpaceAssetSyncAndAudit',
    '1783628194057-DisablePostgresJit',
    '1783700000000-FixSharedSpaceMemberJoinGrantCreateId',
-   '1784000000000-AddAssetFavoriteTables',
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
-   '1784100000000-DropAssetIsFavoriteColumn',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
    '1785000000000-CreatePetSearchTable',
@@ -547,6 +545,10 @@ DELETE FROM "kysely_migrations"
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  -- #763 per-user favorites. Renumbered off 1784000000000/1784100000000 during the v3.2.0 rebase:
+  -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
+  '1794000000000-AddAssetFavoriteTables',
+  '1794100000000-DropAssetIsFavoriteColumn',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts

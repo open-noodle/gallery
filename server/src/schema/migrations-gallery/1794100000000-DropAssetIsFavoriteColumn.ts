@@ -2,7 +2,7 @@ import { Kysely, sql } from 'kysely';
 
 // Per-user favorites overlay (#763), slice 3 — the point of no return. The legacy
 // asset."isFavorite" column has been dead weight since slice 0 backfilled it into
-// `asset_favorite` (1784000000000-AddAssetFavoriteTables): every write path (updateFavorites) has
+// `asset_favorite` (1794000000000-AddAssetFavoriteTables): every write path (updateFavorites) has
 // routed through the overlay since slice 1, every read path (mapAsset's isFavoriteForUser, the
 // owner-scoped job.service.ts websocket payloads, the plugin-facing workflowAssetV1 projection) has
 // resolved from the overlay since slice 1b/2, and the grep gate (favorite-grep-gate.spec.ts) has

@@ -45,7 +45,7 @@ import {
 import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger';
 import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit';
 import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId';
-import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1784000000000-AddAssetFavoriteTables';
+import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables';
 import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift';
 import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
 import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable';
@@ -218,7 +218,7 @@ describe('1793200000000-SharedSpaceAlbumFolderAuditTable override parity', () =>
 // declare them or every DB that runs it reports FunctionDrop + two OverrideDrops — and
 // `migrations:generate` emits DROP TRIGGER + DROP FUNCTION, silently killing #763's favorite delete
 // sync stream.
-describe('1784000000000-AddAssetFavoriteTables override parity', () => {
+describe('1794000000000-AddAssetFavoriteTables override parity', () => {
   beforeEach(() => {
     capturedSql.length = 0;
   });

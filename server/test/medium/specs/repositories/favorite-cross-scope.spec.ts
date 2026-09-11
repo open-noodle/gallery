@@ -122,12 +122,14 @@ describe('favorite cross-scope timeline performance (#763 slice 4)', () => {
       bucketSize: TimeBucketSize.Month,
     };
 
+    const auth = factory.auth({ user: { id: caller.id } });
+
     // Warm-up: untimed, so the measured calls below aren't paying for cold caches / plan
     // compilation.
-    await sut.getTimeBuckets(options);
+    await sut.getTimeBuckets(options, auth);
 
     const bucketsStart = performance.now();
-    const buckets = await sut.getTimeBuckets(options);
+    const buckets = await sut.getTimeBuckets(options, auth);
     const bucketsMs = performance.now() - bucketsStart;
 
     // Sanity: the seeded favorites must actually be what's being measured — a query that
@@ -136,7 +138,6 @@ describe('favorite cross-scope timeline performance (#763 slice 4)', () => {
     expect(totalFavorites).toBe(TOTAL_ASSETS);
     expect(buckets.length).toBeGreaterThan(0);
 
-    const auth = factory.auth({ user: { id: caller.id } });
     const firstBucket = buckets[0].timeBucket;
 
     const bucketStart = performance.now();

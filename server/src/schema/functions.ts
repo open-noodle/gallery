@@ -888,7 +888,7 @@ export const album_space_asset_delete_audit = registerFunction({
 // delete, user delete) — driving the favorite delete sync stream. Statement-level AFTER DELETE so
 // cascades are captured too; see AssetFavoriteAuditTable.
 //
-// Created by migration 1784000000000; registered here so `migrations:generate` / schema-check see a
+// Created by migration 1794000000000; registered here so `migrations:generate` / schema-check see a
 // declarative counterpart, exactly like album_space_asset_delete_audit above. Without this the
 // function and both migration_overrides rows exist only in the database and every instance boots
 // with `Detected schema drift` (the class of bug #827 fixed). Keep byte-identical to that
