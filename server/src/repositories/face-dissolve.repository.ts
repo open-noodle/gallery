@@ -7,7 +7,12 @@ import { DB } from 'src/schema';
 import { dissolveFacePredicate, DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve';
 
 export interface DissolveWriteInput {
-  personId: string;
+  /**
+   * The person's public id. Upstream repointed `asset_face` at `person_group` and dropped `person.id`,
+   * so this is `person.personGroupId` — sound under Option M's 1:1 person_group-to-person invariant
+   * (see PersonRepository.getByGroupIdOnly).
+   */
+  personGroupId: string;
   scope: DissolveScope;
   outcome: 'unassign' | 'delete-faces' | 'delete-faces-and-person';
   redetect: boolean;
@@ -71,15 +76,15 @@ export class FaceDissolveRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
   /**
-   * Clears the recognition watermark for every asset holding an in-scope face of `personId`, so the ordinary
+   * Clears the recognition watermark for every asset holding an in-scope face of `personGroupId`, so the ordinary
    * non-forced "Detect faces (missing)" pass re-processes exactly those assets. streamForDetectFacesJob
    * applies the `facesRecognizedAt IS NULL` filter only when `force === false` (asset-job.repository.ts:458).
    *
-   * MUST run BEFORE the face rows are deleted — afterwards there is no personId left to find the assets by.
+   * MUST run BEFORE the face rows are deleted — afterwards there is no personGroupId left to find the assets by.
    */
   @GenerateSql({ params: [DummyValue.UUID, DissolveScope.All] })
   async clearFacesRecognizedAt(
-    personId: string,
+    personGroupId: string,
     scope: DissolveScope,
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
@@ -91,7 +96,7 @@ export class FaceDissolveRepository {
           .selectFrom('asset_face')
           .select('asset_face.assetId')
           .distinct()
-          .where('asset_face.personId', '=', personId)
+          .where('asset_face.personGroupId', '=', personGroupId)
           .where((inner) => dissolveScopePredicate(inner, scope)),
       )
       .executeTakeFirst();
@@ -105,10 +110,10 @@ export class FaceDissolveRepository {
    * nothing (L11), so the dialog must never promise a repair for those assets.
    */
   @GenerateSql({ params: [DummyValue.UUID, DissolveScope.All] })
-  async getCounts(personId: string, scope: DissolveScope): Promise<DissolveCounts> {
+  async getCounts(personGroupId: string, scope: DissolveScope): Promise<DissolveCounts> {
     // Shared with dissolve() below — see dissolveFacePredicate: the preview and the apply must never be
     // able to drift apart.
-    const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personId, scope);
+    const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personGroupId, scope);
 
     const faceRow = await this.db
       .selectFrom('asset_face')
@@ -152,8 +157,8 @@ export class FaceDissolveRepository {
             .selectFrom('asset_face as other')
             .select(sql`1`.as('one'))
             .whereRef('other.assetId', '=', 'asset.id')
-            .where('other.personId', 'is not', null)
-            .where('other.personId', '!=', personId)
+            .where('other.personGroupId', 'is not', null)
+            .where('other.personGroupId', '!=', personGroupId)
             .where('other.deletedAt', 'is', null)
             // Pet faces can never be lost to re-detection: handleDetectFaces keeps face.isPet out of
             // faceIdsToRemove (person.service.ts:940-946), so a sibling pet carries no L3 risk (F1).
@@ -170,7 +175,7 @@ export class FaceDissolveRepository {
                     inner
                       .selectFrom('person')
                       .select(sql`1`.as('one'))
-                      .whereRef('person.id', '=', 'other.personId')
+                      .whereRef('person.personGroupId', '=', 'other.personGroupId')
                       .where('person.type', '=', 'pet'),
                   ),
                 ]),
@@ -207,7 +212,7 @@ export class FaceDissolveRepository {
     const remainingLiveRow = await this.db
       .selectFrom('asset_face')
       .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personGroupId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where((eb) => eb.not(dissolveScopePredicate(eb, scope)))
@@ -244,13 +249,13 @@ export class FaceDissolveRepository {
       // of visibility or soft-deletion (dissolveFacePredicate). Filtering them here made the Health tab
       // under-report against the dialog for the same person — an admin comparing the two saw numbers that
       // could not be reconciled, and the dissolve then deleted faces discovery never counted.
-      .leftJoin('asset_face', (join) => join.onRef('asset_face.personId', '=', 'person.id'))
+      .leftJoin('asset_face', (join) => join.onRef('asset_face.personGroupId', '=', 'person.personGroupId'))
       .where('person.type', '!=', 'pet')
       // ownerId is mandatory: an unfiltered aggregate spans every visible asset_face row on the instance and
       // orders by an aggregate alias, so no page can be pruned and each page re-runs the whole GROUP BY.
       .where('person.ownerId', '=', options.ownerId)
       .select((eb) => [
-        'person.id',
+        'person.personGroupId as id',
         'person.name',
         'person.ownerId',
         eb.fn.count<number>('asset_face.id').as('faceCount'),
@@ -265,14 +270,14 @@ export class FaceDissolveRepository {
           .filterWhere((inner) => inner.not(hasEmbedding(inner)))
           .as('facesWithoutEmbedding'),
       ])
-      .groupBy(['person.id', 'person.name', 'person.ownerId'])
+      .groupBy(['person.personGroupId', 'person.name', 'person.ownerId'])
       .orderBy(sql.ref(HEALTH_SORT_COLUMN[options.sort]), 'desc')
       // Stable tiebreaker: ties are the common case here (every uncontaminated person ties at 0 under
       // exifFaces/facesWithoutEmbedding), and without one Postgres may order them differently per
       // execution, so the health tab's page-concatenating pagination can show a person twice while
       // silently skipping another. Same fix as face-repair.repository.ts:67 under the identical
       // limit(size+1)/offset scheme.
-      .orderBy('person.id', 'asc')
+      .orderBy('person.personGroupId', 'asc')
       .limit(options.size + 1)
       .offset((options.page - 1) * options.size)
       .execute();
@@ -302,16 +307,16 @@ export class FaceDissolveRepository {
   /**
    * One transaction. Ordering is load-bearing:
    *  1. capture space-person ids first (L1) — afterwards the shared_space_person_face rows are gone;
-   *  2. clear the watermark — afterwards there is no personId to find the assets by;
+   *  2. clear the watermark — afterwards there is no personGroupId to find the assets by;
    *  3. only then write.
-   * Every statement is scoped by personId + scope. Never call the unscoped GC helpers here (L1/L2/L5).
+   * Every statement is scoped by personGroupId + scope. Never call the unscoped GC helpers here (L1/L2/L5).
    */
   async dissolve(input: DissolveWriteInput): Promise<DissolveWriteResult> {
-    const { personId, scope, outcome, redetect } = input;
+    const { personGroupId, scope, outcome, redetect } = input;
 
     return this.db.transaction().execute(async (trx) => {
       // The SAME predicate the preview counted with — see dissolveFacePredicate.
-      const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personId, scope);
+      const inScope = (eb: ExpressionBuilder<DB, 'asset_face'>) => dissolveFacePredicate(eb, personGroupId, scope);
 
       const spacePersonRows = await trx
         .selectFrom('shared_space_person_face')
@@ -321,7 +326,7 @@ export class FaceDissolveRepository {
         .where((eb) => inScope(eb))
         .execute();
 
-      const assetsCleared = redetect ? await this.clearFacesRecognizedAt(personId, scope, trx) : 0;
+      const assetsCleared = redetect ? await this.clearFacesRecognizedAt(personGroupId, scope, trx) : 0;
 
       let faces: number;
       if (outcome === 'unassign') {
@@ -340,7 +345,7 @@ export class FaceDissolveRepository {
 
         const updated = await trx
           .updateTable('asset_face')
-          .set({ personId: null })
+          .set({ personGroupId: null })
           .where((eb) => inScope(eb))
           .executeTakeFirst();
         faces = Number(updated.numUpdatedRows ?? 0);
@@ -379,11 +384,11 @@ export class FaceDissolveRepository {
         const person = await trx
           .selectFrom('person')
           .select(['thumbnailPath'])
-          .where('id', '=', personId)
+          .where('personGroupId', '=', personGroupId)
           .executeTakeFirst();
         if (person) {
           deletedThumbnailPath = person.thumbnailPath === '' ? null : person.thumbnailPath;
-          await trx.deleteFrom('person').where('id', '=', personId).execute();
+          await trx.deleteFrom('person').where('personGroupId', '=', personGroupId).execute();
         }
       }
 

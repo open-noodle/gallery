@@ -45,7 +45,7 @@ test.describe('dissolve a metadata-contaminated person', () => {
     // force-recognition only unassigns machine-learning-sourced faces.
     await utils.createFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.id,
       sourceType: 'exif',
       withEmbedding: false,
     });

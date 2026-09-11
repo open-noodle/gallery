@@ -62,6 +62,7 @@ export const dissolveScopePredicate = (
  */
 export const dissolveFacePredicate = (
   eb: ExpressionBuilder<DB, 'asset_face'>,
-  personId: string,
+  personGroupId: string,
   scope: DissolveScope,
-): Expression<SqlBool> => eb.and([eb('asset_face.personId', '=', personId), dissolveScopePredicate(eb, scope)]);
+): Expression<SqlBool> =>
+  eb.and([eb('asset_face.personGroupId', '=', personGroupId), dissolveScopePredicate(eb, scope)]);

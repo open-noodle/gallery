@@ -17,7 +17,15 @@ describe(FaceDissolveService.name, () => {
   let sut: FaceDissolveService;
   let mocks: ServiceMocks;
 
-  const person = { id: 'person-1', ownerId: 'owner-1', type: 'person', name: 'Target', thumbnailPath: '/t.jpg' };
+  // `personGroupId` is the person's public id since upstream repointed asset_face at person_group
+  // and dropped person.id.
+  const person = {
+    personGroupId: 'person-1',
+    ownerId: 'owner-1',
+    type: 'person',
+    name: 'Target',
+    thumbnailPath: '/t.jpg',
+  };
   const counts = {
     faces: 10,
     exif: 10,
@@ -34,7 +42,7 @@ describe(FaceDissolveService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(FaceDissolveService));
-    mocks.person.getById.mockResolvedValue(person as never);
+    mocks.person.getByGroupIdOnly.mockResolvedValue(person as never);
     // The metadata-import warning asserts the CURRENT setting, so every warning test has to say what it is.
     mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
     mocks.faceDissolve.getCounts.mockResolvedValue(counts);
@@ -48,13 +56,13 @@ describe(FaceDissolveService.name, () => {
   });
 
   it('rejects a pet person', async () => {
-    mocks.person.getById.mockResolvedValue({ ...person, type: 'pet' } as never);
+    mocks.person.getByGroupIdOnly.mockResolvedValue({ ...person, type: 'pet' } as never);
     await expect(sut.apply('person-1', dto())).rejects.toBeInstanceOf(BadRequestException);
     expect(mocks.faceDissolve.dissolve).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown person', async () => {
-    mocks.person.getById.mockResolvedValue(void 0 as never);
+    mocks.person.getByGroupIdOnly.mockResolvedValue(void 0 as never);
     await expect(sut.apply('nope', dto())).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -92,7 +100,7 @@ describe(FaceDissolveService.name, () => {
     await sut.apply('person-1', dto());
     expect(mocks.job.queue).toHaveBeenCalledWith({
       name: JobName.PersonGenerateThumbnail,
-      data: { id: 'person-1' },
+      data: { ownerId: 'owner-1', personGroupId: 'person-1' },
     });
   });
 

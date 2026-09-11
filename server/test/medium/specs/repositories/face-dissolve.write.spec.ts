@@ -28,11 +28,11 @@ describe('FaceDissolveRepository.dissolve', () => {
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: asset.id, personId: person.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
     await setFacesRecognizedAt(db, asset.id, new Date());
 
     const result = await repo.dissolve({
-      personId: person.id,
+      personGroupId: person.personGroupId,
       scope: DissolveScope.Exif,
       outcome: 'delete-faces',
       redetect: true,
@@ -41,7 +41,9 @@ describe('FaceDissolveRepository.dissolve', () => {
     expect(result.faces).toBe(1);
     expect(result.assetsCleared).toBe(1);
 
-    expect(await db.selectFrom('asset_face').select('id').where('personId', '=', person.id).execute()).toEqual([]);
+    expect(
+      await db.selectFrom('asset_face').select('id').where('personGroupId', '=', person.personGroupId).execute(),
+    ).toEqual([]);
 
     const ids: string[] = [];
     for await (const row of assetJob.streamForDetectFacesJob(false)) {
@@ -56,11 +58,15 @@ describe('FaceDissolveRepository.dissolve', () => {
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
-    const face = await seedFace(db, { assetId: asset.id, personId: person.id, withEmbedding: true });
-    await db.updateTable('person').set({ faceAssetId: face.id }).where('id', '=', person.id).execute();
+    const face = await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, withEmbedding: true });
+    await db
+      .updateTable('person')
+      .set({ faceAssetId: face.id })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
 
     await repo.dissolve({
-      personId: person.id,
+      personGroupId: person.personGroupId,
       scope: DissolveScope.All,
       outcome: 'delete-faces',
       redetect: true,
@@ -68,7 +74,11 @@ describe('FaceDissolveRepository.dissolve', () => {
 
     expect(await db.selectFrom('face_search').select('faceId').where('faceId', '=', face.id).execute()).toEqual([]);
 
-    const [row] = await db.selectFrom('person').select('faceAssetId').where('id', '=', person.id).execute();
+    const [row] = await db
+      .selectFrom('person')
+      .select('faceAssetId')
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
     expect(row.faceAssetId).toBeNull();
 
     const audit = await db
@@ -86,13 +96,13 @@ describe('FaceDissolveRepository.dissolve', () => {
     const asset = await seedAsset(db, { ownerId: user.id });
     const tombstone = await seedFace(db, {
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.Exif,
       deletedAt: new Date(),
     });
 
     await repo.dissolve({
-      personId: person.id,
+      personGroupId: person.personGroupId,
       scope: DissolveScope.Exif,
       outcome: 'delete-faces',
       redetect: true,
@@ -109,20 +119,24 @@ describe('FaceDissolveRepository.dissolve', () => {
     const asset = await seedAsset(db, { ownerId: user.id });
     const tombstone = await seedFace(db, {
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       deletedAt: new Date(),
     });
 
     await repo.dissolve({
-      personId: person.id,
+      personGroupId: person.personGroupId,
       scope: DissolveScope.All,
       outcome: 'unassign',
       redetect: false,
     });
 
-    const [row] = await db.selectFrom('asset_face').select(['id', 'personId']).where('id', '=', tombstone.id).execute();
+    const [row] = await db
+      .selectFrom('asset_face')
+      .select(['id', 'personGroupId'])
+      .where('id', '=', tombstone.id)
+      .execute();
     expect(row).toBeDefined();
-    expect(row.personId).toBeNull();
+    expect(row.personGroupId).toBeNull();
   });
 
   it('touches nothing when aimed at an id that does not exist', async () => {
@@ -130,21 +144,23 @@ describe('FaceDissolveRepository.dissolve', () => {
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Bystander' });
     const asset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: asset.id, personId: person.id });
+    await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId });
 
     const result = await repo.dissolve({
-      personId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      personGroupId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
       scope: DissolveScope.All,
       outcome: 'delete-faces-and-person',
       redetect: true,
     });
 
     expect(result.faces).toBe(0);
-    expect(await db.selectFrom('asset_face').select('id').where('personId', '=', person.id).execute()).toHaveLength(1);
+    expect(
+      await db.selectFrom('asset_face').select('id').where('personGroupId', '=', person.personGroupId).execute(),
+    ).toHaveLength(1);
   });
 
   // L10 — the row the spec's matrix names and nobody wrote. It guards a live regression: dissolve() passes
-  // `trx` into clearFacesRecognizedAt(personId, scope, trx). Drop that third argument and the UPDATE falls
+  // `trx` into clearFacesRecognizedAt(personGroupId, scope, trx). Drop that third argument and the UPDATE falls
   // back to `this.db`, running in its own autocommit outside the transaction — so a dissolve that rolls back
   // still leaves its assets re-queued for detection, with no face change to justify it. Verified: dropping
   // that argument fails THIS test and no other in the file.
@@ -153,7 +169,11 @@ describe('FaceDissolveRepository.dissolve', () => {
     const user = await seedUser(db);
     const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
-    const face = await seedFace(db, { assetId: asset.id, personId: person.id, sourceType: SourceType.Exif });
+    const face = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.Exif,
+    });
     const watermark = new Date('2026-01-01T00:00:00.000Z');
     await setFacesRecognizedAt(db, asset.id, watermark);
 
@@ -171,7 +191,7 @@ describe('FaceDissolveRepository.dissolve', () => {
     try {
       await expect(
         repo.dissolve({
-          personId: person.id,
+          personGroupId: person.personGroupId,
           scope: DissolveScope.Exif,
           outcome: 'delete-faces-and-person',
           redetect: true,
@@ -183,7 +203,9 @@ describe('FaceDissolveRepository.dissolve', () => {
     }
 
     expect(await db.selectFrom('asset_face').select('id').where('id', '=', face.id).execute()).toHaveLength(1);
-    expect(await db.selectFrom('person').select('id').where('id', '=', person.id).execute()).toHaveLength(1);
+    expect(
+      await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', person.personGroupId).execute(),
+    ).toHaveLength(1);
 
     const [status] = await db
       .selectFrom('asset_job_status')
