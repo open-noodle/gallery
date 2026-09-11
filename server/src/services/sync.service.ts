@@ -531,14 +531,14 @@ export class SyncService extends BaseService {
     const deletes = this.syncRepository.assetFavorite.getDeletes({ ...options, ack: checkpointMap[deleteType] });
 
     for await (const { id, ...data } of deletes) {
-      send(response, { type: deleteType, ids: [id], data });
+      await send(response, { type: deleteType, ids: [id], data });
     }
 
     const upsertType = SyncEntityType.AssetFavoriteV1;
     const upserts = this.syncRepository.assetFavorite.getUpserts({ ...options, ack: checkpointMap[upsertType] });
 
     for await (const { updateId, ...data } of upserts) {
-      send(response, { type: upsertType, ids: [updateId], data });
+      await send(response, { type: upsertType, ids: [updateId], data });
     }
   }
 
