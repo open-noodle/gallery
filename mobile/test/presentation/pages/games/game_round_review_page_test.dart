@@ -19,6 +19,7 @@ import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../../../maplibre_test_platform.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
@@ -81,6 +82,7 @@ GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailRespon
 );
 
 void main() {
+  useFakeMapLibrePlatformView();
   // getGameRoundImageUrl / getGameRoundImageUrl-backed RemoteImageProvider (used by the reveal's
   // photo/map summary) reads Store.get(StoreKey.serverEndpoint), which throws unless the Store is
   // initialized. The location reveal additionally needs MapThemeOverride's SettingsRepository
