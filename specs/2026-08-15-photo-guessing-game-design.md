@@ -61,7 +61,7 @@ only upstream coupling is reading `asset`, `asset_exif`, `asset_face`, and `smar
 ### 4.1 Schema
 
 Three tables. Migration goes in `server/src/schema/migrations-gallery/` with timestamp
-`1791000000000`; table definitions in `server/src/schema/tables/`.
+`1797000000000`; table definitions in `server/src/schema/tables/`.
 
 **`game_challenge`**
 

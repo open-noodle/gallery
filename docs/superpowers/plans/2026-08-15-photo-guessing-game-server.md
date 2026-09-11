@@ -15,7 +15,7 @@
 - **No relative imports in `server/`** — always use the `src/` path alias. Enforced by ESLint.
 - **Prettier:** 120 char line width, single quotes, trailing commas, semicolons.
 - **ESLint runs with `--max-warnings 0`.** Zero-warning policy.
-- **Fork migrations go in `server/src/schema/migrations-gallery/`, never `migrations/`.** The latter is replaced wholesale on upstream rebases. Use a round timestamp; the next free one is `1791000000000`.
+- **Fork migrations go in `server/src/schema/migrations-gallery/`, never `migrations/`.** The latter is replaced wholesale on upstream rebases. Use a round timestamp; the next free one is `1797000000000`.
 - **Unit tests need the `--config` flag.** The server's vitest config is not at the package root, so `pnpm vitest run <path>` starts with no config, no `globals: true`, and every spec dies with `ReferenceError: describe is not defined`. Always: `cd server && pnpm vitest --config test/vitest.config.mjs run <path>`.
 - **A fresh worktree must have `@immich/sdk`, `@immich/plugin-sdk` and `@immich/plugin-core` built** before any server test will collect. Already done in this worktree.
 - **Reading a suite result:** a healthy server unit run is ~169 files / ~5.7k tests. Vitest **exits 0 even when test files fail to collect**, so read the `Test Files` line, never the exit code.
@@ -33,7 +33,7 @@
 - `server/src/schema/tables/game-challenge.table.ts` — `game_challenge`.
 - `server/src/schema/tables/game-round.table.ts` — `game_round`.
 - `server/src/schema/tables/game-guess.table.ts` — `game_guess`.
-- `server/src/schema/migrations-gallery/1791000000000-AddPhotoGuessingGame.ts` — the migration.
+- `server/src/schema/migrations-gallery/1797000000000-AddPhotoGuessingGame.ts` — the migration.
 - `server/src/repositories/game.repository.ts` — all Kysely queries.
 - `server/src/services/game.service.ts` — challenge lifecycle, generation, guessing, leaderboard.
 - `server/src/services/game.service.spec.ts` — service unit tests.
@@ -714,7 +714,7 @@ git commit -m "refactor(spaces): extract the role hierarchy for reuse"
 - Create: `server/src/schema/tables/game-challenge.table.ts`
 - Create: `server/src/schema/tables/game-round.table.ts`
 - Create: `server/src/schema/tables/game-guess.table.ts`
-- Create: `server/src/schema/migrations-gallery/1791000000000-AddPhotoGuessingGame.ts`
+- Create: `server/src/schema/migrations-gallery/1797000000000-AddPhotoGuessingGame.ts`
 - Modify: `server/src/schema/index.ts`
 
 **Interfaces:**
@@ -899,7 +899,7 @@ game_round: GameRoundTable;
 
 - [ ] **Step 5: Write the migration**
 
-Create `server/src/schema/migrations-gallery/1791000000000-AddPhotoGuessingGame.ts`:
+Create `server/src/schema/migrations-gallery/1797000000000-AddPhotoGuessingGame.ts`:
 
 ```ts
 import { Kysely, sql } from 'kysely';

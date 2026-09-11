@@ -69,3 +69,7 @@
 1794100000000-DropAssetIsFavoriteColumn
 1796000000000-AddAssetFaceCreatedBy
 1797000000000-AddAssetLocalDateTimeIndex
+1797000000000-AddPhotoGuessingGame
+1797100000000-AddDailyGameChallenge
+1797200000000-AddSpaceDailyChallengeEnabled
+1797300000000-AddSoloGameChallenge

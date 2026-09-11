@@ -28,7 +28,7 @@
 **Files:**
 
 - Modify: `server/src/schema/tables/shared-space.table.ts:77-78`
-- Create: `server/src/schema/migrations-gallery/1793000000000-AddSpaceDailyChallengeEnabled.ts`
+- Create: `server/src/schema/migrations-gallery/1797200000000-AddSpaceDailyChallengeEnabled.ts`
 - Modify: `server/src/database.ts:288` — **`SharedSpace` there is a HAND-WRITTEN type**, not
   `Selectable<SharedSpaceTable>`, so a new column does not reach it automatically. Several row types in
   that file are hand-maintained the same way; adding a column to any of their tables means editing both.
@@ -53,7 +53,7 @@ In `server/src/schema/tables/shared-space.table.ts`, directly after the `petsEna
 
 - [ ] **Step 2: Write the migration**
 
-Create `server/src/schema/migrations-gallery/1793000000000-AddSpaceDailyChallengeEnabled.ts`:
+Create `server/src/schema/migrations-gallery/1797200000000-AddSpaceDailyChallengeEnabled.ts`:
 
 ```ts
 import { Kysely, sql } from 'kysely';
@@ -70,7 +70,7 @@ export async function down(db: Kysely<any>): Promise<void> {
 ```
 
 No `migration_overrides` row: this is a plain column with no index and no expression, so the
-declarative schema expresses it completely. (Contrast `1792000000000`, whose partial unique index
+declarative schema expresses it completely. (Contrast `1797100000000`, whose partial unique index
 needed one and drifted on every boot without it.)
 
 - [ ] **Step 3: Update the test factory**
@@ -112,7 +112,7 @@ Expected: clean. If `small.factory.ts` still errors, Step 3 was skipped.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add server/src/schema/tables/shared-space.table.ts server/src/schema/migrations-gallery/1793000000000-AddSpaceDailyChallengeEnabled.ts server/test/small.factory.ts
+git add server/src/schema/tables/shared-space.table.ts server/src/schema/migrations-gallery/1797200000000-AddSpaceDailyChallengeEnabled.ts server/test/small.factory.ts
 git commit -m "feat(spaces): add a tri-state daily challenge setting column"
 ```
 

@@ -74,7 +74,7 @@ export const eligibleSoloAsset = (
           correlateAssetId: 'asset.id',
           correlateLibraryId: 'asset.libraryId',
           scope: { memberUserId: userId, memberShowInTimeline: true },
-          requireShowInTimeline: true,
+          albumTimelineGate: 'space-tab',
         }),
       ),
     );
