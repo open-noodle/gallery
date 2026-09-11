@@ -328,6 +328,7 @@ describe(TimelineService.name, () => {
             timelineSpaceIds: ['space-1'],
             authUserId: authStub.admin.user.id,
           }),
+          authStub.admin,
         );
       });
 
@@ -348,6 +349,7 @@ describe(TimelineService.name, () => {
         expect(mocks.sharedSpace.getAllMemberSpaceIds).not.toHaveBeenCalled();
         expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
           expect.objectContaining({ timelineSpaceIds: ['space-visible'] }),
+          authStub.admin,
         );
       });
 
