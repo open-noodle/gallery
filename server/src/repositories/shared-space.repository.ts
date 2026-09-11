@@ -4839,7 +4839,7 @@ export class SharedSpaceRepository {
     const rows = await this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .leftJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
       // Hoisted above the derived join below on purpose: `reviewableAssetVisibility` takes an
       // ExpressionBuilder over `DB` itself, and the aliased subquery widens that to `DB & {
       // space_person }`. Where a predicate sits in the chain has no effect on the SQL.
@@ -4876,7 +4876,7 @@ export class SharedSpaceRepository {
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
       .where('asset.isOffline', '=', false)
-      .where((eb) => eb.or([eb('person.id', 'is', null), eb('person.isHidden', '=', false)]))
+      .where((eb) => eb.or([eb('person.personGroupId', 'is', null), eb('person.isHidden', '=', false)]))
       .where((eb) => eb.or([eb('space_person.id', 'is', null), eb('space_person.isHidden', '=', false)]))
       .orderBy('asset_face.id')
       .execute();
@@ -5007,6 +5007,9 @@ export class SharedSpaceRepository {
                 spaceAlbumAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceIdRef: 'shared_space_member.spaceId' },
+                  // 'none', matching `checkSpaceEditAccess`: the two must agree on which album
+                  // arm grants an edit, or the edit resolves to a space the response never names.
+                  albumTimelineGate: 'none',
                 }),
               ),
           )

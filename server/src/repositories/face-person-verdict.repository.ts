@@ -929,7 +929,7 @@ export class FacePersonVerdictRepository {
     const row = await this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .leftJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
       .select('asset_face.id')
       .where('asset_face.id', '=', assetFaceId)
       .where('asset_face.deletedAt', 'is', null)
@@ -937,13 +937,16 @@ export class FacePersonVerdictRepository {
       .where('asset.deletedAt', 'is', null)
       .where('asset.isOffline', 'is', false)
       .where((eb) => reviewableAssetVisibility(eb))
-      .where((eb) => eb.or([eb('person.id', 'is', null), eb('person.isHidden', '=', false)]))
+      .where((eb) => eb.or([eb('person.personGroupId', 'is', null), eb('person.isHidden', '=', false)]))
       .where((eb) =>
         eb.or(
           spaceAssetPathBranches(eb as unknown as ExpressionBuilder<DB, keyof DB>, {
             correlateAssetId: 'asset.id',
             correlateLibraryId: 'asset.libraryId',
             scope: { spaceId },
+            // 'none', exactly as `isFaceReachableInSpace` above: whether a face may be assigned
+            // must not depend on a timeline display toggle.
+            albumTimelineGate: 'none',
           }),
         ),
       )
