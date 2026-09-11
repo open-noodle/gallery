@@ -181,16 +181,36 @@ const recencyOf = (album: SharedSpaceLinkedAlbumDto): number =>
 const byRecencyThenId = (a: SharedSpaceLinkedAlbumDto, b: SharedSpaceLinkedAlbumDto): number =>
   recencyOf(b) - recencyOf(a) || a.id.localeCompare(b.id);
 
+// Two different albums can legitimately resolve to the same cover asset — getLinkedAlbums
+// falls back to the newest space-visible asset in the album, so a photo added to two albums
+// makes both covers identical. SpaceCollage keys its `{#each}` on asset id, so a repeated id
+// throws Svelte's each_key_duplicate and aborts the whole tab render (1091).
+const dedupeByAssetId = (albums: SharedSpaceLinkedAlbumDto[]): SharedSpaceLinkedAlbumDto[] => {
+  const seen = new Set<string>();
+  const result: SharedSpaceLinkedAlbumDto[] = [];
+  for (const album of albums) {
+    const assetId = album.albumThumbnailAssetId as string;
+    if (seen.has(assetId)) {
+      continue;
+    }
+    seen.add(assetId);
+    result.push(album);
+  }
+  return result;
+};
+
 export const getFolderPreviewAssetIds = (
   folders: SharedSpaceAlbumFolderDto[],
   albums: SharedSpaceLinkedAlbumDto[],
   folderId: string,
 ): string[] =>
-  albumsInSubtree(folders, albums, folderId)
-    // A null cover means getLinkedAlbums found no space-visible asset. Emitting it would
-    // render a broken tile, which is the exact bug the server-side COALESCE prevents.
-    .filter((a) => a.albumThumbnailAssetId !== null)
-    .sort(byRecencyThenId)
+  dedupeByAssetId(
+    albumsInSubtree(folders, albums, folderId)
+      // A null cover means getLinkedAlbums found no space-visible asset. Emitting it would
+      // render a broken tile, which is the exact bug the server-side COALESCE prevents.
+      .filter((a) => a.albumThumbnailAssetId !== null)
+      .sort(byRecencyThenId),
+  )
     .slice(0, FOLDER_PREVIEW_LIMIT)
     .map((a) => a.albumThumbnailAssetId as string);
 
@@ -285,8 +305,7 @@ export const buildFolderSummaries = (
 
     summaries.set(folder.id, {
       albumCount,
-      previewAssetIds: withCovers
-        .sort(byRecencyThenId)
+      previewAssetIds: dedupeByAssetId(withCovers.sort(byRecencyThenId))
         .slice(0, FOLDER_PREVIEW_LIMIT)
         .map((a) => a.albumThumbnailAssetId as string),
     });
