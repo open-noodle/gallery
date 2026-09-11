@@ -531,7 +531,7 @@ select
 from
   "asset_face"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
-  left join "person" on "person"."id" = "asset_face"."personId"
+  left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
 where
   "asset_face"."id" = $1
   and "asset_face"."deletedAt" is null
@@ -540,7 +540,7 @@ where
   and "asset"."isOffline" is false
   and "asset"."visibility" in ($2, $3)
   and (
-    "person"."id" is null
+    "person"."personGroupId" is null
     or "person"."isHidden" = $4
   )
   and (
@@ -593,13 +593,13 @@ where
 
 -- FacePersonVerdictRepository.getFaceOwnerLink
 select
-  "asset_face"."personId" as "personId",
+  "asset_face"."personGroupId" as "personGroupId",
   "person"."identityId" as "identityId",
   "asset"."ownerId" as "assetOwnerId"
 from
   "asset_face"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
-  left join "person" on "person"."id" = "asset_face"."personId"
+  left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
 where
   "asset_face"."id" = $1
 
