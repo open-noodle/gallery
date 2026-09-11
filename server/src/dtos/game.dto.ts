@@ -79,9 +79,9 @@ const GameChallengeResponseSchema = z
     spaceId: z.string().nullable().describe('Shared space ID, or null for a solo challenge'),
     ownerId: z.string().nullable().describe('Owning user ID, or null for a shared-space challenge'),
     name: z.string().describe('Challenge name'),
-    roundCount: z.number().describe('Number of rounds actually generated (may be less than requested)'),
-    scaleKm: z.number().describe('Frozen distance scale used to score location rounds'),
-    scaleDays: z.number().describe('Frozen day scale used to score date rounds'),
+    roundCount: z.int().describe('Number of rounds actually generated (may be less than requested)'),
+    scaleKm: z.number().meta({ format: 'double' }).describe('Frozen distance scale used to score location rounds'),
+    scaleDays: z.int().describe('Frozen day scale used to score date rounds'),
     createdAt: isoDatetimeToDate.describe('Creation date'),
     // A plain YYYY-MM-DD string, not a datetime: the daily is keyed to a UTC CALENDAR day, and
     // parsing it into a Date would reintroduce the timezone question the date column exists to
@@ -96,12 +96,12 @@ const GameChallengeResponseSchema = z
 
 const GameChallengeListItemResponseSchema = GameChallengeResponseSchema.extend({
   closedAt: isoDatetimeToDate.nullable().describe('When this challenge was closed, if at all'),
-  answered: z.number().describe('Number of rounds the caller has answered'),
-  total: z.number().describe("The caller's total score across answered rounds"),
+  answered: z.int().describe('Number of rounds the caller has answered'),
+  total: z.int().describe("The caller's total score across answered rounds"),
   // The count of rounds that ARE location rounds, so the client can label the challenge from what
   // it actually contains. Deliberately not a stored "requested type", which would keep claiming
   // 'location' for a challenge the generator could only partly fill.
-  locationRoundCount: z.number().describe('How many of the rounds are location rounds'),
+  locationRoundCount: z.int().describe('How many of the rounds are location rounds'),
 }).meta({ id: 'GameChallengeListItemResponseDto' });
 
 // A wrapper rather than a bare nullable challenge: a space with no usable photos has no daily, and
@@ -117,25 +117,25 @@ const GameDailyResponseSchema = z
 // assetId, coordinates, date or filename. GameService.toRoundDetail() is the only place allowed to
 // populate assetId/score/answer/guess, and only once a guess exists for the caller.
 const GameRoundAnswerSchema = z.object({
-  lat: z.number().nullable().describe('Answer latitude, for a location round'),
-  lon: z.number().nullable().describe('Answer longitude, for a location round'),
+  lat: z.number().meta({ format: 'double' }).nullable().describe('Answer latitude, for a location round'),
+  lon: z.number().meta({ format: 'double' }).nullable().describe('Answer longitude, for a location round'),
   date: isoDatetimeToDate.nullable().describe('Answer date, for a date round'),
 });
 
 const GameRoundGuessSchema = z.object({
-  lat: z.number().nullable().describe('Guessed latitude, for a location round'),
-  lon: z.number().nullable().describe('Guessed longitude, for a location round'),
+  lat: z.number().meta({ format: 'double' }).nullable().describe('Guessed latitude, for a location round'),
+  lon: z.number().meta({ format: 'double' }).nullable().describe('Guessed longitude, for a location round'),
   date: isoDatetimeToDate.nullable().describe('Guessed date, for a date round'),
-  distanceKm: z.number().nullable().describe('Distance from the answer, in km'),
-  offsetDays: z.number().nullable().describe('Day offset from the answer'),
+  distanceKm: z.number().meta({ format: 'double' }).nullable().describe('Distance from the answer, in km'),
+  offsetDays: z.int().nullable().describe('Day offset from the answer'),
 });
 
 const GameRoundDetailResponseSchema = z
   .object({
-    index: z.number().describe('Round index (0-based)'),
+    index: z.int().describe('Round index (0-based)'),
     type: GameRoundTypeSchema.describe('Round type'),
     assetId: z.string().optional().describe('Round photo asset ID - present only once the caller has guessed'),
-    score: z.number().optional().describe("The caller's score for this round - present only once guessed"),
+    score: z.int().optional().describe("The caller's score for this round - present only once guessed"),
     answer: GameRoundAnswerSchema.optional().describe('The round answer - present only once guessed'),
     guess: GameRoundGuessSchema.optional().describe("The caller's own guess - present only once guessed"),
   })
@@ -150,20 +150,24 @@ const GameGuessResponseSchema = z
   .object({
     roundId: z.string().describe('Round ID'),
     userId: z.string().describe('User ID'),
-    guessLat: z.number().nullable().describe('Guessed latitude'),
-    guessLon: z.number().nullable().describe('Guessed longitude'),
+    guessLat: z.number().meta({ format: 'double' }).nullable().describe('Guessed latitude'),
+    guessLon: z.number().meta({ format: 'double' }).nullable().describe('Guessed longitude'),
     guessDate: isoDatetimeToDate.nullable().describe('Guessed date'),
-    distanceKm: z.number().nullable().describe('Distance between the guess and the answer, in km'),
-    offsetDays: z.number().nullable().describe('Day offset between the guess and the answer'),
-    score: z.number().describe('Score awarded for this guess'),
+    distanceKm: z
+      .number()
+      .meta({ format: 'double' })
+      .nullable()
+      .describe('Distance between the guess and the answer, in km'),
+    offsetDays: z.int().nullable().describe('Day offset between the guess and the answer'),
+    score: z.int().describe('Score awarded for this guess'),
   })
   .meta({ id: 'GameGuessResponseDto' });
 
 const GameLeaderboardEntrySchema = z.object({
   userId: z.string().describe('User ID'),
   name: z.string().describe('User name'),
-  total: z.number().describe('Total score across all guessed rounds'),
-  answered: z.number().describe('Number of rounds answered'),
+  total: z.int().describe('Total score across all guessed rounds'),
+  answered: z.int().describe('Number of rounds answered'),
 });
 
 const GameLeaderboardResponseSchema = z
@@ -175,8 +179,8 @@ const GameLeaderboardResponseSchema = z
 const GameStandingsEntrySchema = z.object({
   userId: z.string().describe('User ID'),
   name: z.string().describe('User name'),
-  total: z.number().describe("Total score across the month's daily challenges"),
-  daysPlayed: z.number().describe('Number of daily challenges played this month'),
+  total: z.int().describe("Total score across the month's daily challenges"),
+  daysPlayed: z.int().describe('Number of daily challenges played this month'),
 });
 
 // No `average` field: it is total / daysPlayed, and carrying a derived value alongside its own
@@ -197,11 +201,11 @@ const GameStandingsResponseSchema = z
 // stored, so they cannot drift from the guesses they are derived from.
 const GameSoloStatsResponseSchema = z
   .object({
-    currentStreak: z.number().describe('Consecutive UTC days of fully played dailies, ending today or yesterday'),
-    bestStreak: z.number().describe('The longest such run ever'),
-    bestScore: z.number().describe('The highest total scored in a single game'),
-    averageScore: z.number().describe('Mean total across games played, rounded to whole points'),
-    gamesPlayed: z.number().describe('How many games have at least one guess'),
+    currentStreak: z.int().describe('Consecutive UTC days of fully played dailies, ending today or yesterday'),
+    bestStreak: z.int().describe('The longest such run ever'),
+    bestScore: z.int().describe('The highest total scored in a single game'),
+    averageScore: z.int().describe('Mean total across games played, rounded to whole points'),
+    gamesPlayed: z.int().describe('How many games have at least one guess'),
   })
   .meta({ id: 'GameSoloStatsResponseDto' });
 
@@ -227,9 +231,9 @@ const GameSoloHistoryItemResponseSchema = z
       .nullable()
       .describe('The UTC date this was the daily for, or null for a free-play game'),
     createdAt: isoDatetimeToDate.describe('Creation date'),
-    roundCount: z.number().describe('Number of rounds in the challenge'),
-    answered: z.number().describe('Number of rounds the player answered'),
-    total: z.number().describe('Total score across the rounds they answered'),
+    roundCount: z.int().describe('Number of rounds in the challenge'),
+    answered: z.int().describe('Number of rounds the player answered'),
+    total: z.int().describe('Total score across the rounds they answered'),
   })
   .meta({ id: 'GameSoloHistoryItemResponseDto' });
 
