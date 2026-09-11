@@ -126,6 +126,7 @@ const ServerConfigSchema = z
     mapLightStyleUrl: z.string().describe('Map light style URL'),
     maintenanceMode: z.boolean().describe('Whether maintenance mode is active'),
     minFaces: z.int().describe('People min faces server default'),
+    uploadChunkSize: z.int().describe('Chunk size in bytes for resumable uploads; 0 if unsupported'),
     availableMemoryTypes: z.array(z.string()).describe('Globally-available memory type keys'),
   })
   .meta({ id: 'ServerConfigDto' });
