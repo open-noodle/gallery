@@ -1988,7 +1988,7 @@ offset
 select
   "asset_face"."id" as "assetFaceId",
   "asset_face"."assetId" as "assetId",
-  "asset_face"."personId" as "personId",
+  "asset_face"."personGroupId" as "personGroupId",
   "asset"."ownerId" as "assetOwnerId"
 from
   "shared_space_person_face"
