@@ -11822,15 +11822,15 @@ export enum QueueJobStatus {
     Waiting = "waiting",
     Paused = "paused"
 }
+export enum LocationPresence {
+    NoGps = "noGps",
+    NoPlaceName = "noPlaceName"
+}
 export enum SearchOrderField {
     FileCreatedAt = "fileCreatedAt",
     LocalDateTime = "localDateTime",
     FileSizeInBytes = "fileSizeInBytes",
     Rating = "rating"
-}
-export enum LocationPresence {
-    NoGps = "noGps",
-    NoPlaceName = "noPlaceName"
 }
 export enum SearchSuggestionType {
     Country = "country",
