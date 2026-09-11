@@ -40,18 +40,18 @@ describe('clearFacesRecognizedAt', () => {
     const mine: string[] = [];
     for (let i = 0; i < 2; i++) {
       const asset = await seedAsset(db, { ownerId: user.id });
-      await seedFace(db, { assetId: asset.id, personId: target.id });
+      await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId });
       await setFacesRecognizedAt(db, asset.id, new Date());
       mine.push(asset.id);
     }
     const theirs = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: theirs.id, personId: other.id });
+    await seedFace(db, { assetId: theirs.id, personGroupId: other.personGroupId });
     await setFacesRecognizedAt(db, theirs.id, new Date());
 
     // every asset is already recognized, so nothing is pending
     expect(await pending(assetJob)).toEqual([]);
 
-    expect(await dissolve.clearFacesRecognizedAt(target.id, DissolveScope.All)).toBe(2);
+    expect(await dissolve.clearFacesRecognizedAt(target.personGroupId, DissolveScope.All)).toBe(2);
 
     const after = await pending(assetJob);
     expect(after.sort()).toEqual([...mine].sort());
@@ -66,14 +66,22 @@ describe('clearFacesRecognizedAt', () => {
     const person = await seedPerson(db, { ownerId: user.id, name: 'Scoped' });
 
     const exifAsset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: exifAsset.id, personId: person.id, sourceType: SourceType.Exif });
+    await seedFace(db, {
+      assetId: exifAsset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.Exif,
+    });
     await setFacesRecognizedAt(db, exifAsset.id, new Date());
 
     const mlAsset = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: mlAsset.id, personId: person.id, sourceType: SourceType.MachineLearning });
+    await seedFace(db, {
+      assetId: mlAsset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.MachineLearning,
+    });
     await setFacesRecognizedAt(db, mlAsset.id, new Date());
 
-    expect(await dissolve.clearFacesRecognizedAt(person.id, DissolveScope.Exif)).toBe(1);
+    expect(await dissolve.clearFacesRecognizedAt(person.personGroupId, DissolveScope.Exif)).toBe(1);
 
     // db is shared across the tests in this file (see getKyselyDB), so other tests' assets may
     // already be pending — assert membership rather than exact equality.

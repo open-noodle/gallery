@@ -22,35 +22,35 @@ describe('FaceDissolveRepository.getCounts', () => {
     const pet = await seedPerson(db, { ownerId: user.id, name: 'Pet', type: 'pet' });
 
     const solo = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: solo.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: solo.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
     // A second in-scope target face on the SAME asset (F5): `assets` must count this asset once, not twice.
-    await seedFace(db, { assetId: solo.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: solo.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
 
     const shared = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: shared.id, personId: target.id, sourceType: SourceType.Exif });
-    await seedFace(db, { assetId: shared.id, personId: other.id });
+    await seedFace(db, { assetId: shared.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: shared.id, personGroupId: other.personGroupId });
     // A second sibling face on the SAME shared asset (F2): `sharedAssets` counts qualifying ASSETS, not rows.
-    await seedFace(db, { assetId: shared.id, personId: other.id });
+    await seedFace(db, { assetId: shared.id, personGroupId: other.personGroupId });
 
     // hidden and preview-less assets can never be re-detected (L11)
     const hidden = await seedAsset(db, { ownerId: user.id, visibility: AssetVisibility.Hidden });
-    await seedFace(db, { assetId: hidden.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: hidden.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
 
     const noPreview = await seedAsset(db, { ownerId: user.id, withPreview: false });
-    await seedFace(db, { assetId: noPreview.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: noPreview.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
 
     // A trashed asset can never be re-detected either (F3).
     const trashed = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: trashed.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: trashed.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
     await db.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', trashed.id).execute();
 
     // A sibling PET face carries no re-detection risk (F1): handleDetectFaces never removes pet faces, so
     // this asset must NOT count toward sharedAssets even though it holds a second creature's face.
     const petOnly = await seedAsset(db, { ownerId: user.id });
-    await seedFace(db, { assetId: petOnly.id, personId: target.id, sourceType: SourceType.Exif });
-    await seedFace(db, { assetId: petOnly.id, personId: pet.id, isPet: true });
+    await seedFace(db, { assetId: petOnly.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: petOnly.id, personGroupId: pet.personGroupId, isPet: true });
 
-    const counts = await repo.getCounts(target.id, DissolveScope.Exif);
+    const counts = await repo.getCounts(target.personGroupId, DissolveScope.Exif);
 
     expect(counts.faces).toBe(7);
     expect(counts.exif).toBe(7);
@@ -65,13 +65,13 @@ describe('FaceDissolveRepository.getCounts', () => {
     const target = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
 
-    await seedFace(db, { assetId: asset.id, personId: target.id, withEmbedding: true });
-    await seedFace(db, { assetId: asset.id, personId: target.id });
-    await seedFace(db, { assetId: asset.id, personId: target.id, deletedAt: new Date() });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, withEmbedding: true });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, deletedAt: new Date() });
     // An EXIF-sourced face mixed in (F4): `exif` must differ from `faces`, not trivially equal it.
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
 
-    const counts = await repo.getCounts(target.id, DissolveScope.All);
+    const counts = await repo.getCounts(target.personGroupId, DissolveScope.All);
     expect(counts.faces).toBe(4);
     expect(counts.exif).toBe(1);
     expect(counts.mlWithEmbedding).toBe(1);
@@ -88,23 +88,32 @@ describe('FaceDissolveRepository.getCounts', () => {
     const target = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
 
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
-    await seedFace(db, { assetId: asset.id, personId: target.id, withEmbedding: true });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, withEmbedding: true });
     // Neither of these keeps a person alive: PersonCleanup's join excludes both.
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif, deletedAt: new Date() });
-    const invisible = await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: target.personGroupId,
+      sourceType: SourceType.Exif,
+      deletedAt: new Date(),
+    });
+    const invisible = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: target.personGroupId,
+      sourceType: SourceType.Exif,
+    });
     await db.updateTable('asset_face').set({ isVisible: false }).where('id', '=', invisible.id).execute();
 
     // Dissolving only the EXIF faces leaves the live ML face behind — the person survives.
-    const exifScope = await repo.getCounts(target.id, DissolveScope.Exif);
+    const exifScope = await repo.getCounts(target.personGroupId, DissolveScope.Exif);
     expect(exifScope.remainingLiveFaces).toBe(1);
 
     // Dissolving everything leaves nothing live behind, so the nightly cleanup takes the person.
-    const allScope = await repo.getCounts(target.id, DissolveScope.All);
+    const allScope = await repo.getCounts(target.personGroupId, DissolveScope.All);
     expect(allScope.remainingLiveFaces).toBe(0);
 
     // And the ML-only scope leaves the live EXIF face, so it is not a constant either.
-    const mlScope = await repo.getCounts(target.id, DissolveScope.MachineLearning);
+    const mlScope = await repo.getCounts(target.personGroupId, DissolveScope.MachineLearning);
     expect(mlScope.remainingLiveFaces).toBe(1);
   });
 
@@ -119,16 +128,16 @@ describe('FaceDissolveRepository.getCounts', () => {
     const asset = await seedAsset(db, { ownerId: user.id });
 
     // The contamination shape: EXIF faces never carry an embedding.
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
     // A bare ML face — no embedding either, so it belongs to this scope too.
-    await seedFace(db, { assetId: asset.id, personId: target.id });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId });
     // Three EMBEDDED ML faces, which this scope must never touch.
     for (let i = 0; i < 3; i++) {
-      await seedFace(db, { assetId: asset.id, personId: target.id, withEmbedding: true });
+      await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, withEmbedding: true });
     }
 
-    const noEmbedding = await repo.getCounts(target.id, DissolveScope.WithoutEmbedding);
+    const noEmbedding = await repo.getCounts(target.personGroupId, DissolveScope.WithoutEmbedding);
     // 2 exif + 1 bare ML. Every number below is distinct from the machine-learning scope's, so a predicate
     // that aliased the two would fail rather than coincide.
     expect(noEmbedding.faces).toBe(3);
@@ -138,7 +147,7 @@ describe('FaceDissolveRepository.getCounts', () => {
     // if the scope ever selects the embedded faces instead.
     expect(noEmbedding.mlWithEmbedding).toBe(0);
 
-    const ml = await repo.getCounts(target.id, DissolveScope.MachineLearning);
+    const ml = await repo.getCounts(target.personGroupId, DissolveScope.MachineLearning);
     expect(ml.faces).toBe(4);
     expect(ml.mlWithEmbedding).toBe(3);
     // The two scopes must not agree on this library, or the test could not tell them apart.
@@ -154,16 +163,25 @@ describe('FaceDissolveRepository.getCounts', () => {
     const target = await seedPerson(db, { ownerId: user.id, name: 'Target' });
     const asset = await seedAsset(db, { ownerId: user.id });
 
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
+    await seedFace(db, { assetId: asset.id, personGroupId: target.personGroupId, sourceType: SourceType.Exif });
     // Invisible and soft-deleted faces are still this person's, and a dissolve still deletes them.
-    const invisible = await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif });
+    const invisible = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: target.personGroupId,
+      sourceType: SourceType.Exif,
+    });
     await db.updateTable('asset_face').set({ isVisible: false }).where('id', '=', invisible.id).execute();
-    await seedFace(db, { assetId: asset.id, personId: target.id, sourceType: SourceType.Exif, deletedAt: new Date() });
+    await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: target.personGroupId,
+      sourceType: SourceType.Exif,
+      deletedAt: new Date(),
+    });
 
-    const counts = await repo.getCounts(target.id, DissolveScope.All);
+    const counts = await repo.getCounts(target.personGroupId, DissolveScope.All);
     const health = await repo.getPeopleHealth({ ownerId: user.id, sort: 'faceCount', page: 1, size: 10 });
-    const row = health.people.find((person) => person.id === target.id)!;
+    const row = health.people.find((person) => person.id === target.personGroupId)!;
 
     // 4 = 2 plain + 1 invisible + 1 soft-deleted. Discovery must not quietly report 2.
     expect(counts.faces).toBe(4);
