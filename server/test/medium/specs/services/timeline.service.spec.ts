@@ -426,6 +426,27 @@ describe(TimelineService.name, () => {
       expect(response).toEqual(expect.objectContaining({ id: [] }));
     });
 
+    // Upstream has no format validator at all, so its clients — and third parties mirroring them,
+    // such as immich-public-proxy — send the bucket start as a full midnight-UTC timestamp. The
+    // fork validates, so the timestamp form has to be accepted explicitly and resolve to the very
+    // same bucket as the bare date; the unit test pins the grammar, this pins the whole path
+    // through to SQL.
+    it.each(['2024-02-01', '2024-02-01T00:00:00.000Z', '2024-02-01T00:00:00Z'])(
+      'resolves timeBucket=%s to the same month bucket',
+      async (timeBucket) => {
+        const { sut, ctx } = setup();
+        const { user } = await ctx.newUser();
+        const auth = factory.auth({ user });
+
+        const inBucket = await createTimelineAsset(ctx, user.id, new Date('2024-02-15T12:00:00.000Z'));
+        await createTimelineAsset(ctx, user.id, new Date('2024-03-01T00:00:00.000Z')); // must be excluded
+
+        const rawResponse = await sut.getTimeBucket(auth, { timeBucket, bucketSize: TimeBucketSize.Month });
+
+        expect(JSON.parse(rawResponse)).toEqual(expect.objectContaining({ id: [inBucket.id] }));
+      },
+    );
+
     it('should return time bucket in trash', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
