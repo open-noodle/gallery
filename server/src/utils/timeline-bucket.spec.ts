@@ -30,6 +30,25 @@ describe('normalizeTimeBucketForBucketSize', () => {
   it('preserves five-digit years used by existing timeline bucket calls', () => {
     expect(normalizeTimeBucketForBucketSize('012345-01-01', TimeBucketSize.Month)).toBe('012345-01-01');
   });
+
+  it('accepts the midnight-UTC timestamp form upstream clients send and normalises it to a date', () => {
+    expect(normalizeTimeBucketForBucketSize('2024-02-01T00:00:00.000Z', TimeBucketSize.Month)).toBe('2024-02-01');
+    expect(normalizeTimeBucketForBucketSize('2024-02-01T00:00:00Z', TimeBucketSize.Month)).toBe('2024-02-01');
+    expect(normalizeTimeBucketForBucketSize('2024-01-01T00:00:00.000Z', TimeBucketSize.Year)).toBe('2024-01-01');
+    expect(normalizeTimeBucketForBucketSize('2024-02-29T00:00:00.000Z', TimeBucketSize.Day)).toBe('2024-02-29');
+  });
+
+  it('rejects timestamps that are not midnight UTC', () => {
+    expect(() => normalizeTimeBucketForBucketSize('2024-02-01T01:00:00.000Z', TimeBucketSize.Month)).toThrow(
+      BadRequestException,
+    );
+    expect(() => normalizeTimeBucketForBucketSize('2024-02-01T00:00:00.000+02:00', TimeBucketSize.Month)).toThrow(
+      BadRequestException,
+    );
+    expect(() => normalizeTimeBucketForBucketSize('2024-02-01T00:00:00', TimeBucketSize.Month)).toThrow(
+      BadRequestException,
+    );
+  });
 });
 
 describe('dateTruncUnitForTimeBucketSize', () => {
