@@ -3,7 +3,7 @@ import { DB } from 'src/schema';
 // Side-effect import: registers every decorated table so the migrated template database this spec
 // runs against carries the declarative constraints below. Same idiom as schema-drift.spec.ts.
 import 'src/schema';
-import { mediumFactory } from 'test/medium.factory';
+import { insertClusterGroup, mediumFactory } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -32,7 +32,7 @@ describe('game_challenge scope constraints', () => {
   const seedSpaceAndUser = async () => {
     const user = await db
       .insertInto('user')
-      .values(mediumFactory.userInsert())
+      .values(mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) }))
       .returningAll()
       .executeTakeFirstOrThrow();
     const space = await db

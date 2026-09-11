@@ -7,7 +7,7 @@ import { DB } from 'src/schema';
 import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable } from 'src/schema/tables/game-round.table';
-import { asUuid, asVector } from 'src/utils/database';
+import { asUuid } from 'src/utils/database';
 import { GameCandidate } from 'src/utils/game-scoring';
 import { eligibleSoloAsset, soloPoolAssetIdUnion, SoloPoolSources } from 'src/utils/game-solo-eligibility';
 import { spaceAssetIdUnion, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
@@ -44,6 +44,12 @@ export type GameSoloHistoryRow = {
  * than run against nonsense. See GameService.getScenePromptEmbeddings.
  */
 export type ScenePromptEmbeddings = { place: number[]; notPlace: number[] };
+
+// Upstream dropped `asVector` from src/utils/database in immich-30772 ("remove unused code") once
+// its own search paths started passing pre-serialised `string` embeddings around. The game pool's
+// CLIP ordering still holds its prompt vectors as `number[]`, so it keeps the helper - same body -
+// rather than re-adding a fork-only export to an upstream-owned module.
+const asVector = (embedding: number[]) => sql<string>`${`[${embedding}]`}::vector`;
 
 // A face covering more than this fraction of the frame marks the shot as a portrait rather
 // than a place - see the doc comment on rankLocationSample for the measurement behind it.
@@ -235,7 +241,7 @@ const eligibleSpaceAsset = (eb: ExpressionBuilder<DB, keyof DB>, spaceId: string
         correlateAssetId: 'asset.id',
         correlateLibraryId: 'asset.libraryId',
         scope: { spaceId },
-        requireShowInTimeline: true,
+        albumTimelineGate: 'space-tab',
       }),
     ),
     eb('asset.deletedAt', 'is', null),

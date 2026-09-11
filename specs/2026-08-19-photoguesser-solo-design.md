@@ -239,7 +239,7 @@ Three points that are load-bearing:
   re-resolving eligibility from live settings would 404 every round image mid-game.
 - **Both partial indexes need `INSERT INTO migration_overrides` rows**, with payloads matched
   verbatim and generated via sql-tools. Without them the schema-drift check fails. The existing row
-  in `1792000000000-AddDailyGameChallenge.ts:23` is the template, and it must be **rewritten** rather
+  in `1797100000000-AddDailyGameChallenge.ts:23` is the template, and it must be **rewritten** rather
   than merely added to, because the index it describes gains an `AND "spaceId" IS NOT NULL` clause.
 
 The `CHECK` is expressible declaratively — `@Check` already exists and is used at `person.table.ts:33`

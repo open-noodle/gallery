@@ -47,9 +47,9 @@ A two-state boolean cannot express this. With `default false` there is no way to
 asked" from "an editor said no", so the prompt would either nag forever or need a second column to
 record the dismissal. The absence of a default is the feature.
 
-Migration: `server/src/schema/migrations-gallery/1793000000000-AddSpaceDailyChallengeEnabled.ts`, a
+Migration: `server/src/schema/migrations-gallery/1797200000000-AddSpaceDailyChallengeEnabled.ts`, a
 plain `ADD COLUMN` up and a `DROP COLUMN IF EXISTS` down. No index and no expression, so **no
-`migration_overrides` row is required** — unlike `1792000000000`'s partial unique index, whose missing
+`migration_overrides` row is required** — unlike `1797100000000`'s partial unique index, whose missing
 override caused schema drift on every boot. `server/test/medium/specs/schema-drift.spec.ts` is the
 check that settles this either way; it must be run, not assumed.
 
