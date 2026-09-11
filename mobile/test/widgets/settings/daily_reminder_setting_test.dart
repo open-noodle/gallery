@@ -15,6 +15,7 @@ import 'package:immich_mobile/widgets/settings/notification_setting.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../test_utils.dart';
+import '../../widget_tester_extensions.dart';
 
 class _MockController extends Mock implements DailyReminderController {}
 
@@ -44,14 +45,18 @@ void main() {
     await db.close();
   });
 
+  // context.t resolves via EasyLocalization.of(context)!, so a test that builds its own
+  // ProviderScope/MaterialApp has to supply that ancestor itself.
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        dailyReminderProvider.overrideWithValue(controller),
-        // Deliberately made to throw: the settings page must not depend on the network.
-        sharedSpacesProvider.overrideWith((ref) async => throw Exception('offline')),
-      ],
-      child: const MaterialApp(home: Scaffold(body: NotificationSetting())),
+    localizedForTest(
+      ProviderScope(
+        overrides: [
+          dailyReminderProvider.overrideWithValue(controller),
+          // Deliberately made to throw: the settings page must not depend on the network.
+          sharedSpacesProvider.overrideWith((ref) async => throw Exception('offline')),
+        ],
+        child: const MaterialApp(home: Scaffold(body: NotificationSetting())),
+      ),
     ),
   );
 

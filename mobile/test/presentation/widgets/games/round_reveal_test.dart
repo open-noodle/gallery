@@ -19,6 +19,7 @@ import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/map/map_state.provider.dart';
 import 'package:openapi/api.dart';
 
+import '../../../maplibre_test_platform.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
@@ -33,6 +34,7 @@ class _FakeMapStateNotifier extends MapStateNotifier {
 }
 
 void main() {
+  useFakeMapLibrePlatformView();
   // getGameRoundImageUrl (used by the date reveal's dimmed photo) reads
   // Store.get(StoreKey.serverEndpoint), which throws unless the Store is initialized. The location
   // reveal's map additionally needs MapThemeOverride's SettingsRepository wiring. Mirrors

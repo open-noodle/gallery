@@ -27,6 +27,7 @@ import 'package:immich_mobile/routing/router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../../../maplibre_test_platform.dart';
 import '../../../test_helpers/fake_stack_router.dart';
 import '../../../test_helpers/wire_dates.dart';
 import '../../../test_utils.dart';
@@ -149,6 +150,7 @@ GameChallengeDetailResponseDto _dailyChallenge({required bool answered}) => Game
 );
 
 void main() {
+  useFakeMapLibrePlatformView();
   // getGameRoundImageUrl (used by both round surfaces) reads Store.get(StoreKey.serverEndpoint),
   // which throws unless the Store is initialized (mirrors location_round_test.dart /
   // round_reveal_test.dart). The location round additionally needs MapThemeOverride's

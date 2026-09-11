@@ -151,7 +151,9 @@ void main() {
   // The opt-in prompt is a Challenges-page surface, not a timeline one — an un-asked space shows
   // nothing above its photos even to an editor who could act on it.
   testWidgets('an un-asked space puts nothing on the space timeline, even for an editor', (tester) async {
-    await tester.pumpWidget(_wrap(spaceId: 'space-1', canEdit: true, albums: [], dailyChallengeEnabled: null));
+    await tester.pumpWidget(
+      localizedForTest(_wrap(spaceId: 'space-1', canEdit: true, albums: [], dailyChallengeEnabled: null)),
+    );
     await tester.pump();
 
     expect(find.byKey(const Key('daily-prompt')), findsNothing);

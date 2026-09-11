@@ -16,6 +16,7 @@ import 'package:immich_mobile/presentation/widgets/games/location_round.widget.d
 import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/map/map_state.provider.dart';
 
+import '../../../maplibre_test_platform.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
@@ -30,6 +31,7 @@ class _FakeMapStateNotifier extends MapStateNotifier {
 }
 
 void main() {
+  useFakeMapLibrePlatformView();
   // getGameRoundImageUrl reads Store.get(StoreKey.serverEndpoint), which throws unless the Store
   // is initialized (mirrors the setup in people_grid_test.dart). MapThemeOverride additionally
   // reads immichThemeProvider, which reaches SettingsRepository.instance, so that needs
