@@ -44,7 +44,7 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
     ],
     mock: [JobRepository, LoggingRepository],
   });
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   jobs.hasInFlightDedupChain.mockResolvedValue(false);
@@ -67,9 +67,9 @@ const createIdentityBackedFace = async (
       addedById: input.assetAdderId ?? input.ownerId,
     });
   }
-  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
-  const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
   await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
   return { asset, faceId, identity, person };
 };
@@ -80,7 +80,7 @@ const createIdentityBackedFace = async (
 const addFaceToIdentity = async (
   ctx: ReturnType<typeof setupSharedSpace>['ctx'],
   faceIdentityRepository: FaceIdentityRepository,
-  input: { ownerId: string; personId: string; identityId: string; spaceId?: string; assetAdderId?: string },
+  input: { ownerId: string; personGroupId: string; identityId: string; spaceId?: string; assetAdderId?: string },
 ) => {
   const { asset } = await ctx.newAsset({ ownerId: input.ownerId, visibility: AssetVisibility.Timeline });
   if (input.spaceId) {
@@ -90,7 +90,7 @@ const addFaceToIdentity = async (
       addedById: input.assetAdderId ?? input.ownerId,
     });
   }
-  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: input.personId });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: input.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
   await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: input.identityId, source: 'owner-person' });
   return { asset, faceId };
@@ -161,7 +161,7 @@ const setupSingleFaceFixture = async (options?: { retainedFace?: boolean }) => {
   if (options?.retainedFace) {
     retained = await addFaceToIdentity(ctx, faceIdentityRepository, {
       ownerId: owner.id,
-      personId: wrong.person.id,
+      personGroupId: wrong.person.personGroupId,
       identityId: wrong.identity.id,
       spaceId: space.id,
     });
@@ -335,19 +335,19 @@ describe('Shared space person face reassign (#765)', () => {
     // asset_face.personId changed.
     const faceRow = await fx.ctx.database
       .selectFrom('asset_face')
-      .select(['personId'])
+      .select(['personGroupId'])
       .where('id', '=', fx.wrong.faceId)
       .executeTakeFirstOrThrow();
-    expect(faceRow.personId).not.toBe(fx.wrong.person.id);
-    const newPersonId = faceRow.personId!;
+    expect(faceRow.personGroupId).not.toBe(fx.wrong.person.personGroupId);
+    const newPersonGroupId = faceRow.personGroupId!;
 
     // The new global person is owned by the ASSET'S OWNER — not the acting editor, and not the
     // space's creator/owner-role member either (a distinct third user in this fixture, so this can't
     // pass by accident of the fixture conflating the two).
     const newPerson = await fx.ctx.database
       .selectFrom('person')
-      .select(['id', 'ownerId'])
-      .where('id', '=', newPersonId)
+      .select(['personGroupId', 'ownerId'])
+      .where('personGroupId', '=', newPersonGroupId)
       .executeTakeFirstOrThrow();
     expect(newPerson.ownerId).toBe(fx.owner.id);
     expect(newPerson.ownerId).not.toBe(fx.editor.id);
@@ -428,7 +428,7 @@ describe('Shared space person face reassign (#765)', () => {
     // duplicate entirely.
     const ownerAlignedPeople = await fx.ctx.database
       .selectFrom('person')
-      .select(['id', 'ownerId', 'identityId'])
+      .select(['personGroupId', 'ownerId', 'identityId'])
       .where('ownerId', '=', fx.owner.id)
       .where('identityId', '=', fx.grandma.identity.id)
       .execute();
@@ -437,10 +437,10 @@ describe('Shared space person face reassign (#765)', () => {
 
     const faceRow = await fx.ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', fx.wrong.faceId)
       .executeTakeFirstOrThrow();
-    expect(faceRow.personId).toBe(ownerAlignedPerson.id);
+    expect(faceRow.personGroupId).toBe(ownerAlignedPerson.personGroupId);
 
     // Synchronous half: evicted from the wrong space person immediately, before any job runs — #765's
     // sync-eviction requirement applies to reassign-to-existing too, not just reassign-to-new (AC1).
@@ -474,10 +474,10 @@ describe('Shared space person face reassign (#765)', () => {
 
     const faceRow = await fx.ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', fx.wrong.faceId)
       .executeTakeFirstOrThrow();
-    expect(faceRow.personId).toBe(fx.wrong.person.id);
+    expect(faceRow.personGroupId).toBe(fx.wrong.person.personGroupId);
 
     const projected = await spacePersonFacesFor(fx.ctx, { spaceId: fx.space.id, assetFaceId: fx.wrong.faceId });
     expect(projected).toEqual([expect.objectContaining({ personId: fx.sourcePerson.id })]);
@@ -557,7 +557,7 @@ describe('Shared space person face reassign (#765)', () => {
     await fx.ctx.database
       .updateTable('person')
       .set({ faceAssetId: fx.wrong.faceId })
-      .where('id', '=', fx.wrong.person.id)
+      .where('personGroupId', '=', fx.wrong.person.personGroupId)
       .execute();
 
     await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
@@ -568,14 +568,14 @@ describe('Shared space person face reassign (#765)', () => {
     const sourcePerson = await fx.ctx.database
       .selectFrom('person')
       .select('faceAssetId')
-      .where('id', '=', fx.wrong.person.id)
+      .where('personGroupId', '=', fx.wrong.person.personGroupId)
       .executeTakeFirstOrThrow();
     // The moved face now belongs to someone else — its old person must not still advertise it.
     expect(sourcePerson.faceAssetId).not.toBe(fx.wrong.faceId);
     expect(sourcePerson.faceAssetId).toBe(fx.retained!.faceId);
     expect(fx.jobs.queue.mock.calls.map(([job]) => job)).toContainEqual({
       name: JobName.PersonGenerateThumbnail,
-      data: { id: fx.wrong.person.id },
+      data: { ownerId: fx.owner.id, personGroupId: fx.wrong.person.personGroupId },
     });
   });
 
@@ -584,7 +584,7 @@ describe('Shared space person face reassign (#765)', () => {
     await fx.ctx.database
       .updateTable('person')
       .set({ faceAssetId: fx.retained!.faceId })
-      .where('id', '=', fx.wrong.person.id)
+      .where('personGroupId', '=', fx.wrong.person.personGroupId)
       .execute();
 
     await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
@@ -595,7 +595,7 @@ describe('Shared space person face reassign (#765)', () => {
     const sourcePerson = await fx.ctx.database
       .selectFrom('person')
       .select('faceAssetId')
-      .where('id', '=', fx.wrong.person.id)
+      .where('personGroupId', '=', fx.wrong.person.personGroupId)
       .executeTakeFirstOrThrow();
     expect(sourcePerson.faceAssetId).toBe(fx.retained!.faceId);
   });
@@ -705,9 +705,9 @@ describe('Shared space person face reassign (#765)', () => {
 
     const createdPeople = await fx.ctx.database
       .selectFrom('person')
-      .select(['id'])
+      .select(['personGroupId'])
       .where('ownerId', '=', fx.owner.id)
-      .where('id', '!=', fx.wrong.person.id)
+      .where('personGroupId', '!=', fx.wrong.person.personGroupId)
       .execute();
     expect(createdPeople).toHaveLength(1);
 

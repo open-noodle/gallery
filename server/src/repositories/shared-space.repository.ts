@@ -3063,7 +3063,7 @@ export class SharedSpaceRepository {
   getSourceFacesForSpacePersonAssets(
     spacePersonId: string,
     assetIds: string[],
-  ): Promise<Array<{ assetFaceId: string; assetId: string; personId: string | null; assetOwnerId: string }>> {
+  ): Promise<Array<{ assetFaceId: string; assetId: string; personGroupId: string | null; assetOwnerId: string }>> {
     if (assetIds.length === 0) {
       return Promise.resolve([]);
     }
@@ -3075,7 +3075,7 @@ export class SharedSpaceRepository {
       .select([
         'asset_face.id as assetFaceId',
         'asset_face.assetId as assetId',
-        'asset_face.personId as personId',
+        'asset_face.personGroupId as personGroupId',
         'asset.ownerId as assetOwnerId',
       ])
       .where('shared_space_person_face.personId', '=', spacePersonId)
@@ -3104,6 +3104,9 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            // Guard parity with getSpaceRepresentativeFaces above: the reassign source set must be
+            // exactly the faces the space-person surface lists, which applies no album gate.
+            albumTimelineGate: 'none',
           }),
         ]),
       )
