@@ -1,4 +1,10 @@
-import { AssetVisibility, deleteAssets as deleteBulk, restoreAssets, updateAssets } from '@immich/sdk';
+import {
+  AssetVisibility,
+  deleteAssets as deleteBulk,
+  restoreAssets,
+  updateAssetFavorites,
+  updateAssets,
+} from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,6 +43,7 @@ vi.mock('@immich/ui', async (orig) => {
 vi.mock('@immich/sdk', async (orig) => ({
   ...(await orig<typeof import('@immich/sdk')>()),
   updateAssets: vi.fn().mockResolvedValue(undefined),
+  updateAssetFavorites: vi.fn().mockResolvedValue(undefined),
   deleteAssets: vi.fn().mockResolvedValue(undefined),
   restoreAssets: vi.fn().mockResolvedValue(undefined),
 }));
@@ -122,6 +129,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(modalManager.show).mockResolvedValue(true as never);
   vi.mocked(updateAssets).mockResolvedValue(undefined as never);
+  vi.mocked(updateAssetFavorites).mockResolvedValue(undefined as never);
   vi.mocked(deleteBulk).mockResolvedValue(undefined as never);
   vi.mocked(restoreAssets).mockResolvedValue(undefined as never);
   featureFlagsManager.value.trash = true;
@@ -193,13 +201,20 @@ describe('selection command availability', () => {
     expect(canAddSelectedToSpace(makeCtx(null))).toBe(false);
   });
 
-  it('canFavoriteSelected requires selection, all-owned, onFavorite, and at least one non-favorite asset', () => {
+  it('canFavoriteSelected requires selection, onFavorite, and at least one non-favorite asset (ownership-agnostic, #763)', () => {
     const asset = makeAsset({ isFavorite: false });
     expect(canFavoriteSelected(makeCtx(makeSelection({ assets: [asset] })))).toBe(true);
     expect(canFavoriteSelected(makeCtx(null))).toBe(false);
-    expect(canFavoriteSelected(makeCtx(makeSelection({ isAllUserOwned: false })))).toBe(false);
     expect(canFavoriteSelected(makeCtx(makeSelection({ onFavorite: undefined })))).toBe(false);
     expect(canFavoriteSelected(makeCtx(makeSelection({ assets: [makeAsset({ isFavorite: true })] })))).toBe(false);
+  });
+
+  it('canFavoriteSelected returns true for a mixed-ownership selection — favorites are per-user, not gated by ownership (#763)', () => {
+    const owned = makeAsset({ id: 'owned-1', ownerId: 'u-me', isFavorite: false });
+    const notOwned = makeAsset({ id: 'not-owned-1', ownerId: 'u-other', isFavorite: false });
+    const selection = makeSelection({ assets: [owned, notOwned], ownedAssets: [owned], isAllUserOwned: false });
+
+    expect(canFavoriteSelected(makeCtx(selection))).toBe(true);
   });
 
   it('canArchiveSelected requires selection, all-owned, onArchive, and at least one non-archived asset', () => {
@@ -315,18 +330,48 @@ describe('add selected to current space', () => {
 });
 
 describe('favorite selected', () => {
-  it('favorites only non-favorite owned assets, mutates refs, notifies, toasts, and clears after success', async () => {
-    const favorite = makeAsset({ id: 'favorite', isFavorite: true });
-    const target = makeAsset({ id: 'target', isFavorite: false });
-    const selection = makeSelection({ assets: [favorite, target] });
+  it('favorites only non-favorite assets across the FULL selection (owned + non-owned), mutates refs, notifies, toasts, and clears after success (#763)', async () => {
+    const favorite = makeAsset({ id: 'favorite', ownerId: 'u-me', isFavorite: true });
+    const ownedTarget = makeAsset({ id: 'owned-target', ownerId: 'u-me', isFavorite: false });
+    const notOwnedTarget = makeAsset({ id: 'not-owned-target', ownerId: 'u-other', isFavorite: false });
+    const selection = makeSelection({
+      assets: [favorite, ownedTarget, notOwnedTarget],
+      ownedAssets: [favorite, ownedTarget],
+      isAllUserOwned: false,
+    });
 
     await handleFavoriteSelected(makeCtx(selection));
 
-    expect(updateAssets).toHaveBeenCalledWith({ assetBulkUpdateDto: { ids: ['target'], isFavorite: true } });
-    expect(target.isFavorite).toBe(true);
+    expect(updateAssetFavorites).toHaveBeenCalledWith({
+      assetFavoriteUpdateDto: { ids: ['owned-target', 'not-owned-target'], isFavorite: true },
+    });
+    expect(updateAssets).not.toHaveBeenCalled();
+    expect(ownedTarget.isFavorite).toBe(true);
+    expect(notOwnedTarget.isFavorite).toBe(true);
     expect(favorite.isFavorite).toBe(true);
-    expect(selection.onFavorite).toHaveBeenCalledWith(['target'], true);
+    expect(selection.onFavorite).toHaveBeenCalledWith(['owned-target', 'not-owned-target'], true);
     expect(toastManager.primary).toHaveBeenCalledOnce();
+    expect(selection.clearSelection).toHaveBeenCalledOnce();
+  });
+
+  it('direction/mutation coherence: mutates exactly the non-owned asset when it is the only unfavorited one in the selection (web analogue of spec E32, #763)', async () => {
+    const ownedFavorited = makeAsset({ id: 'owned-favorited', ownerId: 'u-me', isFavorite: true });
+    const notOwnedTarget = makeAsset({ id: 'not-owned-target', ownerId: 'u-other', isFavorite: false });
+    const selection = makeSelection({
+      assets: [ownedFavorited, notOwnedTarget],
+      ownedAssets: [ownedFavorited],
+      isAllUserOwned: false,
+    });
+
+    await handleFavoriteSelected(makeCtx(selection));
+
+    // Under the old `ownedAssets` filter this id list would have been empty.
+    expect(updateAssetFavorites).toHaveBeenCalledWith({
+      assetFavoriteUpdateDto: { ids: ['not-owned-target'], isFavorite: true },
+    });
+    expect(notOwnedTarget.isFavorite).toBe(true);
+    expect(ownedFavorited.isFavorite).toBe(true);
+    expect(selection.onFavorite).toHaveBeenCalledWith(['not-owned-target'], true);
     expect(selection.clearSelection).toHaveBeenCalledOnce();
   });
 
@@ -335,15 +380,22 @@ describe('favorite selected', () => {
 
     await handleFavoriteSelected(makeCtx(selection));
 
-    expect(updateAssets).not.toHaveBeenCalled();
+    expect(updateAssetFavorites).not.toHaveBeenCalled();
     expect(selection.onFavorite).not.toHaveBeenCalled();
     expect(toastManager.primary).not.toHaveBeenCalled();
     expect(selection.clearSelection).not.toHaveBeenCalled();
   });
 
+  it('no-ops when there is no selection (regression)', async () => {
+    await handleFavoriteSelected(makeCtx(null));
+
+    expect(updateAssetFavorites).not.toHaveBeenCalled();
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+
   it('calls handleError, does not notify, and does not clear on failure', async () => {
     const error = new Error('favorite failed');
-    vi.mocked(updateAssets).mockRejectedValueOnce(error);
+    vi.mocked(updateAssetFavorites).mockRejectedValueOnce(error);
     const selection = makeSelection();
 
     await handleFavoriteSelected(makeCtx(selection));
@@ -538,6 +590,7 @@ describe('null selection handlers', () => {
 
     expect(modalManager.show).not.toHaveBeenCalled();
     expect(updateAssets).not.toHaveBeenCalled();
+    expect(updateAssetFavorites).not.toHaveBeenCalled();
     expect(deleteBulk).not.toHaveBeenCalled();
     expect(restoreAssets).not.toHaveBeenCalled();
     expect(toastManager.primary).not.toHaveBeenCalled();
@@ -553,6 +606,7 @@ describe('null selection handlers', () => {
 
     expect(modalManager.show).not.toHaveBeenCalled();
     expect(updateAssets).not.toHaveBeenCalled();
+    expect(updateAssetFavorites).not.toHaveBeenCalled();
     expect(deleteBulk).not.toHaveBeenCalled();
     expect(restoreAssets).not.toHaveBeenCalled();
     expect(toastManager.primary).not.toHaveBeenCalled();

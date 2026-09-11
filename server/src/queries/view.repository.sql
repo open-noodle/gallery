@@ -89,13 +89,22 @@ order by
 -- ViewRepository.getAssetsByOriginalPath
 select
   "asset".*,
-  to_json("asset_exif") as "exifInfo"
+  to_json("asset_exif") as "exifInfo",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
   (
-    "asset"."ownerId" = $1::uuid
+    "asset"."ownerId" = $2::uuid
     or exists (
       select
         1 as "exists"
@@ -103,7 +112,7 @@ where
         "shared_space_asset"
         inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
       where
-        "shared_space_member"."userId" = $2::uuid
+        "shared_space_member"."userId" = $3::uuid
         and "shared_space_asset"."assetId" = "asset"."id"
     )
     or exists (
@@ -113,7 +122,7 @@ where
         "shared_space_library"
         inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
       where
-        "shared_space_member"."userId" = $3::uuid
+        "shared_space_member"."userId" = $4::uuid
         and "shared_space_library"."libraryId" = "asset"."libraryId"
     )
     or (
@@ -127,7 +136,7 @@ where
           and "album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
-          "shared_space_member"."userId" = $4::uuid
+          "shared_space_member"."userId" = $5::uuid
           and "album_asset"."assetId" = "asset"."id"
           and not exists (
             select
@@ -137,7 +146,7 @@ where
             where
               "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
               and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-              and "shared_space_album_hidden"."userId" = $5::uuid
+              and "shared_space_album_hidden"."userId" = $6::uuid
           )
       )
       or exists (
@@ -151,7 +160,7 @@ where
           and "album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
-          "shared_space_member"."userId" = $6::uuid
+          "shared_space_member"."userId" = $7::uuid
           and "album_space_asset"."assetId" = "asset"."id"
           and not exists (
             select
@@ -161,17 +170,17 @@ where
             where
               "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
               and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-              and "shared_space_album_hidden"."userId" = $7::uuid
+              and "shared_space_album_hidden"."userId" = $8::uuid
           )
       )
     )
   )
-  and "visibility" = $8
+  and "visibility" = $9
   and "deletedAt" is null
   and "fileCreatedAt" is not null
   and "fileModifiedAt" is not null
   and "localDateTime" is not null
-  and "originalPath" like $9
-  and "originalPath" not like $10
+  and "originalPath" like $10
+  and "originalPath" not like $11
 order by
-  regexp_replace("asset"."originalPath", $11, $12) asc
+  regexp_replace("asset"."originalPath", $12, $13) asc

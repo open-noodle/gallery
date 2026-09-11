@@ -87,7 +87,16 @@ export class TimelineService extends BaseService {
       }
 
       if (dto.withSharedSpaces) {
-        const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+        // #763: an `isFavorite: true` browse is scoped by MY favourites, so it spans every space I
+        // belong to — including ones I've hidden from my home timeline. `showInTimeline` is a
+        // preference about this timeline, not about whether my own explicit favourite still counts;
+        // resolving it here is what made a favourite placed inside a hidden space vanish from
+        // /favorites despite the success toast. Safe because the favorite predicate narrows to the
+        // caller's own overlay rows — see getAllMemberSpaceIds. Every other browse keeps the hide.
+        const spaceRows =
+          dto.isFavorite === true
+            ? await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id)
+            : await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
         if (spaceRows.length > 0) {
           timelineSpaceIds = spaceRows.map((row) => row.spaceId);
         }
@@ -144,6 +153,12 @@ export class TimelineService extends BaseService {
       callerId,
       hiddenScope,
       visibleSpaceIds,
+      // #763: the caller, threaded separately from `userIds` (the timeline *target*, which is not
+      // necessarily the caller on space/album browse paths) so the isFavorite overlay predicate in
+      // withTimeBucketAssetFilters resolves against the right user. Distinct from `callerId` above:
+      // that one is set only on the own-timeline path and drives #1041's hidden-scope subtraction,
+      // while this is always the authenticated user because the overlay is always per-caller.
+      authUserId: auth.user.id,
     };
   }
 
@@ -241,25 +256,24 @@ export class TimelineService extends BaseService {
     if (dto.withPartners) {
       const isRequestedLocked = dto.visibility === AssetVisibility.Locked;
       const isRequestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;
-      const isRequestedFavorite = dto.isFavorite === true || dto.isFavorite === false;
       const isRequestedTrash = dto.isTrashed === true;
 
-      if (isRequestedLocked || isRequestedArchived || isRequestedFavorite || isRequestedTrash) {
+      // #763 slice 4: isFavorite is deliberately no longer rejected here — favorites are a
+      // per-user overlay (asset_favorite) resolved for the CALLER, so they compose with
+      // cross-user scopes. Archive/trash/locked stay rejected: owner-private states.
+      if (isRequestedLocked || isRequestedArchived || isRequestedTrash) {
         throw new BadRequestException(
-          'withPartners is only supported for non-archived, non-trashed, non-favorited, non-locked assets',
+          'withPartners is only supported for non-archived, non-trashed, non-locked assets',
         );
       }
     }
 
     if (dto.withSharedSpaces) {
       const requestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;
-      const requestedFavorite = dto.isFavorite === true || dto.isFavorite === false;
       const requestedTrash = dto.isTrashed === true;
 
-      if (requestedArchived || requestedFavorite || requestedTrash) {
-        throw new BadRequestException(
-          'withSharedSpaces is only supported for non-archived, non-trashed, non-favorited assets',
-        );
+      if (requestedArchived || requestedTrash) {
+        throw new BadRequestException('withSharedSpaces is only supported for non-archived, non-trashed assets');
       }
     }
   }

@@ -26,16 +26,22 @@ export type PhotosPersonFilterReference = {
  * must see the owner's assets (medium test E22). `/photos` is the opposite surface, so it has to
  * state its scope itself: without `userId`, an album chip would collapse the personal timeline to
  * "everything in that album", and `?albumId=A&ownerId=<co-member>` would list a co-member's assets
- * — and the Favorites chip the album OWNER's favourites (`isFavorite` is the owner's flag) — on MY
- * timeline. The server query already ANDs the two gates; it just has to be told about both.
+ * on MY timeline. The server query already ANDs the two gates; it just has to be told about both.
+ *
+ * (#763: the Favorites chip is no longer part of that hazard — a favourite is a per-user overlay
+ * row resolved for the CALLER, not the asset owner's flag, so it narrows to MY favourites whoever
+ * owns the asset.)
  */
 export function buildPhotosTimelineOptions(filters: FilterState, userId: string): Record<string, unknown> {
-  const includeSharedTimelineAssets = filters.isFavorite === undefined;
   const base: Record<string, unknown> = {
     userId,
     visibility: AssetVisibility.Timeline,
     withStacked: true,
-    ...(includeSharedTimelineAssets && { withPartners: true, withSharedSpaces: true }),
+    // #763 slice 4: favorites no longer suppress cross-user scopes — the server guard is gone
+    // and the favorite predicate is per-user, so partner/space content stays in scope while
+    // filtering by favorite.
+    withPartners: true,
+    withSharedSpaces: true,
   };
 
   if (filters.personIds.length > 0) {

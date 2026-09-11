@@ -1,7 +1,15 @@
-import { AssetEditAction, getAssetInfo, type AssetEditActionItemDto, type AssetResponseDto } from '@immich/sdk';
+import {
+  AssetEditAction,
+  getAssetInfo,
+  updateAsset,
+  updateAssetFavorites,
+  type AssetEditActionItemDto,
+  type AssetResponseDto,
+} from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { eventManager } from '$lib/managers/event-manager.svelte';
 import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
 import {
   getAssetActions,
@@ -24,6 +32,7 @@ const { downloadUrlMock } = vitest.hoisted(() => ({
 vitest.mock('@immich/ui', () => ({
   toastManager: {
     primary: vitest.fn(),
+    danger: vitest.fn(),
   },
   modalManager: { show: vitest.fn() },
 }));
@@ -42,6 +51,8 @@ vitest.mock('@immich/sdk', async () => {
   return {
     ...originalModule,
     getAssetInfo: vitest.fn(),
+    updateAsset: vitest.fn(),
+    updateAssetFavorites: vitest.fn(),
   };
 });
 
@@ -348,5 +359,140 @@ describe('add to album/space entry points', () => {
         restrictToSpaceId: undefined,
       });
     });
+  });
+});
+
+describe('favorite actions — per-user, un-gated from ownership (#763 slice 5)', () => {
+  let emitSpy: ReturnType<typeof vitest.spyOn>;
+
+  beforeEach(() => {
+    authManager.reset();
+    setSharedLink(undefined);
+    emitSpy = vitest.spyOn(eventManager, 'emit');
+  });
+
+  afterEach(() => {
+    emitSpy.mockRestore();
+    authManager.reset();
+    setSharedLink(undefined);
+  });
+
+  it('shows Favorite to an authenticated NON-OWNER when not yet favorited by them', () => {
+    const ownerId = 'owner';
+    const user = userAdminFactory.build({ id: 'non-owner' });
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+    const asset = assetFactory.build({ ownerId, isFavorite: false });
+
+    const assetActions = getAssetActions(() => '', asset);
+
+    expect(assetActions.Favorite.$if?.()).toBe(true);
+    expect(assetActions.Unfavorite.$if?.()).toBe(false);
+  });
+
+  it('shows Unfavorite to a non-owner who HAS favorited (viewer state, not owner state)', () => {
+    const ownerId = 'owner';
+    const user = userAdminFactory.build({ id: 'non-owner' });
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+    const asset = assetFactory.build({ ownerId, isFavorite: true });
+
+    const assetActions = getAssetActions(() => '', asset);
+
+    expect(assetActions.Unfavorite.$if?.()).toBe(true);
+    expect(assetActions.Favorite.$if?.()).toBe(false);
+  });
+
+  it('owner behavior unchanged (regression)', () => {
+    const ownerId = 'owner';
+    const user = userAdminFactory.build({ id: ownerId });
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+
+    const notFavorited = assetFactory.build({ ownerId, isFavorite: false });
+    const notFavoritedActions = getAssetActions(() => '', notFavorited);
+    expect(notFavoritedActions.Favorite.$if?.()).toBe(true);
+    expect(notFavoritedActions.Unfavorite.$if?.()).toBe(false);
+
+    const favorited = assetFactory.build({ ownerId, isFavorite: true });
+    const favoritedActions = getAssetActions(() => '', favorited);
+    expect(favoritedActions.Favorite.$if?.()).toBe(false);
+    expect(favoritedActions.Unfavorite.$if?.()).toBe(true);
+  });
+
+  it('shared-link session: neither action available (and thus the f shortcut is inert)', () => {
+    const user = userAdminFactory.build();
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+    setSharedLink(sharedLinkFactory.build());
+
+    const notFavorited = assetFactory.build({ ownerId: user.id, isFavorite: false });
+    const notFavoritedActions = getAssetActions(() => '', notFavorited);
+    expect(notFavoritedActions.Favorite.$if?.()).toBe(false);
+    expect(notFavoritedActions.Unfavorite.$if?.()).toBe(false);
+
+    const favorited = assetFactory.build({ ownerId: user.id, isFavorite: true });
+    const favoritedActions = getAssetActions(() => '', favorited);
+    expect(favoritedActions.Favorite.$if?.()).toBe(false);
+    expect(favoritedActions.Unfavorite.$if?.()).toBe(false);
+  });
+
+  it('handleFavorite calls the canonical endpoint and emits a flipped AssetUpdate', async () => {
+    const $t = vitest.fn().mockReturnValue('formatter');
+    vitest.mocked(getFormatter).mockResolvedValue($t);
+    vitest.mocked(updateAssetFavorites).mockResolvedValue(undefined as never);
+
+    const ownerId = 'owner';
+    const user = userAdminFactory.build({ id: 'non-owner' });
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+    const asset = assetFactory.build({ id: 'asset-1', ownerId, isFavorite: false });
+
+    const assetActions = getAssetActions(() => '', asset);
+    await assetActions.Favorite.onAction(assetActions.Favorite);
+
+    expect(updateAssetFavorites).toHaveBeenCalledWith({
+      assetFavoriteUpdateDto: { ids: [asset.id], isFavorite: true },
+    });
+    expect(emitSpy).toHaveBeenCalledWith('AssetUpdate', expect.objectContaining({ id: asset.id, isFavorite: true }));
+    expect(updateAsset).not.toHaveBeenCalled();
+  });
+
+  it('handleUnfavorite mirrors with isFavorite: false', async () => {
+    const $t = vitest.fn().mockReturnValue('formatter');
+    vitest.mocked(getFormatter).mockResolvedValue($t);
+    vitest.mocked(updateAssetFavorites).mockResolvedValue(undefined as never);
+
+    const ownerId = 'owner';
+    const user = userAdminFactory.build({ id: 'non-owner' });
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+    const asset = assetFactory.build({ id: 'asset-1', ownerId, isFavorite: true });
+
+    const assetActions = getAssetActions(() => '', asset);
+    await assetActions.Unfavorite.onAction(assetActions.Unfavorite);
+
+    expect(updateAssetFavorites).toHaveBeenCalledWith({
+      assetFavoriteUpdateDto: { ids: [asset.id], isFavorite: false },
+    });
+    expect(emitSpy).toHaveBeenCalledWith('AssetUpdate', expect.objectContaining({ id: asset.id, isFavorite: false }));
+    expect(updateAsset).not.toHaveBeenCalled();
+  });
+
+  it('on endpoint error, no AssetUpdate is emitted (state untouched)', async () => {
+    const $t = vitest.fn().mockReturnValue('formatter');
+    vitest.mocked(getFormatter).mockResolvedValue($t);
+    vitest.mocked(updateAssetFavorites).mockRejectedValue(new Error('network error'));
+
+    const ownerId = 'owner';
+    const user = userAdminFactory.build({ id: 'non-owner' });
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(user);
+    const asset = assetFactory.build({ id: 'asset-1', ownerId, isFavorite: false });
+
+    const assetActions = getAssetActions(() => '', asset);
+    await assetActions.Favorite.onAction(assetActions.Favorite);
+
+    expect(emitSpy).not.toHaveBeenCalledWith('AssetUpdate', expect.anything());
   });
 });
