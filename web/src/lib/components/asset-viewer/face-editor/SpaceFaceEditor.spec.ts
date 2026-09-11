@@ -61,7 +61,7 @@ vi.mock('fabric', () => {
   class FakeCanvas {
     width = 0;
     height = 0;
-    constructor(_el?: unknown) {}
+    constructor(_?: unknown) {}
     add() {}
     setActiveObject() {}
     setDimensions(dims: { width: number; height: number }) {
