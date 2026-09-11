@@ -26231,6 +26231,9 @@
           "server": {
             "$ref": "#/components/schemas/AdminConfigServerDto"
           },
+          "storage": {
+            "$ref": "#/components/schemas/AdminConfigStorageDto"
+          },
           "storageTemplate": {
             "$ref": "#/components/schemas/AdminConfigStorageTemplateDto"
           },
@@ -26270,6 +26273,7 @@
           "passwordLogin",
           "reverseGeocoding",
           "server",
+          "storage",
           "storageTemplate",
           "storageUsage",
           "templates",
@@ -27395,6 +27399,39 @@
           "port",
           "secure",
           "username"
+        ],
+        "type": "object"
+      },
+      "AdminConfigStorageDto": {
+        "properties": {
+          "routing": {
+            "$ref": "#/components/schemas/AdminConfigStorageRoutingDto"
+          }
+        },
+        "required": [
+          "routing"
+        ],
+        "type": "object"
+      },
+      "AdminConfigStorageRoutingDto": {
+        "properties": {
+          "encodedVideo": {
+            "$ref": "#/components/schemas/StorageRouting",
+            "description": "Where newly written transcoded videos are stored"
+          },
+          "originals": {
+            "$ref": "#/components/schemas/StorageRouting",
+            "description": "Where newly written original files and sidecars are stored"
+          },
+          "thumbnails": {
+            "$ref": "#/components/schemas/StorageRouting",
+            "description": "Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored"
+          }
+        },
+        "required": [
+          "encodedVideo",
+          "originals",
+          "thumbnails"
         ],
         "type": "object"
       },

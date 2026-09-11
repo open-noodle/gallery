@@ -444,6 +444,17 @@ export type AdminConfigServerDto = {
     /** Public users */
     publicUsers: boolean;
 };
+export type AdminConfigStorageRoutingDto = {
+    /** Where newly written transcoded videos are stored */
+    encodedVideo: StorageRouting;
+    /** Where newly written original files and sidecars are stored */
+    originals: StorageRouting;
+    /** Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored */
+    thumbnails: StorageRouting;
+};
+export type AdminConfigStorageDto = {
+    routing: AdminConfigStorageRoutingDto;
+};
 export type AdminConfigStorageTemplateDto = {
     /** Enabled */
     enabled: boolean;
@@ -501,6 +512,7 @@ export type AdminConfigDto = {
     passwordLogin: AdminConfigPasswordLoginDto;
     reverseGeocoding: AdminConfigReverseGeocodingDto;
     server: AdminConfigServerDto;
+    storage: AdminConfigStorageDto;
     storageTemplate: AdminConfigStorageTemplateDto;
     storageUsage: AdminConfigStorageUsageDto;
     templates: AdminConfigTemplatesDto;
@@ -10882,6 +10894,11 @@ export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
 }
+export enum StorageRouting {
+    Auto = "auto",
+    Disk = "disk",
+    S3 = "s3"
+}
 export enum Recommendation {
     Confident = "confident",
     ReviewFirst = "review-first"
@@ -11586,11 +11603,6 @@ export enum SyncRequestType {
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
     SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1",
     SharedSpaceAlbumHiddensV1 = "SharedSpaceAlbumHiddensV1"
-}
-export enum StorageRouting {
-    Auto = "auto",
-    Disk = "disk",
-    S3 = "s3"
 }
 export enum TimeBucketSize {
     Year = "year",
