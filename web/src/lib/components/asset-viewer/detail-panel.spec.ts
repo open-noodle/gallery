@@ -6,22 +6,34 @@ import {
   type PersonResponseDto,
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { screen, waitFor } from '@testing-library/svelte';
+import { screen, waitFor, within } from '@testing-library/svelte';
 import { getAppleMapsUrl, getGoogleMapsUrl, getOpenStreetMapUrl } from '$lib/utils/exif-utils';
 import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import DetailPanel from './DetailPanel.svelte';
 
-const { faceManagerMock, getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(() => ({
-  faceManagerMock: {
-    data: [] as AssetFaceResponseDto[],
-    facesByPersonId: new Map<string, AssetFaceResponseDto[]>(),
-    people: [] as PersonResponseDto[],
-  },
-  getAllAlbumsMock: vi.fn(),
-  getAssetInfoMock: vi.fn(),
-  zoomImageToBase64Mock: vi.fn(),
-}));
+const { authManagerMock, faceManagerMock, getAllAlbumsMock, getAssetInfoMock, zoomImageToBase64Mock } = vi.hoisted(
+  () => ({
+    authManagerMock: {
+      authenticated: true,
+      user: { id: 'owner-1' },
+      isSharedLink: false,
+      params: {},
+      preferences: {
+        tags: { enabled: false },
+        ratings: { enabled: false },
+      },
+    },
+    faceManagerMock: {
+      data: [] as AssetFaceResponseDto[],
+      facesByPersonId: new Map<string, AssetFaceResponseDto[]>(),
+      people: [] as PersonResponseDto[],
+    },
+    getAllAlbumsMock: vi.fn(),
+    getAssetInfoMock: vi.fn(),
+    zoomImageToBase64Mock: vi.fn(),
+  }),
+);
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();
@@ -42,18 +54,7 @@ vi.mock('$lib/stores/face.svelte', () => ({
   faceManager: faceManagerMock,
 }));
 
-vi.mock('$lib/managers/auth-manager.svelte', () => ({
-  authManager: {
-    authenticated: true,
-    user: { id: 'owner-1' },
-    isSharedLink: false,
-    params: {},
-    preferences: {
-      tags: { enabled: false },
-      ratings: { enabled: false },
-    },
-  },
-}));
+vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: authManagerMock }));
 
 vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
   assetViewerManager: {
@@ -84,28 +85,31 @@ vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
   return { default: MockComponent };
 });
 
+// #734: these five stand in for the row-probe stub (echoes `isOwner`/`canEdit` as data
+// attributes) rather than the plain noop, so the editability-propagation tests below can assert
+// on what DetailPanel actually threaded down to each row.
 vi.mock('$lib/components/asset-viewer/DetailPanelDate.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('$lib/components/asset-viewer/DetailPanelDescription.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('$lib/components/asset-viewer/DetailPanelLocation.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('$lib/components/asset-viewer/DetailPanelStarRating.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
 vi.mock('$lib/components/asset-viewer/DetailPanelTags.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/detail-panel-row-probe.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -149,6 +153,9 @@ describe('DetailPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    authManagerMock.user = { id: 'owner-1' };
+    authManagerMock.preferences.tags.enabled = false;
+    authManagerMock.preferences.ratings.enabled = false;
     faceManagerMock.data = [];
     faceManagerMock.facesByPersonId = new Map();
     faceManagerMock.people = [];
@@ -443,5 +450,80 @@ describe('DetailPanel', () => {
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     }
+  });
+
+  // #734: DetailPanel derives `canEdit` (server-authoritative `asset.canEdit`, ownership
+  // fallback) and threads it into five metadata rows in place of `isOwner`. Description, Rating,
+  // Date, Location and Tags's "add tag" affordance are asserted here via the row-probe stub
+  // (`detail-panel-row-probe.stub.svelte`), which echoes the `isOwner`/`canEdit` prop it actually
+  // received as data attributes — this is the only way to observe the value DetailPanel threaded
+  // down, since the real row components are mocked away elsewhere in this file. Row order in the
+  // DOM mirrors DetailPanel.svelte's fixed template order: Description, Rating, [People — real
+  // component, not part of this probe list], Date, Location, Tags.
+  describe('editability propagation to child rows (#734)', () => {
+    it('widens description/rating/date/location and tags-add to a non-owner space editor when canEdit is true', async () => {
+      authManagerMock.preferences.tags.enabled = true;
+      const asset = assetFactory.build({ ownerId: 'someone-else', canEdit: true, tags: [] });
+
+      renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+      await waitFor(() => expect(screen.getAllByTestId('detail-panel-row-probe')).toHaveLength(5));
+      const [descriptionProbe, ratingProbe, dateProbe, locationProbe, tagsProbe] =
+        screen.getAllByTestId('detail-panel-row-probe');
+
+      for (const probe of [descriptionProbe, ratingProbe, dateProbe, locationProbe]) {
+        expect(probe).toHaveAttribute('data-is-owner', 'true');
+      }
+      // Tags is the one row fed BOTH values: real ownership stays false (per-tag remove must
+      // stay gated on it — fix #1), while the add-tag affordance widens via `canEdit`.
+      expect(tagsProbe).toHaveAttribute('data-is-owner', 'false');
+      expect(tagsProbe).toHaveAttribute('data-can-edit', 'true');
+    });
+
+    it('keeps the rows real-owner-gated for a non-owner when canEdit is false', async () => {
+      authManagerMock.preferences.tags.enabled = true;
+      const asset = assetFactory.build({ ownerId: 'someone-else', canEdit: false, tags: [] });
+
+      renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+      await waitFor(() => expect(screen.getAllByTestId('detail-panel-row-probe')).toHaveLength(5));
+      const [descriptionProbe, ratingProbe, dateProbe, locationProbe, tagsProbe] =
+        screen.getAllByTestId('detail-panel-row-probe');
+
+      // Only Tags receives an explicit `canEdit` prop (DetailPanel.svelte:546); Description,
+      // Rating, Date and Location receive `isOwner={canEdit}` with no separate `canEdit` prop, so
+      // the stub's `data-can-edit` for those four is `String(!!undefined)` === 'false' regardless
+      // of state — asserting it there would pass either way (fix #7). Assert it only where the
+      // prop is actually threaded.
+      for (const probe of [descriptionProbe, ratingProbe, dateProbe, locationProbe]) {
+        expect(probe).toHaveAttribute('data-is-owner', 'false');
+      }
+      expect(tagsProbe).toHaveAttribute('data-is-owner', 'false');
+      expect(tagsProbe).toHaveAttribute('data-can-edit', 'false');
+    });
+
+    // W-18, the hard rule of this task: `canEdit` must never reach the people row. It keeps the
+    // real `isOwner`, so a non-owner space editor still gets no add-face affordance even though
+    // every other row on this same asset just widened.
+    it('W-18: keeps the people row read-only for a non-owner space editor even when canEdit is true', async () => {
+      const person: PersonResponseDto = {
+        id: 'global-person-1',
+        name: 'Nora',
+        thumbnailPath: '/person.jpg',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        isHidden: false,
+        birthDate: null,
+        type: 'person',
+      };
+      faceManagerMock.people = [person];
+
+      const asset = assetFactory.build({ ownerId: 'someone-else', canEdit: true });
+
+      renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
+
+      const peopleSection = await screen.findByTestId('detail-panel-people');
+      expect(within(peopleSection).getByText('Nora')).toBeInTheDocument();
+      expect(within(peopleSection).queryByLabelText('tag_people')).toBeNull();
+    });
   });
 });

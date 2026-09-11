@@ -86,6 +86,8 @@ describe('SpaceActivityFeed', () => {
       { type: 'person_update', data: { personName: 'Alice' }, text: 'updated person "Alice"' },
       { type: 'person_delete', data: { personName: 'Alice' }, text: 'deleted person "Alice"' },
       { type: 'person_merge', data: { personName: 'Alice', count: 2 }, text: 'merged 2 people into "Alice"' },
+      { type: 'asset_edit', data: { count: 3 }, text: 'edited 3 photos' },
+      { type: 'asset_edit', data: { count: 1 }, text: 'edited 1 photo' },
     ];
 
     for (const { type, data, text } of cases) {
@@ -107,6 +109,59 @@ describe('SpaceActivityFeed', () => {
       const activities = [makeActivity({ id: 'act-noname', type: 'album_link', data: {}, userName: 'Bob' })];
       renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
       expect(screen.getByTestId('activity-item-act-noname')).toHaveTextContent('Bob linked album ""');
+    });
+
+    // F-24/F-25 (spec §6.7): the two new face-attribution types render their translated string.
+    it('renders "person_face_assign" with correct description', () => {
+      const activities = [
+        makeActivity({ id: 'act-assign', type: 'person_face_assign', data: { count: 1 }, userName: 'Bob' }),
+      ];
+      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(screen.getByTestId('activity-item-act-assign')).toHaveTextContent('Bob named 1 face');
+    });
+
+    it('renders "person_face_assign" with plural count', () => {
+      const activities = [
+        makeActivity({ id: 'act-assign-plural', type: 'person_face_assign', data: { count: 3 }, userName: 'Bob' }),
+      ];
+      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(screen.getByTestId('activity-item-act-assign-plural')).toHaveTextContent('Bob named 3 faces');
+    });
+
+    it('renders "person_face_detach" with correct description', () => {
+      const activities = [
+        makeActivity({ id: 'act-detach', type: 'person_face_detach', data: { count: 1 }, userName: 'Bob' }),
+      ];
+      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      expect(screen.getByTestId('activity-item-act-detach')).toHaveTextContent('Bob removed 1 face');
+    });
+  });
+
+  describe('face-attribution activity impact tier', () => {
+    // person_face_assign/detach must sit in MEDIUM_TYPES: a row with an avatar and a left
+    // border accent (`border-l-2`, unique to the medium branch), never the high-impact card
+    // wrapper (`rounded-lg`, unique to asset_add/asset_remove) and never the low-tier dot row
+    // (no avatar `<figure>` at all).
+    it('renders "person_face_assign" in the medium-impact tier', () => {
+      const activities = [
+        makeActivity({ id: 'act-assign-tier', type: 'person_face_assign', data: { count: 1 }, userName: 'Bob' }),
+      ];
+      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      const item = screen.getByTestId('activity-item-act-assign-tier');
+      expect(item.className).toContain('border-l-2');
+      expect(item.className).not.toContain('rounded-lg');
+      expect(item.querySelector('figure')).not.toBeNull();
+    });
+
+    it('renders "person_face_detach" in the medium-impact tier', () => {
+      const activities = [
+        makeActivity({ id: 'act-detach-tier', type: 'person_face_detach', data: { count: 1 }, userName: 'Bob' }),
+      ];
+      renderFeed({ activities, spaceColor: 'primary', onLoadMore: vi.fn(), hasMore: false });
+      const item = screen.getByTestId('activity-item-act-detach-tier');
+      expect(item.className).toContain('border-l-2');
+      expect(item.className).not.toContain('rounded-lg');
+      expect(item.querySelector('figure')).not.toBeNull();
     });
   });
 });

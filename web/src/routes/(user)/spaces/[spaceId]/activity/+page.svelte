@@ -1,6 +1,7 @@
 <script lang="ts">
   import SpaceActivityFeed from '$lib/components/spaces/space-activity-feed.svelte';
   import { handleError } from '$lib/utils/handle-error';
+  import { appendUniqueById } from '$lib/utils/people-utils';
   import { getSpaceActivities } from '@immich/sdk';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -17,7 +18,12 @@
   async function loadMoreActivities() {
     try {
       const result = await getSpaceActivities({ id: space.id, limit: ACTIVITY_PAGE_SIZE, offset: activityOffset });
-      activities = [...activities, ...result];
+      // Merged by id: this feed grows at the head, so anything written in the space while it is
+      // open pushes the OFFSET boundary down and re-sends a row this page already holds -- and the
+      // items are rendered in a keyed block, which a repeated id kills outright. The offset still
+      // advances by what the SERVER returned, duplicates included; counting the merged rows instead
+      // would skip a row on the next page for every duplicate dropped.
+      activities = appendUniqueById(activities, result);
       activityOffset += result.length;
       hasMoreActivities = result.length === ACTIVITY_PAGE_SIZE;
     } catch (error) {

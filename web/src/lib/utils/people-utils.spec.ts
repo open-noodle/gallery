@@ -11,6 +11,7 @@ import {
   getBoundingBox,
   getFaceCropTransform,
   isUsableFaceBox,
+  orderPickerCandidates,
   sortPeople,
   sortPeopleForManagement,
   zoomImageToBase64,
@@ -560,5 +561,42 @@ describe('getFaceCropTransform (regression)', () => {
     });
 
     expect(transform).toEqual({ backgroundSize: 'cover', backgroundPosition: 'center' });
+  });
+});
+
+describe('orderPickerCandidates', () => {
+  it('puts named people ahead of unnamed clusters', () => {
+    const ordered = orderPickerCandidates([
+      { id: 'p-1', name: '' },
+      { id: 'p-2', name: 'Bob' },
+      { id: 'p-3', name: '' },
+      { id: 'p-4', name: 'Carol' },
+    ]);
+
+    expect(ordered.map((candidate) => candidate.id)).toEqual(['p-2', 'p-4', 'p-1', 'p-3']);
+  });
+
+  // The owner's picker asks for `closestAssetId`, so its incoming order is "looks most like this
+  // face" -- the single most useful signal it has. The partition must be STABLE so that signal
+  // survives inside each group: the likeliest named person stays first, and the wall of unnamed
+  // clusters simply moves below it rather than being re-sorted or dropped.
+  it('keeps the incoming order within each group', () => {
+    const ordered = orderPickerCandidates([
+      { id: 'p-1', name: 'Zoe' },
+      { id: 'p-2', name: 'Adam' },
+      { id: 'p-3', name: '' },
+      { id: 'p-4', name: '' },
+    ]);
+
+    expect(ordered.map((candidate) => candidate.id)).toEqual(['p-1', 'p-2', 'p-3', 'p-4']);
+  });
+
+  it('treats a whitespace-only name as unnamed', () => {
+    const ordered = orderPickerCandidates([
+      { id: 'p-1', name: ' '.repeat(3) },
+      { id: 'p-2', name: 'Bob' },
+    ]);
+
+    expect(ordered.map((candidate) => candidate.id)).toEqual(['p-2', 'p-1']);
   });
 });

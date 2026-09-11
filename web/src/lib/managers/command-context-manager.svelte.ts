@@ -53,6 +53,19 @@ export interface SelectionCommandContext {
   isAllFavorite: boolean;
   isAllArchived: boolean;
   isAllTrashed: boolean;
+  /**
+   * Which of `selectedAssetIds` the caller may edit (#734). `undefined` means not yet
+   * resolved — a consumer should hide the affected actions until it resolves, rather than
+   * popping them in late. An all-owned selection resolves synchronously, without a request.
+   *
+   * Always `undefined` on this context: nothing today gates on `canEditMetadata` /
+   * `canSetVisibility` off the cmdk-driven `CommandContext.selection`
+   * (`selection-command-handlers.ts` only gates favorite/archive/delete, which stay
+   * `isAllUserOwned`-only) — resolving it here would be dead work. The real consumer is
+   * `SelectionToolbar.svelte`, which builds its own `SelectionCommandContext` (see that
+   * component's header comment) and resolves this field itself.
+   */
+  editableSelectedAssetIds: string[] | undefined;
   clearSelection: () => void;
   onFavorite?: OnFavorite;
   onArchive?: OnArchive;
@@ -160,6 +173,7 @@ class CommandContextManager {
       isAllFavorite: assets.every((asset) => asset.isFavorite),
       isAllArchived: assets.every((asset) => asset.visibility === AssetVisibility.Archive),
       isAllTrashed: assets.every((asset) => asset.isTrashed),
+      editableSelectedAssetIds: undefined,
       clearSelection: registered.options.clearSelection,
       onFavorite: registered.options.getOnFavorite?.(),
       onArchive: registered.options.getOnArchive?.(),

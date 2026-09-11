@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { StackService } from 'src/services/stack.service';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
@@ -72,6 +72,44 @@ describe(StackService.name, () => {
         userId: auth.user.id,
       });
       expect(mocks.access.asset.checkOwnerAccess).toHaveBeenCalled();
+    });
+  });
+
+  describe('create — owner-only guard (#734)', () => {
+    it('S-26: rejects stacking an asset the caller does not own', async () => {
+      const auth = AuthFactory.create();
+      const assetId = newUuid();
+      // AssetUpdate passes via space-edit, but the asset is not owned.
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
+
+      await expect(sut.create(auth, { assetIds: [assetId] })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mocks.stack.create).not.toHaveBeenCalled();
+    });
+
+    it('S-27: rejects the whole request when only some assets are owned', async () => {
+      const auth = AuthFactory.create();
+      const mine = newUuid();
+      const theirs = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([mine]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([theirs]));
+
+      await expect(sut.create(auth, { assetIds: [mine, theirs] })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mocks.stack.create).not.toHaveBeenCalled();
+    });
+
+    it('S-28: still stacks the caller’s own assets', async () => {
+      const auth = AuthFactory.create();
+      const a = newUuid();
+      const b = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([a, b]));
+      mocks.stack.create.mockResolvedValue(getForStack(StackFactory.create({ ownerId: auth.user.id })));
+
+      await sut.create(auth, { assetIds: [a, b] });
+
+      expect(mocks.stack.create).toHaveBeenCalled();
     });
   });
 

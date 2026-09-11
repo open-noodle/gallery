@@ -337,6 +337,15 @@ from
         or "asset"."livePhotoVideoId" in ($5)
       )
       and "shared_space_member"."role" in ($6, $7)
+      and exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_member" as "owner_member"
+        where
+          "owner_member"."spaceId" = "shared_space_asset"."spaceId"
+          and "owner_member"."userId" = "asset"."ownerId"
+      )
     union
     select
       "asset"."id",
@@ -355,6 +364,67 @@ from
         or "asset"."livePhotoVideoId" in ($13)
       )
       and "shared_space_member"."role" in ($14, $15)
+      and exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_member" as "owner_member"
+        where
+          "owner_member"."spaceId" = "shared_space_library"."spaceId"
+          and "owner_member"."userId" = "asset"."ownerId"
+      )
+    union
+    select
+      "asset"."id",
+      "asset"."livePhotoVideoId"
+    from
+      "asset"
+      inner join "shared_space_member" on "shared_space_member"."userId" = $16
+      and "shared_space_member"."role" in ($17, $18)
+    where
+      "asset"."deletedAt" is null
+      and "asset"."isOffline" = $19
+      and "asset"."visibility" in ($20, $21)
+      and (
+        "asset"."id" in ($22)
+        or "asset"."livePhotoVideoId" in ($23)
+      )
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_album"
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = "shared_space_member"."spaceId"
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_album"
+            inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+            and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+          where
+            "album_space_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = "shared_space_member"."spaceId"
+        )
+      )
+      and exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_member" as "owner_member"
+        where
+          "owner_member"."spaceId" = "shared_space_member"."spaceId"
+          and "owner_member"."userId" = "asset"."ownerId"
+      )
   ) as "combined"
 
 -- AccessRepository.asset.checkSharedLinkAccess
