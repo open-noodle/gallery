@@ -11,10 +11,11 @@ part 'search_filter.model.freezed.dart';
 abstract class SearchLocationFilter with _$SearchLocationFilter {
   const SearchLocationFilter._();
 
-  const factory SearchLocationFilter({String? country, String? state, String? city}) = _SearchLocationFilter;
+  const factory SearchLocationFilter({String? country, String? state, String? city, String? locationPresence}) =
+      _SearchLocationFilter;
 
   Map<String, dynamic> toMap() {
-    return <String, dynamic>{'country': country, 'state': state, 'city': city};
+    return <String, dynamic>{'country': country, 'state': state, 'city': city, 'locationPresence': locationPresence};
   }
 
   factory SearchLocationFilter.fromMap(Map<String, dynamic> map) {
@@ -22,6 +23,7 @@ abstract class SearchLocationFilter with _$SearchLocationFilter {
       country: map['country'] != null ? map['country'] as String : null,
       state: map['state'] != null ? map['state'] as String : null,
       city: map['city'] != null ? map['city'] as String : null,
+      locationPresence: map['locationPresence'] != null ? map['locationPresence'] as String : null,
     );
   }
 
@@ -163,6 +165,7 @@ abstract class SearchFilter with _$SearchFilter {
         location.country == null &&
         location.state == null &&
         location.city == null &&
+        location.locationPresence == null &&
         camera.make == null &&
         camera.model == null &&
         date.takenBefore == null &&

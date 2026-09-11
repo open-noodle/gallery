@@ -33,6 +33,7 @@ export const FILTER_URL_PARAMS = [
   'city',
   'state',
   'country',
+  'locationPresence',
   'make',
   'model',
   'lens',
@@ -59,6 +60,7 @@ export type DecodedFilterState = Partial<
     | 'city'
     | 'state'
     | 'country'
+    | 'locationPresence'
     | 'make'
     | 'model'
     | 'lensModel'
@@ -102,6 +104,7 @@ export function encodeFilterParams(params: URLSearchParams, filters: FilterState
   setTrimmed('city', filters.city);
   setTrimmed('state', filters.state);
   setTrimmed('country', filters.country);
+  setTrimmed('locationPresence', filters.locationPresence);
   setTrimmed('make', filters.make);
   setTrimmed('model', filters.model);
   setTrimmed('lens', filters.lensModel);
@@ -166,9 +169,17 @@ export function decodeFilterParams(url: URL): DecodedFilterState {
     result.tagIds = tags;
   }
 
-  result.city = get('city');
-  result.state = get('state');
-  result.country = get('country');
+  const locationPresence = get('locationPresence');
+  if (locationPresence === 'noGps' || locationPresence === 'noPlaceName') {
+    result.locationPresence = locationPresence;
+  }
+  // The location group is one filter: a hand-edited URL carrying both must not produce a
+  // combination the server rejects. The narrower, unambiguous statement wins.
+  if (!result.locationPresence) {
+    result.city = get('city');
+    result.state = get('state');
+    result.country = get('country');
+  }
   result.make = get('make');
   result.model = get('model');
   result.lensModel = get('lens');

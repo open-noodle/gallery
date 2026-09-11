@@ -1,10 +1,13 @@
 import {
   FilterSuggestionsRequestDto,
+  LargeAssetSearchDto,
   MetadataSearchDto,
+  RandomSearchDto,
   SearchSuggestionRequestDto,
   SearchSuggestionType,
   SmartSearchDto,
   SmartSearchFacetsDto,
+  StatisticsSearchDto,
 } from 'src/dtos/search.dto';
 import { AssetType } from 'src/enum';
 
@@ -166,6 +169,34 @@ describe('SearchSuggestionRequestDto (#858)', () => {
 
   it('rejects a non-uuid contributor filter', () => {
     expect(SearchSuggestionRequestDto.schema.safeParse({ type: 'city', ownerId: 'not-a-uuid' }).success).toBe(false);
+  });
+});
+
+describe('locationPresence query param handling', () => {
+  // Covers all five search-controller DTOs: each independently pipes the exclusivity constraint,
+  // so each needs its own regression coverage rather than trusting that one schema's pipe implies
+  // the others are wired correctly too. None of these DTOs require any field to parse, so there is
+  // no per-DTO base payload to thread through (unlike the time-bucket DTOs).
+  const dtoCases = [
+    { name: 'RandomSearchDto', dto: RandomSearchDto },
+    { name: 'LargeAssetSearchDto', dto: LargeAssetSearchDto },
+    { name: 'MetadataSearchDto', dto: MetadataSearchDto },
+    { name: 'StatisticsSearchDto', dto: StatisticsSearchDto },
+    { name: 'SmartSearchDto', dto: SmartSearchDto },
+  ];
+
+  it.each(dtoCases)('$name enforces locationPresence exclusivity', ({ dto }) => {
+    for (const locationPresence of ['noGps', 'noPlaceName']) {
+      expect(dto.schema.safeParse({ locationPresence }).success).toBe(true);
+    }
+
+    expect(dto.schema.safeParse({ locationPresence: 'nogps' }).success).toBe(false);
+
+    for (const sibling of ['city', 'state', 'country']) {
+      expect(dto.schema.safeParse({ locationPresence: 'noGps', [sibling]: 'Paris' }).success).toBe(false);
+    }
+
+    expect(dto.schema.safeParse({ city: 'Paris' }).success).toBe(true);
   });
 });
 

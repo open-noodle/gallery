@@ -201,6 +201,12 @@ describe('buildPhotosTimelineOptions', () => {
     });
   });
 
+  it('forwards locationPresence to the timeline query', () => {
+    const options = buildPhotosTimelineOptions({ ...createFilterState(), locationPresence: 'noGps' }, MY_USER_ID);
+
+    expect(options.locationPresence).toBe('noGps');
+  });
+
   it('should handle multiple simultaneous filters', () => {
     const filters = {
       ...createFilterState(),

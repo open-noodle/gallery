@@ -107,9 +107,17 @@
       result.push({ type: 'person', id: personId, icon: mdiAccount, label: name });
     }
 
-    // Location chip (city + state + country fold into ONE chip — getActiveFilterCount already
-    // counts all three as a single filter, so all three must render — and clear — together)
-    const locationParts = [filters.city, filters.state, filters.country].filter(Boolean);
+    // Location chip (city + state + country + locationPresence fold into ONE chip —
+    // getActiveFilterCount already counts them as a single filter, so they must render — and
+    // clear — together). locationPresence is mutually exclusive with the other three, so at most
+    // one of these parts is ever non-empty alongside it.
+    const presenceLabel =
+      filters.locationPresence === 'noGps'
+        ? $t('filter_location_no_gps')
+        : filters.locationPresence === 'noPlaceName'
+          ? $t('filter_location_no_place_name')
+          : undefined;
+    const locationParts = [presenceLabel, filters.city, filters.state, filters.country].filter(Boolean);
     if (locationParts.length > 0) {
       result.push({ type: 'location', icon: mdiMapMarker, label: locationParts.join(', ') });
     }

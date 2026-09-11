@@ -111,6 +111,8 @@ export interface FilterSuggestionsResponse {
   hasFavorites: boolean;
   hasAssetsInAlbum: boolean;
   hasAssetsNotInAlbum: boolean;
+  hasNoGpsAssets: boolean;
+  hasNoPlaceNameAssets: boolean;
 }
 
 export interface FilterPanelConfig {
@@ -146,6 +148,8 @@ export interface FilterState {
   model?: string;
   lensModel?: string;
   state?: string;
+  /** Absence-of-location filter. A member of the location group — never set alongside city/state/country. */
+  locationPresence?: 'noGps' | 'noPlaceName';
   albumId?: string;
   ownerId?: string;
   description?: string;
@@ -179,7 +183,7 @@ export function getActiveFilterCount(state: FilterState): number {
 
   return (
     (state.personIds.length > 0 ? 1 : 0) +
-    (state.city || state.country || state.state ? 1 : 0) + // location counts once (city/state/country)
+    (state.city || state.country || state.state || state.locationPresence ? 1 : 0) + // location counts once
     (state.make || state.model ? 1 : 0) + // camera counts once; a model-only value (no make) still applies ?model=
     (state.lensModel ? 1 : 0) +
     (state.albumId ? 1 : 0) +
@@ -397,6 +401,7 @@ export function clearFilters(state: FilterState): FilterState {
     model: undefined,
     lensModel: undefined,
     state: undefined,
+    locationPresence: undefined,
     albumId: undefined,
     ownerId: undefined,
     description: undefined,

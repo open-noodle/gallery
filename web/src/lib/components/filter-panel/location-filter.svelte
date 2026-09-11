@@ -30,6 +30,15 @@
      */
     onSelectionChange: (country?: string, city?: string, state?: string) => void;
     emptyText?: string;
+    /**
+     * Whether the server found any asset in the current scope matching each absence-of-location
+     * state. A row is offered only when its flag is true — OR when it is the active selection, so an
+     * applied filter is never reachable only through the chip (same rule as `orphanedCountry`).
+     */
+    hasNoGpsAssets?: boolean;
+    hasNoPlaceNameAssets?: boolean;
+    selectedLocationPresence?: 'noGps' | 'noPlaceName';
+    onLocationPresenceChange?: (value?: 'noGps' | 'noPlaceName') => void;
   }
 
   let {
@@ -41,6 +50,10 @@
     onCityFetch,
     onSelectionChange,
     emptyText,
+    hasNoGpsAssets,
+    hasNoPlaceNameAssets,
+    selectedLocationPresence,
+    onLocationPresenceChange,
   }: Props = $props();
 
   let searchQuery = $state('');
@@ -352,10 +365,39 @@
   </button>
 {/snippet}
 
+<!--
+  A row for the absence of location data ("no GPS at all" / "coordinates but no name"). Mutually
+  exclusive with country/city/state — clicking it replaces the whole location group, so
+  `onLocationPresenceChange` alone is the signal, not `onSelectionChange`.
+-->
+{#snippet presenceRow(value: 'noGps' | 'noPlaceName', label: string)}
+  {@const isSelected = selectedLocationPresence === value}
+  <button
+    type="button"
+    class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium hover:bg-subtle"
+    onclick={() => onLocationPresenceChange?.(isSelected ? undefined : value)}
+    aria-pressed={isSelected}
+    data-testid="location-presence-{value}"
+  >
+    <div
+      class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isSelected
+        ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
+        : 'border-gray-300 dark:border-gray-600'}"
+    >
+      {#if isSelected}
+        <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
+      {/if}
+    </div>
+    <span class="flex-1 truncate text-left">{label}</span>
+  </button>
+{/snippet}
+
 <div data-testid="location-filter">
-  <!-- `selectedState` counts as something to render: an active filter must never be reachable only
-       through the chip, or it cannot be removed from here. -->
-  {#if countries.length === 0 && !orphanedCountry && !selectedState}
+  <!-- `selectedState` / `selectedLocationPresence` count as something to render: an active filter
+       must never be reachable only through the chip, or it cannot be removed from here.
+       `hasNoGpsAssets` / `hasNoPlaceNameAssets` count too: a library with nothing geotagged has an
+       empty `countries` list but must still offer the presence rows instead of the empty message. -->
+  {#if countries.length === 0 && !orphanedCountry && !selectedState && !selectedLocationPresence && !hasNoGpsAssets && !hasNoPlaceNameAssets}
     <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-empty">
       {emptyText ?? $t('filter_no_locations_found')}
     </p>
@@ -376,6 +418,13 @@
         data-testid="location-search-input"
       />
     </div>
+
+    {#if hasNoGpsAssets || selectedLocationPresence === 'noGps'}
+      {@render presenceRow('noGps', $t('filter_location_no_gps'))}
+    {/if}
+    {#if hasNoPlaceNameAssets || selectedLocationPresence === 'noPlaceName'}
+      {@render presenceRow('noPlaceName', $t('filter_location_no_place_name'))}
+    {/if}
 
     <!-- Orphaned country (selected but no longer in suggestions) -->
     {#if orphanedCountry}

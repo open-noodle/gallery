@@ -1,4 +1,4 @@
-import { TimeBucketAssetDto, TimeBucketDto } from 'src/dtos/time-bucket.dto';
+import { TimeBucketAssetDto, TimeBucketCoverDto, TimeBucketDto } from 'src/dtos/time-bucket.dto';
 import { TimeBucketSize } from 'src/enum';
 
 describe('TimeBucketDto', () => {
@@ -186,6 +186,35 @@ describe('TimeBucketDto', () => {
       expect(absent.data?.ownerId).toBeUndefined();
       expect(absent.data?.lensModel).toBeUndefined();
       expect(absent.data?.state).toBeUndefined();
+    });
+  });
+
+  describe('locationPresence query param handling', () => {
+    // Covers all three time-bucket DTOs (TimeBucketDto, TimeBucketAssetDto, TimeBucketCoverDto):
+    // each one independently pipes the exclusivity constraint, so each needs its own regression
+    // coverage rather than trusting that fixing one schema fixed them all. basePayload supplies the
+    // fields each DTO otherwise requires (timeBucket / timeBuckets) so parsing failures below are
+    // never confused with "missing required field" failures.
+    const dtoCases = [
+      { name: 'TimeBucketDto', dto: TimeBucketDto, basePayload: {} },
+      { name: 'TimeBucketAssetDto', dto: TimeBucketAssetDto, basePayload: { timeBucket: '2024-01-01' } },
+      { name: 'TimeBucketCoverDto', dto: TimeBucketCoverDto, basePayload: { timeBuckets: ['2024-01-01'] } },
+    ];
+
+    it.each(dtoCases)('$name enforces locationPresence exclusivity', ({ dto, basePayload }) => {
+      for (const locationPresence of ['noGps', 'noPlaceName']) {
+        expect(dto.schema.safeParse({ ...basePayload, locationPresence }).success).toBe(true);
+      }
+
+      expect(dto.schema.safeParse({ ...basePayload, locationPresence: 'nogps' }).success).toBe(false);
+
+      for (const sibling of ['city', 'state', 'country']) {
+        expect(dto.schema.safeParse({ ...basePayload, locationPresence: 'noGps', [sibling]: 'Paris' }).success).toBe(
+          false,
+        );
+      }
+
+      expect(dto.schema.safeParse({ ...basePayload, city: 'Paris' }).success).toBe(true);
     });
   });
 });
