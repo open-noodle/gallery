@@ -57,6 +57,9 @@ void main() {
   Map<String, dynamic> personJson(String id, {required String name}) => {
     'id': id,
     'name': name,
+    // Required by PersonResponseDto even though it is nullable — the server always emits the
+    // key, and the generated fromJson asserts on its presence rather than defaulting it.
+    'birthDate': null,
     'thumbnailPath': '',
     'isHidden': false,
   };
