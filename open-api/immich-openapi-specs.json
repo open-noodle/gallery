@@ -30134,31 +30134,49 @@
           "counts": {
             "properties": {
               "assets": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "exif": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "faces": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "mlWithEmbedding": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "mlWithoutEmbedding": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "notRedetectable": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "remainingLiveFaces": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "sharedAssets": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               },
               "softDeleted": {
-                "type": "number"
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
               }
             },
             "required": [
@@ -30175,7 +30193,9 @@
             "type": "object"
           },
           "expectedFaceCount": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "personId": {
             "type": "string"
@@ -30187,7 +30207,9 @@
                   "type": "string"
                 },
                 "count": {
-                  "type": "number"
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
                 }
               },
               "required": [
@@ -34678,22 +34700,32 @@
             "items": {
               "properties": {
                 "exif": {
-                  "type": "number"
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
                 },
                 "faceCount": {
-                  "type": "number"
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
                 },
                 "facesWithoutEmbedding": {
-                  "type": "number"
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
                 },
                 "id": {
                   "type": "string"
                 },
                 "machineLearning": {
-                  "type": "number"
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
                 },
                 "manual": {
-                  "type": "number"
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
                 },
                 "name": {
                   "type": "string"
@@ -34717,7 +34749,9 @@
             "type": "array"
           },
           "total": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
