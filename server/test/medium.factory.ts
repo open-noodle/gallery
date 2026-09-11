@@ -43,6 +43,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
+import { FamilyRepository } from 'src/repositories/family.repository';
 import { IntegrityRepository } from 'src/repositories/integrity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LibraryRepository } from 'src/repositories/library.repository';
@@ -170,6 +171,22 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
 
       if (options.mock.includes(dep)) {
         return newMockRepository(dep);
+      }
+
+      // Gallery-fork: FamilyRepository is now touched unconditionally by every identity merge
+      // (IdentityMergePropagationService.executePlanInTransaction always calls
+      // repointIdentities, regardless of whether the merge involves any family data), so — unlike
+      // every other dependency here — a test that never opted into it must still get a working
+      // stand-in rather than `undefined`, or any test exercising ANY merge path breaks. Silently
+      // auto-mocking it here avoids touching the ~185 existing newMediumService(...) call sites
+      // across the medium suite that predate family relationships and have no reason to know
+      // about it. Unlike newMockRepository's usual STRICT automock (which intentionally fails a
+      // test that calls an unconfigured method), this one must resolve quietly — these call
+      // sites never configured `repointIdentities` because they never knew it existed, and
+      // `repointIdentities` returns `Promise<void>`, so a bare `undefined` return is exactly the
+      // right no-op result for `await` to see.
+      if (dep === FamilyRepository) {
+        return automock(FamilyRepository, { args: [undefined, { setContext: () => {} }], strict: false });
       }
     }) as unknown as ClassConstructorsToInstances<BaseServiceDeps>;
   }
@@ -688,6 +705,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     case ClassificationRepository:
+    case FamilyRepository:
     case TagRepository: {
       return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
@@ -764,6 +782,10 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
 
     case EmailRepository: {
       return automock(EmailRepository, { args: [{ setContext: () => {} }] });
+    }
+
+    case FamilyRepository: {
+      return automock(FamilyRepository, { args: [undefined, { setContext: () => {} }] });
     }
 
     case EventRepository: {

@@ -34,6 +34,7 @@ import {
   GalleryClassificationSchema,
   GalleryClipExtension,
   GalleryFaceSuggestionSchema,
+  GalleryFamilyTreeSchema,
   galleryJobDefaults,
   galleryMachineLearningDefaults,
   GalleryMemoriesSchema,
@@ -435,6 +436,8 @@ const AdminConfigSchemaWithVisibility = z
     classification: GalleryClassificationSchema,
     memories: GalleryMemoriesSchema,
     storageUsage: GalleryStorageUsageSchema,
+    // Gallery-fork: see GalleryFamilyTreeSchema.
+    familyTree: GalleryFamilyTreeSchema,
   })
   .describe('Configuration properties that are visible to the admin')
   .meta({ id: 'AdminConfigDto' });

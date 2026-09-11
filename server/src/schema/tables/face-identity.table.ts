@@ -27,6 +27,11 @@ export class FaceIdentityTable {
   @Column({ type: 'character varying', default: 'person' })
   type!: Generated<string>;
 
+  // Optional, used only for labelling ("mother" vs the neutral "parent"). Never inferred
+  // from a name or a face; unset yields the neutral term.
+  @Column({ type: 'character varying', nullable: true })
+  gender!: string | null;
+
   @ForeignKeyColumn(() => AssetFaceTable, { onDelete: 'SET NULL', nullable: true, index: false })
   representativeFaceId!: string | null;
 
