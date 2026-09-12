@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility } from 'src/enum';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
@@ -508,6 +508,113 @@ describe(AlbumRepository.name, () => {
       const rows = await sut.getByAssetId(viewer.id, asset.id);
 
       expect(rows).toEqual([]);
+    });
+
+    it('stops surfacing a contributed asset album once the user leaves the space', async () => {
+      const { ctx, sut } = setup();
+      const { user: albumOwner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: contributor.id });
+      const { album } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Departed Contribution Album' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: albumOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+
+      expect(await sut.getByAssetId(contributor.id, asset.id)).toHaveLength(1);
+
+      // Membership is the whole grant on this arm — revoking it must close the album title too.
+      await ctx.database.deleteFrom('shared_space_member').where('userId', '=', contributor.id).execute();
+
+      expect(await sut.getByAssetId(contributor.id, asset.id)).toEqual([]);
+    });
+
+    it('surfaces a contributed asset album to a space Viewer, not only to editors', async () => {
+      const { ctx, sut } = setup();
+      const { user: albumOwner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { user: spaceViewer } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: contributor.id });
+      const { album } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Viewer Role Album' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: albumOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id, role: SharedSpaceRole.Editor });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: spaceViewer.id, role: SharedSpaceRole.Viewer });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+
+      // Any-role membership is deliberate: a Viewer can already open the linked album, so the read
+      // arm must not be narrowed to write-capable roles.
+      const rows = await sut.getByAssetId(spaceViewer.id, asset.id);
+
+      expect(rows.map((row) => row.id)).toEqual([album.id]);
+    });
+
+    it('does not surface a sibling album in the same space that lacks the asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: albumOwner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: contributor.id });
+      const { album: withAsset } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Holds The Asset' });
+      const { album: sibling } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Unrelated Sibling' });
+
+      const { space } = await ctx.newSharedSpace({ createdById: albumOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id });
+      // BOTH albums are linked into the space the viewer belongs to; only one holds the asset.
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: withAsset.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: sibling.id });
+      await ctx.newAlbumSpaceAsset({ albumId: withAsset.id, assetId: asset.id, spaceId: space.id });
+
+      const rows = await sut.getByAssetId(contributor.id, asset.id);
+
+      // The sibling's user-authored title must not ride along on an accessible-space match.
+      expect(rows.map((row) => row.id)).toEqual([withAsset.id]);
+      expect(rows.map((row) => row.id)).not.toContain(sibling.id);
+    });
+
+    it('does not surface a contributed asset album to a partner of the asset owner', async () => {
+      const { ctx, sut } = setup();
+      const { user: albumOwner } = await ctx.newUser();
+      const { user: assetOwner } = await ctx.newUser();
+      const { user: partner } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: assetOwner.id });
+      const { album } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Partner Blind Album' });
+
+      // A partner can view the asset itself, but partnership is not an album or space grant — it
+      // must not reveal where someone else filed the photo.
+      await ctx.newPartner({ sharedById: assetOwner.id, sharedWithId: partner.id });
+
+      const { space } = await ctx.newSharedSpace({ createdById: albumOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: assetOwner.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+
+      const rows = await sut.getByAssetId(partner.id, asset.id);
+
+      expect(rows).toEqual([]);
+    });
+
+    it('does not surface a contributed asset album to the album owner outside the space', async () => {
+      const { ctx, sut } = setup();
+      const { user: albumOwner } = await ctx.newUser();
+      const { user: spaceOwner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: contributor.id });
+      const { album } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Owner Outside Space Album' });
+
+      // The album owner holds an album_user row but no membership of the space the contribution
+      // came through. getMetadataForIds gates its contributed arm on membership too, so the panel
+      // and the album card agree on not counting it — pinned so neither side drifts alone.
+      const { space } = await ctx.newSharedSpace({ createdById: spaceOwner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+
+      expect(await sut.getByAssetId(albumOwner.id, asset.id)).toEqual([]);
+
+      const [metadata] = await sut.getMetadataForIds([album.id], { forUserId: albumOwner.id });
+      expect(metadata).toBeUndefined();
     });
 
     it('does not return a space-linked album that has been soft-deleted', async () => {
