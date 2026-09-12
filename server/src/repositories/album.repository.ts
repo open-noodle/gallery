@@ -110,43 +110,89 @@ export class AlbumRepository {
    * Deliberately NOT every album containing the asset: album names are user-authored and a space
    * member must not learn the owner's private album titles. Callers do not separately authorize
    * `assetId` (see AlbumService.getAll) — this scoping IS the access check.
+   *
+   * An asset reaches an album through EITHER membership table, so both are checked (#1095): the
+   * owner's own `album_asset` row, or a cross-owner `album_space_asset` contribution (#764). The
+   * previous `innerJoin('album_asset')` dropped every contribution-only album, so a member who
+   * added someone else's space asset saw it in the album grid but never in "Contained in" — the
+   * count from `getMetadataForIds` already unions both arms, and this now agrees with it.
    */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   getByAssetId(ownerId: string, assetId: string) {
-    return this.db
-      .selectFrom('album')
-      .selectAll('album')
-      .innerJoin('album_asset', 'album_asset.albumId', 'album.id')
-      .where((eb) =>
-        eb.or([
-          eb.exists(
-            eb
-              .selectFrom('album_user')
-              .whereRef('album_user.albumId', '=', 'album.id')
-              .where('album_user.userId', '=', ownerId),
-          ),
-          eb.and([
-            eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)),
-            // A space member must never learn that another member's Hidden/Locked asset sits in a
-            // linked album, so the space arm carries the space-shareable visibility gate
-            // (Archive/Timeline). The album_user arm above is deliberately NOT gated: an album
-            // member — including the owner, who always has an album_user row — keeps seeing
-            // "Contained in" for their own Hidden/Locked assets.
-            eb.exists(
-              eb
-                .selectFrom('asset')
-                .select(eb.lit(1).as('exists'))
-                .whereRef('asset.id', '=', 'album_asset.assetId')
-                .where((e) => spaceVisibilityGate(e)),
-            ),
+    // A space member must never learn that another member's Hidden/Locked asset sits in a linked
+    // album, so both space-reached arms below carry the space-shareable visibility gate
+    // (Archive/Timeline). The album_user arm is deliberately NOT gated: an album member — including
+    // the owner, who always has an album_user row — keeps seeing "Contained in" for their own
+    // Hidden/Locked assets.
+    const isSpaceShareable = (eb: ExpressionBuilder<DB, 'album'>) =>
+      eb.exists(
+        eb
+          .selectFrom('asset')
+          .select(eb.lit(1).as('exists'))
+          .where('asset.id', '=', asUuid(assetId))
+          .where((e) => spaceVisibilityGate(e)),
+      );
+
+    return (
+      this.db
+        .selectFrom('album')
+        .selectAll('album')
+        .where((eb) =>
+          eb.or([
+            // The owner's own `album_asset` row, reached either by a direct album share or by the
+            // album being linked into a space the caller can access.
+            eb.and([
+              eb.exists(
+                eb
+                  .selectFrom('album_asset')
+                  .select(eb.lit(1).as('exists'))
+                  .whereRef('album_asset.albumId', '=', 'album.id')
+                  .where('album_asset.assetId', '=', asUuid(assetId)),
+              ),
+              eb.or([
+                eb.exists(
+                  eb
+                    .selectFrom('album_user')
+                    .whereRef('album_user.albumId', '=', 'album.id')
+                    .where('album_user.userId', '=', ownerId),
+                ),
+                eb.and([eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)), isSpaceShareable(eb)]),
+              ]),
+            ]),
+            // A cross-owner contribution (#764) is only ever reachable through the ONE space it was
+            // contributed to, so membership and the live album↔space link are correlated to that
+            // space — the same scoping `getMetadataForIds` applies to its contributed arm. Written
+            // inline rather than via `spaceContributedAssetExists`, whose subquery correlates on the
+            // asset only: that helper answers "can I reach this asset through any linked album", and
+            // here the question is album-centric ("is THIS album's link to the asset valid for me").
+            eb.and([
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_album')
+                  .innerJoin('album_space_asset', (join) =>
+                    join
+                      .onRef('album_space_asset.albumId', '=', 'shared_space_album.albumId')
+                      .onRef('album_space_asset.spaceId', '=', 'shared_space_album.spaceId'),
+                  )
+                  .innerJoin('shared_space_member', (join) =>
+                    join
+                      .onRef('shared_space_member.spaceId', '=', 'shared_space_album.spaceId')
+                      .on('shared_space_member.userId', '=', asUuid(ownerId)),
+                  )
+                  .select(eb.lit(1).as('exists'))
+                  .whereRef('shared_space_album.albumId', '=', 'album.id')
+                  .where('album_space_asset.assetId', '=', asUuid(assetId)),
+              ),
+              isSpaceShareable(eb),
+            ]),
           ]),
-        ]),
-      )
-      .where('album_asset.assetId', '=', assetId)
-      .where('album.deletedAt', 'is', null)
-      .select(withAlbumUsers(ownerId))
-      .orderBy('album.createdAt', 'desc')
-      .execute();
+        )
+        // The A1 invariant, covering both arms above — a soft-deleted album is never returned.
+        .where('album.deletedAt', 'is', null)
+        .select(withAlbumUsers(ownerId))
+        .orderBy('album.createdAt', 'desc')
+        .execute()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
