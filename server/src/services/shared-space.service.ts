@@ -85,6 +85,7 @@ import {
 } from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
+import { retryOnDeadlock } from 'src/utils/database.js';
 import { asDateString, asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
@@ -2265,22 +2266,31 @@ export class SharedSpaceService extends BaseService {
       throw new BadRequestException('Face not found');
     }
 
-    const person = await this.databaseRepository.transaction(async (trx) => {
-      // Mirrors attachFaceToSpacePerson's F-37 lock: two concurrent creates seeded from the SAME
-      // face must not both succeed with two different new people each holding a projection row.
-      await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
+    // #864-shaped: SharedSpacePersonDedup (queued on every real asset-add, see the class doc)
+    // touches this same space's `shared_space_person` rows concurrently with an interactive
+    // create — `lockFaceForAssignment` below and the dedup pass's own recount can take their
+    // locks in different orders, so Postgres occasionally picks this transaction as the deadlock
+    // victim (`deadlock detected`, seen under real concurrent load; a bare medium test with jobs
+    // mocked out never exercises it). Re-drive the whole transaction rather than surface a 500 or
+    // silently drop the create.
+    const person = await retryOnDeadlock(() =>
+      this.databaseRepository.transaction(async (trx) => {
+        // Mirrors attachFaceToSpacePerson's F-37 lock: two concurrent creates seeded from the SAME
+        // face must not both succeed with two different new people each holding a projection row.
+        await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
 
-      const existingIdentityId = await this.faceIdentityRepository.getIdentityIdForFace(assetFaceId, trx);
-      const created = existingIdentityId
-        ? await this.sharedSpaceRepository.createOrGetPersonForIdentity(
-            { spaceId, identityId: existingIdentityId, name: dto.name ?? '' },
-            trx,
-          )
-        : await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' }, trx);
+        const existingIdentityId = await this.faceIdentityRepository.getIdentityIdForFace(assetFaceId, trx);
+        const created = existingIdentityId
+          ? await this.sharedSpaceRepository.createOrGetPersonForIdentity(
+              { spaceId, identityId: existingIdentityId, name: dto.name ?? '' },
+              trx,
+            )
+          : await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' }, trx);
 
-      await this.linkFaceToSpacePerson(trx, created, assetFaceId, { writeIdentity: true });
-      return created;
-    });
+        await this.linkFaceToSpacePerson(trx, created, assetFaceId, { writeIdentity: true });
+        return created;
+      }),
+    );
 
     const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
     return this.mapSpacePerson(person, alias?.alias ?? null);

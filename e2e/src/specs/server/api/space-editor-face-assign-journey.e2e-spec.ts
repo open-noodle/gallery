@@ -23,6 +23,7 @@ import {
   createSpaceAssetFace,
   createSpacePerson,
   deleteSpaceAssetFace,
+  getAssetInfo,
   getSpaceActivities,
   getSpaceAssetFaces,
   updatePerson,
@@ -100,6 +101,23 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
       spacePersonId: sueId,
       spacePersonName: 'Aunt Sue',
     });
+  });
+
+  // Field report (email, 2026-09-12, pr-992-rc.12): the web People row (`AssetService.get` /
+  // `refreshAssetPeople`) is a DIFFERENT read from `getSpaceAssetFaces` above -- it resolves
+  // through `findSpacePersonsByLinkedPersonIds`, joining the owner's `asset_face.personGroupId`
+  // back to the space person. Nothing in this journey (or anywhere else) called `getAssetInfo`
+  // after a CREATE from a brand-new face; the "owner-named override" tests below only cover it
+  // after an ATTACH. This is that missing case.
+  it('2b. Aunt Sue also appears correctly in the People row (GET /assets/:id?spaceId=...)', async () => {
+    const info = await getAssetInfo(
+      { id: ctx.spaceAssetId, spaceId: ctx.spaceId },
+      { headers: asBearerAuth(ctx.spaceEditor.token!) },
+    );
+
+    const person = info.people?.find((p) => p.name === 'Aunt Sue');
+    expect(person).toBeDefined();
+    expect(person?.name).toBe('Aunt Sue');
   });
 
   it('3. She (mistakenly) attaches a face to the wrong person, then corrects it to Aunt Sue', async () => {
