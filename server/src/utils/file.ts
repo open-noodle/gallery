@@ -123,6 +123,20 @@ export const sendFile = async (
     }
 
     if (file instanceof ImmichStreamResponse) {
+      // The client can disconnect while we were still awaiting the backend's initial
+      // fetch (getServeStrategy/getObject), i.e. before file.stream even existed. Nothing
+      // below would ever notice that: `res.once('close', ...)` can't fire for a close that
+      // already happened, and nothing else pipes or resumes file.stream, so it would sit
+      // forever as an unconsumed, un-destroyed Readable — holding its proxyReadLimiter slot
+      // permanently, since releaseWhenStreamCloses is waiting on 'close'/'error'/'end' events
+      // that will now never come. A burst of client aborts during the initial fetch (a fast
+      // scroll past many thumbnails) can leak the whole pool this way, well before the idle
+      // timer below ever gets a chance to run. Catch it here, before touching res at all.
+      if (res.destroyed || res.writableEnded) {
+        file.stream.destroy();
+        return;
+      }
+
       const cacheControlHeader = cacheControlHeaders[file.cacheControl];
       if (cacheControlHeader) {
         res.set('Cache-Control', cacheControlHeader);

@@ -620,6 +620,145 @@ describe('S3 stream idle timeout', () => {
   });
 });
 
+describe('sendFile with a client that disconnects before the stream is ready', () => {
+  let mockLogger: LoggingRepository;
+
+  beforeEach(() => {
+    mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
+  });
+
+  // res.once('close', ...) can only catch a close that hasn't happened yet -- it can't fire
+  // for one that already did. A client that aborts while the handler is still awaiting the
+  // backend's initial fetch (getServeStrategy/getObject) leaves res already destroyed by the
+  // time the handler resolves, so that registration is a no-op and nothing else ever pipes
+  // or resumes the stream either. Without an upfront guard, the stream -- and the
+  // proxyReadLimiter slot it holds -- would leak forever.
+  it('destroys the stream immediately and never touches res, when res is already destroyed', async () => {
+    const stream = new Readable({ read() {} });
+    const streamDestroy = vi.spyOn(stream, 'destroy');
+    const res = {
+      set: vi.fn(),
+      header: vi.fn(),
+      headersSent: false,
+      status: vi.fn().mockReturnThis(),
+      once: vi.fn(),
+      destroyed: true,
+      writableEnded: false,
+    } as any;
+
+    await sendFile(
+      res,
+      vi.fn(),
+      () =>
+        new ImmichStreamResponse({
+          stream,
+          contentType: 'video/mp4',
+          cacheControl: CacheControl.PrivateWithCache,
+        }),
+      mockLogger,
+    );
+
+    // no-arg destroy, matching the existing res.once('close', ...) cleanup convention below --
+    // this is an orderly "client's gone" teardown, not an error condition to surface
+    expect(streamDestroy).toHaveBeenCalledWith();
+    expect(res.set).not.toHaveBeenCalled();
+    expect(res.header).not.toHaveBeenCalled();
+    expect(res.once).not.toHaveBeenCalled();
+  });
+
+  it('destroys the stream immediately when BOTH destroyed and writableEnded are already true', async () => {
+    // belt-and-suspenders: a real dead connection can plausibly present as either depending
+    // on how it died (client RST vs a clean end from the other side) -- covers both flags at
+    // once, and that setting neither doesn't false-positive.
+    const stream = new Readable({ read() {} });
+    const streamDestroy = vi.spyOn(stream, 'destroy');
+    const res = {
+      set: vi.fn(),
+      header: vi.fn(),
+      headersSent: false,
+      status: vi.fn().mockReturnThis(),
+      once: vi.fn(),
+      destroyed: true,
+      writableEnded: true,
+    } as any;
+
+    await sendFile(
+      res,
+      vi.fn(),
+      () =>
+        new ImmichStreamResponse({
+          stream,
+          contentType: 'video/mp4',
+          cacheControl: CacheControl.PrivateWithCache,
+        }),
+      mockLogger,
+    );
+
+    expect(streamDestroy).toHaveBeenCalledWith();
+    expect(res.header).not.toHaveBeenCalled();
+  });
+
+  it('destroys the stream immediately when res.writableEnded is already true', async () => {
+    const stream = new Readable({ read() {} });
+    const streamDestroy = vi.spyOn(stream, 'destroy');
+    const res = {
+      set: vi.fn(),
+      header: vi.fn(),
+      headersSent: false,
+      status: vi.fn().mockReturnThis(),
+      once: vi.fn(),
+      destroyed: false,
+      writableEnded: true,
+    } as any;
+
+    await sendFile(
+      res,
+      vi.fn(),
+      () =>
+        new ImmichStreamResponse({
+          stream,
+          contentType: 'video/mp4',
+          cacheControl: CacheControl.PrivateWithCache,
+        }),
+      mockLogger,
+    );
+
+    expect(streamDestroy).toHaveBeenCalledWith();
+    expect(res.header).not.toHaveBeenCalled();
+  });
+
+  it('proceeds normally when res is still alive', async () => {
+    const stream = new Readable({ read() {} });
+    stream.pipe = vi.fn() as any;
+    const streamDestroy = vi.spyOn(stream, 'destroy');
+    const res = {
+      set: vi.fn(),
+      header: vi.fn(),
+      headersSent: false,
+      status: vi.fn().mockReturnThis(),
+      once: vi.fn(),
+      destroyed: false,
+      writableEnded: false,
+    } as any;
+
+    await sendFile(
+      res,
+      vi.fn(),
+      () =>
+        new ImmichStreamResponse({
+          stream,
+          contentType: 'video/mp4',
+          cacheControl: CacheControl.PrivateWithCache,
+        }),
+      mockLogger,
+    );
+
+    expect(streamDestroy).not.toHaveBeenCalled();
+    expect(res.header).toHaveBeenCalledWith('Content-Type', 'video/mp4');
+    expect(stream.pipe).toHaveBeenCalledWith(res);
+  });
+});
+
 describe('sendFile stream responses over real HTTP', () => {
   const mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
   const object = Buffer.from('0123456789'.repeat(200)); // 2000 bytes
@@ -710,6 +849,62 @@ describe('sendFile stream responses over real HTTP', () => {
     });
 
     await vi.waitFor(() => expect(source.destroyed).toBe(true));
+    server.close();
+  });
+
+  it('should destroy an orphaned stream when the client disconnects before the handler resolves', async () => {
+    // The production trigger: a client aborts (e.g. scrolls past a thumbnail) while the
+    // handler is still awaiting the backend's initial fetch (getServeStrategy/getObject),
+    // i.e. before any stream exists yet. A real disconnected `res` -- not a mock -- so this
+    // exercises the actual `res.destroyed`/`res.writableEnded` values Node/Express set, not
+    // an assumption about their shape.
+    const source: Readable = new Readable({ read() {} });
+    const sourceDestroy = vi.spyOn(source, 'destroy');
+
+    const { promise: handlerGate, resolve: resolveHandler } = Promise.withResolvers<void>();
+    const { promise: resClosed, resolve: notifyResClosed } = Promise.withResolvers<void>();
+    // res.once('close', ...) below is only registered once Express actually dispatches to
+    // this route handler -- destroying the client connection before that happens would leave
+    // it unregistered and the test hanging forever, so wait for it explicitly rather than
+    // guessing at timing with the client-side 'socket' event.
+    const { promise: handlerStarted, resolve: notifyHandlerStarted } = Promise.withResolvers<void>();
+
+    const app = express();
+    app.get('/media', (_req, res, next) => {
+      res.once('close', () => notifyResClosed());
+      notifyHandlerStarted();
+      void sendFile(
+        res,
+        next,
+        async () => {
+          // simulates the in-flight S3 GetObject the client's disconnect races against
+          await handlerGate;
+          return new ImmichStreamResponse({
+            stream: source,
+            contentType: 'video/mp4',
+            cacheControl: CacheControl.PrivateWithCache,
+          });
+        },
+        mockLogger,
+      );
+    });
+
+    const server = app.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const clientRequest = get(`http://127.0.0.1:${port}/media`);
+    clientRequest.once('error', () => {}); // destroy() below causes an expected client-side ECONNRESET
+
+    await handlerStarted;
+    clientRequest.destroy();
+
+    // wait for the server to have actually observed the disconnect before letting the
+    // "S3 fetch" resolve -- otherwise this just re-tests the ordinary res.once('close') path
+    await resClosed;
+    resolveHandler();
+
+    await vi.waitFor(() => expect(sourceDestroy).toHaveBeenCalledWith());
     server.close();
   });
 });
