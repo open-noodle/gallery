@@ -82,6 +82,13 @@ const cacheControlHeaders: Record<CacheControl, string | null> = {
   [CacheControl.None]: null, // falsy value to prevent adding Cache-Control header
 };
 
+// How long a proxied S3 stream may go without delivering data before it is destroyed.
+// Anchored to the 60s send-timeout default common to reverse proxies sitting in front of
+// S3-compatible endpoints, so the timer usually fires on a connection the remote has
+// already given up on. Exported so tests derive their timings from it instead of
+// hard-coding a value that silently drifts out of sync when this one changes.
+export const S3_STREAM_IDLE_TIMEOUT_MS = 60_000;
+
 export const sendFile = async (
   res: Response,
   next: NextFunction,
@@ -138,12 +145,65 @@ export const sendFile = async (
       if (file.fileName) {
         res.header('Content-Disposition', getContentDispositionHeader(file.disposition ?? 'inline', file.fileName));
       }
+      // Idle timeout for proxied S3 streams. When `.pipe()` applies backpressure (the browser
+      // has buffered ahead and stopped reading), Node stops the libuv read watcher on the S3
+      // socket. While stopped it cannot notice the remote closing the connection, so the
+      // socket zombies — dead at the OS level, but still holding its proxy-read slot — until
+      // the browser resumes or the process restarts. Once every slot is held by a zombie,
+      // each new proxied read blocks in `proxyReadLimiter.acquire()` and never returns.
+      // Destroying the stream is what releases both the socket and the slot.
+      //
+      // The window is a tuning knob rather than a correctness bound: `.destroy()` behaves
+      // identically whether or not the remote has already hung up. Too long leaves zombies
+      // holding slots; too short cuts streams the client could still have resumed.
+      let lastDataAt = Date.now();
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+      // runs for every chunk of every proxied read — keep it to the single assignment
+      const onData = () => {
+        lastDataAt = Date.now();
+      };
+
+      const checkIdle = () => {
+        const idleFor = Date.now() - lastDataAt;
+        if (idleFor >= S3_STREAM_IDLE_TIMEOUT_MS) {
+          file.stream.destroy(new Error('S3 stream idle timeout'));
+          return;
+        }
+
+        // data arrived while this timer was pending, so the stream is not idle after all —
+        // re-arm for whatever is left of the window instead of rescheduling on every chunk
+        idleTimer = setTimeout(checkIdle, S3_STREAM_IDLE_TIMEOUT_MS - idleFor);
+      };
+
+      const cleanup = () => {
+        clearTimeout(idleTimer);
+        idleTimer = undefined;
+        file.stream.removeListener('data', onData);
+      };
+
+      file.stream.once('end', cleanup);
+      file.stream.once('close', cleanup);
+      file.stream.once('error', cleanup);
+
       // A client can walk away mid-stream — a <video> abandons a range response on every
       // seek. `pipe` only unpipes on the destination's close and leaves the source open,
       // so destroy it explicitly: for S3 that is what frees the socket and the proxy-read
       // slot (see `releaseWhenStreamCloses`), and without it 32 aborted seeks wedge every
       // proxied read. Destroying an already-finished stream is a no-op.
-      res.once('close', () => file.stream.destroy());
+      res.once('close', () => {
+        cleanup();
+        file.stream.destroy();
+      });
+
+      idleTimer = setTimeout(checkIdle, S3_STREAM_IDLE_TIMEOUT_MS);
+
+      // Attaching 'data' resumes the stream, so these two lines must stay adjacent — never
+      // insert an `await` between them. `resume()` defers emission to process.nextTick, so
+      // piping within the same tick guarantees no chunk is emitted before `res` is attached.
+      // Watching for data from the storage backend instead would cross await boundaries and
+      // lose those chunks, which is why the backend only watches for the stream closing.
+      file.stream.on('data', onData);
       file.stream.pipe(res);
       return;
     }
