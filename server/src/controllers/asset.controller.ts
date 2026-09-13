@@ -6,6 +6,8 @@ import {
   AssetBulkDeleteDto,
   AssetBulkUpdateDto,
   AssetCopyDto,
+  AssetEditableDto,
+  AssetEditableResponseDto,
   AssetJobsDto,
   AssetMetadataBulkDeleteDto,
   AssetMetadataBulkResponseDto,
@@ -51,6 +53,19 @@ export class AssetController {
   })
   runAssetJobs(@Auth() auth: AuthDto, @Body() dto: AssetJobsDto): Promise<void> {
     return this.service.run(auth, dto);
+  }
+
+  @Post('editable')
+  @Authenticated({ permission: Permission.AssetRead })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Resolve which of the given assets the caller may edit',
+    description:
+      'Returns the subset of the requested asset IDs the caller is allowed to edit — owned assets, plus assets belonging to a member of a space where the caller is Owner or Editor.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  getEditableAssets(@Auth() auth: AuthDto, @Body() dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
+    return this.service.getEditable(auth, dto);
   }
 
   @Put()

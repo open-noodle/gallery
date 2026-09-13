@@ -5,7 +5,12 @@
   import FaceCreateTagModal from '$lib/modals/CreateFaceModal.svelte';
   import { faceManager } from '$lib/stores/face.svelte';
   import { getPeopleThumbnailUrl } from '$lib/utils';
-  import { getNaturalSize, scaleToFit } from '$lib/utils/container-utils';
+  import { getNaturalSize } from '$lib/utils/container-utils';
+  import {
+    computeFaceCroppedCoordinates,
+    computeImageContentMetrics,
+    computeSelectorPosition,
+  } from '$lib/utils/face-box-drag';
   import { handleError } from '$lib/utils/handle-error';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { createFace, getAllPeople, type PersonResponseDto } from '@immich/sdk';
@@ -88,17 +93,7 @@
     searchInputEl?.focus();
   });
 
-  const imageContentMetrics = $derived.by(() => {
-    const natural = getNaturalSize(htmlElement);
-    const container = { width: containerWidth, height: containerHeight };
-    const { width: contentWidth, height: contentHeight } = scaleToFit(natural, container);
-    return {
-      contentWidth,
-      contentHeight,
-      offsetX: (containerWidth - contentWidth) / 2,
-      offsetY: (containerHeight - contentHeight) / 2,
-    };
-  });
+  const imageContentMetrics = $derived(computeImageContentMetrics(htmlElement, containerWidth, containerHeight));
 
   const setDefaultFaceRectanglePosition = (faceRect: Rect) => {
     const { offsetX, offsetY } = imageContentMetrics;
@@ -180,43 +175,14 @@
     const listHeight = Math.min(MAX_LIST_HEIGHT, containerHeight - gap * 2 - chromeHeight);
     const selectorHeight = listHeight + chromeHeight;
 
-    const clampTop = (top: number) => clamp(top, gap, containerHeight - selectorHeight - gap);
-    const clampLeft = (left: number) => clamp(left, gap, containerWidth - selectorWidth - gap);
-
-    const overlapArea = (position: { top: number; left: number }) => {
-      const selectorRight = position.left + selectorWidth;
-      const selectorBottom = position.top + selectorHeight;
-      const faceRight = faceBox.left + faceBox.width;
-      const faceBottom = faceBox.top + faceBox.height;
-
-      const overlapX = Math.max(0, Math.min(selectorRight, faceRight) - Math.max(position.left, faceBox.left));
-      const overlapY = Math.max(0, Math.min(selectorBottom, faceBottom) - Math.max(position.top, faceBox.top));
-      return overlapX * overlapY;
-    };
-
-    const faceBottom = faceBox.top + faceBox.height;
-    const faceRight = faceBox.left + faceBox.width;
-
-    const positions = [
-      { top: clampTop(faceBottom + gap), left: clampLeft(faceBox.left) },
-      { top: clampTop(faceBox.top - selectorHeight - gap), left: clampLeft(faceBox.left) },
-      { top: clampTop(faceBox.top), left: clampLeft(faceRight + gap) },
-      { top: clampTop(faceBox.top), left: clampLeft(faceBox.left - selectorWidth - gap) },
-    ];
-
-    let bestPosition = positions[0];
-    let leastOverlap = Infinity;
-
-    for (const position of positions) {
-      const overlap = overlapArea(position);
-      if (overlap < leastOverlap) {
-        leastOverlap = overlap;
-        bestPosition = position;
-        if (overlap === 0) {
-          break;
-        }
-      }
-    }
+    const bestPosition = computeSelectorPosition({
+      faceBox,
+      selectorWidth,
+      selectorHeight,
+      containerWidth,
+      containerHeight,
+      gap,
+    });
 
     faceSelectorEl.style.top = `${bestPosition.top}px`;
     faceSelectorEl.style.left = `${bestPosition.left}px`;
@@ -244,23 +210,7 @@
       return;
     }
 
-    const { left, top, width, height } = faceRect.getBoundingRect();
-    const { offsetX, offsetY, contentWidth, contentHeight } = imageContentMetrics;
-    const natural = getNaturalSize(htmlElement);
-
-    const scaleX = natural.width / contentWidth;
-    const scaleY = natural.height / contentHeight;
-    const imageX = (left - offsetX) * scaleX;
-    const imageY = (top - offsetY) * scaleY;
-
-    return {
-      imageWidth: natural.width,
-      imageHeight: natural.height,
-      x: Math.floor(imageX),
-      y: Math.floor(imageY),
-      width: Math.floor(width * scaleX),
-      height: Math.floor(height * scaleY),
-    };
+    return computeFaceCroppedCoordinates(faceRect.getBoundingRect(), htmlElement, containerWidth, containerHeight);
   };
 
   type FaceCoordinates = NonNullable<ReturnType<typeof getFaceCroppedCoordinates>>;
