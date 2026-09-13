@@ -6,7 +6,13 @@ import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import { CacheControl } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
-import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse, sendFile } from 'src/utils/file';
+import {
+  ImmichFileResponse,
+  ImmichRedirectResponse,
+  ImmichStreamResponse,
+  S3_STREAM_IDLE_TIMEOUT_MS,
+  sendFile,
+} from 'src/utils/file';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -505,6 +511,112 @@ describe('sendFile with ImmichMediaResponse', () => {
     await sendFile(res, next, () => Promise.reject(error), mockLogger);
 
     expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('S3 stream idle timeout', () => {
+  const TIMEOUT = S3_STREAM_IDLE_TIMEOUT_MS;
+  let mockLogger: LoggingRepository;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // starts a proxied stream response the way sendFile does, with `pipe` stubbed out so the
+  // stream stays quiet and only the idle timer acts on it
+  const startProxyStream = async () => {
+    const stream = new Readable({ read() {} });
+    const destroy = vi.spyOn(stream, 'destroy');
+    const res = {
+      set: vi.fn(),
+      header: vi.fn(),
+      headersSent: false,
+      status: vi.fn().mockReturnThis(),
+      once: vi.fn(),
+    } as any;
+    stream.pipe = vi.fn() as any;
+
+    await sendFile(
+      res,
+      vi.fn(),
+      () =>
+        new ImmichStreamResponse({
+          stream,
+          contentType: 'video/mp4',
+          cacheControl: CacheControl.PrivateWithCache,
+        }),
+      mockLogger,
+    );
+
+    return { stream, destroy, res };
+  };
+
+  it('should destroy the stream after a full idle window with no data', async () => {
+    const { destroy } = await startProxyStream();
+
+    vi.advanceTimersByTime(TIMEOUT - 1);
+    expect(destroy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(destroy).toHaveBeenCalledWith(expect.objectContaining({ message: 'S3 stream idle timeout' }));
+  });
+
+  it('should not destroy the stream while data keeps arriving', async () => {
+    const { stream, destroy } = await startProxyStream();
+
+    // span more than two full windows — a timer that never reset would have fired long ago
+    for (let elapsed = 0; elapsed < TIMEOUT * 2.5; elapsed += TIMEOUT / 4) {
+      vi.advanceTimersByTime(TIMEOUT / 4);
+      stream.emit('data', Buffer.from('x'));
+    }
+
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('should destroy the stream one full window after the last chunk, not after the first', async () => {
+    const { stream, destroy } = await startProxyStream();
+
+    vi.advanceTimersByTime(TIMEOUT * 0.9);
+    stream.emit('data', Buffer.from('x'));
+
+    // the timer armed at the start fires in here, but the stream has only been idle for a
+    // tenth of a window, so it has to re-arm for the remainder instead of destroying
+    vi.advanceTimersByTime(TIMEOUT * 0.9);
+    expect(destroy).not.toHaveBeenCalled();
+
+    // now a full window has passed since that last chunk
+    vi.advanceTimersByTime(TIMEOUT * 0.1);
+    expect(destroy).toHaveBeenCalledWith(expect.objectContaining({ message: 'S3 stream idle timeout' }));
+  });
+
+  it('should clear the idle timer when the stream ends normally', async () => {
+    const { stream, destroy } = await startProxyStream();
+
+    stream.emit('end');
+    vi.advanceTimersByTime(TIMEOUT * 2);
+
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('should clear the idle timer when the downstream response closes', async () => {
+    const { destroy, res } = await startProxyStream();
+
+    vi.advanceTimersByTime(TIMEOUT / 2);
+
+    const closeHandler = res.once.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
+    closeHandler();
+
+    // `res.once('close')` destroys with no argument — pre-existing behavior
+    expect(destroy).toHaveBeenCalledWith();
+
+    // the idle timer was cleared, so nothing destroys it a second time
+    vi.advanceTimersByTime(TIMEOUT * 2);
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 });
 
