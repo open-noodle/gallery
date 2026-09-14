@@ -207,6 +207,63 @@ function findRegions(lines: string[]): Region[] {
   return regions;
 }
 
+/** Tries the structured statement-level merge. Returns rendered lines, or null to refuse. */
+function resolveRegionStructured(ours: string[], theirs: string[]): string[] | null {
+  const ourStatements = splitStatements(ours);
+  const theirStatements = splitStatements(theirs);
+  if (!ourStatements || !theirStatements) {
+    return null;
+  }
+
+  const ourParsed = ourStatements.map((s) => parseStatement(s));
+  const theirParsed = theirStatements.map((s) => parseStatement(s));
+  if (ourParsed.includes(null) || theirParsed.includes(null)) {
+    return null;
+  }
+
+  const ourSide = ourParsed as ParsedStatement[];
+  const theirSide = theirParsed as ParsedStatement[];
+  const merged = mergeStatements([ourSide, theirSide]);
+  if (!merged) {
+    return null;
+  }
+
+  // Post-condition: nothing either side contributed may be missing.
+  const expected = new Set([...specifierKeys(ourSide), ...specifierKeys(theirSide)]);
+  const actual = specifierKeys(merged);
+  if ([...expected].some((key) => !actual.has(key))) {
+    return null;
+  }
+
+  return merged.map((s) => renderStatement(s));
+}
+
+/**
+ * Per-line specifier normalizer for the fallback path below. Rewrites only the quoted module
+ * string following `import '...'` or `... from '...'` — never touches bindings, so it cannot
+ * paper over a real difference in what a line imports.
+ */
+const SPECIFIER = /(\bfrom\s*|^\s*import\s*)(['"])([^'"]+)\2/g;
+
+export function normalizeLineSpecifiers(line: string): string {
+  return line.replace(SPECIFIER, (_m, head: string, q: string, mod: string) => `${head}${q}${normalizeModule(mod)}${q}`);
+}
+
+/**
+ * Fallback for regions the structured path refuses because they don't start on a statement
+ * boundary (zdiff3 hoisted a shared multi-line import's opening lines out of the region, leaving
+ * only a trailing fragment like `} from '...';`). Safe because it never reads outside the region:
+ * if both sides become byte-identical after normalizing only the quoted module specifiers on each
+ * line, they differed *only* in specifier form, so nothing can be lost — the same guarantee the
+ * structured path's post-condition checks explicitly.
+ */
+function resolveSpecifierOnlyRegion(ours: string[], theirs: string[]): string[] | null {
+  if (ours.length !== theirs.length) return null;
+  const normalizedOurs = ours.map(normalizeLineSpecifiers);
+  const normalizedTheirs = theirs.map(normalizeLineSpecifiers);
+  return normalizedOurs.every((line, i) => line === normalizedTheirs[i]) ? normalizedOurs : null;
+}
+
 export function resolveConflictedSource(text: string): {
   text: string;
   resolved: number;
@@ -219,37 +276,15 @@ export function resolveConflictedSource(text: string): {
   let refused = 0;
 
   for (const region of regions) {
-    const ourStatements = splitStatements(region.ours);
-    const theirStatements = splitStatements(region.theirs);
-    if (!ourStatements || !theirStatements) {
+    const structured = resolveRegionStructured(region.ours, region.theirs);
+    const rendered = structured ?? resolveSpecifierOnlyRegion(region.ours, region.theirs);
+
+    if (!rendered) {
       refused += 1;
       continue;
     }
 
-    const ourParsed = ourStatements.map((s) => parseStatement(s));
-    const theirParsed = theirStatements.map((s) => parseStatement(s));
-    if (ourParsed.includes(null) || theirParsed.includes(null)) {
-      refused += 1;
-      continue;
-    }
-
-    const ours = ourParsed as ParsedStatement[];
-    const theirs = theirParsed as ParsedStatement[];
-    const merged = mergeStatements([ours, theirs]);
-    if (!merged) {
-      refused += 1;
-      continue;
-    }
-
-    // Post-condition: nothing either side contributed may be missing.
-    const expected = new Set([...specifierKeys(ours), ...specifierKeys(theirs)]);
-    const actual = specifierKeys(merged);
-    if ([...expected].some((key) => !actual.has(key))) {
-      refused += 1;
-      continue;
-    }
-
-    replacements.set(region.start, { end: region.end, lines: merged.map((s) => renderStatement(s)) });
+    replacements.set(region.start, { end: region.end, lines: rendered });
     resolved += 1;
   }
 
