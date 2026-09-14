@@ -193,6 +193,25 @@ describe('specifier-only fallback (zdiff3-truncated regions)', () => {
     expect(result.text).toContain('Extra,');
   });
 
+  it('REFUSES when the other side has a trailing added binding ours lacks (theirs longer)', () => {
+    // Mirror of the previous case, constructed so it actually exercises the length guard rather
+    // than an incidental same-index mismatch: every overlapping line matches after normalizing,
+    // and the extra line is APPENDED at the end of theirs. `resolveSpecifierOnlyRegion` compares
+    // via `normalizedOurs.every(...)`, which is bounded by ours's own (shorter) length — without
+    // the explicit `ours.length !== theirs.length` guard, `.every` would never even look at
+    // theirs' trailing extra line, and this region would falsely resolve, silently dropping the
+    // `Extra` import theirs added.
+    const source = conflict(
+      "} from 'src/foo';\nimport { X } from 'src/bar';",
+      "} from 'src/foo.js';\nimport { X } from 'src/bar.js';\nimport { Extra } from 'src/baz.js';",
+    );
+    const result = resolveConflictedSource(source);
+    expect(result.resolved).toBe(0);
+    expect(result.refused).toBe(1);
+    expect(result.text).toContain('<<<<<<<');
+    expect(result.text).toContain('Extra');
+  });
+
   it('REFUSES when the sides differ in a non-specifier way on the same line', () => {
     const source = conflict(
       "} from 'src/foo';\nimport { A as B } from 'src/bar';",
@@ -207,5 +226,53 @@ describe('specifier-only fallback (zdiff3-truncated regions)', () => {
   it('normalizeLineSpecifiers leaves a bare package specifier unchanged', () => {
     expect(normalizeLineSpecifiers("import x from 'kysely';")).toBe("import x from 'kysely';");
     expect(normalizeLineSpecifiers("} from 'kysely';")).toBe("} from 'kysely';");
+  });
+});
+
+describe('parseStatement refuses statements squished onto one physical line', () => {
+  it('refuses two full import statements matched as one (the reviewer-found case)', () => {
+    expect(
+      parseStatement("import { A } from 'src/m'; import { Lost } from 'src/m';"),
+    ).toBeNull();
+  });
+
+  it('resolveConflictedSource refuses a region built from the squished-statement case', () => {
+    const source = conflict(
+      "import { A } from 'src/m'; import { Lost } from 'src/m';",
+      "import { A } from 'src/m.js';",
+    );
+    const result = resolveConflictedSource(source);
+    expect(result.resolved).toBe(0);
+    expect(result.refused).toBe(1);
+    expect(result.text).toContain('<<<<<<<');
+    expect(result.text).not.toContain(
+      "import { A } from 'src/m'; import { Lost, A } from 'src/m.js';",
+    );
+  });
+
+  it('refuses an illegal named specifier that does not start with a letter', () => {
+    expect(parseStatement("import { A, 3bad } from 'src/m';")).toBeNull();
+  });
+
+  it('still parses every legal form (does not over-reject)', () => {
+    expect(parseStatement("import type { A } from 'src/m';")).toMatchObject({
+      typeOnly: true,
+      named: ['A'],
+    });
+    expect(parseStatement("import { type A, B as C } from 'src/m';")).toMatchObject({
+      named: ['type A', 'B as C'],
+    });
+    expect(parseStatement("import { default as D } from 'src/m';")).toMatchObject({
+      named: ['default as D'],
+    });
+    expect(parseStatement("import X, { Y } from 'src/m';")).toMatchObject({
+      defaultName: 'X',
+      named: ['Y'],
+    });
+    expect(parseStatement("import * as ns from 'node:fs';")).toMatchObject({ namespaceName: 'ns' });
+    expect(parseStatement("import 'reflect-metadata';")).toMatchObject({ sideEffectOnly: true });
+    expect(parseStatement("import {\n  A,\n  B,\n} from 'src/m';")).toMatchObject({
+      named: ['A', 'B'],
+    });
   });
 });
