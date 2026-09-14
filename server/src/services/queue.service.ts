@@ -309,6 +309,7 @@ export class QueueService extends BaseService {
         { name: JobName.MemoryCleanup },
         { name: JobName.SessionCleanup },
         { name: JobName.HlsSessionCleanup },
+        { name: JobName.UploadSessionCleanup },
         { name: JobName.AuditTableCleanup },
         // L8: low-frequency backstop for the album-grant reconcile mechanism — sweeps every
         // album with a live grant, independent of which code path created/removed it. Grouped

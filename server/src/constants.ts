@@ -27,6 +27,21 @@ export const VECTOR_VERSION_RANGE = '>=0.5 <1';
 export const JOBS_ASSET_PAGINATION_SIZE = 1000;
 export const JOBS_LIBRARY_PAGINATION_SIZE = 10_000;
 
+/** How long an idle chunked-upload session survives before the Slice 2 sweeper reclaims it. */
+/**
+ * Chunk size advertised to clients for resumable upload, and the threshold above which they
+ * switch protocols. 32 MiB sits comfortably under Cloudflare's 100 MB request cap while keeping
+ * a 4 GB video at ~128 chunks rather than thousands. Advice only — the server itself enforces no
+ * chunk size (spec 5.4), which is what lets an in-flight upload survive a deploy that changes it.
+ */
+export const UPLOAD_CHUNK_SIZE = 33_554_432;
+
+export const UPLOAD_SESSION_TTL_MS = 86_400_000; // 24h
+/** Per-user cap on simultaneously open chunked-upload sessions (spec §5.6). */
+export const UPLOAD_SESSION_MAX_OPEN = 32;
+/** XMP sidecars are small text files; anything larger is rejected at create (spec §8 row 8). */
+export const UPLOAD_SESSION_SIDECAR_MAX_BYTES = 1_048_576;
+
 export const PET_RECOGNITION_MODEL_NAMES = [
   'pet-recognition-small',
   'pet-recognition-base',

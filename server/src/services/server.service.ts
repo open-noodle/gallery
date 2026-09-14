@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { serverVersion } from 'src/constants';
+import { serverVersion, UPLOAD_CHUNK_SIZE } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { OnEvent } from 'src/decorators';
 import { LicenseKeyDto, LicenseResponseDto } from 'src/dtos/license.dto';
@@ -175,6 +175,7 @@ export class ServerService extends BaseService {
       mapLightStyleUrl: config.map.lightStyle,
       maintenanceMode: false,
       minFaces: config.machineLearning.facialRecognition.minFaces,
+      uploadChunkSize: UPLOAD_CHUNK_SIZE,
       availableMemoryTypes: MEMORY_TYPE_KEYS.filter((key) => getAdminAvailableMemoryTypeKeys(config.memories).has(key)),
     };
   }
