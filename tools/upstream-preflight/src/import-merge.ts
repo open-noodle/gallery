@@ -16,6 +16,8 @@ const STATEMENT_START = /^(import|export)\b/;
 const FROM_FORM =
   /^(?<kind>import|export)\s+(?<body>[\s\S]*?)\s*from\s*['"](?<module>[^'"]+)['"]\s*;?$/;
 const BARE_FORM = /^import\s*['"](?<module>[^'"]+)['"]\s*;?$/;
+/** A legal `{ … }` binding: optional `type`, an identifier or `default`, optional `as <ident>`. */
+const NAMED_SPECIFIER = /^(?:type\s+)?(?:[A-Za-z_$][\w$]*|default)(?:\s+as\s+[A-Za-z_$][\w$]*)?$/;
 
 export function normalizeModule(module: string): string {
   if (!ALIAS_OR_RELATIVE.test(module)) return module;
@@ -68,6 +70,11 @@ export function parseStatement(text: string): ParsedStatement | null {
   const kind = match.groups.kind as ImportKind;
   const module = match.groups.module;
   let body = match.groups.body.trim();
+  // A single import's body can never contain a statement terminator. If it does, the lazy
+  // FROM_FORM regex backtracked past an embedded `;` to find a later `from '...'` — i.e. two (or
+  // more) statements were squished onto one physical line and matched as one. Refuse rather than
+  // silently absorb the extra statement's tail into this one's specifier list.
+  if (body.includes(';')) return null;
   let typeOnly = false;
   if (/^type\b/.test(body)) {
     typeOnly = true;
@@ -96,7 +103,9 @@ export function parseStatement(text: string): ParsedStatement | null {
     if (braceEnd < braceStart) return null;
     for (const piece of body.slice(braceStart + 1, braceEnd).split(',')) {
       const specifier = piece.trim().replace(/\s+/g, ' ');
-      if (specifier.length > 0) named.push(specifier);
+      if (specifier.length === 0) continue;
+      if (!NAMED_SPECIFIER.test(specifier)) return null;
+      named.push(specifier);
     }
   }
 
