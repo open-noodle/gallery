@@ -5072,6 +5072,55 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/favorites": {
+      "put": {
+        "description": "Favorites are per-user. Requires only read access to the assets; a space viewer may favorite an asset they do not own. Never affects any other user.",
+        "operationId": "updateAssetFavorites",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetFavoriteUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Set favorite state for the requesting user",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/jobs": {
       "post": {
         "description": "Run a specific job on a set of assets.",
@@ -28002,7 +28051,7 @@
             "type": "array"
           },
           "isFavorite": {
-            "description": "Mark as favorite",
+            "description": "Mark as favorite. Deprecated: use PUT /assets/favorites instead (favorites are per-user).",
             "type": "boolean"
           },
           "latitude": {
@@ -28467,6 +28516,30 @@
         "required": [
           "assetId",
           "personId"
+        ],
+        "type": "object"
+      },
+      "AssetFavoriteUpdateDto": {
+        "properties": {
+          "ids": {
+            "description": "Asset IDs",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          },
+          "isFavorite": {
+            "description": "Favorite state for the requesting user",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ids",
+          "isFavorite"
         ],
         "type": "object"
       },
@@ -41893,6 +41966,34 @@
         ],
         "type": "object"
       },
+      "SyncAssetFavoriteDeleteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "SyncAssetFavoriteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
       "SyncAssetMetadataDeleteV1": {
         "properties": {
           "assetId": {
@@ -42446,6 +42547,8 @@
           "AssetMetadataDeleteV1",
           "AssetOcrV1",
           "AssetOcrDeleteV1",
+          "AssetFavoriteV1",
+          "AssetFavoriteDeleteV1",
           "PartnerV1",
           "PartnerDeleteV1",
           "PartnerAssetV1",
@@ -42904,6 +43007,7 @@
           "AssetEditsV1",
           "AssetMetadataV1",
           "AssetOcrV1",
+          "AssetFavoritesV1",
           "AuthUsersV1",
           "MemoriesV1",
           "MemoryToAssetsV1",
@@ -44202,7 +44306,7 @@
             "type": "string"
           },
           "isFavorite": {
-            "description": "Mark as favorite",
+            "description": "Mark as favorite. Deprecated: use PUT /assets/favorites instead (favorites are per-user).",
             "type": "boolean"
           },
           "latitude": {

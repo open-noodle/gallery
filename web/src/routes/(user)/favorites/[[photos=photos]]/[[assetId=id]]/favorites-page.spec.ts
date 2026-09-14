@@ -151,6 +151,51 @@ describe('Favorites page timeline grouping', () => {
     expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"day"');
   });
 
+  // #763: a favorite is a per-user `asset_favorite` row, so this page must be cross-scope like the
+  // Photos timeline's favorites chip (buildPhotosTimelineOptions). The server only resolves
+  // `timelineSpaceIds` when the request carries `withSharedSpaces`; without it, the timeline query
+  // falls back to a hard `asset.ownerId = caller` filter, so a favorite the caller placed on another
+  // member's Space asset — which the overlay explicitly permits, and which the heart reports as
+  // favorited — is silently unreachable here and the page renders its empty placeholder.
+  //
+  // The break this catches: dropping either flag from `baseTimelineOptions`. That regression shipped
+  // once already (fixed in abbbde288e8, reverted by fd0c6b38aa1 along with this coverage), and the
+  // API-level e2e cannot catch it because its helper hardcodes `withSharedSpaces=true` — the very
+  // flag the page omitted. Asserted on the serialised options because the timeline is stubbed here.
+  it('requests favorites across shared spaces and partners, not just owned assets', async () => {
+    renderPage();
+
+    const options = await screen.findByTestId('timeline-options');
+    expect(options).toHaveTextContent('"withSharedSpaces":true');
+    expect(options).toHaveTextContent('"withPartners":true');
+  });
+
+  // The cross-scope flags are only half the contract: timeline.service.ts rejects both of them with
+  // a 400 unless `visibility` is set, because an undefined visibility resolves to Archive+Timeline
+  // and would expose other users' archived assets. Sending the flags without it makes every request
+  // on this page fail — the page renders empty either way, so only this assertion separates "asks
+  // for the right scope" from "asks for a scope the server will refuse".
+  it('pins the visibility the cross-scope flags require, so the request is not rejected', async () => {
+    renderPage();
+
+    expect(await screen.findByTestId('timeline-options')).toHaveTextContent('"visibility":"timeline"');
+  });
+
+  // Guards the composition rather than the constant: `options` is $derived by spreading
+  // baseTimelineOptions, so a refactor that rebuilds it per grouping could drop the flags on every
+  // surface except the initial render. Activating a year bucket regroups to month.
+  it('keeps the cross-scope flags after a bucket change regroups the timeline', async () => {
+    renderPage();
+
+    await fireEvent.click(await screen.findByTestId('activate-year-bucket'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"grouping":"month"');
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withSharedSpaces":true');
+      expect(screen.getByTestId('timeline-options')).toHaveTextContent('"withPartners":true');
+    });
+  });
+
   it('year and month buckets keep favorite options without temporal chips', async () => {
     renderPage();
 

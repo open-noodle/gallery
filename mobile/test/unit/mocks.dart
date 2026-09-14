@@ -182,6 +182,7 @@ class ServiceMocks {
   void _stubAssetService() {
     when(asset.getAsset).thenAnswer((_) async => null);
     when(asset.update).thenAnswer((_) async {});
+    when(asset.updateFavorite).thenAnswer((_) async {});
     when(asset.stack).thenAnswer((_) async {});
     when(asset.unstack).thenAnswer((_) async {});
     when(asset.restoreTrash).thenAnswer((_) async {});
@@ -357,6 +358,12 @@ extension type const AssetServiceStub(MockAssetService service) implements Stub<
         dateTime: any(named: 'dateTime'),
         location: any(named: 'location'),
       );
+
+  // gallery-fork (#763): favorites are a per-user overlay written through their own endpoint,
+  // so the action calls updateFavorite rather than update. Without a descriptor here it has no
+  // default answer and every awaited call returns null.
+  Future<void> Function() get updateFavorite =>
+      () => service.updateFavorite(any(), any());
 
   Future<void> Function() get stack =>
       () => service.stack(any(), any());

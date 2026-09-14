@@ -49,6 +49,7 @@ import {
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AudioStreamInfo, VectorExtension, VideoFormat, VideoPacketInfo, VideoStreamInfo } from 'src/types';
+import { favoriteExistsFor } from 'src/utils/favorite';
 import { fromChecksum } from 'src/utils/request';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket';
@@ -1028,7 +1029,13 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
       )
       .$if(!!options.type, (qb) => qb.where('asset.type', '=', options.type!))
-      .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+      .$if(options.isFavorite !== undefined, (qb) =>
+        qb.where((eb) =>
+          options.isFavorite
+            ? favoriteExistsFor(eb, options.authUserId!)
+            : eb.not(favoriteExistsFor(eb, options.authUserId!)),
+        ),
+      )
       .$if(options.isOffline !== undefined, (qb) => qb.where('asset.isOffline', '=', options.isOffline!))
       .$if(options.isEncoded !== undefined, (qb) =>
         qb.where((eb) => {
@@ -1247,14 +1254,21 @@ function existsPredicates(
 
 // predicates are collected as expressions rather than chained `where` calls so the same
 // helpers can build each `or` branch, which must compose into eb.and/eb.or
-function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch) {
+function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch, authUserId?: string) {
   const { encodedVideoPath } = branch;
   return [
     ...comparisonPredicates(eb, 'asset.id', branch.id),
     ...comparisonPredicates(eb, 'asset.libraryId', branch.libraryId),
     ...comparisonPredicates(eb, 'asset.type', branch.type),
     ...comparisonPredicates(eb, 'asset.visibility', branch.visibility),
-    ...(branch.isFavorite ? [eb('asset.isFavorite', '=', branch.isFavorite.eq)] : []),
+    // #763: favorites are a per-user overlay (asset_favorite) — the raw `asset.isFavorite` column
+    // this used to compare against was dropped in slice 3. Resolved for the CALLER, mirroring
+    // searchAssetBuilderLegacy's isFavorite arm above. V3 is dormant in the fork (see the
+    // coexistence spec), so `authUserId` has no live caller yet; whoever wires V3 to an endpoint
+    // must thread it, exactly as the legacy path already does.
+    ...(branch.isFavorite
+      ? [branch.isFavorite.eq ? favoriteExistsFor(eb, authUserId!) : eb.not(favoriteExistsFor(eb, authUserId!))]
+      : []),
     ...(branch.isOffline ? [eb('asset.isOffline', '=', branch.isOffline.eq)] : []),
     ...(branch.isMotion ? [eb('asset.livePhotoVideoId', branch.isMotion.eq ? 'is not' : 'is', null)] : []),
     ...existsPredicates(eb, branch.isEncoded, () => encodedVideoFiles(eb)),
@@ -1338,13 +1352,13 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       )
       .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
       .where((eb) => {
-        const predicates = branchPredicates(eb, filter);
+        const predicates = branchPredicates(eb, filter, options.authUserId);
         if (branches.length > 0) {
           predicates.push(
             eb.or(
               branches.map((branch) =>
                 eb.and([
-                  ...branchPredicates(eb, branch),
+                  ...branchPredicates(eb, branch, options.authUserId),
                   ...(scopePerBranch && !isAlbumConfined(branch) ? [ownershipPredicate(eb)] : []),
                 ]),
               ),
@@ -1531,6 +1545,7 @@ export const searchMetadataV3Examples: GenerateSqlQueries[] = [
     params: [
       { take: 100 },
       {
+        authUserId: DummyValue.UUID,
         filter: {
           or: [{ isFavorite: { eq: true } }, { personIds: { any: [DummyValue.UUID] } }],
         },
@@ -1543,6 +1558,7 @@ export const searchMetadataV3Examples: GenerateSqlQueries[] = [
     params: [
       { take: 100 },
       {
+        authUserId: DummyValue.UUID,
         filter: {
           takenAt: { gte: DummyValue.DATE, lt: DummyValue.DATE },
           or: [{ isFavorite: { eq: true } }, { albumIds: { any: [DummyValue.UUID] } }],
@@ -1553,7 +1569,14 @@ export const searchMetadataV3Examples: GenerateSqlQueries[] = [
   },
   {
     name: 'cursor-offset',
-    params: [{ take: 100, skip: 100 }, { filter: { isFavorite: { eq: true } } }, scopeExample],
+    // #763: `authUserId` is required by any example whose filter uses `isFavorite` -- the predicate
+    // resolves against the per-user `asset_favorite` overlay, so omitting it binds `undefined` and
+    // sync-sql logs `UNDEFINED_VALUE` instead of failing, which is easy to miss.
+    params: [
+      { take: 100, skip: 100 },
+      { authUserId: DummyValue.UUID, filter: { isFavorite: { eq: true } } },
+      scopeExample,
+    ],
   },
 ];
 
@@ -1561,7 +1584,7 @@ export const searchRandomV3Examples: GenerateSqlQueries[] = [
   { name: 'baseline', params: [100, {}, scopeExample] },
   {
     name: 'with-filter',
-    params: [100, { filter: { isFavorite: { eq: true } } }, scopeExample],
+    params: [100, { authUserId: DummyValue.UUID, filter: { isFavorite: { eq: true } } }, scopeExample],
   },
 ];
 
@@ -1605,6 +1628,7 @@ export const searchStatisticsV3Examples: GenerateSqlQueries[] = [
     name: 'with-or',
     params: [
       {
+        authUserId: DummyValue.UUID,
         filter: {
           or: [{ isFavorite: { eq: true } }, { hasAlbums: { eq: false } }],
         },

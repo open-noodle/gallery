@@ -424,9 +424,9 @@
             onclick={handleSelectAll}
           />
           <ActionButton action={Actions.AddToAlbum} />
-          {#if assetMultiSelectManager.isAllUserOwned}
-            <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} {onFavorite} />
+          <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} {onFavorite} />
 
+          {#if assetMultiSelectManager.isAllUserOwned}
             <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
               <ActionMenuItem action={Actions.AddToAlbum} />
               <DownloadAction menuItem />
