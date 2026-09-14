@@ -33,7 +33,7 @@ The reason this cycle is not routine is the third of its 32 pending commits.
 import-suffix sweep; it is a stack of coupled majors:
 
 - `"type": "module"`, `module`/`moduleResolution` → `nodenext`, `isolatedModules: true`
-- NestJS 11 → 12 (all eight `@nestjs/*` packages)
+- NestJS 11 → 12 (eleven `@nestjs/*` packages: eight runtime, plus `cli`, `schematics`, `testing`)
 - **Vitest 3 → 4**
 - **Kysely 0.28.17 → ^0.29.5**
 - `lodash` → `lodash-es`
@@ -59,9 +59,16 @@ disabled) produced the real inventory rather than estimates:
 | Fork commits that modify import lines in ESM-touched files | **147** |
 
 The semantic work is concentrated: `person.service.ts` (8 regions), its two spec files (6),
-`utils/config.ts` (3), `packages/sdk/fetch-client.ts` (3), `asset.service.ts` (2), `utils/file.ts`
-(2), then a tail of single-region files. The 18 mobile conflicts come from the cloud-ids, static-Store
-and DataController commits, not from ESM.
+`utils/config.ts` (3), `packages/sdk/src/fetch-client.ts` (3), `asset.service.ts` (2),
+`utils/file.ts` (2), then a tail of single-region files.
+
+None of the 18 mobile conflicts come from ESM — that commit touches only `server/`, `e2e/`,
+`packages/` and the lockfile. They are dominated by **immich-31099 (static `Store`), which accounts
+for 11 of the 18** and lands squarely on the fork's mobile people surface: `people.service.dart`,
+`people_collection.page.dart`, `people_details.widget.dart`, `people.provider.dart`,
+`people_picker.dart` and both person-edit modals. The remainder are immich-30345 (cloud ids, 3),
+immich-31457 (DataController, 2), and one each from immich-31541, immich-31428, immich-31277 and
+immich-31441.
 
 The tension the design resolves: a **merge** reaches this end state in one pass, but the rolling flow
 needs a **rebase**, which replays 1493 fork commits — 147 of which would conflict individually on
@@ -143,13 +150,33 @@ design rests on. Both fixes must be applied by hand: the `import:` hook inside
 `CompositeMigrationProvider`'s `FileMigrationProvider` construction, and `import.meta.dirname` at the
 call site.
 
+**Neither fix can be staged ahead of batch B.** The `import` prop is new in Kysely 0.29 — verified
+against the installed 0.28.17 typings, whose `FileMigrationProviderProps` declares only `fs`, `path`
+and `migrationFolder`. It does not type-check until the bump lands, which is precisely why upstream
+ships the Kysely bump inside the ESM commit.
+
 ### The rest of the fork-side set
 
+The same shape repeats wherever the fork extended upstream's migration-path handling to cover
+`migrations-gallery`, because each extension duplicated a `__dirname` that upstream is now converting:
+
+- `cli.service.ts:26` — the fork widened upstream's single-folder read into
+  `[join(__dirname, '../schema/migrations'), join(__dirname, '../schema/migrations-gallery')]`, so it
+  carries **two** `__dirname` uses where upstream's converted line has one
+- `config.repository.ts:175` (helmet path) — adopt upstream's `import.meta.dirname` form, preserving
+  the fork delta in that file
 - `server/src/schema/revert-to-immich.spec.ts` (fork-only) — `__dirname` → `import.meta.dirname`
-- `config.repository.ts` (helmet path), `cli.service.ts` (schema report) — adopt upstream's form while
-  preserving the fork deltas in those files
+- `server/src/schema/sync-gallery-migrations.spec.ts` (fork-only) — the one fork-only file using
+  `module.exports`; must move to ESM export form
+
+The bulk conversion:
+
 - **293 fork-only server files** — codemod `.js` suffixes and `type` qualifiers. Verified tractable:
-  zero relative imports, zero `lodash`, zero `require`/`__dirname`/`module.exports` among them
+  zero relative imports, zero `lodash`, zero `require(`. The only CJS globals among them are the two
+  files named directly above
+- **102 fork-only e2e files** — the ESM commit applies the identical `.js`-suffix treatment to `e2e/`
+  (63 files), so fork-only e2e specs need the same codemod. This is the surface `cd e2e && pnpm check`
+  gates
 - **Build pipeline** — build becomes `nest build && tsc-alias`, then the fork's
   `postbuild: node bin/sync-gallery-migrations.mjs`. Assert that the hook still fires after
   `tsc-alias`, that gallery migrations copied into `dist/schema/migrations` are alias-rewritten, and
@@ -203,8 +230,9 @@ container registry rate limit.
 - Landing on `main`. That is governed by the standing rule and is not part of this design.
 - Migrating web or mobile clients onto the new `POST /people/merge` route.
 - Reversing the cluster-groups decision.
-- Propagating ESM style to anything outside `server/` and `packages/` — web, mobile and ML are
-  unaffected by immich-31237.
+- Propagating ESM style to `web/`, `mobile/` or `machine-learning/` — immich-31237 touches only
+  `server/`, `e2e/`, `packages/` and the lockfile, so those three are unaffected. (`e2e/` **is** in
+  scope; see Section 3.)
 
 ## Artifacts
 
