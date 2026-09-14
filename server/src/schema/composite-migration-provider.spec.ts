@@ -1,16 +1,16 @@
-import { Migration } from 'kysely';
+import { Migration } from 'kysely/migration';
 import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider';
 
 // Mock FileMigrationProvider to avoid filesystem access
-vi.mock('kysely', async () => {
-  const actual = await vi.importActual('kysely');
+vi.mock('kysely/migration', async () => {
+  const actual = await vi.importActual('kysely/migration');
   return {
     ...actual,
     FileMigrationProvider: vi.fn(),
   };
 });
 
-import { FileMigrationProvider } from 'kysely';
+import { FileMigrationProvider } from 'kysely/migration';
 
 const mockMigration = (_name: string): Migration => ({
   up: vi.fn().mockResolvedValue(void 0),
@@ -22,7 +22,7 @@ const setupMockProviders = (folders: Record<string, Record<string, Migration>>) 
   MockFMP.mockReset();
   const folderList = Object.keys(folders);
   let callIndex = 0;
-  MockFMP.mockImplementation(() => {
+  MockFMP.mockImplementation(function () {
     const folder = folderList[callIndex++];
     return {
       getMigrations: vi.fn().mockResolvedValue(folders[folder] ?? {}),
@@ -147,7 +147,7 @@ describe('CompositeMigrationProvider', () => {
   // Test 8 (design #14): Folder doesn't exist — propagates error
   it('should propagate error when a folder does not exist', async () => {
     const MockFMP = vi.mocked(FileMigrationProvider);
-    MockFMP.mockImplementation(() => {
+    MockFMP.mockImplementation(function () {
       return {
         getMigrations: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory')),
       } as any;
@@ -161,7 +161,7 @@ describe('CompositeMigrationProvider', () => {
   it('should propagate provider errors from individual folders', async () => {
     const MockFMP = vi.mocked(FileMigrationProvider);
     let callIndex = 0;
-    MockFMP.mockImplementation(() => {
+    MockFMP.mockImplementation(function () {
       callIndex++;
       if (callIndex === 1) {
         return {
