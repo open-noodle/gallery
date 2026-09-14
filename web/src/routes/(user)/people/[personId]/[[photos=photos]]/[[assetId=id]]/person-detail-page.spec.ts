@@ -545,6 +545,44 @@ describe('Person detail page', () => {
     expect(screen.getByText('select_representative_face')).toBeInTheDocument();
   });
 
+  it('hides "Fix incorrect match" from the selection toolbar when the current user is a space viewer', async () => {
+    // The reassign endpoint is Editor-gated server-side, so offering this to a viewer only buys them
+    // a 403 (and, before the sibling fix, a danger toast plus an optimistically emptied grid).
+    mockAssetMultiSelectManager.selectionActive = true;
+    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    renderPage({
+      person: makePerson({
+        id: 'space-person-1',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'viewer-space-reassign-gate' },
+      }),
+    });
+
+    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-reassign-gate' }));
+    await waitFor(() => expect(screen.queryByText('fix_incorrect_match')).not.toBeInTheDocument());
+  });
+
+  it('keeps "Fix incorrect match" in the selection toolbar for space editors', async () => {
+    mockAssetMultiSelectManager.selectionActive = true;
+    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    renderPage({
+      person: makePerson({
+        id: 'space-person-1',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'editor-space-reassign-gate' },
+      }),
+    });
+
+    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'editor-space-reassign-gate' }));
+    expect(screen.getByText('fix_incorrect_match')).toBeInTheDocument();
+  });
+
+  it('keeps "Fix incorrect match" for a personal person (no space membership involved)', () => {
+    mockAssetMultiSelectManager.selectionActive = true;
+    renderPage();
+
+    expect(screen.getByText('fix_incorrect_match')).toBeInTheDocument();
+    expect(sdkMock.getMembers).not.toHaveBeenCalled();
+  });
+
   it('opens the representative face picker from the person menu', async () => {
     renderPage();
 
