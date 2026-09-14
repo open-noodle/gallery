@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   mergeStatements,
+  normalizeLineSpecifiers,
   normalizeModule,
   parseStatement,
   resolveConflictedSource,
@@ -152,5 +153,59 @@ describe('resolveConflictedSource', () => {
     expect(result.text).toContain("import { app, utils } from 'src/utils.js';");
     // the shared tail zdiff3 left outside the region is untouched
     expect(result.text).toContain("import request from 'supertest';");
+  });
+});
+
+describe('specifier-only fallback (zdiff3-truncated regions)', () => {
+  it('resolves a truncated import tail that differs only by the .js suffix', () => {
+    // The real shape found in the spike tree: zdiff3 hoisted the identical opening lines of a
+    // multi-line named import out of the region, leaving only the closing `} from '...';` line,
+    // which the structured path refuses because it does not start on a statement boundary.
+    const source = conflict("} from 'src/dtos/foo.dto';", "} from 'src/dtos/foo.dto.js';");
+    const result = resolveConflictedSource(source);
+    expect(result.refused).toBe(0);
+    expect(result.resolved).toBe(1);
+    expect(result.text).toContain("} from 'src/dtos/foo.dto.js';");
+    expect(result.text).not.toContain('<<<<<<<');
+  });
+
+  it('resolves a multi-line truncated region that differs only by specifier form', () => {
+    const source = conflict(
+      "} from 'src/foo';\nimport { X } from 'src/bar';",
+      "} from 'src/foo.js';\nimport { X } from 'src/bar.js';",
+    );
+    const result = resolveConflictedSource(source);
+    expect(result.refused).toBe(0);
+    expect(result.resolved).toBe(1);
+    expect(result.text).toContain("} from 'src/foo.js';");
+    expect(result.text).toContain("import { X } from 'src/bar.js';");
+  });
+
+  it('REFUSES when one side has an added binding the other lacks (line count differs)', () => {
+    const source = conflict(
+      "} from 'src/foo';\n  Extra,\nimport { X } from 'src/bar';",
+      "} from 'src/foo.js';\nimport { X } from 'src/bar.js';",
+    );
+    const result = resolveConflictedSource(source);
+    expect(result.resolved).toBe(0);
+    expect(result.refused).toBe(1);
+    expect(result.text).toContain('<<<<<<<');
+    expect(result.text).toContain('Extra,');
+  });
+
+  it('REFUSES when the sides differ in a non-specifier way on the same line', () => {
+    const source = conflict(
+      "} from 'src/foo';\nimport { A as B } from 'src/bar';",
+      "} from 'src/foo.js';\nimport { A as C } from 'src/bar.js';",
+    );
+    const result = resolveConflictedSource(source);
+    expect(result.resolved).toBe(0);
+    expect(result.refused).toBe(1);
+    expect(result.text).toContain('<<<<<<<');
+  });
+
+  it('normalizeLineSpecifiers leaves a bare package specifier unchanged', () => {
+    expect(normalizeLineSpecifiers("import x from 'kysely';")).toBe("import x from 'kysely';");
+    expect(normalizeLineSpecifiers("} from 'kysely';")).toBe("} from 'kysely';");
   });
 });
