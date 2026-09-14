@@ -37,6 +37,7 @@ class ApiService {
   late SessionsApi sessionsApi;
   late TagsApi tagsApi;
   late SharedSpacesApi sharedSpacesApi;
+  late GamesApi gamesApi;
   late TimelineApi timelineApi;
 
   ApiService() {
@@ -80,6 +81,7 @@ class ApiService {
     sessionsApi = SessionsApi(_apiClient);
     tagsApi = TagsApi(_apiClient);
     sharedSpacesApi = SharedSpacesApi(_apiClient);
+    gamesApi = GamesApi(_apiClient);
     timelineApi = TimelineApi(_apiClient);
   }
 

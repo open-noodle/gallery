@@ -45,6 +45,35 @@ const deleteBlockStart = sql.indexOf('DELETE FROM "kysely_migrations"');
 const deleteBlockEnd = sql.indexOf(');', deleteBlockStart) + 2;
 const deleteBlock = sql.slice(deleteBlockStart, deleteBlockEnd);
 
+// Every migration_overrides row migrations-gallery INSERTs. That table is sql-tools' schema-diff
+// registry: a fork row left behind makes a later upstream `migrations:generate` diff against an
+// index that no longer exists. Derived from the migrations rather than from the script's own
+// DELETE list, for the same reason the table set above is — deriving the expectation from the
+// thing under test can only ever confirm it agrees with itself.
+const insertedOverrides = new Set<string>();
+for (const file of migrationFiles) {
+  const content = readFileSync(join(migrationsGalleryDir, file), 'utf8');
+  for (const m of content.matchAll(/INSERT INTO "migration_overrides" \("name", "value"\) VALUES \('([^']+)'/g)) {
+    insertedOverrides.add(m[1]);
+  }
+}
+
+// Every `DELETE FROM "migration_overrides" ...;` statement in the script, concatenated. Not just
+// the step-6 IN-list: a couple of overrides are cleaned up next to the schema change that owns
+// them (step 7's trigram index), and those count.
+//
+// Line comments are stripped first. A `;` inside a `--` comment is not a statement terminator, but
+// the non-greedy match below cannot tell the difference: the renumber note sitting in the middle of
+// the step-6 IN-list contains one, and matching against the raw text truncates that statement
+// two thirds of the way through, reporting 46 names as uncovered that are listed right there.
+const sqlStatementsOnly = sql.replaceAll(/--[^\n]*/g, '');
+
+const overrideDeleteStatements = sqlStatementsOnly
+  .matchAll(/DELETE FROM "migration_overrides"[\S\s]*?;/g)
+  .map((m) => m[0])
+  .toArray()
+  .join('\n');
+
 describe('revert-to-immich.sql', () => {
   it('drops every fork table with CASCADE', () => {
     const missing = forkTables.filter((t) => !sql.includes(`DROP TABLE IF EXISTS "${t}" CASCADE`));
@@ -58,6 +87,11 @@ describe('revert-to-immich.sql', () => {
 
   it('lists every migrations-gallery migration in the step-8 kysely_migrations DELETE block', () => {
     const missing = migrationNames.filter((name) => !deleteBlock.includes(`'${name}'`));
+    expect(missing).toEqual([]);
+  });
+
+  it('deletes every migration_overrides row migrations-gallery inserts', () => {
+    const missing = [...insertedOverrides].filter((name) => !overrideDeleteStatements.includes(`'${name}'`)).sort();
     expect(missing).toEqual([]);
   });
 });

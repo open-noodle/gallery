@@ -94,6 +94,19 @@ describe('SpaceTabs', () => {
     expect(screen.getAllByTestId('space-tab-activity')).toHaveLength(2);
   });
 
+  it('renders a Games tab linking to the games route', () => {
+    render(SpaceTabs, base);
+    const games = screen.getByTestId('space-tab-games');
+    expect(games).toHaveAttribute('href', '/spaces/s1/games');
+  });
+
+  it('marks the Games tab active on the games route', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/games');
+    render(SpaceTabs, base);
+    expect(screen.getByTestId('space-tab-games')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('space-tab-activity')).not.toHaveAttribute('aria-current');
+  });
+
   it('hides the Libraries tab for a non-admin', () => {
     render(SpaceTabs, { ...base, isAdmin: false });
     expect(screen.queryByTestId('space-tab-libraries')).not.toBeInTheDocument();
