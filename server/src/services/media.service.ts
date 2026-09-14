@@ -3,6 +3,7 @@ import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants';
 import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core';
 import { AssetFile } from 'src/database';
@@ -76,11 +77,21 @@ export class MediaService extends BaseService {
   }
 
   /**
-   * After generating a file locally, uploads it to S3 if the write backend is S3.
+   * After generating a file locally, uploads it to the backend this kind routes to.
    * Returns the key to store in the DB.
+   *
+   * The backend is resolved ONCE here and both branches read that single value. Resolving
+   * twice would let a concurrent config save produce an upload with no unlink (orphaned
+   * local file) or an unlink with no upload (data loss).
    */
-  private async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
-    const writeBackend = StorageService.getWriteBackend();
+  private async persistFile(
+    localPath: string,
+    relativeKey: string,
+    kind: StorageRoutingKind,
+    contentType?: string,
+  ): Promise<string> {
+    const config = await this.getConfig({ withCache: true });
+    const writeBackend = StorageService.getWriteBackend(kind, config);
     if (!writeBackend || writeBackend instanceof DiskStorageBackend) {
       // Disk mode: the file was already written to the final path
       return localPath;
@@ -107,7 +118,12 @@ export class MediaService extends BaseService {
         format: file.path.split('.').pop() as ImageFormat,
         isEdited: file.isEdited,
       });
-      file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
+      file.path = await this.persistFile(
+        file.path,
+        relativeKey,
+        StorageRoutingKind.Thumbnails,
+        mimeTypes.lookup(file.path),
+      );
     }
   }
 
@@ -365,6 +381,7 @@ export class MediaService extends BaseService {
       const editedVideoPath = await this.persistFile(
         outputPath,
         StorageCore.getRelativeEditedEncodedVideoPath(asset),
+        StorageRoutingKind.EncodedVideo,
         'video/mp4',
       );
 
@@ -693,7 +710,7 @@ export class MediaService extends BaseService {
 
       // Persist person thumbnail to S3 if needed
       const relativeKey = StorageCore.getRelativePersonThumbnailPath({ ownerId, personGroupId });
-      const finalPath = await this.persistFile(thumbnailPath, relativeKey, 'image/jpeg');
+      const finalPath = await this.persistFile(thumbnailPath, relativeKey, StorageRoutingKind.Thumbnails, 'image/jpeg');
 
       await this.personRepository.update({ ownerId, personGroupId, thumbnailPath: finalPath });
 
@@ -887,7 +904,7 @@ export class MediaService extends BaseService {
 
       // Persist encoded video to S3 if needed
       const relativeKey = StorageCore.getRelativeEncodedVideoPath(asset);
-      const finalPath = await this.persistFile(output, relativeKey, 'video/mp4');
+      const finalPath = await this.persistFile(output, relativeKey, StorageRoutingKind.EncodedVideo, 'video/mp4');
 
       await this.assetRepository.upsertFile({
         assetId: asset.id,

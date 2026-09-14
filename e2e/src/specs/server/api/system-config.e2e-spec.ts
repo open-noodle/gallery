@@ -87,6 +87,10 @@ describe('/system-config', () => {
       // Defaults always have classification.enabled=true and categories=[] —
       // see server/src/config.ts:417-420.
       expect(body.classification).toEqual({ enabled: true, categories: [] });
+      // Per-file-type storage routing defaults to `auto` everywhere, so behaviour matches
+      // IMMICH_STORAGE_BACKEND exactly and no existing install changes on upgrade —
+      // see server/src/config.ts:424-430.
+      expect(body.storage).toEqual({ routing: { originals: 'auto', thumbnails: 'auto', encodedVideo: 'auto' } });
       // Same top-level shape as the persisted config.
       const live = await getSystemConfig(admin.accessToken);
       expect(Object.keys(body).toSorted((a, b) => a.localeCompare(b))).toEqual(
