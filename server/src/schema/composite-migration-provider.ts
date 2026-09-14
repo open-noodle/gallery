@@ -1,4 +1,4 @@
-import { FileMigrationProvider, Migration, MigrationProvider } from 'kysely';
+import { FileMigrationProvider, Migration, MigrationProvider } from 'kysely/migration';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -11,6 +11,7 @@ export class CompositeMigrationProvider implements MigrationProvider {
         new FileMigrationProvider({
           fs: { readdir },
           path: { join },
+          import: (filePath) => import(filePath),
           migrationFolder: folder,
         }),
     );
