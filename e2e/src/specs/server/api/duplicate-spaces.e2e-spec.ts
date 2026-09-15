@@ -1,6 +1,6 @@
 import { AssetMediaResponseDto } from '@immich/sdk';
-import { buildSpaceContext, type SpaceContext } from 'src/actors';
-import { app, utils } from 'src/utils';
+import { buildSpaceContext, type SpaceContext } from 'src/actors.js';
+import { app, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

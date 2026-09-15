@@ -7,8 +7,8 @@ import {
   SharedSpaceRole,
 } from '@immich/sdk';
 import { expect, test, type Page } from '@playwright/test';
-import { createUserDto } from 'src/fixtures';
-import { utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { utils } from 'src/utils.js';
 
 // Web E2E: the space-albums navigation JOURNEY, asserted by CLICKING the real
 // nav chain (never page.goto to a deep URL), per role. Rows = Owner/Editor/

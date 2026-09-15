@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 // Hardening net for the tonal re-skin, running in CI (which checks out
 // test-assets and uses a deterministic renderer):

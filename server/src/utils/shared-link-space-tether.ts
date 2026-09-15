@@ -17,9 +17,9 @@
 // link to the creator's own assets rather than breaking it. Encoding this once here means the access
 // gate and the link payload can never drift apart and start disagreeing about what a link shows.
 import { Expression, ExpressionBuilder, SqlBool } from 'kysely';
-import { SharedSpaceRole } from 'src/enum';
-import { DB } from 'src/schema';
-import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
+import { SharedSpaceRole } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
 /**
  * The space roles that may publish a link covering other members' photos. Single source of truth for

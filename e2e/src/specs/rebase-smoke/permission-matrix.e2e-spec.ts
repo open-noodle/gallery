@@ -7,7 +7,7 @@ import {
 } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 test.describe('Rebase Smoke — UI Permission Matrix', () => {
   let admin: LoginResponseDto;

@@ -1,4 +1,4 @@
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 type QueryRecord = {
   table: string;

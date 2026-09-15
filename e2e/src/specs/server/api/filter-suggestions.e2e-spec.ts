@@ -2,7 +2,7 @@ import { AssetMediaResponseDto, LoginResponseDto, updateAsset } from '@immich/sd
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Socket } from 'socket.io-client';
-import { app, asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { app, asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

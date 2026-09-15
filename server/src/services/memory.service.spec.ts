@@ -346,7 +346,7 @@ describe(MemoryService.name, () => {
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
 
       const birthdayRule = { id: 'birthday', evaluate: vi.fn().mockResolvedValue([]) };
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([birthdayRule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([birthdayRule] as never);
 
       await sut.onMemoriesCreate();
 
@@ -404,7 +404,7 @@ describe(MemoryService.name, () => {
         ]),
       };
 
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([failingRule, scoringRule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([failingRule, scoringRule] as never);
 
       await sut.onMemoriesCreate();
 
@@ -458,7 +458,7 @@ describe(MemoryService.name, () => {
         ]),
       };
 
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([rule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([rule] as never);
 
       await sut.onMemoriesCreate();
 
@@ -502,7 +502,7 @@ describe(MemoryService.name, () => {
         ]),
       };
 
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([rule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([rule] as never);
 
       await sut.onMemoriesCreate();
 
@@ -550,7 +550,7 @@ describe(MemoryService.name, () => {
         ]),
       };
 
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([scoringRule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([scoringRule] as never);
 
       await sut.onMemoriesCreate();
 
@@ -609,7 +609,7 @@ describe(MemoryService.name, () => {
         ]),
       };
 
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([recentTripRule, birthdayRule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([recentTripRule, birthdayRule] as never);
 
       await sut.onMemoriesCreate();
 
@@ -644,7 +644,7 @@ describe(MemoryService.name, () => {
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
 
-      vi.spyOn(sut as never, 'createRuleMemories')
+      vi.spyOn(sut as any, 'createRuleMemories')
         .mockResolvedValueOnce(undefined as never)
         .mockRejectedValueOnce(new Error('boom'));
 
@@ -800,7 +800,7 @@ describe(MemoryService.name, () => {
           },
         ]),
       };
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([rule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([rule] as never);
 
       await sut.onMemoriesCreate();
       vi.useRealTimers();
@@ -861,7 +861,7 @@ describe(MemoryService.name, () => {
           },
         ]),
       };
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([recapRule, dailyRule] as never);
+      vi.spyOn(sut as any, 'getMemoryRules').mockReturnValue([recapRule, dailyRule] as never);
 
       await sut.onMemoriesCreate();
 
