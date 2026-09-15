@@ -51,7 +51,7 @@ describe('sendFile with ImmichMediaResponse', () => {
   let mockLogger: LoggingRepository;
 
   beforeEach(() => {
-    mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
+    mockLogger = { debug: vi.fn(), error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
   });
 
   it('should send redirect response with 302', async () => {
@@ -323,7 +323,7 @@ describe('sendFile with ImmichMediaResponse', () => {
     );
 
     expect(res.header).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
-    expect(res.set).toHaveBeenCalledWith('Cache-Control', expect.stringContaining('private'));
+    expect(res.header).toHaveBeenCalledWith('Cache-Control', expect.stringContaining('private'));
   });
 
   it('should send file response with fileName for ImmichFileResponse', async () => {
@@ -465,7 +465,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
     await sendFile(res, next, () => Promise.reject(error), mockLogger);
 
-    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Unable to send file'), error.stack);
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Unknown error'), error.stack);
     expect(next).toHaveBeenCalledWith(expect.any(HttpException));
   });
 
@@ -520,7 +520,7 @@ describe('S3 stream idle timeout', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
+    mockLogger = { debug: vi.fn(), error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
   });
 
   afterEach(() => {
@@ -624,7 +624,7 @@ describe('sendFile with a client that disconnects before the stream is ready', (
   let mockLogger: LoggingRepository;
 
   beforeEach(() => {
-    mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
+    mockLogger = { debug: vi.fn(), error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
   });
 
   // res.once('close', ...) can only catch a close that hasn't happened yet -- it can't fire

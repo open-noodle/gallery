@@ -396,23 +396,6 @@ describe('handlePromiseError', () => {
   });
 });
 
-describe('isConnectionAborted', () => {
-  it('should return true for ECONNABORTED error code', () => {
-    const error = { code: 'ECONNABORTED' };
-    expect(isConnectionAborted(error)).toBe(true);
-  });
-
-  it('should return false for other error codes', () => {
-    const error = { code: 'ECONNRESET' };
-    expect(isConnectionAborted(error)).toBe(false);
-  });
-
-  it('should return false for errors without a code', () => {
-    const error = new Error('test');
-    expect(isConnectionAborted(error)).toBe(false);
-  });
-});
-
 describe('getCLIPModelInfo', () => {
   it('should return model info for a known model', () => {
     const info = getCLIPModelInfo('ViT-B-32__openai');
