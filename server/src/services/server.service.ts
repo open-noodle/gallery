@@ -19,7 +19,7 @@ import { StorageFolder, SyncRequestType, SystemMetadataKey } from 'src/enum.js';
 import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { getAdminAvailableMemoryTypeKeys, MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata.js';
+import { MEMORY_TYPE_KEYS, getAdminAvailableMemoryTypeKeys } from 'src/services/memory-rules/memory-type.metadata.js';
 import { asHumanReadable } from 'src/utils/bytes.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import {

@@ -1,4 +1,5 @@
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
+import { Mocked, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetType, ImmichWorker, QueueName } from 'src/enum.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -7,7 +8,6 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository.js';
 import { AppMetricsService } from 'src/services/app-metrics.service.js';
 import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
-import { beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
 
 const observe = async (callback: ObservableCallback) => {
   const result = { observe: vi.fn() } as unknown as ObservableResult;

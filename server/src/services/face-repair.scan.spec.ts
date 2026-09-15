@@ -3,7 +3,7 @@ import { JobName } from 'src/enum.js';
 import { ScanInProgressError } from 'src/repositories/face-repair-scan.repository.js';
 import { EligibleFaceRow } from 'src/repositories/face-repair.repository.js';
 import { FaceRepairService, RepairPlan } from 'src/services/face-repair.service.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 /** A single eligible-face page for the progress test mock (keyset scan reads pages, not a cursor). */
 const singleFacePage = (): EligibleFaceRow[] => [

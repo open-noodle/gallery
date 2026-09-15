@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { Mocked } from 'vitest';
 import { AssetVisibility, JobName, JobStatus, QueueName, SharedSpaceRole, SourceType } from 'src/enum.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -17,7 +18,6 @@ import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory, newEmbedding } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 

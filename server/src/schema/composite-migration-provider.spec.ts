@@ -1,4 +1,4 @@
-import { Migration } from 'kysely/migration';
+import { FileMigrationProvider, Migration } from 'kysely/migration';
 import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider.js';
 
 // Mock FileMigrationProvider to avoid filesystem access
@@ -9,8 +9,6 @@ vi.mock('kysely/migration', async () => {
     FileMigrationProvider: vi.fn(),
   };
 });
-
-import { FileMigrationProvider } from 'kysely/migration';
 
 const mockMigration = (_name: string): Migration => ({
   up: vi.fn().mockResolvedValue(void 0),

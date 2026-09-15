@@ -16,7 +16,7 @@
  * this exact shape hid a real bug behind 139 green tests in this repo before.
  */
 
-import { expressionBuilder, Kysely } from 'kysely';
+import { Kysely, expressionBuilder } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
 import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum.js';

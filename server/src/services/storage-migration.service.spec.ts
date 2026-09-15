@@ -4,7 +4,7 @@ import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 describe(StorageMigrationService.name, () => {
   let sut: StorageMigrationService;

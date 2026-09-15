@@ -1,4 +1,5 @@
 import { Insertable, Kysely } from 'kysely';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -12,7 +13,6 @@ import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { beforeAll, describe, expect, it } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 

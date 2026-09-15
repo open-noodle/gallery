@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
 import { Auth, Authenticated } from 'src/middleware/auth.guard.js';

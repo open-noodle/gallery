@@ -1,7 +1,7 @@
 import { JobName } from 'src/enum.js';
 import { StorageUsageService } from 'src/gallery/storage-usage.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const config = (includeDerivatives: boolean) => ({ storageUsage: { includeDerivatives } }) as never;
 
