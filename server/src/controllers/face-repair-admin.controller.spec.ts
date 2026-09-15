@@ -967,6 +967,13 @@ describe(FaceRepairAdminController.name, () => {
     const assetFaceId = '00000000-0000-4000-a000-000000000060';
 
     it('should be an authenticated route', async () => {
+      // Mocked so sendFile takes its ImmichRedirectResponse branch instead of the unmocked-call
+      // path, which reads `file.path` off an undefined response and throws inside sendFile's
+      // catch (caught -> 404, but it's still an uncaught-looking TypeError logged on every run,
+      // and an auth-check test has no business exercising the handler's file-serving logic at all).
+      service.getAdminFaceThumbnail.mockResolvedValue(
+        new ImmichRedirectResponse({ url: 'https://example.com/face.jpg', cacheControl: CacheControl.None }),
+      );
       await request(ctx.getHttpServer()).get(`/admin/face-repair/faces/${assetFaceId}/thumbnail`);
       expect(ctx.authenticate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1005,6 +1012,13 @@ describe(FaceRepairAdminController.name, () => {
     const assetFaceId = '00000000-0000-4000-a000-000000000061';
 
     it('T3.1: should be an authenticated admin route', async () => {
+      // Mocked so sendFile takes its ImmichRedirectResponse branch instead of the unmocked-call
+      // path, which reads `file.path` off an undefined response and throws inside sendFile's
+      // catch (caught -> 404, but it's still an uncaught-looking TypeError logged on every run,
+      // and an auth-check test has no business exercising the handler's file-serving logic at all).
+      service.getAdminFacePreview.mockResolvedValue(
+        new ImmichRedirectResponse({ url: 'https://example.com/photo.jpg', cacheControl: CacheControl.None }),
+      );
       await request(ctx.getHttpServer()).get(`/admin/face-repair/faces/${assetFaceId}/preview`);
       expect(ctx.authenticate).toHaveBeenCalledWith(
         expect.objectContaining({
