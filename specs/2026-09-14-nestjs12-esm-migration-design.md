@@ -14,13 +14,13 @@ release-branch-only `chore: version` bumps, and the remaining 5 are on `main` un
 numbers** — they differ only in context, because `main` has already landed ESM and the release branch
 has not:
 
-| On `release/v3.2` | On `upstream/main` | Subject |
-| --- | --- | --- |
-| immich-31375 | immich-31355 | maplibre-gl v6 (security) |
-| immich-31446 | immich-31424 | vacuum after migrations, concurrent reindex |
-| immich-31463 | immich-31461 | sync client disconnect |
-| immich-31554 | immich-31551 | metadata extraction of faces |
-| immich-31555 | immich-31456 | people merge improvements |
+| On `release/v3.2` | On `upstream/main` | Subject                                     |
+| ----------------- | ------------------ | ------------------------------------------- |
+| immich-31375      | immich-31355       | maplibre-gl v6 (security)                   |
+| immich-31446      | immich-31424       | vacuum after migrations, concurrent reindex |
+| immich-31463      | immich-31461       | sync client disconnect                      |
+| immich-31554      | immich-31551       | metadata extraction of faces                |
+| immich-31555      | immich-31456       | people merge improvements                   |
 
 So the standing rule holds — **do not retarget the rebase at `release/*`**. Pulling `upstream/main`
 to `ca4637adc79` reaches v3.2.1 parity and four weeks beyond it.
@@ -47,16 +47,16 @@ adds `eslint-plugin-import-x` and makes the new import style a CI gate.
 A stage-0 merge spike (`git merge --no-commit --no-ff upstream/main` from `origin/main`, rerere
 disabled) produced the real inventory rather than estimates:
 
-| Measure | Count |
-| --- | --- |
-| Conflicted files, one pass, all 32 commits | **156** (124 server, 18 mobile, 5 e2e, 4 web) |
-| …of those, carrying in-tree conflict regions | 150 (the other 6 are modify/delete and add/add) |
-| Conflict regions | **219** |
-| …fully mechanical (import blocks only) | **155 regions across 111 files** |
-| …genuinely semantic | **64 regions across 39 files** |
-| Fork-modified upstream server files the ESM commit also touches | 203 |
-| Fork-only files under `server/src` | 293 |
-| Fork commits that modify import lines in ESM-touched files | **147** |
+| Measure                                                         | Count                                           |
+| --------------------------------------------------------------- | ----------------------------------------------- |
+| Conflicted files, one pass, all 32 commits                      | **156** (124 server, 18 mobile, 5 e2e, 4 web)   |
+| …of those, carrying in-tree conflict regions                    | 150 (the other 6 are modify/delete and add/add) |
+| Conflict regions                                                | **219**                                         |
+| …fully mechanical (import blocks only)                          | **155 regions across 111 files**                |
+| …genuinely semantic                                             | **64 regions across 39 files**                  |
+| Fork-modified upstream server files the ESM commit also touches | 203                                             |
+| Fork-only files under `server/src`                              | 293                                             |
+| Fork commits that modify import lines in ESM-touched files      | **147**                                         |
 
 The semantic work is concentrated: `person.service.ts` (8 regions), its two spec files (6),
 `utils/config.ts` (3), `packages/sdk/src/fetch-client.ts` (3), `asset.service.ts` (2),
@@ -79,18 +79,18 @@ import lines.
 Target `ca4637adc79`; all 32 commits.
 
 **Fork-sync first.** The rolling branch sits at the cutover commit `94223af206b` while `main` has
-moved to `07390535860`. Run `upstream-sync-fork-main` *before* the ESM batch, while both sides are
+moved to `07390535860`. Run `upstream-sync-fork-main` _before_ the ESM batch, while both sides are
 still CJS. Every fork PR merged to `main` after ESM lands on rolling is authored in CJS import style
 and will need adaptation on arrival, so front-loading buys one clean sync.
 
 **Batch shape** — override the default plan so the ESM commit is alone:
 
-| Batch | Commits | Rationale |
-| --- | --- | --- |
-| A | 1–2 (`CropAspectRatio` enum, github-actions) | trivial; proves the machinery on a fresh rolling branch |
-| B | **3 alone** (immich-31237, ESM) | isolated so every conflict is attributable to it |
-| C | 4–20 (through immich-31537, imports linting) | pairs the lint gate with the style it enforces |
-| D | 21–32 (incl. people-merge, cloud ids) | normal-sized tail |
+| Batch | Commits                                      | Rationale                                               |
+| ----- | -------------------------------------------- | ------------------------------------------------------- |
+| A     | 1–2 (`CropAspectRatio` enum, github-actions) | trivial; proves the machinery on a fresh rolling branch |
+| B     | **3 alone** (immich-31237, ESM)              | isolated so every conflict is attributable to it        |
+| C     | 4–20 (through immich-31537, imports linting) | pairs the lint gate with the style it enforces          |
+| D     | 21–32 (incl. people-merge, cloud ids)        | normal-sized tail                                       |
 
 Isolating B matters because a gate chain hides its own tail: an early throw skips the post-apply
 checks, so a batch mixing ESM with seventeen other commits makes a first failure unattributable.
@@ -109,7 +109,7 @@ prettier formats.
 Two properties make it trustworthy:
 
 1. **Proven both ways before first use.** It must reproduce known-good resolutions from the spike
-   tree, *and* must refuse a synthetic region where a specifier would be dropped. A resolver proven
+   tree, _and_ must refuse a synthetic region where a specifier would be dropped. A resolver proven
    only green is the Shape-K trap in miniature.
 2. **Per-file post-condition, asserted not spot-checked.** Every specifier present on either side is
    present in the result, and `tsc` resolves every specifier.
@@ -138,22 +138,49 @@ Upstream's ESM commit changed its migration loader **twice**:
 `__dirname` does not exist under `"type": "module"`, and Kysely's `FileMigrationProvider` needs the
 explicit `import:` hook to load migration modules as ESM.
 
+**A third change rides in the same window, from Kysely itself rather than from this diff.** Kysely
+0.29 moved `FileMigrationProvider`, `Migration` and `MigrationProvider` off the `kysely` package root
+onto a `kysely/migration` subpath — the root package now types them as a `KyselyTypeError` stub
+directing callers to the subpath. Any importer that still writes `from 'kysely'`, fork code included,
+must repoint:
+
+```diff
+-import { FileMigrationProvider, Migration, MigrationProvider } from 'kysely';
++import { FileMigrationProvider, Migration, MigrationProvider } from 'kysely/migration';
+```
+
 The fork **replaced that entire call site** with `CompositeMigrationProvider`
 (`server/src/schema/composite-migration-provider.ts`, fork-only, which upstream never touches) and
-therefore inherits **neither** change. Its call site in `database.repository.ts` still uses
+therefore inherits **none** of the three changes. Its call site in `database.repository.ts` still uses
 `__dirname` twice, behind `// eslint-disable-next-line unicorn/prefer-module` comments that suppress
-the one rule that would have flagged it.
+the one rule that would have flagged it, and its own imports of `FileMigrationProvider` /
+`Migration` / `MigrationProvider` still read from the `kysely` root.
 
 Consequence: **no conflict, no type error, lint green — and the server cannot load migrations at
 boot.** It takes out the dual-directory migration architecture that the whole `migrations-gallery`
-design rests on. Both fixes must be applied by hand: the `import:` hook inside
-`CompositeMigrationProvider`'s `FileMigrationProvider` construction, and `import.meta.dirname` at the
-call site.
+design rests on. All three fixes must be applied by hand: the `kysely/migration` subpath import, the
+`import:` hook inside `CompositeMigrationProvider`'s `FileMigrationProvider` construction, and
+`import.meta.dirname` at the call site.
 
-**Neither fix can be staged ahead of batch B.** The `import` prop is new in Kysely 0.29 — verified
-against the installed 0.28.17 typings, whose `FileMigrationProviderProps` declares only `fs`, `path`
-and `migrationFolder`. It does not type-check until the bump lands, which is precisely why upstream
-ships the Kysely bump inside the ESM commit.
+**None of the three fixes can be staged ahead of batch B.** The `import` prop, and the
+`kysely/migration` subpath itself, are both new in Kysely 0.29 — verified against the installed
+0.28.17 typings, whose `FileMigrationProviderProps` declares only `fs`, `path` and `migrationFolder`,
+and whose package root still exports `FileMigrationProvider` directly. Neither type-checks until the
+bump lands, which is precisely why upstream ships the Kysely bump inside the ESM commit.
+
+_(2026-09-15 addendum, from the cycle that implemented this design — Task 5's review pressed on which
+of the three is the one that actually breaks boot, since the framing above treats them as one
+undifferentiated consequence. Removing only the `import:` hook and re-running the suite still passed:
+on POSIX, Kysely's `FileMigrationProvider` falls back to a bare `await import(filePath)`, and Node's
+dynamic `import()` accepts absolute POSIX paths without the hook. The hook is not vestigial — it is
+genuine optional API that plausibly matters on Windows path separators, and a later fix round found it
+load-bearing for a *different* call path, a hand-built migrator in a medium test that runs through
+vite-node's alias-aware resolver rather than Node's own. What was not re-verified end-to-end this
+cycle is whether the `kysely/migration` subpath omission alone — being compile-visible, per the
+`KyselyTypeError` stub — would already have failed `tsc` before ever reaching boot, which would mean
+the "no type error" half of the sentence above describes a narrower window than stated. That question
+is left open rather than resolved on inference; the boot-vs-compile distinction argued for above is
+plausible but unconfirmed by a direct before/after `tsc` run isolating just that one import line.)_
 
 ### The rest of the fork-side set
 
@@ -189,7 +216,7 @@ The bulk conversion:
 
 `7b51c50a96c` — `feat: people merge improvements (immich-31456)` adds `POST /people/merge` →
 `mergePeople(auth, { ids })` and deprecates the old per-id route as `mergePersonLegacy`. Its
-documented behaviour is *"also automatically merges people for other users in the cluster group"*,
+documented behaviour is _"also automatically merges people for other users in the cluster group"_,
 and its implementation buckets `peopleMap[personGroupId]` then iterates `targetPeople[ownerId]` — it
 assumes one `personGroupId` maps to many person rows across owners.
 
