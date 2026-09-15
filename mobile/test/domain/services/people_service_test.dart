@@ -132,7 +132,10 @@ void main() {
         ),
       ).thenThrow(Exception('offline'));
       when(
-        () => mockRepository.getAllPeople(minFaces: any(named: 'minFaces'), sortBy: any(named: 'sortBy')),
+        () => mockRepository.getAllPeople(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+        ),
       ).thenAnswer((_) async => [person('local-person')]);
 
       final result = await sut.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets);
