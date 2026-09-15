@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
 export class BirthdayMemoryRule implements MemoryRule {
   readonly id = 'birthday';

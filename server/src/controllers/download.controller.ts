@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { Request } from 'express';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { DownloadArchiveDto, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto.js';

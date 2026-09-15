@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { TimeBucketSize } from 'src/enum';
-import { dateTruncUnitForTimeBucketSize, normalizeTimeBucketForBucketSize } from 'src/utils/timeline-bucket';
+import { TimeBucketSize } from 'src/enum.js';
+import { dateTruncUnitForTimeBucketSize, normalizeTimeBucketForBucketSize } from 'src/utils/timeline-bucket.js';
 
 describe('normalizeTimeBucketForBucketSize', () => {
   it('accepts a year bucket at January 1', () => {

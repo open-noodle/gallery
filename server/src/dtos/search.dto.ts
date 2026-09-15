@@ -4,8 +4,8 @@ import { Place } from 'src/database.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { AlbumResponseSchema } from 'src/dtos/album.dto.js';
 import { AssetResponseSchema } from 'src/dtos/asset-response.dto.js';
-import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto.js';
 import { ScopedPrimaryProfileSchema } from 'src/dtos/person.dto.js';
+import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto.js';
 import {
   AssetOrder,
   AssetOrderSchema,

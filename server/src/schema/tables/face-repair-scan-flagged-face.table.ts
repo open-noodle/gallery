@@ -1,6 +1,6 @@
-import { Column, ForeignKeyColumn, Generated, Index, Table } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
-import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table';
+import { Column, ForeignKeyColumn, type Generated, Index, Table } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
+import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
 
 @Table('face_repair_scan_flagged_face')
 @Index({ name: 'face_repair_scan_flagged_face_scanId_personGroupId_idx', columns: ['scanId', 'personGroupId'] })

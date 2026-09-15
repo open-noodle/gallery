@@ -1,7 +1,7 @@
 import { Insertable, Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { DB } from 'src/schema';
-import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table';
+import { DB } from 'src/schema/index.js';
+import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
 
 export interface PersonDeclineInput {
   personId: string;
