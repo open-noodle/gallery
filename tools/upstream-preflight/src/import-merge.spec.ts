@@ -1,5 +1,8 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  collectDirectoryImportSpecifiers,
   mergeStatements,
   normalizeLineSpecifiers,
   normalizeModule,
@@ -13,9 +16,13 @@ const conflict = (ours: string, theirs: string) =>
 
 describe('normalizeModule', () => {
   it('appends .js to path-alias specifiers', () => {
-    expect(normalizeModule('src/services/base.service')).toBe('src/services/base.service.js');
+    expect(normalizeModule('src/services/base.service')).toBe(
+      'src/services/base.service.js',
+    );
     expect(normalizeModule('test/utils')).toBe('test/utils.js');
-    expect(normalizeModule('../schema/tables/person.table')).toBe('../schema/tables/person.table.js');
+    expect(normalizeModule('../schema/tables/person.table')).toBe(
+      '../schema/tables/person.table.js',
+    );
   });
 
   it('leaves bare package specifiers and already-suffixed paths alone', () => {
@@ -24,19 +31,89 @@ describe('normalizeModule', () => {
     expect(normalizeModule('lodash-es')).toBe('lodash-es');
     expect(normalizeModule('src/enum.js')).toBe('src/enum.js');
   });
+
+  // Deliberate default, not a bug: with no directory knowledge, normalizeModule cannot tell
+  // "src/schema" (a directory, needs /index.js) from "src/services/base.service" (a file, needs
+  // .js) — it stays filesystem-free so a caller with no tree to scan gets a pure, deterministic
+  // answer. Do not "fix" this by making the bare form directory-aware; give the caller a set instead.
+  it('without knownDirectories, appends .js even to a directory specifier (the pure default)', () => {
+    expect(normalizeModule('src/schema')).toBe('src/schema.js');
+  });
+
+  describe('with knownDirectories', () => {
+    const dirs = new Set(['src/schema']);
+
+    it('resolves a known directory specifier via its index', () => {
+      expect(normalizeModule('src/schema', dirs)).toBe('src/schema/index.js');
+    });
+
+    it('still appends a plain .js to a real file specifier', () => {
+      expect(normalizeModule('src/enum', dirs)).toBe('src/enum.js');
+    });
+
+    it('does not add /index.js to a directory with no index.ts, since no such module exists', () => {
+      // src/utils is a real directory but carries no index.ts — the set built from the tree would
+      // never include it, and even if a caller mistakenly did, only exact membership matters here.
+      expect(normalizeModule('src/utils', dirs)).toBe('src/utils.js');
+    });
+
+    it('leaves already-suffixed and bare package specifiers unchanged', () => {
+      expect(normalizeModule('src/enum.js', dirs)).toBe('src/enum.js');
+      expect(normalizeModule('kysely', dirs)).toBe('kysely');
+      expect(normalizeModule('node:fs', dirs)).toBe('node:fs');
+    });
+  });
+});
+
+describe('collectDirectoryImportSpecifiers', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const serverRoot = join(here, '../../../server');
+  const e2eRoot = join(here, '../../../e2e');
+
+  it('finds every server/src directory that resolves via an index.ts', () => {
+    const dirs = collectDirectoryImportSpecifiers(serverRoot);
+    expect(dirs.has('src/schema')).toBe(true);
+    expect(dirs.has('src/repositories')).toBe(true);
+    expect(dirs.has('src/services')).toBe(true);
+  });
+
+  it('excludes a real directory that has no index.ts', () => {
+    const dirs = collectDirectoryImportSpecifiers(serverRoot);
+    expect(dirs.has('src/utils')).toBe(false);
+    expect(dirs.has('src/dtos')).toBe(false);
+  });
+
+  it('builds an independent, and in this tree empty, set for e2e — src/foo means a different directory there', () => {
+    const dirs = collectDirectoryImportSpecifiers(e2eRoot);
+    expect(dirs.has('src/schema')).toBe(false);
+  });
 });
 
 describe('parseStatement', () => {
   it('parses named, default, namespace, type-only and side-effect forms', () => {
-    expect(parseStatement("import { A, B as C } from 'src/enum';")).toMatchObject({
-      kind: 'import', module: 'src/enum', typeOnly: false, named: ['A', 'B as C'],
+    expect(
+      parseStatement("import { A, B as C } from 'src/enum';"),
+    ).toMatchObject({
+      kind: 'import',
+      module: 'src/enum',
+      typeOnly: false,
+      named: ['A', 'B as C'],
     });
-    expect(parseStatement("import type { JobOf } from 'src/types';")).toMatchObject({
-      typeOnly: true, named: ['JobOf'],
+    expect(
+      parseStatement("import type { JobOf } from 'src/types';"),
+    ).toMatchObject({
+      typeOnly: true,
+      named: ['JobOf'],
     });
-    expect(parseStatement("import * as fs from 'node:fs';")).toMatchObject({ namespaceName: 'fs' });
-    expect(parseStatement("import React from 'react';")).toMatchObject({ defaultName: 'React' });
-    expect(parseStatement("import 'reflect-metadata';")).toMatchObject({ sideEffectOnly: true });
+    expect(parseStatement("import * as fs from 'node:fs';")).toMatchObject({
+      namespaceName: 'fs',
+    });
+    expect(parseStatement("import React from 'react';")).toMatchObject({
+      defaultName: 'React',
+    });
+    expect(parseStatement("import 'reflect-metadata';")).toMatchObject({
+      sideEffectOnly: true,
+    });
   });
 
   it('refuses anything that is not an import/export-from statement', () => {
@@ -78,8 +155,12 @@ describe('resolveConflictedSource', () => {
     expect(result.refused).toBe(0);
     expect(result.resolved).toBe(1);
     expect(result.text).not.toContain('<<<<<<<');
-    expect(result.text).toContain("import { AssetFileType, AssetStatus } from 'src/enum.js';");
-    expect(result.text).toContain("import { BaseService } from 'src/services/base.service.js';");
+    expect(result.text).toContain(
+      "import { AssetFileType, AssetStatus } from 'src/enum.js';",
+    );
+    expect(result.text).toContain(
+      "import { BaseService } from 'src/services/base.service.js';",
+    );
     expect(result.text).toContain('export class Foo {}');
   });
 
@@ -147,9 +228,13 @@ describe('resolveConflictedSource', () => {
       "import { LoginResponseDto, ManualJobName, login } from '@immich/sdk';",
     );
     // fork-only import upstream never had, now suffixed
-    expect(result.text).toContain("import { loginDto } from 'src/fixtures.js';");
+    expect(result.text).toContain(
+      "import { loginDto } from 'src/fixtures.js';",
+    );
     // upstream's suffixing adopted on the shared modules
-    expect(result.text).toContain("import { errorDto } from 'src/responses.js';");
+    expect(result.text).toContain(
+      "import { errorDto } from 'src/responses.js';",
+    );
     expect(result.text).toContain("import { app, utils } from 'src/utils.js';");
     // the shared tail zdiff3 left outside the region is untouched
     expect(result.text).toContain("import request from 'supertest';");
@@ -161,7 +246,10 @@ describe('specifier-only fallback (zdiff3-truncated regions)', () => {
     // The real shape found in the spike tree: zdiff3 hoisted the identical opening lines of a
     // multi-line named import out of the region, leaving only the closing `} from '...';` line,
     // which the structured path refuses because it does not start on a statement boundary.
-    const source = conflict("} from 'src/dtos/foo.dto';", "} from 'src/dtos/foo.dto.js';");
+    const source = conflict(
+      "} from 'src/dtos/foo.dto';",
+      "} from 'src/dtos/foo.dto.js';",
+    );
     const result = resolveConflictedSource(source);
     expect(result.refused).toBe(0);
     expect(result.resolved).toBe(1);
@@ -224,15 +312,21 @@ describe('specifier-only fallback (zdiff3-truncated regions)', () => {
   });
 
   it('normalizeLineSpecifiers leaves a bare package specifier unchanged', () => {
-    expect(normalizeLineSpecifiers("import x from 'kysely';")).toBe("import x from 'kysely';");
-    expect(normalizeLineSpecifiers("} from 'kysely';")).toBe("} from 'kysely';");
+    expect(normalizeLineSpecifiers("import x from 'kysely';")).toBe(
+      "import x from 'kysely';",
+    );
+    expect(normalizeLineSpecifiers("} from 'kysely';")).toBe(
+      "} from 'kysely';",
+    );
   });
 });
 
 describe('parseStatement refuses statements squished onto one physical line', () => {
   it('refuses two full import statements matched as one (the reviewer-found case)', () => {
     expect(
-      parseStatement("import { A } from 'src/m'; import { Lost } from 'src/m';"),
+      parseStatement(
+        "import { A } from 'src/m'; import { Lost } from 'src/m';",
+      ),
     ).toBeNull();
   });
 
@@ -259,19 +353,29 @@ describe('parseStatement refuses statements squished onto one physical line', ()
       typeOnly: true,
       named: ['A'],
     });
-    expect(parseStatement("import { type A, B as C } from 'src/m';")).toMatchObject({
+    expect(
+      parseStatement("import { type A, B as C } from 'src/m';"),
+    ).toMatchObject({
       named: ['type A', 'B as C'],
     });
-    expect(parseStatement("import { default as D } from 'src/m';")).toMatchObject({
+    expect(
+      parseStatement("import { default as D } from 'src/m';"),
+    ).toMatchObject({
       named: ['default as D'],
     });
     expect(parseStatement("import X, { Y } from 'src/m';")).toMatchObject({
       defaultName: 'X',
       named: ['Y'],
     });
-    expect(parseStatement("import * as ns from 'node:fs';")).toMatchObject({ namespaceName: 'ns' });
-    expect(parseStatement("import 'reflect-metadata';")).toMatchObject({ sideEffectOnly: true });
-    expect(parseStatement("import {\n  A,\n  B,\n} from 'src/m';")).toMatchObject({
+    expect(parseStatement("import * as ns from 'node:fs';")).toMatchObject({
+      namespaceName: 'ns',
+    });
+    expect(parseStatement("import 'reflect-metadata';")).toMatchObject({
+      sideEffectOnly: true,
+    });
+    expect(
+      parseStatement("import {\n  A,\n  B,\n} from 'src/m';"),
+    ).toMatchObject({
       named: ['A', 'B'],
     });
   });
