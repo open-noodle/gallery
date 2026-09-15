@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { AssetVisibility } from 'src/enum';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
+import { AssetVisibility } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
 
 export interface ClassificationFaceSummary {
   hasAssignedFace: boolean;

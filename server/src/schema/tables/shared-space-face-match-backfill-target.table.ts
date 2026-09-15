@@ -1,7 +1,14 @@
-import { CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp, UpdateDateColumn } from '@immich/sql-tools';
-import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { AssetTable } from 'src/schema/tables/asset.table';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
+import {
+  CreateDateColumn,
+  ForeignKeyColumn,
+  type Generated,
+  Table,
+  Timestamp,
+  UpdateDateColumn,
+} from '@immich/sql-tools';
+import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
 
 @Table('shared_space_face_match_backfill_target')
 @UpdatedAtTrigger('shared_space_face_match_backfill_target_updatedAt')

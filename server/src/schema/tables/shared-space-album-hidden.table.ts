@@ -4,15 +4,15 @@ import {
   CreateDateColumn,
   ForeignKeyColumn,
   ForeignKeyConstraint,
-  Generated,
+  type Generated,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { shared_space_album_hidden_delete_audit } from 'src/schema/functions';
-import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { shared_space_album_hidden_delete_audit } from 'src/schema/functions.js';
+import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // gallery-fork (#1041): "this album does not appear in MY timeline" — per member, per linked album.
 //

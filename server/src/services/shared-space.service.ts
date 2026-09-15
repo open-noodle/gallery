@@ -1,12 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Kysely, Transaction } from 'kysely';
-import { AssetFace, SharedSpacePerson } from 'src/database';
-import { OnEvent, OnJob } from 'src/decorators';
-import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
-import type { MapMarkerResponseDto } from 'src/dtos/map.dto';
-import { mapNotification } from 'src/dtos/notification.dto';
+import { AssetFace, SharedSpacePerson } from 'src/database.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
+import type { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
+import { mapNotification } from 'src/dtos/notification.dto.js';
 import {
   PeopleFaceStatisticsResponseDto,
   PersonFacePageQueryDto,
@@ -14,7 +14,7 @@ import {
   PersonFaceSuggestionPageQueryDto,
   PersonFaceSuggestionPageResponseDto,
   PersonStatisticsResponseDto,
-} from 'src/dtos/person.dto';
+} from 'src/dtos/person.dto.js';
 import {
   SharedSpacePeopleStatisticsResponseDto,
   SharedSpacePersonAliasDto,
@@ -23,7 +23,7 @@ import {
   SharedSpacePersonUpdateDto,
   SpacePeopleQueryDto,
   SpaceRepresentativeFaceUpdateDto,
-} from 'src/dtos/shared-space-person.dto';
+} from 'src/dtos/shared-space-person.dto.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_NAME_MAX,
   SharedSpaceActivityResponseDto,
@@ -49,7 +49,7 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceTimelineHidePreviewDto,
   SharedSpaceUpdateDto,
-} from 'src/dtos/shared-space.dto';
+} from 'src/dtos/shared-space.dto.js';
 import {
   AssetType,
   AssetVisibility,
@@ -65,28 +65,28 @@ import {
   SharedSpaceRole,
   SystemMetadataKey,
   UserAvatarColor,
-} from 'src/enum';
-import { AlbumAssetCount } from 'src/repositories/album.repository';
-import type { ArgOf } from 'src/repositories/event.repository';
-import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
+} from 'src/enum.js';
+import { AlbumAssetCount } from 'src/repositories/album.repository.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH,
   visibleSpaceAssetVisibilities,
-} from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
+} from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
   filterUnambiguousReconciliationClaims,
   type ReconciliationClaim,
-} from 'src/services/accessible-identity-reconciliation';
-import { BaseService } from 'src/services/base.service';
-import { JobOf } from 'src/types';
-import { asDateString, asDateTimeString } from 'src/utils/date';
-import { ImmichMediaResponse } from 'src/utils/file';
-import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
-import { mimeTypes } from 'src/utils/mime-types';
-import { isFaceSuggestionEnabled } from 'src/utils/misc';
+} from 'src/services/accessible-identity-reconciliation.js';
+import { BaseService } from 'src/services/base.service.js';
+import type { JobOf } from 'src/types.js';
+import { asDateString, asDateTimeString } from 'src/utils/date.js';
+import { ImmichMediaResponse } from 'src/utils/file.js';
+import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
+import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
   [SharedSpaceRole.Viewer]: 0,
@@ -119,7 +119,7 @@ export const SHARED_SPACE_DEDUP_MAX_PASSES = 100;
  * Defined in the repository — the writer enforces it under the advisory lock — and re-exported
  * here, which is where every caller has always imported it from.
  */
-export { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/repositories/shared-space.repository';
+export { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/repositories/shared-space.repository.js';
 /** Bounds the whole-space folder fetch the web client uses to render the tree. */
 export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
 

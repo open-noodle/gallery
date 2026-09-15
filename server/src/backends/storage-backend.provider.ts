@@ -1,5 +1,5 @@
 import { isAbsolute } from 'node:path';
-import { StorageBackend } from 'src/interfaces/storage-backend.interface';
+import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 
 /**
  * Determines which backend owns a given path/key.

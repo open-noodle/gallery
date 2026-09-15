@@ -3,19 +3,19 @@
 // space, and for nobody else (album_user shares, shared links, departed members). Count and grid
 // must never desync: both consume the same member-gate (albumSpaceIds / forUserId).
 import { Kysely } from 'kysely';
-import { AlbumUserRole, AssetVisibility, SharedLinkType, SharedSpaceRole } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { AlbumRepository } from 'src/repositories/album.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PartnerRepository } from 'src/repositories/partner.repository';
-import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { TimelineService } from 'src/services/timeline.service';
-import { newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AlbumUserRole, AssetVisibility, SharedLinkType, SharedSpaceRole } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PartnerRepository } from 'src/repositories/partner.repository.js';
+import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { TimelineService } from 'src/services/timeline.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

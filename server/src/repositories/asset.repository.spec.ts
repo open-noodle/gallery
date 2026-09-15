@@ -1,6 +1,6 @@
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
-import { withTimeBucketAssetFilters } from 'src/repositories/asset.repository';
-import type { DB } from 'src/schema';
+import { withTimeBucketAssetFilters } from 'src/repositories/asset.repository.js';
+import type { DB } from 'src/schema/index.js';
 import { describe, expect, it } from 'vitest';
 
 // Offline Kysely — compiles SQL without executing it. No DB connection needed.

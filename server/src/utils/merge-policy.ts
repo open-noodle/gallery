@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { IdentityMergePropagationPlan, MergeAuthorizer } from 'src/services/identity-merge-propagation.service';
+import { IdentityMergePropagationPlan, MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 
 /**
  * Machine-readable error codes for the destructive-merge boundary (issue #733). Returned in the exception body so

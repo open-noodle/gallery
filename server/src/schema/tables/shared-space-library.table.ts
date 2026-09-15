@@ -3,16 +3,16 @@ import {
   AfterInsertTrigger,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { shared_space_library_after_insert_user, shared_space_library_delete_audit } from 'src/schema/functions';
-import { LibraryTable } from 'src/schema/tables/library.table';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { shared_space_library_after_insert_user, shared_space_library_delete_audit } from 'src/schema/functions.js';
+import { LibraryTable } from 'src/schema/tables/library.table.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('shared_space_library')
 @UpdatedAtTrigger('shared_space_library_updatedAt')

@@ -1,4 +1,4 @@
-import { DatabaseExtension } from 'src/enum';
+import { DatabaseExtension } from 'src/enum.js';
 import {
   ASSET_CHECKSUM_CONSTRAINT,
   isAssetChecksumConstraint,
@@ -8,7 +8,7 @@ import {
   tokenizeForSearch,
   updateLockedColumns,
   vectorIndexQuery,
-} from 'src/utils/database';
+} from 'src/utils/database.js';
 import { describe, expect, it } from 'vitest';
 
 describe('tokenizeForSearch', () => {

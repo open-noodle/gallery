@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely';
-import { clusterGroupsApplied } from 'src/utils/cluster-groups-order';
+import { clusterGroupsApplied } from 'src/utils/cluster-groups-order.js';
 
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`

@@ -3,17 +3,17 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Index,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { shared_space_album_folder_delete_audit } from 'src/schema/functions';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { shared_space_album_folder_delete_audit } from 'src/schema/functions.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('shared_space_album_folder')
 @UpdatedAtTrigger('shared_space_album_folder_updatedAt')

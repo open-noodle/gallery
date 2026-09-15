@@ -1,13 +1,13 @@
 import { Kysely, sql } from 'kysely';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
 // Side-effect import: registers every decorated table so the schema exists to assert against.
-import 'src/schema';
-import { seedHiddenRowsFromSharedFlag } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import 'src/schema/index.js';
+import { seedHiddenRowsFromSharedFlag } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 let db: Kysely<DB>;

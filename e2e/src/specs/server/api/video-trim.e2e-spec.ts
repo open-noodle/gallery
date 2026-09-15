@@ -2,9 +2,9 @@ import { LoginResponseDto, TranscodePolicy, updateConfig } from '@immich/sdk';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Socket } from 'socket.io-client';
-import { createUserDto } from 'src/fixtures';
-import { errorDto } from 'src/responses';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { errorDto } from 'src/responses.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

@@ -1,6 +1,6 @@
 import { Insertable, Kysely, Transaction } from 'kysely';
-import { DB } from 'src/schema';
-import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table';
+import { DB } from 'src/schema/index.js';
+import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
 
 /**
  * Re-keys the source person's cluster mute onto the survivor before the merge deletes that person.

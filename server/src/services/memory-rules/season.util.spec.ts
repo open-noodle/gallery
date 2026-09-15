@@ -5,7 +5,7 @@ import {
   seasonOf,
   seasonStartingOn,
   seasonYearOf,
-} from 'src/services/memory-rules/season.util';
+} from 'src/services/memory-rules/season.util.js';
 
 import { readFileSync } from 'node:fs';
 

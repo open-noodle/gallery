@@ -12,15 +12,15 @@ import {
   selectRandomMultiple,
   TimelineAssetConfig,
   TimelineData,
-} from 'src/ui/generators/timeline';
+} from 'src/ui/generators/timeline.js';
 import { setupBaseMockApiRoutes } from 'src/ui/mock-network/base-network.js';
 import {
   pageRoutePromise,
   setupTimelineMockApiRoutes,
   TimelineTestContext,
-} from 'src/ui/mock-network/timeline-network';
+} from 'src/ui/mock-network/timeline-network.js';
 import { utils } from 'src/utils.js';
-import { assetViewerUtils, pageUtils, poll, thumbnailUtils, timelineUtils } from './utils';
+import { assetViewerUtils, pageUtils, poll, thumbnailUtils, timelineUtils } from './utils.js';
 
 test.describe.configure({ mode: 'parallel' });
 test.describe('Timeline', () => {

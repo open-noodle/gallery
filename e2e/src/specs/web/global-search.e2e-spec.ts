@@ -1,6 +1,6 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { expect, type Page, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 async function openGlobalSearchDropdown(page: Page) {
   const trigger = page.getByTestId('cmdk-input-trigger');

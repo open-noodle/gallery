@@ -1,10 +1,10 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole } from 'src/enum';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { SyncRepository } from 'src/repositories/sync.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SharedSpaceRole } from 'src/enum.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Repo-level tests for SharedSpaceAlbumHiddenSync:
 //   - getUpserts: streams MY OWN shared_space_album_hidden rows only (userId equality, NOT

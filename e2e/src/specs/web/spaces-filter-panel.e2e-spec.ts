@@ -3,7 +3,7 @@ import { updateAsset } from '@immich/sdk';
 import type { Locator } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 // isVisible() rejects if the locator resolution races with a navigation; the
 // empty-state probes below treat that the same as "not visible".

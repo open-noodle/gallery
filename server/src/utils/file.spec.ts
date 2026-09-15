@@ -4,15 +4,15 @@ import { once } from 'node:events';
 import { get } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
-import { CacheControl } from 'src/enum';
-import { LoggingRepository } from 'src/repositories/logging.repository';
+import { CacheControl } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import {
   ImmichFileResponse,
   ImmichRedirectResponse,
   ImmichStreamResponse,
   S3_STREAM_IDLE_TIMEOUT_MS,
   sendFile,
-} from 'src/utils/file';
+} from 'src/utils/file.js';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 

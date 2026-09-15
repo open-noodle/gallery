@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
-import { MemoryPeriodFace } from 'src/repositories/asset.repository';
-import { PeopleTogetherMemoryRule } from 'src/services/memory-rules/people-together.rule';
+import { MemoryPeriodFace } from 'src/repositories/asset.repository.js';
+import { PeopleTogetherMemoryRule } from 'src/services/memory-rules/people-together.rule.js';
 
 const target = DateTime.fromISO('2026-06-20', { zone: 'utc' });
 

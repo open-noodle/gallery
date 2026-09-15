@@ -5,17 +5,17 @@
 // face-backfill-contributions.medium.spec.ts. Slice 4 (below) adds the repository methods
 // (PersonRepository.refreshPetFaces, SearchRepository.searchPets) that write/read pet_search.
 import { Kysely, sql } from 'kysely';
-import { VECTOR_INDEX_TABLES } from 'src/constants';
-import { VectorIndex } from 'src/enum';
-import { probes } from 'src/repositories/database.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SearchRepository } from 'src/repositories/search.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { newEmbedding, newUuid } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { VECTOR_INDEX_TABLES } from 'src/constants.js';
+import { VectorIndex } from 'src/enum.js';
+import { probes } from 'src/repositories/database.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { newEmbedding, newUuid } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

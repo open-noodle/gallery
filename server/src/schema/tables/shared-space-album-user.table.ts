@@ -1,7 +1,7 @@
-import { CreateDateColumn, ForeignKeyColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { CreateIdColumn } from 'src/decorators';
-import { AlbumTable } from 'src/schema/tables/album.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateDateColumn, ForeignKeyColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { CreateIdColumn } from 'src/decorators.js';
+import { AlbumTable } from 'src/schema/tables/album.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // Internal, write-once (userId, albumId) album-access grant with a per-user
 // createId watermark. Trigger-maintained (A2/A3); never user-facing; never

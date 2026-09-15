@@ -1,9 +1,9 @@
-import { ServerController } from 'src/controllers/server.controller';
-import { ServerService } from 'src/services/server.service';
-import { SystemMetadataService } from 'src/services/system-metadata.service';
-import { VersionService } from 'src/services/version.service';
+import { ServerController } from 'src/controllers/server.controller.js';
+import { ServerService } from 'src/services/server.service.js';
+import { SystemMetadataService } from 'src/services/system-metadata.service.js';
+import { VersionService } from 'src/services/version.service.js';
 import request from 'supertest';
-import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
+import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 // Upstream #30715 deleted this spec because its only content was per-route
 // `should be an authenticated route` assertions, which `index.spec.ts` now covers

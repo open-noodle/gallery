@@ -5,7 +5,7 @@
 //   nothing. Falling back to the `main` element, which UserPageLayout always renders.
 import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 type CanaryRoute = {
   path: string;

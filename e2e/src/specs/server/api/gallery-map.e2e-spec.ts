@@ -8,10 +8,10 @@ import {
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Socket } from 'socket.io-client';
-import { authHeaders, type Actor } from 'src/actors';
-import { createUserDto } from 'src/fixtures';
-import { makeRandomImage } from 'src/generators';
-import { app, asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { authHeaders, type Actor } from 'src/actors.js';
+import { createUserDto } from 'src/fixtures.js';
+import { makeRandomImage } from 'src/generators.js';
+import { app, asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
