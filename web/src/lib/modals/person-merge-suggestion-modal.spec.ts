@@ -72,7 +72,7 @@ describe('PersonMergeSuggestionModal', () => {
         },
       }),
     );
-    expect(sdkMock.mergePerson).not.toHaveBeenCalled();
+    expect(sdkMock.mergePersonLegacy).not.toHaveBeenCalled();
   });
 
   it('keeps legacy personal merge when both sides are personal profiles', async () => {
@@ -86,7 +86,7 @@ describe('PersonMergeSuggestionModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'yes' }));
 
     await waitFor(() =>
-      expect(sdkMock.mergePerson).toHaveBeenCalledWith({
+      expect(sdkMock.mergePersonLegacy).toHaveBeenCalledWith({
         id: 'person-target',
         mergePersonDto: { ids: ['person-source'] },
       }),
@@ -96,7 +96,7 @@ describe('PersonMergeSuggestionModal', () => {
 
   it('shows the descriptive message and does not close when a classic merge is blocked across owners', async () => {
     vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
-    sdkMock.mergePerson.mockRejectedValueOnce(
+    sdkMock.mergePersonLegacy.mockRejectedValueOnce(
       httpError(403, { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' }),
     );
     const onClose = vi.fn();
@@ -112,12 +112,12 @@ describe('PersonMergeSuggestionModal', () => {
 
     await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();
-    expect(sdkMock.mergePerson).toHaveBeenCalledTimes(1);
+    expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(1);
   });
 
   it('re-runs a classic merge with the cross-owner acknowledgement once the user confirms', async () => {
     vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
-    sdkMock.mergePerson
+    sdkMock.mergePersonLegacy
       .mockRejectedValueOnce(httpError(409, { code: 'cross_owner_merge_confirmation_required', impactedOwnerCount: 1 }))
       .mockResolvedValueOnce([{ id: 'person-source', success: true }]);
     vi.mocked(modalManager.showDialog).mockResolvedValue(true);
@@ -132,12 +132,12 @@ describe('PersonMergeSuggestionModal', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'yes' }));
 
-    await waitFor(() => expect(sdkMock.mergePerson).toHaveBeenCalledTimes(2));
-    expect(sdkMock.mergePerson).toHaveBeenNthCalledWith(1, {
+    await waitFor(() => expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(2));
+    expect(sdkMock.mergePersonLegacy).toHaveBeenNthCalledWith(1, {
       id: 'person-target',
       mergePersonDto: { ids: ['person-source'] },
     });
-    expect(sdkMock.mergePerson).toHaveBeenNthCalledWith(2, {
+    expect(sdkMock.mergePersonLegacy).toHaveBeenNthCalledWith(2, {
       id: 'person-target',
       mergePersonDto: { ids: ['person-source'], confirmCrossOwner: true },
     });

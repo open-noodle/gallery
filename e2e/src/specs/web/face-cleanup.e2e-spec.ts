@@ -41,7 +41,7 @@
  */
 import {
   getFaceRepairPersonFaces,
-  mergePerson,
+  mergePersonLegacy,
   resolveFaces,
   unconfirmFaceRepairFaces,
   type LoginResponseDto,
@@ -764,7 +764,7 @@ test.describe.serial('Face Cleanup', () => {
 
     // Merge `source` into `mergeTarget` via the real API. The human placement is keyed by identity, which the
     // merge preserves, so it survives with no bespoke re-pointing (the whole point of the unified layer).
-    await mergePerson(
+    await mergePersonLegacy(
       { id: mergeTarget.id, mergePersonDto: { ids: [source.id] } },
       { headers: asBearerAuth(admin.accessToken) },
     );
