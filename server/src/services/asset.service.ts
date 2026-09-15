@@ -1,12 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import type { ShallowDehydrateObject } from 'kysely';
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import { isAbsolute } from 'node:path';
-import { StorageCore } from 'src/cores/storage.core.js';
+import type { ShallowDehydrateObject } from 'kysely';
 import type { AssetFace, AssetFile } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import type { LinkedSpacePerson } from 'src/repositories/shared-space.repository.js';
 import type { JobItem, JobOf } from 'src/types.js';
+import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AssetResponseDto, SanitizedAssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import {
@@ -42,8 +44,6 @@ import {
   Permission,
   QueueName,
 } from 'src/enum.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { LinkedSpacePerson } from 'src/repositories/shared-space.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';

@@ -30,14 +30,14 @@ import {
   SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
   SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE,
   SHARED_SPACE_DEDUP_MAX_PASSES,
-  sharedSpaceAlbumFolderDepthMessage,
   SharedSpaceService,
+  sharedSpaceAlbumFolderDepthMessage,
 } from 'src/services/shared-space.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy.js';
 import { factory, newDate, newUuid } from 'test/small.factory.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const sharedSpaceFaceIdentityJobNames = new Set<JobName>([
   JobName.AssetDetectFacesQueueAll,

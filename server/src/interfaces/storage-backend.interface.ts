@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
-import { CacheControl } from 'src/enum.js';
 import type { ContentDisposition } from 'src/utils/file.js';
+import { CacheControl } from 'src/enum.js';
 
 /**
  * Thrown by a backend when the client's `Range` header cannot be satisfied, so

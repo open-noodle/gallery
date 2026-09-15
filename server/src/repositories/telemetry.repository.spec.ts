@@ -1,7 +1,7 @@
 import { ObservableCallback } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-import { MetricGroupRepository } from 'src/repositories/telemetry.repository.js';
 import { describe, expect, it, vi } from 'vitest';
+import { MetricGroupRepository } from 'src/repositories/telemetry.repository.js';
 
 const newMetricService = () => {
   const observableGauge = { addCallback: vi.fn() };

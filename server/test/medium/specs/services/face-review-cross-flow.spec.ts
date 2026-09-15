@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { vi } from 'vitest';
 import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -24,7 +25,6 @@ import { clearConfigCache } from 'src/utils/config.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { vi } from 'vitest';
 
 // Slice 7 — cross-flow integration. This is the slice that would have caught every leak in the design's
 // defect inventory: it drives BOTH engines against ONE database and asserts that a decision made in one is

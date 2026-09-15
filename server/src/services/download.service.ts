@@ -2,8 +2,9 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { isAbsolute, parse } from 'node:path';
 import { Readable } from 'node:stream';
 import sanitize from 'sanitize-filename';
-import { StorageCore } from 'src/cores/storage.core.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
+import { StorageCore } from 'src/cores/storage.core.js';
 import {
   DownloadArchiveDto,
   DownloadArchiveInfo,
@@ -12,7 +13,6 @@ import {
 } from 'src/dtos/download.dto.js';
 import { Permission } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
-import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';

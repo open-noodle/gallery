@@ -1,3 +1,5 @@
+import { describe, expect, it } from 'vitest';
+import z from 'zod';
 import { AdminConfigDto, defaults, mapPublicConfig, mapUserConfig } from 'src/dtos/config.dto.js';
 import {
   GalleryClassificationSchema,
@@ -6,8 +8,6 @@ import {
   GalleryPetDetectionSchema,
   galleryConfigBool,
 } from 'src/gallery/config.dto.js';
-import { describe, expect, it } from 'vitest';
-import z from 'zod';
 
 describe('gallery config fragments', () => {
   it('coerces string booleans the way configBool does', () => {

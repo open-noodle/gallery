@@ -15,8 +15,8 @@ import { TagRepository } from 'src/repositories/tag.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SearchService } from 'src/services/search.service.js';
 import { upsertTags } from 'src/utils/tag.js';
-import { newMediumService } from 'test/medium.factory.js';
 import { createTwoOwnerSpace } from 'test/medium/fixtures/two-owner-space.js';
+import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 

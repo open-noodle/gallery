@@ -1,5 +1,5 @@
-import { asHumanReadable, hexOrBufferToBase64, HumanReadableSize } from 'src/utils/bytes.js';
 import { describe, expect, it } from 'vitest';
+import { HumanReadableSize, asHumanReadable, hexOrBufferToBase64 } from 'src/utils/bytes.js';
 
 describe('asHumanReadable', () => {
   it('should format 0 bytes', () => {

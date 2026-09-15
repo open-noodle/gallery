@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   Expression,
-  expressionBuilder,
   type ExpressionBuilder,
   type Insertable,
   type Kysely,
@@ -13,13 +12,14 @@ import {
   type Transaction,
   UpdateResult,
   type Updateable,
+  expressionBuilder,
   sql,
 } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash-es';
 import { InjectKysely } from 'nestjs-kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
-import { lockableProperties, type LockableProperty, Stack } from 'src/database.js';
+import { type LockableProperty, Stack, lockableProperties } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
   AssetFileType,
@@ -65,12 +65,12 @@ import {
 } from 'src/utils/database.js';
 import { globToPostgresRegex } from 'src/utils/misc.js';
 import {
+  type TimelineHiddenScope,
+  type TimelineRescue,
   hiddenFromOwnTimeline,
   spaceAssetPathBranches,
   spaceVisibilityGate,
-  type TimelineHiddenScope,
   timelineHiddenScopeIsEmpty,
-  type TimelineRescue,
 } from 'src/utils/shared-space-album-scope.js';
 
 export type AssetStats = Record<AssetType, number>;

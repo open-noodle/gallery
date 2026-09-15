@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
+import { vi } from 'vitest';
 import { AssetVisibility, SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -14,7 +15,6 @@ import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { vi } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 

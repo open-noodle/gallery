@@ -1,9 +1,9 @@
 import { HttpException } from '@nestjs/common';
+import z from 'zod';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AlbumService } from 'src/services/album.service.js';
 import { BaseService } from 'src/services/base.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
-import z from 'zod';
 
 export type GallerySkipReason = 'invalid-config' | 'no-access' | 'not-found' | 'unknown-method';
 export type GalleryDispatchResult = { ok: true } | { ok: false; reason: GallerySkipReason };

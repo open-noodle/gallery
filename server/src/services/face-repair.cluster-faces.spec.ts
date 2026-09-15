@@ -1,5 +1,5 @@
 import { FaceRepairService } from 'src/services/face-repair.service.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe(FaceRepairService.name, () => {
   let sut: FaceRepairService;

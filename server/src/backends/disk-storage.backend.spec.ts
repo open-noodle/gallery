@@ -3,9 +3,9 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { CacheControl } from 'src/enum.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('DiskStorageBackend', () => {
   let backend: DiskStorageBackend;

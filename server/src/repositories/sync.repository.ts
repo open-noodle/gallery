@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type Expression, type ExpressionBuilder, type Kysely, sql, type SqlBool } from 'kysely';
+import { type Expression, type ExpressionBuilder, type Kysely, type SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import type { SyncAck } from 'src/types.js';
 import { columns } from 'src/database.js';

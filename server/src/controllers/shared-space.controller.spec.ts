@@ -1,11 +1,11 @@
+import request from 'supertest';
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { Permission } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
-import request from 'supertest';
 import { errorDto } from 'test/medium/responses.js';
 import { factory } from 'test/small.factory.js';
-import { automock, ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
+import { ControllerContext, automock, controllerSetup, mockBaseService } from 'test/utils.js';
 
 describe(SharedSpaceController.name, () => {
   let ctx: ControllerContext;

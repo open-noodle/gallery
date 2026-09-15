@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { Insertable, Selectable } from 'kysely';
 import { isAbsolute } from 'node:path';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import type {
+  AccessibleIdentityFaceMatch,
+  SharedSpaceFaceMatchBackfillTarget,
+} from 'src/repositories/face-identity.repository.js';
+import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { Chunked, OnEvent, OnJob } from 'src/decorators.js';
@@ -50,11 +56,6 @@ import {
   SystemMetadataKey,
   VectorIndex,
 } from 'src/enum.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type {
-  AccessibleIdentityFaceMatch,
-  SharedSpaceFaceMatchBackfillTarget,
-} from 'src/repositories/face-identity.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -66,7 +67,6 @@ import {
   chooseAutomaticTargetIdentity,
 } from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
-import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import { getDimensions } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';

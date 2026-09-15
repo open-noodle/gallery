@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   FaceRepairScanRepository,
   RepairScanParams,
@@ -9,7 +10,6 @@ import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js
 import { DB } from 'src/schema/index.js';
 import { insertClusterGroup, insertPersonGroup, mediumFactory } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const PARAMS: RepairScanParams = {
   maxDistance: 0.5,

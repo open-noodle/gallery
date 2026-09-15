@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import {
   FaceRepairClusterFacesRequestSchema,
   FaceRepairClusterFacesResponseSchema,
@@ -9,7 +10,6 @@ import {
   FaceRepairScanTriggerRequestSchema,
   FaceRepairUnconfirmRequestSchema,
 } from 'src/dtos/face-repair.dto.js';
-import { describe, expect, it } from 'vitest';
 
 // face_repair_decline.id is a UUID v7 (@PrimaryGeneratedUuidV7Column). The remove DTO must accept it —
 // validating with z.uuidv4() rejected v7 ids with a 400, which broke "Undo" on the declined page.

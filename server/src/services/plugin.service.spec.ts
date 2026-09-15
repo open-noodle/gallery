@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { WorkflowType } from 'src/enum.js';
 import { PluginService } from 'src/services/plugin.service.js';
 import { newUuid } from 'test/small.factory.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const plugin = (overrides: Record<string, unknown> = {}) => ({
   id: newUuid(),

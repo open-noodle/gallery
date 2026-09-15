@@ -98,16 +98,6 @@ import { newMetadataRepositoryMock } from 'test/repositories/metadata.repository
 import { newStorageRepositoryMock } from 'test/repositories/storage.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
-import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
-import { ClassificationRepository } from 'src/repositories/classification.repository.js';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
-import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
-import { RepositoryInterface } from 'src/types.js';
 
 export type ControllerContext = {
   authenticate: Mock;

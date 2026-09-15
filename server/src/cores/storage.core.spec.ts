@@ -1,7 +1,7 @@
+import { vitest } from 'vitest';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, AssetPathType, ImageFormat, StorageFolder } from 'src/enum.js';
 import { getMocks } from 'test/utils.js';
-import { vitest } from 'vitest';
 
 vitest.mock('src/constants', () => ({
   IWorker: 'IWorker',

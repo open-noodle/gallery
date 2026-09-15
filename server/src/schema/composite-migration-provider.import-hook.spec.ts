@@ -1,5 +1,5 @@
-import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider.js';
 import { describe, expect, it } from 'vitest';
+import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider.js';
 
 // Unlike composite-migration-provider.spec.ts, this file does not mock `kysely/migration` — it
 // exercises the real FileMigrationProvider against on-disk fixtures to prove migrations actually

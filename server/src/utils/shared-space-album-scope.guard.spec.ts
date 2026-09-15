@@ -44,7 +44,7 @@
 //     inline DEFAULT_VISIBILITY gate). Those are outside this guard's detection
 //     model by construction; Fix C covers them with its own unit tests.
 //
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
