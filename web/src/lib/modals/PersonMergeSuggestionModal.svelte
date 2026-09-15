@@ -7,7 +7,7 @@
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
-  import { mergePerson, type PersonResponseDto } from '@immich/sdk';
+  import { mergePersonLegacy, type PersonResponseDto } from '@immich/sdk';
   import { FormModal, Icon, IconButton, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiCallMerge, mdiSwapHorizontal } from '@mdi/js';
   import { onMount, tick } from 'svelte';
@@ -52,7 +52,7 @@
             )
           : await runMergeWithCrossOwnerConfirmation(
               (confirmCrossOwner) =>
-                mergePerson({
+                mergePersonLegacy({
                   id: personToBeMergedInto.id,
                   mergePersonDto: confirmCrossOwner
                     ? { ids: [personToMerge.id], confirmCrossOwner: true }

@@ -1,4 +1,4 @@
-import { LoginResponseDto, QueueCommand, QueueName, getQueuesLegacy, mergePerson, updateConfig } from '@immich/sdk';
+import { LoginResponseDto, QueueCommand, QueueName, getQueuesLegacy, mergePersonLegacy, updateConfig } from '@immich/sdk';
 import { errorDto } from 'src/responses.js';
 import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
@@ -623,7 +623,7 @@ describe('/pet-detection', () => {
       const person = await utils.createPerson(admin.accessToken, { name: 'Merge Target Person' });
       const pet = await utils.createPet(admin.userId, 'sheep');
 
-      await mergePerson(
+      await mergePersonLegacy(
         { id: person.id, mergePersonDto: { ids: [pet] } },
         { headers: asBearerAuth(admin.accessToken) },
       );
@@ -639,7 +639,7 @@ describe('/pet-detection', () => {
       const person = await utils.createPerson(admin.accessToken, { name: 'Merge Source Person' });
       const pet = await utils.createPet(admin.userId, 'zebra');
 
-      await mergePerson(
+      await mergePersonLegacy(
         { id: pet, mergePersonDto: { ids: [person.id] } },
         { headers: asBearerAuth(admin.accessToken) },
       );
