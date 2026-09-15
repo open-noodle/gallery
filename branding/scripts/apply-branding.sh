@@ -785,6 +785,13 @@ patch_android() {
   sed -i "s/applicationId \"app\.alextran\.immich\"/applicationId \"${BUNDLE_ID}\"/g" "$build_gradle"
   sed -i "s/namespace \"app\.alextran\.immich\"/namespace \"${BUNDLE_ID}\"/g" "$build_gradle"
 
+  # build.gradle — app_name resValue (drives the Android app label; there is no
+  # strings.xml entry for it). Two forms: the default build and the PR-numbered debug
+  # variant, which interpolates ${prNumber} as a literal Groovy GString — escape the $
+  # so bash doesn't try to expand it.
+  sed -i "s/resValue \"string\", \"app_name\", \"Immich\"/resValue \"string\", \"app_name\", \"${NAME}\"/g" "$build_gradle"
+  sed -i "s/resValue \"string\", \"app_name\", \"Immich PR \${prNumber}\"/resValue \"string\", \"app_name\", \"${NAME} PR \${prNumber}\"/g" "$build_gradle"
+
   # AndroidManifest.xml — app label
   sed -i "s/android:label=\"Immich\"/android:label=\"${NAME}\"/g" "$manifest"
 
