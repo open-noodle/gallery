@@ -1,19 +1,44 @@
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
+import { CacheControl } from 'src/enum.js';
+import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 
-// Mock AWS SDK before importing the backend
+// vi.mock() calls are hoisted above every import by Vitest's transform regardless of where they
+// appear textually, so the imports above already see the mocked modules — this ordering is just
+// for readability (mocks grouped together before the test body that uses them).
 vi.mock('@aws-sdk/client-s3', () => {
   const mockSend = vi.fn();
   return {
-    S3Client: vi.fn(() => ({ send: mockSend, destroy: vi.fn() })),
-    PutObjectCommand: vi.fn((input: any) => ({ input, _type: 'PutObjectCommand' })),
-    GetObjectCommand: vi.fn((input: any) => ({ input, _type: 'GetObjectCommand' })),
-    HeadObjectCommand: vi.fn((input: any) => ({ input, _type: 'HeadObjectCommand' })),
-    DeleteObjectCommand: vi.fn((input: any) => ({ input, _type: 'DeleteObjectCommand' })),
-    ListObjectsV2Command: vi.fn((input: any) => ({ input, _type: 'ListObjectsV2Command' })),
-    DeleteObjectsCommand: vi.fn((input: any) => ({ input, _type: 'DeleteObjectsCommand' })),
+    // Vitest 4 invokes a mocked constructor via Reflect.construct when the code under test `new`s
+    // it; an arrow function has no [[Construct]] slot, so this must be a function expression.
+    S3Client: vi.fn(function () {
+      return { send: mockSend, destroy: vi.fn() };
+    }),
+    // All six below are also `new`-ed by the backend (or exist for parity with the real SDK), so
+    // they get the same function-expression treatment as S3Client above.
+    PutObjectCommand: vi.fn(function (input: any) {
+      return { input, _type: 'PutObjectCommand' };
+    }),
+    GetObjectCommand: vi.fn(function (input: any) {
+      return { input, _type: 'GetObjectCommand' };
+    }),
+    HeadObjectCommand: vi.fn(function (input: any) {
+      return { input, _type: 'HeadObjectCommand' };
+    }),
+    DeleteObjectCommand: vi.fn(function (input: any) {
+      return { input, _type: 'DeleteObjectCommand' };
+    }),
+    ListObjectsV2Command: vi.fn(function (input: any) {
+      return { input, _type: 'ListObjectsV2Command' };
+    }),
+    DeleteObjectsCommand: vi.fn(function (input: any) {
+      return { input, _type: 'DeleteObjectsCommand' };
+    }),
   };
 });
 
@@ -22,20 +47,11 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 vi.mock('@aws-sdk/lib-storage', () => ({
-  Upload: vi.fn().mockImplementation(() => ({
-    done: vi.fn().mockResolvedValue({}),
-  })),
+  // Same Reflect.construct requirement as S3Client above — Upload is also `new`-ed.
+  Upload: vi.fn().mockImplementation(function () {
+    return { done: vi.fn().mockResolvedValue({}) };
+  }),
 }));
-
-// These must stay below the vi.mock() calls above — they import the mocked modules, and moving
-// them earlier (as import-x/order would otherwise want) would import the real, un-mocked SDK.
-// eslint-disable-next-line import-x/order
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-// eslint-disable-next-line import-x/order
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
-import { CacheControl } from 'src/enum.js';
-import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 
 describe('S3StorageBackend', () => {
   let backend: S3StorageBackend;
