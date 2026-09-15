@@ -64,7 +64,7 @@ void main() {
   });
 
   test('forAsset fetches from the server for an asset the viewer does not own', () async {
-    when(() => api.getAssetPeople(any())).thenAnswer((_) async => [Person(id: 'space-person', name: 'Alice')]);
+    when(() => api.getAssetPeople(any())).thenAnswer((_) async => [const Person(id: 'space-person', name: 'Alice')]);
 
     final people = await container.read(Store.people.forAsset((id: 'shared-asset', ownerId: 'other-user')).future);
 
