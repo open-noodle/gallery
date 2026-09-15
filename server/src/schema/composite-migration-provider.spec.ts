@@ -1,5 +1,5 @@
 import { Migration } from 'kysely/migration';
-import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider';
+import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider.js';
 
 // Mock FileMigrationProvider to avoid filesystem access
 vi.mock('kysely/migration', async () => {

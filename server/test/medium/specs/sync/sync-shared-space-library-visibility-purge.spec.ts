@@ -6,13 +6,13 @@
 // shared_space_library_asset_audit, unioned (owner-gated) into LibraryAssetSync.
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
-import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { SyncRepository } from 'src/repositories/sync.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 import { v4 } from 'uuid';
 
 let defaultDatabase: Kysely<DB>;

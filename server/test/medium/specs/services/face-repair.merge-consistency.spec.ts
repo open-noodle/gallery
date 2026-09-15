@@ -1,14 +1,14 @@
 import { Kysely } from 'kysely';
-import { SourceType } from 'src/enum';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SourceType } from 'src/enum.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Temporal consistency across a person merge or hard delete.
 //

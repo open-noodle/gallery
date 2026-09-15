@@ -1,5 +1,5 @@
-import { FaceRepairService } from 'src/services/face-repair.service';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { newTestService, ServiceMocks } from 'test/utils.js';
 
 // #1061: getScanFlaggedFaces now carries photo context alongside each stored face. These tests are about
 // verdict-filtering behaviour (E3/E6/E9), not about the context fields themselves, so this fixture supplies

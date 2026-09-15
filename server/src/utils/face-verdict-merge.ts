@@ -1,5 +1,5 @@
 import { Kysely, sql, Transaction } from 'kysely';
-import { DB } from 'src/schema';
+import { DB } from 'src/schema/index.js';
 
 /**
  * Re-key negative/keep-here verdicts from merged-away source identities onto the surviving identity.

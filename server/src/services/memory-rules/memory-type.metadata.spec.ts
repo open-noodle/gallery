@@ -1,5 +1,5 @@
-import { MemoryType } from 'src/enum';
-import * as favoritesThrowback from 'src/services/memory-rules/favorites-throwback.rule';
+import { MemoryType } from 'src/enum.js';
+import * as favoritesThrowback from 'src/services/memory-rules/favorites-throwback.rule.js';
 import {
   buildDefaultMemoryTypeMap,
   getAdminAvailableMemoryTypeKeys,
@@ -9,17 +9,17 @@ import {
   isMemoryTypeEnabledForUser,
   MEMORY_TYPE_KEYS,
   MEMORY_TYPE_METADATA,
-} from 'src/services/memory-rules/memory-type.metadata';
-import * as monthRecap from 'src/services/memory-rules/month-recap.rule';
-import * as onThisDayPlace from 'src/services/memory-rules/on-this-day-place.rule';
-import * as peopleTogether from 'src/services/memory-rules/people-together.rule';
-import * as personThrowback from 'src/services/memory-rules/person-throwback.rule';
-import * as recentTrip from 'src/services/memory-rules/recent-trip.rule';
-import * as seasonRecap from 'src/services/memory-rules/season-recap.rule';
-import * as themed from 'src/services/memory-rules/themed.rule';
-import * as tripAnniversary from 'src/services/memory-rules/trip-anniversary.rule';
-import { curateTripAssets } from 'src/services/memory-rules/trip.util';
-import * as videoMoments from 'src/services/memory-rules/video-moments.rule';
+} from 'src/services/memory-rules/memory-type.metadata.js';
+import * as monthRecap from 'src/services/memory-rules/month-recap.rule.js';
+import * as onThisDayPlace from 'src/services/memory-rules/on-this-day-place.rule.js';
+import * as peopleTogether from 'src/services/memory-rules/people-together.rule.js';
+import * as personThrowback from 'src/services/memory-rules/person-throwback.rule.js';
+import * as recentTrip from 'src/services/memory-rules/recent-trip.rule.js';
+import * as seasonRecap from 'src/services/memory-rules/season-recap.rule.js';
+import * as themed from 'src/services/memory-rules/themed.rule.js';
+import * as tripAnniversary from 'src/services/memory-rules/trip-anniversary.rule.js';
+import { curateTripAssets } from 'src/services/memory-rules/trip.util.js';
+import * as videoMoments from 'src/services/memory-rules/video-moments.rule.js';
 
 /**
  * The smallest asset count each rule can actually emit. This is NOT always its pool gate:

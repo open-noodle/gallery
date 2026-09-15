@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
-import { AssetOrder, MemoryType } from 'src/enum';
-import { RecentTripMemoryRule } from 'src/services/memory-rules/recent-trip.rule';
+import { AssetOrder, MemoryType } from 'src/enum.js';
+import { RecentTripMemoryRule } from 'src/services/memory-rules/recent-trip.rule.js';
 
 const makeAsset = (id: string, localDateTime: string) => ({
   id,

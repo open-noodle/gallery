@@ -1,7 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
-import { setupPeopleAvatarMockApiRoutes } from 'src/ui/mock-network/people-avatar-network';
-import { assetViewerUtils } from '../timeline/utils';
-import { ensureDetailPanelVisible, setupAssetViewerFixture } from './utils';
+import { setupPeopleAvatarMockApiRoutes } from 'src/ui/mock-network/people-avatar-network.js';
+import { assetViewerUtils } from '../timeline/utils.js';
+import { ensureDetailPanelVisible, setupAssetViewerFixture } from './utils.js';
 
 const PERSON_THUMBNAIL = /\/api\/people\/[^/]+\/thumbnail/;
 

@@ -1,13 +1,13 @@
 import { DateTime } from 'luxon';
-import { AssetType } from 'src/enum';
-import { MemoryAsset, MemoryLocationCluster, MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { recencyBonus } from 'src/services/memory-rules/curation.util';
+import { AssetType } from 'src/enum.js';
+import { MemoryAsset, MemoryLocationCluster, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { recencyBonus } from 'src/services/memory-rules/curation.util.js';
 import {
   MAX_COUNT_BONUS,
   MAX_YEAR_BONUS,
   OnThisDayPlaceMemoryRule,
   SCORE_BASE as PLACE_SCORE_BASE,
-} from 'src/services/memory-rules/on-this-day-place.rule';
+} from 'src/services/memory-rules/on-this-day-place.rule.js';
 import {
   ASSET_CAP,
   MAX_CANDIDATES,
@@ -18,7 +18,7 @@ import {
   MIN_TRIP_DAYS,
   SCORE_BASE as TRIP_SCORE_BASE,
   TripAnniversaryMemoryRule,
-} from 'src/services/memory-rules/trip-anniversary.rule';
+} from 'src/services/memory-rules/trip-anniversary.rule.js';
 
 const TARGET = DateTime.fromISO('2026-06-10', { zone: 'utc' });
 
