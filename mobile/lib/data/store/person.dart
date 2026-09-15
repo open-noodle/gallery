@@ -74,6 +74,11 @@ final _allProvider = StreamProvider.autoDispose<List<Person>>((ref) async* {
 class PersonMutations extends StoreMutations {
   const PersonMutations._(super.ref);
 
+  // TODO(rewrite): these route unconditionally to the owner-only PATCH /people/{id}; a
+  // space-scoped person has no row there and would 404. Needs a spaceId branch (see
+  // DriftPeopleService.updateName/updateBirthday -> SharedSpaceApiRepository.updateSpacePerson)
+  // before any caller adopts Store.people for edits. Unused today, so this is latent.
+
   /// Update a person's name
   Future<int> updateName(String personId, String name) async {
     await read(personApiRepositoryProvider).update(personId, name: name);
