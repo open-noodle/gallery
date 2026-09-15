@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/data/server/person.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
@@ -12,7 +13,6 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_details/people_details.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
-import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:mocktail/mocktail.dart';
@@ -21,6 +21,8 @@ import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
 class _MockUserService extends Mock implements UserService {}
+
+class _MockPersonApi extends Mock implements PersonApiRepository {}
 
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto user) {
@@ -68,11 +70,16 @@ void main() {
   }
 
   Future<void> pumpStrip(WidgetTester tester, Person person) async {
+    // Owned by 'admin', viewed by 'viewer': Store.people.forAsset routes a non-owned asset
+    // through personApiRepositoryProvider (see PersonStore._forAssetProvider), so that's what
+    // this test controls rather than the local Drift DB.
     final asset = TestUtils.createRemoteAsset(id: 'asset-1', ownerId: 'admin');
+    final personApi = _MockPersonApi();
+    when(() => personApi.getAssetPeople(any())).thenAnswer((_) async => [person]);
     await tester.pumpConsumerWidget(
       PeopleDetails(asset: asset),
       overrides: [
-        peopleAssetProvider.overrideWith((ref, key) async => [person]),
+        personApiRepositoryProvider.overrideWithValue(personApi),
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith(
           (ref) => _StubCurrentUserNotifier(
