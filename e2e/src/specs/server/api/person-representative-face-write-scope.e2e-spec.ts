@@ -18,8 +18,8 @@
  * `utils.getPersonFaceAssetId` (reads the column over SQL) rather than the PUT/GET response body.
  */
 
-import { type SpaceContext, buildSpaceContext } from 'src/actors';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { type SpaceContext, buildSpaceContext } from 'src/actors.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

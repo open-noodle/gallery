@@ -1,6 +1,6 @@
 import { LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
-import { createUserDto } from 'src/fixtures';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import type { Response } from 'supertest';
 import request from 'supertest';
 

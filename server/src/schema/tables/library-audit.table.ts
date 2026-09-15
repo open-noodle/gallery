@@ -1,6 +1,6 @@
-import { AfterInsertTrigger, Column, CreateDateColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
-import { library_user_delete_after_audit } from 'src/schema/functions';
+import { AfterInsertTrigger, Column, CreateDateColumn, type Generated, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
+import { library_user_delete_after_audit } from 'src/schema/functions.js';
 
 @Table('library_audit')
 // When audit rows land, drop the corresponding library_user rows. See

@@ -7,7 +7,7 @@ import {
 } from '@immich/sdk';
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // E2E for the "add all filter results to album/space" feature in the filter bar.
 //

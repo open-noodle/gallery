@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
-import { AlbumUserRole, SharedSpaceRole } from 'src/enum';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AlbumUserRole, SharedSpaceRole } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 beforeAll(async () => {

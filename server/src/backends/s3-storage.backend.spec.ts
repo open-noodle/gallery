@@ -29,9 +29,9 @@ vi.mock('@aws-sdk/lib-storage', () => ({
 
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3StorageBackend } from 'src/backends/s3-storage.backend';
-import { CacheControl } from 'src/enum';
-import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface';
+import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
+import { CacheControl } from 'src/enum.js';
+import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 
 describe('S3StorageBackend', () => {
   let backend: S3StorageBackend;

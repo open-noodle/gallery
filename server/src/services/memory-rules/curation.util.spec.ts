@@ -8,7 +8,7 @@ import {
   recencyBonus,
   sampleAssetsAcrossGroups,
   sampleAssetsByTime,
-} from 'src/services/memory-rules/curation.util';
+} from 'src/services/memory-rules/curation.util.js';
 
 const asset = (id: string, iso: string) => ({ id, localDateTime: DateTime.fromISO(iso, { zone: 'utc' }).toJSDate() });
 

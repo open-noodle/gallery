@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole } from 'src/enum';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SharedSpaceRole } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Schema-level guarantees for album_space_asset's sync substrate (#764 Slice 5):
 //   - updateId bumps on UPDATE (the BEFORE-UPDATE trigger), enabling restore re-emit

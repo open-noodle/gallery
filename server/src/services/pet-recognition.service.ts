@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { JOBS_ASSET_PAGINATION_SIZE, PET_RECOGNITION_MODEL_NAMES } from 'src/constants';
-import { OnEvent, OnJob } from 'src/decorators';
-import { SystemConfig } from 'src/dtos/config.dto';
-import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum';
-import { ArgOf } from 'src/repositories/event.repository';
-import { BaseService } from 'src/services/base.service';
-import { JobItem, JobOf } from 'src/types';
-import { isPetDetectionEnabled, isPetRecognitionEnabled } from 'src/utils/misc';
+import { JOBS_ASSET_PAGINATION_SIZE, PET_RECOGNITION_MODEL_NAMES } from 'src/constants.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { SystemConfig } from 'src/dtos/config.dto.js';
+import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import { JobItem, type JobOf } from 'src/types.js';
+import { isPetDetectionEnabled, isPetRecognitionEnabled } from 'src/utils/misc.js';
 
 @Injectable()
 export class PetRecognitionService extends BaseService {

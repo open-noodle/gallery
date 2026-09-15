@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { BirthdayMemoryRule } from 'src/services/memory-rules/birthday.rule';
+import { BirthdayMemoryRule } from 'src/services/memory-rules/birthday.rule.js';
 
 describe(BirthdayMemoryRule.name, () => {
   it('creates a snapshot fallback birthday candidate from four single-year assets', async () => {

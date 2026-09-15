@@ -1,10 +1,10 @@
 import { Readable } from 'node:stream';
-import { StorageCore } from 'src/cores/storage.core';
-import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum';
-import { StorageMigrationService } from 'src/services/storage-migration.service';
-import { StorageService } from 'src/services/storage.service';
-import { mockEnvData } from 'test/repositories/config.repository.mock';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { StorageMigrationService } from 'src/services/storage-migration.service.js';
+import { StorageService } from 'src/services/storage.service.js';
+import { mockEnvData } from 'test/repositories/config.repository.mock.js';
+import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
 
 describe(StorageMigrationService.name, () => {
   let sut: StorageMigrationService;

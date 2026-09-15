@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetType } from 'src/enum';
-import { MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { SeasonRecapMemoryRule } from 'src/services/memory-rules/season-recap.rule';
+import { AssetType } from 'src/enum.js';
+import { MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { SeasonRecapMemoryRule } from 'src/services/memory-rules/season-recap.rule.js';
 
 const summerStart = DateTime.fromISO('2026-06-01', { zone: 'utc' });
 const winterStart = DateTime.fromISO('2026-12-01', { zone: 'utc' });

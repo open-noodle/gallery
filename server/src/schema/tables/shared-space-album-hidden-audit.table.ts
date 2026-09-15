@@ -1,5 +1,5 @@
-import { Column, CreateDateColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
+import { Column, CreateDateColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 // Append-only delete log for shared_space_album_hidden. Unhiding an album is a ROW DELETE,
 // so without this a synced client would never learn the row went away. FK-less by design

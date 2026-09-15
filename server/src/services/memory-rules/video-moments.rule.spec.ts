@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetType } from 'src/enum';
-import { MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { VideoMomentsMemoryRule } from 'src/services/memory-rules/video-moments.rule';
+import { AssetType } from 'src/enum.js';
+import { MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { VideoMomentsMemoryRule } from 'src/services/memory-rules/video-moments.rule.js';
 
 const target = DateTime.fromISO('2026-07-08', { zone: 'utc' });
 

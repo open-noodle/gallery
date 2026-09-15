@@ -11,20 +11,20 @@
  * two are asserted together.
  */
 import { Kysely } from 'kysely';
-import { StorageCore } from 'src/cores/storage.core';
-import { SharedLinkType, SharedSpaceRole } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { AlbumRepository } from 'src/repositories/album.repository';
-import { DownloadRepository } from 'src/repositories/download.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { DB } from 'src/schema';
-import { DownloadService } from 'src/services/download.service';
-import { newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { SharedLinkType, SharedSpaceRole } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { DownloadRepository } from 'src/repositories/download.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { DB } from 'src/schema/index.js';
+import { DownloadService } from 'src/services/download.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -11,8 +11,8 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
-import { UserTable } from 'src/schema/tables/user.table.js';
 import { library_after_insert } from 'src/schema/functions.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('library')
 @UpdatedAtTrigger('library_updatedAt')

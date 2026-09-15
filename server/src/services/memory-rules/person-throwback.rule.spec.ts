@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryPersonDayCount } from 'src/repositories/asset.repository';
-import { DormantPerson } from 'src/repositories/person.repository';
-import { DEFAULT_DORMANCY_MONTHS, PersonThrowbackMemoryRule } from 'src/services/memory-rules/person-throwback.rule';
+import { MemoryAsset, MemoryPersonDayCount } from 'src/repositories/asset.repository.js';
+import { DormantPerson } from 'src/repositories/person.repository.js';
+import { DEFAULT_DORMANCY_MONTHS, PersonThrowbackMemoryRule } from 'src/services/memory-rules/person-throwback.rule.js';
 
 const target = DateTime.fromISO('2026-08-13', { zone: 'utc' });
 

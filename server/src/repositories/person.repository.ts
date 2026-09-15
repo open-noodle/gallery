@@ -20,7 +20,14 @@ import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
 import { PersonTable } from 'src/schema/tables/person.table.js';
 import type { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
-import { asUuid, dummy, inSharedAlbum, petFacePredicate, removeUndefinedKeys, withFilePath } from 'src/utils/database.js';
+import {
+  asUuid,
+  dummy,
+  inSharedAlbum,
+  petFacePredicate,
+  removeUndefinedKeys,
+  withFilePath,
+} from 'src/utils/database.js';
 import { isLeapDayObserved } from 'src/utils/date.js';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';

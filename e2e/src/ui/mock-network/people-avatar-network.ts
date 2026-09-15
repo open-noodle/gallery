@@ -1,5 +1,5 @@
 import { BrowserContext } from '@playwright/test';
-import { randomThumbnail } from 'src/ui/generators/timeline/images';
+import { randomThumbnail } from 'src/ui/generators/timeline/images.js';
 
 export type MockAvatarPerson = {
   id: string;

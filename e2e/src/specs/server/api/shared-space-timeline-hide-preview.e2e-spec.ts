@@ -13,8 +13,8 @@
  * real, and the zero case returns 0 rather than erroring.
  */
 
-import { createUserDto } from 'src/fixtures';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

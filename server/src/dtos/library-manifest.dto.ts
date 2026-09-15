@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { AssetTypeSchema, ChecksumAlgorithm } from 'src/enum';
+import { AssetTypeSchema, ChecksumAlgorithm } from 'src/enum.js';
 import z from 'zod';
 
 const LibraryManifestOwnerSchema = z

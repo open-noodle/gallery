@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MANIFEST_PAGE_SIZE, MANIFEST_SCHEMA_VERSION } from 'src/constants';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { LibraryManifestAssetDto, LibraryManifestResponseDto } from 'src/dtos/library-manifest.dto';
-import { BaseService } from 'src/services/base.service';
-import { hexOrBufferToBase64 } from 'src/utils/bytes';
+import { MANIFEST_PAGE_SIZE, MANIFEST_SCHEMA_VERSION } from 'src/constants.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { LibraryManifestAssetDto, LibraryManifestResponseDto } from 'src/dtos/library-manifest.dto.js';
+import { BaseService } from 'src/services/base.service.js';
+import { hexOrBufferToBase64 } from 'src/utils/bytes.js';
 
 @Injectable()
 export class LibraryManifestService extends BaseService {

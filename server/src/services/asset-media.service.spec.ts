@@ -11,7 +11,7 @@ import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
-import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName, AssetStatus } from 'src/enum.js';
+import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum.js';
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';

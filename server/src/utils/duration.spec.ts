@@ -1,4 +1,4 @@
-import { formatSecondsToDuration, parseDurationToSeconds } from 'src/utils/duration';
+import { formatSecondsToDuration, parseDurationToSeconds } from 'src/utils/duration.js';
 import { describe, expect, it } from 'vitest';
 
 describe('parseDurationToSeconds', () => {

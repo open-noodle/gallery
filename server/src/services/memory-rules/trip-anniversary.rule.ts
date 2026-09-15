@@ -1,8 +1,8 @@
 import { DateTime } from 'luxon';
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { dominantBy, recencyBonus } from 'src/services/memory-rules/curation.util';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
-import { curateTripAssets, findTripStartingOn, inferHome, placeKeyOf } from 'src/services/memory-rules/trip.util';
+import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { dominantBy, recencyBonus } from 'src/services/memory-rules/curation.util.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
+import { curateTripAssets, findTripStartingOn, inferHome, placeKeyOf } from 'src/services/memory-rules/trip.util.js';
 
 export const MIN_PROBE_ASSETS = 3;
 export const MIN_PROBE_DOMINANCE = 0.6;

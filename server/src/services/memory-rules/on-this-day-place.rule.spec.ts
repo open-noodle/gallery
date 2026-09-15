@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetType } from 'src/enum';
-import { MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { recencyBonus } from 'src/services/memory-rules/curation.util';
+import { AssetType } from 'src/enum.js';
+import { MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { recencyBonus } from 'src/services/memory-rules/curation.util.js';
 import {
   ASSET_CAP,
   MAX_COUNT_BONUS,
@@ -9,7 +9,7 @@ import {
   OnThisDayPlaceMemoryRule,
   SCORE_BASE,
   YEAR_BONUS,
-} from 'src/services/memory-rules/on-this-day-place.rule';
+} from 'src/services/memory-rules/on-this-day-place.rule.js';
 
 const target = DateTime.fromISO('2026-06-10', { zone: 'utc' });
 

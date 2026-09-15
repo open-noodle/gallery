@@ -8,7 +8,7 @@ import {
   FaceRepairScanStatusSchema,
   FaceRepairScanTriggerRequestSchema,
   FaceRepairUnconfirmRequestSchema,
-} from 'src/dtos/face-repair.dto';
+} from 'src/dtos/face-repair.dto.js';
 import { describe, expect, it } from 'vitest';
 
 // face_repair_decline.id is a UUID v7 (@PrimaryGeneratedUuidV7Column). The remove DTO must accept it —

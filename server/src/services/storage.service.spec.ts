@@ -1,4 +1,4 @@
-import { SystemMetadataKey, JobStatus } from 'src/enum.js';
+import { JobStatus, SystemMetadataKey } from 'src/enum.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';

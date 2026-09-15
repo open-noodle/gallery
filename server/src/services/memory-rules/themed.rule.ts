@@ -1,8 +1,8 @@
 import { DateTime } from 'luxon';
-import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
-import { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port';
-import { themeForMonth } from 'src/services/memory-rules/theme.catalog';
+import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
+import { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import { themeForMonth } from 'src/services/memory-rules/theme.catalog.js';
 
 export const TRIGGER_DAY = 22;
 export const MAX_YEARS_BACK = 3;

@@ -13,9 +13,9 @@ import {
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { person_delete_audit } from 'src/schema/functions.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
-import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 
 @Table('person')
 @Index({

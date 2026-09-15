@@ -1,5 +1,5 @@
-import { RepairPlan } from 'src/services/face-repair.service';
-import { summarizeRepairPlan } from 'src/services/face-repair.summary';
+import { RepairPlan } from 'src/services/face-repair.service.js';
+import { summarizeRepairPlan } from 'src/services/face-repair.summary.js';
 
 const plan: RepairPlan = {
   toRepair: [

@@ -1,7 +1,7 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { removeMember as removeSpaceMember, SharedSpaceRole, updateAssets, updateMemberTimeline } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // Asset-creation helper: createAsset in utils doesn't set GPS coords, so we
 // patch the asset after upload via the SDK's bulk update endpoint.

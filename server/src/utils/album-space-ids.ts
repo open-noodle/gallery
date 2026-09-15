@@ -7,9 +7,9 @@
 // the same answer — the album time-bucket browse (`timeline.service`) and the album archive
 // (`download.service`, #1048) — and they must agree, or "download all" ships something other than
 // what the grid just showed.
-import { AuthDto } from 'src/dtos/auth.dto';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { sharedLinkPublisherRoles } from 'src/utils/shared-link-space-tether';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { sharedLinkPublisherRoles } from 'src/utils/shared-link-space-tether.js';
 
 /**
  * The live member-spaces whose contributions `albumId` may surface for this caller, or `undefined`

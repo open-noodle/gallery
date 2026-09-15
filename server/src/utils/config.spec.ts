@@ -1,15 +1,15 @@
-import { defaults } from 'src/dtos/config.dto';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
+import { defaults } from 'src/dtos/config.dto.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import {
   deriveSuggestionBand,
   foldLegacyFaceSuggestionConfig,
   getConfig,
   migrateLegacyPetDetectionModel,
-} from 'src/utils/config';
-import { mockEnvData, newConfigRepositoryMock } from 'test/repositories/config.repository.mock';
-import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock';
+} from 'src/utils/config.js';
+import { mockEnvData, newConfigRepositoryMock } from 'test/repositories/config.repository.mock.js';
+import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const legacy = (suggestionMaxDistance: number, maxDistance?: number) => ({

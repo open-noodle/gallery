@@ -1,25 +1,25 @@
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { AssetVisibility, JobStatus, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SearchRepository } from 'src/repositories/search.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { DB } from 'src/schema';
-import { FaceSuggestionService } from 'src/services/face-suggestion.service';
-import { PersonService } from 'src/services/person.service';
-import { SharedSpaceService } from 'src/services/shared-space.service';
-import { clearConfigCache } from 'src/utils/config';
-import { MediumTestContext, newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, JobStatus, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { DB } from 'src/schema/index.js';
+import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
+import { PersonService } from 'src/services/person.service.js';
+import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
+import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // D3 of the face-verdict remediation work: the suggestion engine must
 // consult the SAME shared verdict layer the Face Cleanup engine writes to. This suite drives the REAL

@@ -2,10 +2,10 @@
 // Exercises spaceAlbumAssetExists / spaceAssetPathBranches against a real DB over
 // every access-path combination and edge case (spec §3.2).
 import { Kysely } from 'kysely';
-import { SharedSpaceRole } from 'src/enum';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
+import { SharedSpaceRole } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
@@ -13,9 +13,9 @@ import {
   spaceLibraryAssetExists,
   type AlbumTimelineGate,
   type SpaceScope,
-} from 'src/utils/shared-space-album-scope';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+} from 'src/utils/shared-space-album-scope.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

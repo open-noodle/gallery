@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { TimeBucketSize } from 'src/enum';
+import { TimeBucketSize } from 'src/enum.js';
 
 const TIME_BUCKET_PATTERN = /^([+]?\d{4,6})-(\d{2})-(\d{2})(?:T00:00:00(?:\.000)?Z)?$/;
 

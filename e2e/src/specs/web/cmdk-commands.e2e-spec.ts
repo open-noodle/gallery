@@ -1,6 +1,6 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 // Task 16 — cmdk v1.3.0 commands E2E.
 //

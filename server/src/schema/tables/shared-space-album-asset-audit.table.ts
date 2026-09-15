@@ -1,5 +1,5 @@
-import { Column, CreateDateColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
+import { Column, CreateDateColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 @Table('shared_space_album_asset_audit')
 // gaps-7: SharedSpaceAlbumToAssetSync.getDeletes scans by albumId IN (...) AND id > ack AND id <

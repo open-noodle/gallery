@@ -11,6 +11,9 @@ import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFace, UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
+import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
+import { computePhysicalUsage } from 'src/gallery/storage-usage.js';
+import { RangeNotSatisfiableError, ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -21,6 +24,7 @@ import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -57,7 +61,9 @@ import { ServerInfoRepository } from 'src/repositories/server-info.repository.js
 import { SessionRepository } from 'src/repositories/session.repository.js';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
 import { SyncRepository } from 'src/repositories/sync.repository.js';
@@ -65,6 +71,7 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { TagRepository } from 'src/repositories/tag.repository.js';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository.js';
 import { TrashRepository } from 'src/repositories/trash.repository.js';
+import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { VersionHistoryRepository } from 'src/repositories/version-history.repository.js';
 import { VideoStreamRepository } from 'src/repositories/video-stream.repository.js';
@@ -76,11 +83,6 @@ import { FaceVerdictService } from 'src/services/face-verdict.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
 import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
-import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
-import { computePhysicalUsage } from 'src/gallery/storage-usage.js';
-import { RangeNotSatisfiableError, ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import {
   ContentDisposition,
   ImmichFileResponse,
@@ -88,8 +90,6 @@ import {
   ImmichRedirectResponse,
   ImmichStreamResponse,
 } from 'src/utils/file.js';
-import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
-import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { clamp } from 'src/utils/misc.js';
 
 type FaceThumbnailBounds = {

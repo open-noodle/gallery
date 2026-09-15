@@ -1,12 +1,12 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility } from 'src/enum';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { newEmbedding } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility } from 'src/enum.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { newEmbedding } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let database: Kysely<DB>;
 

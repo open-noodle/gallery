@@ -1,13 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AssetFace } from 'src/database';
-import { OnJob } from 'src/decorators';
-import { FaceRepairResolveRequest, FaceRepairResolveResponse, FaceRepairScanParams } from 'src/dtos/face-repair.dto';
-import { CacheControl, JobName, JobStatus, QueueName } from 'src/enum';
-import { RepairScanPerson, RepairScanRow, ScanInProgressError } from 'src/repositories/face-repair-scan.repository';
-import { OwnerPersonRow, PersonMetadataRow } from 'src/repositories/face-repair.repository';
-import { BaseService } from 'src/services/base.service';
-import { RepairReport, summarizeRepairPlan } from 'src/services/face-repair.summary';
-import { JobOf } from 'src/types';
+import { AssetFace } from 'src/database.js';
+import { OnJob } from 'src/decorators.js';
+import { FaceRepairResolveRequest, FaceRepairResolveResponse, FaceRepairScanParams } from 'src/dtos/face-repair.dto.js';
+import { CacheControl, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { RepairScanPerson, RepairScanRow, ScanInProgressError } from 'src/repositories/face-repair-scan.repository.js';
+import { OwnerPersonRow, PersonMetadataRow } from 'src/repositories/face-repair.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import { RepairReport, summarizeRepairPlan } from 'src/services/face-repair.summary.js';
+import type { JobOf } from 'src/types.js';
 import {
   FlagParams,
   ReattributionTally,
@@ -18,11 +18,11 @@ import {
   findOverlappingIds,
   findUnresolvableIds,
   tallyReattribution,
-} from 'src/utils/face-repair';
-import { FaceWithPhotoContext } from 'src/utils/face-review';
-import { ImmichMediaResponse } from 'src/utils/file';
-import { mimeTypes } from 'src/utils/mime-types';
-import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
+} from 'src/utils/face-repair.js';
+import { FaceWithPhotoContext } from 'src/utils/face-review.js';
+import { ImmichMediaResponse } from 'src/utils/file.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
+import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
 
 export interface ReattributionCandidate extends ReattributionTally {
   assetFaceId: string;
@@ -128,7 +128,7 @@ export interface RunRepairResult {
   executed?: RepairExecution;
 }
 
-export { RepairReport } from 'src/services/face-repair.summary';
+export type { RepairReport } from 'src/services/face-repair.summary.js';
 
 @Injectable()
 export class FaceRepairService extends BaseService {

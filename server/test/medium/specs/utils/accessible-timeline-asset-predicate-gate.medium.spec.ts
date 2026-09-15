@@ -10,13 +10,13 @@
 // runs) while the resource under test is linked through a DIFFERENT, non-timeline space. Then a
 // missing gate leaks the second space's assets.
 import { Kysely, sql } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { accessibleTimelineAssetPredicate } from 'src/utils/shared-space-album-scope';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { accessibleTimelineAssetPredicate } from 'src/utils/shared-space-album-scope.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

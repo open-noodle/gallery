@@ -5,7 +5,11 @@ import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
-import { asBaseEb, sharedLinkAssetIsServable, sharedLinkCreatorCanPublish } from 'src/utils/shared-link-space-tether.js';
+import {
+  asBaseEb,
+  sharedLinkAssetIsServable,
+  sharedLinkCreatorCanPublish,
+} from 'src/utils/shared-link-space-tether.js';
 import {
   spaceAssetPathBranches,
   spaceVisibilityGate,

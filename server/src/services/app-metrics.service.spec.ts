@@ -1,12 +1,12 @@
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
-import { AssetType, ImmichWorker, QueueName } from 'src/enum';
-import { AppMetricsRepository } from 'src/repositories/app-metrics.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { TelemetryRepository } from 'src/repositories/telemetry.repository';
-import { AppMetricsService } from 'src/services/app-metrics.service';
-import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock';
+import { AssetType, ImmichWorker, QueueName } from 'src/enum.js';
+import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { TelemetryRepository } from 'src/repositories/telemetry.repository.js';
+import { AppMetricsService } from 'src/services/app-metrics.service.js';
+import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
 import { beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
 
 const observe = async (callback: ObservableCallback) => {

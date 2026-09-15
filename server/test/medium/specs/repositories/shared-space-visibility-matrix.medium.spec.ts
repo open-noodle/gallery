@@ -21,29 +21,29 @@
  */
 
 import { Kysely } from 'kysely';
-import { AlbumUserRole, AssetVisibility, TimeBucketSize } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { ActivityRepository } from 'src/repositories/activity.repository';
-import { AlbumUserRepository } from 'src/repositories/album-user.repository';
-import { AlbumRepository } from 'src/repositories/album.repository';
-import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository';
-import { DownloadRepository } from 'src/repositories/download.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { MapRepository } from 'src/repositories/map.repository';
-import { MemoryRepository } from 'src/repositories/memory.repository';
-import { SearchRepository } from 'src/repositories/search.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { SyncBackfillOptions, SyncRepository } from 'src/repositories/sync.repository';
-import { TagRepository } from 'src/repositories/tag.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { ViewRepository } from 'src/repositories/view-repository';
-import { DB } from 'src/schema';
-import { AlbumService } from 'src/services/album.service';
-import { BaseService } from 'src/services/base.service';
-import { upsertTags } from 'src/utils/tag';
-import { newMediumService } from 'test/medium.factory';
-import { factory, newEmbedding } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AlbumUserRole, AssetVisibility, TimeBucketSize } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { ActivityRepository } from 'src/repositories/activity.repository.js';
+import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
+import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository.js';
+import { DownloadRepository } from 'src/repositories/download.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MapRepository } from 'src/repositories/map.repository.js';
+import { MemoryRepository } from 'src/repositories/memory.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { SyncBackfillOptions, SyncRepository } from 'src/repositories/sync.repository.js';
+import { TagRepository } from 'src/repositories/tag.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { ViewRepository } from 'src/repositories/view-repository.js';
+import { DB } from 'src/schema/index.js';
+import { AlbumService } from 'src/services/album.service.js';
+import { BaseService } from 'src/services/base.service.js';
+import { upsertTags } from 'src/utils/tag.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory, newEmbedding } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
