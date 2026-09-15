@@ -5714,6 +5714,44 @@ describe(PersonService.name, () => {
     });
   });
 
+  describe('mergePeople', () => {
+    // immich-31456 added this batch endpoint on top of a multi-owner cluster-group model: `ids[0]`
+    // becomes the target and every other id in the array — including rows owned by OTHER users
+    // sharing its personGroupId — merges into it directly, no per-owner authorization gate. Gallery
+    // adopted cluster groups inert (person_personGroupId_key is 1:1, ClusterGroupController is
+    // unmounted), so there is only ever one row per personGroupId here. `mergePeople` reflects that:
+    // it does not group `ids` by owner via PersonRepository.getForMergePerson (upstream's
+    // cluster-group primitive, present on the repository but never called) — it delegates the whole
+    // list straight to `mergePerson`, the fork's own confirmCrossOwner-gated path. This pins that
+    // shape so a rebase cannot quietly reintroduce a second, ungated merge branch here.
+    it('collapses to a single-owner merge via mergePerson because personGroupId is 1:1 on Gallery', async () => {
+      const auth = AuthFactory.create();
+      const [target, source] = [
+        PersonFactory.create({ personGroupId: 'person-x' }),
+        PersonFactory.create({ personGroupId: 'person-y' }),
+      ];
+      const identityMergePropagation = useIdentityMergePropagation();
+
+      identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: source.personGroupId, success: true }]);
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce(target);
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce(source);
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([target.personGroupId]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([source.personGroupId]));
+
+      await expect(
+        sut.mergePeople(auth, { ids: [target.personGroupId, source.personGroupId] } as never),
+      ).resolves.toEqual([{ id: source.personGroupId, success: true }]);
+
+      expect(mocks.person.getForMergePerson).not.toHaveBeenCalled();
+      expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
+        auth,
+        target.personGroupId,
+        [source.personGroupId],
+        expect.any(Function),
+      );
+    });
+  });
+
   describe('mergePerson cross-owner policy', () => {
     // §5.4 parity: merging two of your OWN people still propagates through any identity they share with other
     // users. Before #733 this endpoint would silently merge two of another user's people. It now hands the
