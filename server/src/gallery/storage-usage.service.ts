@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { OnEvent } from 'src/decorators.js';
 import { ImmichWorker, JobName } from 'src/enum.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 
 @Injectable()

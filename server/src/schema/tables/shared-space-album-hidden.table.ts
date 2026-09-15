@@ -9,7 +9,7 @@ import {
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { shared_space_album_hidden_delete_audit } from 'src/schema/functions.js';
 import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';

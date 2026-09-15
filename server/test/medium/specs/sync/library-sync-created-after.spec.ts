@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { accessibleLibraries, SyncRepository } from 'src/repositories/sync.repository.js';
+import { SyncRepository, accessibleLibraries } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';

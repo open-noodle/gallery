@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AssetVisibility } from 'src/enum.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
@@ -10,7 +11,6 @@ import { FacePersonVerdictStatus } from 'src/schema/tables/face-person-verdict.t
 import { BaseService } from 'src/services/base.service.js';
 import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 

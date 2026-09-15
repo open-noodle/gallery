@@ -10,7 +10,7 @@ import { AuthFactory } from 'test/factories/auth.factory.js';
 import { PersonFactory } from 'test/factories/person.factory.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { getForAssetFace } from 'test/mappers.js';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 describe(FaceSuggestionService.name, () => {
   let sut: FaceSuggestionService;

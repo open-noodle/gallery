@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
+import { vi } from 'vitest';
 import { JobName, SourceType } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -24,7 +25,6 @@ import { FaceRepairResolveErrorCode, FaceRepairService } from 'src/services/face
 import { applyVerdictFilters } from 'src/utils/face-repair.js';
 import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { vi } from 'vitest';
 
 const EMBEDDING = '[' + Array.from({ length: 512 }, () => 1).join(',') + ']';
 

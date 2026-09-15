@@ -1,11 +1,11 @@
 import { CreateBucketCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { CacheControl } from 'src/enum.js';
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const canRunDocker = process.env.IMMICH_TEST_DOCKER === 'true';
 

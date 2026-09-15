@@ -1,7 +1,7 @@
 import { DatabaseConnectionParams, schemaDiff, schemaFromCode, schemaFromDatabase } from '@immich/sql-tools';
+import { describe, expect, it } from 'vitest';
 import { immich_uuid_v7 } from 'src/schema/functions.js';
 import 'src/schema/index.js';
-import { describe, expect, it } from 'vitest';
 
 // The medium global setup migrates the `mich` template DB (all upstream + gallery migrations), so its
 // live schema is exactly what a freshly-migrated instance boots with. This mirrors

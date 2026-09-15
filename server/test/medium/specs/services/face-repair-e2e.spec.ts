@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { Mocked } from 'vitest';
 import { AssetVisibility, JobName, SourceType } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -18,7 +19,6 @@ import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { PersonService } from 'src/services/person.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { Mocked } from 'vitest';
 
 // Disjoint-axis embeddings (cosine distance ~1.0) stand in for genuinely different people.
 // newEmbedding() all-positive components leave two vectors ~0.75 similar — unusable here.

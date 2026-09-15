@@ -19,9 +19,9 @@ import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
 import { asUuid } from 'src/utils/database.js';
 import {
+  type TimelineHiddenScope,
   hiddenFromOwnTimeline,
   spaceAlbumAssetExists,
-  type TimelineHiddenScope,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
 

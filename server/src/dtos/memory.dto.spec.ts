@@ -1,4 +1,4 @@
-import { mapMemory, MemoryCreateDto, MemoryResponseDto } from 'src/dtos/memory.dto.js';
+import { MemoryCreateDto, MemoryResponseDto, mapMemory } from 'src/dtos/memory.dto.js';
 import { MemoryType } from 'src/enum.js';
 import { RuleMemoryData } from 'src/types.js';
 import { MemoryFactory } from 'test/factories/memory.factory.js';

@@ -1,4 +1,4 @@
-import { Kysely, sql, Transaction } from 'kysely';
+import { Kysely, Transaction, sql } from 'kysely';
 import { DB } from 'src/schema/index.js';
 
 /**
