@@ -7,10 +7,10 @@ import { AssetVisibility } from '@immich/sdk';
 import { DateTime } from 'luxon';
 import { writeFileSync } from 'node:fs';
 import { SeededRandom } from 'src/ui/generators/timeline/utils.js';
-import type { DayPattern, MonthDistribution } from './distribution-patterns';
-import { ASSET_DISTRIBUTION, DAY_DISTRIBUTION } from './distribution-patterns';
-import type { MockTimelineAsset, MockTimelineData, SerializedTimelineData, TimelineConfig } from './timeline-config';
-import { ASPECT_RATIO_WEIGHTS, GENERATION_CONSTANTS, validateTimelineConfig } from './timeline-config';
+import type { DayPattern, MonthDistribution } from './distribution-patterns.js';
+import { ASSET_DISTRIBUTION, DAY_DISTRIBUTION } from './distribution-patterns.js';
+import type { MockTimelineAsset, MockTimelineData, SerializedTimelineData, TimelineConfig } from './timeline-config.js';
+import { ASPECT_RATIO_WEIGHTS, GENERATION_CONSTANTS, validateTimelineConfig } from './timeline-config.js';
 
 /**
  * Generate a random aspect ratio based on weighted probabilities

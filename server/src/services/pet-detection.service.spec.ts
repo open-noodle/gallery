@@ -1,9 +1,9 @@
-import { AssetVisibility, ImmichWorker, JobName, JobStatus } from 'src/enum';
-import { PetDetectionService } from 'src/services/pet-detection.service';
-import { clearConfigCache } from 'src/utils/config';
-import { AssetFactory } from 'test/factories/asset.factory';
-import { systemConfigStub } from 'test/fixtures/system-config.stub';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils';
+import { AssetVisibility, ImmichWorker, JobName, JobStatus } from 'src/enum.js';
+import { PetDetectionService } from 'src/services/pet-detection.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
+import { AssetFactory } from 'test/factories/asset.factory.js';
+import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
+import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
 
 const makePerson = (overrides: Record<string, unknown> = {}) => ({
   personGroupId: 'person-id',

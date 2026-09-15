@@ -1,4 +1,4 @@
-import { PersonResponseDto } from 'src/dtos/person.dto';
+import { PersonResponseDto } from 'src/dtos/person.dto.js';
 
 type ResolvablePerson = Pick<PersonResponseDto, 'id' | 'name' | 'birthDate'>;
 

@@ -1,10 +1,10 @@
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
-import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service';
-import { newTestService } from 'test/utils';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto.js';
+import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service.js';
+import { newTestService } from 'test/utils.js';
 import { type Mock, describe, expect, it, vi } from 'vitest';
 
 const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');

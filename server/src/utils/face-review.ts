@@ -1,6 +1,6 @@
 import { Expression, ExpressionBuilder, ReferenceExpression, SqlBool } from 'kysely';
-import { DB } from 'src/schema';
-import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
+import { DB } from 'src/schema/index.js';
+import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
 
 /**
  * A face is REVIEWABLE if a human may be shown its crop by either face-review engine.

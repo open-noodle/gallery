@@ -1,14 +1,14 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
-import { AssetVisibility, SourceType } from 'src/enum';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { mediumFactory, newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SourceType } from 'src/enum.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { mediumFactory, newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

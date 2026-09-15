@@ -11,9 +11,9 @@ import {
   randomPreview,
   randomThumbnail,
   TimelineData,
-} from 'src/ui/generators/timeline';
+} from 'src/ui/generators/timeline.js';
 import { sleep } from 'src/ui/specs/timeline/utils.js';
-import { MINIMAL_MP4_BUFFER } from './face-editor-network';
+import { MINIMAL_MP4_BUFFER } from './face-editor-network.js';
 
 export class TimelineTestContext {
   slowBucket = false;

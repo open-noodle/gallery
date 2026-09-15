@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { AlbumNameDto } from 'src/dtos/album-name.dto';
+import { AlbumNameDto } from 'src/dtos/album-name.dto.js';
 import {
   AddUsersDto,
   AlbumResponseDto,

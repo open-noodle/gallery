@@ -7,7 +7,7 @@
  */
 
 import { LoginResponseDto } from '@immich/sdk';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

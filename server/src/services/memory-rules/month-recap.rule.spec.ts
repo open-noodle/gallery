@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetType } from 'src/enum';
-import { MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { MonthRecapMemoryRule } from 'src/services/memory-rules/month-recap.rule';
+import { AssetType } from 'src/enum.js';
+import { MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MonthRecapMemoryRule } from 'src/services/memory-rules/month-recap.rule.js';
 
 const target = DateTime.fromISO('2026-07-01', { zone: 'utc' });
 

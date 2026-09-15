@@ -1,18 +1,18 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Kysely, sql, Transaction } from 'kysely';
-import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto';
-import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { IPersonJob } from 'src/types';
-import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code';
+import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
+import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { IPersonJob } from 'src/types.js';
+import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code.js';
 
 export type MergeProfileKind = 'person' | 'space-person';
 

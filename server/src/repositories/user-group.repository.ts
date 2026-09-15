@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, Updateable } from 'kysely';
+import { Insertable, Kysely, type Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { DummyValue, GenerateSql } from 'src/decorators';
-import { DB } from 'src/schema';
-import { UserGroupTable } from 'src/schema/tables/user-group.table';
+import { DummyValue, GenerateSql } from 'src/decorators.js';
+import { DB } from 'src/schema/index.js';
+import { UserGroupTable } from 'src/schema/tables/user-group.table.js';
 
 @Injectable()
 export class UserGroupRepository {

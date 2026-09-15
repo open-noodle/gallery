@@ -1,6 +1,6 @@
 import { ForeignKeyColumn, PrimaryColumn, Table } from '@immich/sql-tools';
-import { AssetTable } from 'src/schema/tables/asset.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('asset_duplicate_checksum')
 export class AssetDuplicateChecksumTable {

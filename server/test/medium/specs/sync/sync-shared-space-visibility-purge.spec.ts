@@ -18,11 +18,11 @@
 // end-to-end verification are documented follow-ups (out of scope here).
 
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

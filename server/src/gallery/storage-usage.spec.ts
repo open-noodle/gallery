@@ -1,4 +1,4 @@
-import { getDerivativeAssetId } from 'src/gallery/storage-usage';
+import { getDerivativeAssetId } from 'src/gallery/storage-usage.js';
 
 describe('getDerivativeAssetId', () => {
   const id = '0f9b1e2c-4a5d-4c8e-9f10-2b3c4d5e6f70';

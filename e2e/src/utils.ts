@@ -87,7 +87,7 @@ import { io, type Socket } from 'socket.io-client';
 import { loginDto, signupDto } from 'src/fixtures.js';
 import { makeRandomImage } from 'src/generators.js';
 import request from 'supertest';
-import { playwrightDbHost, playwrightDbPort, playwrightHost, playwriteBaseUrl } from '../playwright.config';
+import { playwrightDbHost, playwrightDbPort, playwrightHost, playwriteBaseUrl } from '../playwright.config.js';
 
 export type { Emitter } from '@socket.io/component-emitter';
 

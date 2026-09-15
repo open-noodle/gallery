@@ -2,18 +2,18 @@ import {
   AfterDeleteTrigger,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Index,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { album_space_asset_delete_audit } from 'src/schema/functions';
-import { AlbumTable } from 'src/schema/tables/album.table';
-import { AssetTable } from 'src/schema/tables/asset.table';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { album_space_asset_delete_audit } from 'src/schema/functions.js';
+import { AlbumTable } from 'src/schema/tables/album.table.js';
+import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // A cross-owner contribution: a space photo the contributor does NOT own, bookmarked into a
 // space-linked album (#764). Deliberately NOT `album_asset` — it must never become a permanent

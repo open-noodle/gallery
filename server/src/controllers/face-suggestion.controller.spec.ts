@@ -1,9 +1,9 @@
-import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller';
-import { Permission } from 'src/enum';
-import { FaceSuggestionService } from 'src/services/face-suggestion.service';
+import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller.js';
+import { Permission } from 'src/enum.js';
+import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
 import request from 'supertest';
-import { errorDto } from 'test/medium/responses';
-import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
+import { errorDto } from 'test/medium/responses.js';
+import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 describe(FaceSuggestionController.name, () => {
   let ctx: ControllerContext;

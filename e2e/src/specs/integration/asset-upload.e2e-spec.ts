@@ -1,7 +1,7 @@
 import { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import type { Socket } from 'socket.io-client';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 test.describe('Asset Upload Integration', () => {
   let admin: LoginResponseDto;

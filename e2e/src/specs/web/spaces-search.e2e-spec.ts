@@ -1,6 +1,6 @@
 import type { LoginResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 async function submitGlobalSearch(page: import('@playwright/test').Page, query: string) {
   await page.keyboard.press('Control+k');

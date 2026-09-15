@@ -1,15 +1,15 @@
 import { NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum';
-import { AlbumRepository } from 'src/repositories/album.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { DB } from 'src/schema';
-import { LibraryManifestService } from 'src/services/library-manifest.service';
-import { newMediumService } from 'test/medium.factory';
-import { factory, newUuid } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
+import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { DB } from 'src/schema/index.js';
+import { LibraryManifestService } from 'src/services/library-manifest.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory, newUuid } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
-import { accessibleLibraries, SyncRepository } from 'src/repositories/sync.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { accessibleLibraries, SyncRepository } from 'src/repositories/sync.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Unit tests for LibrarySync.getCreatedAfter. These tests PIN the expected
 // behavior of the post-fix query. The current (pre-rewrite) implementation

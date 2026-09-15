@@ -1,13 +1,13 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
-import { SourceType } from 'src/enum';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SourceType } from 'src/enum.js';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 // NOTE: Docker is required to run these tests. They are not run locally (no Docker) but are validated in CI.
