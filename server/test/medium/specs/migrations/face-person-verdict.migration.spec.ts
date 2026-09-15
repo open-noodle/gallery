@@ -4,9 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { immich_uuid_v7 } from 'src/schema/functions.js';
+// eslint-disable-next-line import-x/no-duplicates -- the side-effect import below is intentionally separate, see its comment
 import { DB } from 'src/schema/index.js';
 // Side-effect import: registers every decorated table (incl. FacePersonVerdictTable's partial-index overrides)
 // so schemaFromCode() below has something to diff against. See schema-drift.spec.ts for the same idiom.
+// eslint-disable-next-line import-x/no-duplicates -- intentionally separate from the named DB import above
 import 'src/schema/index.js';
 import {
   down as downMigration,

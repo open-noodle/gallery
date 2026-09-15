@@ -465,7 +465,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
     await sendFile(res, next, () => Promise.reject(error), mockLogger);
 
-    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Unknown error'), error.stack);
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Unable to send file'), error.stack);
     expect(next).toHaveBeenCalledWith(expect.any(HttpException));
   });
 

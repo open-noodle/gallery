@@ -2,8 +2,10 @@ import { Kysely, sql } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+// eslint-disable-next-line import-x/no-duplicates -- the side-effect import below is intentionally separate, see its comment
 import { DB } from 'src/schema/index.js';
 // Side-effect import: registers every decorated table so the schema exists to assert against.
+// eslint-disable-next-line import-x/no-duplicates -- intentionally separate from the named DB import above
 import 'src/schema/index.js';
 import { seedHiddenRowsFromSharedFlag } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden.js';
 import { BaseService } from 'src/services/base.service.js';

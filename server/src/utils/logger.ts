@@ -6,7 +6,13 @@ const isRequestAborted = (request: Request) => request.destroyed && !request.com
 export const isHttpException = (error: Error): error is HttpException => error instanceof HttpException;
 export const isConnectionAbortedError = (error: Error | any) => error.code === 'ECONNABORTED';
 
-export const onRouteError = (req: Request | undefined, res: Response, error: Error, logger: LoggingRepository) => {
+export const onRouteError = (
+  req: Request | undefined,
+  res: Response,
+  error: Error,
+  logger: LoggingRepository,
+  context = 'Unknown error',
+) => {
   // ignore client-closed connection
   if (res.headersSent || isConnectionAbortedError(error) || (req && isRequestAborted(req))) {
     logger.debug(`Client aborted request: ${error}`);
@@ -21,7 +27,7 @@ export const onRouteError = (req: Request | undefined, res: Response, error: Err
   }
 
   if (error instanceof Error) {
-    logger.error(`Unknown error: ${error}`, error?.stack);
+    logger.error(`${context}: ${error}`, error?.stack);
     return { canWrite: true };
   }
 
