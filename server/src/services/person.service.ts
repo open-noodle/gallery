@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Insertable, Selectable } from 'kysely';
 import { isAbsolute } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
@@ -63,6 +57,7 @@ import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
+import { PersonTable } from 'src/schema/tables/person.table.js';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
@@ -1531,6 +1526,13 @@ export class PersonService extends BaseService {
     return JobStatus.Success;
   }
 
+  /**
+   * Multi-owner bulk merge (upstream's cluster-group `mergePeople`, adopted inert): groups `ids` by
+   * owner (each cluster's personGroupId can carry one row per owner) and delegates each owner's
+   * target + sources to {@link mergePerson}, which owns validation, access control and the
+   * cross-owner policy. This never merges two DIFFERENT owners' rows against each other directly —
+   * each owner's group is merged independently, same as the fork's pre-cluster-groups behavior.
+   */
   async mergePeople(auth: AuthDto, dto: MergePersonDto): Promise<BulkIdResponseDto[]> {
     const { ids } = dto;
     if (ids.length < 2) {
@@ -1541,29 +1543,68 @@ export class PersonService extends BaseService {
       throw new BadRequestException('Cannot merge a person into themselves');
     }
 
-    const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonMerge, ids });
-    const failures: BulkIdResponseDto[] = [];
-
-    if (targets.has(auth.user.id)) {
-      results.set(targetId, { id: targetId, success: true });
+    const peopleMap: Record<string, Selectable<PersonTable>[]> = {};
+    for (const mergePerson of await this.personRepository.getForMergePerson(ids)) {
+      (peopleMap[mergePerson.personGroupId] ??= []).push(mergePerson);
     }
 
     const targetPeople: Record<string, Selectable<PersonTable>> = {};
     const sourcesByOwner: Record<string, string[]> = {};
     for (const mergeId of ids) {
-      const hasAccess = allowedIds.has(mergeId);
-      if (!hasAccess) {
-        failures.push({ id: mergeId, success: false, error: BulkIdErrorReason.NO_PERMISSION });
-        continue;
-      }
-
-      for (const mergePerson of peopleMap[mergeId]) {
+      for (const mergePerson of peopleMap[mergeId] ?? []) {
         if (!targetPeople[mergePerson.ownerId]) {
           targetPeople[mergePerson.ownerId] = mergePerson;
           continue;
         }
 
         (sourcesByOwner[mergePerson.ownerId] ??= []).push(mergeId);
+      }
+    }
+
+    const results: BulkIdResponseDto[] = [];
+    for (const [ownerId, targetPerson] of Object.entries(targetPeople)) {
+      const sourceIds = sourcesByOwner[ownerId];
+      if (!sourceIds || sourceIds.length === 0) {
+        continue;
+      }
+
+      results.push(
+        ...(await this.mergePerson(auth, targetPerson.personGroupId, {
+          ids: sourceIds,
+          confirmCrossOwner: dto.confirmCrossOwner,
+        })),
+      );
+    }
+
+    return results;
+  }
+
+  async mergePerson(auth: AuthDto, id: string, dto: MergePersonDto): Promise<BulkIdResponseDto[]> {
+    if (dto.ids.length === 0) {
+      throw new BadRequestException('No people selected for merge');
+    }
+
+    if (dto.ids.includes(id)) {
+      throw new BadRequestException('Cannot merge a person into themselves');
+    }
+
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [id] });
+    const person = await this.personRepository.getByGroupIdOnly(id);
+    if (!person) {
+      throw new BadRequestException('Person not found');
+    }
+
+    const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonMerge, ids: dto.ids });
+    const failures: BulkIdResponseDto[] = [];
+    for (const mergeId of dto.ids) {
+      if (!allowedIds.has(mergeId)) {
+        failures.push({ id: mergeId, success: false, error: BulkIdErrorReason.NO_PERMISSION });
+        continue;
+      }
+
+      const mergePerson = await this.personRepository.getByGroupIdOnly(mergeId);
+      if (!mergePerson) {
+        failures.push({ id: mergeId, success: false, error: BulkIdErrorReason.NOT_FOUND });
       }
     }
 
@@ -1575,26 +1616,12 @@ export class PersonService extends BaseService {
     // Same cross-owner policy as every other merge path (#733): a merge of your own two people can still
     // reach into someone else's library through a shared identity, and if it would combine two of THEIR
     // people it needs the instance toggle and an explicit acknowledgement. Re-pointing is free.
-    const authorizer = await this.crossOwnerMergeAuthorizer(dto);
-
-    const results: BulkIdResponseDto[] = [];
-    for (const [ownerId, targetPerson] of Object.entries(targetPeople)) {
-      const sourceIds = sourcesByOwner[ownerId];
-      if (!sourceIds || sourceIds.length === 0) {
-        continue;
-      }
-
-      results.push(
-        ...(await this.identityMergePropagationService.mergePersonalPeople(
-          auth,
-          targetPerson.personGroupId,
-          sourceIds,
-          authorizer,
-        )),
-      );
-    }
-
-    return results;
+    return this.identityMergePropagationService.mergePersonalPeople(
+      auth,
+      id,
+      dto.ids,
+      await this.crossOwnerMergeAuthorizer(dto),
+    );
   }
 
   private async queueSpacePersonMetadataBackfill(identityId?: string | null): Promise<void> {
