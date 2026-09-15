@@ -10778,7 +10778,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11074,7 +11074,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11247,7 +11247,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -12064,6 +12064,87 @@
         ],
         "x-immich-permission": "person.merge",
         "x-immich-state": "Stable"
+      }
+    },
+    "/people/{id}/merge": {
+      "post": {
+        "deprecated": true,
+        "description": "Merge a list of people into the person specified in the path parameter.",
+        "operationId": "mergePersonLegacy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergePersonDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BulkIdResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Merge people",
+        "tags": [
+          "People",
+          "Deprecated"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          },
+          {
+            "version": "v3.2.1",
+            "state": "Deprecated",
+            "replacementId": "mergePeople"
+          }
+        ],
+        "x-immich-permission": "person.merge",
+        "x-immich-state": "Deprecated"
       }
     },
     "/people/{id}/reassign": {
@@ -17583,7 +17664,7 @@
     },
     "/shared-spaces/{id}/albums/{albumId}/folder": {
       "put": {
-        "description": "Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required — making it optional would regenerate the Dart client into three-state territory.",
+        "description": "Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required \u2014 making it optional would regenerate the Dart client into three-state territory.",
         "operationId": "setSharedSpaceAlbumFolder",
         "parameters": [
           {
@@ -17723,7 +17804,7 @@
     },
     "/shared-spaces/{id}/albums/{albumId}/timeline-hide-preview": {
       "get": {
-        "description": "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
+        "description": "Read-only. Always the caller's own count, scoped to their own photos \u2014 never a cross-member number.",
         "operationId": "getAlbumTimelineHidePreview",
         "parameters": [
           {
@@ -18769,7 +18850,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -18963,7 +19044,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -19104,7 +19185,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -20427,7 +20508,7 @@
     },
     "/shared-spaces/{id}/timeline-hide-preview": {
       "get": {
-        "description": "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
+        "description": "Read-only. Always the caller's own count, scoped to their own photos \u2014 never a cross-member number.",
         "operationId": "getTimelineHidePreview",
         "parameters": [
           {
@@ -38423,7 +38504,7 @@
             "type": "boolean"
           },
           "hiddenFromMyTimeline": {
-            "description": "Whether the caller has hidden this album from their own timeline (§2 personal switch)",
+            "description": "Whether the caller has hidden this album from their own timeline (\u00a72 personal switch)",
             "type": "boolean"
           },
           "id": {

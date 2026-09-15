@@ -72,7 +72,7 @@
     getSpacePersonFaceSuggestions,
     ignorePersonFaceSuggestion,
     ignoreSpacePersonFaceSuggestion,
-    mergePerson,
+    mergePersonLegacy,
     searchPerson,
     Type2 as ScopedPersonProfileType,
     type BulkIdResponseDto,
@@ -259,7 +259,7 @@
   ): Promise<number | undefined> => {
     let results: BulkIdResponseDto[] = [];
     const committed = await runMergeWithCrossOwnerConfirmation(async (confirmCrossOwner) => {
-      results = await mergePerson({
+      results = await mergePersonLegacy({
         id: targetPerson.id,
         mergePersonDto: confirmCrossOwner
           ? { ids: sourcePeople.map(({ id }) => id), confirmCrossOwner: true }

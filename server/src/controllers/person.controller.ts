@@ -321,6 +321,6 @@ export class PersonController {
     @Param() { id }: UUIDParamDto,
     @Body() dto: MergePersonDto,
   ): Promise<BulkIdResponseDto[]> {
-    return this.service.mergePeople(auth, { ids: [id, ...dto.ids] });
+    return this.service.mergePerson(auth, id, dto);
   }
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Insertable, Selectable } from 'kysely';
+import { Insertable } from 'kysely';
 import { isAbsolute } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type {
@@ -55,7 +55,6 @@ import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
-import { PersonTable } from 'src/schema/tables/person.table.js';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
@@ -1511,8 +1510,17 @@ export class PersonService extends BaseService {
    * cross-owner policy. This never merges two DIFFERENT owners' rows against each other directly —
    * each owner's group is merged independently, same as the fork's pre-cluster-groups behavior.
    */
-  async mergePeople(auth: AuthDto, dto: MergePersonDto): Promise<BulkIdResponseDto[]> {
-    const { ids } = dto;
+  /**
+   * Multi-person bulk merge (upstream's cluster-group `mergePeople`, adopted inert). Upstream's own
+   * "merge an ordered list of people into a single person" contract already reduces to a single
+   * target: `ids[0]` is that person, everything after it merges into it — exactly what
+   * {@link mergePerson} does, cross-owner authorizer included. An earlier per-owner grouping here
+   * (splitting `ids` into same-owner clusters) silently no-opped a target/source pair that
+   * belonged to different owners instead of merging them, which broke the fork's real cross-owner
+   * flow (#733: a personal merge that reaches into another owner's identity). Delegating directly
+   * avoids that trap and matches `origin/main`'s `mergePerson` behavior.
+   */
+  async mergePeople(auth: AuthDto, { ids, confirmCrossOwner }: MergePersonDto): Promise<BulkIdResponseDto[]> {
     if (ids.length < 2) {
       throw new BadRequestException('At least two people are required for merging');
     }
@@ -1521,40 +1529,8 @@ export class PersonService extends BaseService {
       throw new BadRequestException('Cannot merge a person into themselves');
     }
 
-    const peopleMap: Record<string, Selectable<PersonTable>[]> = {};
-    for (const mergePerson of await this.personRepository.getForMergePerson(ids)) {
-      (peopleMap[mergePerson.personGroupId] ??= []).push(mergePerson);
-    }
-
-    const targetPeople: Record<string, Selectable<PersonTable>> = {};
-    const sourcesByOwner: Record<string, string[]> = {};
-    for (const mergeId of ids) {
-      for (const mergePerson of peopleMap[mergeId] ?? []) {
-        if (!targetPeople[mergePerson.ownerId]) {
-          targetPeople[mergePerson.ownerId] = mergePerson;
-          continue;
-        }
-
-        (sourcesByOwner[mergePerson.ownerId] ??= []).push(mergeId);
-      }
-    }
-
-    const results: BulkIdResponseDto[] = [];
-    for (const [ownerId, targetPerson] of Object.entries(targetPeople)) {
-      const sourceIds = sourcesByOwner[ownerId];
-      if (!sourceIds || sourceIds.length === 0) {
-        continue;
-      }
-
-      results.push(
-        ...(await this.mergePerson(auth, targetPerson.personGroupId, {
-          ids: sourceIds,
-          confirmCrossOwner: dto.confirmCrossOwner,
-        })),
-      );
-    }
-
-    return results;
+    const [id, ...sourceIds] = ids;
+    return this.mergePerson(auth, id, { ids: sourceIds, confirmCrossOwner });
   }
 
   async mergePerson(auth: AuthDto, id: string, dto: MergePersonDto): Promise<BulkIdResponseDto[]> {

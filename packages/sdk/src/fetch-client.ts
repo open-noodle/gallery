@@ -7623,24 +7623,6 @@ export function mergePeople({ mergePersonDto }: {
     })));
 }
 /**
- * Merge people
- *
- * @deprecated
- */
-export function mergePerson({ id, mergePersonDto }: {
-    id: string;
-    mergePersonDto: MergePersonDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>(`/people/${encodeURIComponent(id)}/merge`, oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: mergePersonDto
-    })));
-}
-/**
  * Detach a scoped person profile
  */
 export function detachScopedPerson({ detachScopedPersonDto }: {
