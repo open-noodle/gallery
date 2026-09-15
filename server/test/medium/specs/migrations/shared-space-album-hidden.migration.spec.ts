@@ -1,4 +1,5 @@
 import { Kysely, sql } from 'kysely';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -8,7 +9,6 @@ import { seedHiddenRowsFromSharedFlag } from 'src/schema/migrations-gallery/1793
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { beforeAll, describe, expect, it } from 'vitest';
 
 let db: Kysely<DB>;
 

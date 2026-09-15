@@ -1,7 +1,7 @@
+import type { VideoInfo } from 'src/types.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, ImmichWorker, JobName, JobStatus } from 'src/enum.js';
 import { SmartInfoService } from 'src/services/smart-info.service.js';
-import type { VideoInfo } from 'src/types.js';
 import { getCLIPModelInfo } from 'src/utils/misc.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { systemConfigStub } from 'test/fixtures/system-config.stub.js';

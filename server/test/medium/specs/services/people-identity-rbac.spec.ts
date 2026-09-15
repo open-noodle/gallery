@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
+import { Mocked } from 'vitest';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AssetVisibility, JobName, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -23,7 +24,6 @@ import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory, newEmbedding } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 

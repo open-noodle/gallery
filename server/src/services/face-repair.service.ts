@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { JobOf } from 'src/types.js';
 import { AssetFace } from 'src/database.js';
 import { OnJob } from 'src/decorators.js';
 import { FaceRepairResolveRequest, FaceRepairResolveResponse, FaceRepairScanParams } from 'src/dtos/face-repair.dto.js';
@@ -7,7 +8,6 @@ import { RepairScanPerson, RepairScanRow, ScanInProgressError } from 'src/reposi
 import { OwnerPersonRow, PersonMetadataRow } from 'src/repositories/face-repair.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { RepairReport, summarizeRepairPlan } from 'src/services/face-repair.summary.js';
-import type { JobOf } from 'src/types.js';
 import {
   FlagParams,
   ReattributionTally,

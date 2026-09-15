@@ -10,7 +10,8 @@ import {
 } from 'kysely';
 import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
-import { AssetFace, PersonUser, columns } from 'src/database.js';
+import type { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
+import { AssetFace } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import { PersonUserRole } from 'src/dtos/person.dto.js';
 import { AssetFileType, AssetVisibility, SharingDirection, SourceType, UserMetadataKey } from 'src/enum.js';
@@ -20,7 +21,6 @@ import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
 import { PersonTable } from 'src/schema/tables/person.table.js';
-import type { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
 import {
   asUuid,
   dummy,

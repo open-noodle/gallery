@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaults } from 'src/dtos/config.dto.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -10,7 +11,6 @@ import {
 } from 'src/utils/config.js';
 import { mockEnvData, newConfigRepositoryMock } from 'test/repositories/config.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const legacy = (suggestionMaxDistance: number, maxDistance?: number) => ({
   machineLearning: {

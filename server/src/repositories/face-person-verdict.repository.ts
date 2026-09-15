@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Expression, ExpressionBuilder, Kysely, SelectQueryBuilder, sql, SqlBool, Transaction } from 'kysely';
+import { Expression, ExpressionBuilder, Kysely, SelectQueryBuilder, SqlBool, Transaction, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { DB } from 'src/schema/index.js';

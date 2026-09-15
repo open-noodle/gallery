@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { AssetRepository, MemoryAsset } from 'src/repositories/asset.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
-import { Chapter, CHAPTER_MAX_SPAN_DAYS, DayCount, densestChapter } from 'src/services/memory-rules/chapter.util.js';
+import { CHAPTER_MAX_SPAN_DAYS, Chapter, DayCount, densestChapter } from 'src/services/memory-rules/chapter.util.js';
 import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 

@@ -1,4 +1,4 @@
-import { createPostgres, DatabaseConnectionParams } from '@immich/sql-tools';
+import { DatabaseConnectionParams, createPostgres } from '@immich/sql-tools';
 import { Kysely, sql } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 import { readdir } from 'node:fs/promises';

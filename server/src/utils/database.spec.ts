@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { DatabaseExtension } from 'src/enum.js';
 import {
   ASSET_CHECKSUM_CONSTRAINT,
@@ -9,7 +10,6 @@ import {
   updateLockedColumns,
   vectorIndexQuery,
 } from 'src/utils/database.js';
-import { describe, expect, it } from 'vitest';
 
 describe('tokenizeForSearch', () => {
   describe('Latin text', () => {

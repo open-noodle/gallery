@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
+import type { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -14,7 +15,6 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
-import type { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
 import { MemoryService, RULE_DAILY_LIMIT } from 'src/services/memory.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';

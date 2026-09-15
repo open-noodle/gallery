@@ -1,9 +1,9 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { IdentityMergePropagationPlan } from 'src/services/identity-merge-propagation.service.js';
 import {
+  CROSS_OWNER_MERGE_ERROR_CODE,
   assertDestructiveCollapseAllowed,
   createCrossOwnerMergeAuthorizer,
-  CROSS_OWNER_MERGE_ERROR_CODE,
 } from 'src/utils/merge-policy.js';
 
 const makePlan = (overrides: Partial<IdentityMergePropagationPlan> = {}): IdentityMergePropagationPlan => ({

@@ -1,9 +1,9 @@
 import {
+  type AutomaticReconciliationCandidate,
+  type ReconciliationClaim,
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
   filterUnambiguousReconciliationClaims,
-  type AutomaticReconciliationCandidate,
-  type ReconciliationClaim,
 } from 'src/services/accessible-identity-reconciliation.js';
 
 const baseCandidate = (

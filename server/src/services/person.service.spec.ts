@@ -1,9 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
-import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { mapFaces, mapPerson } from 'src/dtos/person.dto.js';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto.js';
 import {

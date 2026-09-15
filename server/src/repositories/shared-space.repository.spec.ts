@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
+import { describe, expect, it, vitest } from 'vitest';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
-import { describe, expect, it, vitest } from 'vitest';
 
 const deadlock = () => Object.assign(new Error('deadlock detected'), { code: '40P01' });
 

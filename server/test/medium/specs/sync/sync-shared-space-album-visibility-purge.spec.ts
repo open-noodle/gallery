@@ -7,6 +7,7 @@
 // (shared_space_album_asset_audit) unioned into SharedSpaceAlbumToAssetSync.
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
+import { v4 } from 'uuid';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
@@ -14,7 +15,6 @@ import { SyncRepository } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { v4 } from 'uuid';
 
 let defaultDatabase: Kysely<DB>;
 
