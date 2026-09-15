@@ -1,4 +1,11 @@
-import { LoginResponseDto, QueueCommand, QueueName, getQueuesLegacy, mergePersonLegacy, updateConfig } from '@immich/sdk';
+import {
+  LoginResponseDto,
+  QueueCommand,
+  QueueName,
+  getQueuesLegacy,
+  mergePersonLegacy,
+  updateConfig,
+} from '@immich/sdk';
 import { errorDto } from 'src/responses.js';
 import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
