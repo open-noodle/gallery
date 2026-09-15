@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Duration } from 'luxon';
 import { readFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import { MachineLearningConfig } from 'src/dtos/config.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { isAbsolute } from 'node:path';
 
 export interface BoundingBox {
   x1: number;

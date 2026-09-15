@@ -3,17 +3,17 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Index,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
+import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
 
 @Table('shared_space_person')
 @UpdatedAtTrigger('shared_space_person_updatedAt')

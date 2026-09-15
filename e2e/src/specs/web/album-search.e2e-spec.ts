@@ -1,6 +1,6 @@
 import type { AlbumResponseDto, LoginResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 /**
  * #986 — page-aware search on the two album detail routes.

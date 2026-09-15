@@ -1,7 +1,7 @@
 import { schemaFromCode } from '@immich/sql-tools';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import 'src/schema';
+import 'src/schema/index.js';
 
 // Companion to migration-override-parity.spec.ts, which pins FUNCTION DDL. A trigger has no
 // `registerFunction(...).expression` to compare against — it is generated from a decorator

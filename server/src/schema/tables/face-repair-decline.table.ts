@@ -1,8 +1,8 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { PersonGroupTable } from 'src/schema/tables/person-group.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { Column, CreateDateColumn, ForeignKeyColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // A persisted admin "leave it" decision for the Face Cleanup console. `type='face'` rows mute a single flagged
 // face while it is still suspected toward `suspectedOwnerId`; `type='person'` rows mute a whole cluster while its

@@ -21,24 +21,24 @@
  * corresponding switch was left un-flipped, so none of them can pass vacuously.
  */
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { AlbumUserRepository } from 'src/repositories/album-user.repository';
-import { AlbumRepository } from 'src/repositories/album.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { EventRepository } from 'src/repositories/event.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PartnerRepository } from 'src/repositories/partner.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { StorageRepository } from 'src/repositories/storage.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { DB } from 'src/schema';
-import { SharedSpaceService } from 'src/services/shared-space.service';
-import { TimelineService } from 'src/services/timeline.service';
-import { MediumTestContext, newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
+import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { EventRepository } from 'src/repositories/event.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PartnerRepository } from 'src/repositories/partner.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { TimelineService } from 'src/services/timeline.service.js';
+import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

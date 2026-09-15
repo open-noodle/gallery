@@ -19,7 +19,11 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { dummy } from 'src/utils/database.js';
-import { asBaseEb, sharedLinkAssetIsServable, sharedLinkCreatorCanPublish } from 'src/utils/shared-link-space-tether.js';
+import {
+  asBaseEb,
+  sharedLinkAssetIsServable,
+  sharedLinkCreatorCanPublish,
+} from 'src/utils/shared-link-space-tether.js';
 import { spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
 export type SharedLinkSearchOptions = {

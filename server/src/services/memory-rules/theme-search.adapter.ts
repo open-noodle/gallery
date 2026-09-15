@@ -1,10 +1,10 @@
-import { SystemConfig } from 'src/dtos/config.dto';
-import { AssetType, AssetVisibility } from 'src/enum';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
-import { SearchRepository } from 'src/repositories/search.repository';
-import { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port';
-import { isSmartSearchEnabled } from 'src/utils/misc';
+import { SystemConfig } from 'src/dtos/config.dto.js';
+import { AssetType, AssetVisibility } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import { isSmartSearchEnabled } from 'src/utils/misc.js';
 
 /**
  * `searchAssetBuilder` filters `takenAfter`/`takenBefore` against `asset.fileCreatedAt`

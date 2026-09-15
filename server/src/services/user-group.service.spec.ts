@@ -1,8 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
-import { UserAvatarColor } from 'src/enum';
-import { UserGroupService } from 'src/services/user-group.service';
-import { factory, newDate, newUuid } from 'test/small.factory';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { UserAvatarColor } from 'src/enum.js';
+import { UserGroupService } from 'src/services/user-group.service.js';
+import { factory, newDate, newUuid } from 'test/small.factory.js';
+import { newTestService, ServiceMocks } from 'test/utils.js';
 
 const makeGroup = (overrides: Record<string, unknown> = {}) => ({
   id: newUuid(),

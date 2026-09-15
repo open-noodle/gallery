@@ -1,4 +1,4 @@
-import { without } from 'src/utils/filter-suggestions';
+import { without } from 'src/utils/filter-suggestions.js';
 
 describe('without', () => {
   it('should remove a single key', () => {

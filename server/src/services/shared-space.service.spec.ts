@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { FACE_THUMBNAIL_SIZE } from 'src/constants';
-import { AssetEditAction } from 'src/dtos/editing.dto';
-import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
-import { MapMarkerResponseDto } from 'src/dtos/map.dto';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
+import { AssetEditAction } from 'src/dtos/editing.dto.js';
+import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
+import { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
 import {
   AlbumUserRole,
   AssetFileType,
@@ -24,7 +24,7 @@ import {
   SharedSpaceRole,
   SystemMetadataKey,
   UserAvatarColor,
-} from 'src/enum';
+} from 'src/enum.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE,
   SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
@@ -32,12 +32,12 @@ import {
   SHARED_SPACE_DEDUP_MAX_PASSES,
   sharedSpaceAlbumFolderDepthMessage,
   SharedSpaceService,
-} from 'src/services/shared-space.service';
-import { StorageService } from 'src/services/storage.service';
-import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
-import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy';
-import { factory, newDate, newUuid } from 'test/small.factory';
-import { newTestService, ServiceMocks } from 'test/utils';
+} from 'src/services/shared-space.service.js';
+import { StorageService } from 'src/services/storage.service.js';
+import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file.js';
+import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy.js';
+import { factory, newDate, newUuid } from 'test/small.factory.js';
+import { newTestService, ServiceMocks } from 'test/utils.js';
 
 const sharedSpaceFaceIdentityJobNames = new Set<JobName>([
   JobName.AssetDetectFacesQueueAll,

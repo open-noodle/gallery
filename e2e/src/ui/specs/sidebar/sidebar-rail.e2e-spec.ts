@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { expect, test } from '@playwright/test';
-import { setupBaseMockApiRoutes } from 'src/ui/mock-network/base-network';
-import { utils } from 'src/utils';
+import { setupBaseMockApiRoutes } from 'src/ui/mock-network/base-network.js';
+import { utils } from 'src/utils.js';
 
 // This suite only needs the app shell (auth, preferences, server config, navbar, sidebar) to
 // render at a given viewport - no timeline/asset data is asserted on, so `setupTimelineMockApiRoutes`

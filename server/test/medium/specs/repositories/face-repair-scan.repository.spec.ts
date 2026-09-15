@@ -4,11 +4,11 @@ import {
   RepairScanParams,
   RepairScanPerson,
   ScanInProgressError,
-} from 'src/repositories/face-repair-scan.repository';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
-import { DB } from 'src/schema';
-import { insertClusterGroup, insertPersonGroup, mediumFactory } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+} from 'src/repositories/face-repair-scan.repository.js';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { DB } from 'src/schema/index.js';
+import { insertClusterGroup, insertPersonGroup, mediumFactory } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const PARAMS: RepairScanParams = {

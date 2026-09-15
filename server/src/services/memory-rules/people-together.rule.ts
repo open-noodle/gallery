@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetRepository, MemoryPeriodFace } from 'src/repositories/asset.repository';
-import { medianTime, pairCounts, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
+import { AssetRepository, MemoryPeriodFace } from 'src/repositories/asset.repository.js';
+import { medianTime, pairCounts, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
 export const TRIGGER_DAY = 20;
 export const MIN_ASSETS = 6;

@@ -1,6 +1,6 @@
 import { Kysely, sql } from 'kysely';
-import { getVectorExtension } from 'src/repositories/database.repository';
-import { vectorIndexQuery } from 'src/utils/database';
+import { getVectorExtension } from 'src/repositories/database.repository.js';
+import { vectorIndexQuery } from 'src/utils/database.js';
 
 export async function up(db: Kysely<any>): Promise<void> {
   const vectorExtension = await getVectorExtension(db);

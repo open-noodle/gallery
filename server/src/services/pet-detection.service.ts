@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
-import { OnJob } from 'src/decorators';
-import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum';
-import { DetectedPet } from 'src/repositories/machine-learning.repository';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { BaseService } from 'src/services/base.service';
-import { JobItem, JobOf } from 'src/types';
-import { isPetDetectionEnabled, isPetRecognitionEnabled, isRecognizablePetSpecies } from 'src/utils/misc';
+import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
+import { OnJob } from 'src/decorators.js';
+import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { DetectedPet } from 'src/repositories/machine-learning.repository.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { BaseService } from 'src/services/base.service.js';
+import { JobItem, type JobOf } from 'src/types.js';
+import { isPetDetectionEnabled, isPetRecognitionEnabled, isRecognizablePetSpecies } from 'src/utils/misc.js';
 
 @Injectable()
 export class PetDetectionService extends BaseService {

@@ -46,8 +46,8 @@
  */
 
 import { AlbumUserRole, BulkIdErrorReason, SharedLinkType, addUsersToAlbum } from '@immich/sdk';
-import { authHeaders, buildSpaceContext, forEachActor, type SpaceContext } from 'src/actors';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { authHeaders, buildSpaceContext, forEachActor, type SpaceContext } from 'src/actors.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

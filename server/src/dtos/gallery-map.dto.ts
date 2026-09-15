@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation';
+import { boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 import z from 'zod';
 
 export enum MapMediaType {

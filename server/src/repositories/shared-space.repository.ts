@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, NotNull, sql, Transaction, Updateable } from 'kysely';
+import { Insertable, Kysely, NotNull, sql, Transaction, type Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
+import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
   AlbumUserRole,
   AssetType,
@@ -10,28 +10,28 @@ import {
   SharedSpaceRole,
   SourceType,
   VectorIndex,
-} from 'src/enum';
-import { probes } from 'src/repositories/database.repository';
-import type { PeopleFaceStatistics } from 'src/repositories/person.repository';
-import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository';
-import { DB } from 'src/schema';
-import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table';
-import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table';
-import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table';
-import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table';
-import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table';
-import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
-import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database';
-import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge';
+} from 'src/enum.js';
+import { probes } from 'src/repositories/database.repository.js';
+import type { PeopleFaceStatistics } from 'src/repositories/person.repository.js';
+import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
+import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table.js';
+import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table.js';
+import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table.js';
+import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table.js';
+import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table.js';
+import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database.js';
+import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceContributedAssetExists,
   spaceVisibilityGate,
   spaceVisibleAssetVisibilities,
-} from 'src/utils/shared-space-album-scope';
+} from 'src/utils/shared-space-album-scope.js';
 
 export const visibleSpaceAssetVisibilities = spaceVisibleAssetVisibilities;
 

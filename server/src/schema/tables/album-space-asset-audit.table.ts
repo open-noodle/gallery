@@ -1,5 +1,5 @@
-import { Column, CreateDateColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
+import { Column, CreateDateColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 // Delete-audit for album_space_asset cross-owner contributions (#764). Trigger-driven
 // (album_space_asset_delete_audit fires AFTER DELETE ... FOR EACH STATEMENT), so it captures BOTH

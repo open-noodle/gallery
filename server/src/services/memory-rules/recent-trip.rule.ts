@@ -1,9 +1,9 @@
 import { DateTime } from 'luxon';
-import { AssetOrderWithRandom, MemoryType } from 'src/enum';
-import { AssetRepository, MemoryLocationCluster } from 'src/repositories/asset.repository';
-import { MemoryRepository } from 'src/repositories/memory.repository';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
-import { curateTripAssets, inferHome, isAwayFromHome, placeKeyOf } from 'src/services/memory-rules/trip.util';
+import { AssetOrderWithRandom, MemoryType } from 'src/enum.js';
+import { AssetRepository, MemoryLocationCluster } from 'src/repositories/asset.repository.js';
+import { MemoryRepository } from 'src/repositories/memory.repository.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
+import { curateTripAssets, inferHome, isAwayFromHome, placeKeyOf } from 'src/services/memory-rules/trip.util.js';
 
 export const ASSET_CAP = 10;
 

@@ -1,9 +1,9 @@
-import { StorageCore } from 'src/cores/storage.core';
-import { UserAdmin } from 'src/database';
-import { StorageFolder } from 'src/enum';
-import { StorageBackend } from 'src/interfaces/storage-backend.interface';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { StorageRepository } from 'src/repositories/storage.repository';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { UserAdmin } from 'src/database.js';
+import { StorageFolder } from 'src/enum.js';
+import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
 
 const UUID_LENGTH = 36;
 const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;

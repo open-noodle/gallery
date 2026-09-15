@@ -1,7 +1,7 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { SharedSpaceRole, updateConfig } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // A space member's main People view shows shared_space_person profiles; person edits
 // from there must hit the shared-space endpoints (PUT /shared-spaces/:id/people/:personId),

@@ -1,5 +1,5 @@
-import { BaseService } from 'src/services/base.service';
-import { newTestService } from 'test/utils';
+import { BaseService } from 'src/services/base.service.js';
+import { newTestService } from 'test/utils.js';
 
 describe(BaseService.name, () => {
   let sut: BaseService;

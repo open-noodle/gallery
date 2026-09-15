@@ -1,7 +1,7 @@
 import { Kysely, sql } from 'kysely';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { DB } from 'src/schema';
-import { getKyselyConfig } from 'src/utils/database';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { DB } from 'src/schema/index.js';
+import { getKyselyConfig } from 'src/utils/database.js';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

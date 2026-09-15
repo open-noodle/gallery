@@ -1,6 +1,6 @@
 import type { AdminConfigDto, LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // Browser coverage for the cross-owner people-merge UX (issue #733). A regular (non-admin) user drives the
 // real person-detail merge flow; the instance toggle — not admin status — decides the outcome.

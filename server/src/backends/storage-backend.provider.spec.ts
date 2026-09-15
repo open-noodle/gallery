@@ -1,6 +1,6 @@
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { S3StorageBackend } from 'src/backends/s3-storage.backend';
-import { resolveBackend } from 'src/backends/storage-backend.provider';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
+import { resolveBackend } from 'src/backends/storage-backend.provider.js';
 import { describe, expect, it } from 'vitest';
 
 // Use minimal mocks

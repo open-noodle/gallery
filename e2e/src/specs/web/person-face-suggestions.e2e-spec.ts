@@ -1,7 +1,7 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { updateConfig } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 test.describe('Person face suggestions (web)', () => {
   let admin: LoginResponseDto;

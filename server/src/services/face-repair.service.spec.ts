@@ -1,11 +1,11 @@
 import { NotFoundException } from '@nestjs/common';
 import { writeFile } from 'node:fs/promises';
-import { AssetFileType, CacheControl } from 'src/enum';
-import { FaceRepairService } from 'src/services/face-repair.service';
-import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file';
-import { AssetFaceFactory } from 'test/factories/asset-face.factory';
-import { getForAssetFace } from 'test/mappers';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { AssetFileType, CacheControl } from 'src/enum.js';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file.js';
+import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
+import { getForAssetFace } from 'test/mappers.js';
+import { newTestService, ServiceMocks } from 'test/utils.js';
 
 // #1061: a stored flagged face carrying the photo context getScanFlaggedFaces now returns.
 const stored = (assetFaceId: string) => ({

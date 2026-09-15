@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole, SyncEntityType } from 'src/enum';
-import { SyncRepository } from 'src/repositories/sync.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SharedSpaceRole, SyncEntityType } from 'src/enum.js';
+import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Repo-level tests for SharedSpaceAlbumAssetExifSync:
 //   - getBackfill: per-album backfill of asset_exif rows

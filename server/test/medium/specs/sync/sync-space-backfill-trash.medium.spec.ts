@@ -6,11 +6,11 @@
 // an already-synced device learns to hide/purge a newly-trashed asset (the asset.updateId bump
 // rides through). Sync-side sibling of H-1.
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole, SyncEntityType } from 'src/enum';
-import { SyncRepository } from 'src/repositories/sync.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole, SyncEntityType } from 'src/enum.js';
+import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

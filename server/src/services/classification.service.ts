@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { OnEvent, OnJob } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { type SystemConfig } from 'src/dtos/config.dto';
-import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
-import { type ClassificationFaceExclusion } from 'src/gallery/config.dto';
-import { type ClassificationFaceSummary } from 'src/repositories/classification.repository';
-import { ArgOf } from 'src/repositories/event.repository';
-import { BaseService } from 'src/services/base.service';
-import { JobOf } from 'src/types';
-import { isFacialRecognitionEnabled } from 'src/utils/misc';
-import { upsertTags } from 'src/utils/tag';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { type SystemConfig } from 'src/dtos/config.dto.js';
+import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
+import { type ClassificationFaceExclusion } from 'src/gallery/config.dto.js';
+import { type ClassificationFaceSummary } from 'src/repositories/classification.repository.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import type { JobOf } from 'src/types.js';
+import { isFacialRecognitionEnabled } from 'src/utils/misc.js';
+import { upsertTags } from 'src/utils/tag.js';
 
 type ClassificationConfig = SystemConfig['classification'];
 

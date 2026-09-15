@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { randomBytes } from 'node:crypto';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto.js';
 import { AssetMediaSize } from 'src/dtos/asset-media.dto.js';
 import { AssetFileType, SharedLinkType } from 'src/enum.js';
@@ -15,12 +16,11 @@ import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
 import { AssetService } from 'src/services/asset.service.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
 import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { StorageService } from 'src/services/storage.service.js';
 
 let defaultDatabase: Kysely<DB>;
 

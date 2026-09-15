@@ -1,23 +1,23 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, JobName, Permission } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { AlbumUserRepository } from 'src/repositories/album-user.repository';
-import { AlbumRepository } from 'src/repositories/album.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { EventRepository } from 'src/repositories/event.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { StorageRepository } from 'src/repositories/storage.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { DB } from 'src/schema';
-import { AlbumService } from 'src/services/album.service';
-import { checkAccess } from 'src/utils/access';
-import { inAlbums } from 'src/utils/database';
-import { spaceContributedAssetExists } from 'src/utils/shared-space-album-scope';
-import { newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, JobName, Permission } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
+import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { EventRepository } from 'src/repositories/event.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { DB } from 'src/schema/index.js';
+import { AlbumService } from 'src/services/album.service.js';
+import { checkAccess } from 'src/utils/access.js';
+import { inAlbums } from 'src/utils/database.js';
+import { spaceContributedAssetExists } from 'src/utils/shared-space-album-scope.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // -------------------------------------------------------------------------------------------------
 // Cross-owner contribution permission matrix (#764)

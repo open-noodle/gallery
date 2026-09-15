@@ -1,26 +1,26 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, JobStatus, SourceType, SystemMetadataKey } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SearchRepository } from 'src/repositories/search.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { StorageRepository } from 'src/repositories/storage.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { PersonService } from 'src/services/person.service';
-import { clearConfigCache } from 'src/utils/config';
-import { newMediumService } from 'test/medium.factory';
-import { newEmbedding } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, JobStatus, SourceType, SystemMetadataKey } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { PersonService } from 'src/services/person.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { newEmbedding } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Slice 6: the two source-of-truth safety fixes.
 //   1. searchFaces must exclude soft-deleted faces (the "not a face" tombstone), so neither the suggestion

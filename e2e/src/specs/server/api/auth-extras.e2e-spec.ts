@@ -1,7 +1,7 @@
 import { type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
-import { createUserDto } from 'src/fixtures';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { type Actor, authHeaders } from 'src/actors.js';
+import { createUserDto } from 'src/fixtures.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

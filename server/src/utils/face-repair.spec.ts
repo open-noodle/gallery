@@ -10,7 +10,7 @@ import {
   findUnresolvableIds,
   isSubset,
   tallyReattribution,
-} from 'src/utils/face-repair';
+} from 'src/utils/face-repair.js';
 
 const n = (personId: string | null, distance: number): ReattributionNeighbor => ({
   assetFaceId: `${personId}-${distance}`,

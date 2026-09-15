@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { MachineLearningRepository, ModelTask, ModelType } from 'src/repositories/machine-learning.repository';
-import { automock } from 'test/utils';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MachineLearningRepository, ModelTask, ModelType } from 'src/repositories/machine-learning.repository.js';
+import { automock } from 'test/utils.js';
 
 const mockReadFile = vi.fn();
 

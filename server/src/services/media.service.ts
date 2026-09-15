@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
+import { isAbsolute } from 'node:path';
 import type {
   AudioStreamInfo,
   DecodeToBufferOptions,
@@ -12,14 +13,13 @@ import type {
   VideoInterfaces,
   VideoStreamInfo,
 } from 'src/types.js';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFile } from 'src/database.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ConfigFFmpegDto, SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, CropParameters, TrimParameters } from 'src/dtos/editing.dto.js';
-import { isAbsolute } from 'node:path';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import {
   AssetFileType,
   AssetType,

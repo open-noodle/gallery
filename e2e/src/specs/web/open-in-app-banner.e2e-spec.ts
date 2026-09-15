@@ -1,7 +1,7 @@
 import { type LoginResponseDto } from '@immich/sdk';
 import { devices, expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { testAssetDir, utils } from 'src/utils';
+import { testAssetDir, utils } from 'src/utils.js';
 
 const SCHEME_RX = /^(immich|noodle-gallery):\/\/asset\?id=[0-9a-fA-F-]{36}$/;
 const BANNER = 'open-in-app-banner';

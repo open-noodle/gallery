@@ -1,15 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
-import { OnJob } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { PersonFaceSuggestionPageQueryDto, PersonFaceSuggestionPageResponseDto } from 'src/dtos/person.dto';
-import { JobName, JobStatus, Permission, QueueName } from 'src/enum';
-import { PersonId } from 'src/repositories/person.repository';
-import { BaseService } from 'src/services/base.service';
-import { JobItem, JobOf } from 'src/types';
-import { asDateTimeString } from 'src/utils/date';
-import { isFaceSuggestionEnabled } from 'src/utils/misc';
-import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
+import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
+import { OnJob } from 'src/decorators.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { PersonFaceSuggestionPageQueryDto, PersonFaceSuggestionPageResponseDto } from 'src/dtos/person.dto.js';
+import { JobName, JobStatus, Permission, QueueName } from 'src/enum.js';
+import { PersonId } from 'src/repositories/person.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import { JobItem, type JobOf } from 'src/types.js';
+import { asDateTimeString } from 'src/utils/date.js';
+import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
+import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
 
 const PERSON_SUGGESTION_EMBEDDING_SAMPLE = 20;
 const PERSON_SUGGESTION_NUM_RESULTS = 100;

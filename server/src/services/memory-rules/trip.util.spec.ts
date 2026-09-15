@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository';
+import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository.js';
 import {
   BURST_WINDOW_MS,
   curateTripAssets,
@@ -10,7 +10,7 @@ import {
   placeKeyOf,
   SMALL_TRIP_MAX,
   TripThresholds,
-} from 'src/services/memory-rules/trip.util';
+} from 'src/services/memory-rules/trip.util.js';
 
 const cluster = (
   country: string | null,

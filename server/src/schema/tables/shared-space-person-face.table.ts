@@ -1,6 +1,6 @@
 import { ForeignKeyColumn, Index, Table } from '@immich/sql-tools';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
 
 @Table('shared_space_person_face')
 @Index({ name: 'shared_space_person_face_assetFaceId_idx', columns: ['assetFaceId'] })

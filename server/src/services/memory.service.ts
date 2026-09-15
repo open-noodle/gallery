@@ -5,6 +5,7 @@ import { Memory } from 'src/database.js';
 import { OnJob } from 'src/decorators.js';
 import { BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
 import {
   MemoryCreateDto,
   MemoryResponseDto,
@@ -12,7 +13,6 @@ import {
   MemoryUpdateDto,
   mapMemory,
 } from 'src/dtos/memory.dto.js';
-import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
