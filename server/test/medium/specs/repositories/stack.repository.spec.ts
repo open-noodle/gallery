@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetVisibility } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
@@ -6,7 +7,6 @@ import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { beforeAll, describe, expect, it } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
