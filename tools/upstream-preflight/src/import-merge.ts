@@ -1,3 +1,6 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 export type ImportKind = 'import' | 'export';
 
 export interface ParsedStatement {
@@ -17,12 +20,68 @@ const FROM_FORM =
   /^(?<kind>import|export)\s+(?<body>[\s\S]*?)\s*from\s*['"](?<module>[^'"]+)['"]\s*;?$/;
 const BARE_FORM = /^import\s*['"](?<module>[^'"]+)['"]\s*;?$/;
 /** A legal `{ … }` binding: optional `type`, an identifier or `default`, optional `as <ident>`. */
-const NAMED_SPECIFIER = /^(?:type\s+)?(?:[A-Za-z_$][\w$]*|default)(?:\s+as\s+[A-Za-z_$][\w$]*)?$/;
+const NAMED_SPECIFIER =
+  /^(?:type\s+)?(?:[A-Za-z_$][\w$]*|default)(?:\s+as\s+[A-Za-z_$][\w$]*)?$/;
 
-export function normalizeModule(module: string): string {
+/**
+ * Alias/relative specifiers (bare, no extension — e.g. "src/schema", "test/foo") that resolve to a
+ * directory via an `index.ts` rather than a same-named `.ts` file. Exact-string keyed because the
+ * directory set is small and known ahead of time; callers with filesystem access build one with
+ * `collectDirectoryImportSpecifiers` below. Relative specifiers ("./foo") are never included here —
+ * their meaning depends on the importing file's own directory, which this exact-string set cannot
+ * express, and no relative directory import exists in the tree today (grepped for
+ * `from '../…/index.js'` — zero hits), so the gap is real but currently empty.
+ */
+export type KnownDirectoryImports = ReadonlySet<string>;
+
+/**
+ * Pure by design: no filesystem access, so a caller with no tree to scan (a unit test, a fixture, a
+ * one-off string) gets a deterministic answer. Without `knownDirectories` this appends `.js`
+ * unconditionally, which is WRONG for a bare directory import (`src/schema` needs
+ * `src/schema/index.js`, since `src/schema.ts` does not exist) — that is the documented, deliberate
+ * default, not a bug to "simplify" away. A caller that can enumerate the tree's directories should
+ * build a set with `collectDirectoryImportSpecifiers` and pass it in.
+ */
+export function normalizeModule(
+  module: string,
+  knownDirectories?: KnownDirectoryImports,
+): string {
   if (!ALIAS_OR_RELATIVE.test(module)) return module;
   if (HAS_EXTENSION.test(module)) return module;
+  if (knownDirectories?.has(module)) return `${module}/index.js`;
   return `${module}.js`;
+}
+
+/**
+ * Builds a `KnownDirectoryImports` set for one package root (e.g. `server/`, `e2e/`) by walking its
+ * `src/` and `test/` trees for directories containing an `index.ts`. The alias `src/foo` means a
+ * different filesystem directory in each package, so build one set per package root and never share
+ * one across `server` and `e2e` — a caller resolving a conflicted file must pick the set matching
+ * that file's own package root (see rebase-resolve-loop.sh, which dispatches on the `server/`
+ * vs `e2e/` path prefix before calling the resolver).
+ */
+export function collectDirectoryImportSpecifiers(
+  packageRoot: string,
+): Set<string> {
+  const specifiers = new Set<string>();
+
+  const walk = (dir: string, aliasPath: string): void => {
+    if (existsSync(join(dir, 'index.ts'))) {
+      specifiers.add(aliasPath);
+    }
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        walk(join(dir, entry.name), `${aliasPath}/${entry.name}`);
+      }
+    }
+  };
+
+  for (const prefix of ['src', 'test']) {
+    const base = join(packageRoot, prefix);
+    if (existsSync(base)) walk(base, prefix);
+  }
+
+  return specifiers;
 }
 
 /** Splits a block into whole statements. Returns null if the block holds anything else. */
@@ -34,7 +93,12 @@ export function splitStatements(lines: string[]): string[] | null {
   for (const raw of lines) {
     const line = raw.trim();
     if (current.length === 0) {
-      if (line === '' || line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
+      if (
+        line === '' ||
+        line.startsWith('//') ||
+        line.startsWith('/*') ||
+        line.startsWith('*')
+      ) {
         continue;
       }
       if (!STATEMENT_START.test(line)) return null;
@@ -86,7 +150,9 @@ export function parseStatement(text: string): ParsedStatement | null {
   const named: string[] = [];
 
   const braceStart = body.indexOf('{');
-  const head = (braceStart === -1 ? body : body.slice(0, braceStart)).replace(/,\s*$/, '').trim();
+  const head = (braceStart === -1 ? body : body.slice(0, braceStart))
+    .replace(/,\s*$/, '')
+    .trim();
   if (head.length > 0) {
     const namespace = /^\*\s+as\s+([A-Za-z_$][\w$]*)$/.exec(head);
     if (namespace) {
@@ -109,16 +175,27 @@ export function parseStatement(text: string): ParsedStatement | null {
     }
   }
 
-  return { kind, module, typeOnly, defaultName, namespaceName, named, sideEffectOnly: false };
+  return {
+    kind,
+    module,
+    typeOnly,
+    defaultName,
+    namespaceName,
+    named,
+    sideEffectOnly: false,
+  };
 }
 
-export function mergeStatements(sides: ParsedStatement[][]): ParsedStatement[] | null {
+export function mergeStatements(
+  sides: ParsedStatement[][],
+  knownDirectories?: KnownDirectoryImports,
+): ParsedStatement[] | null {
   const byKey = new Map<string, ParsedStatement>();
   const order: string[] = [];
 
   for (const side of sides) {
     for (const statement of side) {
-      const module = normalizeModule(statement.module);
+      const module = normalizeModule(statement.module, knownDirectories);
       const key = `${statement.kind}|${module}|${statement.typeOnly}|${statement.sideEffectOnly}`;
       const existing = byKey.get(key);
 
@@ -128,10 +205,18 @@ export function mergeStatements(sides: ParsedStatement[][]): ParsedStatement[] |
         continue;
       }
 
-      if (statement.defaultName && existing.defaultName && statement.defaultName !== existing.defaultName) {
+      if (
+        statement.defaultName &&
+        existing.defaultName &&
+        statement.defaultName !== existing.defaultName
+      ) {
         return null;
       }
-      if (statement.namespaceName && existing.namespaceName && statement.namespaceName !== existing.namespaceName) {
+      if (
+        statement.namespaceName &&
+        existing.namespaceName &&
+        statement.namespaceName !== existing.namespaceName
+      ) {
         return null;
       }
       existing.defaultName ??= statement.defaultName;
@@ -151,24 +236,31 @@ export function renderStatement(statement: ParsedStatement): string {
   const clauses: string[] = [];
   if (statement.defaultName) clauses.push(statement.defaultName);
   if (statement.namespaceName) clauses.push(`* as ${statement.namespaceName}`);
-  if (statement.named.length > 0) clauses.push(`{ ${statement.named.join(', ')} }`);
+  if (statement.named.length > 0)
+    clauses.push(`{ ${statement.named.join(', ')} }`);
 
   const prefix = statement.typeOnly ? `${statement.kind} type` : statement.kind;
   return `${prefix} ${clauses.join(', ')} from '${statement.module}';`;
 }
 
 /** Every (module, binding) pair a statement list contributes. The loss detector. */
-export function specifierKeys(statements: ParsedStatement[]): Set<string> {
+export function specifierKeys(
+  statements: ParsedStatement[],
+  knownDirectories?: KnownDirectoryImports,
+): Set<string> {
   const keys = new Set<string>();
   for (const statement of statements) {
-    const module = normalizeModule(statement.module);
+    const module = normalizeModule(statement.module, knownDirectories);
     if (statement.sideEffectOnly) {
       keys.add(`${module}::<side-effect>`);
       continue;
     }
-    if (statement.defaultName) keys.add(`${module}::default ${statement.defaultName}`);
-    if (statement.namespaceName) keys.add(`${module}::* ${statement.namespaceName}`);
-    for (const specifier of statement.named) keys.add(`${module}::${specifier}`);
+    if (statement.defaultName)
+      keys.add(`${module}::default ${statement.defaultName}`);
+    if (statement.namespaceName)
+      keys.add(`${module}::* ${statement.namespaceName}`);
+    for (const specifier of statement.named)
+      keys.add(`${module}::${specifier}`);
   }
   return keys;
 }
@@ -217,7 +309,11 @@ function findRegions(lines: string[]): Region[] {
 }
 
 /** Tries the structured statement-level merge. Returns rendered lines, or null to refuse. */
-function resolveRegionStructured(ours: string[], theirs: string[]): string[] | null {
+function resolveRegionStructured(
+  ours: string[],
+  theirs: string[],
+  knownDirectories?: KnownDirectoryImports,
+): string[] | null {
   const ourStatements = splitStatements(ours);
   const theirStatements = splitStatements(theirs);
   if (!ourStatements || !theirStatements) {
@@ -232,14 +328,17 @@ function resolveRegionStructured(ours: string[], theirs: string[]): string[] | n
 
   const ourSide = ourParsed as ParsedStatement[];
   const theirSide = theirParsed as ParsedStatement[];
-  const merged = mergeStatements([ourSide, theirSide]);
+  const merged = mergeStatements([ourSide, theirSide], knownDirectories);
   if (!merged) {
     return null;
   }
 
   // Post-condition: nothing either side contributed may be missing.
-  const expected = new Set([...specifierKeys(ourSide), ...specifierKeys(theirSide)]);
-  const actual = specifierKeys(merged);
+  const expected = new Set([
+    ...specifierKeys(ourSide, knownDirectories),
+    ...specifierKeys(theirSide, knownDirectories),
+  ]);
+  const actual = specifierKeys(merged, knownDirectories);
   if ([...expected].some((key) => !actual.has(key))) {
     return null;
   }
@@ -254,8 +353,15 @@ function resolveRegionStructured(ours: string[], theirs: string[]): string[] | n
  */
 const SPECIFIER = /(\bfrom\s*|^\s*import\s*)(['"])([^'"]+)\2/g;
 
-export function normalizeLineSpecifiers(line: string): string {
-  return line.replace(SPECIFIER, (_m, head: string, q: string, mod: string) => `${head}${q}${normalizeModule(mod)}${q}`);
+export function normalizeLineSpecifiers(
+  line: string,
+  knownDirectories?: KnownDirectoryImports,
+): string {
+  return line.replace(
+    SPECIFIER,
+    (_m, head: string, q: string, mod: string) =>
+      `${head}${q}${normalizeModule(mod, knownDirectories)}${q}`,
+  );
 }
 
 /**
@@ -266,14 +372,27 @@ export function normalizeLineSpecifiers(line: string): string {
  * line, they differed *only* in specifier form, so nothing can be lost — the same guarantee the
  * structured path's post-condition checks explicitly.
  */
-function resolveSpecifierOnlyRegion(ours: string[], theirs: string[]): string[] | null {
+function resolveSpecifierOnlyRegion(
+  ours: string[],
+  theirs: string[],
+  knownDirectories?: KnownDirectoryImports,
+): string[] | null {
   if (ours.length !== theirs.length) return null;
-  const normalizedOurs = ours.map(normalizeLineSpecifiers);
-  const normalizedTheirs = theirs.map(normalizeLineSpecifiers);
-  return normalizedOurs.every((line, i) => line === normalizedTheirs[i]) ? normalizedOurs : null;
+  const normalizedOurs = ours.map((line) =>
+    normalizeLineSpecifiers(line, knownDirectories),
+  );
+  const normalizedTheirs = theirs.map((line) =>
+    normalizeLineSpecifiers(line, knownDirectories),
+  );
+  return normalizedOurs.every((line, i) => line === normalizedTheirs[i])
+    ? normalizedOurs
+    : null;
 }
 
-export function resolveConflictedSource(text: string): {
+export function resolveConflictedSource(
+  text: string,
+  knownDirectories?: KnownDirectoryImports,
+): {
   text: string;
   resolved: number;
   refused: number;
@@ -285,8 +404,14 @@ export function resolveConflictedSource(text: string): {
   let refused = 0;
 
   for (const region of regions) {
-    const structured = resolveRegionStructured(region.ours, region.theirs);
-    const rendered = structured ?? resolveSpecifierOnlyRegion(region.ours, region.theirs);
+    const structured = resolveRegionStructured(
+      region.ours,
+      region.theirs,
+      knownDirectories,
+    );
+    const rendered =
+      structured ??
+      resolveSpecifierOnlyRegion(region.ours, region.theirs, knownDirectories);
 
     if (!rendered) {
       refused += 1;
