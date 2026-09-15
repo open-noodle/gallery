@@ -241,7 +241,7 @@ export const sendFile = async (
 
     return await _sendFile(resolvedPath, { root: '/', dotfiles: 'allow' });
   } catch (error: Error | any) {
-    const { canWrite } = onRouteError(undefined, res, error, logger);
+    const { canWrite } = onRouteError(undefined, res, error, logger, 'Unable to send file');
     if (canWrite) {
       // gallery-fork: preserve HttpException status codes. Upstream #28843 masks
       // every sendFile error as 404, but the fork's shared-space access matrix

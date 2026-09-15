@@ -61,7 +61,6 @@ import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
-import { PersonTable } from 'src/schema/tables/person.table.js';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
