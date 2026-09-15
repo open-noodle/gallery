@@ -325,7 +325,9 @@
         // lands the user at lastVisibleScrollTop (0 on a fresh mount) before the anchor resolves.
         timelineManager.scrollTo(lastVisibleScrollTop);
       }
-    } else {
+    } else if (!temporalAnchor) {
+      // Same guard as above (#625): a pending temporal anchor owns the scroll position, so the
+      // routing scroll-to-top fallback must not run here either while it is still pending.
       timelineManager.scrollTo(0);
     }
 
