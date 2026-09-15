@@ -1,6 +1,5 @@
-import { THEMES, themeForMonth } from 'src/services/memory-rules/theme.catalog.js';
-
 import { readFileSync } from 'node:fs';
+import { THEMES, themeForMonth } from 'src/services/memory-rules/theme.catalog.js';
 
 /** The shared `i18n/en.json`, read from disk (vitest roots at `server/`): no module alias reaches it. */
 const messageKeys = new Set(Object.keys(JSON.parse(readFileSync('../i18n/en.json', 'utf8'))));

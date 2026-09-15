@@ -2,14 +2,14 @@ import { DateTime } from 'luxon';
 import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository.js';
 import {
   BURST_WINDOW_MS,
+  HOME_DOMINANCE_RATIO,
+  SMALL_TRIP_MAX,
+  TripThresholds,
   curateTripAssets,
   findTripStartingOn,
-  HOME_DOMINANCE_RATIO,
   inferHome,
   isAwayFromHome,
   placeKeyOf,
-  SMALL_TRIP_MAX,
-  TripThresholds,
 } from 'src/services/memory-rules/trip.util.js';
 
 const cluster = (

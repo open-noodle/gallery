@@ -1,6 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import { SyncEntityType } from 'src/enum.js';
 import { fromAck, mapJsonLine, serialize, toAck } from 'src/utils/sync.js';
-import { describe, expect, it } from 'vitest';
 
 describe('fromAck', () => {
   it('should parse an ack string without extraId', () => {

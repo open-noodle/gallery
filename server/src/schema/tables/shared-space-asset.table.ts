@@ -7,7 +7,7 @@ import {
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { shared_space_asset_delete_audit } from 'src/schema/functions.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';

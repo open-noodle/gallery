@@ -1,5 +1,5 @@
-import { QueueName } from 'src/enum.js';
 import z from 'zod';
+import { QueueName } from 'src/enum.js';
 
 // Deliberate copy of the module-private `configBool` in src/dtos/config.dto.ts. This module must
 // stay a leaf — importing from config.dto.ts would be circular and leave this undefined at

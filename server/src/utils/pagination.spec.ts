@@ -1,5 +1,5 @@
-import { paginationHelper } from 'src/utils/pagination.js';
 import { describe, expect, it } from 'vitest';
+import { paginationHelper } from 'src/utils/pagination.js';
 
 describe('paginationHelper', () => {
   it('should return hasNextPage false when items length is less than take', () => {

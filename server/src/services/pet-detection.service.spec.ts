@@ -3,7 +3,7 @@ import { PetDetectionService } from 'src/services/pet-detection.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 const makePerson = (overrides: Record<string, unknown> = {}) => ({
   personGroupId: 'person-id',

@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { vi } from 'vitest';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -7,7 +8,6 @@ import { BaseService } from 'src/services/base.service.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { vi } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
