@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Request } from 'express';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { onRequestError } from 'src/utils/logger';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { onRequestError } from 'src/utils/logger.js';
 import { describe, expect, it, vi } from 'vitest';
 
 const newMockLogger = () =>

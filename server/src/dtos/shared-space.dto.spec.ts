@@ -7,7 +7,7 @@ import {
   SharedSpacePersonFaceParamDto,
   SharedSpacePersonParamDto,
   SharedSpaceUpdateDto,
-} from 'src/dtos/shared-space.dto';
+} from 'src/dtos/shared-space.dto.js';
 
 // Generates valid v4 UUIDs by varying the last 12 hex chars
 const makeUUIDs = (count: number) =>

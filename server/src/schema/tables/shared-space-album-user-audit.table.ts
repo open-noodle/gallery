@@ -1,6 +1,14 @@
-import { AfterInsertTrigger, Column, CreateDateColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
-import { shared_space_album_user_delete_after_audit } from 'src/schema/functions';
+import {
+  AfterInsertTrigger,
+  Column,
+  CreateDateColumn,
+  type Generated,
+  Index,
+  Table,
+  Timestamp,
+} from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
+import { shared_space_album_user_delete_after_audit } from 'src/schema/functions.js';
 
 // Gated grant-revocation audit: one row per (album, user) who has lost all
 // paths. The consumer trigger shared_space_album_user_delete_after_audit

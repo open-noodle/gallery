@@ -22,8 +22,8 @@ import {
   ServeOptions,
   ServeStrategy,
   StorageBackend,
-} from 'src/interfaces/storage-backend.interface';
-import { getContentDispositionHeader } from 'src/utils/file';
+} from 'src/interfaces/storage-backend.interface.js';
+import { getContentDispositionHeader } from 'src/utils/file.js';
 
 // getReadableUrl backs server-side, download-free probing (ffprobe) that completes within the
 // request. Its URL is a bearer credential, so it gets a much shorter expiry than the client-facing

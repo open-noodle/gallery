@@ -1,6 +1,6 @@
 import { ObservableCallback } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-import { MetricGroupRepository } from 'src/repositories/telemetry.repository';
+import { MetricGroupRepository } from 'src/repositories/telemetry.repository.js';
 import { describe, expect, it, vi } from 'vitest';
 
 const newMetricService = () => {

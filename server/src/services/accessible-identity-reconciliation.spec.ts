@@ -4,7 +4,7 @@ import {
   filterUnambiguousReconciliationClaims,
   type AutomaticReconciliationCandidate,
   type ReconciliationClaim,
-} from 'src/services/accessible-identity-reconciliation';
+} from 'src/services/accessible-identity-reconciliation.js';
 
 const baseCandidate = (
   overrides: Partial<AutomaticReconciliationCandidate> = {},

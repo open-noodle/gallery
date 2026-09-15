@@ -1,18 +1,18 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   UserGroupCreateDto,
   UserGroupMemberResponseDto,
   UserGroupMemberSetDto,
   UserGroupResponseDto,
   UserGroupUpdateDto,
-} from 'src/dtos/user-group.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
-import { UserGroupService } from 'src/services/user-group.service';
-import { UUIDParamDto } from 'src/validation';
+} from 'src/dtos/user-group.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
+import { UserGroupService } from 'src/services/user-group.service.js';
+import { UUIDParamDto } from 'src/validation.js';
 
 @ApiTags(ApiTag.UserGroups)
 @Controller('user-groups')
