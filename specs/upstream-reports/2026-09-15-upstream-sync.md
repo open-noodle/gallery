@@ -4,8 +4,9 @@
 
 - **Upstream commits pulled**: 32 (`86ae0dd06c7..ca4637adc79`), replayed as 18 batches across ~1550
   fork commits
-- **Upstream version**: Immich v3.2.0 → v3.2.1 (equivalent content; see "Version note" below —
-  `branding/config.json` intentionally left at `3.2.0`, this cycle does not land on `main`)
+- **Upstream version**: Immich v3.2.0 → v3.2.2-equivalent — every fix carried by both tags is
+  present in this branch (verified commit-by-commit; see "Version note" below). `branding/config.json`
+  is intentionally left at `3.2.0`.
 - **Headline payload**: NestJS 11 → 12 + ESM (`"type": "module"`, `moduleResolution: nodenext`,
   `isolatedModules`, `tsc-alias`), Vitest 3 → 4, Kysely 0.28.17 → 0.29.5, `lodash` → `lodash-es`
   (immich-31237, immich-31537)
@@ -624,6 +625,33 @@ This cycle's branch is named for Immich v3.2.1 and absorbs upstream through `ca4
 version references are updated only at a cutover that actually lands on `main` against a real tagged
 release — this cycle stays on the rolling branch, so bumping them here would advertise a version the
 public-facing `main` branch has not reached.
+
+### Addendum, 2026-09-15 evening — what the tags actually contain
+
+The summary bullet above originally read "v3.2.0 → v3.2.1 (equivalent content)" as an assumption, and
+it was later contradicted in-session by a check that sampled `release/v3.2` **PR numbers** against our
+history and concluded none of v3.2.1 was present. That check was wrong, and its conclusion was wrong.
+`release/v3.2` is a pure cherry-pick branch: each fix lands on `upstream/main` first under one PR
+number, then reaches the release branch as a **re-numbered** cherry-pick (`immich-31555` on the
+release branch is `immich-31456` on `main`). Grepping our history for the release-side numbers can
+therefore only ever return nothing.
+
+Verified properly — by `cherry picked from commit <sha>` trailer where present, and by subject match
+on `upstream/main` for the four commits without one — **all 15 of v3.2.1's fixes are ancestors of this
+branch.** The containment claim is correct; only the reasoning offered for it was missing.
+
+**v3.2.2** (tagged `60b51cb3bc9`, 2026-09-15) adds exactly one functional commit on top of v3.2.1:
+`fix: skip faces of other users when reassigning faces`, which is a cherry-pick of `e35aa718d9e`
+(`immich-31580`) from `upstream/main`. That commit sits 11 places above our base `ca4637adc79`, so
+advancing the rolling base to reach it would have pulled the 10 commits below it as well — including a
+`user.oauthId` schema migration, a `base-server` image bump, a Node bump with ~670 lines of lockfile
+churn, upstream's own `drop tsc-alias` reversal of part of this cycle's ESM work, and a mobile Drift
+`v32` snapshot that **collides with the fork's own shipped v32**. All of that would have invalidated
+the RC already validated on staging.
+
+It was therefore taken as a single fork backport instead (`09b5a13c651`), with a regression test proved
+red against the pre-fix service. **This branch's content is now v3.2.2-equivalent.** Drop that commit
+when the rolling base advances past `e35aa718d9e` and upstream's own copy arrives.
 
 ## Out of scope (explicitly, not oversights)
 
