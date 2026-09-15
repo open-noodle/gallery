@@ -22,7 +22,7 @@ import { UserTable } from 'src/schema/tables/user.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getCalendarHeatmap } from 'src/services/shared/user-methods.js';
 import { StorageService } from 'src/services/storage.service.js';
-import { ImmichFileResponse, ImmichMediaResponse } from 'src/utils/file.js';
+import { ImmichMediaResponse } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
