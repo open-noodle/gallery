@@ -78,6 +78,13 @@ describe('Database Migration Scenarios', () => {
         provider: new FileMigrationProvider({
           fs: { readdir },
           path: { join },
+          // Mirrors CompositeMigrationProvider's `import` hook: without it, FileMigrationProvider
+          // falls back to the plain `import(filePath)` defined inside the (externalized) kysely
+          // package itself, which Node resolves natively and can't see this project's `src/` path
+          // alias. Writing the import call here, in project source, routes it back through
+          // vite-node's own module resolution (tsconfigPaths included) so bare `src/...` imports
+          // in the migration files resolve the same way they do for the real migrator.
+          import: (filePath) => import(filePath),
           // eslint-disable-next-line unicorn/prefer-module
           migrationFolder: join(__dirname, '../../../../src/schema/migrations'),
         }),
