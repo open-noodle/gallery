@@ -6,13 +6,13 @@ import '../../medium/repository_context.dart';
 
 void main() {
   late MediumRepositoryContext ctx;
-  late PeopleRepository sut;
+  late PeopleDatabaseRepository sut;
   late String userId;
   late String assetId;
 
   setUp(() async {
     ctx = MediumRepositoryContext();
-    sut = PeopleRepository(ctx.db);
+    sut = PeopleDatabaseRepository(ctx.db);
     final user = await ctx.newUser();
     userId = user.id;
     final asset = await ctx.newRemoteAsset(ownerId: userId);
