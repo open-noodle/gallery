@@ -1,7 +1,7 @@
 import { Kysely, sql } from 'kysely';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Tests for the library_user migration backfill SQL. The SQL body below is a
 // verbatim copy of Pass 1 + Pass 2 in

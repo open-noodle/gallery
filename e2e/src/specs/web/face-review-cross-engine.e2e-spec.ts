@@ -28,8 +28,8 @@ import {
   type LoginResponseDto,
 } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { createUserDto } from 'src/fixtures';
-import { asBearerAuth, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 

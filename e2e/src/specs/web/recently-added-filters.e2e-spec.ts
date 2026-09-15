@@ -2,8 +2,8 @@ import type { LoginResponseDto } from '@immich/sdk';
 import { updateAsset } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
-import { asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { thumbnailUtils } from 'src/ui/specs/timeline/utils.js';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 test.describe('Recently Added', () => {
   let admin: LoginResponseDto;

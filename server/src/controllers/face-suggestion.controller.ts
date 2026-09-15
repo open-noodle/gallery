@@ -1,17 +1,17 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   FaceSuggestionActionResponseDto,
   PersonFaceSuggestionPageQueryDto,
   PersonFaceSuggestionPageResponseDto,
   PersonFaceSuggestionParamsDto,
-} from 'src/dtos/person.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
-import { FaceSuggestionService } from 'src/services/face-suggestion.service';
-import { UUIDParamDto } from 'src/validation';
+} from 'src/dtos/person.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
+import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
+import { UUIDParamDto } from 'src/validation.js';
 
 /**
  * Slice 13 (fork isolation): the five `/people/:id/face-suggestions...` routes, extracted out of

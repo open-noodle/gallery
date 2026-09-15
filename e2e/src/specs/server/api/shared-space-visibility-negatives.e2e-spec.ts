@@ -24,8 +24,8 @@ import {
 } from '@immich/sdk';
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { createUserDto } from 'src/fixtures';
-import { app, asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { app, asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 

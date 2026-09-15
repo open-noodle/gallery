@@ -6,11 +6,11 @@ import {
   generateTimelineData,
   type Changes,
   type TimelineData,
-} from 'src/ui/generators/timeline';
-import { setupBaseMockApiRoutes } from 'src/ui/mock-network/base-network';
-import { setupTimelineMockApiRoutes, TimelineTestContext } from 'src/ui/mock-network/timeline-network';
-import { thumbnailUtils, timelineUtils } from 'src/ui/specs/timeline/utils';
-import { utils } from 'src/utils';
+} from 'src/ui/generators/timeline.js';
+import { setupBaseMockApiRoutes } from 'src/ui/mock-network/base-network.js';
+import { setupTimelineMockApiRoutes, TimelineTestContext } from 'src/ui/mock-network/timeline-network.js';
+import { thumbnailUtils, timelineUtils } from 'src/ui/specs/timeline/utils.js';
+import { utils } from 'src/utils.js';
 
 test.describe('Timeline grouping UI', () => {
   let adminUserId: string;

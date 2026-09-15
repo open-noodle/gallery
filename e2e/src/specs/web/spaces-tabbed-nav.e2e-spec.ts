@@ -1,7 +1,7 @@
 import { LoginResponseDto, SharedSpaceResponseDto, SharedSpaceRole } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { createUserDto } from 'src/fixtures';
-import { utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { utils } from 'src/utils.js';
 
 // Web E2E coverage for the space tabbed-navigation shell.
 //

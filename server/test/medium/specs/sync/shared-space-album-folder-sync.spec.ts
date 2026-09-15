@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
-import { SyncRepository } from 'src/repositories/sync.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -1,11 +1,11 @@
 import { Kysely, sql } from 'kysely';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { ALBUM_FOLDER_TRAVERSAL_LIMIT, SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/services/shared-space.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { ALBUM_FOLDER_TRAVERSAL_LIMIT, SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/services/shared-space.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -17,28 +17,28 @@
  */
 
 import { expressionBuilder, Kysely } from 'kysely';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { TimeBucketDto } from 'src/dtos/time-bucket.dto';
-import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { AssetRepository, withTimeBucketAssetFilters } from 'src/repositories/asset.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { MemoryRepository } from 'src/repositories/memory.repository';
-import { PartnerRepository } from 'src/repositories/partner.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { ViewRepository } from 'src/repositories/view-repository';
-import { DB } from 'src/schema';
-import { MemoryService } from 'src/services/memory.service';
-import { TimelineService } from 'src/services/timeline.service';
-import { ViewService } from 'src/services/view.service';
-import { hiddenFromOwnTimeline } from 'src/utils/shared-space-album-scope';
-import { MediumTestContext, newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
+import { AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { AssetRepository, withTimeBucketAssetFilters } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MemoryRepository } from 'src/repositories/memory.repository.js';
+import { PartnerRepository } from 'src/repositories/partner.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { ViewRepository } from 'src/repositories/view-repository.js';
+import { DB } from 'src/schema/index.js';
+import { MemoryService } from 'src/services/memory.service.js';
+import { TimelineService } from 'src/services/timeline.service.js';
+import { ViewService } from 'src/services/view.service.js';
+import { hiddenFromOwnTimeline } from 'src/utils/shared-space-album-scope.js';
+import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

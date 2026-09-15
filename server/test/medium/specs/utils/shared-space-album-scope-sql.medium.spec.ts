@@ -4,12 +4,12 @@
 // that keeps the two authoring styles from drifting.
 // Slice 1 extension — requireShowInTimeline option equivalence between raw-SQL and Kysely.
 import { Kysely, sql } from 'kysely';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { spaceAlbumAssetExists, spaceAlbumAssetExistsSql } from 'src/utils/shared-space-album-scope';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { spaceAlbumAssetExists, spaceAlbumAssetExistsSql } from 'src/utils/shared-space-album-scope.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

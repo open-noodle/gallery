@@ -1,9 +1,9 @@
 import { type LoginResponseDto } from '@immich/sdk';
 import { Socket } from 'socket.io-client';
-import { type Actor, authHeaders } from 'src/actors';
-import { createUserDto } from 'src/fixtures';
-import { errorDto } from 'src/responses';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { type Actor, authHeaders } from 'src/actors.js';
+import { createUserDto } from 'src/fixtures.js';
+import { errorDto } from 'src/responses.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

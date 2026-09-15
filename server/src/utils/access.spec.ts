@@ -1,9 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { Permission } from 'src/enum';
-import { checkAccess, requireElevatedPermission } from 'src/utils/access';
-import { newAccessRepositoryMock } from 'test/repositories/access.repository.mock';
-import { newUuid } from 'test/small.factory';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { Permission } from 'src/enum.js';
+import { checkAccess, requireElevatedPermission } from 'src/utils/access.js';
+import { newAccessRepositoryMock } from 'test/repositories/access.repository.mock.js';
+import { newUuid } from 'test/small.factory.js';
 
 const makeAuth = (userId?: string): AuthDto => ({
   user: {

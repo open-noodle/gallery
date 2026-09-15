@@ -3,7 +3,7 @@ import { access, mkdir, opendir, rm, stat, unlink, writeFile } from 'node:fs/pro
 import { dirname, isAbsolute, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface';
+import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 
 export class DiskStorageBackend implements StorageBackend {
   constructor(private mediaLocation: string) {}

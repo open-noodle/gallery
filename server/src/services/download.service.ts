@@ -4,15 +4,20 @@ import { Readable } from 'node:stream';
 import sanitize from 'sanitize-filename';
 import { StorageCore } from 'src/cores/storage.core.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
-import { DownloadArchiveDto, DownloadArchiveInfo, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto.js';
+import {
+  DownloadArchiveDto,
+  DownloadArchiveInfo,
+  DownloadInfoDto,
+  DownloadResponseDto,
+} from 'src/dtos/download.dto.js';
 import { Permission } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getPreferences } from 'src/utils/preferences.js';
-import { StorageService } from 'src/services/storage.service.js';
 
 class LazyS3Readable extends Readable {
   private source?: Readable;

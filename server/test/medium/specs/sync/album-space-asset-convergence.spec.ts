@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
-import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Task 5 (#764 slice 5) — service-level convergence guard for cross-owner contributions
 // (album_space_asset). Drives the real SyncService seam via SyncTestContext.syncStream /

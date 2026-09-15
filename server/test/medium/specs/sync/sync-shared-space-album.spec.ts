@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
-import { AlbumUserRole, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AlbumUserRole, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Handler-level end-to-end tests for the five SharedSpaceAlbum* sync types
 // (Phase 2A slice A5). Tests mirror sync-shared-space-library.spec.ts but

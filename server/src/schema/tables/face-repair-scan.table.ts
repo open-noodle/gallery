@@ -1,12 +1,12 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
+import { Column, CreateDateColumn, ForeignKeyColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 import {
   RepairScanParams,
   RepairScanPerson,
   RepairScanProgress,
   RepairScanTotals,
-} from 'src/repositories/face-repair-scan.repository';
-import { UserTable } from 'src/schema/tables/user.table';
+} from 'src/repositories/face-repair-scan.repository.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // Partial unique index restricted to in-flight rows: the DB-level single-flight guard. It makes the
 // SELECT-then-INSERT in createScan race-safe — two concurrent triggers can't both persist an in-flight scan (the

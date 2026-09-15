@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely';
-import { personKeyTarget } from 'src/utils/cluster-groups-order';
+import { personKeyTarget } from 'src/utils/cluster-groups-order.js';
 
 // Final-form migration for the shared face-review verdict layer. Replaces three earlier fork migrations
 // that were never deployed (AddPersonFaceSuggestion, AddSpacePersonFaceSuggestion,

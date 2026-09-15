@@ -1,14 +1,14 @@
 // P1-7 (#752): faces on contributed-only assets must be selectable as projection targets and by
 // the link-time face-sync pager. Face fixtures are seeded with direct inserts (no factory).
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 
