@@ -1,8 +1,8 @@
+import { describe, expect, it } from 'vitest';
 import { AssetOrder, UserMetadataKey } from 'src/enum.js';
 import { UserMetadataItem, UserPreferences } from 'src/types.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
-import { describe, expect, it } from 'vitest';
 
 const getDefaultPreferences = (): UserPreferences => ({
   albums: {

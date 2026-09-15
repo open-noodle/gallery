@@ -1,13 +1,12 @@
 import { DateTime } from 'luxon';
+import { readFileSync } from 'node:fs';
 import {
-  isSeasonStart,
   SEASON_MONTHS,
+  isSeasonStart,
   seasonOf,
   seasonStartingOn,
   seasonYearOf,
 } from 'src/services/memory-rules/season.util.js';
-
-import { readFileSync } from 'node:fs';
 
 /** The shared `i18n/en.json`, read from disk (vitest roots at `server/`): no module alias reaches it. */
 const messageKeys = new Set(Object.keys(JSON.parse(readFileSync('../i18n/en.json', 'utf8'))));

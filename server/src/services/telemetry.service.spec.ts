@@ -1,6 +1,6 @@
 import { JobName, JobStatus, QueueName } from 'src/enum.js';
 import { TelemetryService } from 'src/services/telemetry.service.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe(TelemetryService.name, () => {
   let sut: TelemetryService;

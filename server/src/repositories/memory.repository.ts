@@ -20,9 +20,9 @@ import { MemoryTable } from 'src/schema/tables/memory.table.js';
 import { asUuid } from 'src/utils/database.js';
 import { asLocalTime } from 'src/utils/date.js';
 import {
+  type TimelineHiddenScope,
   hiddenFromOwnTimeline,
   spaceAlbumAssetExists,
-  type TimelineHiddenScope,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
 

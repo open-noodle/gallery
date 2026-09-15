@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import type { JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { type SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { type ClassificationFaceExclusion } from 'src/gallery/config.dto.js';
 import { type ClassificationFaceSummary } from 'src/repositories/classification.repository.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import type { JobOf } from 'src/types.js';
 import { isFacialRecognitionEnabled } from 'src/utils/misc.js';
 import { upsertTags } from 'src/utils/tag.js';
 

@@ -1,4 +1,4 @@
-import { Chapter, CHAPTER_MAX_SPAN_DAYS, DayCount, densestChapter } from 'src/services/memory-rules/chapter.util.js';
+import { CHAPTER_MAX_SPAN_DAYS, Chapter, DayCount, densestChapter } from 'src/services/memory-rules/chapter.util.js';
 
 const day = (iso: string, count: number): DayCount => ({ day: new Date(`${iso}T00:00:00.000Z`), count });
 

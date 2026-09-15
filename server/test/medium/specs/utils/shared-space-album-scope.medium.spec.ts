@@ -7,12 +7,12 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import {
+  type AlbumTimelineGate,
+  type SpaceScope,
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceDirectAssetExists,
   spaceLibraryAssetExists,
-  type AlbumTimelineGate,
-  type SpaceScope,
 } from 'src/utils/shared-space-album-scope.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
