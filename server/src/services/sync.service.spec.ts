@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
 import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { SYNC_TYPES_ORDER, SyncService, send } from 'src/services/sync.service.js';
+import { ClientDisconnectedError } from 'src/utils/response.js';
 import { serialize, toAck } from 'src/utils/sync.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { newUuid } from 'test/small.factory.js';
@@ -78,6 +79,38 @@ describe('send', () => {
 
     expect(resolved).toBe(true);
     expect(chunks).toEqual([serialize(item)]);
+  });
+
+  it('should throw a disconnect error when the stream destroyed', async () => {
+    const { stream, chunks } = createTestStream(1024 * 1024);
+
+    stream.destroy();
+
+    await expect(send(stream, item)).rejects.toBeInstanceOf(ClientDisconnectedError);
+    expect(chunks).toEqual([]);
+  });
+
+  it('should throw a disconnect error when the stream is destroyed after writing some data', async () => {
+    const { stream } = createTestStream(1);
+
+    const sendPromise = send(stream, item);
+
+    await Promise.resolve();
+    stream.destroy();
+
+    await expect(sendPromise).rejects.toBeInstanceOf(ClientDisconnectedError);
+  });
+
+  it('should handle a stream error', async () => {
+    const { stream } = createTestStream(1);
+    const error = new Error('socket hang up');
+
+    const sendPromise = send(stream, item);
+
+    await Promise.resolve();
+    stream.emit('error', error);
+
+    await expect(sendPromise).rejects.toBe(error);
   });
 });
 
