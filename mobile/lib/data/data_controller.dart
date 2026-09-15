@@ -6,21 +6,24 @@ import 'package:immich_mobile/data/server/activity.dart';
 import 'package:immich_mobile/data/server/person.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:openapi/api.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:sqlite3/common.dart';
 
 /// Controls all data access. Serves request against the HTTP API and the Drift DB
 class DataController {
   final Drift _db;
   final DriftLogger _logDb;
-  final ApiClient _apiClient;
+  final ApiService _apiService;
 
-  DataController._(this._db, this._logDb, this._apiClient);
+  DataController._(this._db, this._logDb, this._apiService);
 
   /// Initalize the base data system. Sets up primary/logging DBs and the settings store
   ///
   /// `disableStoreWatching` prevents continually updating the setting store's cache on change
-  static Future<(DataController, bool)> init({required ApiClient apiClient, bool disableStoreWatching = false}) async {
+  static Future<(DataController, bool)> init({
+    required ApiService apiService,
+    bool disableStoreWatching = false,
+  }) async {
     await configureSqliteCache();
 
     final (db, updatePool) = await openSqliteConnectionWithUpdatePool(name: 'immich');
@@ -30,7 +33,7 @@ class DataController {
 
     await StoreService.init(storeRepository: StoreRepository(drift), listenUpdates: !disableStoreWatching);
 
-    return (DataController._(drift, logDb, apiClient), wasRecreated);
+    return (DataController._(drift, logDb, apiService), wasRecreated);
   }
 
   /// Open the logger database, recreating if corrupt. Returns the logger and whether it was recreated
@@ -64,10 +67,10 @@ class DataController {
   // ignore: unused-code
   late final PeopleDatabaseRepository peopleDb = PeopleDatabaseRepository(_db);
   // ignore: unused-code
-  late final PersonApiRepository personApi = PersonApiRepository(PeopleApi(_apiClient));
+  late final PersonApiRepository personApi = PersonApiRepository(_apiService);
 
   // ignore: unused-code
-  late final ActivityApiRepository activityApi = ActivityApiRepository(ActivitiesApi(_apiClient));
+  late final ActivityApiRepository activityApi = ActivityApiRepository(_apiService);
 
   /// Direct database access for the logic that has not yet been migrated
   // TODO(rewrite): Remove once all repositories have been migrated
