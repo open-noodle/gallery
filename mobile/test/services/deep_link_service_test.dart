@@ -26,8 +26,6 @@ class _MockRemoteAlbumService extends Mock implements RemoteAlbumService {}
 
 class _MockDriftMemoryService extends Mock implements MemoryService {}
 
-class _MockDriftPeopleService extends Mock implements PeopleService {}
-
 class _MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
 class _MockWidgetRef extends Mock implements WidgetRef {}
