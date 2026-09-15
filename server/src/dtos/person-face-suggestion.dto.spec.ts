@@ -1,10 +1,10 @@
+import { describe, expect, it } from 'vitest';
 import {
   PersonFaceSuggestionPageQueryDto,
   PersonFaceSuggestionPageResponseDto,
   PersonFaceSuggestionParamsDto,
 } from 'src/dtos/person.dto.js';
 import { SpacePersonFaceSuggestionParamsDto, SpacePersonParamsDto } from 'src/dtos/shared-space-person.dto.js';
-import { describe, expect, it } from 'vitest';
 
 describe('PersonFaceSuggestion DTOs', () => {
   it('query schema coerces and defaults page/size', () => {

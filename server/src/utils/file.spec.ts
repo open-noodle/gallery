@@ -2,8 +2,10 @@ import { HttpException } from '@nestjs/common';
 import express from 'express';
 import { once } from 'node:events';
 import { get } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
+import request from 'supertest';
+import { describe, expect, it, vi } from 'vitest';
+import type { AddressInfo } from 'node:net';
 import { CacheControl } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import {
@@ -13,8 +15,6 @@ import {
   S3_STREAM_IDLE_TIMEOUT_MS,
   sendFile,
 } from 'src/utils/file.js';
-import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs/promises', () => ({
   access: vi.fn().mockResolvedValue(void 0),

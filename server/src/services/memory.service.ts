@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { shuffle } from 'lodash-es';
 import { DateTime } from 'luxon';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
+import type { MemoryRule, MemoryRuleCandidate } from 'src/services/memory-rules/memory-rule.interface.js';
+import type { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import type { MemoriesState, RuleMemoryData } from 'src/types.js';
 import { Memory } from 'src/database.js';
 import { OnJob } from 'src/decorators.js';
 import { BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import type { SystemConfig } from 'src/dtos/config.dto.js';
 import {
   MemoryCreateDto,
   MemoryResponseDto,
@@ -16,7 +19,6 @@ import {
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import type { MemoryRule, MemoryRuleCandidate } from 'src/services/memory-rules/memory-rule.interface.js';
 import {
   getAdminAvailableMemoryTypeKeys,
   getMemoryTypeFloor,
@@ -25,10 +27,8 @@ import {
   isMemoryTypeEnabledForUser,
 } from 'src/services/memory-rules/memory-type.metadata.js';
 import { createMemoryRules } from 'src/services/memory-rules/memory-type.registry.js';
-import { planReservation, type ReservableMemory } from 'src/services/memory-rules/reservation.util.js';
+import { type ReservableMemory, planReservation } from 'src/services/memory-rules/reservation.util.js';
 import { MemoryThemeSearchAdapter } from 'src/services/memory-rules/theme-search.adapter.js';
-import type { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
-import type { MemoriesState, RuleMemoryData } from 'src/types.js';
 import { addAssets, removeAssets } from 'src/utils/asset.util.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences } from 'src/utils/preferences.js';
