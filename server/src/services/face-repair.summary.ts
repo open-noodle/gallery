@@ -1,4 +1,4 @@
-import { FlaggedFace, RepairPlan } from 'src/services/face-repair.service';
+import { FlaggedFace, RepairPlan } from 'src/services/face-repair.service.js';
 
 export interface SuspectedOwnerCount {
   ownerPersonId: string;

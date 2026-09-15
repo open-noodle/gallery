@@ -1,6 +1,6 @@
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
-import { ViewRepository } from 'src/repositories/view-repository';
-import type { DB } from 'src/schema';
+import { ViewRepository } from 'src/repositories/view-repository.js';
+import type { DB } from 'src/schema/index.js';
 
 const offlineKysely = () =>
   new Kysely<DB>({

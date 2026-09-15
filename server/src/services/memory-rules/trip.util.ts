@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository';
-import { pickEvenlySpaced } from 'src/services/memory-rules/curation.util';
+import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository.js';
+import { pickEvenlySpaced } from 'src/services/memory-rules/curation.util.js';
 
 export const BURST_WINDOW_MS = 2 * 60 * 1000;
 export const SMALL_TRIP_MAX = 6;

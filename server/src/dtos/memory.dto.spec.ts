@@ -1,9 +1,9 @@
-import { mapMemory, MemoryCreateDto, MemoryResponseDto } from 'src/dtos/memory.dto';
-import { MemoryType } from 'src/enum';
-import { RuleMemoryData } from 'src/types';
-import { MemoryFactory } from 'test/factories/memory.factory';
-import { getForMemory } from 'test/mappers';
-import { factory } from 'test/small.factory';
+import { mapMemory, MemoryCreateDto, MemoryResponseDto } from 'src/dtos/memory.dto.js';
+import { MemoryType } from 'src/enum.js';
+import { RuleMemoryData } from 'src/types.js';
+import { MemoryFactory } from 'test/factories/memory.factory.js';
+import { getForMemory } from 'test/mappers.js';
+import { factory } from 'test/small.factory.js';
 
 describe('Memory DTOs', () => {
   describe('MemoryCreateDto', () => {

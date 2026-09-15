@@ -1,4 +1,4 @@
-import { THEMES, themeForMonth } from 'src/services/memory-rules/theme.catalog';
+import { THEMES, themeForMonth } from 'src/services/memory-rules/theme.catalog.js';
 
 import { readFileSync } from 'node:fs';
 

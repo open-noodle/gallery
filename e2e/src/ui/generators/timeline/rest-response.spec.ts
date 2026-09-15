@@ -1,8 +1,8 @@
 import { TimeBucketSize } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 
-import type { Changes } from './rest-response';
-import { getTimeBucketCovers, getTimeBuckets } from './rest-response';
+import type { Changes } from './rest-response.js';
+import { getTimeBucketCovers, getTimeBuckets } from './rest-response.js';
 
 const changes: Changes = {
   albumAdditions: [],

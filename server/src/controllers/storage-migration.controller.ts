@@ -1,14 +1,14 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import {
   StorageMigrationBatchParamDto,
   StorageMigrationEstimateQueryDto,
   StorageMigrationStartDto,
-} from 'src/dtos/storage-migration.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Authenticated } from 'src/middleware/auth.guard';
-import { StorageMigrationService } from 'src/services/storage-migration.service';
+} from 'src/dtos/storage-migration.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Authenticated } from 'src/middleware/auth.guard.js';
+import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 
 @ApiTags(ApiTag.StorageMigration)
 @Controller('storage-migration')

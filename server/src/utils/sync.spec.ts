@@ -1,5 +1,5 @@
-import { SyncEntityType } from 'src/enum';
-import { fromAck, mapJsonLine, serialize, toAck } from 'src/utils/sync';
+import { SyncEntityType } from 'src/enum.js';
+import { fromAck, mapJsonLine, serialize, toAck } from 'src/utils/sync.js';
 import { describe, expect, it } from 'vitest';
 
 describe('fromAck', () => {

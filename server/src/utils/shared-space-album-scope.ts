@@ -17,9 +17,9 @@
 //
 // See docs / data/sa-abstraction-spec-t8/report.md for the full design + slices.
 import { Expression, ExpressionBuilder, RawBuilder, ReferenceExpression, sql, SqlBool } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
-import { DB } from 'src/schema';
-import { anyUuid, asUuid } from 'src/utils/database';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { anyUuid, asUuid } from 'src/utils/database.js';
 
 /**
  * The canonical set of asset visibilities that are shareable through a space.

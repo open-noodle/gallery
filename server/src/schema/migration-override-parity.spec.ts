@@ -34,19 +34,19 @@ import {
   shared_space_album_folder_delete_audit,
   shared_space_album_hidden_delete_audit,
   shared_space_member_after_insert_album,
-} from 'src/schema/functions';
+} from 'src/schema/functions.js';
 // Static import (not dynamic `import()`): tsc's node16/nodenext resolution can't resolve a
 // `src/`-aliased specifier inside a dynamic import expression (TS2307), unlike a static
 // import. vitest hoists `vi.mock('kysely', ...)` above every import in this file regardless
 // of source position (same pattern as composite-migration-provider.spec.ts), so the mock is
 // already installed by the time this migration module's top-level `import { sql } from
 // 'kysely'` resolves.
-import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger';
-import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit';
-import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId';
-import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift';
-import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
-import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable';
+import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger.js';
+import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit.js';
+import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId.js';
+import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift.js';
+import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden.js';
+import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable.js';
 
 describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parity', () => {
   beforeEach(() => {

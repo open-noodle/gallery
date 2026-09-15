@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { AssetType, AssetVisibility } from 'src/enum';
-import { DB } from 'src/schema';
+import { AssetType, AssetVisibility } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
 
 export interface AssetTelemetryByType {
   type: AssetType;

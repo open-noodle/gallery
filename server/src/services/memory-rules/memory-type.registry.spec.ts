@@ -1,5 +1,5 @@
-import { MEMORY_TYPE_KEYS, MEMORY_TYPE_METADATA } from 'src/services/memory-rules/memory-type.metadata';
-import { createMemoryRules, MemoryRuleDeps } from 'src/services/memory-rules/memory-type.registry';
+import { MEMORY_TYPE_KEYS, MEMORY_TYPE_METADATA } from 'src/services/memory-rules/memory-type.metadata.js';
+import { createMemoryRules, MemoryRuleDeps } from 'src/services/memory-rules/memory-type.registry.js';
 
 const deps = {
   themeSearchPort: { resolveEmbedding: vi.fn(), searchByEmbedding: vi.fn() },

@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
-import { CacheControl, JobName, UserMetadataKey, JobStatus } from 'src/enum.js';
+import { CacheControl, JobName, JobStatus, UserMetadataKey } from 'src/enum.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { UserService } from 'src/services/user.service.js';
 import { clearConfigCache } from 'src/utils/config.js';

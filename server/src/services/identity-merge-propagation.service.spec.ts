@@ -1,8 +1,8 @@
 import { ConflictException } from '@nestjs/common';
-import { JobName, SharedSpaceActivityType } from 'src/enum';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { IdentityMergePropagationService, MergeProfile } from 'src/services/identity-merge-propagation.service';
+import { JobName, SharedSpaceActivityType } from 'src/enum.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { IdentityMergePropagationService, MergeProfile } from 'src/services/identity-merge-propagation.service.js';
 
 type PersonalMergePersonRow = {
   personGroupId: string;

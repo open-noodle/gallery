@@ -3,18 +3,18 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Index,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
-import { PersonGroupTable } from 'src/schema/tables/person-group.table';
-import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
+import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
+import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // The shared face-review layer. One row says everything the system knows about a (face -> human) pairing:
 //

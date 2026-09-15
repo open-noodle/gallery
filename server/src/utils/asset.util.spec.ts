@@ -1,4 +1,4 @@
-import { getDimensions, isPanorama } from 'src/utils/asset.util';
+import { getDimensions, isPanorama } from 'src/utils/asset.util.js';
 
 describe('getDimensions', () => {
   it('should return 0x0 when width is null', () => {

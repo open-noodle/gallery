@@ -7,7 +7,7 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // Regression cover for the `addToSpaceAlbum` step's album-name field.
 //

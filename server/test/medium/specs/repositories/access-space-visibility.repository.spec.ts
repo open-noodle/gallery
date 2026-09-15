@@ -8,14 +8,14 @@
  * Each test seeds a clean context so there is no shared-state cross-contamination.
  */
 import { Kysely } from 'kysely';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

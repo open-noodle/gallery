@@ -1,20 +1,20 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility } from 'src/enum';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
-import { FaceRepairScanRepository, RepairScanParams } from 'src/repositories/face-repair-scan.repository';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SearchRepository } from 'src/repositories/search.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { DB } from 'src/schema';
-import { FaceRepairService } from 'src/services/face-repair.service';
-import { insertPersonGroup, mediumFactory, newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility } from 'src/enum.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
+import { FaceRepairScanRepository, RepairScanParams } from 'src/repositories/face-repair-scan.repository.js';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { DB } from 'src/schema/index.js';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { insertPersonGroup, mediumFactory, newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Two clusters on disjoint embedding axes — maximally dissimilar (cosine distance ~1.0),
 // standing in for two genuinely different people.

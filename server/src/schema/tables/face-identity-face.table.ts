@@ -3,15 +3,15 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Index,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
+import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 
 export type FaceIdentityFaceSource = 'owner-person' | 'ml' | 'backfill' | 'shared-space-evidence' | 'manual' | 'import';
 

@@ -1,4 +1,4 @@
-import { elementWiseMean } from 'src/utils/vector';
+import { elementWiseMean } from 'src/utils/vector.js';
 
 describe('elementWiseMean', () => {
   it('should average two vectors', () => {

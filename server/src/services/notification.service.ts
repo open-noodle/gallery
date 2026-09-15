@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { isAbsolute } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { EmailImageAttachment, JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -6,7 +7,6 @@ import { MapAlbumDto } from 'src/dtos/album.dto.js';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfigSmtpDto } from 'src/dtos/config.dto.js';
-import { isAbsolute } from 'node:path';
 import {
   NotificationDeleteAllDto,
   NotificationDto,

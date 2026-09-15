@@ -15,10 +15,10 @@
 // - The config is restored to defaults in afterAll.
 
 import { LoginResponseDto, PersonResponseDto, updateConfig } from '@immich/sdk';
-import { type SpaceContext, buildSpaceContext } from 'src/actors';
-import { createUserDto, uuidDto } from 'src/fixtures';
-import { errorDto } from 'src/responses';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { type SpaceContext, buildSpaceContext } from 'src/actors.js';
+import { createUserDto, uuidDto } from 'src/fixtures.js';
+import { errorDto } from 'src/responses.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

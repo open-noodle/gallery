@@ -1,13 +1,13 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, SourceType } from 'src/enum';
-import { FaceRepairScanRepository, RepairScanParams } from 'src/repositories/face-repair-scan.repository';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SourceType } from 'src/enum.js';
+import { FaceRepairScanRepository, RepairScanParams } from 'src/repositories/face-repair-scan.repository.js';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 const PARAMS: RepairScanParams = {
   maxDistance: 0.5,

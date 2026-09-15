@@ -7,9 +7,9 @@ import {
   PostgresQueryCompiler,
 } from 'kysely';
 import { DateTime } from 'luxon';
-import { AssetOrderWithRandom } from 'src/enum';
-import { MemoryRepository } from 'src/repositories/memory.repository';
-import type { DB } from 'src/schema';
+import { AssetOrderWithRandom } from 'src/enum.js';
+import { MemoryRepository } from 'src/repositories/memory.repository.js';
+import type { DB } from 'src/schema/index.js';
 
 const offlineDialect = () => ({
   createAdapter: () => new PostgresAdapter(),

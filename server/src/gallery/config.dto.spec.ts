@@ -1,11 +1,11 @@
-import { AdminConfigDto, defaults, mapPublicConfig, mapUserConfig } from 'src/dtos/config.dto';
+import { AdminConfigDto, defaults, mapPublicConfig, mapUserConfig } from 'src/dtos/config.dto.js';
 import {
   GalleryClassificationSchema,
   GalleryFaceSuggestionSchema,
   GalleryMemoriesSchema,
   GalleryPetDetectionSchema,
   galleryConfigBool,
-} from 'src/gallery/config.dto';
+} from 'src/gallery/config.dto.js';
 import { describe, expect, it } from 'vitest';
 import z from 'zod';
 

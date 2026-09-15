@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { AssetFileType } from 'src/enum';
-import { DB } from 'src/schema';
-import { StorageMigrationLogTable } from 'src/schema/tables/storage-migration-log.table';
+import { AssetFileType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { StorageMigrationLogTable } from 'src/schema/tables/storage-migration-log.table.js';
 
 export type StorageMigrationDirection = 'toS3' | 'toDisk';
 

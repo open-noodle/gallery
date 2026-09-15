@@ -1,9 +1,9 @@
 // server/src/repositories/search.repository.spec.ts
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
-import { AssetOrder, AssetVisibility } from 'src/enum';
-import { SearchRepository } from 'src/repositories/search.repository';
-import type { DB } from 'src/schema';
-import { searchAssetBuilderLegacy } from 'src/utils/database';
+import { AssetOrder, AssetVisibility } from 'src/enum.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
+import type { DB } from 'src/schema/index.js';
+import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { describe, expect, it } from 'vitest';
 
 // Offline Kysely — compiles SQL without executing it. No DB connection needed.

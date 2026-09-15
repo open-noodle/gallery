@@ -3,14 +3,14 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Index,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
+import { PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 
 @Table('face_identity')
 @UpdatedAtTrigger('face_identity_updatedAt')

@@ -1,20 +1,20 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, JobStatus, SharedSpaceRole } from 'src/enum';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { DB } from 'src/schema';
-import { SharedSpaceService } from 'src/services/shared-space.service';
-import { asDateString } from 'src/utils/date';
-import { newMediumService } from 'test/medium.factory';
-import { factory, newEmbedding } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, JobStatus, SharedSpaceRole } from 'src/enum.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { asDateString } from 'src/utils/date.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory, newEmbedding } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

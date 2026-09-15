@@ -1,7 +1,7 @@
-import { CreateDateColumn, ForeignKeyColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { CreateIdColumn } from 'src/decorators';
-import { LibraryTable } from 'src/schema/tables/library.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateDateColumn, ForeignKeyColumn, type Generated, Index, Table, Timestamp } from '@immich/sql-tools';
+import { CreateIdColumn } from 'src/decorators.js';
+import { LibraryTable } from 'src/schema/tables/library.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // Denormalized (userId, libraryId) access-grant table with a per-user createId.
 // Drives LibrarySync.getCreatedAfter so users who gain access to pre-existing

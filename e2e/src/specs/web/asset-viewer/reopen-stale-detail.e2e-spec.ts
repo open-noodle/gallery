@@ -1,7 +1,7 @@
 import { AssetMediaResponseDto, LoginResponseDto, getConfig, updateAsset, updateConfig } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 // Regression test for the stale/unreactive asset viewer on reopen (reported against v5.1.0):
 // open a photo with tagged people, go back to the timeline, open a photo without people —

@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { emptyStringToNull, isoDatetimeToDate, stringToBool } from 'src/validation';
+import { emptyStringToNull, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 import z from 'zod';
 
 const SpacePeopleQuerySchema = z

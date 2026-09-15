@@ -1,16 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JobName, JobStatus, MetadataKey, QueueName } from 'src/enum';
-import { FaceSearchResult } from 'src/repositories/search.repository';
-import { FaceSuggestionService } from 'src/services/face-suggestion.service';
-import { clearConfigCache } from 'src/utils/config';
-import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
-import { AssetFaceFactory } from 'test/factories/asset-face.factory';
-import { AuthFactory } from 'test/factories/auth.factory';
-import { PersonFactory } from 'test/factories/person.factory';
-import { authStub } from 'test/fixtures/auth.stub';
-import { getForAssetFace } from 'test/mappers';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils';
+import { JobName, JobStatus, MetadataKey, QueueName } from 'src/enum.js';
+import { FaceSearchResult } from 'src/repositories/search.repository.js';
+import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
+import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
+import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
+import { AuthFactory } from 'test/factories/auth.factory.js';
+import { PersonFactory } from 'test/factories/person.factory.js';
+import { authStub } from 'test/fixtures/auth.stub.js';
+import { getForAssetFace } from 'test/mappers.js';
+import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
 
 describe(FaceSuggestionService.name, () => {
   let sut: FaceSuggestionService;

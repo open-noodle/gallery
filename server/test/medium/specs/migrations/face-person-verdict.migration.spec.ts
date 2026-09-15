@@ -1,19 +1,19 @@
 import { DatabaseConnectionParams, schemaDiff, schemaFromCode, schemaFromDatabase } from '@immich/sql-tools';
 import { Kysely, sql } from 'kysely';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
 // Side-effect import: registers every decorated table (incl. FacePersonVerdictTable's partial-index overrides)
 // so schemaFromCode() below has something to diff against. See schema-drift.spec.ts for the same idiom.
-import 'src/schema';
-import { immich_uuid_v7 } from 'src/schema/functions';
+import 'src/schema/index.js';
+import { immich_uuid_v7 } from 'src/schema/functions.js';
 import {
   down as downMigration,
   up as upMigration,
-} from 'src/schema/migrations-gallery/1788000000000-ReconcileFacePersonVerdictConstraints';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+} from 'src/schema/migrations-gallery/1788000000000-ReconcileFacePersonVerdictConstraints.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // The unified branch authors `face_person_verdict` in its final shape in one migration

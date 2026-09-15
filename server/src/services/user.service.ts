@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Updateable } from 'kysely';
 import { DateTime } from 'luxon';
+import { createReadStream } from 'node:fs';
+import { basename } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, UserMetadataItem } from 'src/types.js';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -18,15 +21,12 @@ import { UserFindOptions } from 'src/repositories/user.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getCalendarHeatmap } from 'src/services/shared/user-methods.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse, ImmichMediaResponse } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
-import { createReadStream } from 'node:fs';
-import { basename } from 'node:path';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { StorageService } from 'src/services/storage.service.js';
 
 @Injectable()
 export class UserService extends BaseService {

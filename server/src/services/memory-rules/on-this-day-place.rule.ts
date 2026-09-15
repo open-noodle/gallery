@@ -1,7 +1,7 @@
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { dominantBy, recencyBonus, sampleAssetsAcrossGroups } from 'src/services/memory-rules/curation.util';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
-import { placeKeyOf } from 'src/services/memory-rules/trip.util';
+import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { dominantBy, recencyBonus, sampleAssetsAcrossGroups } from 'src/services/memory-rules/curation.util.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
+import { placeKeyOf } from 'src/services/memory-rules/trip.util.js';
 
 /** Per contributing year: how many photos the dominant place must hold that year. */
 export const MIN_ASSETS = 4;

@@ -1,12 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
-import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller';
-import { CacheControl } from 'src/enum';
-import { FaceRepairService } from 'src/services/face-repair.service';
-import { ImmichRedirectResponse } from 'src/utils/file';
+import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller.js';
+import { CacheControl } from 'src/enum.js';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { ImmichRedirectResponse } from 'src/utils/file.js';
 import request from 'supertest';
-import { errorDto } from 'test/medium/responses';
-import { factory } from 'test/small.factory';
-import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
+import { errorDto } from 'test/medium/responses.js';
+import { factory } from 'test/small.factory.js';
+import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 describe(FaceRepairAdminController.name, () => {
   let ctx: ControllerContext;

@@ -1,13 +1,13 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, SourceType } from 'src/enum';
-import { ClassificationRepository } from 'src/repositories/classification.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { TagRepository } from 'src/repositories/tag.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { upsertTags } from 'src/utils/tag';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, SourceType } from 'src/enum.js';
+import { ClassificationRepository } from 'src/repositories/classification.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { TagRepository } from 'src/repositories/tag.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { upsertTags } from 'src/utils/tag.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
