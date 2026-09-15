@@ -195,7 +195,7 @@ describe(PersonService.name, () => {
     expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
     expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
     expect((mocks.faceIdentity as any).deleteUnreferencedIdentities).not.toHaveBeenCalled();
-    expect(mocks.person.vacuum).not.toHaveBeenCalled();
+    expect(mocks.database.vacuum).not.toHaveBeenCalled();
     expect(mocks.job.queueAll).not.toHaveBeenCalled();
     expect(mocks.job.queue).not.toHaveBeenCalledWith({
       name: JobName.FaceIdentityMaintenanceAfterRecognition,
@@ -2572,7 +2572,8 @@ describe(PersonService.name, () => {
         name: JobName.FileDelete,
         data: { files: [orphan.thumbnailPath] },
       });
-      expect(mocks.person.vacuum).toHaveBeenCalledWith({ reindexVectors: false });
+      expect(mocks.database.vacuum).toHaveBeenCalledWith({ analyze: true, table: 'asset_face' });
+      expect(mocks.database.vacuum).toHaveBeenCalledWith({ analyze: true, table: 'person' });
       expect(mocks.sharedSpace.deleteAllPersonFaces).toHaveBeenCalledOnce();
       expect(mocks.sharedSpace.deleteAllPersons).toHaveBeenCalledOnce();
       expect((mocks.faceIdentity as any).deleteUnreferencedIdentities).toHaveBeenCalledOnce();
