@@ -1765,6 +1765,58 @@ describe(PersonService.name, () => {
         [face.id],
       );
     });
+
+    // immich-31580 (shipped upstream in v3.2.2). `PersonCreate` on a face id is owner-only
+    // (`checkFaceOwnerAccess`), so a person the caller owns can still carry a face on an asset they do
+    // not — in the fork, via a person group shared across a Space. This loop is NOT transactional, so
+    // when the denied face used to throw, every face already processed in the batch stayed reassigned
+    // and the caller got a 403 with no way to tell which half landed. The fork's loop writes a verdict,
+    // an identity link and a negative-verdict clear per face, so it left strictly more half-done than
+    // upstream's. Denied faces must be skipped, and the accessible ones must still go through.
+    it('should skip a face on an asset the caller does not own and reassign the rest', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+      const ownedFace = AssetFaceFactory.create();
+      const foreignFace = AssetFaceFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.getFacesByIds
+        .mockResolvedValueOnce([getForAssetFace(ownedFace)])
+        .mockResolvedValueOnce([getForAssetFace(foreignFace)]);
+      // one `checkAccess` per face, in batch order: the first is owned, the second is not
+      mocks.access.person.checkFaceOwnerAccess
+        .mockResolvedValueOnce(new Set([ownedFace.id]))
+        .mockResolvedValueOnce(new Set());
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await expect(
+        sut.reassignFaces(auth, person.personGroupId, {
+          data: [
+            { personId: person.personGroupId, assetId: ownedFace.assetId },
+            { personId: person.personGroupId, assetId: foreignFace.assetId },
+          ],
+        }),
+      ).resolves.toBeDefined();
+
+      expect(mocks.person.reassignFace).toHaveBeenCalledTimes(1);
+      expect(mocks.person.reassignFace).toHaveBeenCalledWith(ownedFace.id, person.personGroupId);
+
+      // the fork-only per-face writes must not fire for the skipped face either
+      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledTimes(1);
+      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(ownedFace.id);
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledTimes(1);
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
+        assetFaceId: ownedFace.id,
+        identityId: 'identity-1',
+        source: 'manual',
+      });
+      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledTimes(1);
+      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
+        { personGroupId: person.personGroupId, identityId: 'identity-1' },
+        [ownedFace.id],
+      );
+    });
   });
 
   describe('handlePersonMigration', () => {
