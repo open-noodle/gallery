@@ -27,7 +27,11 @@ vi.mock('@aws-sdk/lib-storage', () => ({
   })),
 }));
 
+// These must stay below the vi.mock() calls above — they import the mocked modules, and moving
+// them earlier (as import-x/order would otherwise want) would import the real, un-mocked SDK.
+// eslint-disable-next-line import-x/order
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+// eslint-disable-next-line import-x/order
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { CacheControl } from 'src/enum.js';
