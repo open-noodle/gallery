@@ -214,4 +214,29 @@ describe('CompositeMigrationProvider', () => {
     expect(result['up-only'].up).toBeTypeOf('function');
     expect(result['up-only'].down).toBeUndefined();
   });
+
+  // Test 13: every FileMigrationProvider we construct gets an `import` hook. Kysely's own
+  // FileMigrationProvider falls back to a bare `await import(filePath)` when `import` is omitted,
+  // and on this stack (POSIX absolute paths, plain ESM dynamic import) that fallback happens to
+  // work — so this can't be pinned by a real load ever failing. It pins the props instead: we pass
+  // `import` because upstream's own call site does, and because Kysely documents it as the
+  // supported hook for environments where a bare `import()` of a filesystem path does not resolve
+  // (e.g. Windows path separators).
+  it('constructs every FileMigrationProvider with an import hook, alongside fs/path/migrationFolder', () => {
+    setupMockProviders({ upstream: {}, fork: {} });
+
+    // Constructed for its side effect on the mock's call log below.
+    new CompositeMigrationProvider(['upstream', 'fork']);
+
+    const MockFMP = vi.mocked(FileMigrationProvider);
+    expect(MockFMP.mock.calls).toHaveLength(2);
+    for (const [props] of MockFMP.mock.calls) {
+      expect(props).toMatchObject({
+        fs: expect.any(Object),
+        path: expect.any(Object),
+        migrationFolder: expect.any(String),
+      });
+      expect(props.import).toBeTypeOf('function');
+    }
+  });
 });
