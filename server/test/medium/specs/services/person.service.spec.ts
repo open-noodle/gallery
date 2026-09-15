@@ -64,6 +64,9 @@ const setup = (db?: Kysely<DB>) => {
   ctx
     .getMock(SystemMetadataRepository)
     .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
+  // handleQueueRecognizeFaces(force: true) records FacialRecognitionState after the run; tests here don't
+  // assert on it, matching setupFaceRecognition()'s equivalent default below.
+  ctx.getMock(SystemMetadataRepository).set.mockResolvedValue();
 
   return { sut, ctx };
 };
@@ -1191,12 +1194,18 @@ describe(PersonService.name, () => {
 
   describe('handleQueueRecognizeFaces', () => {
     it('should delete all people and queue faces for recognition', async () => {
-      const { sut, ctx } = setup();
+      // This suite asserts on the ENTIRE 'person' table (force-recognition deletes system-wide),
+      // so it needs its own database rather than the file's shared defaultDatabase — otherwise
+      // person rows left behind by earlier tests in this file inflate the count.
+      const { sut, ctx } = setup(await getKyselyDB());
       const jobRepo = ctx.getMock(JobRepository);
       ctx.getMock(StorageRepository).unlink.mockResolvedValue();
       jobRepo.waitForQueueCompletion.mockResolvedValue();
       jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0, paused: 0 });
       jobRepo.queueAll.mockResolvedValue();
+      // removeAllPersonGroups queues a FileDelete job per chunk of deleted people; this test doesn't
+      // assert on it, so it only needs a resolved value the way setupFaceRecognition() does above.
+      jobRepo.queue.mockResolvedValue();
 
       const { user } = await ctx.newUser();
       const { user: user1 } = await ctx.newUser();
@@ -1215,19 +1224,28 @@ describe(PersonService.name, () => {
       await expect(ctx.database.selectFrom('person').selectAll().execute()).resolves.toHaveLength(0);
       expect(jobRepo.queueAll).toHaveBeenCalledWith(
         expect.objectContaining([
-          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false } },
-          { name: JobName.FacialRecognition, data: { id: assetFaceUser1.id, deferred: false } },
+          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false, skipSharedSpaceMatch: true } },
+          {
+            name: JobName.FacialRecognition,
+            data: { id: assetFaceUser1.id, deferred: false, skipSharedSpaceMatch: true },
+          },
         ]),
       );
     });
 
     it('should only delete all people of a specified cluster group and queue their faces for recognition', async () => {
-      const { sut, ctx } = setup();
+      // This suite asserts on the ENTIRE 'person' table (force-recognition deletes system-wide),
+      // so it needs its own database rather than the file's shared defaultDatabase — otherwise
+      // person rows left behind by earlier tests in this file inflate the count.
+      const { sut, ctx } = setup(await getKyselyDB());
       const jobRepo = ctx.getMock(JobRepository);
       ctx.getMock(StorageRepository).unlink.mockResolvedValue();
       jobRepo.waitForQueueCompletion.mockResolvedValue();
       jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0, paused: 0 });
       jobRepo.queueAll.mockResolvedValue();
+      // removeAllPersonGroups queues a FileDelete job per chunk of deleted people; this test doesn't
+      // assert on it, so it only needs a resolved value the way setupFaceRecognition() does above.
+      jobRepo.queue.mockResolvedValue();
 
       const { user } = await ctx.newUser();
       const { user: user1 } = await ctx.newUser();
@@ -1245,12 +1263,17 @@ describe(PersonService.name, () => {
 
       await expect(ctx.database.selectFrom('person').selectAll().execute()).resolves.toHaveLength(1);
       expect(jobRepo.queueAll).toHaveBeenCalledWith(
-        expect.objectContaining([{ name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false } }]),
+        expect.objectContaining([
+          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false, skipSharedSpaceMatch: true } },
+        ]),
       );
       expect(jobRepo.queueAll).not.toHaveBeenCalledWith(
         expect.objectContaining([
-          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false } },
-          { name: JobName.FacialRecognition, data: { id: assetFaceUser1.id, deferred: false } },
+          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false, skipSharedSpaceMatch: true } },
+          {
+            name: JobName.FacialRecognition,
+            data: { id: assetFaceUser1.id, deferred: false, skipSharedSpaceMatch: true },
+          },
         ]),
       );
     });

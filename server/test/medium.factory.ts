@@ -770,7 +770,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     }
 
     case JobRepository: {
-      return automock(JobRepository, {
+      const jobRepository = automock(JobRepository, {
         args: [
           undefined,
           undefined,
@@ -780,6 +780,12 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
           },
         ],
       });
+      // `empty()` drains a queue as an incidental cleanup step (e.g. PersonService.handleQueueRecognizeFaces
+      // force-resets the FacialRecognition queue before requeuing), rather than something most callers
+      // assert on. Vitest 4's stricter automocks throw when a mock is invoked without an implementation, so
+      // give it a real default here in the shared harness instead of every spec having to stub it.
+      jobRepository.empty.mockResolvedValue();
+      return jobRepository;
     }
 
     case LoggingRepository as unknown as ClassConstructor<T>: {
