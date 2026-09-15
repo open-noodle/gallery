@@ -1504,13 +1504,6 @@ export class PersonService extends BaseService {
   }
 
   /**
-   * Multi-owner bulk merge (upstream's cluster-group `mergePeople`, adopted inert): groups `ids` by
-   * owner (each cluster's personGroupId can carry one row per owner) and delegates each owner's
-   * target + sources to {@link mergePerson}, which owns validation, access control and the
-   * cross-owner policy. This never merges two DIFFERENT owners' rows against each other directly —
-   * each owner's group is merged independently, same as the fork's pre-cluster-groups behavior.
-   */
-  /**
    * Multi-person bulk merge (upstream's cluster-group `mergePeople`, adopted inert). Upstream's own
    * "merge an ordered list of people into a single person" contract already reduces to a single
    * target: `ids[0]` is that person, everything after it merges into it — exactly what
