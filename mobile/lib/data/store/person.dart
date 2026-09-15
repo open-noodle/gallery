@@ -76,7 +76,7 @@ class PersonMutations extends StoreMutations {
 
   // TODO(rewrite): these route unconditionally to the owner-only PATCH /people/{id}; a
   // space-scoped person has no row there and would 404. Needs a spaceId branch (see
-  // DriftPeopleService.updateName/updateBirthday -> SharedSpaceApiRepository.updateSpacePerson)
+  // PeopleService.updateName/updateBirthday -> SharedSpaceApiRepository.updateSpacePerson)
   // before any caller adopts Store.people for edits. Unused today, so this is latent.
 
   /// Update a person's name
