@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { onRequestError } from 'src/utils/logger.js';
+import { isConnectionAbortedError, onRouteError } from 'src/utils/logger.js';
 import { describe, expect, it, vi } from 'vitest';
 
 const newMockLogger = () =>
@@ -17,12 +17,15 @@ const newMockLogger = () =>
 const newMockRequest = (overrides: Partial<Request> = {}) =>
   ({ destroyed: false, complete: true, ...overrides }) as unknown as Request;
 
-describe('onRequestError', () => {
+const newMockResponse = (overrides: Partial<Response> = {}) =>
+  ({ headersSent: false, ...overrides }) as unknown as Response;
+
+describe('onRouteError', () => {
   it('should log HttpException at debug level with status and response', () => {
     const logger = newMockLogger();
     const exception = new HttpException('Not Found', HttpStatus.NOT_FOUND);
 
-    onRequestError(newMockRequest(), exception, logger);
+    onRouteError(newMockRequest(), newMockResponse(), exception, logger);
 
     expect(logger.debug).toHaveBeenCalledOnce();
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('HttpException(404)'));
@@ -34,7 +37,7 @@ describe('onRequestError', () => {
     const logger = newMockLogger();
     const exception = new HttpException({ message: 'Validation failed', errors: ['field required'] }, 422);
 
-    onRequestError(newMockRequest(), exception, logger);
+    onRouteError(newMockRequest(), newMockResponse(), exception, logger);
 
     expect(logger.debug).toHaveBeenCalledOnce();
     const message = (logger.debug as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
@@ -46,7 +49,7 @@ describe('onRequestError', () => {
     const logger = newMockLogger();
     const error = new Error('socket hang up');
 
-    onRequestError(newMockRequest({ destroyed: true, complete: false }), error, logger);
+    onRouteError(newMockRequest({ destroyed: true, complete: false }), newMockResponse(), error, logger);
 
     expect(logger.debug).toHaveBeenCalledOnce();
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('Client aborted request'));
@@ -57,7 +60,7 @@ describe('onRequestError', () => {
     const logger = newMockLogger();
     const error = new Error('something broke');
 
-    onRequestError(newMockRequest(), error, logger);
+    onRouteError(newMockRequest(), newMockResponse(), error, logger);
 
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Unknown error'), error.stack);
@@ -69,7 +72,7 @@ describe('onRequestError', () => {
     const logger = newMockLogger();
     const error = new Error('stack test');
 
-    onRequestError(newMockRequest(), error, logger);
+    onRouteError(newMockRequest(), newMockResponse(), error, logger);
 
     const stackArg = (logger.error as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(stackArg).toContain('stack test');
@@ -87,7 +90,7 @@ describe('onRequestError', () => {
 
     const error = new CustomError('custom failure');
 
-    onRequestError(newMockRequest(), error, logger);
+    onRouteError(newMockRequest(), newMockResponse(), error, logger);
 
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Unknown error'), expect.any(String));
@@ -99,10 +102,27 @@ describe('onRequestError', () => {
 
     for (const status of [400, 401, 403, 500]) {
       const exception = new HttpException('error', status);
-      onRequestError(newMockRequest(), exception, logger);
+      onRouteError(newMockRequest(), newMockResponse(), exception, logger);
     }
 
     expect(logger.debug).toHaveBeenCalledTimes(4);
     expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('isConnectionAbortedError', () => {
+  it('should return true for ECONNABORTED error code', () => {
+    const error = { code: 'ECONNABORTED' };
+    expect(isConnectionAbortedError(error)).toBe(true);
+  });
+
+  it('should return false for other error codes', () => {
+    const error = { code: 'ECONNRESET' };
+    expect(isConnectionAbortedError(error)).toBe(false);
+  });
+
+  it('should return false for errors without a code', () => {
+    const error = new Error('test');
+    expect(isConnectionAbortedError(error)).toBe(false);
   });
 });
