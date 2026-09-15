@@ -1,5 +1,5 @@
-import { SharedSpaceRole } from 'src/enum';
-import { MediumTestContext } from 'test/medium.factory';
+import { SharedSpaceRole } from 'src/enum.js';
+import { MediumTestContext } from 'test/medium.factory.js';
 
 /**
  * The bucket (and the date inside it) every asset of the two-owner Space fixture is seeded into.

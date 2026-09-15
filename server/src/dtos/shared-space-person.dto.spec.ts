@@ -1,4 +1,4 @@
-import { SharedSpacePersonMergeDto, SpacePeopleQueryDto } from 'src/dtos/shared-space-person.dto';
+import { SharedSpacePersonMergeDto, SpacePeopleQueryDto } from 'src/dtos/shared-space-person.dto.js';
 
 // A valid v4 UUID for index i — uniqueness is not required for the length checks, only a valid format.
 const uuids = (n: number) =>

@@ -1,4 +1,4 @@
-import { MergePersonDto, MergeScopedPeopleDto } from 'src/dtos/person.dto';
+import { MergePersonDto, MergeScopedPeopleDto } from 'src/dtos/person.dto.js';
 
 // A valid v4 UUID for index i — uniqueness is not required for the length checks, only a valid format.
 const uuidAt = (i: number) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;

@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Expression, ExpressionBuilder, Kysely, SelectQueryBuilder, sql, SqlBool, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { DummyValue, GenerateSql } from 'src/decorators';
-import { DB } from 'src/schema';
-import { FacePersonVerdictSource } from 'src/schema/tables/face-person-verdict.table';
-import { reviewableAssetVisibility } from 'src/utils/face-review';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
+import { DummyValue, GenerateSql } from 'src/decorators.js';
+import { DB } from 'src/schema/index.js';
+import { FacePersonVerdictSource } from 'src/schema/tables/face-person-verdict.table.js';
+import { reviewableAssetVisibility } from 'src/utils/face-review.js';
+import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
 
 export interface NegativeVerdictListRow {
   id: string;

@@ -1,8 +1,8 @@
-import { PET_RECOGNITION_MODEL_NAMES } from 'src/constants';
-import { SystemConfig } from 'src/dtos/config.dto';
-import { JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum';
-import { PetRecognitionService } from 'src/services/pet-recognition.service';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils';
+import { PET_RECOGNITION_MODEL_NAMES } from 'src/constants.js';
+import { SystemConfig } from 'src/dtos/config.dto.js';
+import { JobName, JobStatus, QueueName, SystemMetadataKey, VectorIndex } from 'src/enum.js';
+import { PetRecognitionService } from 'src/services/pet-recognition.service.js';
+import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
 
 // Mirrors person.service.spec.ts's `recognitionCounts` for the sibling FacialRecognition queue —
 // used to stub QueueName.PetRecognition's own job counts for the non-force pending-work skip.

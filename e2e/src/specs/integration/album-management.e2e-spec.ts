@@ -1,7 +1,7 @@
 import { LoginResponseDto, createAlbum } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import type { Socket } from 'socket.io-client';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 test.describe('Album Management Integration', () => {
   let admin: LoginResponseDto;

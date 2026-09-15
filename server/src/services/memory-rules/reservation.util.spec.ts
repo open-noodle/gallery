@@ -1,4 +1,4 @@
-import { planReservation, ReservableMemory } from 'src/services/memory-rules/reservation.util';
+import { planReservation, ReservableMemory } from 'src/services/memory-rules/reservation.util.js';
 
 const memory = (overrides: Partial<ReservableMemory> & { id: string }): ReservableMemory => ({
   assetIds: [],

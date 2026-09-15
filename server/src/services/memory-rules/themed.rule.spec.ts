@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
-import { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port';
-import { ASSET_CAP, FETCH_SIZE, MAX_YEARS_BACK, ThemedMemoryRule } from 'src/services/memory-rules/themed.rule';
+import { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import { ASSET_CAP, FETCH_SIZE, MAX_YEARS_BACK, ThemedMemoryRule } from 'src/services/memory-rules/themed.rule.js';
 
 const target = DateTime.fromISO('2026-07-22', { zone: 'utc' });
 

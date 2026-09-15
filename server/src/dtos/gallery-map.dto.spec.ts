@@ -1,4 +1,4 @@
-import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
+import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
 
 function parse(plain: Record<string, unknown>) {
   return FilteredMapMarkerDto.schema.safeParse(plain);

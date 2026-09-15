@@ -1,6 +1,6 @@
 import { Column, ForeignKeyColumn, Table } from '@immich/sql-tools';
-import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('shared_space_person_alias')
 export class SharedSpacePersonAliasTable {

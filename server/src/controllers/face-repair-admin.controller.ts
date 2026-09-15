@@ -12,9 +12,9 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
-import { NextFunction, Response } from 'express';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+import type { NextFunction, Response } from 'express';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   FaceRepairClusterFacesRequestDto,
   FaceRepairClusterFacesResponseDto,
@@ -42,12 +42,12 @@ import {
   FaceRepairScanTriggerRequestDto,
   FaceRepairScanTriggerResponseDto,
   FaceRepairUnconfirmRequestDto,
-} from 'src/dtos/face-repair.dto';
-import { ApiTag } from 'src/enum';
-import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { FaceRepairService } from 'src/services/face-repair.service';
-import { sendFile } from 'src/utils/file';
+} from 'src/dtos/face-repair.dto.js';
+import { ApiTag } from 'src/enum.js';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { sendFile } from 'src/utils/file.js';
 
 @ApiTags(ApiTag.Faces)
 @Controller('admin/face-repair')

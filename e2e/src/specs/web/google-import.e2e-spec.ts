@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 /**
  * Creates a Google Takeout zip file with the expected directory structure:

@@ -1,14 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuthDto } from 'src/dtos/auth.dto';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   UserGroupCreateDto,
   UserGroupMemberResponseDto,
   UserGroupMemberSetDto,
   UserGroupResponseDto,
   UserGroupUpdateDto,
-} from 'src/dtos/user-group.dto';
-import { UserAvatarColor } from 'src/enum';
-import { BaseService } from 'src/services/base.service';
+} from 'src/dtos/user-group.dto.js';
+import { UserAvatarColor } from 'src/enum.js';
+import { BaseService } from 'src/services/base.service.js';
 
 @Injectable()
 export class UserGroupService extends BaseService {

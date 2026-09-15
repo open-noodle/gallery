@@ -9,8 +9,8 @@ import {
   updateAssets,
 } from '@immich/sdk';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { createUserDto } from 'src/fixtures';
-import { asBearerAuth, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // Web E2E: S4b of SPACE-ALBUMS-RBAC-REMEDIATION-SPEC-2026-07-11.md — behavioral UI round-trips
 // for the space-albums timeline surfaces. Complements the exhaustive API matrix in

@@ -1,7 +1,7 @@
 import { AssetMediaResponseDto, LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { PNG } from 'pngjs';
-import { utils } from 'src/utils';
+import { utils } from 'src/utils.js';
 
 /** Create a solid-color PNG with specific dimensions */
 const createSizedPNG = (width: number, height: number): Buffer => {

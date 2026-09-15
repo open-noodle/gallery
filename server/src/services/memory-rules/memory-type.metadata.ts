@@ -1,4 +1,4 @@
-import { MemoryType } from 'src/enum';
+import { MemoryType } from 'src/enum.js';
 
 export type MemoryTypeKind = 'on_this_day' | 'rule';
 

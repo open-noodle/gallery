@@ -6,8 +6,8 @@ import {
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
-import { asBearerAuth, utils } from 'src/utils';
+import { thumbnailUtils } from 'src/ui/specs/timeline/utils.js';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // Task 11 — unified "Add to album or space" timeline picker E2E.
 //

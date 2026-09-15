@@ -1,6 +1,6 @@
 import AsyncLock from 'async-lock';
 import { load as loadYaml } from 'js-yaml';
-import { cloneDeep, get, isEmpty, isEqual, set } from 'lodash-es';
+import { cloneDeep, get, isEmpty, isEqual, isObject, set } from 'lodash-es';
 import type { DeepPartial } from 'src/types.js';
 import { AdminConfigDto, SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { DatabaseLock, SystemMetadataKey } from 'src/enum.js';
@@ -94,7 +94,7 @@ const loadFromFile = async ({ metadataRepo, logger }: RepoDeps, filepath: string
 
 // Typed as `string` rather than left as an inferred literal: lodash's `get` overload resolution
 // picks a path-walking `GetFieldType<TObject, TPath>` for literal `TPath` string types, which
-// resolves to `undefined` against the generic `object` type `_.isObject` narrows to below. Widening
+// resolves to `undefined` against the generic `object` type `isObject` narrows to below. Widening
 // to `string` matches the dynamic-path call further down in this file and falls back to the `any`
 // overload instead.
 const LEGACY_SUGGESTION_PATH: string = 'machineLearning.facialRecognition.suggestionMaxDistance';
@@ -108,20 +108,20 @@ const SUGGESTIONS_PATH: string = 'machineLearning.facialRecognition.suggestions'
  * feature off on every instance already running it.
  */
 export const foldLegacyFaceSuggestionConfig = (partial: unknown): unknown => {
-  if (!_.isObject(partial) || _.get(partial, LEGACY_SUGGESTION_PATH) === undefined) {
+  if (!isObject(partial) || get(partial, LEGACY_SUGGESTION_PATH) === undefined) {
     return partial;
   }
 
-  const folded = _.cloneDeep(partial);
-  const legacy = _.get(folded, LEGACY_SUGGESTION_PATH) as number;
+  const folded = cloneDeep(partial);
+  const legacy = get(folded, LEGACY_SUGGESTION_PATH) as number;
   unsetDeep(folded, LEGACY_SUGGESTION_PATH);
 
-  if (_.get(folded, SUGGESTIONS_PATH) === undefined) {
+  if (get(folded, SUGGESTIONS_PATH) === undefined) {
     const maxDistance =
-      (_.get(folded, 'machineLearning.facialRecognition.maxDistance') as number | undefined) ??
+      (get(folded, 'machineLearning.facialRecognition.maxDistance') as number | undefined) ??
       defaults.machineLearning.facialRecognition.maxDistance;
 
-    _.set(folded, SUGGESTIONS_PATH, {
+    set(folded, SUGGESTIONS_PATH, {
       enabled: legacy > maxDistance,
       // The new field's minimum is 0.1, so a legacy 0 (or any sub-minimum value) must fall back to
       // the default rather than fold through into a config that fails its own schema.
@@ -152,7 +152,7 @@ export const deriveSuggestionBand = (
   merged: SystemConfig,
   logger?: { warn: (message: string) => void },
 ): SystemConfig => {
-  if (_.get(partial, SUGGESTIONS_MAX_DISTANCE_PATH) !== undefined) {
+  if (get(partial, SUGGESTIONS_MAX_DISTANCE_PATH) !== undefined) {
     return merged;
   }
 
@@ -167,7 +167,7 @@ export const deriveSuggestionBand = (
     Math.round((maxDistance + SUGGESTION_BAND_HEADROOM) * 100) / 100,
     SUGGESTION_MAX_DISTANCE_CEILING,
   );
-  const config = _.cloneDeep(merged);
+  const config = cloneDeep(merged);
   config.machineLearning.facialRecognition.suggestions.maxDistance = derived;
   // At the schema ceiling no valid band exists at all. Disable rather than ship a config that fails its
   // own invariant on every save — and say so, because the invariant check below is gated on `enabled`
@@ -192,7 +192,7 @@ const buildConfig = async (repos: RepoDeps) => {
   const partial = foldLegacyFaceSuggestionConfig(rawPartial);
 
   // merge with defaults. Enumerate the user-supplied partial WITHOUT emptyObjectsAsLeaves: an empty
-  // object in the partial must yield no path so it can't `_.set` over (and wipe) a populated default
+  // object in the partial must yield no path so it can't `set` over (and wipe) a populated default
   // section. Only the defaults enumeration below opts into empty-object leaves.
   const rawConfig = cloneDeep(defaults);
   for (const property of getKeysDeep(partial)) {

@@ -1,4 +1,4 @@
-import { paginationHelper } from 'src/utils/pagination';
+import { paginationHelper } from 'src/utils/pagination.js';
 import { describe, expect, it } from 'vitest';
 
 describe('paginationHelper', () => {

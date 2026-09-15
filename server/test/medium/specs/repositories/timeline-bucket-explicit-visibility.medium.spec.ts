@@ -18,15 +18,15 @@
  */
 
 import { Kysely } from 'kysely';
-import { AssetVisibility, TimeBucketSize } from 'src/enum';
-import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { factory, newEmbedding } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, TimeBucketSize } from 'src/enum.js';
+import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { factory, newEmbedding } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

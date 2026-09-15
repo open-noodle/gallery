@@ -1,11 +1,11 @@
 import { NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { FaceRepairService } from 'src/services/face-repair.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // Slice 3 of manual face review (spec specs/2026-07-23-manual-face-review-mode-design.md §5.5/§7):
 // GET admin/face-repair/person/:personId. The manual review page has no scan to read personName/ownerId off,

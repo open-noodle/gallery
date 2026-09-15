@@ -1,10 +1,10 @@
 import { ExpressionBuilder, Insertable, Kysely, Selectable, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { PostgresError } from 'postgres';
-import { SourceType } from 'src/enum';
-import { DB } from 'src/schema';
-import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table';
-import { FaceWithPhotoContext, reviewableAssetVisibility } from 'src/utils/face-review';
+import { SourceType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
+import { FaceWithPhotoContext, reviewableAssetVisibility } from 'src/utils/face-review.js';
 
 // The partial unique index enforcing at most one in-flight scan (see face-repair-scan.table.ts).
 const IN_FLIGHT_INDEX = 'face_repair_scan_in_flight_uq';

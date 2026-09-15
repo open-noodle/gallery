@@ -1,4 +1,4 @@
-import { applyVerdictFilters, isSettledForOwner, targetTokens, VerdictMaps } from 'src/utils/face-repair';
+import { applyVerdictFilters, isSettledForOwner, targetTokens, VerdictMaps } from 'src/utils/face-repair.js';
 import { describe, expect, it } from 'vitest';
 
 // Slice 3 of the face-review unification. These are the exclusion rules BOTH face engines consult, so they

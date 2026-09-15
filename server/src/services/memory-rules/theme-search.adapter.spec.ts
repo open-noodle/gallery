@@ -1,6 +1,6 @@
-import { SystemConfig } from 'src/dtos/config.dto';
-import { AssetType, AssetVisibility } from 'src/enum';
-import { MemoryThemeSearchAdapter, SEARCH_WINDOW_MARGIN_DAYS } from 'src/services/memory-rules/theme-search.adapter';
+import { SystemConfig } from 'src/dtos/config.dto.js';
+import { AssetType, AssetVisibility } from 'src/enum.js';
+import { MemoryThemeSearchAdapter, SEARCH_WINDOW_MARGIN_DAYS } from 'src/services/memory-rules/theme-search.adapter.js';
 
 const buildConfig = (
   overrides: {

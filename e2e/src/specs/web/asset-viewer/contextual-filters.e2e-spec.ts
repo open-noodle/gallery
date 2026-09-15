@@ -11,7 +11,7 @@ import {
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
-import { asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 /**
  * The two camera fixtures every scenario below is built on. They are picked so that no assertion can

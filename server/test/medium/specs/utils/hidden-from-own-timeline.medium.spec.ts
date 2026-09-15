@@ -5,12 +5,12 @@
 // back the matching ids, exactly like shared-space-album-scope.medium.spec.ts does for its
 // sibling helpers.
 import { Kysely } from 'kysely';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { hiddenFromOwnTimeline, type TimelineHiddenScope } from 'src/utils/shared-space-album-scope';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { hiddenFromOwnTimeline, type TimelineHiddenScope } from 'src/utils/shared-space-album-scope.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

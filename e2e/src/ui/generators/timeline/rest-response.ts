@@ -19,7 +19,7 @@ import {
 import { DateTime } from 'luxon';
 import { signupDto } from 'src/fixtures.js';
 import { parseTimeBucketKey } from 'src/ui/generators/timeline/utils.js';
-import type { MockTimelineAsset, MockTimelineData } from './timeline-config';
+import type { MockTimelineAsset, MockTimelineData } from './timeline-config.js';
 
 type MockTimeBucketAssetResponseDto = TimeBucketAssetResponseDto & {
   city: NonNullable<TimeBucketAssetResponseDto['city']>;

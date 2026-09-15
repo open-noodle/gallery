@@ -4,17 +4,17 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
+  type Generated,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { shared_space_album_after_insert_user, shared_space_album_delete_audit } from 'src/schema/functions';
-import { AlbumTable } from 'src/schema/tables/album.table';
-import { SharedSpaceAlbumFolderTable } from 'src/schema/tables/shared-space-album-folder.table';
-import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { shared_space_album_after_insert_user, shared_space_album_delete_audit } from 'src/schema/functions.js';
+import { AlbumTable } from 'src/schema/tables/album.table.js';
+import { SharedSpaceAlbumFolderTable } from 'src/schema/tables/shared-space-album-folder.table.js';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('shared_space_album')
 @UpdatedAtTrigger('shared_space_album_updatedAt')

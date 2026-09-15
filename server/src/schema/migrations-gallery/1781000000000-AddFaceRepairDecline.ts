@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely';
-import { personKeyTarget } from 'src/utils/cluster-groups-order';
+import { personKeyTarget } from 'src/utils/cluster-groups-order.js';
 
 export async function up(db: Kysely<any>): Promise<void> {
   // On an Immich-to-Gallery switch upstream's ClusterGroups has already run, so `person.id` is gone and

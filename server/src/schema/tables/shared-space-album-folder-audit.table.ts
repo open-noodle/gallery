@@ -1,5 +1,5 @@
-import { Column, CreateDateColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
+import { Column, CreateDateColumn, type Generated, Table, Timestamp } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 // Ungated folder-removal audit: one row per deleted folder. Consumed by
 // SharedSpaceAlbumFolderSync.getDeletes. FK-less append log, mirroring

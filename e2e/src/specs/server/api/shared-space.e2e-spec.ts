@@ -1,8 +1,8 @@
 import { AssetMediaResponseDto, AssetVisibility, LoginResponseDto, SharedSpaceRole, updateAssets } from '@immich/sdk';
-import { authHeaders, forEachActor, type Actor } from 'src/actors';
-import { createUserDto } from 'src/fixtures';
-import { errorDto } from 'src/responses';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { authHeaders, forEachActor, type Actor } from 'src/actors.js';
+import { createUserDto } from 'src/fixtures.js';
+import { errorDto } from 'src/responses.js';
+import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

@@ -14,10 +14,10 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { NextFunction, Response } from 'express';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { MapMarkerResponseDto } from 'src/dtos/map.dto';
+import type { NextFunction, Response } from 'express';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
 import {
   FaceSuggestionActionResponseDto,
   PeopleFaceStatisticsResponseDto,
@@ -26,7 +26,7 @@ import {
   PersonFaceSuggestionPageQueryDto,
   PersonFaceSuggestionPageResponseDto,
   PersonStatisticsResponseDto,
-} from 'src/dtos/person.dto';
+} from 'src/dtos/person.dto.js';
 import {
   SharedSpacePeopleStatisticsResponseDto,
   SharedSpacePersonAliasDto,
@@ -37,7 +37,7 @@ import {
   SpacePersonFaceSuggestionParamsDto,
   SpacePersonParamsDto,
   SpaceRepresentativeFaceUpdateDto,
-} from 'src/dtos/shared-space-person.dto';
+} from 'src/dtos/shared-space-person.dto.js';
 import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
@@ -69,13 +69,13 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceTimelineHidePreviewDto,
   SharedSpaceUpdateDto,
-} from 'src/dtos/shared-space.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceService } from 'src/services/shared-space.service';
-import { sendFile } from 'src/utils/file';
-import { UUIDParamDto } from 'src/validation';
+} from 'src/dtos/shared-space.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { sendFile } from 'src/utils/file.js';
+import { UUIDParamDto } from 'src/validation.js';
 
 @ApiTags(ApiTag.SharedSpaces)
 @Controller('shared-spaces')
