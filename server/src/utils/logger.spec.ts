@@ -1,8 +1,8 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { describe, expect, it, vi } from 'vitest';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { isConnectionAbortedError, onRouteError } from 'src/utils/logger.js';
-import { describe, expect, it, vi } from 'vitest';
 
 const newMockLogger = () =>
   ({

@@ -1,14 +1,14 @@
 import { MemoryType } from 'src/enum.js';
 import * as favoritesThrowback from 'src/services/memory-rules/favorites-throwback.rule.js';
 import {
+  MEMORY_TYPE_KEYS,
+  MEMORY_TYPE_METADATA,
   buildDefaultMemoryTypeMap,
   getAdminAvailableMemoryTypeKeys,
   getMemoryTypeFloor,
   getMemoryTypeKeyForMemory,
   getMemoryTypeMetadata,
   isMemoryTypeEnabledForUser,
-  MEMORY_TYPE_KEYS,
-  MEMORY_TYPE_METADATA,
 } from 'src/services/memory-rules/memory-type.metadata.js';
 import * as monthRecap from 'src/services/memory-rules/month-recap.rule.js';
 import * as onThisDayPlace from 'src/services/memory-rules/on-this-day-place.rule.js';

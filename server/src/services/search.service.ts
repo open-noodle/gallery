@@ -7,8 +7,6 @@ import { PersonResponseDto, mapPerson } from 'src/dtos/person.dto.js';
 import {
   FilterSuggestionsRequestDto,
   FilterSuggestionsResponseDto,
-  isFullyAlbumConfined,
-  isNewShapeRequest,
   LargeAssetSearchDto,
   MetadataSearchDto,
   PlacesResponseDto,
