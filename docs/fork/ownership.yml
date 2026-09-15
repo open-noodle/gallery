@@ -540,6 +540,25 @@ ci_invariants:
       - server/src/services/search.service.ts
     exceptions: []
 
+  # immich-31456's mergePeople merges people for every other owner sharing a personGroupId. Gallery
+  # adopted cluster groups inert: person_personGroupId_key makes the mapping 1:1 and
+  # ClusterGroupController is unmounted, so that arm is unreachable and the fork's own
+  # confirmCrossOwner-gated mergeScopedPeople stays the cross-owner path. Mounting the controller is
+  # the single edit that would make upstream's silent cross-owner merge live; this catches it.
+  # Adopting cluster groups is a deliberate project: delete this invariant in the same change.
+  #
+  # The other half of this invariant — that person_personGroupId_key still exists and is unique —
+  # cannot be expressed as a forbidden pattern (this schema can only assert absence). It is already
+  # covered by the declarative schema in server/src/schema/tables/person.table.ts being diffed
+  # against the database by SQL Schema Checks.
+  - id: people-merge-inert
+    title: ClusterGroupController stays unmounted, keeping upstream's cross-owner merge unreachable
+    forbidden_patterns:
+      - '  ClusterGroupController,'
+    paths:
+      - server/src/controllers/index.ts
+    exceptions: []
+
 patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'
