@@ -2,8 +2,8 @@ import {
   PersonFaceSuggestionPageQueryDto,
   PersonFaceSuggestionPageResponseDto,
   PersonFaceSuggestionParamsDto,
-} from 'src/dtos/person.dto';
-import { SpacePersonFaceSuggestionParamsDto, SpacePersonParamsDto } from 'src/dtos/shared-space-person.dto';
+} from 'src/dtos/person.dto.js';
+import { SpacePersonFaceSuggestionParamsDto, SpacePersonParamsDto } from 'src/dtos/shared-space-person.dto.js';
 import { describe, expect, it } from 'vitest';
 
 describe('PersonFaceSuggestion DTOs', () => {

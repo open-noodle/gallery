@@ -1,8 +1,8 @@
-import { LibraryManifestController } from 'src/controllers/library-manifest.controller';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { LibraryManifestService } from 'src/services/library-manifest.service';
+import { LibraryManifestController } from 'src/controllers/library-manifest.controller.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { LibraryManifestService } from 'src/services/library-manifest.service.js';
 import request from 'supertest';
-import { automock, ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
+import { automock, ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
 
 describe(LibraryManifestController.name, () => {
   let ctx: ControllerContext;

@@ -1,8 +1,8 @@
 import { Kysely, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { SourceType } from 'src/enum';
-import { DB } from 'src/schema';
-import { FaceWithPhotoContext, reviewableAssetVisibility } from 'src/utils/face-review';
+import { SourceType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { FaceWithPhotoContext, reviewableAssetVisibility } from 'src/utils/face-review.js';
 
 export interface EligibleFaceRow {
   assetFaceId: string;

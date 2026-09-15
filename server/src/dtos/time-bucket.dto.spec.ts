@@ -1,5 +1,5 @@
-import { TimeBucketAssetDto, TimeBucketDto } from 'src/dtos/time-bucket.dto';
-import { TimeBucketSize } from 'src/enum';
+import { TimeBucketAssetDto, TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
+import { TimeBucketSize } from 'src/enum.js';
 
 describe('TimeBucketDto', () => {
   describe('bucketSize query param handling', () => {

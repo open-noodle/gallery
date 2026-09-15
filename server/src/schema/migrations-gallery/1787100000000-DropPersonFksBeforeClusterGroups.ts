@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely';
-import { clusterGroupsApplied } from 'src/utils/cluster-groups-order';
+import { clusterGroupsApplied } from 'src/utils/cluster-groups-order.js';
 
 /**
  * Runs immediately BEFORE upstream's `1787148183729-ClusterGroups`.

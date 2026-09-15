@@ -1,9 +1,9 @@
 import { ConflictException } from '@nestjs/common';
-import { JobName } from 'src/enum';
-import { ScanInProgressError } from 'src/repositories/face-repair-scan.repository';
-import { EligibleFaceRow } from 'src/repositories/face-repair.repository';
-import { FaceRepairService, RepairPlan } from 'src/services/face-repair.service';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { JobName } from 'src/enum.js';
+import { ScanInProgressError } from 'src/repositories/face-repair-scan.repository.js';
+import { EligibleFaceRow } from 'src/repositories/face-repair.repository.js';
+import { FaceRepairService, RepairPlan } from 'src/services/face-repair.service.js';
+import { newTestService, ServiceMocks } from 'test/utils.js';
 
 /** A single eligible-face page for the progress test mock (keyset scan reads pages, not a cursor). */
 const singleFacePage = (): EligibleFaceRow[] => [

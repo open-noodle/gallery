@@ -1,8 +1,8 @@
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { VerdictMaps } from 'src/utils/face-repair';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { VerdictMaps } from 'src/utils/face-repair.js';
 
 export interface FaceVerdictServiceDependencies {
   faceIdentityRepository: FaceIdentityRepository;

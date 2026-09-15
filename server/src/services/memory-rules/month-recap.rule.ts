@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
-import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
+import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
+import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
 export const MIN_ASSETS = 10;
 export const MAX_YEARS = 3;

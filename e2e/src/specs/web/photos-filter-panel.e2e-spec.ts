@@ -2,7 +2,7 @@ import type { LoginResponseDto } from '@immich/sdk';
 import { updateAsset } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { asBearerAuth, testAssetDir, utils } from 'src/utils';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils.js';
 
 test.describe('Photos FilterPanel', () => {
   let admin: LoginResponseDto;
