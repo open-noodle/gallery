@@ -438,6 +438,7 @@ describe(TripAnniversaryMemoryRule.name, () => {
       ]);
 
       let callCount = 0;
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises -- pre-existing, out of scope for this task; mockImplementation's inferred signature flags the resolved-promise return here
       assetRepository.getMemoryLocationClusters.mockImplementation(() => {
         const isHomeCall = callCount % 2 === 0;
         callCount++;
