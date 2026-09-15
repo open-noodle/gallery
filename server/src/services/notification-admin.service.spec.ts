@@ -3,8 +3,6 @@ import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { NotificationLevel, NotificationType } from 'src/enum.js';
 import { EmailTemplate } from 'src/repositories/email.repository.js';
 import { NotificationAdminService } from 'src/services/notification-admin.service.js';
-import { NotificationService } from 'src/services/notification.service.js';
-import { userStub } from 'test/fixtures/user.stub.js';
 import { factory, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
