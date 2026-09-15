@@ -2432,12 +2432,6 @@ export type PeopleUpdateDto = {
     /** People to update */
     people: PeopleUpdateItem[];
 };
-export type MergePersonDto = {
-    /** Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge. */
-    confirmCrossOwner?: boolean;
-    /** Person IDs to merge */
-    ids: string[];
-};
 export type ScopedPersonProfileRefDto = {
     /** Scoped profile ID */
     id: string;
@@ -2461,6 +2455,12 @@ export type PeopleFaceStatisticsResponseDto = {
     namedVisiblePersonCount: number;
     /** Number of detected faces not assigned to people in this scope */
     unassignedFaceCount: number;
+};
+export type MergePersonDto = {
+    /** Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge. */
+    confirmCrossOwner?: boolean;
+    /** Person IDs to merge */
+    ids: string[];
 };
 export type MergeScopedPeopleDto = {
     /** Acknowledgement that this merge will combine two people belonging to another user, which cannot be undone. Required to commit such a merge. */
@@ -7608,21 +7608,6 @@ export function updatePeople({ peopleUpdateDto }: {
     })));
 }
 /**
- * Merge people
- */
-export function mergePeople({ mergePersonDto }: {
-    mergePersonDto: MergePersonDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: BulkIdResponseDto[];
-    }>("/people/merge", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: mergePersonDto
-    })));
-}
-/**
  * Detach a scoped person profile
  */
 export function detachScopedPerson({ detachScopedPersonDto }: {
@@ -7660,6 +7645,21 @@ export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page,
     }))}`, {
         ...opts
     }));
+}
+/**
+ * Merge people
+ */
+export function mergePeople({ mergePersonDto }: {
+    mergePersonDto: MergePersonDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: BulkIdResponseDto[];
+    }>("/people/merge", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: mergePersonDto
+    })));
 }
 /**
  * Merge scoped people by identity

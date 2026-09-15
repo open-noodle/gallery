@@ -10778,7 +10778,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11074,7 +11074,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11140,6 +11140,65 @@
           }
         ],
         "x-immich-permission": "person.read",
+        "x-immich-state": "Stable"
+      }
+    },
+    "/people/merge": {
+      "post": {
+        "description": "Merge an ordered list of people together into a single person. The final name and birth date are always the first defined value, following the order. Also automatically merges people for other users in the cluster group, skipping people that would result in overriding a previously set name or birth date.",
+        "operationId": "mergePeople",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergePersonDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BulkIdResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Merge people",
+        "tags": [
+          "People"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.2.1",
+            "state": "Added"
+          },
+          {
+            "version": "v3.2.1",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "person.merge",
         "x-immich-state": "Stable"
       }
     },
@@ -11247,7 +11306,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11588,7 +11647,7 @@
     },
     "/people/{id}/face-suggestions/{assetFaceId}/confirm": {
       "post": {
-        "description": "Assign the suggested face to the person. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Assign the suggested face to the person. Idempotent — the response reports whether it acted.",
         "operationId": "confirmPersonFaceSuggestion",
         "parameters": [
           {
@@ -11657,7 +11716,7 @@
     },
     "/people/{id}/face-suggestions/{assetFaceId}/dismiss": {
       "post": {
-        "description": "Compatibility alias for rejecting this suggestion. The face stays unassigned. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Compatibility alias for rejecting this suggestion. The face stays unassigned. Idempotent — the response reports whether it acted.",
         "operationId": "dismissPersonFaceSuggestion",
         "parameters": [
           {
@@ -11726,7 +11785,7 @@
     },
     "/people/{id}/face-suggestions/{assetFaceId}/ignore": {
       "post": {
-        "description": "Ignore this suggestion for the person. The face stays unassigned. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Ignore this suggestion for the person. The face stays unassigned. Idempotent — the response reports whether it acted.",
         "operationId": "ignorePersonFaceSuggestion",
         "parameters": [
           {
@@ -11795,7 +11854,7 @@
     },
     "/people/{id}/face-suggestions/{assetFaceId}/reject": {
       "post": {
-        "description": "Reject this suggestion for the person. The face stays unassigned. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Reject this suggestion for the person. The face stays unassigned. Idempotent — the response reports whether it acted.",
         "operationId": "rejectPersonFaceSuggestion",
         "parameters": [
           {
@@ -12004,65 +12063,6 @@
           }
         ],
         "x-immich-permission": "person.read",
-        "x-immich-state": "Stable"
-      }
-    },
-    "/people/merge": {
-      "post": {
-        "description": "Merge an ordered list of people together into a single person. The final name and birth date are always the first defined value, following the order. Also automatically merges people for other users in the cluster group, skipping people that would result in overriding a previously set name or birth date.",
-        "operationId": "mergePeople",
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MergePersonDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/BulkIdResponseDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Merge people",
-        "tags": [
-          "People"
-        ],
-        "x-immich-history": [
-          {
-            "version": "v3.2.1",
-            "state": "Added"
-          },
-          {
-            "version": "v3.2.1",
-            "state": "Stable"
-          }
-        ],
-        "x-immich-permission": "person.merge",
         "x-immich-state": "Stable"
       }
     },
@@ -17664,7 +17664,7 @@
     },
     "/shared-spaces/{id}/albums/{albumId}/folder": {
       "put": {
-        "description": "Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required \u2014 making it optional would regenerate the Dart client into three-state territory.",
+        "description": "Separate from PATCH :id/albums/:albumId so that endpoint's required showInTimeline stays required — making it optional would regenerate the Dart client into three-state territory.",
         "operationId": "setSharedSpaceAlbumFolder",
         "parameters": [
           {
@@ -17804,7 +17804,7 @@
     },
     "/shared-spaces/{id}/albums/{albumId}/timeline-hide-preview": {
       "get": {
-        "description": "Read-only. Always the caller's own count, scoped to their own photos \u2014 never a cross-member number.",
+        "description": "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
         "operationId": "getAlbumTimelineHidePreview",
         "parameters": [
           {
@@ -18049,7 +18049,7 @@
     },
     "/shared-spaces/{id}/assets/linked-albums": {
       "post": {
-        "description": "Return the albums linked to this space that project any of the given assets into it (via the album or a cross-owner contribution). Used to explain why an album-projected asset cannot be removed from the space directly \u2014 it must be removed from the album instead.",
+        "description": "Return the albums linked to this space that project any of the given assets into it (via the album or a cross-owner contribution). Used to explain why an album-projected asset cannot be removed from the space directly — it must be removed from the album instead.",
         "operationId": "getSharedSpaceAssetLinkedAlbums",
         "parameters": [
           {
@@ -18850,7 +18850,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -19044,7 +19044,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -19185,7 +19185,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified \u2014 species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the minimumFaces threshold is waived. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -19737,7 +19737,7 @@
     },
     "/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/confirm": {
       "post": {
-        "description": "Assign the suggested face to the space person. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Assign the suggested face to the space person. Idempotent — the response reports whether it acted.",
         "operationId": "confirmSpacePersonFaceSuggestion",
         "parameters": [
           {
@@ -19817,7 +19817,7 @@
     },
     "/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/dismiss": {
       "post": {
-        "description": "Compatibility alias for rejecting this suggestion for the space person. The face stays unassigned. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Compatibility alias for rejecting this suggestion for the space person. The face stays unassigned. Idempotent — the response reports whether it acted.",
         "operationId": "dismissSpacePersonFaceSuggestion",
         "parameters": [
           {
@@ -19897,7 +19897,7 @@
     },
     "/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/ignore": {
       "post": {
-        "description": "Ignore this suggestion for the space person. The face stays unassigned. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Ignore this suggestion for the space person. The face stays unassigned. Idempotent — the response reports whether it acted.",
         "operationId": "ignoreSpacePersonFaceSuggestion",
         "parameters": [
           {
@@ -19977,7 +19977,7 @@
     },
     "/shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/reject": {
       "post": {
-        "description": "Reject this suggestion for the space person. The face stays unassigned. Idempotent \u2014 the response reports whether it acted.",
+        "description": "Reject this suggestion for the space person. The face stays unassigned. Idempotent — the response reports whether it acted.",
         "operationId": "rejectSpacePersonFaceSuggestion",
         "parameters": [
           {
@@ -20508,7 +20508,7 @@
     },
     "/shared-spaces/{id}/timeline-hide-preview": {
       "get": {
-        "description": "Read-only. Always the caller's own count, scoped to their own photos \u2014 never a cross-member number.",
+        "description": "Read-only. Always the caller's own count, scoped to their own photos — never a cross-member number.",
         "operationId": "getTimelineHidePreview",
         "parameters": [
           {
@@ -38504,7 +38504,7 @@
             "type": "boolean"
           },
           "hiddenFromMyTimeline": {
-            "description": "Whether the caller has hidden this album from their own timeline (\u00a72 personal switch)",
+            "description": "Whether the caller has hidden this album from their own timeline (§2 personal switch)",
             "type": "boolean"
           },
           "id": {
@@ -42061,42 +42061,42 @@
             "type": "number"
           },
           "x1": {
-            "description": "Top-left X coordinate (normalized 0\u20131)",
+            "description": "Top-left X coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "x2": {
-            "description": "Top-right X coordinate (normalized 0\u20131)",
+            "description": "Top-right X coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "x3": {
-            "description": "Bottom-right X coordinate (normalized 0\u20131)",
+            "description": "Bottom-right X coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "x4": {
-            "description": "Bottom-left X coordinate (normalized 0\u20131)",
+            "description": "Bottom-left X coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "y1": {
-            "description": "Top-left Y coordinate (normalized 0\u20131)",
+            "description": "Top-left Y coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "y2": {
-            "description": "Top-right Y coordinate (normalized 0\u20131)",
+            "description": "Top-right Y coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "y3": {
-            "description": "Bottom-right Y coordinate (normalized 0\u20131)",
+            "description": "Bottom-right Y coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           },
           "y4": {
-            "description": "Bottom-left Y coordinate (normalized 0\u20131)",
+            "description": "Bottom-left Y coordinate (normalized 0–1)",
             "format": "double",
             "type": "number"
           }
@@ -44105,7 +44105,7 @@
             "type": "array"
           },
           "projectionType": {
-            "description": "Array of projection types for 360\u00b0 content (e.g., \"EQUIRECTANGULAR\", \"CUBEFACE\", \"CYLINDRICAL\")",
+            "description": "Array of projection types for 360° content (e.g., \"EQUIRECTANGULAR\", \"CUBEFACE\", \"CYLINDRICAL\")",
             "items": {
               "nullable": true,
               "type": "string"
@@ -44308,7 +44308,7 @@
             "type": "string"
           },
           "createdAt": {
-            "description": "Album creation date. Must include a timezone designator (Z or \u00b1HH:MM).",
+            "description": "Album creation date. Must include a timezone designator (Z or ±HH:MM).",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
