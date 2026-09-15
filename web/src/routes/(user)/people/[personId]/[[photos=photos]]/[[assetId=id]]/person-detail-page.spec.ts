@@ -238,12 +238,12 @@ describe('Person detail page', () => {
         sources: [{ type: 'space-person', id: 'space-person-candidate', spaceId: 'space-2' }],
       },
     });
-    expect(sdkMock.mergePerson).not.toHaveBeenCalled();
+    expect(sdkMock.mergePersonLegacy).not.toHaveBeenCalled();
   });
 
   it('shows the descriptive message and does not merge a classic merge blocked across owners', async () => {
     vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
-    sdkMock.mergePerson.mockRejectedValueOnce({
+    sdkMock.mergePersonLegacy.mockRejectedValueOnce({
       __http: true,
       status: 403,
       data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
@@ -256,13 +256,13 @@ describe('Person detail page', () => {
     await userEvent.click(screen.getByTestId('merge-personal-candidate'));
 
     await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
-    expect(sdkMock.mergePerson).toHaveBeenCalledTimes(1);
+    expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(1);
     expect(modalManager.showDialog).not.toHaveBeenCalled();
   });
 
   it('re-runs a classic merge with the cross-owner acknowledgement once the user confirms', async () => {
     vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
-    sdkMock.mergePerson
+    sdkMock.mergePersonLegacy
       .mockRejectedValueOnce({
         __http: true,
         status: 409,
@@ -277,12 +277,12 @@ describe('Person detail page', () => {
     await userEvent.click(screen.getByText('merge_people'));
     await userEvent.click(screen.getByTestId('merge-personal-candidate'));
 
-    await waitFor(() => expect(sdkMock.mergePerson).toHaveBeenCalledTimes(2));
-    expect(sdkMock.mergePerson).toHaveBeenNthCalledWith(1, {
+    await waitFor(() => expect(sdkMock.mergePersonLegacy).toHaveBeenCalledTimes(2));
+    expect(sdkMock.mergePersonLegacy).toHaveBeenNthCalledWith(1, {
       id: 'person-1',
       mergePersonDto: { ids: ['person-candidate'] },
     });
-    expect(sdkMock.mergePerson).toHaveBeenNthCalledWith(2, {
+    expect(sdkMock.mergePersonLegacy).toHaveBeenNthCalledWith(2, {
       id: 'person-1',
       mergePersonDto: { ids: ['person-candidate'], confirmCrossOwner: true },
     });
