@@ -7,7 +7,7 @@
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
-  import { mergePeople, type PersonResponseDto } from '@immich/sdk';
+  import { mergePerson, type PersonResponseDto } from '@immich/sdk';
   import { FormModal, Icon, IconButton, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiCallMerge, mdiSwapHorizontal } from '@mdi/js';
   import { onMount, tick } from 'svelte';
@@ -52,10 +52,11 @@
             )
           : await runMergeWithCrossOwnerConfirmation(
               (confirmCrossOwner) =>
-                mergePeople({
+                mergePerson({
+                  id: personToBeMergedInto.id,
                   mergePersonDto: confirmCrossOwner
-                    ? { ids: [personToBeMergedInto.id, personToMerge.id], confirmCrossOwner: true }
-                    : { ids: [personToBeMergedInto.id, personToMerge.id] },
+                    ? { ids: [personToMerge.id], confirmCrossOwner: true }
+                    : { ids: [personToMerge.id] },
                 }),
               createCrossOwnerMergeHandlers(),
             );
