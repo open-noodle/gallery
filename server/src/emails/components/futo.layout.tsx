@@ -14,7 +14,6 @@ import {
 } from '@react-email/components';
 import * as React from 'react';
 import { ImmichFooter } from './footer.template.js';
-// @ts-expect-error
 import tailwindPresetEmail from 'tailwindcss-preset-email';
 
 interface FutoLayoutProps {
