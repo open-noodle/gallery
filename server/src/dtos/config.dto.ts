@@ -36,14 +36,14 @@ import {
   GalleryClassificationSchema,
   GalleryClipExtension,
   GalleryFaceSuggestionSchema,
-  galleryJobDefaults,
-  galleryMachineLearningDefaults,
   GalleryMemoriesSchema,
   GalleryPetDetectionSchema,
   GalleryPetRecognitionSchema,
-  galleryServerDefaults,
   GalleryServerExtension,
   GalleryStorageUsageSchema,
+  galleryJobDefaults,
+  galleryMachineLearningDefaults,
+  galleryServerDefaults,
   galleryTopLevelDefaults,
 } from 'src/gallery/config.dto.js';
 

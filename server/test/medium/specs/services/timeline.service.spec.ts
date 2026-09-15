@@ -20,8 +20,8 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { DB } from 'src/schema/index.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { TimelineService } from 'src/services/timeline.service.js';
+import { SPACE_BUCKET, SPACE_DATE, createTwoOwnerSpace } from 'test/medium/fixtures/two-owner-space.js';
 import { newMediumService } from 'test/medium.factory.js';
-import { createTwoOwnerSpace, SPACE_BUCKET, SPACE_DATE } from 'test/medium/fixtures/two-owner-space.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 

@@ -4,8 +4,10 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Stats } from 'node:fs';
 import { Readable } from 'node:stream';
 import type { UploadBody } from 'src/types.js';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { AssetFile } from 'src/database.js';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto.js';
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto.js';
@@ -15,6 +17,7 @@ import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CacheControl, J
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
 import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { AssetFileFactory } from 'test/factories/asset-file.factory.js';
@@ -24,9 +27,6 @@ import { authStub } from 'test/fixtures/auth.stub.js';
 import { fileStub } from 'test/fixtures/file.stub.js';
 import { userStub } from 'test/fixtures/user.stub.js';
 import { getForAsset } from 'test/mappers.js';
-import { Stats } from 'node:fs';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const file1 = Buffer.from('d2947b871a706081be194569951b7db246907957', 'hex');

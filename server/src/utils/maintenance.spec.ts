@@ -1,4 +1,5 @@
 import { jwtVerify } from 'jose';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { StorageFolder } from 'src/enum.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
@@ -8,7 +9,6 @@ import {
   generateMaintenanceSecret,
   signMaintenanceJwt,
 } from 'src/utils/maintenance.js';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 describe('generateMaintenanceSecret', () => {
   it('should return a hex string', () => {

@@ -9,7 +9,7 @@ import {
   TriggerFunction,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators.js';
+import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import {
   shared_space_delete_album_audit,
   shared_space_delete_audit,

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { Kysely, sql, Transaction } from 'kysely';
+import { Kysely, Transaction, sql } from 'kysely';
 import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';

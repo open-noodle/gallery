@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
-import { UserAvatarColorSchema } from 'src/enum.js';
 import z from 'zod';
+import { UserAvatarColorSchema } from 'src/enum.js';
 
 const UserGroupCreateSchema = z
   .object({

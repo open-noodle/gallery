@@ -1,11 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Kysely, Transaction } from 'kysely';
+import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
+import type { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository.js';
+import type { JobOf } from 'src/types.js';
 import { AssetFace, SharedSpacePerson } from 'src/database.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
-import type { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
 import { mapNotification } from 'src/dtos/notification.dto.js';
 import {
   PeopleFaceStatisticsResponseDto,
@@ -67,21 +70,18 @@ import {
   UserAvatarColor,
 } from 'src/enum.js';
 import { AlbumAssetCount } from 'src/repositories/album.repository.js';
-import type { ArgOf } from 'src/repositories/event.repository.js';
-import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH,
   visibleSpaceAssetVisibilities,
 } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import {
+  type ReconciliationClaim,
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
   filterUnambiguousReconciliationClaims,
-  type ReconciliationClaim,
 } from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
-import type { JobOf } from 'src/types.js';
 import { asDateString, asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';

@@ -1,9 +1,9 @@
 import { Kysely, sql } from 'kysely';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { DB } from 'src/schema/index.js';
 import { getKyselyConfig } from 'src/utils/database.js';
-import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // Hagen's production database is the legacy Immich pgvecto.rs image. Its `vector` type has NO
 // `avg` aggregate (VectorChord's does — which is why the vchord-based medium harness never caught

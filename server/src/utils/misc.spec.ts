@@ -1,6 +1,8 @@
-import { defaults, type SystemConfig } from 'src/dtos/config.dto.js';
+import { describe, expect, it, vi } from 'vitest';
+import { type SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import {
+  ImmichStartupError,
   clamp,
   getCLIPModelInfo,
   getExternalDomain,
@@ -9,7 +11,6 @@ import {
   getMethodNames,
   globToPostgresRegex,
   handlePromiseError,
-  ImmichStartupError,
   isDuplicateDetectionEnabled,
   isFaceImportEnabled,
   isFaceSuggestionEnabled,
@@ -22,7 +23,6 @@ import {
   routeToErrorMessage,
   unsetDeep,
 } from 'src/utils/misc.js';
-import { describe, expect, it, vi } from 'vitest';
 
 describe('getKeysDeep', () => {
   it('should handle an empty object', () => {

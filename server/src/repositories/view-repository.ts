@@ -5,9 +5,9 @@ import { AssetVisibility } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid, withExif } from 'src/utils/database.js';
 import {
+  type TimelineHiddenScope,
   hiddenFromOwnTimeline,
   spaceAssetPathBranches,
-  type TimelineHiddenScope,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
 
