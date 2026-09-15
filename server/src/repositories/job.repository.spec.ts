@@ -1,12 +1,12 @@
 import { ModuleRef } from '@nestjs/core';
 import { setTimeout } from 'node:timers/promises';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobName, QueueJobStatus, QueueName } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
-import { buildWorkerOptions, JobRepository } from 'src/repositories/job.repository.js';
+import { JobRepository, buildWorkerOptions } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { JobCounts } from 'src/types.js';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:timers/promises', () => ({
   setTimeout: vi.fn().mockResolvedValue(void 0),

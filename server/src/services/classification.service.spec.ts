@@ -1,8 +1,8 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetVisibility, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { ClassificationService } from 'src/services/classification.service.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 type ClassificationCategoryConfig = {
   name: string;

@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import {
-  dominantBy,
   FaceRow,
+  dominantBy,
   medianTime,
   pairCounts,
   pickEvenlySpaced,

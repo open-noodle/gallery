@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
+import z from 'zod';
 import { AlbumResponseSchema } from 'src/dtos/album.dto.js';
 import { SharedSpaceRole, UserAvatarColor, UserAvatarColorSchema } from 'src/enum.js';
-import z from 'zod';
 
 const SharedSpaceRoleSchema = z.enum(SharedSpaceRole).meta({ id: 'SharedSpaceRole' });
 

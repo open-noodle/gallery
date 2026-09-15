@@ -8,7 +8,7 @@ import { Kysely } from 'kysely';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
-import { hiddenFromOwnTimeline, type TimelineHiddenScope } from 'src/utils/shared-space-album-scope.js';
+import { type TimelineHiddenScope, hiddenFromOwnTimeline } from 'src/utils/shared-space-album-scope.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
