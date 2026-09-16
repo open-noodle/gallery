@@ -58,24 +58,22 @@ describe('branding target paths', () => {
     });
   }
 
-  // M8 — the branch is rebased onto upstream Immich v3.2.0, so
+  // M8 — the branch is rebased onto upstream Immich v3.2.2, so
   // `branding/config.json` upstream.version is bumped to match. The
   // gallery-revert-to-immich-validation workflow boots the Gallery image
   // against `ghcr.io/immich-app/immich-server:v${upstream.version}`, so this
   // value decides which upstream release the revert script has to land on.
   //
-  // Unlike the v3.0.3→v3.1.0 bump (which added no upstream migrations at all),
-  // v3.1.0→v3.2.0 adds **eight**, and they move in the *opposite* direction to a
-  // normal rebase: a migration the tagged release now ships must NOT be reversed
-  // and its kysely_migrations row must NOT be deleted, or the tagged migrator
-  // re-runs it against a half-reverted schema. So this bump REMOVED eight entries
-  // from revert-to-immich.sql (ConvertUserPasswordEmptyStringToNull,
-  // AlbumDescriptionNullable, AlbumOwnerDeleteTrigger, AddWorkflowLogsTable,
-  // AssetOcrUpdatedAtTrigger, AssetOcrSyncReset, ClusterGroups,
-  // DeleteMismatchedMemoryAssets) rather than adding any.
+  // A bump normally moves revert-to-immich.sql in the *opposite* direction to a
+  // rebase — a migration the tagged release now ships must NOT be reversed and
+  // its kysely_migrations row must NOT be deleted — which is why the v3.1.0→v3.2.0
+  // bump REMOVED eight entries. This 3.2.0→3.2.2 bump removes none: **v3.2.2 ships
+  // byte-identical migrations to v3.2.0** (97 files, `git trees` diff empty), so
+  // neither direction of the coverage detector changes. Verified both ways before
+  // bumping; do not assume that of the next bump.
   //
   // Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.2.0 (base is immich v3.2.0)', () => {
-    expect(CONFIG.upstream.version).toBe('3.2.0');
+  it('M8: config.json upstream.version is 3.2.2 (base is immich v3.2.2)', () => {
+    expect(CONFIG.upstream.version).toBe('3.2.2');
   });
 });
