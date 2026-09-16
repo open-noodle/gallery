@@ -3415,7 +3415,8 @@ select
 from
   (
     select
-      "shared_space_asset"."spaceId"
+      "shared_space_asset"."spaceId",
+      "shared_space_member"."showInTimeline"
     from
       "shared_space_asset"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
@@ -3426,7 +3427,8 @@ from
       and "shared_space_member"."userId" = $2
     union
     select
-      "shared_space_library"."spaceId"
+      "shared_space_library"."spaceId",
+      "shared_space_member"."showInTimeline"
     from
       "shared_space_library"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
@@ -3473,5 +3475,8 @@ from
         )
       )
   ) as "combined"
+order by
+  "combined"."showInTimeline" desc,
+  "combined"."spaceId" asc
 limit
   $8
