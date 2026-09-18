@@ -2804,6 +2804,7 @@
   "reset_sqlite_confirmation": "Czy na pewno chcesz wyczyścić dane aplikacji? Spowoduje to usunięcie wszystkich ustawień i wylogowanie.",
   "reset_sqlite_confirmation_note": "Informacja: Po wyczyszczeniu musisz zamknąć i ponownie uruchomić aplikację.",
   "reset_sqlite_done": "Dane aplikacji zostały usunięte. Proszę zamknij i uruchom ponownie Immich, a następnie zaloguj się na nowo.",
+  "reset_sqlite_error_hint": "Coś poszło nie tak, zresetuj lokalną bazę danych za pomocą przycisku poniżej",
   "reset_sqlite_success": "Pomyślnie zresetowano bazę danych SQLite",
   "reset_to_default": "Przywróć ustawienia domyślne",
   "resolution": "Rozdzielczość",

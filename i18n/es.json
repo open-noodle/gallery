@@ -2781,6 +2781,7 @@
   "reset_sqlite_confirmation": "¿Seguro que quieres borrar los datos de la aplicación? Esto eliminará toda la configuración y cerrará tu sesión.",
   "reset_sqlite_confirmation_note": "Nota: Deberás reiniciar la aplicación después de borrarla.",
   "reset_sqlite_done": "Se han borrado los datos de la aplicación. Reinicie Immich y vuelva a iniciar sesión.",
+  "reset_sqlite_error_hint": "Algo salió mal, restablece la base de datos local con el botón de abajo",
   "reset_sqlite_success": "Restablecer exitosamente la base de datos SQLite",
   "reset_to_default": "Restablecer los valores predeterminados",
   "resolution": "Resolución",
