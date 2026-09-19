@@ -113,7 +113,7 @@ already paid for once — see the `selectedState` comment at `location-filter.sv
 after a state narrowing went invisible and unremovable in the panel.
 
 ```ts
-locationPresence: z.enum(['noGps', 'noPlaceName']).optional();
+locationPresence: z.enum(["noGps", "noPlaceName"]).optional();
 ```
 
 ### It is a member of the location group, not a new dimension
@@ -145,9 +145,7 @@ as `Base.pipe(IsNotSiblingOf(Base, 'a', ['b']))` (`validation.ts:59`, applied at
 and `:315-319`):
 
 ```ts
-const MetadataSearchSchema = MetadataSearchBaseSchema.pipe(
-  IsNotSiblingOf(MetadataSearchBaseSchema, 'locationPresence', ['city', 'state', 'country']),
-);
+const MetadataSearchSchema = MetadataSearchBaseSchema.pipe(IsNotSiblingOf(MetadataSearchBaseSchema, "locationPresence", ["city", "state", "country"]));
 ```
 
 This matters structurally, not just stylistically. `BaseSearchSchema` is extended by

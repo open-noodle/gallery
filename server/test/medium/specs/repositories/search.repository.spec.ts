@@ -10,9 +10,8 @@ import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { upsertTags } from 'src/utils/tag.js';
 import { newMediumService } from 'test/medium.factory.js';
-import { newEmbedding } from 'test/small.factory.js';
-import { getKyselyDB } from 'test/utils.js';
 import { factory, newEmbedding } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
