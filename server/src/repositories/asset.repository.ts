@@ -31,6 +31,7 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum.js';
+import { LocationPresence } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -38,7 +39,6 @@ import { AssetFileTable } from 'src/schema/tables/asset-file.table.js';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table.js';
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
-import { LocationPresence } from 'src/repositories/search.repository.js';
 import {
   anyUuid,
   asUuid,
