@@ -36,10 +36,10 @@ import {
   withExifInner,
   withSearchOrder,
 } from 'src/utils/database.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { without } from 'src/utils/filter-suggestions.js';
 import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
-import { favoriteExistsFor } from 'src/utils/favorite.js';
 
 export interface SearchAssetIdOptions {
   checksum?: Buffer;

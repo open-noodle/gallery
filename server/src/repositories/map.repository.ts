@@ -14,12 +14,12 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { DB } from 'src/schema/index.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { NaturalEarthCountriesTable } from 'src/schema/tables/natural-earth-countries.table.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceVisibilityGate,
 } from 'src/utils/shared-space-album-scope.js';
-import { favoriteExistsFor } from 'src/utils/favorite.js';
 
 export interface MapMarkerSearchOptions {
   isArchived?: boolean;

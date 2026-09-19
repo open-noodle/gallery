@@ -48,7 +48,6 @@ import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1
 import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift.js';
 import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden.js';
 import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable.js';
-import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1784000000000-AddAssetFavoriteTables.js';
 import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables.js';
 
 describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parity', () => {

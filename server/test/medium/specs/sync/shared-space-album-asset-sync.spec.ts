@@ -1,10 +1,10 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SyncEntityType } from 'src/enum.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { SyncRepository } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 const drain = async (stream: AsyncIterable<any>) => {
   const out: any[] = await Array.fromAsync(stream);

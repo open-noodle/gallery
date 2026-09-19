@@ -6,6 +6,7 @@ import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName,
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
@@ -25,7 +26,6 @@ import { AssetService } from 'src/services/asset.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 

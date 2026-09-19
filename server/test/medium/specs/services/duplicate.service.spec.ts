@@ -3,6 +3,7 @@ import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.respons
 import { AssetStatus, AssetVisibility } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
@@ -18,7 +19,6 @@ import { clearConfigCache } from 'src/utils/config.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -1,8 +1,9 @@
-import { AfterDeleteTrigger, CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
-import { CreateIdColumn, UpdateIdColumn } from 'src/decorators';
-import { asset_favorite_delete_audit } from 'src/schema/functions';
-import { AssetTable } from 'src/schema/tables/asset.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { AfterDeleteTrigger, CreateDateColumn, ForeignKeyColumn, Table, Timestamp } from '@immich/sql-tools';
+import type { Generated } from '@immich/sql-tools';
+import { CreateIdColumn, UpdateIdColumn } from 'src/decorators.js';
+import { asset_favorite_delete_audit } from 'src/schema/functions.js';
+import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // Per-user favorites overlay (#763). A favorite is a fact about (user, asset), never about an
 // asset alone — see docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §3.

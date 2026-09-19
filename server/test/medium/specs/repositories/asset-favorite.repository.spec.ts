@@ -1,11 +1,11 @@
 import { Kysely } from 'kysely';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { favoriteExistsFor } from 'src/utils/favorite';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // #763 slice 0 laid the schema foundation (`asset_favorite` / `asset_favorite_audit`), exercised
 // below directly via the Kysely DB handle. Slice 2 (this file's `AssetFavoriteRepository` describe

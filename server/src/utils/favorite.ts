@@ -14,8 +14,8 @@
 // `getTimeBucket`'s `.with('asset', ...)` / `.with('cte', ...)` chain) — `sql.ref` interpolates it
 // as a raw identifier instead of being resolved against the schema at compile time.
 import { AliasableExpression, ExpressionBuilder, SqlBool, sql } from 'kysely';
-import { DB } from 'src/schema';
-import { asUuid } from 'src/utils/database';
+import { DB } from 'src/schema/index.js';
+import { asUuid } from 'src/utils/database.js';
 
 /**
  * Per-user favorites (#763). Correlated EXISTS against the `asset_favorite` overlay: true iff

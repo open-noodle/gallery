@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 

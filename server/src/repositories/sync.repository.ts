@@ -6,8 +6,8 @@ import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
-import { accessibleSpaceAlbums, accessibleSpaces, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
+import { accessibleSpaceAlbums, accessibleSpaces, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
 // Re-export the relocated scoping helpers so existing `sync.repository` importers
 // keep working after the definitions moved to the fork-owned scope module.
