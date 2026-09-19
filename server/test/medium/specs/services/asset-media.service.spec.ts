@@ -7,11 +7,13 @@ import { AssetFileType, SharedLinkType } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
@@ -21,8 +23,6 @@ import { ImmichFileResponse } from 'src/utils/file.js';
 import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { ConfigRepository } from 'src/repositories/config.repository.js';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 

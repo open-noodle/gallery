@@ -6,6 +6,7 @@ import { basename } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, UserMetadataItem } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -27,7 +28,6 @@ import { mimeTypes } from 'src/utils/mime-types.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
-import { StorageRoutingKind } from 'src/backends/storage-router.js';
 
 @Injectable()
 export class UserService extends BaseService {
