@@ -1,12 +1,12 @@
+import { describe, expect, it } from 'vitest';
 import {
-  deriveDirectRelations,
-  deriveRelationLabel,
   FamilyGender,
   ProjectedFamilyGraph,
   ProjectedFamilyParticipant,
   ProjectedFamilyUnion,
-} from 'src/utils/family-labels';
-import { describe, expect, it } from 'vitest';
+  deriveDirectRelations,
+  deriveRelationLabel,
+} from 'src/utils/family-labels.js';
 
 const known = (identityId: string): ProjectedFamilyParticipant => ({ kind: 'known', identityId });
 const anonymous = (): ProjectedFamilyParticipant => ({ kind: 'anonymous' });

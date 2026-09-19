@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -14,7 +15,6 @@ import { asDateString } from 'src/utils/date.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { FamilyRepository } from 'src/repositories/family.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 

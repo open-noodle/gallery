@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { DefaultAccess, getConfigDefaults, updateConfig, type LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { utils, asBearerAuth } from 'src/utils.js';
+import { asBearerAuth, utils } from 'src/utils.js';
 
 // Hardening net for the tonal re-skin, running in CI (which checks out
 // test-assets and uses a deterministic renderer):

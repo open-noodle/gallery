@@ -13,9 +13,10 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { NextFunction, Response } from 'express';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+
+import type { NextFunction, Response } from 'express';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import {
   FamilyAccessGrantResponseDto,
   FamilyAccessUpdateDto,
@@ -33,17 +34,17 @@ import {
   FamilyUnionCreateResponseDto,
   FamilyUnionParamDto,
   FamilyUnionParticipantParamDto,
-  FamilyUnionsQueryDto,
   FamilyUnionUpdateDto,
-} from 'src/dtos/family.dto';
-import { PersonResponseDto } from 'src/dtos/person.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { FamilyService } from 'src/services/family.service';
-import { asDateString } from 'src/utils/date';
-import { deriveRelationLabel, FamilyGender, ProjectedFamilyParticipant } from 'src/utils/family-labels';
-import { sendFile } from 'src/utils/file';
+  FamilyUnionsQueryDto,
+} from 'src/dtos/family.dto.js';
+import { PersonResponseDto } from 'src/dtos/person.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { FamilyService } from 'src/services/family.service.js';
+import { asDateString } from 'src/utils/date.js';
+import { FamilyGender, ProjectedFamilyParticipant, deriveRelationLabel } from 'src/utils/family-labels.js';
+import { sendFile } from 'src/utils/file.js';
 
 // The internal `ProjectedFamilyParticipant` (slice 6) is `{kind:'known', identityId}` OR
 // `{kind:'anonymous'}` with NO `identityId` key at all. The wire DTO is a flat

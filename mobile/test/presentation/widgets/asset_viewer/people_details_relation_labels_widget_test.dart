@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/data/store.dart' as data_store;
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
@@ -10,7 +11,6 @@ import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_details/people_details.widget.dart';
-import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:mocktail/mocktail.dart';
@@ -61,9 +61,8 @@ void main() {
     await Store.clear();
     await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
     userService = _MockUserService();
-    when(
-      () => userService.tryGetMyUser(),
-    ).thenReturn(UserDto(id: 'viewer', email: 'v@e', name: 'v', profileChangedAt: DateTime(2024)));
+    when(() => userService.tryGetMyUser())
+        .thenReturn(UserDto(id: 'viewer', email: 'v@e', name: 'v', profileChangedAt: DateTime(2024)));
     when(() => userService.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
   });
 
@@ -77,7 +76,8 @@ void main() {
     await tester.pumpConsumerWidget(
       PeopleDetails(asset: asset),
       overrides: [
-        peopleAssetProvider.overrideWith((ref, key) async => people),
+        // The strip reads the people store, not the old peopleAssetProvider (renamed upstream).
+        data_store.Store.people.forAsset((id: asset.id, ownerId: asset.ownerId)).overrideWith((ref) async => people),
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith(
           (ref) => _StubCurrentUserNotifier(

@@ -70,7 +70,6 @@ import { BaseService } from 'src/services/base.service.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
-import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { isHttpException } from 'src/utils/logger.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';

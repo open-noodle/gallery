@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp } from '@immich/sql-tools';
-import { UserTable } from 'src/schema/tables/user.table';
+import { Column, CreateDateColumn, ForeignKeyColumn, Table, Timestamp } from '@immich/sql-tools';
+import type { Generated } from '@immich/sql-tools';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // A fork-owned table rather than a column on `user`: user.table.ts is pure upstream and
 // carries no fork columns, so a column there would conflict on every rebase. This also
