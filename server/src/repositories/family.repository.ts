@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, sql, Transaction } from 'kysely';
+import { Insertable, Kysely, Transaction, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { PostgresError } from 'postgres';
-import { DummyValue, GenerateSql } from 'src/decorators';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { FamilyUnionTable } from 'src/schema/tables/family-union.table';
+import { DummyValue, GenerateSql } from 'src/decorators.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { FamilyUnionTable } from 'src/schema/tables/family-union.table.js';
 
 export interface CreateUnionInput {
   status?: string;

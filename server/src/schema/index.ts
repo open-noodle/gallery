@@ -64,6 +64,10 @@ import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.ta
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table.js';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
+import { FamilyAccessTable } from 'src/schema/tables/family-access.table.js';
+import { FamilyUnionChildTable } from 'src/schema/tables/family-union-child.table.js';
+import { FamilyUnionPartnerTable } from 'src/schema/tables/family-union-partner.table.js';
+import { FamilyUnionTable } from 'src/schema/tables/family-union.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
@@ -130,10 +134,6 @@ import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.ta
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { VersionHistoryTable } from 'src/schema/tables/version-history.table.js';
-import { FamilyAccessTable } from 'src/schema/tables/family-access.table.js';
-import { FamilyUnionChildTable } from 'src/schema/tables/family-union-child.table.js';
-import { FamilyUnionPartnerTable } from 'src/schema/tables/family-union-partner.table.js';
-import { FamilyUnionTable } from 'src/schema/tables/family-union.table.js';
 import {
   VideoStreamSegmentTable,
   VideoStreamSessionTable,

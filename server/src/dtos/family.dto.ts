@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
-import { PersonResponseSchema } from 'src/dtos/person.dto';
-import { FamilyAccessLevel } from 'src/enum';
 import z from 'zod';
+import { PersonResponseSchema } from 'src/dtos/person.dto.js';
+import { FamilyAccessLevel } from 'src/enum.js';
 
 // Gallery-fork: family relationships. See `FamilyService` and `specs/2026-08-31-family-relationships-design-and-slices.md`.
 //

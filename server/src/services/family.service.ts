@@ -1,19 +1,19 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { PersonResponseDto } from 'src/dtos/person.dto';
-import { CacheControl, FamilyAccessLevel, Permission, UserMetadataKey } from 'src/enum';
-import { BaseService } from 'src/services/base.service';
-import { asDateTimeString } from 'src/utils/date';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { PersonResponseDto } from 'src/dtos/person.dto.js';
+import { CacheControl, FamilyAccessLevel, Permission, UserMetadataKey } from 'src/enum.js';
+import { BaseService } from 'src/services/base.service.js';
+import { asDateTimeString } from 'src/utils/date.js';
 import {
-  buildFamilyGraph,
   FamilyLabelRepositories,
+  buildFamilyGraph,
   resolveFamilyAccessLevel,
   resolveFamilyRootId,
   resolveFamilyVisibility,
-} from 'src/utils/family-graph';
-import { deriveDirectRelations, FamilyGender, ProjectedFamilyGraph } from 'src/utils/family-labels';
-import { ImmichMediaResponse } from 'src/utils/file';
-import { mimeTypes } from 'src/utils/mime-types';
+} from 'src/utils/family-graph.js';
+import { FamilyGender, ProjectedFamilyGraph, deriveDirectRelations } from 'src/utils/family-labels.js';
+import { ImmichMediaResponse } from 'src/utils/file.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
 
 export type FamilyParticipantRole = 'partner' | 'child';
 

@@ -2,15 +2,15 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
-  Generated,
   Index,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { UserTable } from 'src/schema/tables/user.table';
+import type { Generated } from '@immich/sql-tools';
+import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table('family_union')
 @UpdatedAtTrigger('family_union_updatedAt')

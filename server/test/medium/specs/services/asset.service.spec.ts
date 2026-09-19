@@ -2,13 +2,22 @@ import { Kysely } from 'kysely';
 import type { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
-import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType, SystemMetadataKey } from 'src/enum.js';
+import {
+  AssetFileType,
+  AssetMetadataKey,
+  AssetStatus,
+  AssetVisibility,
+  JobName,
+  SharedLinkType,
+  SystemMetadataKey,
+} from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -20,6 +29,7 @@ import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -27,9 +37,6 @@ import { AssetService } from 'src/services/asset.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
-import { ConfigRepository } from 'src/repositories/config.repository.js';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 

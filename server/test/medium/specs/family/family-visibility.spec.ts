@@ -1,16 +1,16 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetVisibility, SharedSpaceRole } from 'src/enum';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FamilyRepository } from 'src/repositories/family.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { FamilyService } from 'src/services/family.service';
-import { ProjectedFamilyParticipant } from 'src/utils/family-labels';
-import { insertClusterGroup, newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { FamilyService } from 'src/services/family.service.js';
+import { ProjectedFamilyParticipant } from 'src/utils/family-labels.js';
+import { insertClusterGroup, newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

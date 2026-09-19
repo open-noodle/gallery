@@ -6,6 +6,7 @@ import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -13,7 +14,6 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { DB } from 'src/schema/index.js';
 import { IPersonJob } from 'src/types.js';
 import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code.js';
-import { FamilyRepository } from 'src/repositories/family.repository.js';
 
 export type MergeProfileKind = 'person' | 'space-person';
 

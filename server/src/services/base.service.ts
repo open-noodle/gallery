@@ -10,6 +10,7 @@ import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE, SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFace, UserAdmin } from 'src/database.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
 import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
@@ -41,6 +42,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -93,8 +95,6 @@ import {
   requirePersonAccess,
 } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
-import { FamilyRepository } from 'src/repositories/family.repository.js';
-import { AuthDto } from 'src/dtos/auth.dto.js';
 import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph.js';
 import {
   ContentDisposition,

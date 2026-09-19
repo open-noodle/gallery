@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
-import { DB } from 'src/schema';
-import { insertClusterGroup } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { DB } from 'src/schema/index.js';
+import { insertClusterGroup } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

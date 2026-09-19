@@ -1,12 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
-import { FamilyController } from 'src/controllers/family.controller';
-import { FamilyAccessLevel } from 'src/enum';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { FamilyService } from 'src/services/family.service';
 import request from 'supertest';
-import { authStub } from 'test/fixtures/auth.stub';
-import { errorDto } from 'test/medium/responses';
-import { automock, ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
+import { FamilyController } from 'src/controllers/family.controller.js';
+import { FamilyAccessLevel } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { FamilyService } from 'src/services/family.service.js';
+import { authStub } from 'test/fixtures/auth.stub.js';
+import { errorDto } from 'test/medium/responses.js';
+import { ControllerContext, automock, controllerSetup, mockBaseService } from 'test/utils.js';
 
 const UNION_ID = '00000000-0000-4000-a000-000000000401';
 const UNION_A = '00000000-0000-4000-a000-000000000001';

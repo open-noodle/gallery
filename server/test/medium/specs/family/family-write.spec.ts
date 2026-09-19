@@ -1,14 +1,14 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { FamilyRepository } from 'src/repositories/family.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { FamilyService } from 'src/services/family.service';
-import { insertClusterGroup, newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { FamilyService } from 'src/services/family.service.js';
+import { insertClusterGroup, newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

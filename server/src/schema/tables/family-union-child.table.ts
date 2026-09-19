@@ -1,6 +1,6 @@
 import { ForeignKeyColumn, Table } from '@immich/sql-tools';
-import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
-import { FamilyUnionTable } from 'src/schema/tables/family-union.table';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
+import { FamilyUnionTable } from 'src/schema/tables/family-union.table.js';
 
 @Table('family_union_child')
 export class FamilyUnionChildTable {

@@ -1,9 +1,9 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { FamilyAccessLevel, SharedSpaceRole } from 'src/enum';
-import { FamilyService } from 'src/services/family.service';
-import { authStub } from 'test/fixtures/auth.stub';
-import { newTestService, ServiceMocks } from 'test/utils';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { FamilyAccessLevel, SharedSpaceRole } from 'src/enum.js';
+import { FamilyService } from 'src/services/family.service.js';
+import { authStub } from 'test/fixtures/auth.stub.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const makeFamilyConfig = (enabled: boolean, defaultAccess: 'none' | 'view' | 'contribute' = 'none') => ({
   familyTree: { enabled, defaultAccess },

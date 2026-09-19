@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import {
   FamilyClusterResponseDto,
   FamilyGraphResponseDto,
@@ -7,8 +8,7 @@ import {
   FamilyParticipantAddDto,
   FamilyUnionCreateDto,
   FamilyUnionParticipantParamDto,
-} from 'src/dtos/family.dto';
-import { describe, expect, it } from 'vitest';
+} from 'src/dtos/family.dto.js';
 
 // face_identity.id is a UUID **v7** (@PrimaryGeneratedUuidV7Column) — every field on this page
 // that carries one MUST validate with z.uuid() (version-agnostic), never z.uuidv4(). Getting this

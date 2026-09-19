@@ -8,20 +8,20 @@
 // Every export here takes its repositories as a plain object rather than as `this` from a
 // specific class, so any `BaseService` subclass can call it with `this` directly (it already has
 // `familyRepository`/`faceIdentityRepository`/`userRepository` injected).
-import { FamilyAccessLevel, UserMetadataKey } from 'src/enum';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FamilyRepository, RawUnionRow, VisibleUnion } from 'src/repositories/family.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { UserMetadataItem } from 'src/types';
+import { FamilyAccessLevel, UserMetadataKey } from 'src/enum.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FamilyRepository, RawUnionRow, VisibleUnion } from 'src/repositories/family.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { UserMetadataItem } from 'src/types.js';
 import {
-  deriveRelationLabel,
   FamilyGender,
   FamilyUnionStatus,
   ProjectedFamilyGraph,
   ProjectedFamilyIdentity,
   ProjectedFamilyParticipant,
   ProjectedFamilyUnion,
-} from 'src/utils/family-labels';
+  deriveRelationLabel,
+} from 'src/utils/family-labels.js';
 
 export interface FamilyAccessRepositories {
   familyRepository: Pick<FamilyRepository, 'getAccess'>;
