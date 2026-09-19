@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
+import { Column, CreateDateColumn, Index, Table, Timestamp } from '@immich/sql-tools';
+import type { Generated } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
 
 // Delete-audit for the asset_favorite per-user overlay (#763). Trigger-driven
 // (asset_favorite_delete_audit fires AFTER DELETE ... FOR EACH STATEMENT), so it captures both an

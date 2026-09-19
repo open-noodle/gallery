@@ -18,7 +18,7 @@
 // see job-favorite-payload medium spec). Separately, `person.isFavorite` (a different table) and
 // a bare `isFavorite:` object key never match — the patterns all require the literal `asset.`
 // prefix.
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 

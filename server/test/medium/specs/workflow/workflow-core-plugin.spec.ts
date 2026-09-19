@@ -5,6 +5,7 @@ import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto.js';
 import { AssetType, AssetVisibility, LogLevel } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
@@ -22,7 +23,6 @@ import { resolveMethod } from 'src/utils/workflow.js';
 import { MediumTestContext } from 'test/medium.factory.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { getKyselyDB } from 'test/utils.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 
 let isInitialized = false;
 

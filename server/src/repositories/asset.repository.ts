@@ -63,8 +63,8 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database.js';
-import { globToPostgresRegex } from 'src/utils/misc.js';
 import { favoriteExistsFor, favoriteExistsForOwner } from 'src/utils/favorite.js';
+import { globToPostgresRegex } from 'src/utils/misc.js';
 import {
   type TimelineHiddenScope,
   type TimelineRescue,

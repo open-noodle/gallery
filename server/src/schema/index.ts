@@ -45,6 +45,8 @@ import { AssetEditTable } from 'src/schema/tables/asset-edit.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetFaceAuditTable } from 'src/schema/tables/asset-face-audit.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
+import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import { AssetFileTable } from 'src/schema/tables/asset-file.table.js';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table.js';
 import { AssetMetadataAuditTable } from 'src/schema/tables/asset-metadata-audit.table.js';
@@ -126,8 +128,6 @@ import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.ta
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { VersionHistoryTable } from 'src/schema/tables/version-history.table.js';
-import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
-import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import {
   VideoStreamSegmentTable,
   VideoStreamSessionTable,

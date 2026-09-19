@@ -1,10 +1,10 @@
 import { Kysely } from 'kysely';
-import { SyncEntityType, SyncRequestType } from 'src/enum';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // #763 slice 6 (design doc §4.3): asset_favorite is its own synced entity, because a favorite
 // write must never bump asset.updateId — that would amplify a personal write into a cross-user

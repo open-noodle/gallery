@@ -1,15 +1,15 @@
 import { Kysely } from 'kysely';
-import { JobName, JobStatus, QueueName } from 'src/enum';
-import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { EventRepository } from 'src/repositories/event.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { WebsocketRepository } from 'src/repositories/websocket.repository';
-import { DB } from 'src/schema';
-import { JobService } from 'src/services/job.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { JobName, JobStatus, QueueName } from 'src/enum.js';
+import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { EventRepository } from 'src/repositories/event.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
+import { DB } from 'src/schema/index.js';
+import { JobService } from 'src/services/job.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // #763 (Task 1 review finding): job.service.ts's AssetEditReadyV2 / AssetUploadReadyV2 websocket
 // payloads are built by hand (not via mapAsset) from `assetRepository.getById` /

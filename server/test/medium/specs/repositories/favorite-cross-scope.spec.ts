@@ -1,12 +1,12 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, TimeBucketSize } from 'src/enum';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { mediumFactory, newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetVisibility, TimeBucketSize } from 'src/enum.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { mediumFactory, newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // #763 slice 4 (design §10.10): a favorite-filtered timeline first page that crosses TEN shared
 // spaces the caller belongs to but owns none of — the branch in withTimeBucketAssetFilters

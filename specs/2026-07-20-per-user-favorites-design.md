@@ -142,12 +142,12 @@ New fork table, structurally a copy of the established per-user overlay preceden
 letting each member hold their own value for a shared entity without touching the shared row):
 
 ```ts
-@Table('asset_favorite')
+@Table("asset_favorite")
 export class AssetFavoriteTable {
-  @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', primary: true })
+  @ForeignKeyColumn(() => UserTable, { onDelete: "CASCADE", primary: true })
   userId!: string;
 
-  @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', primary: true })
+  @ForeignKeyColumn(() => AssetTable, { onDelete: "CASCADE", primary: true })
   assetId!: string;
 
   @CreateDateColumn()
@@ -260,7 +260,7 @@ before assuming it does.** The spec derives `createdTables` from what `migration
 actually `CREATE`s, but then narrows it (`server/src/schema/revert-to-immich.spec.ts:38`):
 
 ```ts
-const forkTables = [...createdTables].filter((name) => name.startsWith('shared_space') || name.endsWith('_audit'));
+const forkTables = [...createdTables].filter((name) => name.startsWith("shared_space") || name.endsWith("_audit"));
 ```
 
 `asset_favorite` matches **neither** predicate, so it is silently excluded from both the

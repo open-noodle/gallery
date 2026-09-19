@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { Chunked, DummyValue, GenerateSql } from 'src/decorators';
-import { DB } from 'src/schema';
-import { asUuid } from 'src/utils/database';
+import { Chunked, DummyValue, GenerateSql } from 'src/decorators.js';
+import { DB } from 'src/schema/index.js';
+import { asUuid } from 'src/utils/database.js';
 
 // Per-user favorites overlay (#763). A favorite is a fact about (user, asset) — see
 // docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §3. `addAll`/`removeAll`
