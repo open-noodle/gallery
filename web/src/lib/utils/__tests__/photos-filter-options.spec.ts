@@ -144,13 +144,13 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options.withSharedSpaces).toBe(true);
   });
 
-  it('should include isFavorite and omit shared timeline inclusions when favorites is selected', () => {
+  it('should include isFavorite and keep partner/shared-space scope active when favorites is selected (#763 slice 4)', () => {
     const filters = { ...createFilterState(), isFavorite: true };
     const options = buildPhotosTimelineOptions(filters, MY_USER_ID);
 
     expect(options.isFavorite).toBe(true);
-    expect(options).not.toHaveProperty('withPartners');
-    expect(options).not.toHaveProperty('withSharedSpaces');
+    expect(options.withPartners).toBe(true);
+    expect(options.withSharedSpaces).toBe(true);
   });
 
   it('should include has-no-album when selected', () => {
@@ -276,15 +276,19 @@ describe('buildPhotosTimelineOptions', () => {
       expect(options.userId).toBe(MY_USER_ID);
     });
 
-    it('keeps the owner gate under the favorites chip, where the shared widenings are dropped', () => {
+    it('keeps the owner gate under the favorites chip (#763: the widenings now stay too)', () => {
       const options = buildPhotosTimelineOptions(
         { ...createFilterState(), isFavorite: true, albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa' },
         MY_USER_ID,
       );
 
+      // The owner gate is the point of this test and is unchanged.
       expect(options.userId).toBe(MY_USER_ID);
-      expect(options).not.toHaveProperty('withPartners');
-      expect(options).not.toHaveProperty('withSharedSpaces');
+      // #763: the widenings used to be dropped here, because `isFavorite` was the asset OWNER's
+      // flag and the server rejected the combination. It is a per-user overlay row now, so the
+      // chip narrows to MY favourites and partner/space content stays legitimately in scope.
+      expect(options.withPartners).toBe(true);
+      expect(options.withSharedSpaces).toBe(true);
     });
   });
 });

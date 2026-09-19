@@ -3,7 +3,7 @@
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import type { OnFavorite } from '$lib/utils/actions';
   import { handleError } from '$lib/utils/handle-error';
-  import { updateAssets } from '@immich/sdk';
+  import { updateAssetFavorites } from '@immich/sdk';
   import { IconButton, toastManager } from '@immich/ui';
   import { mdiHeartMinusOutline, mdiHeartOutline, mdiTimerSand } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -26,12 +26,12 @@
     loading = true;
 
     try {
-      const assets = assetMultiSelectManager.ownedAssets.filter((asset) => asset.isFavorite !== isFavorite);
+      const assets = assetMultiSelectManager.assets.filter((asset) => asset.isFavorite !== isFavorite);
 
       const ids = assets.map(({ id }) => id);
 
       if (ids.length > 0) {
-        await updateAssets({ assetBulkUpdateDto: { ids, isFavorite } });
+        await updateAssetFavorites({ assetFavoriteUpdateDto: { ids, isFavorite } });
       }
 
       for (const asset of assets) {

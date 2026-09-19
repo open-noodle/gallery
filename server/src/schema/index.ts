@@ -45,6 +45,8 @@ import { AssetEditTable } from 'src/schema/tables/asset-edit.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetFaceAuditTable } from 'src/schema/tables/asset-face-audit.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
+import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import { AssetFileTable } from 'src/schema/tables/asset-file.table.js';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table.js';
 import { AssetMetadataAuditTable } from 'src/schema/tables/asset-metadata-audit.table.js';
@@ -155,6 +157,8 @@ export class ImmichDatabase {
     AssetEditAuditTable,
     AssetFaceTable,
     AssetFaceAuditTable,
+    AssetFavoriteTable,
+    AssetFavoriteAuditTable,
     AssetMetadataTable,
     AssetMetadataAuditTable,
     AssetJobStatusTable,
@@ -300,6 +304,8 @@ export interface DB {
   asset_exif: AssetExifTable;
   asset_face: AssetFaceTable;
   asset_face_audit: AssetFaceAuditTable;
+  asset_favorite: AssetFavoriteTable;
+  asset_favorite_audit: AssetFavoriteAuditTable;
   asset_file: AssetFileTable;
   asset_metadata: AssetMetadataTable;
   asset_metadata_audit: AssetMetadataAuditTable;

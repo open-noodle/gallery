@@ -185,6 +185,16 @@ const SyncAssetEditDeleteV1Schema = z
   .object({ editId: z.uuidv4().describe('Edit ID') })
   .meta({ id: 'SyncAssetEditDeleteV1' });
 
+// #763: asset_favorite is its own synced entity (design doc §4.3) — caller-scoped (no userId in
+// the payload; the stream is already filtered to the syncing user), mirroring SyncAssetEditV1.
+const SyncAssetFavoriteV1Schema = z
+  .object({ assetId: z.uuidv4().describe('Asset ID') })
+  .meta({ id: 'SyncAssetFavoriteV1' });
+
+const SyncAssetFavoriteDeleteV1Schema = z
+  .object({ assetId: z.uuidv4().describe('Asset ID') })
+  .meta({ id: 'SyncAssetFavoriteDeleteV1' });
+
 @ExtraModel()
 class SyncAssetDeleteV1 extends createZodDto(SyncAssetDeleteV1Schema) {}
 @ExtraModel()
@@ -197,6 +207,10 @@ class SyncAssetMetadataDeleteV1 extends createZodDto(SyncAssetMetadataDeleteV1Sc
 export class SyncAssetEditV1 extends createZodDto(SyncAssetEditV1Schema) {}
 @ExtraModel()
 class SyncAssetEditDeleteV1 extends createZodDto(SyncAssetEditDeleteV1Schema) {}
+@ExtraModel()
+export class SyncAssetFavoriteV1 extends createZodDto(SyncAssetFavoriteV1Schema) {}
+@ExtraModel()
+class SyncAssetFavoriteDeleteV1 extends createZodDto(SyncAssetFavoriteDeleteV1Schema) {}
 
 const SyncAlbumDeleteV1Schema = z
   .object({ albumId: z.uuidv4().describe('Album ID') })
@@ -681,6 +695,8 @@ export type SyncItem = {
   [SyncEntityType.AssetOcrDeleteV1]: SyncAssetOcrDeleteV1;
   [SyncEntityType.AssetEditV1]: SyncAssetEditV1;
   [SyncEntityType.AssetEditDeleteV1]: SyncAssetEditDeleteV1;
+  [SyncEntityType.AssetFavoriteV1]: SyncAssetFavoriteV1;
+  [SyncEntityType.AssetFavoriteDeleteV1]: SyncAssetFavoriteDeleteV1;
   [SyncEntityType.PartnerAssetV2]: SyncAssetV2;
   [SyncEntityType.PartnerAssetBackfillV2]: SyncAssetV2;
   [SyncEntityType.PartnerAssetDeleteV1]: SyncAssetDeleteV1;

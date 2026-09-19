@@ -26,6 +26,7 @@ import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -249,6 +250,7 @@ export type ServiceOverrides = {
   app: AppRepository;
   asset: AssetRepository;
   assetEdit: AssetEditRepository;
+  assetFavorite: AssetFavoriteRepository;
   assetFile: AssetFileRepository;
   assetJob: AssetJobRepository;
   clusterGroup: ClusterGroupRepository;
@@ -349,6 +351,7 @@ export const getMocks = () => {
     albumUser: automock(AlbumUserRepository),
     asset: newAssetRepositoryMock(),
     assetEdit: automock(AssetEditRepository),
+    assetFavorite: automock(AssetFavoriteRepository),
     assetFile: automock(AssetFileRepository),
     assetJob: automock(AssetJobRepository),
     clusterGroup: automock(ClusterGroupRepository),
@@ -434,6 +437,7 @@ export const newTestService = <T extends BaseService>(
     overrides.app || (mocks.app as As<AppRepository>),
     overrides.asset || (mocks.asset as As<AssetRepository>),
     overrides.assetEdit || (mocks.assetEdit as As<AssetEditRepository>),
+    overrides.assetFavorite || (mocks.assetFavorite as As<AssetFavoriteRepository>),
     overrides.assetFile || (mocks.assetFile as As<AssetFileRepository>),
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),

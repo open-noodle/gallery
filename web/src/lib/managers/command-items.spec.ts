@@ -301,10 +301,11 @@ describe('selection-context commands', () => {
     expect(item.isAvailable!(makeCtx(null))).toBe(false);
   });
 
-  it('favorite hides when ownership is mixed, missing onFavorite, or already all favorite', () => {
+  it('favorite is available regardless of ownership (per-user, #763); hides on missing onFavorite or already all favorite', () => {
     const item = cmd('cmd:selection_favorite');
     expect(item.isAvailable!(makeCtx(makeSelection()))).toBe(true);
-    expect(item.isAvailable!(makeCtx(makeSelection({ isAllUserOwned: false })))).toBe(false);
+    // #763: favorites are per-user, so a mixed-ownership selection no longer hides the command.
+    expect(item.isAvailable!(makeCtx(makeSelection({ isAllUserOwned: false })))).toBe(true);
     expect(item.isAvailable!(makeCtx(makeSelection({ onFavorite: undefined })))).toBe(false);
     expect(item.isAvailable!(makeCtx(makeSelection({ isAllFavorite: true })))).toBe(false);
   });

@@ -14,6 +14,7 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { DB } from 'src/schema/index.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { NaturalEarthCountriesTable } from 'src/schema/tables/natural-earth-countries.table.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
@@ -110,7 +111,9 @@ export class MapRepository {
       .$if(isArchived === false || isArchived === undefined, (qb) =>
         qb.where('asset.visibility', '=', AssetVisibility.Timeline),
       )
-      .$if(isFavorite !== undefined, (q) => q.where('isFavorite', '=', isFavorite!))
+      .$if(isFavorite !== undefined, (q) =>
+        q.where((eb) => (isFavorite ? favoriteExistsFor(eb, authUserId) : eb.not(favoriteExistsFor(eb, authUserId)))),
+      )
       .$if(fileCreatedAfter !== undefined, (q) => q.where('fileCreatedAt', '>=', fileCreatedAfter!))
       .$if(fileCreatedBefore !== undefined, (q) => q.where('fileCreatedAt', '<=', fileCreatedBefore!))
       .where((eb) => {
