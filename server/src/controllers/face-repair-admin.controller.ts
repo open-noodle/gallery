@@ -15,7 +15,6 @@ import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { NextFunction, Response } from 'express';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
-import { DissolveRequestDto, DissolveResponseDto } from 'src/dtos/face-dissolve.dto.js';
 import {
   DissolveRequestDto,
   DissolveResponseDto,
@@ -53,9 +52,9 @@ import {
 import { ApiTag } from 'src/enum.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { FaceDissolveService } from 'src/services/face-dissolve.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { sendFile } from 'src/utils/file.js';
-import { FaceDissolveService } from 'src/services/face-dissolve.service.js';
 
 @ApiTags(ApiTag.Faces)
 @Controller('admin/face-repair')

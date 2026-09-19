@@ -1,18 +1,18 @@
 import { Kysely, sql } from 'kysely';
-import { SourceType } from 'src/enum';
-import { AssetJobRepository } from 'src/repositories/asset-job.repository';
-import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository';
-import { DB } from 'src/schema';
-import { DissolveScope } from 'src/utils/face-dissolve';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { SourceType } from 'src/enum.js';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
+import { DB } from 'src/schema/index.js';
+import { DissolveScope } from 'src/utils/face-dissolve.js';
 import {
   seedAsset,
   seedFace,
   seedPerson,
   seedUser,
   setFacesRecognizedAt,
-} from 'test/medium/specs/repositories/face-dissolve.fixtures';
-import { getKyselyDB } from 'test/utils';
-import { beforeAll, describe, expect, it } from 'vitest';
+} from 'test/medium/specs/repositories/face-dissolve.fixtures.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

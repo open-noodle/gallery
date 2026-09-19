@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
-import { DissolveScope } from 'src/utils/face-dissolve';
 import z from 'zod';
+import { DissolveScope } from 'src/utils/face-dissolve.js';
 
 // Named, not anonymous: without an id oazapfts emits a bare `enum Scope` into the SDK, squatting a generic
 // name (OAuth/permission scope) that a later endpoint will want — and a published SDK export cannot be

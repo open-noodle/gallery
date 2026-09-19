@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
-import { AssetFileType, AssetVisibility, SourceType } from 'src/enum';
-import { DB } from 'src/schema';
-import { mediumFactory } from 'test/medium.factory';
-import { newUuid } from 'test/small.factory';
+import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { mediumFactory } from 'test/medium.factory.js';
+import { newUuid } from 'test/small.factory.js';
 
 export const ZERO_EMBEDDING = '[' + Array.from({ length: 512 }, () => 0).join(',') + ']';
 

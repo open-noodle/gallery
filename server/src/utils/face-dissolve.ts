@@ -1,7 +1,7 @@
 import { Expression, ExpressionBuilder, SqlBool, sql } from 'kysely';
-import { SourceType } from 'src/enum';
-import { DB } from 'src/schema';
-import { petFacePredicate } from 'src/utils/database';
+import { SourceType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { petFacePredicate } from 'src/utils/database.js';
 
 export enum DissolveScope {
   All = 'all',
