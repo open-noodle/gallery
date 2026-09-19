@@ -32,7 +32,10 @@ function isSectionEmpty(section: FilterSection, facets: FilterSuggestionsRespons
       return facets.people.length === 0 && !facets.hasUnnamedPeople;
     }
     case 'location': {
-      return facets.countries.length === 0;
+      // Not just the country list since #868: the section also offers the "No location" and
+      // "No place name" entries, and a scope where nothing has coordinates offers exactly those.
+      // Only the absence of all three leaves the user nothing to select.
+      return facets.countries.length === 0 && !facets.hasNoGpsAssets && !facets.hasNoPlaceNameAssets;
     }
     case 'camera': {
       return facets.cameraMakes.length === 0;

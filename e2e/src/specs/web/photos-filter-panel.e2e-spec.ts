@@ -194,10 +194,18 @@ test.describe('Photos FilterPanel — unavailable sections (#910)', () => {
     await expect(page.locator('[data-testid="filter-section-timeline"]')).toBeVisible();
     await expect(page.locator('[data-testid="filter-section-text"]')).toBeVisible();
 
-    for (const section of ['media', 'rating', 'favorites', 'albums', 'people', 'location', 'camera', 'tags']) {
+    for (const section of ['media', 'rating', 'favorites', 'albums', 'people', 'camera', 'tags']) {
       await expect(page.locator(`[data-testid="filter-section-${section}"]`)).toHaveCount(0);
       await expect(page.locator(`[data-testid="section-toggle-${section}"]`)).toHaveCount(0);
     }
+
+    // Location is deliberately NOT in that list. The seed asset carries no EXIF, so it has no
+    // coordinates — which is exactly what #868's "No location" entry filters for. The section can
+    // therefore filter something and must stay, even though its country list is empty. Hiding it
+    // here would make the feature unreachable in the very library it exists for.
+    await expect(page.locator('[data-testid="filter-section-location"]')).toBeVisible();
+    await expect(page.locator('[data-testid="location-presence-noGps"]')).toBeVisible();
+    await expect(page.locator('[data-testid="location-empty"]')).toHaveCount(0);
   });
 
   test('shows the favorites section once something is favourited', async ({ context, page }) => {

@@ -467,6 +467,33 @@ describe('text filters (#802)', () => {
   });
 });
 
+/**
+ * The map plots markers from `asset_exif.latitude IS NOT NULL` (map.repository.ts:187), so a
+ * "no GPS" filter can only ever produce an empty map. None of the four map option builders may
+ * ever forward `locationPresence` — there is no row on the map's location section for it, so a
+ * value that slipped through would be an active filter the surface can neither show nor honour.
+ */
+describe('locationPresence suppression (map plots asset_exif.latitude IS NOT NULL)', () => {
+  it.each([
+    ['buildMapMarkerOptions', () => buildMapMarkerOptions({ ...createFilterState(), locationPresence: 'noGps' })],
+    [
+      'buildMapTimeBucketOptions',
+      () => buildMapTimeBucketOptions({ ...createFilterState(), locationPresence: 'noGps' }),
+    ],
+    [
+      'buildAlbumMapMarkerOptions',
+      () => buildAlbumMapMarkerOptions('album-1', { ...createFilterState(), locationPresence: 'noGps' }),
+    ],
+    [
+      'buildMapTimelineOptions',
+      () =>
+        buildMapTimelineOptions({ ...createFilterState(), locationPresence: 'noGps' }, '1,2,3,4', new Set(['asset-1'])),
+    ],
+  ] as const)('never forwards locationPresence via %s', (_name, build) => {
+    expect(build().locationPresence).toBeUndefined();
+  });
+});
+
 describe('buildAlbumMapMarkerOptions', () => {
   it('scopes to the album and forwards the active filters', () => {
     const options = buildAlbumMapMarkerOptions('album-1', {

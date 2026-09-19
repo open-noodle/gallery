@@ -79,6 +79,12 @@ describe('buildAlbumTimelineOptions', () => {
     );
   });
 
+  it('forwards locationPresence to the album timeline query', () => {
+    const filters = { ...createFilterState(), locationPresence: 'noGps' as const };
+
+    expect(buildAlbumTimelineOptions('album-1', AssetOrder.Desc, filters).locationPresence).toBe('noGps');
+  });
+
   // The album page's route ALREADY scopes the query to its album, and the server's albumId is a
   // scalar driving one inner join — a second album cannot be AND-ed. So an albumId FILTER is
   // meaningless here and must not overwrite the route's album scope.

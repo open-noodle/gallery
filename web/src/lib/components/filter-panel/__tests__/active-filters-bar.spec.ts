@@ -141,6 +141,40 @@ describe('ActiveFiltersBar', () => {
     expect(removedType).toBe('location');
   });
 
+  it('should render one location chip labelled "No location" for a noGps selection', () => {
+    const filters = createFilterState();
+    filters.locationPresence = 'noGps';
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('No location');
+  });
+
+  it('should render one location chip labelled "Unnamed place" for a noPlaceName selection', () => {
+    const filters = createFilterState();
+    filters.locationPresence = 'noPlaceName';
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Unnamed place');
+  });
+
   it('should render chip for rating as "≥ 3 stars" (star shown as a leading icon)', () => {
     const filters = createFilterState();
     filters.rating = 3;

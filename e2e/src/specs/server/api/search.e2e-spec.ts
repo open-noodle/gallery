@@ -829,6 +829,33 @@ describe('/search', () => {
       expect(totalFiltered).toBeLessThanOrEqual(cityCount);
     });
 
+    it('should filter buckets by locationPresence=noGps', async () => {
+      // Every asset in THIS describe's fixture gets a lat/long via updateAsset in the outer
+      // beforeAll (the `coordinates` array — one entry per asset, none left unset), so noGps
+      // must exclude all of them. It cannot assert an empty result, though: other describes in
+      // this file create admin-owned assets with no coordinates (e.g. :386, :404-409), and they
+      // share one database, so noGps legitimately matches those.
+      //
+      // Comparing against the unfiltered baseline is what makes this falsifiable: if
+      // locationPresence were dropped anywhere between the DTO, the service and the repository,
+      // the filtered total would come back EQUAL to the unfiltered one rather than smaller.
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?locationPresence=noGps')
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+
+      const { body: allBuckets } = await request(app)
+        .get('/timeline/buckets')
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      const totalFiltered = body.reduce((total: number, b: { count: number }) => total + b.count, 0);
+      const totalAll = allBuckets.reduce((total: number, b: { count: number }) => total + b.count, 0);
+
+      expect(totalAll).toBeGreaterThan(0);
+      expect(totalFiltered).toBeLessThan(totalAll);
+    });
+
     it('should return zero when combined filters match no assets', async () => {
       // Tokyo + Canon: assetDenali (Canon EOS 7D) is in Tokyo — this should match
       // But Accra + Canon: no Canon camera in Accra

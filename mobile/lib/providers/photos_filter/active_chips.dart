@@ -119,7 +119,13 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
   }
 
   // ── location ─────────────────────────────────────────────────────────
+  final presenceLabel = switch (filter.location.locationPresence) {
+    'noGps' => 'filter_location_no_gps'.tr(),
+    'noPlaceName' => 'filter_location_no_place_name'.tr(),
+    _ => null,
+  };
   final locParts = [
+    presenceLabel,
     filter.location.country,
     filter.location.state,
     filter.location.city,

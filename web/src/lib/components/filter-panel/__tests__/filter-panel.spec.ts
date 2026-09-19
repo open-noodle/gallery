@@ -151,6 +151,79 @@ describe('FilterPanel', () => {
     expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({ country: 'Germany', city: undefined }));
   });
 
+  it('clears locationPresence when a country is chosen', async () => {
+    const onFiltersChange = vi.fn();
+    const filters = { ...createFilterState(), locationPresence: 'noGps' as const };
+
+    render(FilterPanel, {
+      props: {
+        config: {
+          sections: ['location'],
+          providers: {
+            locations: () => Promise.resolve([{ value: 'Germany', type: 'country' as const }]),
+            cities: () => Promise.resolve([]),
+          },
+        },
+        timeBuckets: [],
+        filters,
+        onFiltersChange,
+      },
+    });
+
+    // The location group is replaced wholesale in BOTH directions — the LocationFilter row test
+    // only covers presence-replaces-country; a country click must equally drop locationPresence.
+    await fireEvent.click(await screen.findByTestId('location-country-Germany'));
+
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'Germany', locationPresence: undefined }),
+    );
+  });
+
+  it('clears country/city/state when a presence row is chosen', async () => {
+    const onFiltersChange = vi.fn();
+    const filters = { ...createFilterState(), country: 'Germany' };
+
+    render(FilterPanel, {
+      props: {
+        config: {
+          sections: ['location'],
+          // suggestionsProvider (rather than providers.locations) because hasNoGpsAssets has to be
+          // true for the row to render unselected — providers.locations never touches that flag.
+          suggestionsProvider: () =>
+            Promise.resolve({
+              countries: ['Germany'],
+              cameraMakes: [],
+              tags: [],
+              people: [],
+              ratings: [],
+              mediaTypes: [],
+              hasUnnamedPeople: false,
+              hasNoGpsAssets: true,
+              hasNoPlaceNameAssets: false,
+            }),
+          providers: {},
+        },
+        timeBuckets: [],
+        filters,
+        onFiltersChange,
+      },
+    });
+
+    // The reverse direction of the pair above: a presence row must equally drop country/city/state,
+    // not just record itself alongside a stale country — otherwise the query carries a contradictory
+    // country + locationPresence pair the server rejects.
+    await fireEvent.click(await screen.findByTestId('location-presence-noGps'));
+
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        country: undefined,
+        city: undefined,
+        state: undefined,
+        locationPresence: 'noGps',
+      }),
+    );
+  });
+
   it('should update filters when has-no-album is selected', async () => {
     const onFiltersChange = vi.fn();
 

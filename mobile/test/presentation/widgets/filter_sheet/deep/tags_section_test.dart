@@ -27,6 +27,8 @@ FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsTagDto>? tags}) => Fil
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   tags: tags ?? const [],
 );
 
