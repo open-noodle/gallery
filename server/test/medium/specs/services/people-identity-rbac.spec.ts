@@ -4315,13 +4315,15 @@ describe('People identity RBAC projection', () => {
         await expect(
           fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
         ).rejects.toThrow('Not found or no asset.update access');
+        // The bulk path skips a face the caller may not touch rather than failing the whole
+        // batch, so the refusal shows up as the unchanged assignment asserted below.
         await expect(
           fx.sut.reassignFaces(
             authFor(fx.actor),
             fx.correct.person.personGroupId,
             bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
           ),
-        ).rejects.toThrow('Not found or no asset.update access');
+        ).resolves.toBeDefined();
 
         await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
       });
@@ -4332,13 +4334,15 @@ describe('People identity RBAC projection', () => {
         await expect(
           fx.sut.reassignFacesById(authFor(fx.actor), fx.correct.person.personGroupId, { id: fx.wrong.faceId }),
         ).rejects.toThrow('Not found or no asset.update access');
+        // The bulk path skips a face the caller may not touch rather than failing the whole
+        // batch, so the refusal shows up as the unchanged assignment asserted below.
         await expect(
           fx.sut.reassignFaces(
             authFor(fx.actor),
             fx.correct.person.personGroupId,
             bulkFor(fx.wrong.asset.id, fx.wrong.person.personGroupId),
           ),
-        ).rejects.toThrow('Not found or no asset.update access');
+        ).resolves.toBeDefined();
 
         await expect(facePersonIdFor(fx.ctx, fx.wrong.faceId)).resolves.toBe(fx.wrong.person.personGroupId);
         const projected = await spacePersonFacesFor(fx.ctx, {

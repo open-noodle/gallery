@@ -6778,6 +6778,17 @@ describe(PersonService.name, () => {
       (typeof entryPoints)[keyof typeof entryPoints],
     ][];
 
+    // The two entry points refuse the FACE gate differently: the single-face endpoint throws, while
+    // the bulk path skips that face and carries on, so one face the caller may not touch does not
+    // fail the whole batch. The gate's reach is identical either way — nothing is written.
+    const expectFaceGateRefusal = async (name: keyof typeof entryPoints, call: () => Promise<unknown>) => {
+      if (name === 'reassignFacesById') {
+        await expect(call()).rejects.toThrow('Not found or no asset.update access');
+      } else {
+        await expect(call()).resolves.toBeDefined();
+      }
+    };
+
     it.each(bothEntryPoints)(
       '%s does not admit the any-role PersonRead space grant on the target person',
       async (_name, call) => {
@@ -6802,7 +6813,7 @@ describe(PersonService.name, () => {
 
     it.each(bothEntryPoints)(
       '%s does not admit the any-role space / partner / album grants on the face’s asset',
-      async (_name, call) => {
+      async (name, call) => {
         const face = AssetFaceFactory.create();
         const person = PersonFactory.create();
         armReassignLookups(mocks, face, person);
@@ -6816,9 +6827,7 @@ describe(PersonService.name, () => {
         mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([face.assetId]));
         mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
 
-        await expect(call(AuthFactory.create(), person.personGroupId, face)).rejects.toThrow(
-          'Not found or no asset.update access',
-        );
+        await expectFaceGateRefusal(name, () => call(AuthFactory.create(), person.personGroupId, face));
 
         expect(mocks.access.asset.checkSpaceAccess).not.toHaveBeenCalled();
         expect(mocks.access.asset.checkPartnerAccess).not.toHaveBeenCalled();
@@ -6839,7 +6848,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
     });
 
-    it.each(bothEntryPoints)('%s refuses an admin at the face gate', async (_name, call) => {
+    it.each(bothEntryPoints)('%s refuses an admin at the face gate', async (name, call) => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
       armReassignLookups(mocks, face, person);
@@ -6848,7 +6857,7 @@ describe(PersonService.name, () => {
       const admin = AuthFactory.create({ isAdmin: true });
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
-      await expect(call(admin, person.personGroupId, face)).rejects.toThrow('Not found or no asset.update access');
+      await expectFaceGateRefusal(name, () => call(admin, person.personGroupId, face));
 
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
     });
@@ -6908,10 +6917,10 @@ describe(PersonService.name, () => {
       ]);
     });
 
-    // Characterisation, not an endorsement: the per-face gate lives inside the loop (as it did
-    // upstream), so a batch is not atomic — a face the caller may touch is already reassigned when a
-    // later one is refused. Pinned so the behaviour is visible if the batch is ever made atomic.
-    it('aborts the bulk path at the first unauthorized face, keeping earlier writes', async () => {
+    // Characterisation, not an endorsement: the per-face gate lives inside the loop, so a batch is
+    // not atomic — a face the caller may not touch is skipped and the rest of the batch is still
+    // written. Pinned so the behaviour is visible if the batch is ever made atomic.
+    it('skips an unauthorized face in the bulk path, keeping the writes it may make', async () => {
       const person = PersonFactory.create();
       const faceA = AssetFaceFactory.create();
       const faceB = AssetFaceFactory.create();
@@ -6926,14 +6935,12 @@ describe(PersonService.name, () => {
         .mockResolvedValueOnce([getForAssetFace(faceA)])
         .mockResolvedValueOnce([getForAssetFace(faceB)]);
 
-      await expect(
-        sut.reassignFaces(AuthFactory.create(), person.personGroupId, {
-          data: [
-            { personId: person.personGroupId, assetId: faceA.assetId },
-            { personId: person.personGroupId, assetId: faceB.assetId },
-          ],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await sut.reassignFaces(AuthFactory.create(), person.personGroupId, {
+        data: [
+          { personId: person.personGroupId, assetId: faceA.assetId },
+          { personId: person.personGroupId, assetId: faceB.assetId },
+        ],
+      });
 
       expect(mocks.person.reassignFace.mock.calls).toEqual([[faceA.id, person.personGroupId]]);
     });
