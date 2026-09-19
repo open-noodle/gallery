@@ -31,13 +31,13 @@ have the library repair itself on the next detection/recognition run.
 The face cleanup console, the scan, manual review and "Reset all people" are **all** restricted to
 machine-learning faces that have an embedding. Faces imported from file metadata satisfy neither condition.
 
-| Mechanism                                       | Why it cannot see the contaminating faces                                                                                        |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| "Reset all people" (force recognition)          | `unassignFaces({ sourceType: MachineLearning })` — `person.service.ts:1076`. A comment at `:1147` concedes EXIF personIds survive. |
-| Recognition fan-out                             | `getAllFaces` filters `sourceType: MachineLearning` on **both** the force and non-force arms — `person.service.ts:1113`.           |
-| Cleanup scan / manual review                    | Every query in `face-repair.repository.ts` is `innerJoin('face_search')` **and** `sourceType = 'machine-learning'` (`:224-226`).   |
-| Ever gaining an embedding                       | Only if ML detection later lands a box at IoU > 0.5 on the same region — `person.service.ts:967`. A region over a lamp never will. |
-| `DELETE /people/:id`                            | `asset_face.personId` is `ON DELETE SET NULL`. The junk rows outlive the person as invisible orphans — strictly worse.             |
+| Mechanism                              | Why it cannot see the contaminating faces                                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| "Reset all people" (force recognition) | `unassignFaces({ sourceType: MachineLearning })` — `person.service.ts:1076`. A comment at `:1147` concedes EXIF personIds survive. |
+| Recognition fan-out                    | `getAllFaces` filters `sourceType: MachineLearning` on **both** the force and non-force arms — `person.service.ts:1113`.           |
+| Cleanup scan / manual review           | Every query in `face-repair.repository.ts` is `innerJoin('face_search')` **and** `sourceType = 'machine-learning'` (`:224-226`).   |
+| Ever gaining an embedding              | Only if ML detection later lands a box at IoU > 0.5 on the same region — `person.service.ts:967`. A region over a lamp never will. |
+| `DELETE /people/:id`                   | `asset_face.personId` is `ON DELETE SET NULL`. The junk rows outlive the person as invisible orphans — strictly worse.             |
 
 Where they come from: `applyTaggedFaces` (`metadata.service.ts:1039`) turns every `RegionInfo` region in a
 file into an `asset_face` row with `sourceType: 'exif'`, auto-creating a person per distinct region name,
@@ -47,7 +47,7 @@ the reported symptom. **Not in scope to fix here**, but it dictates that dissolv
 
 **Consequence for the design:** the two contamination causes need opposite treatments.
 
-- **EXIF-sourced junk has no vector.** It can never be re-clustered. Deleting the rows *is* the repair.
+- **EXIF-sourced junk has no vector.** It can never be re-clustered. Deleting the rows _is_ the repair.
 - **ML mis-clustering has vectors.** Those rows must survive and be re-clustered.
 
 A single "dissolve" button cannot serve both. Scope and outcome are separate axes.
@@ -121,7 +121,7 @@ Four warnings are load-bearing honesty rather than decoration:
 - Unassign leaves the person with zero faces; the nightly `PersonCleanup` will delete it regardless. We do
   not trigger that ourselves (L2), but we must not imply the person survives. **[shipped]** as the
   `person-will-be-cleaned-up` warning, fired when the outcome is `unassign` and `remainingLiveFaces` — the
-  person's faces the dissolve does *not* touch, counted with `getAllWithoutFaces`'s own
+  person's faces the dissolve does _not_ touch, counted with `getAllWithoutFaces`'s own
   `deletedAt IS NULL AND isVisible IS TRUE` — is zero. Counted that way on purpose: that query, not the
   displayed face count, is what decides the person's fate.
 - Unassigned ML faces re-cluster from scratch, which changes the outcome **only** if recognition settings
@@ -145,7 +145,7 @@ unchanged. Because the operation is irreversible, an apply must never act on a d
 previewed. `redetect` is forced to `true` for both delete outcomes; an explicit `false` alongside a delete
 outcome is a 400 rather than a silent override, so a client can never believe it opted out.
 
-**[shipped] The guard is best-effort, not a lock.** It is a `getCounts` read compared *outside* the write
+**[shipped] The guard is best-effort, not a lock.** It is a `getCounts` read compared _outside_ the write
 transaction; nothing holds a lock between that read and the `DELETE`. So the edge-case row "concurrent
 dissolve of the same person → second gets 409" holds for anything slower than the gap between the two
 statements, and the L13 refusal covers the one racer that actually matters (a running recognition pass) —
@@ -171,7 +171,7 @@ single indexed delete handles tens of thousands of rows well under a second. Chu
 Pass `trx` through explicitly; never `this.db` inside the transaction.
 
 **Ordering constraint — getting this backwards silently no-ops the entire feature:** clear
-`facesRecognizedAt` *before* the delete, because afterwards there is no `personId` left to find the assets by.
+`facesRecognizedAt` _before_ the delete, because afterwards there is no `personId` left to find the assets by.
 For the same reason, capture the affected `shared_space_person` ids (L1) before the delete too — afterwards
 the `shared_space_person_face` rows that identify them are already gone.
 
@@ -193,20 +193,20 @@ nulled, and `AssetDetectFacesQueueAll { force: false }` when `redetect`.
 has **two** entry points, because discovery and the modal live on different pages and this spec originally
 connected neither:
 
-| Launcher                                                     | Why it exists                                                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `routes/admin/face-cleanup/[personId]/+page.svelte`           | The original: the scan-result person page, opened from the header.                                     |
-| `routes/admin/face-cleanup/people/[personId]/+page.svelte`    | The manual-review page — **where the Health tab's rows actually link**. Without it, discovery dead-ends. |
+| Launcher                                                   | Why it exists                                                                                            |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `routes/admin/face-cleanup/[personId]/+page.svelte`        | The original: the scan-result person page, opened from the header.                                       |
+| `routes/admin/face-cleanup/people/[personId]/+page.svelte` | The manual-review page — **where the Health tab's rows actually link**. Without it, discovery dead-ends. |
 
 Contents: scope/outcome controls, debounced preview, warnings, ~~sample crops~~ (cut), typed confirmation
 (the person's name) before apply. Quick-select chips map the three original mental-model options onto the two
 axes:
 
-| Chip                            | scope   | outcome                   | redetect |
-| ------------------------------- | ------- | ------------------------- | -------- |
-| Remove imported metadata faces  | `exif`  | `delete-faces`            | true     |
-| Start this person over          | `all`   | `delete-faces`            | true     |
-| Delete person and its faces     | `all`   | `delete-faces-and-person` | true     |
+| Chip                           | scope  | outcome                   | redetect |
+| ------------------------------ | ------ | ------------------------- | -------- |
+| Remove imported metadata faces | `exif` | `delete-faces`            | true     |
+| Start this person over         | `all`  | `delete-faces`            | true     |
+| Delete person and its faces    | `all`  | `delete-faces-and-person` | true     |
 
 ### 6. i18n
 
@@ -219,23 +219,23 @@ in fr/ru. Then `npx prettier --write i18n/*.json`.
 A dissolve writes to `asset_face`, six cascading tables and `asset_job_status`. Each path below is a way the
 operation could reach data outside the target person. Every one has a named test in the matrix.
 
-| #   | Leak path                                                                                                                                                                                                                             | Decision                                                                                                                                        |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| L1  | `sharedSpaceRepository.deleteAllOrphanedPersons()` is **unscoped**: `DELETE FROM shared_space_person WHERE id NOT IN (SELECT "personId" FROM shared_space_person_face)` (`shared-space.repository.ts:4090`) — instance-wide.             | **Do not call.** Capture affected `shared_space_person` ids before the delete; remove only those left with zero faces.                            |
-| L2  | `PersonCleanup` uses `getAllWithoutFaces()` — library-wide. Queuing it makes our dissolve delete unrelated faceless people.                                                                                                              | **Do not queue.** `delete-faces-and-person` deletes the one target person directly. The nightly job handles the rest on its own schedule.         |
-| L3  | Clearing `facesRecognizedAt` on an asset that also holds **other people's** faces re-detects that asset; `handleDetectFaces` hard-deletes any ML face not re-matched at IoU > 0.5 (`faceIdsToRemove` + `unlinkFaces`, `person.service.ts:990`). | **Cannot be prevented without abandoning the repair** — junk regions usually sit on photos that do contain real people. Surface the shared-asset count in the preview; test that still-matching faces survive. |
-| L4  | Deleting `face_identity_face` by `identityId` would wipe manual links for other people sharing that identity after a merge.                                                                                                              | Key the delete by **our face ids only**, never by identity.                                                                                      |
-| L5  | `faceIdentityRepository.deleteUnreferencedIdentities()` is a global GC.                                                                                                                                                                 | **Do not call.** Leave to the existing maintenance job.                                                                                          |
-| L6  | Pet faces use `pet_search`, not `face_search`, so `scope: 'without-embedding'` matches **every pet face** of a pet person.                                                                                                              | Exclude pets with `petFacePredicate` (`utils/database.ts:1512`) on every scope; reject `person.type = 'pet'` with 400.                            |
-| L7  | `FileDelete` queued with an empty `thumbnailPath`.                                                                                                                                                                                     | Skip the job when the path is empty.                                                                                                             |
-| L8  | Another user's people/faces.                                                                                                                                                                                                           | Scope by `personId` only; assert non-interference explicitly.                                                                                    |
-| L9  | `face_person_verdict` drain on unassign.                                                                                                                                                                                               | Scope to the affected face ids.                                                                                                                  |
-| L10 | Partial failure leaving faces deleted but the person alive (or vice versa).                                                                                                                                                            | One transaction; assert full rollback.                                                                                                           |
-| L11 | `streamForDetectFacesJob` runs through `assetsWithPreviews()` (`asset-job.repository.ts:181`), requiring `visibility != Hidden`, `deletedAt IS NULL` and an existing `Preview` `asset_file`; `handleDetectFaces` gates again on `files.length === 1` and skips Hidden. On such assets the junk is deleted and **nothing is recovered**. | Cannot be repaired here. Count them in the preview and warn explicitly. Never claim repair for assets that cannot be re-detected. |
-| L12 | `getForDetectFacesJob`'s faces subquery has **no `deletedAt` filter** (`asset-job.repository.ts:246`), so a soft-deleted face still matches a fresh detection at IoU > 0.5, absorbs the embedding and stays soft-deleted — swallowing the real face and creating no visible one. | Delete outcomes **hard-delete** soft-deleted faces in scope, so re-detection can create a fresh visible face. `unassign` leaves them alone. |
-| L13 | A dissolve deleting faces underneath a running recognition pass races it.                                                                                                                                                              | Refuse with `ConflictException`, mirroring `face-repair.service.ts:572`.                                                                          |
+| #   | Leak path                                                                                                                                                                                                                                                                                                                               | Decision                                                                                                                                                                                                       |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L1  | `sharedSpaceRepository.deleteAllOrphanedPersons()` is **unscoped**: `DELETE FROM shared_space_person WHERE id NOT IN (SELECT "personId" FROM shared_space_person_face)` (`shared-space.repository.ts:4090`) — instance-wide.                                                                                                            | **Do not call.** Capture affected `shared_space_person` ids before the delete; remove only those left with zero faces.                                                                                         |
+| L2  | `PersonCleanup` uses `getAllWithoutFaces()` — library-wide. Queuing it makes our dissolve delete unrelated faceless people.                                                                                                                                                                                                             | **Do not queue.** `delete-faces-and-person` deletes the one target person directly. The nightly job handles the rest on its own schedule.                                                                      |
+| L3  | Clearing `facesRecognizedAt` on an asset that also holds **other people's** faces re-detects that asset; `handleDetectFaces` hard-deletes any ML face not re-matched at IoU > 0.5 (`faceIdsToRemove` + `unlinkFaces`, `person.service.ts:990`).                                                                                         | **Cannot be prevented without abandoning the repair** — junk regions usually sit on photos that do contain real people. Surface the shared-asset count in the preview; test that still-matching faces survive. |
+| L4  | Deleting `face_identity_face` by `identityId` would wipe manual links for other people sharing that identity after a merge.                                                                                                                                                                                                             | Key the delete by **our face ids only**, never by identity.                                                                                                                                                    |
+| L5  | `faceIdentityRepository.deleteUnreferencedIdentities()` is a global GC.                                                                                                                                                                                                                                                                 | **Do not call.** Leave to the existing maintenance job.                                                                                                                                                        |
+| L6  | Pet faces use `pet_search`, not `face_search`, so `scope: 'without-embedding'` matches **every pet face** of a pet person.                                                                                                                                                                                                              | Exclude pets with `petFacePredicate` (`utils/database.ts:1512`) on every scope; reject `person.type = 'pet'` with 400.                                                                                         |
+| L7  | `FileDelete` queued with an empty `thumbnailPath`.                                                                                                                                                                                                                                                                                      | Skip the job when the path is empty.                                                                                                                                                                           |
+| L8  | Another user's people/faces.                                                                                                                                                                                                                                                                                                            | Scope by `personId` only; assert non-interference explicitly.                                                                                                                                                  |
+| L9  | `face_person_verdict` drain on unassign.                                                                                                                                                                                                                                                                                                | Scope to the affected face ids.                                                                                                                                                                                |
+| L10 | Partial failure leaving faces deleted but the person alive (or vice versa).                                                                                                                                                                                                                                                             | One transaction; assert full rollback.                                                                                                                                                                         |
+| L11 | `streamForDetectFacesJob` runs through `assetsWithPreviews()` (`asset-job.repository.ts:181`), requiring `visibility != Hidden`, `deletedAt IS NULL` and an existing `Preview` `asset_file`; `handleDetectFaces` gates again on `files.length === 1` and skips Hidden. On such assets the junk is deleted and **nothing is recovered**. | Cannot be repaired here. Count them in the preview and warn explicitly. Never claim repair for assets that cannot be re-detected.                                                                              |
+| L12 | `getForDetectFacesJob`'s faces subquery has **no `deletedAt` filter** (`asset-job.repository.ts:246`), so a soft-deleted face still matches a fresh detection at IoU > 0.5, absorbs the embedding and stays soft-deleted — swallowing the real face and creating no visible one.                                                        | Delete outcomes **hard-delete** soft-deleted faces in scope, so re-detection can create a fresh visible face. `unassign` leaves them alone.                                                                    |
+| L13 | A dissolve deleting faces underneath a running recognition pass races it.                                                                                                                                                                                                                                                               | Refuse with `ConflictException`, mirroring `face-repair.service.ts:572`.                                                                                                                                       |
 
-**[shipped] L1 has a residue the row does not mention.** A `shared_space_person` that *survives* the dissolve
+**[shipped] L1 has a residue the row does not mention.** A `shared_space_person` that _survives_ the dissolve
 (it still has other faces, so we correctly leave it alone) can nevertheless have pointed its
 `representativeFaceId` at one of the faces we deleted. That FK is `ON DELETE SET NULL`, so the space person
 is left alive with a null representative and drops out of `getSpacePersonsWithEmbeddings`, whose join on
@@ -270,7 +270,7 @@ null out.
 rejection, empty-thumbnail skip, the active-recognition refusal (L13), and exactly which jobs are queued
 (and that L1/L2/L5 are **not**).
 
-**Slice 7 — preview endpoint.** Its own slice because for an irreversible operation the preview *is* the
+**Slice 7 — preview endpoint.** Its own slice because for an irreversible operation the preview _is_ the
 safety mechanism: counts by source × embedding, shared-asset count (L3), non-re-detectable count (L11), and
 each of the four warnings. A wrong preview is as harmful as a wrong delete. Red: endpoint does not exist.
 
@@ -310,42 +310,42 @@ One fixture, reused by every isolation test, built so that a missing `WHERE` cla
 
 Mocked repositories cannot see cascades or the re-detect gate, which are the whole design.
 
-| Test                     | Asserts                                                                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `redetect-gate`          | After dissolve, `streamForDetectFacesJob(false)` yields **exactly** the dissolved assets — no more, no fewer.                                     |
-| `cascades`               | Matching `face_search`, `face_identity_face`, `face_person_verdict`, `face_repair_decline`, `pet_search`, `shared_space_person_face` rows removed. |
-| `set-null`               | `person.faceAssetId`, `face_identity.representativeFaceId`, `shared_space_person.representativeFaceId` null out.                                  |
-| `sync-tombstones`        | `asset_face_audit` receives one row per deleted face, so mobile clients see the deletion.                                                          |
-| `isolation-P2`           | Every P2 face, its `face_identity_face` (incl. `source='manual'`), and its verdicts survive — **including on the shared asset**.                   |
-| `isolation-P3-pets`      | No pet face touched under any scope, `without-embedding` included (L6).                                                                            |
-| `isolation-P4-otheruser` | User B's faces, people and job status untouched (L8).                                                                                              |
-| `isolation-P5-cleanup`   | The unrelated faceless person still exists — no global cleanup ran (L2).                                                                           |
-| `isolation-space-orphan` | The pre-existing orphaned space person still exists; only space persons orphaned **by this dissolve** are removed (L1).                            |
-| `identity-not-gc`        | `face_identity` rows referenced elsewhere survive; no global identity GC ran (L5).                                                                 |
-| `shared-asset-redetect`  | After re-detection of a shared asset, P2 faces that still match at IoU > 0.5 keep their identity and gain a refreshed embedding (L3).              |
+| Test                     | Asserts                                                                                                                                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redetect-gate`          | After dissolve, `streamForDetectFacesJob(false)` yields **exactly** the dissolved assets — no more, no fewer.                                                                                                                                                       |
+| `cascades`               | Matching `face_search`, `face_identity_face`, `face_person_verdict`, `face_repair_decline`, `pet_search`, `shared_space_person_face` rows removed.                                                                                                                  |
+| `set-null`               | `person.faceAssetId`, `face_identity.representativeFaceId`, `shared_space_person.representativeFaceId` null out.                                                                                                                                                    |
+| `sync-tombstones`        | `asset_face_audit` receives one row per deleted face, so mobile clients see the deletion.                                                                                                                                                                           |
+| `isolation-P2`           | Every P2 face, its `face_identity_face` (incl. `source='manual'`), and its verdicts survive — **including on the shared asset**.                                                                                                                                    |
+| `isolation-P3-pets`      | No pet face touched under any scope, `without-embedding` included (L6).                                                                                                                                                                                             |
+| `isolation-P4-otheruser` | User B's faces, people and job status untouched (L8).                                                                                                                                                                                                               |
+| `isolation-P5-cleanup`   | The unrelated faceless person still exists — no global cleanup ran (L2).                                                                                                                                                                                            |
+| `isolation-space-orphan` | The pre-existing orphaned space person still exists; only space persons orphaned **by this dissolve** are removed (L1).                                                                                                                                             |
+| `identity-not-gc`        | `face_identity` rows referenced elsewhere survive; no global identity GC ran (L5).                                                                                                                                                                                  |
+| `shared-asset-redetect`  | After re-detection of a shared asset, P2 faces that still match at IoU > 0.5 keep their identity and gain a refreshed embedding (L3).                                                                                                                               |
 | `rollback`               | A forced failure after the face delete leaves **every** row intact (L10) — **including `facesRecognizedAt`**: `dissolve()` passes `trx` into `clearFacesRecognizedAt`, and dropping that third argument silently moves the watermark clear outside the transaction. |
-| `not-redetectable`       | A hidden asset, a trashed asset and one with no `Preview` file are counted by the preview and **excluded** from any repair claim (L11).            |
-| `soft-deleted-hard-gone` | A soft-deleted face in scope is hard-deleted by delete outcomes, so re-detection yields a fresh **visible** face rather than reviving a tombstone (L12). |
+| `not-redetectable`       | A hidden asset, a trashed asset and one with no `Preview` file are counted by the preview and **excluded** from any repair claim (L11).                                                                                                                             |
+| `soft-deleted-hard-gone` | A soft-deleted face in scope is hard-deleted by delete outcomes, so re-detection yields a fresh **visible** face rather than reviving a tombstone (L12).                                                                                                            |
 
 ### Edge cases
 
-| Case                                          | Expected                                                                     |
-| --------------------------------------------- | ---------------------------------------------------------------------------- |
-| Person has zero faces                         | 200, no-op, preview says nothing to do                                       |
-| `expectedFaceCount` drifted                   | 409, **nothing** modified (assert row counts unchanged)                       |
-| Person not found / wrong id                   | 404                                                                          |
-| Person is a pet (`type='pet'`)                | 400 — pet re-detection is a separate pipeline; `facesRecognizedAt` would not repair it |
-| Empty `thumbnailPath` on person delete        | No `FileDelete` queued (L7)                                                   |
-| Soft-deleted faces (`deletedAt` not null)     | **Hard-deleted** by delete outcomes — required, not tidiness (L12); left alone by `unassign`; excluded from displayed counts |
-| `isVisible = false` faces                     | Same as soft-deleted                                                          |
-| Facial recognition queue active               | 409 `ConflictException`, mirroring `face-repair.service.ts:572` (L13)          |
-| Every affected asset hidden / trashed / no preview | 200, but the preview states nothing will be recovered (L11)              |
-| `scope: 'without-embedding'` where all faces have embeddings | 200, zero affected                                             |
-| Admin dissolving another user's person        | Allowed (the console is cross-user by design); only that person's faces change |
-| `scope: 'exif'` on a person with only ML faces | 200, zero affected, preview says so                                          |
-| `redetect: false` with a delete outcome       | 400 — never a silent override                                                |
-| Non-admin caller                              | 403                                                                          |
-| Concurrent dissolve of the same person        | Second gets 409 via `expectedFaceCount` — **best-effort**: the guard is a read compared outside the write transaction, so two applies landing inside that gap can both pass it (see §3) |
+| Case                                                         | Expected                                                                                                                                                                                |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Person has zero faces                                        | 200, no-op, preview says nothing to do                                                                                                                                                  |
+| `expectedFaceCount` drifted                                  | 409, **nothing** modified (assert row counts unchanged)                                                                                                                                 |
+| Person not found / wrong id                                  | 404                                                                                                                                                                                     |
+| Person is a pet (`type='pet'`)                               | 400 — pet re-detection is a separate pipeline; `facesRecognizedAt` would not repair it                                                                                                  |
+| Empty `thumbnailPath` on person delete                       | No `FileDelete` queued (L7)                                                                                                                                                             |
+| Soft-deleted faces (`deletedAt` not null)                    | **Hard-deleted** by delete outcomes — required, not tidiness (L12); left alone by `unassign`; excluded from displayed counts                                                            |
+| `isVisible = false` faces                                    | Same as soft-deleted                                                                                                                                                                    |
+| Facial recognition queue active                              | 409 `ConflictException`, mirroring `face-repair.service.ts:572` (L13)                                                                                                                   |
+| Every affected asset hidden / trashed / no preview           | 200, but the preview states nothing will be recovered (L11)                                                                                                                             |
+| `scope: 'without-embedding'` where all faces have embeddings | 200, zero affected                                                                                                                                                                      |
+| Admin dissolving another user's person                       | Allowed (the console is cross-user by design); only that person's faces change                                                                                                          |
+| `scope: 'exif'` on a person with only ML faces               | 200, zero affected, preview says so                                                                                                                                                     |
+| `redetect: false` with a delete outcome                      | 400 — never a silent override                                                                                                                                                           |
+| Non-admin caller                                             | 403                                                                                                                                                                                     |
+| Concurrent dissolve of the same person                       | Second gets 409 via `expectedFaceCount` — **best-effort**: the guard is a read compared outside the write transaction, so two applies landing inside that gap can both pass it (see §3) |
 
 ### Unit / web / e2e
 

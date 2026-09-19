@@ -1,9 +1,9 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { JobName } from 'src/enum';
-import { FaceDissolveService } from 'src/services/face-dissolve.service';
-import { DissolveScope } from 'src/utils/face-dissolve';
-import { newTestService, ServiceMocks } from 'test/utils';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { JobName } from 'src/enum.js';
+import { FaceDissolveService } from 'src/services/face-dissolve.service.js';
+import { DissolveScope } from 'src/utils/face-dissolve.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const dto = (over: Record<string, unknown> = {}) => ({
   scope: DissolveScope.Exif,

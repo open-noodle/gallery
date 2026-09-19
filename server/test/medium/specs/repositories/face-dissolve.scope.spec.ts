@@ -1,10 +1,10 @@
 import { Kysely } from 'kysely';
-import { SourceType } from 'src/enum';
-import { DB } from 'src/schema';
-import { DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve';
-import { seedAsset, seedFace, seedPerson, seedUser } from 'test/medium/specs/repositories/face-dissolve.fixtures';
-import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { SourceType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve.js';
+import { seedAsset, seedFace, seedPerson, seedUser } from 'test/medium/specs/repositories/face-dissolve.fixtures.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
 

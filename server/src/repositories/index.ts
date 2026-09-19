@@ -19,6 +19,7 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
@@ -63,7 +64,6 @@ import { VideoStreamRepository } from 'src/repositories/video-stream.repository.
 import { ViewRepository } from 'src/repositories/view-repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
-import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 
 export const repositories = [
   AccessRepository,
