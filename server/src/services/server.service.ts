@@ -1,9 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { serverVersion } from 'src/constants.js';
+import { UPLOAD_CHUNK_SIZE, serverVersion } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent } from 'src/decorators.js';
 import { LicenseKeyDto, LicenseResponseDto } from 'src/dtos/license.dto.js';
-import { serverVersion, UPLOAD_CHUNK_SIZE } from 'src/constants.js';
 import {
   ServerAboutResponseDto,
   ServerApkLinksDto,

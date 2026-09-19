@@ -2,15 +2,15 @@ import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  UploadSessionState,
   claimFinalize,
   committedOffset,
   finalizeClaimPath,
   readState,
   sessionPaths,
-  UploadSessionState,
   writeChunkAt,
   writeState,
-} from 'src/utils/upload-session-store';
+} from 'src/utils/upload-session-store.js';
 
 const state: UploadSessionState = {
   userId: 'user-1',

@@ -162,9 +162,7 @@ Path traversal is structurally impossible: the filename is uuid-derived, and onl
   "originalName": "IMG_1234.CR3",
   "checksum": "...", // optional, base64 sha1 as declared at create
   "createdAt": "2026-09-08T10:00:00.000Z",
-  "dto": {
-    /* the create-schema fields, already parsed to their output types (§4.3) */
-  },
+  "dto": {/* the create-schema fields, already parsed to their output types (§4.3) */},
 }
 ```
 

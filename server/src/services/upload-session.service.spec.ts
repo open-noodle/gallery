@@ -1,30 +1,30 @@
 import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
-import { StorageCore } from 'src/cores/storage.core';
-import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
-import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto';
-import { DatabaseLock, StorageFolder } from 'src/enum';
-import { AssetMediaService } from 'src/services/asset-media.service';
-import { StorageService } from 'src/services/storage.service';
-import { UploadSessionService } from 'src/services/upload-session.service';
-import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database';
-import { fromChecksum } from 'src/utils/request';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants.js';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto.js';
+import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto.js';
+import { DatabaseLock, StorageFolder } from 'src/enum.js';
+import { AssetMediaService } from 'src/services/asset-media.service.js';
+import { StorageService } from 'src/services/storage.service.js';
+import { UploadSessionService } from 'src/services/upload-session.service.js';
+import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
+import { fromChecksum } from 'src/utils/request.js';
 import {
+  UploadSessionState,
   claimFinalize,
   committedOffset,
   finalizeClaimPath,
   readState,
   sessionPaths,
-  UploadSessionState,
   writeChunkAt,
   writeState,
-} from 'src/utils/upload-session-store';
-import { factory } from 'test/small.factory';
-import { newTestService, ServiceMocks } from 'test/utils';
+} from 'src/utils/upload-session-store.js';
+import { factory } from 'test/small.factory.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 vi.mock('src/utils/upload-session-store', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('src/utils/upload-session-store')>();
+  const actual = await importOriginal<typeof import('src/utils/upload-session-store.js')>();
   return {
     ...actual,
     writeState: vi.fn(),

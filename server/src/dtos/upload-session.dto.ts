@@ -1,9 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
-import { UPLOAD_SESSION_SIDECAR_MAX_BYTES } from 'src/constants';
-import { AssetMetadataUpsertItemSchema } from 'src/dtos/asset.dto';
-import { AssetVisibilitySchema } from 'src/enum';
-import { isoDatetimeToDate } from 'src/validation';
 import z from 'zod';
+import { UPLOAD_SESSION_SIDECAR_MAX_BYTES } from 'src/constants.js';
+import { AssetMetadataUpsertItemSchema } from 'src/dtos/asset.dto.js';
+import { AssetVisibilitySchema } from 'src/enum.js';
+import { isoDatetimeToDate } from 'src/validation.js';
 
 /**
  * JSON-native counterpart to AssetMediaCreateSchema. It deliberately does NOT reuse that schema:
