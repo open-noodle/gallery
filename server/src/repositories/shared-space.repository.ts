@@ -24,8 +24,8 @@ import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-perso
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
 import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database.js';
-import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';
+import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,

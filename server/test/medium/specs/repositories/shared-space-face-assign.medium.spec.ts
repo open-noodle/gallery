@@ -16,23 +16,23 @@
  */
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetEditAction } from 'src/dtos/editing.dto';
-import { AssetVisibility, SourceType } from 'src/enum';
-import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { PersonRepository } from 'src/repositories/person.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { SharedSpaceService } from 'src/services/shared-space.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { AssetEditAction } from 'src/dtos/editing.dto.js';
+import { AssetVisibility, SourceType } from 'src/enum.js';
+import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { DB } from 'src/schema/index.js';
+import { BaseService } from 'src/services/base.service.js';
+import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 

@@ -1,6 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { PersonRepository } from 'src/repositories/person.repository.js';
 import { vi } from 'vitest';
 import { AssetVisibility, SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -9,6 +8,7 @@ import { FaceIdentityRepository } from 'src/repositories/face-identity.repositor
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { DB } from 'src/schema/index.js';

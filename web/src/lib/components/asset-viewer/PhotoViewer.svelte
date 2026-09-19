@@ -2,7 +2,6 @@
   import { shortcuts } from '$lib/actions/shortcut';
   import { zoomImageAction } from '$lib/actions/zoom-image';
   import AdaptiveImage from '$lib/components/AdaptiveImage.svelte';
-  import FaceEditor from '$lib/components/asset-viewer/face-editor/FaceEditor.svelte';
   import FaceEditorPanel from '$lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import OcrBoundingBox from '$lib/components/asset-viewer/OcrBoundingBox.svelte';
   import AssetViewerEvents from '$lib/components/AssetViewerEvents.svelte';

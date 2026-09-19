@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { isUndefined, omitBy } from 'lodash-es';
+import { chunk, isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import { isAbsolute } from 'node:path';
 import type { ShallowDehydrateObject } from 'kysely';
@@ -875,15 +875,15 @@ export class AssetService extends BaseService {
       const truncated = crossOwnerIds.length > MAX_ATTRIBUTION_ASSETS;
       const sampledIds = crossOwnerIds.slice(0, MAX_ATTRIBUTION_ASSETS);
       const bySpace = new Map<string, string[]>();
-      for (const chunk of _.chunk(sampledIds, 10)) {
+      for (const batch of chunk(sampledIds, 10)) {
         const spaces = await Promise.all(
-          chunk.map((assetId) => this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)),
+          batch.map((assetId) => this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)),
         );
         for (const [index, space] of spaces.entries()) {
           if (!space) {
             continue;
           }
-          const assetId = chunk[index];
+          const assetId = batch[index];
           const ids = bySpace.get(space.spaceId) ?? [];
           ids.push(assetId);
           bySpace.set(space.spaceId, ids);

@@ -2,10 +2,19 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { DateTime } from 'luxon';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import type { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
+import { type AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto.js';
 import { AssetEditAction, AssetEditsCreateDto } from 'src/dtos/editing.dto.js';
-import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus, SharedSpaceActivityType } from 'src/enum.js';
+import {
+  AssetFileType,
+  AssetMetadataKey,
+  AssetStatus,
+  AssetType,
+  AssetVisibility,
+  JobName,
+  JobStatus,
+  SharedSpaceActivityType,
+} from 'src/enum.js';
 import { AssetStats } from 'src/repositories/asset.repository.js';
 import { AssetService } from 'src/services/asset.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';

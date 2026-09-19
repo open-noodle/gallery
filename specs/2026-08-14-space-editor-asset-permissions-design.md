@@ -391,10 +391,7 @@ Introduce one shared helper so the fallback (§5.3) lives in exactly one place:
 
 ```ts
 // web/src/lib/utils/asset-editability.ts  (new, pure)
-export function canEditAsset(
-  asset: { ownerId?: string; canEdit?: boolean },
-  ctx: { userId?: string; space?: { canWrite: boolean; members: { userId: string }[] } | null },
-): boolean;
+export function canEditAsset(asset: { ownerId?: string; canEdit?: boolean }, ctx: { userId?: string; space?: { canWrite: boolean; members: { userId: string }[] } | null }): boolean;
 ```
 
 Resolution order: `asset.canEdit` when present → else `ownerId === userId` → else the space

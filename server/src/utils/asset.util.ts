@@ -5,6 +5,7 @@ import { AssetFile } from 'src/database.js';
 import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
+import { AssetEditActionItem } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, Permission } from 'src/enum.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -12,7 +13,6 @@ import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { PartnerRepository } from 'src/repositories/partner.repository.js';
 import { checkAccess } from 'src/utils/access.js';
-import { AssetEditActionItem } from 'src/dtos/editing.dto.js';
 import { Point, transformPoints } from 'src/utils/transform.js';
 
 export const getAssetFile = (files: AssetFile[], type: AssetFileType, { isEdited }: { isEdited: boolean }) => {

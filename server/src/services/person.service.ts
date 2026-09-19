@@ -60,7 +60,7 @@ import {
   chooseAutomaticTargetIdentity,
 } from 'src/services/accessible-identity-reconciliation.js';
 import { BaseService } from 'src/services/base.service.js';
-import { getDimensions, convertFaceBoxToOriginalImageSpace } from 'src/utils/asset.util.js';
+import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
@@ -68,7 +68,6 @@ import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, findOrFail, isFaceSuggestionEnabled, isFacialRecognitionEnabled } from 'src/utils/misc.js';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 import { getPreferences } from 'src/utils/preferences.js';
-import { Point, transformPoints } from 'src/utils/transform.js';
 
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
 const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
