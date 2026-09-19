@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { ExpressionBuilder, Kysely, sql, Transaction } from 'kysely';
+import { ExpressionBuilder, Kysely, Transaction, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { DummyValue, GenerateSql } from 'src/decorators';
-import { AssetFileType, AssetVisibility, SourceType } from 'src/enum';
-import { DB } from 'src/schema';
-import { dissolveFacePredicate, DissolveScope, dissolveScopePredicate } from 'src/utils/face-dissolve';
+import { DummyValue, GenerateSql } from 'src/decorators.js';
+import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { DissolveScope, dissolveFacePredicate, dissolveScopePredicate } from 'src/utils/face-dissolve.js';
 
 export interface DissolveWriteInput {
   /**
