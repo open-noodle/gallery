@@ -9,7 +9,7 @@ import {
   TimeBucketSize,
   TimeBucketSizeSchema,
 } from 'src/enum.js';
-import { boundedTextFilter, IsNotSiblingOf, stringToBool } from 'src/validation.js';
+import { IsNotSiblingOf, boundedTextFilter, stringToBool } from 'src/validation.js';
 
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const ScopedPersonTokenSchema = z
