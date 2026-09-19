@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
-import { ScopedPersonProfileRefSchema } from 'src/dtos/person.dto.js';
 import z from 'zod';
+import { ScopedPersonProfileRefSchema } from 'src/dtos/person.dto.js';
 import { emptyStringToNull, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 
 const SpacePeopleQuerySchema = z
