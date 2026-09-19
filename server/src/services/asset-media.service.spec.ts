@@ -7,6 +7,7 @@ import {
 import { Readable } from 'node:stream';
 import type { UploadBody } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { AssetFile } from 'src/database.js';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto.js';
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto.js';
@@ -27,7 +28,6 @@ import { fileStub } from 'test/fixtures/file.stub.js';
 import { userStub } from 'test/fixtures/user.stub.js';
 import { getForAsset } from 'test/mappers.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
-import { StorageRoutingKind } from 'src/backends/storage-router.js';
 
 const file1 = Buffer.from('d2947b871a706081be194569951b7db246907957', 'hex');
 

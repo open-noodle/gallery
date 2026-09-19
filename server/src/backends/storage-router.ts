@@ -1,4 +1,4 @@
-import { StorageRouting } from 'src/gallery/config.dto';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 
 /**
  * The three routable groups. Eight physical file types collapse into these because no

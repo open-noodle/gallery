@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { isAbsolute, join } from 'node:path';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, SystemFlags } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { resolveBackend } from 'src/backends/storage-backend.provider.js';
+import { StorageRoutingKind, resolveRouting } from 'src/backends/storage-router.js';
 import { ErrorMessages } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
-import { resolveRouting, StorageRoutingKind } from 'src/backends/storage-router.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import {
   BootstrapEventPriority,
@@ -18,12 +19,11 @@ import {
   StorageFolder,
   SystemMetadataKey,
 } from 'src/enum.js';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
-import { ArgOf } from 'src/repositories/event.repository.js';
-import { LoggingRepository } from 'src/repositories/logging.repository.js';
 
 const docsMessage = `Please see https://docs.immich.app/administration/system-integrity#folder-checks for more information.`;
 

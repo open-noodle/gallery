@@ -1,6 +1,7 @@
 import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { CacheControl, JobName, JobStatus, UserMetadataKey } from 'src/enum.js';
@@ -16,7 +17,6 @@ import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
 import { userStub } from 'test/fixtures/user.stub.js';
 import { factory, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
-import { StorageRoutingKind } from 'src/backends/storage-router.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const original = await importOriginal<typeof import('node:fs')>();

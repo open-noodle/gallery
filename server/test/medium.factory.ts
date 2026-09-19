@@ -65,6 +65,7 @@ import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.re
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
 import { SyncRepository } from 'src/repositories/sync.repository.js';
@@ -98,7 +99,6 @@ import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
 import { factory, newDate, newEmbedding, newUuid } from 'test/small.factory.js';
 import { automock, wait } from 'test/utils.js';
-import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 
 export const testAssetsDir = resolve(import.meta.dirname, '../../e2e/test-assets');
 

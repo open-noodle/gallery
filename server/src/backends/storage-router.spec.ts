@@ -1,11 +1,11 @@
+import { describe, expect, it } from 'vitest';
 import {
   MIGRATION_FILE_TYPE_TO_KIND,
-  resolveRouting,
   StorageMigrationFileType,
   StorageRoutingKind,
-} from 'src/backends/storage-router';
-import { StorageRouting } from 'src/gallery/config.dto';
-import { describe, expect, it } from 'vitest';
+  resolveRouting,
+} from 'src/backends/storage-router.js';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 
 describe('resolveRouting', () => {
   it('follows the env backend when set to auto', () => {

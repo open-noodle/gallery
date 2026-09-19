@@ -1,11 +1,11 @@
 import { Readable } from 'node:stream';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
 
 const routing = (originals: StorageRouting, thumbnails: StorageRouting, encodedVideo: StorageRouting) => ({
   storage: { routing: { originals, thumbnails, encodedVideo } },

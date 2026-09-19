@@ -1,11 +1,11 @@
 import { ShallowDehydrateObject } from 'kysely';
 import { OutputInfo } from 'sharp';
 import type { AudioStreamInfo, JobCounts, RawImageInfo, VideoFormat, VideoStreamInfo } from 'src/types.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { Exif } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
-import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import {
   AssetFileType,
   AssetPathType,
