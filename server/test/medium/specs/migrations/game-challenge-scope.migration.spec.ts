@@ -1,11 +1,13 @@
 import { Kysely } from 'kysely';
-import { DB } from 'src/schema';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+// eslint-disable-next-line import-x/no-duplicates -- the side-effect import below is intentionally separate, see its comment
+import { DB } from 'src/schema/index.js';
 // Side-effect import: registers every decorated table so the migrated template database this spec
 // runs against carries the declarative constraints below. Same idiom as schema-drift.spec.ts.
-import 'src/schema';
-import { insertClusterGroup, mediumFactory } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+// eslint-disable-next-line import-x/no-duplicates -- intentionally separate from the named DB import above
+import 'src/schema/index.js';
+import { insertClusterGroup, mediumFactory } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 // A challenge belongs to EXACTLY ONE scope: a shared space or a user, never both and never
 // neither. Both halves of that rule are database constraints rather than service-layer checks,

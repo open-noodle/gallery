@@ -1,17 +1,17 @@
 import {
   type GameCandidate,
-  geoCellKey,
-  haversineKm,
   type LatLon,
   MAX_ROUND_SCORE,
   MIN_SCALE,
+  geoCellKey,
+  haversineKm,
   monthOffsetDays,
   mulberry32,
   poolScaleDays,
   poolScaleKm,
   scoreFromError,
   selectLocationRounds,
-} from 'src/utils/game-scoring';
+} from 'src/utils/game-scoring.js';
 
 describe('haversineKm', () => {
   it('returns zero for identical points', () => {

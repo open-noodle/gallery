@@ -1,4 +1,4 @@
-import { SharedSpaceRole } from 'src/enum';
+import { SharedSpaceRole } from 'src/enum.js';
 
 /**
  * Ordering of shared-space roles. Extracted from shared-space.service.ts so that

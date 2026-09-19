@@ -1,14 +1,14 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Settings } from 'luxon';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { CacheControl, SharedSpaceRole, UserMetadataKey } from 'src/enum';
-import { NOT_PLACE_PROMPT_EMBEDDING, PLACE_PROMPT_EMBEDDING } from 'src/repositories/game.repository';
-import { GameService } from 'src/services/game.service';
-import { PERSONAL_NO_ROUNDS_MESSAGE } from 'src/services/game/personal-pool';
-import { StorageService } from 'src/services/storage.service';
-import { clearConfigCache } from 'src/utils/config';
-import { ImmichFileResponse } from 'src/utils/file';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { CacheControl, SharedSpaceRole, UserMetadataKey } from 'src/enum.js';
+import { NOT_PLACE_PROMPT_EMBEDDING, PLACE_PROMPT_EMBEDDING } from 'src/repositories/game.repository.js';
+import { PERSONAL_NO_ROUNDS_MESSAGE } from 'src/services/game/personal-pool.js';
+import { GameService } from 'src/services/game.service.js';
+import { StorageService } from 'src/services/storage.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
+import { ImmichFileResponse } from 'src/utils/file.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const locationCandidate = (id: string, lat: number, lon: number, country: string) => ({
   assetId: id,

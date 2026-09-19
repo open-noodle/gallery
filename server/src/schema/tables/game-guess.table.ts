@@ -1,7 +1,8 @@
-import { Column, CreateDateColumn, ForeignKeyColumn, Generated, Table, Timestamp, Unique } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
-import { GameRoundTable } from 'src/schema/tables/game-round.table';
-import { UserTable } from 'src/schema/tables/user.table';
+import { Column, CreateDateColumn, ForeignKeyColumn, Table, Timestamp, Unique } from '@immich/sql-tools';
+import type { Generated } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
+import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 // One player's answer to one round. Final: the unique constraint is what makes
 // "you get one guess" a database guarantee rather than a service convention.

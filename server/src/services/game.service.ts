@@ -8,8 +8,9 @@ import {
 import { Insertable } from 'kysely';
 import { DateTime } from 'luxon';
 import { PostgresError } from 'postgres';
-import { OnEvent, OnJob } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   GameChallengeDetailResponseDto,
   GameChallengeListItemResponseDto,
@@ -26,9 +27,8 @@ import {
   GameSoloHistoryResponseDto,
   GameSoloStatsResponseDto,
   GameStandingsResponseDto,
-} from 'src/dtos/game.dto';
-import { CacheControl, JobName, QueueName, SharedSpaceRole } from 'src/enum';
-import { ArgOf } from 'src/repositories/event.repository';
+} from 'src/dtos/game.dto.js';
+import { CacheControl, JobName, QueueName, SharedSpaceRole } from 'src/enum.js';
 import {
   GameChallengeRow,
   GameGuessRow,
@@ -36,32 +36,32 @@ import {
   NOT_PLACE_PROMPT_EMBEDDING,
   PLACE_PROMPT_EMBEDDING,
   ScenePromptEmbeddings,
-} from 'src/repositories/game.repository';
-import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
-import { GameGuessTable } from 'src/schema/tables/game-guess.table';
-import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
-import { BaseService } from 'src/services/base.service';
-import { ChallengePool } from 'src/services/game/challenge-pool';
-import { PersonalPool } from 'src/services/game/personal-pool';
-import { SpacePool } from 'src/services/game/space-pool';
-import { getFilenameExtension, ImmichMediaResponse } from 'src/utils/file';
+} from 'src/repositories/game.repository.js';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
+import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table.js';
+import { BaseService } from 'src/services/base.service.js';
+import { ChallengePool } from 'src/services/game/challenge-pool.js';
+import { PersonalPool } from 'src/services/game/personal-pool.js';
+import { SpacePool } from 'src/services/game/space-pool.js';
+import { ImmichMediaResponse, getFilenameExtension } from 'src/utils/file.js';
 import {
   GameCandidate,
-  haversineKm,
   LatLon,
+  haversineKm,
   monthOffsetDays,
   mulberry32,
   poolScaleDays,
   poolScaleKm,
   scoreFromError,
   selectLocationRounds,
-} from 'src/utils/game-scoring';
-import { compareStandings } from 'src/utils/game-standings';
-import { computeStreak } from 'src/utils/game-streak';
-import { mimeTypes } from 'src/utils/mime-types';
-import { isSmartSearchEnabled } from 'src/utils/misc';
-import { getPreferences } from 'src/utils/preferences';
-import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
+} from 'src/utils/game-scoring.js';
+import { compareStandings } from 'src/utils/game-standings.js';
+import { computeStreak } from 'src/utils/game-streak.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
+import { isSmartSearchEnabled } from 'src/utils/misc.js';
+import { getPreferences } from 'src/utils/preferences.js';
+import { hasSharedSpaceRole } from 'src/utils/shared-space-role.js';
 
 /** Location rounds fill up to this fraction of the requested round count; the rest are date
  * rounds. See design doc §7.4 - this is what keeps a GPS-poor space playable. */

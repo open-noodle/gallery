@@ -1,7 +1,8 @@
-import { Column, ForeignKeyColumn, Generated, Table, Timestamp, Unique } from '@immich/sql-tools';
-import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
-import { AssetTable } from 'src/schema/tables/asset.table';
-import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
+import { Column, ForeignKeyColumn, Table, Timestamp, Unique } from '@immich/sql-tools';
+import type { Generated } from '@immich/sql-tools';
+import { PrimaryGeneratedUuidV7Column } from 'src/decorators.js';
+import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
 
 export type GameRoundType = 'location' | 'date';
 

@@ -1,7 +1,7 @@
-import { GameChallengeType } from 'src/dtos/game.dto';
-import { GameRepository } from 'src/repositories/game.repository';
-import { ChallengePool, GameCandidate, ScenePromptEmbeddings } from 'src/services/game/challenge-pool';
-import { SoloPoolSources } from 'src/utils/game-solo-eligibility';
+import { GameChallengeType } from 'src/dtos/game.dto.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
+import { ChallengePool, GameCandidate, ScenePromptEmbeddings } from 'src/services/game/challenge-pool.js';
+import { SoloPoolSources } from 'src/utils/game-solo-eligibility.js';
 
 /**
  * Why no rounds could be built, phrased per requested type - the solo counterpart to

@@ -1,8 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { NextFunction, Response } from 'express';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+
+import type { NextFunction, Response } from 'express';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import {
   GameChallengeDetailResponseDto,
   GameChallengeListItemResponseDto,
@@ -15,15 +16,15 @@ import {
   GameRoundParamDto,
   GameSpaceParamDto,
   GameStandingsResponseDto,
-} from 'src/dtos/game.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { GameService } from 'src/services/game.service';
-import { sendFile } from 'src/utils/file';
+} from 'src/dtos/game.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { GameService } from 'src/services/game.service.js';
+import { sendFile } from 'src/utils/file.js';
 // Challenge ids are v7 uuids (game_challenge.id is @PrimaryGeneratedUuidV7Column), so these routes
 // take UUIDv7ParamDto - UUIDParamDto validates v4 and would reject every real id with a 400.
-import { UUIDv7ParamDto } from 'src/validation';
+import { UUIDv7ParamDto } from 'src/validation.js';
 
 @ApiTags(ApiTag.Games)
 @Controller()

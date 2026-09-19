@@ -1,9 +1,9 @@
-import { GameChallengeType } from 'src/dtos/game.dto';
-import { ScenePromptEmbeddings } from 'src/repositories/game.repository';
-import { GameCandidate } from 'src/utils/game-scoring';
+import { GameChallengeType } from 'src/dtos/game.dto.js';
+import { ScenePromptEmbeddings } from 'src/repositories/game.repository.js';
+import { GameCandidate } from 'src/utils/game-scoring.js';
 
-export type { ScenePromptEmbeddings } from 'src/repositories/game.repository';
-export type { GameCandidate } from 'src/utils/game-scoring';
+export type { ScenePromptEmbeddings } from 'src/repositories/game.repository.js';
+export type { GameCandidate } from 'src/utils/game-scoring.js';
 
 /**
  * The scope a challenge is generated against: today, a shared space (`SpacePool`); a later task
