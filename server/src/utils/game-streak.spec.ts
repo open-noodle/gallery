@@ -1,4 +1,4 @@
-import { computeStreak } from 'src/utils/game-streak';
+import { computeStreak } from 'src/utils/game-streak.js';
 
 describe('computeStreak', () => {
   it('returns zeroes when nothing has been played', () => {

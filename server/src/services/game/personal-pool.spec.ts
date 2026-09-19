@@ -1,5 +1,5 @@
-import { PersonalPool } from 'src/services/game/personal-pool';
 import { describe, expect, it, vi } from 'vitest';
+import { PersonalPool } from 'src/services/game/personal-pool.js';
 
 const repository = () =>
   ({

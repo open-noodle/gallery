@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { GameRepository } from 'src/repositories/game.repository';
+import { GameRepository } from 'src/repositories/game.repository.js';
 
 // Server root - vitest runs with cwd at server/ (matches face-identity-query-shape.spec.ts and
 // shared-space-album-scope.guard.spec.ts).

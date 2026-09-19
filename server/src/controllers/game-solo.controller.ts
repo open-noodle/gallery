@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import {
   GameChallengeResponseDto,
   GameDailyResponseDto,
@@ -9,10 +9,10 @@ import {
   GameSoloHistoryQueryDto,
   GameSoloHistoryResponseDto,
   GameSoloStatsResponseDto,
-} from 'src/dtos/game.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
-import { GameService } from 'src/services/game.service';
+} from 'src/dtos/game.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
+import { GameService } from 'src/services/game.service.js';
 
 /**
  * Solo play: the routes that take no space at all. A separate controller from GameController

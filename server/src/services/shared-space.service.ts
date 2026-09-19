@@ -92,10 +92,7 @@ import { ImmichMediaResponse } from 'src/utils/file.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
-import {
-  getSharedSpaceRoleScore,
-  SHARED_SPACE_ROLE_HIERARCHY as ROLE_HIERARCHY,
-} from 'src/utils/shared-space-role.js';
+import { SHARED_SPACE_ROLE_HIERARCHY as ROLE_HIERARCHY, getSharedSpaceRoleScore } from 'src/utils/shared-space-role.js';
 import { transformFaceBoundingBox } from 'src/utils/transform.js';
 
 const getMetadataSourceScore = (sourceProfileType?: string | null) => (sourceProfileType === 'user-person' ? 1 : 0);

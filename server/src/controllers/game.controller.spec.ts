@@ -1,7 +1,7 @@
 import { Reflector } from '@nestjs/core';
-import { GameSoloController } from 'src/controllers/game-solo.controller';
-import { GameController } from 'src/controllers/game.controller';
-import { MetadataKey, Permission } from 'src/enum';
+import { GameSoloController } from 'src/controllers/game-solo.controller.js';
+import { GameController } from 'src/controllers/game.controller.js';
+import { MetadataKey, Permission } from 'src/enum.js';
 
 // The API-key scope on `@Authenticated({ permission })` and the in-space ACL (membership/ownership,
 // enforced by GameService.requireMember) are different layers. Before Permission.Game* existed, every

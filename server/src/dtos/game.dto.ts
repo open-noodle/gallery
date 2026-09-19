@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
-import { isoDatetimeToDate, latitudeSchema, longitudeSchema } from 'src/validation';
 import z from 'zod';
+import { isoDatetimeToDate, latitudeSchema, longitudeSchema } from 'src/validation.js';
 
 // 'location' | 'date' - mirrors GameRoundType in src/schema/tables/game-round.table.ts, which is a
 // plain string union rather than a real enum, so there is nothing to import here.

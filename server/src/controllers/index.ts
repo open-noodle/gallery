@@ -27,6 +27,8 @@ import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.con
 import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller.js';
 import { FaceController } from 'src/controllers/face.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
+import { GameSoloController } from 'src/controllers/game-solo.controller.js';
+import { GameController } from 'src/controllers/game.controller.js';
 import { IntegrityAdminController } from 'src/controllers/integrity-admin.controller.js';
 import { JobController } from 'src/controllers/job.controller.js';
 import { LibraryManifestController } from 'src/controllers/library-manifest.controller.js';
@@ -60,8 +62,6 @@ import { UserController } from 'src/controllers/user.controller.js';
 import { VideoStreamController } from 'src/controllers/video-stream.controller.js';
 import { ViewController } from 'src/controllers/view.controller.js';
 import { WorkflowController } from 'src/controllers/workflow.controller.js';
-import { GameController } from 'src/controllers/game.controller.js';
-import { GameSoloController } from 'src/controllers/game-solo.controller.js';
 
 export const controllers = [
   ApiKeyController,

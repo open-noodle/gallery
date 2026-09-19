@@ -1,8 +1,8 @@
-import { Expression, ExpressionBuilder, Kysely, sql, SqlBool } from 'kysely';
-import { AssetType, AssetVisibility } from 'src/enum';
-import { DB } from 'src/schema';
-import { asUuid } from 'src/utils/database';
-import { spaceAssetIdUnion, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
+import { Expression, ExpressionBuilder, Kysely, SqlBool, sql } from 'kysely';
+import { AssetType, AssetVisibility } from 'src/enum.js';
+import { DB } from 'src/schema/index.js';
+import { asUuid } from 'src/utils/database.js';
+import { spaceAssetIdUnion, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
 
 /**
  * Which libraries a solo challenge draws from. The two flags are frozen onto the challenge row at

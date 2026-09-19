@@ -1,4 +1,4 @@
-import { compareStandings, StandingsSortable } from 'src/utils/game-standings';
+import { StandingsSortable, compareStandings } from 'src/utils/game-standings.js';
 
 const entry = (name: string, total: number, played: number): StandingsSortable => ({ name, total, played });
 

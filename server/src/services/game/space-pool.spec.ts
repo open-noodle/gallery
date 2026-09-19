@@ -1,5 +1,5 @@
-import { SpacePool } from 'src/services/game/space-pool';
 import { describe, expect, it, vi } from 'vitest';
+import { SpacePool } from 'src/services/game/space-pool.js';
 
 const repository = () =>
   ({

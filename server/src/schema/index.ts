@@ -64,6 +64,9 @@ import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.ta
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table.js';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
+import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
@@ -130,9 +133,6 @@ import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.ta
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { VersionHistoryTable } from 'src/schema/tables/version-history.table.js';
-import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
-import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
-import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
 import {
   VideoStreamSegmentTable,
   VideoStreamSessionTable,

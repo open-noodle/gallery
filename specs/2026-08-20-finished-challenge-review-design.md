@@ -29,10 +29,7 @@ client exactly once — in the response to the guess that created them — and a
 `GameService.get` (the challenge-detail endpoint) already fetches them:
 
 ```ts
-const [rounds, guesses] = await Promise.all([
-  this.gameRepository.getRounds(challengeId),
-  this.gameRepository.getGuessesForUser(challengeId, auth.user.id),
-]);
+const [rounds, guesses] = await Promise.all([this.gameRepository.getRounds(challengeId), this.gameRepository.getGuessesForUser(challengeId, auth.user.id)]);
 const guessByRoundId = new Map(guesses.map((guess) => [guess.roundId, guess]));
 rounds.map((round) => this.toRoundDetail(round, guessByRoundId.get(round.id)));
 ```
@@ -46,11 +43,11 @@ Add a guess object to the round detail:
 
 ```ts
 const GameRoundGuessSchema = z.object({
-  lat: z.number().nullable().describe('Guessed latitude, for a location round'),
-  lon: z.number().nullable().describe('Guessed longitude, for a location round'),
-  date: isoDatetimeToDate.nullable().describe('Guessed date, for a date round'),
-  distanceKm: z.number().nullable().describe('Distance from the answer, in km'),
-  offsetDays: z.number().nullable().describe('Day offset from the answer'),
+  lat: z.number().nullable().describe("Guessed latitude, for a location round"),
+  lon: z.number().nullable().describe("Guessed longitude, for a location round"),
+  date: isoDatetimeToDate.nullable().describe("Guessed date, for a date round"),
+  distanceKm: z.number().nullable().describe("Distance from the answer, in km"),
+  offsetDays: z.number().nullable().describe("Day offset from the answer"),
 });
 ```
 
