@@ -1,29 +1,29 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { join } from 'node:path';
-import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants';
-import { StorageCore } from 'src/cores/storage.core';
-import { OnJob } from 'src/decorators';
-import { AssetMediaResponseDto } from 'src/dtos/asset-media-response.dto';
-import { AssetMediaCreateDto, UploadFieldName } from 'src/dtos/asset-media.dto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { UploadSessionCreateDto, UploadSessionResponseDto } from 'src/dtos/upload-session.dto';
-import { AssetVisibility, DatabaseLock, JobName, QueueName, StorageFolder } from 'src/enum';
-import { AssetMediaService } from 'src/services/asset-media.service';
-import { BaseService } from 'src/services/base.service';
-import { UploadFile } from 'src/types';
-import { requireUploadAccess } from 'src/utils/access';
-import { getFilenameExtension } from 'src/utils/file';
-import { fromChecksum } from 'src/utils/request';
+import { UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from 'src/constants.js';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { OnJob } from 'src/decorators.js';
+import { AssetMediaResponseDto } from 'src/dtos/asset-media-response.dto.js';
+import { AssetMediaCreateDto, UploadFieldName } from 'src/dtos/asset-media.dto.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { UploadSessionCreateDto, UploadSessionResponseDto } from 'src/dtos/upload-session.dto.js';
+import { AssetVisibility, DatabaseLock, JobName, QueueName, StorageFolder } from 'src/enum.js';
+import { AssetMediaService } from 'src/services/asset-media.service.js';
+import { BaseService } from 'src/services/base.service.js';
+import { UploadFile } from 'src/types.js';
+import { requireUploadAccess } from 'src/utils/access.js';
+import { getFilenameExtension } from 'src/utils/file.js';
+import { fromChecksum } from 'src/utils/request.js';
 import {
+  UploadSessionState,
   claimFinalize,
   committedOffset,
   finalizeClaimPath,
   readState,
   sessionPaths,
-  UploadSessionState,
   writeChunkAt,
   writeState,
-} from 'src/utils/upload-session-store';
+} from 'src/utils/upload-session-store.js';
 
 /**
  * A JS string can hold a lone surrogate (e.g. `\uD800` unpaired), which has no lossless UTF-8

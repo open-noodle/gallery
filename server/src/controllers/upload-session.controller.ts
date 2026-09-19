@@ -14,15 +14,15 @@ import {
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { ApiConsumes, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request, Response } from 'express';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AssetMediaResponseDto, AssetMediaStatus } from 'src/dtos/asset-media-response.dto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { UploadSessionCreateDto, UploadSessionResponseDto } from 'src/dtos/upload-session.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
-import { UploadSessionService } from 'src/services/upload-session.service';
-import { UUIDParamDto } from 'src/validation';
+import type { Request, Response } from 'express';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import { AssetMediaResponseDto, AssetMediaStatus } from 'src/dtos/asset-media-response.dto.js';
+import { UploadSessionCreateDto, UploadSessionResponseDto } from 'src/dtos/upload-session.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
+import { UploadSessionService } from 'src/services/upload-session.service.js';
+import { UUIDParamDto } from 'src/validation.js';
 
 /** The only Content-Type a chunk PATCH may carry (spec §4.1, §4.2 — tus-identical on purpose). */
 const CHUNK_CONTENT_TYPE = 'application/offset+octet-stream';

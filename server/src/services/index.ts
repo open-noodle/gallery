@@ -55,6 +55,7 @@ import { TelemetryService } from 'src/services/telemetry.service.js';
 import { TimelineService } from 'src/services/timeline.service.js';
 import { TranscodingService } from 'src/services/transcoding.service.js';
 import { TrashService } from 'src/services/trash.service.js';
+import { UploadSessionService } from 'src/services/upload-session.service.js';
 import { UserAdminService } from 'src/services/user-admin.service.js';
 import { UserGroupService } from 'src/services/user-group.service.js';
 import { UserService } from 'src/services/user.service.js';
@@ -62,7 +63,6 @@ import { VersionService } from 'src/services/version.service.js';
 import { ViewService } from 'src/services/view.service.js';
 import { WorkflowExecutionService } from 'src/services/workflow-execution.service.js';
 import { WorkflowService } from 'src/services/workflow.service.js';
-import { UploadSessionService } from 'src/services/upload-session.service.js';
 
 export const services = [
   ApiKeyService,

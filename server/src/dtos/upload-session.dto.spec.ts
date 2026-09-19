@@ -1,4 +1,4 @@
-import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto';
+import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto.js';
 
 const valid = {
   filename: 'IMG_1234.jpg',
