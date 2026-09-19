@@ -1,10 +1,10 @@
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { JobStatus, SystemMetadataKey } from 'src/enum.js';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
-import { StorageRoutingKind } from 'src/backends/storage-router.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
 
 describe(StorageService.name, () => {
   let sut: StorageService;

@@ -1,19 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { JobOf } from 'src/types.js';
+import {
+  MIGRATION_FILE_TYPE_TO_KIND,
+  StorageMigrationFileType,
+  StorageRoutingKind,
+  resolveRouting,
+} from 'src/backends/storage-router.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 import { StorageMigrationDirection } from 'src/repositories/storage-migration.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
-import {
-  MIGRATION_FILE_TYPE_TO_KIND,
-  resolveRouting,
-  StorageMigrationFileType,
-  StorageRoutingKind,
-} from 'src/backends/storage-router.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
 
 interface StorageMigrationFileTypes {
   originals: boolean;
