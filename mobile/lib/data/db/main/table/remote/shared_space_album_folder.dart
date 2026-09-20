@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
+import 'package:immich_mobile/data/db/util/datetime_clamp_type.dart';
 import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Album folder inside a space (fed by SharedSpaceAlbumFolderV1). spaceId has a cascade FK to
@@ -25,8 +26,8 @@ class SharedSpaceAlbumFolderEntity extends Table with DriftDefaultsMixin {
 
   TextColumn get name => text()();
 
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {id};
