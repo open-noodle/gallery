@@ -84,7 +84,9 @@
     onAction: () => setPlayOriginalVideo(!isPlayingOriginalVideo),
   });
 
-  const Actions = $derived(getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space, album }));
+  const Actions = $derived(
+    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space, album }),
+  );
   const StackActions = $derived(getStackActions($t, stack, asset));
   const sharedLink = getSharedLink();
 </script>
