@@ -65,7 +65,7 @@ void main() {
     final user = await ctx.newUser();
     await ctx.newRemoteAsset(ownerId: user.id, createdAt: DateTime.utc(144769, 11, 18, 12, 38, 32));
 
-    final buckets = await TimelineRepository(ctx.db).main([user.id], .day).bucketSource().first;
+    final buckets = await TimelineRepository(ctx.db).main([user.id], user.id, .day).bucketSource().first;
     expect(buckets, [TimeBucket(date: DateTime(9999, 12, 31), assetCount: 1)]);
   });
 }
