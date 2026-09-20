@@ -37,7 +37,7 @@ void main() {
 
     // The local sync DB never receives faces for assets the viewer does not own, so the
     // drift query comes back empty for a Space-shared asset.
-    when(() => mockRepository.getAssetPeople(any())).thenAnswer((_) async => <Person>[]);
+    when(() => mockRepository.watchPeopleForAsset(any())).thenAnswer((_) => Stream.value(<Person>[]));
     // The server (like the web app) resolves the Space's people for that asset.
     when(() => mockApiRepository.getAssetPeople(any())).thenAnswer((_) async => [person('space-person')]);
   });
@@ -49,16 +49,16 @@ void main() {
 
       expect(result, [person('space-person')]);
       verify(() => mockApiRepository.getAssetPeople('shared-asset')).called(1);
-      verifyNever(() => mockRepository.getAssetPeople(any()));
+      verifyNever(() => mockRepository.watchPeopleForAsset(any()));
     });
 
     test('reads people from the local sync DB for the viewer\'s own asset', () async {
-      when(() => mockRepository.getAssetPeople(any())).thenAnswer((_) async => [person('local-person')]);
+      when(() => mockRepository.watchPeopleForAsset(any())).thenAnswer((_) => Stream.value([person('local-person')]));
 
       final result = await sut.getAssetPeople('own-asset', ownedByCurrentUser: true);
 
       expect(result, [person('local-person')]);
-      verify(() => mockRepository.getAssetPeople('own-asset')).called(1);
+      verify(() => mockRepository.watchPeopleForAsset('own-asset')).called(1);
       verifyNever(() => mockApiRepository.getAssetPeople(any()));
     });
 
