@@ -9,6 +9,7 @@
 - **Conflicts resolved**: ~45 regions across 26 files
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED — routine cycle, stays off `main` (no upstream tag yet)
+- **CI**: 6/6 workflows GREEN, `Test` 22/22 jobs with 0 skipped
 
 The previous cycle (v3.2.1) landed on `main` on 2026-09-16, and the old rolling branch was
 byte-identical to `origin/main`, so this is a clean restart rather than a continuation.
@@ -252,14 +253,44 @@ immich-31591 made them `getDeletesV2`/`getUpsertsV2` and added V3, and all four 
 ## Remote CI Verification
 
 - **Branch**: `rebase/upstream-rolling-v3.3.0`
-- **Commit**: `bf3101348ec`
+- **Commit validated**: `bf3101348ec`, plus `7f8626e394b` for the revert gate (see below)
 
-Dispatched: `test.yml`, `static_analysis.yml`, `docker.yml`, `gallery-rebase-smoke.yml`, with the
-storage-migration and revert-validation workflows to follow in a second wave (a simultaneous dispatch
-trips the container-registry rate limit).
+| Workflow                                  | Status    | Run         | Notes                                                     |
+| ----------------------------------------- | --------- | ----------- | --------------------------------------------------------- |
+| `test.yml`                                | **GREEN** | 35513683898 | **22/22 jobs, 0 skipped, 0 failed**                       |
+| `docker.yml`                              | **GREEN** | 35513750079 | builds the shipped images                                 |
+| `static_analysis.yml`                     | **GREEN** | 35513720040 | `dart analyze` + `dart format` + generated-file freshness |
+| `gallery-rebase-smoke.yml`                | **GREEN** | 35513780032 |                                                           |
+| `storage-migration-tests.yml`             | **GREEN** | 35513867658 |                                                           |
+| `gallery-revert-to-immich-validation.yml` | **GREEN** | 35514494256 | on `7f8626e394b` after the fix below                      |
 
-An earlier push of batch 09 (`58ebf713fbb`) ran Docker (green), Static Code Analysis (caught the
-orphaned import, fixed) and Test.
+The five workflows above the revert gate ran on `bf3101348ec`; the only code difference up to
+`7f8626e394b` is `scripts/revert-to-immich.sql`, which no other workflow exercises, plus this report.
+
+### Failure found and fixed
+
+`gallery-revert-to-immich-validation` failed first time on `bf3101348ec`:
+
+> corrupted migrations: previously executed migration 1776735180298-ChangeDurationToInteger is missing
+
+**Cause, and it was self-inflicted.** Appending the new post-tag entry to step 8's `IN` list left the
+line above it — `'1776735180298-ChangeDurationToInteger'`, the build-time compatibility alias — without
+a trailing comma. **Postgres concatenates adjacent string literals across a newline into one literal
+rather than erroring**, so the list silently lost _both_ names: the alias row survived the revert and
+the tagged v3.2.2 migrator aborted on boot.
+
+Confirmed self-inflicted rather than pre-existing by control: that gate is green on `main` across its
+last five runs, all on `c566f2766cc`. Fixed, and all three `IN` lists in the file audited — 173
+literals, no other missing comma.
+
+This is worth remembering: a dropped comma in a SQL `IN` list of string literals is **not** a syntax
+error. It silently merges two entries into one, and only an end-to-end boot catches it.
+
+### Earlier batch push
+
+Batch 09 (`58ebf713fbb`) was pushed and gated mid-cycle: Docker green, Test green, and **Static Code
+Analysis caught a real orphaned import** in `tab_shell.page.dart` that local reasoning had waved
+through. Running the gates per batch rather than only at the end is what surfaced it.
 
 ## Known Blemish
 
