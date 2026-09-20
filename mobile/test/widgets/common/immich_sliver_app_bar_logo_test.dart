@@ -22,9 +22,13 @@ import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as in
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/services/background_upload.service.dart';
+import 'package:immich_mobile/services/foreground_upload.service.dart';
 import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../service.mocks.dart';
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
@@ -152,6 +156,12 @@ void main() {
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, _testUser)),
         serverInfoServiceProvider.overrideWithValue(_MockServerInfoService()),
+        // immich-31082 put AssetService (hence ApiService) behind
+        // backgroundUploadServiceProvider, which backupProvider watches and the app
+        // bar's _BackupIndicator in turn watches. This test is about logo width, so
+        // stub the upload services rather than standing up the whole API layer.
+        foregroundUploadServiceProvider.overrideWithValue(MockForegroundUploadService()),
+        backgroundUploadServiceProvider.overrideWithValue(MockBackgroundUploadService()),
       ],
     );
 
