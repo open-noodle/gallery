@@ -183,7 +183,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 38;
+  int get schemaVersion => 39;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -439,6 +439,13 @@ class Drift extends $Drift {
                 await m.alterTable(
                   TableMigration(v38.sharedSpaceAlbumLinkEntity, newColumns: [v38.sharedSpaceAlbumLinkEntity.folderId]),
                 );
+              },
+              // Upstream immich-31577 added local_asset.previous_checksum at its drift v32,
+              // which collides with the fork's v32 (the created_at index). Renumbered here to
+              // v39 — the next version after the fork's v38 — because installed clients already
+              // ran the fork's v32-v38 and must not re-run them under new numbers.
+              from38To39: (m, v39) async {
+                await m.addColumn(v39.localAssetEntity, v39.localAssetEntity.previousChecksum);
               },
             ),
           ),
