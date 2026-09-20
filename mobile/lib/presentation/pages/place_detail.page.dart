@@ -26,10 +26,7 @@ class PlaceDetailPage extends StatelessWidget {
         final users = ref.watch(timelineUsersProvider).valueOrNull ?? [user.id];
         return ref.watch(timelineFactoryProvider).place(place, users, user.id, groupBy: groupBy, temporalScope: scope);
       },
-      child: Timeline(
-        withGroupingPill: true,
-        appBar: MesmerizingSliverAppBar(title: place),
-      ),
+      child: Timeline(withGroupingPill: true, appBar: MesmerizingSliverAppBar(title: place)),
     );
   }
 }

@@ -42150,7 +42150,7 @@
         ],
         "type": "object"
       },
-      "SyncAssetFaceV2": {
+      "SyncAssetFaceV3": {
         "properties": {
           "assetId": {
             "description": "Asset ID",
@@ -42926,6 +42926,7 @@
           "PersonDeleteV1",
           "AssetFaceV1",
           "AssetFaceV2",
+          "AssetFaceV3",
           "AssetFaceDeleteV1",
           "UserMetadataV1",
           "UserMetadataDeleteV1",
@@ -43456,6 +43457,7 @@
           "PeopleV1",
           "AssetFacesV1",
           "AssetFacesV2",
+          "AssetFacesV3",
           "UserMetadataV1",
           "SharedSpacesV1",
           "SharedSpaceMembersV1",
