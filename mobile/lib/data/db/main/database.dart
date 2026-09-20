@@ -500,10 +500,11 @@ const _v33DateTimeColumns = <String, List<String>>{
   'asset_face_entity': ['deleted_at'],
   'settings': ['updated_at'],
   // gallery-fork: the fork's own tables adopted clampedDateTime in the same change, so
-  // they carry the same pre-clamp exposure and are healed here too.
+  // they carry the same pre-clamp exposure and are healed here too. Column lists are
+  // derived from each table's clampedDateTime getters.
   'library_entity': ['created_at', 'updated_at'],
-  'shared_space_entity': ['created_at', 'updated_at', 'deleted_at'],
-  'shared_space_member_entity': ['created_at'],
+  'shared_space_entity': ['last_activity_at', 'created_at', 'updated_at'],
+  'shared_space_member_entity': ['joined_at'],
   'shared_space_library_entity': ['created_at'],
   'shared_space_album_entity': ['created_at', 'updated_at'],
   'shared_space_album_link_entity': ['created_at', 'updated_at'],
