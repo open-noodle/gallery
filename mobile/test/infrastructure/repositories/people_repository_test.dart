@@ -119,7 +119,7 @@ void main() {
       // two emissions into one.
       final emissions = <List<String>>[];
       final sub = sut
-          .watch(sortBy: PeopleSortBy.photoCount)
+          .watchAll(sortBy: PeopleSortBy.photoCount)
           .listen((people) => emissions.add(people.map((p) => p.name).toList()));
       await pumpEventQueue();
       expect(emissions.last, ['Alice']);
@@ -136,7 +136,7 @@ void main() {
 
       final emissions = <List<String>>[];
       final sub = sut
-          .watch(sortBy: PeopleSortBy.photoCount)
+          .watchAll(sortBy: PeopleSortBy.photoCount)
           .listen((people) => emissions.add(people.map((p) => p.id).toList()));
       await pumpEventQueue();
       expect(emissions.last, isEmpty);
@@ -152,15 +152,15 @@ void main() {
       await seedPerson(id: 'b-many', name: 'Bob', faces: 5);
       await seedPerson(id: 'a-few', name: 'Ann', faces: 3);
 
-      expect((await sut.watch(sortBy: PeopleSortBy.photoCount).first).map((p) => p.id), ['b-many', 'a-few']);
-      expect((await sut.watch(sortBy: PeopleSortBy.name).first).map((p) => p.id), ['a-few', 'b-many']);
+      expect((await sut.watchAll(sortBy: PeopleSortBy.photoCount).first).map((p) => p.id), ['b-many', 'a-few']);
+      expect((await sut.watchAll(sortBy: PeopleSortBy.name).first).map((p) => p.id), ['a-few', 'b-many']);
     });
 
     test('the first emission equals getAllPeople', () async {
       await seedPerson(id: 'p1', name: 'Alice');
       await seedPerson(id: 'p2', faces: 5);
 
-      expect(await sut.watch().first, await sut.getAllPeople());
+      expect(await sut.watchAll().first, await sut.getAllPeople());
     });
   });
 }

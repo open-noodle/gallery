@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:immich_mobile/data/db/util/datetime_clamp_type.dart';
 import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Space-album METADATA, keyed by albumId (fed by the SharedSpaceAlbumV1 wire
@@ -13,8 +14,8 @@ class SharedSpaceAlbumEntity extends Table with DriftDefaultsMixin {
   TextColumn get name => text()();
   TextColumn get description => text().nullable()();
   TextColumn get thumbnailAssetId => text().nullable()();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
   BoolColumn get isActivityEnabled => boolean().withDefault(const Constant(true))();
   // SyncAlbumV2.order is an AssetOrder enum on the wire; store its index. The
   // executor MUST confirm the exact generated Dart type of SyncAlbumV2.order
