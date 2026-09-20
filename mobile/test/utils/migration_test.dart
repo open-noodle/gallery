@@ -10,6 +10,8 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/platform/native_sync_api.g.dart';
+import 'package:immich_mobile/platform/permission_api.g.dart';
 import 'package:immich_mobile/utils/migration.dart';
 
 // The old Isar/Store-era id for `StoreKey.peopleSortBy` (fork PR #683). It was
@@ -82,7 +84,7 @@ void main() {
     test('migrates a legacy PeopleSortBy.name ordinal into SettingsKey.peopleSortBy', () async {
       await seedLegacyStoreInt(_legacyPeopleSortById, PeopleSortBy.name.index);
 
-      await migrateDatabaseIfNeeded(db);
+      await migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi());
 
       expect(await readMigratedPeopleSortBy(), PeopleSortBy.name);
       expect(await legacyRowExists(_legacyPeopleSortById), isFalse, reason: 'migrated legacy row should be deleted');
@@ -90,7 +92,7 @@ void main() {
 
     test('no legacy value leaves SettingsKey.peopleSortBy unset (default preserved)', () async {
       // No row seeded for _legacyPeopleSortById.
-      await migrateDatabaseIfNeeded(db);
+      await migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi());
 
       expect(await readMigratedPeopleSortBy(), isNull);
     });
@@ -98,7 +100,7 @@ void main() {
     test('legacy ordinal out of PeopleSortBy.values range does not throw, default preserved', () async {
       await seedLegacyStoreInt(_legacyPeopleSortById, 99);
 
-      await expectLater(migrateDatabaseIfNeeded(db), completes);
+      await expectLater(migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi()), completes);
 
       expect(await readMigratedPeopleSortBy(), isNull);
       // Out-of-range legacy data is left behind un-migrated -- matches the
@@ -109,8 +111,8 @@ void main() {
     test('running the migration twice is idempotent', () async {
       await seedLegacyStoreInt(_legacyPeopleSortById, PeopleSortBy.name.index);
 
-      await migrateDatabaseIfNeeded(db);
-      await expectLater(migrateDatabaseIfNeeded(db), completes);
+      await migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi());
+      await expectLater(migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi()), completes);
 
       expect(await readMigratedPeopleSortBy(), PeopleSortBy.name);
     });
@@ -118,7 +120,7 @@ void main() {
     test('fresh install (no legacy Store rows, no version row) is untouched', () async {
       await resetMigrationState(version: null);
 
-      await migrateDatabaseIfNeeded(db);
+      await migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi());
 
       expect(await readMigratedPeopleSortBy(), isNull);
     });

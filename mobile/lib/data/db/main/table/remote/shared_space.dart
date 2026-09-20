@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/user.dart';
+import 'package:immich_mobile/data/db/util/datetime_clamp_type.dart';
 import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Mirrors the server `shared_space` row but DROPS the server-side sync cursor
@@ -31,11 +32,11 @@ class SharedSpaceEntity extends Table with DriftDefaultsMixin {
 
   BoolColumn get petsEnabled => boolean().withDefault(const Constant(false))();
 
-  DateTimeColumn get lastActivityAt => dateTime().nullable()();
+  DateTimeColumn get lastActivityAt => customType(clampedDateTime).nullable()();
 
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
 
-  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {id};

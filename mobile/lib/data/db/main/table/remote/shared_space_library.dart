@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
+import 'package:immich_mobile/data/db/util/datetime_clamp_type.dart';
 import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Mirrors the server `shared_space_library` join row. spaceId has a FK to
@@ -24,7 +25,7 @@ class SharedSpaceLibraryEntity extends Table with DriftDefaultsMixin {
 
   TextColumn get addedById => text().nullable()();
 
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get createdAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {spaceId, libraryId};
