@@ -2085,10 +2085,11 @@ describe(AuthService.name, () => {
     });
 
     it('should use state from cookie when not in dto', async () => {
-      const user = factory.userAdmin();
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: user.oauthId } });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -2107,10 +2108,11 @@ describe(AuthService.name, () => {
     });
 
     it('should use code verifier from cookie when not in dto', async () => {
-      const user = factory.userAdmin();
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: user.oauthId } });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -2151,11 +2153,12 @@ describe(AuthService.name, () => {
     });
 
     it('should allow linking when duplicate is the same user', async () => {
-      const user = factory.userAdmin();
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId });
       const auth = factory.auth({ user, apiKey: { permissions: [] } });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
-      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: user.oauthId } });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user as any);
       mocks.user.update.mockResolvedValue(user);
 
@@ -2171,12 +2174,13 @@ describe(AuthService.name, () => {
 
   describe('callback - profile name handling', () => {
     it('should use given_name and family_name when name is not available', async () => {
-      const user = factory.userAdmin({ oauthId: 'oauth-id' });
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
         profile: {
-          sub: user.oauthId,
+          sub: oauthId,
           email: user.email,
           given_name: 'John',
           family_name: 'Doe',
@@ -2197,12 +2201,13 @@ describe(AuthService.name, () => {
     });
 
     it('should use profile name when available', async () => {
-      const user = factory.userAdmin({ oauthId: 'oauth-id' });
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
         profile: {
-          sub: user.oauthId,
+          sub: oauthId,
           email: user.email,
           name: 'Full Name',
           given_name: 'John',
@@ -2226,12 +2231,13 @@ describe(AuthService.name, () => {
 
   describe('callback - profile picture error handling', () => {
     it('should handle errors when syncing profile picture', async () => {
-      const user = factory.userAdmin({ oauthId: 'oauth-id' });
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
         profile: {
-          sub: user.oauthId,
+          sub: oauthId,
           email: user.email,
           picture: 'https://auth.immich.cloud/profiles/1.jpg',
         },
@@ -2252,14 +2258,15 @@ describe(AuthService.name, () => {
 
     it('should queue file deletion for old profile path', async () => {
       const fileId = newUuid();
-      const user = factory.userAdmin({ oauthId: 'oauth-id', profileImagePath: '/old/profile.jpg' });
+      const oauthId = 'oauth-id';
+      const user = factory.userAdmin({ oauthId, profileImagePath: '/old/profile.jpg' });
       // Need profileImagePath to be empty for syncProfilePicture to be called
       const userNoProfile = { ...user, profileImagePath: '' };
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
       mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
         profile: {
-          sub: userNoProfile.oauthId,
+          sub: oauthId,
           email: userNoProfile.email,
           picture: 'https://auth.immich.cloud/profiles/1.jpg',
         },
