@@ -424,6 +424,15 @@ ALTER ROLE CURRENT_USER RESET jit;
 -- table is the person_personGroupId_key index, removed in section 4. Nothing further to reverse —
 -- only their kysely_migrations rows, in step 8.
 
+-- immich-31560 (1789419229196-ConvertUserOAuthIdEmptyStringToNull) made user.oauthId
+-- nullable and re-defaulted it to NULL. v3.2.2 still expects NOT NULL DEFAULT ''. These
+-- three statements are idempotent by construction: on a DB where the migration never ran
+-- the UPDATE matches no rows and the two ALTERs re-assert what is already true, so this
+-- is also safe against the tagged :main image.
+UPDATE "user" SET "oauthId" = '' WHERE "oauthId" IS NULL;
+ALTER TABLE "user" ALTER COLUMN "oauthId" SET DEFAULT '';
+ALTER TABLE "user" ALTER COLUMN "oauthId" SET NOT NULL;
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -536,9 +545,9 @@ DELETE FROM "kysely_migrations"
 -- Post-tag upstream migrations pulled in by rebase, paired with the schema
 -- rollbacks in step 7. Keep timestamp-sorted.
 --
--- Currently EMPTY — see the note in step 7. `upstream.version` is 3.2.0 and this
--- branch carries no upstream migration the tagged release lacks. Re-populate from
--- the step 7 diff on the next rebase that pulls upstream ahead of the tag.
+-- `upstream.version` is 3.2.2; this branch sits ahead of that tag and carries one
+-- upstream migration the tagged release lacks. Its schema rollback is in step 7.
+   '1789419229196-ConvertUserOAuthIdEmptyStringToNull'
  );
 
 -- -----------------------------------------------------------------------------
