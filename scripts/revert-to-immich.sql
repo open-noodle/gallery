@@ -540,7 +540,7 @@ DELETE FROM "kysely_migrations"
    -- 1776735180298-ChangeDurationToInteger is missing". Drop the alias row here;
    -- the real 1777667825574 row is always present by revert time and matches the
    -- upstream file, so it stays.
-   '1776735180298-ChangeDurationToInteger'
+   '1776735180298-ChangeDurationToInteger',
 
 -- Post-tag upstream migrations pulled in by rebase, paired with the schema
 -- rollbacks in step 7. Keep timestamp-sorted.
