@@ -45,16 +45,16 @@ void main() {
     expect(await storedCreatedAt(date), date);
   });
 
-  test('v34 clamps dates already stored out of range', () async {
+  test('v41 clamps dates already stored out of range', () async {
     final verifier = SchemaVerifier(GeneratedHelper());
-    final schema = await verifier.schemaAt(33);
+    final schema = await verifier.schemaAt(40);
     schema.rawDatabase.execute(
       "INSERT INTO local_asset_entity (id, name, type, created_at, updated_at) "
       "VALUES ('a', 'a.jpg', 0, '+144769-11-18T12:38:32.000Z', '-4712-03-04T05:06:07.000Z')",
     );
     final db = Drift(schema.newConnection());
     addTearDown(db.close);
-    await verifier.migrateAndValidate(db, 34);
+    await verifier.migrateAndValidate(db, 41);
 
     final row = await (db.select(db.localAssetEntity)..where((t) => t.id.equals('a'))).getSingle();
     expect(row.createdAt, DateTime.utc(9999, 12, 31));
