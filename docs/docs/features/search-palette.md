@@ -1,12 +1,12 @@
 # Search Palette
 
-A keyboard-driven command palette that searches everything in your library — photos, people, places, tags — and jumps to any admin or settings page, all from one input. Press <kbd>Cmd</kbd>+<kbd>K</kbd> (macOS) or <kbd>Ctrl</kbd>+<kbd>K</kbd> (Windows / Linux) to open it from anywhere in Gallery.
+A keyboard-driven command palette. One input searches your whole library (photos, people, places, tags) and jumps to any admin or settings page. Press <kbd>Cmd</kbd>+<kbd>K</kbd> (macOS) or <kbd>Ctrl</kbd>+<kbd>K</kbd> (Windows / Linux) to open it from anywhere in Gallery.
 
-The top navigation search field opens this same palette. On searchable pages, the sort control next to the search field applies immediately to the current view, so searching and sorting live in one consistent place instead of separate page-specific search bars.
+The search field in the top navigation opens the same palette. On searchable pages, the sort control next to it applies to the current view right away, so search and sort sit in one place instead of a separate bar on every page.
 
 ## What you can search
 
-Each query runs in parallel against the configured providers and groups the results into named sections:
+Each query runs against the configured providers in parallel and groups the results into named sections:
 
 | Section           | What it returns                                                                                                               |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -16,27 +16,27 @@ Each query runs in parallel against the configured providers and groups the resu
 | **Tags**          | Tags assigned to your assets, plus inherited tags from parent tags.                                                           |
 | **Albums**        | Your albums, matched on album name.                                                                                           |
 | **Shared spaces** | Spaces you own or belong to, matched on space name.                                                                           |
-| **Commands**      | Verbs — upload files, create things, sign out, toggle theme, manage pages.                                                    |
-| **Navigation**    | Admin and settings pages — fuzzy-matched against the live page catalog.                                                       |
+| **Commands**      | Verbs: upload files, create things, sign out, toggle theme, manage pages.                                                     |
+| **Navigation**    | Admin and settings pages, fuzzy-matched against the live page catalog.                                                        |
 
-Empty sections collapse silently so the result list stays tight. If smart search is unhealthy (the ML server is unreachable), a banner appears at the top of the palette and offers a one-tap switch to filename mode.
+Empty sections are hidden, so the result list stays tight. If smart search is unhealthy (the ML server is unreachable), a banner appears at the top of the palette and offers a one-tap switch to filename mode.
 
 ## Search modes
 
 The footer shows the current matching mode for the **Photos** section. Press <kbd>Ctrl</kbd>+<kbd>/</kbd> to cycle through them:
 
-- **Smart** — CLIP semantic search ("photos of a kitten on a couch")
-- **Filename** — Substring match against the original file name
-- **Description** — Substring match against your photo descriptions
-- **OCR** — Substring match against text extracted from your photos
+- Smart: CLIP semantic search ("photos of a kitten on a couch")
+- Filename: substring match against the original file name
+- Description: substring match against your photo descriptions
+- OCR: substring match against text extracted from your photos
 
-The other sections (People, Places, Tags, Commands, Navigation) are unaffected by the mode — they always run their own provider.
+The mode only touches Photos. People, Places, Tags, Commands and Navigation always run their own provider.
 
 ## Commands
 
-Commands are verbs you can fire from the palette without leaving your current page. They live in their own section above **Go to…**, and the list is permission-aware: admin-only commands, album commands, space commands, and selection commands only appear when the current user and page context can run them.
+Commands are verbs you can fire from the palette without leaving the page you're on. They live in their own section above **Go to...**, and the list follows your permissions: admin, album, space and selection commands only appear when the current user and page context can run them.
 
-Commands never appear in the **Recent** list. They're verbs, not destinations, and re-firing them belongs in the muscle-memory of the palette itself.
+Commands never appear in the **Recent** list. Re-firing one belongs in the muscle memory of the palette itself.
 
 ### Global commands
 
@@ -54,7 +54,7 @@ These commands are available everywhere after login:
 
 ### Admin queue commands
 
-Administrators see an extra group of commands for driving the job queues without leaving whatever page they're on. They are hidden from non-admin users.
+Administrators get an extra group of commands for driving the job queues from whatever page they're on. Non-admin users never see them.
 
 | Command                      | What it does                                                                              |
 | ---------------------------- | ----------------------------------------------------------------------------------------- |
@@ -67,7 +67,7 @@ Administrators see an extra group of commands for driving the job queues without
 | **Resume all queues**        | Resumes every paused queue                                                                |
 | **Clear failed jobs**        | Removes failed jobs from every queue (safe to fire even when none have failed)            |
 
-Each **Run…** command confirms with a toast like **Started: Thumbnail generation**. The bulk commands (**Pause all queues**, **Resume all queues**, **Clear failed jobs**) fire a parallel request per admin-visible queue. If every request succeeds you get a single green confirmation; if any fail, a yellow warning toast reports **"N of M queue operations failed"** and the others still take effect. These commands target the same set of queues shown on **Administration → Jobs**, so the Jobs page is still the right place to watch per-queue progress in detail.
+Each **Run...** command confirms with a toast like **Started: Thumbnail generation**. The bulk commands (**Pause all queues**, **Resume all queues**, **Clear failed jobs**) fire one request per admin-visible queue, in parallel. If every request succeeds you get a single green confirmation. If any fail, a yellow warning toast reports **"N of M queue operations failed"** and the others still take effect. These commands target the same set of queues shown on **Administration → Jobs**, so the Jobs page is still the right place to watch per-queue progress in detail.
 
 ### Album commands
 
@@ -83,7 +83,7 @@ When you open the palette from an album page, album-specific commands appear acc
 
 ### Selection commands
 
-When one or more assets are selected on a supported timeline page, the palette also shows bulk actions for that live selection:
+Select one or more assets on a supported timeline page and the palette also shows bulk actions for that live selection:
 
 | Command                        | When it appears                                                                                           | What it does                                                                |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -109,15 +109,15 @@ When you open the palette from a shared-space page, space-specific commands appe
 | **Leave this space**                | Space member who is not owner | Removes you from the space and returns to Spaces                |
 | **Delete this space**               | Space owner                   | Permanently removes the space and returns to Spaces             |
 
-Readers and other non-writers do not see write actions like **Add photos to this space**, **Add selected to this space**, or **Add all my photos to this space**. Space-owner actions are separate from write access: a user can be able to add photos without being able to manage members or delete the space.
+Readers and other non-writers do not see write actions like **Add photos to this space**, **Add selected to this space**, or **Add all my photos to this space**. Space-owner actions are separate from write access: a user can be allowed to add photos without being allowed to manage members or delete the space.
 
 ### Destructive confirmations
 
-Destructive commands keep the palette confirmation step: press <kbd>Enter</kbd> once to arm the command, then press <kbd>Enter</kbd> again to confirm or <kbd>Esc</kbd> to cancel. This applies to destructive album commands, destructive space commands, and **Delete selected**. Permanent asset deletes can still show the normal delete confirmation modal after the palette confirmation.
+Destructive commands keep the palette confirmation step: press <kbd>Enter</kbd> once to arm the command, then <kbd>Enter</kbd> again to confirm or <kbd>Esc</kbd> to cancel. This applies to destructive album commands, destructive space commands, and **Delete selected**. Permanent asset deletes can still show the normal delete confirmation modal after the palette confirmation.
 
 ## Navigation entries
 
-Navigation entries are destinations rather than commands. They appear in the **Navigation**, **Admin**, and **System Settings** groups, and can be found with normal search or the `>` prefix.
+Navigation entries are destinations. They appear in the **Navigation**, **Admin**, and **System Settings** groups, and you can reach them with normal search or the `>` prefix.
 
 Admin pages and system settings are hidden from non-admin users. Feature-gated destinations, such as **Map** and **Trash**, only appear when that server feature is enabled.
 
@@ -173,11 +173,11 @@ System settings:
 
 ### Unscoped: command-first tie-break
 
-When a command and a navigation entry score similarly against an unscoped query, the command wins the **Top result** slot. So plain `album` activates **New Album** on <kbd>Enter</kbd>, and plain `upload` activates **Upload** — even though the Albums and Library pages also match.
+When a command and a navigation entry score similarly against an unscoped query, the command wins the **Top result** slot. Plain `album` activates **New Album** on <kbd>Enter</kbd>, and plain `upload` activates **Upload**, even though the Albums and Library pages also match.
 
 ## Prefix shortcuts
 
-Start a query with a prefix character to restrict results to a single scope. The prefix is consumed by the palette and is not part of the query text, so `@alice`, `#xmas`, `/trip`, and `>theme` search the relevant scope for `alice`, `xmas`, `trip`, and `theme` respectively.
+Start a query with a prefix character to restrict results to a single scope. The palette swallows the prefix, so it is not part of the query text: `@alice`, `#xmas`, `/trip`, and `>theme` search the relevant scope for `alice`, `xmas`, `trip`, and `theme` respectively.
 
 | Prefix | Scope                      | What it searches                            |
 | ------ | -------------------------- | ------------------------------------------- |
@@ -186,24 +186,24 @@ Start a query with a prefix character to restrict results to a single scope. The
 | `/`    | **Albums + shared spaces** | Both collection types at once               |
 | `>`    | **Commands + navigation**  | Palette commands and admin / settings pages |
 
-When a prefix is active, all other sections (Photos, Places, and the two you didn't pick) are hidden for the duration of that query. Prefixes are handy when a bare query is dominated by photos and you want a single section to come through cleanly, or when you know exactly which kind of thing you're after.
+While a prefix is active, all other sections (Photos, Places, and the two you didn't pick) are hidden for that query. Use one when photos drown out the section you wanted, or when you already know which kind of thing you're after.
 
 ### Bare-prefix browsing
 
-Typing just the prefix character with nothing after it opens the full index for that scope, so the palette doubles as a lightweight browser for recent people, tags, collections, and admin pages:
+Type just the prefix character, with nothing after it, and the palette opens the full index for that scope. It then doubles as a browser for recent people, tags, collections, and admin pages:
 
-- `@` — your people, most-recently-updated first
-- `#` — your tags, most-recently-updated first
-- `/` — your most-recently-active albums and shared spaces
-- `>` — every command and navigation entry you have access to, alphabetical
+- `@`: your people, most-recently-updated first
+- `#`: your tags, most-recently-updated first
+- `/`: your most-recently-active albums and shared spaces
+- `>`: every command and navigation entry you have access to, alphabetical
 
-This is faster than reaching for a sidebar when you just want to glance at recent activity.
+Quicker than reaching for a sidebar when you only want a glance at recent activity.
 
 ## Top result band
 
-Typing plain free text in the palette creates a synthetic **Top result** row: **Search for "…"**. Hitting <kbd>Enter</kbd> on that row routes the query to the current page's search surface when one exists. Pages without a filter panel fall back to `/photos?q=...`.
+Plain free text creates a **Top result** row: **Search for "..."**. Hitting <kbd>Enter</kbd> on that row routes the query to the current page's search surface when one exists. Pages without a filter panel fall back to `/photos?q=...`.
 
-When your query closely matches a single command or navigation entry, that entry takes over the **Top result** slot instead of the generic search row. Hitting <kbd>Enter</kbd> activates it immediately, no arrow keys needed.
+When your query closely matches a single command or navigation entry, that entry takes over the **Top result** slot instead of the generic search row. <kbd>Enter</kbd> activates it immediately, no arrow keys needed.
 
 Promotion is based on a fuzzy score against the title, description, and search keywords. Commands win tie-breaks against navigation entries, so unscoped verbs like `upload` or `album` surface their command first. A short query like `peo` will surface **People** as the top result; `users` will surface **Administration → User Management**.
 
@@ -221,9 +221,9 @@ Live filter rows apply filters; they do not navigate to person or tag pages. `ca
 
 ### Page-aware search
 
-When you open the palette from a page that supports inline search, Gallery preloads the page's current query and sort mode. Submitting a new free-text query updates the page URL instead of navigating away:
+Open the palette from a page that supports inline search and Gallery preloads that page's current query and sort mode. Submitting a new free-text query updates the page URL instead of navigating away:
 
-| Current page                          | Where **Search for "…"** applies                                   |
+| Current page                          | Where **Search for "..."** applies                                 |
 | ------------------------------------- | ------------------------------------------------------------------ |
 | **Photos**                            | `/photos?q=...` with the selected relevance / newest / oldest sort |
 | **Shared space detail**               | That space's timeline, scoped to the space's assets                |
@@ -235,13 +235,13 @@ The URL carries the query in `q` and, when needed, the sort in `sort=asc` or `so
 
 ### Typed filter syntax
 
-You can add advanced filters directly to a palette search by typing `key:value` tokens alongside normal search text:
+You can add advanced filters to a palette search by typing `key:value` tokens alongside normal search text:
 
 ```text
 beach person:anna from:2025 to:2026 camera:nikon
 ```
 
-Pressing <kbd>Enter</kbd> applies the plain words as the search query and applies the typed filters to the current searchable page's filter state. On **Photos**, the query stays on `/photos`; inside a shared space, it stays scoped to that space. Pages without a searchable context fall back to the Photos timeline.
+Pressing <kbd>Enter</kbd> applies the plain words as the search query and the typed filters to the current searchable page's filter state. On **Photos**, the query stays on `/photos`; inside a shared space, it stays scoped to that space. Pages without a searchable context fall back to the Photos timeline.
 
 Typed filters are a keyboard shortcut for the existing filter panel. After submission, the active filter chips and filter panel reflect the same filters, and the URL can be refreshed or shared.
 
@@ -266,11 +266,11 @@ Use quotes when a filter value contains spaces:
 person:"Anna Maria" city:"New York"
 ```
 
-Filters are resolved only when you press <kbd>Enter</kbd>, not while you type. If a person, tag, or camera value has no match, or if multiple matches are possible, the palette stays open and asks you to fix or choose a result. Invalid filters such as `persn:anna`, `rating:9`, `from:soon`, or a repeated scalar filter block submission instead of being ignored.
+Filters are resolved when you press <kbd>Enter</kbd>, never while you type. If a person, tag, or camera value has no match, or if multiple matches are possible, the palette stays open and asks you to fix or choose a result. Invalid filters such as `persn:anna`, `rating:9`, `from:soon`, or a repeated scalar filter block submission instead of being ignored.
 
 ## Recents
 
-Every destination or free-text search you activate is added to a **Recent** list (per user, per browser). When you reopen the palette with an empty query, your last few activations are shown immediately so you can repeat a workflow with two keystrokes.
+Every destination or free-text search you activate is added to a **Recent** list (per user, per browser). Reopen the palette with an empty query and your last few activations are there, so a workflow can be repeated with two keystrokes.
 
 - Recent entries that are no longer accessible (admin pages after a demotion, deleted people, removed tags) are filtered out automatically the next time you open the palette.
 - Remove a single entry with the **×** button on the row, or with <kbd>Delete</kbd> while it's highlighted.
@@ -278,18 +278,18 @@ Every destination or free-text search you activate is added to a **Recent** list
 
 ## Quick links fallback
 
-When you open the palette for the first time on a fresh browser — no recents yet — a curated set of **Quick links** is shown instead, so the empty state is still useful. The quick-link set is admin-aware: non-admins don't see admin destinations.
+Open the palette for the first time on a fresh browser, with no recents yet, and you get a set of **Quick links** instead, so the empty state is still useful. The set is admin-aware: non-admins don't see admin destinations.
 
 ## Preview pane
 
 On large screens (≥ `lg` breakpoint) a preview pane appears to the right of the result list:
 
-- **Photos** → larger thumbnail with file name and an **Open** affordance
-- **People** → face thumbnail with the person's name and an **Open person page** button
-- **Places** → region/country breakdown
-- **Tags** → tag value with parent path
+- Photos: larger thumbnail with file name and an **Open** affordance
+- People: face thumbnail with the person's name and an **Open person page** button
+- Places: region/country breakdown
+- Tags: tag value with parent path
 
-The preview updates as you arrow up and down through the list. On smaller screens it's hidden — the result list takes the full width and previews don't get in the way.
+The preview updates as you arrow up and down through the list. On smaller screens it's hidden and the result list takes the full width.
 
 ## Keyboard reference
 
@@ -297,7 +297,7 @@ The preview updates as you arrow up and down through the list. On smaller screen
 | ---------------------------------------------------------- | ------------------------------------------------------------------- |
 | <kbd>Cmd</kbd>+<kbd>K</kbd> / <kbd>Ctrl</kbd>+<kbd>K</kbd> | Open the palette from anywhere                                      |
 | <kbd>Esc</kbd>                                             | Close the palette                                                   |
-| <kbd>↑</kbd> / <kbd>↓</kbd>                                | Move through results — wraps at top/bottom                          |
+| <kbd>↑</kbd> / <kbd>↓</kbd>                                | Move through results, wrapping at top and bottom                    |
 | <kbd>Enter</kbd>                                           | Activate the highlighted result                                     |
 | <kbd>Delete</kbd>                                          | Remove the highlighted **Recent** entry                             |
 | <kbd>Ctrl</kbd>+<kbd>/</kbd>                               | Cycle the Photos search mode (smart → filename → description → OCR) |
@@ -305,7 +305,7 @@ The preview updates as you arrow up and down through the list. On smaller screen
 
 ## How it stays responsive
 
-- Each provider runs on its own **150 ms debounce** with a **15 s timeout** via `AbortSignal.timeout`. A slow people query never blocks photos from rendering.
-- The palette uses a **stale-while-revalidate** rule: when a query is being re-run, the previous successful results stay visible until new ones arrive. No skeleton flash between keystrokes.
-- A thin **progress stripe** appears across the top after a 200 ms grace window if any provider is still in flight, so you know work is happening when results are slow.
-- The navigation provider runs **synchronously** against an in-memory catalog of admin/settings pages, so you see jumps from the very first keystroke even before the network comes back.
+- Each provider runs on its own 150 ms debounce with a 15 s timeout via `AbortSignal.timeout`. A slow people query never blocks photos from rendering.
+- While a query is being re-run, the previous successful results stay visible until the new ones arrive (stale-while-revalidate). No skeleton flash between keystrokes.
+- If any provider is still in flight after a 200 ms grace window, a thin progress stripe appears across the top, so you can tell slow results from no results.
+- The navigation provider runs synchronously against an in-memory catalog of admin and settings pages, so you see jumps from the very first keystroke, before the network comes back.

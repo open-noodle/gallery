@@ -402,7 +402,7 @@
   }
 
   // Shared by both entry points that move an album — a drag-and-drop and the card kebab's
-  // "Move to folder…" — so both get the same optimistic-apply-then-rollback behaviour.
+  // "Move to folder..." — so both get the same optimistic-apply-then-rollback behaviour.
   async function moveAlbumToFolder(albumId: string, targetFolderId: string | null) {
     const previous = albums;
     albums = albums.map((a) => (a.id === albumId ? { ...a, folderId: targetFolderId } : a));

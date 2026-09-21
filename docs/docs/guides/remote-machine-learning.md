@@ -47,7 +47,7 @@ volumes:
 Version mismatches between both hosts may cause bugs and instability, so remember to update this container as well when updating the local Gallery instance.
 :::
 
-4. Navigate to the [Machine Learning Settings](the Machine Learning Settings in the Administration panel?isOpen=machine-learning)
+4. Navigate to the [Machine Learning Settings](/administration/system-settings#machine-learning-settings)
 5. Click _Add URL_
 6. Fill the new field with the URL to the remote machine learning container, e.g. `http://ip:port`
 
@@ -63,7 +63,7 @@ Do note that this will mean that Smart Search and Face Detection jobs will fail 
 
 While several URLs can be provided in the settings, they are tried sequentially; there is no attempt to distribute load across multiple containers. It is recommended to use a dedicated load balancer for such use-cases and specify it as the only URL. Among other things, it may enable the use of different APIs on the same server by running multiple containers with different configurations. For example, one might run an OpenVINO container in addition to a CUDA container, or run a standard release container to maximize both CPU and GPU utilization.
 
-If your load balancer distributes traffic per connection, long-lived HTTP connections from the server can still make traffic uneven. Set `IMMICH_MACHINE_LEARNING_CLOSE_CONNECTIONS=true` on the server container to close each machine learning HTTP request after completion, which gives the load balancer a new connection to place for each request. The default is `false`, which preserves HTTP connection reuse.
+If your load balancer distributes traffic per connection, the server's long-lived HTTP connections can still leave the load uneven. Set `IMMICH_MACHINE_LEARNING_CLOSE_CONNECTIONS=true` on the server container to close each machine learning request once it finishes. The load balancer then has a fresh connection to place every time. The default is `false`, which keeps HTTP connection reuse.
 
 :::tip
 The machine learning container can be shared among several Gallery instances regardless of the models a particular instance uses. However, using different models will lead to higher peak memory usage.

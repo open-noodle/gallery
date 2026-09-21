@@ -68,9 +68,9 @@ Information on the current workers can be found [here](/administration/jobs-work
 
 ## Diagnostics
 
-| Variable                | Description                                                                                                                                                                                                                                                                                             | Default | Containers          |
-| :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-----: | :------------------ |
-| `GALLERY_SEARCH_TIMING` | When `true`, emits one `log`-level line per smart search with per-phase timing (setup / embedding / space lookup / DB), plus a line per ML `/predict` call (fetch + JSON parse). Useful for diagnosing slow smart search — tells you whether ML encode or DB is dominating. Restart required to toggle. |         | server (api worker) |
+| Variable                | Description                                                                                                                                                                                                                                                                                               | Default | Containers          |
+| :---------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-----: | :------------------ |
+| `GALLERY_SEARCH_TIMING` | When `true`, emits one `log`-level line per smart search with per-phase timing (setup / embedding / space lookup / DB), plus a line per ML `/predict` call (fetch + JSON parse). Useful for diagnosing slow smart search: it tells you whether ML encode or DB is dominating. Restart required to toggle. |         | server (api worker) |
 
 ## Ports
 

@@ -169,7 +169,7 @@ export const sharedSpaceAlbumFolderPromotionConflictMessage = (
   reason: 'sibling' | 'parent' | 'unknown',
 ): string => {
   if (reason === 'parent' && name) {
-    return `Cannot delete: "${name}" has the same name as the folder you are deleting — rename it first`;
+    return `Cannot delete: "${name}" has the same name as the folder you are deleting. Rename it first`;
   }
   if (reason === 'sibling' && name) {
     return `Cannot delete: "${name}" would collide with a folder that already exists at the destination`;

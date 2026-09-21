@@ -164,7 +164,7 @@
   const canMoveEntireCluster = $derived(canBulkMove && !restLoadError);
   // Staged rest faces are KEPT even once their destination stops being usable — discarding a page of
   // deliberate selection over a dropdown mis-click (e.g. accidentally picking the reviewed cluster itself in
-  // "Choose someone else…") was considered and rejected: a mis-click must not destroy real work. Apply is
+  // "Choose someone else...") was considered and rejected: a mis-click must not destroy real work. Apply is
   // blocked instead, until the admin resolves the mismatch by picking a valid destination (one action) or
   // unticking every staged face — there is no deselect-all, so that is one click per face — and both remain
   // available (see the rest-tile's onclick below).
