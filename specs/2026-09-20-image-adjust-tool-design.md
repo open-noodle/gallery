@@ -54,23 +54,34 @@ Effects spec pixel-for-pixel so the live preview and the saved result are accura
   constants, **not** `.modulate({ saturation })` — modulate works in HSL
   space and visibly disagrees with CSS's RGB-matrix approach at the same
   parameter value.
-- Invert: `sharp().negate()`. Already an exact match with CSS `invert()`
-  — both are plain per-channel 255-minus-value, no design needed.
+- Invert: expressed as part of the same `linear(a, b)` call as
+  exposure/contrast (`v -> range - v` is just `a = -1, b = range`), not
+  `sharp().negate()` — see the gotcha below for why.
 
-**A real sharp gotcha found in testing, not obvious from its docs**:
-`.linear(a, b)` and `.negate()` are single option slots on the pipeline,
-not a queue of operations — sharp's native code always applies recomb,
-then linear, then negate, regardless of the order these are called in
-JS, and a second `.linear()` call silently *overwrites* the first rather
-than composing with it. Two consequences, both handled in
-`applyAdjust()`: exposure and contrast must be pre-combined into a single
-equivalent `(a, b)` pair before the one `.linear()` call (calling it
-twice for exposure then contrast was dropping exposure entirely whenever
-contrast was also set), and because negate always runs *last*, making
-invert *feel* like it runs first — so a negative exposure darkens an
-inverted film negative instead of brightening it — means algebraically
-pre-adjusting `(a, b)` to simulate inverting the input before exposure
-and contrast are applied, not literally reordering any calls.
+**Two real sharp gotchas found in testing, neither obvious from its
+docs**:
+1. `.linear(a, b)` is a single option slot on the pipeline, not a queue
+   of operations — sharp's native code always applies recomb, then
+   linear, regardless of the order these are called in JS, and a second
+   `.linear()` call silently *overwrites* the first rather than composing
+   with it. So exposure and contrast are pre-combined into a single
+   equivalent `(a, b)` pair before the one `.linear()` call — calling it
+   twice for exposure then contrast was dropping exposure entirely
+   whenever contrast was also set.
+2. `.recomb()` (used for saturation) followed by `.negate()` produces
+   all-zero output — reproduced even with a plain identity recomb matrix,
+   so it isn't specific to this formula, and it happens regardless of
+   whether anything runs between the two calls. `.recomb()` then
+   `.linear()` composes correctly, so invert is folded into the same
+   `(a, b)` pair as exposure/contrast — substituting `range - v` for `v`
+   in `amount * v + offset` gives `-amount * v + (amount * range +
+   offset)`, still one linear() call, applied whenever invert is on even
+   if exposure and contrast are both untouched. This is also what makes
+   invert *feel* like it runs before exposure/contrast (a negative
+   exposure value darkens an inverted film negative instead of
+   brightening it) — folding it into the same transform as "invert the
+   input first, then apply (amount, offset)" is what produces that,
+   not any actual reordering of calls.
 
 **Client**: not a new top-level tool. `EditManager.applyEdits()` only ever
 submits the *selected* tool's manager's `.edits` — one manager per

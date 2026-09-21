@@ -201,18 +201,25 @@ export class MediaRepository {
   // real brightness()/contrast()/saturate()/invert() CSS filters — shows exactly what gets
   // saved here, not an approximation. See specs/2026-09-20-image-adjust-tool-design.md.
   //
-  // sharp's `.linear(a, b)` and `.negate()` are single option slots on the pipeline, not a
-  // queue of operations — its native code always applies recomb, then linear, then negate,
-  // regardless of JS call order, and a second `.linear()` call overwrites the first rather
-  // than composing with it. So exposure and contrast must be pre-combined into one (a, b)
-  // pair here (calling `.linear()` twice silently dropped exposure whenever contrast was
-  // also set), and invert — which always runs last — needs (a, b) algebraically adjusted to
-  // simulate running *before* exposure/contrast, or a negative exposure visibly brightens an
-  // inverted (film negative) image instead of darkening it.
+  // Two real sharp/libvips (0.35.3/8.18.3) gotchas drive this implementation, neither obvious
+  // from sharp's docs:
+  //
+  // 1. `.linear(a, b)` is a single option slot on the pipeline, not a queue - its native code
+  //    always applies recomb, then linear, in that fixed order regardless of JS call order,
+  //    and a second `.linear()` call overwrites the first rather than composing with it. So
+  //    exposure and contrast are combined into one equivalent (a, b) pair below, not two
+  //    separate calls (calling it twice silently dropped exposure whenever contrast was also
+  //    set).
+  //
+  // 2. `.recomb()` followed by `.negate()` produces all-zero output - reproduced even with a
+  //    plain identity recomb matrix, so it isn't specific to this formula. `.recomb()` then
+  //    `.linear()` composes correctly, so invert (v -> range - v) is expressed as part of the
+  //    same (a, b) linear transform instead of a separate `.negate()` call, whether or not
+  //    saturation is also set.
   private applyAdjust(pipeline: Sharp, parameters: AdjustParameters, range: number): Sharp {
     const { exposure, contrast, saturation, invert } = parameters;
 
-    if (exposure || contrast) {
+    if (exposure || contrast || invert) {
       // CSS brightness(amount): output = input * amount.
       // CSS contrast(amount): output = (input - mid) * amount + mid, pivoting around the
       // mid-grey of the value range.
@@ -220,16 +227,17 @@ export class MediaRepository {
       const contrastAmount = 1 + (contrast ?? 0) / 100;
       const midpoint = range / 2;
 
-      // Composed as "exposure, then contrast": a single equivalent linear(a, b).
-      let a = exposureAmount * contrastAmount;
-      let b = midpoint * (1 - contrastAmount);
+      // Exposure and contrast composed as a single equivalent linear(amount, offset), as if
+      // exposure ran first: amount * v + offset.
+      const amount = exposureAmount * contrastAmount;
+      const offset = midpoint * (1 - contrastAmount);
 
-      if (invert) {
-        // negate(a * v + b) = -a * v + (range - b). To make that equal what "invert the
-        // input first, then apply (a, b)" would give — a * (range - v) + b, i.e.
-        // -a * v + (a * range + b) — b must become range * (1 - a) - b. `a` is unchanged.
-        b = range * (1 - a) - b;
-      }
+      // Invert, if on, is folded in as running *before* exposure/contrast (so it feels like
+      // undoing a film negative first, then tuning the result) rather than after: substituting
+      // (range - v) for v in `amount * v + offset` gives `-amount * v + (amount * range +
+      // offset)` - a plain sign flip on the coefficient and a shifted offset, still one linear() call.
+      const a = invert ? -amount : amount;
+      const b = invert ? amount * range + offset : offset;
 
       pipeline = pipeline.linear(a, b);
     }
@@ -244,11 +252,6 @@ export class MediaRepository {
         [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s],
         [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s],
       ]);
-    }
-
-    if (invert) {
-      // Matches CSS invert(1) exactly — both are a plain per-channel value negation.
-      pipeline = pipeline.negate();
     }
 
     return pipeline;
