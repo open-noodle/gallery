@@ -124,7 +124,7 @@ describe('SpaceAlbumCard', () => {
     expect(screen.getByAltText('Trip')).toBeInTheDocument();
   });
 
-  it('offers "Move to folder…" alongside unlink and toggle when canManage=true', () => {
+  it('offers "Move to folder..." alongside unlink and toggle when canManage=true', () => {
     renderWithTooltips(SpaceAlbumCard, {
       spaceId: 's-1',
       album,
@@ -133,10 +133,10 @@ describe('SpaceAlbumCard', () => {
       onToggleTimeline: vi.fn(),
       onMove: vi.fn(),
     });
-    expect(screen.getByText('Move to folder…')).toBeInTheDocument();
+    expect(screen.getByText('Move to folder...')).toBeInTheDocument();
   });
 
-  it('clicking "Move to folder…" calls onMove with the album', async () => {
+  it('clicking "Move to folder..." calls onMove with the album', async () => {
     const onMove = vi.fn();
     renderWithTooltips(SpaceAlbumCard, {
       spaceId: 's-1',
@@ -147,14 +147,14 @@ describe('SpaceAlbumCard', () => {
       onMove,
     });
 
-    await fireEvent.click(screen.getByText('Move to folder…'));
+    await fireEvent.click(screen.getByText('Move to folder...'));
 
     expect(onMove).toHaveBeenCalledWith(album);
   });
 
-  it('viewer sees no "Move to folder…" option either', () => {
+  it('viewer sees no "Move to folder..." option either', () => {
     renderWithTooltips(SpaceAlbumCard, { spaceId: 's-1', album, canManage: false });
-    expect(screen.queryByText('Move to folder…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Move to folder...')).not.toBeInTheDocument();
   });
 
   // W-11's album-card equivalent: viewers get no drag affordance.

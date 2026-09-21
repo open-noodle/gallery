@@ -1,6 +1,6 @@
 # Supported Media Formats
 
-Gallery supports a number of image and video formats, the most common of which are outlined here.
+Gallery supports many image and video formats. The most common ones are listed here.
 
 :::note
 For the full list, refer to the [source code](https://github.com/immich-app/immich/blob/main/server/src/utils/mime-types.ts).

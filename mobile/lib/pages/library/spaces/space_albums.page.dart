@@ -46,9 +46,9 @@ import 'package:openapi/api.dart' show ApiException;
 ///  - Editor-only card ⋮ overflow (Show/Hide in timeline, Unlink, Move to
 ///    folder…). [onToggle] and [onUnlink] are supplied by the caller, because
 ///    the space-detail page owns those mutations and its top sliver renders
-///    the same cards; "Move to folder…" is wired directly against
+///    the same cards; "Move to folder..." is wired directly against
 ///    [spaceAlbumActionsProvider] since it is not shared with that sliver.
-///  - Editor-only folder-card ⋮ overflow (Rename / Move to folder… / Delete)
+///  - Editor-only folder-card ⋮ overflow (Rename / Move to folder... / Delete)
 ///    and app-bar "New folder" action, all wired directly against
 ///    [spaceAlbumActionsProvider]'s `renameFolder`/`moveFolder`/`deleteFolder`/
 ///    `createFolder`. "New folder" creates in the CURRENT folder (this page

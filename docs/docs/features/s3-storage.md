@@ -1,6 +1,6 @@
 # S3-Compatible Storage
 
-Gallery supports using S3-compatible object storage (such as AWS S3, MinIO, Cloudflare R2, Backblaze B2, or Wasabi) as the storage backend for new uploads. This is useful for scaling storage independently of the server, leveraging cloud durability, or integrating with existing infrastructure.
+Gallery can store new uploads in S3-compatible object storage instead of on local disk: AWS S3, MinIO, Cloudflare R2, Backblaze B2 and Wasabi all work. Storage then grows without resizing the server, durability becomes your provider's problem, and a bucket you already run fits straight in.
 
 :::tip
 If you have existing files on disk, you can migrate them to S3 using the built-in [Storage Migration](/features/storage-migration) tool.
@@ -11,7 +11,7 @@ If you have existing files on disk, you can migrate them to S3 using the built-i
 When S3 storage is enabled:
 
 - **New uploads** (photos, videos, thumbnails, transcoded videos, profile images) are written to your S3 bucket.
-- **Existing files** on disk continue to be served from disk — both backends run simultaneously.
+- **Existing files** on disk keep being served from disk. Both backends run at the same time.
 - The [Storage Template](/administration/storage-template) determines the S3 object key at upload time.
 
 Gallery supports two modes for serving files from S3:
@@ -22,7 +22,7 @@ Gallery supports two modes for serving files from S3:
 | `proxy`    | The Gallery server streams the file from S3 to the client. Use only when S3 is not directly reachable by browsers.                |
 
 :::info
-The recent direct-media delivery change makes `redirect` the normal S3 mode for browser-reachable buckets. Before switching an existing deployment from `proxy` to `redirect`, apply bucket CORS for your Gallery origins or canvas-based features can fail.
+Direct media delivery makes `redirect` the normal S3 mode for browser-reachable buckets. Before you switch an existing deployment from `proxy` to `redirect`, apply bucket CORS for your Gallery origins, or canvas-based features can fail.
 :::
 
 For most deployments, use `redirect`. Only use `proxy` when browsers cannot reach your S3 endpoint directly.
@@ -55,7 +55,7 @@ All S3 variables are set on the `immich-server` container.
 
 1. Open the [AWS S3 Console](https://s3.console.aws.amazon.com/) and click **Create bucket**.
 2. Choose a bucket name (e.g. `my-gallery-storage`) and region.
-3. Leave "Block all public access" **enabled** — Gallery uses presigned URLs or proxying, so the bucket does not need to be public.
+3. Leave "Block all public access" **enabled**. Gallery uses presigned URLs or proxying, so the bucket does not need to be public.
 4. Create the bucket.
 5. Create an IAM user (or use an existing one) with programmatic access. Attach a policy granting access to your bucket:
 
@@ -119,8 +119,8 @@ IMMICH_S3_SERVE_MODE=redirect
 
 Pick the mode that fits your setup:
 
-- **`redirect`** (default, recommended) — Use this unless you have a hard network constraint. Gallery authorizes the API request and returns a short-lived presigned URL, so media bytes flow directly from S3 to the browser.
-- **`proxy`** — Fallback mode for private-network S3 endpoints. Gallery streams every media byte through the API process, so it costs more server resources and is not the recommended mode for large scrolling grids.
+- **`redirect`** (default, recommended). Use this unless the network forces your hand. Gallery authorizes the API request and returns a short-lived presigned URL, so media bytes go straight from S3 to the browser.
+- **`proxy`**. The fallback for S3 endpoints that only exist on a private network. Gallery streams every media byte through the API process, so it costs more server resources and is a poor fit for large scrolling grids.
 
 ```bash title=".env"
 IMMICH_S3_SERVE_MODE=proxy
@@ -140,7 +140,7 @@ CORS does not make the bucket public. It only tells browsers which Gallery origi
 
 #### Pick the Correct Origins
 
-An origin is only the scheme, host, and optional port. It must not include a path or trailing slash.
+An origin is just a scheme, a host and an optional port. It must not include a path or trailing slash.
 
 Use every browser URL that people use to open Gallery:
 
@@ -171,7 +171,7 @@ For AWS S3 and most S3-compatible providers, use this policy and replace the ori
 }
 ```
 
-This allows browser reads of presigned objects from Gallery. `GET` loads media, `HEAD` allows metadata checks when a provider or tool uses them, `AllowedHeaders` covers preflight headers, and `ExposeHeaders` lets Gallery and browser media features read range, size, type, and cache validation headers.
+This allows browser reads of presigned objects from Gallery. `GET` loads media, `HEAD` allows metadata checks when a provider or tool uses them, `AllowedHeaders` covers preflight headers, and `ExposeHeaders` lets Gallery and browser media features read the range, size, type and cache-validation headers.
 
 Do not use `"*"` for production origins. Gallery media requests use anonymous CORS today, but explicit origins are safer and avoid surprises if credentialed browser requests are introduced later.
 
@@ -354,7 +354,7 @@ IMMICH_S3_SECRET_ACCESS_KEY=your-r2-secret-key
 ## FAQ
 
 **Can I migrate existing files from disk to S3?**
-Yes! Use the built-in [Storage Migration](/features/storage-migration) tool. It supports bidirectional migration, is resumable and idempotent, and includes rollback support.
+Yes. Use the built-in [Storage Migration](/features/storage-migration) tool. It migrates in both directions, resumes after an interruption, is idempotent, and can roll back.
 
 **Do I need to make my S3 bucket public?**
 No. Gallery uses presigned URLs (in `redirect` mode) or proxies the files through the server (in `proxy` mode). The bucket should remain private.
@@ -399,12 +399,12 @@ The `StorageService` manages both backends as static singletons and routes opera
 
 ### Dual Backend Routing
 
-The key insight is that **file path format determines the backend**:
+The **file path format decides the backend**:
 
-- **Absolute paths** (e.g., `/usr/src/app/upload/library/user/file.jpg`) — legacy disk files, routed to the disk backend.
-- **Relative paths** (e.g., `library/user/file.jpg`) — S3 files, routed to the S3 backend.
+- **Absolute paths** such as `/usr/src/app/upload/library/user/file.jpg` are legacy disk files and route to the disk backend.
+- **Relative paths** such as `library/user/file.jpg` are S3 files and route to the S3 backend.
 
-This means no database schema changes were needed. Existing `originalPath`, `path`, `thumbnailPath`, and `profileImagePath` columns store either format, and the `resolveBackendForKey()` function dispatches to the correct backend at runtime. Both backends are always active — the `IMMICH_STORAGE_BACKEND` setting only controls where **new writes** go.
+So no database schema change was needed. The existing `originalPath`, `path`, `thumbnailPath`, and `profileImagePath` columns store either format, and `resolveBackendForKey()` dispatches to the correct backend at runtime. Both backends are always active; `IMMICH_STORAGE_BACKEND` only controls where **new writes** go.
 
 ### Serve Modes
 
@@ -412,7 +412,7 @@ When a client requests an asset, `BaseService.serveFromBackend()` asks the resol
 
 | Backend | Mode       | Response                 | Client Behavior                                     |
 | :------ | :--------- | :----------------------- | :-------------------------------------------------- |
-| Disk    | —          | `ImmichFileResponse`     | Express sends the local file directly               |
+| Disk    | n/a        | `ImmichFileResponse`     | Express sends the local file directly               |
 | S3      | `redirect` | `ImmichRedirectResponse` | HTTP 302 to a presigned URL; client fetches from S3 |
 | S3      | `proxy`    | `ImmichStreamResponse`   | Server streams S3 data through to the client        |
 
@@ -436,7 +436,7 @@ For operations that require filesystem access (ffmpeg transcoding, exiftool meta
 
 ### Archive Downloads
 
-Album, selection, and shared-link archive downloads work with both disk and S3-backed assets. For S3 assets, Gallery opens object streams lazily and serializes ZIP entry appends so large archives do not exhaust the S3 connection pool. This is most visible in `proxy` mode or when downloading many S3-only assets through the server.
+Album downloads, selection downloads and shared-link archives all work with both disk and S3-backed assets. For S3 assets, Gallery opens object streams lazily and serializes ZIP entry appends so large archives do not exhaust the S3 connection pool. This is most visible in `proxy` mode or when downloading many S3-only assets through the server.
 
 ### Cleanup Behavior
 

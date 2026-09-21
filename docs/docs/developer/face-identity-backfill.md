@@ -40,7 +40,7 @@ It queues `FaceIdentityBackfill` when any of these are true:
 - a visible, non-deleted assigned face is missing a `face_identity_face` link;
 - a legacy `shared_space_person` can be resolved to exactly one identity without creating a duplicate identity inside the same space.
 
-This means upgraded installs should not require users to reset face recognition. Restarting the microservices worker is enough to re-run the check. Force-clearing face recognition is destructive and should only be a last-resort repair because it deletes existing recognition state and rebuilds people from scratch.
+Upgraded installs therefore should not need a face-recognition reset. Restarting the microservices worker is enough to re-run the check. Force-clearing face recognition is destructive and should only be a last-resort repair because it deletes existing recognition state and rebuilds people from scratch.
 
 Admins can also start this repair from the **People identity maintenance** queue on the admin Jobs page. The queue start action enqueues the `FaceIdentityBackfill` root job and shows progress alongside the other queue stats.
 
@@ -53,7 +53,7 @@ When Personal People and Global People do not line up, treat it as identity-link
 - a people filter, global search, map filter, or album filter returns a different person set than the personal People page;
 - a Space Person is visible in a Shared Space but does not appear in Global People even though that space is enabled for the viewer's timeline.
 
-The first repair step is to run **People identity maintenance** from **Administration -> Jobs**. Starting that queue runs the `FaceIdentityBackfill` job, which repairs missing Personal Person identity links, missing face-to-identity links, and resolvable legacy Space Person identity links. Wait for the queue to drain before comparing the People pages again; the job is paged, resumable, and safe to rerun.
+The first repair step is to run **People identity maintenance** from **Administration -> Jobs**. Starting that queue runs the `FaceIdentityBackfill` job, which repairs missing Personal Person identity links, missing face-to-identity links, and resolvable legacy Space Person identity links. Wait for the queue to drain before comparing the People pages again; the job is paged and resumable, and safe to rerun.
 
 If identity maintenance finishes but a selected Shared Space still disagrees with Global People, check the scope before running heavier repairs. Global People only includes spaces where the viewer has **Show photos in timeline** enabled, while an explicit Shared Space page reads that space directly. If the scope is correct and only that space's assignments are stale, queue a selected-space face rematch by toggling face recognition off and back on for that space.
 
@@ -80,7 +80,7 @@ For each identity-backed `shared_space_person`, it:
 - gathers eligible source metadata from accessible Personal People and Space People;
 - respects `sharePersonMetadata`, `showInTimeline`, space membership, space deletion, source Space Person visibility, target-space asset adders, and linked-library linkers;
 - ranks candidates by space role, whether the source is the asset adder or library linker, and supporting face count;
-- applies the inherited name or birth date only when the target field is unlocked (`none` or `inherited`);
+- applies the inherited name or birth date only when the target field is not locked (`none` or `inherited`);
 - clears previously inherited fields when the old source is no longer eligible and no replacement source wins.
 
 Manual target-space names and birth dates stay manual. Aliases are member-local and are not backfilled.
@@ -102,7 +102,7 @@ Metadata backfill is queued automatically when an operation can change inheritan
 - a member changes `showInTimeline` or `sharePersonMetadata`;
 - an owner disables another member's metadata contribution.
 
-When the changed operation is tied to one identity, the job is queued with that `identityId`. Membership, role, preference, and space deletion changes can affect many identities, so they queue a full metadata backfill.
+When the changed operation is tied to one identity, the job is queued with that `identityId`. Changes to membership, role, preference or space deletion can affect many identities, so they queue a full metadata backfill.
 
 Root metadata backfill jobs are also deduplicated with stable queue job ids: one for a full-library metadata backfill and one per identity-scoped metadata backfill. Cursor jobs include the cursor in the job id, so a large library is still processed page by page without enqueuing duplicate full scans. Dedupe-keyed backfill jobs are removed on failure so the next bootstrap or metadata-changing operation can retry instead of being blocked by a stale failed job id.
 

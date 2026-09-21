@@ -288,7 +288,7 @@ So you can just grab it from there, paste it into a file and you're pretty much 
 :::
 
 :::info Classification
-The `classification` section configures [Auto-Classification](/features/auto-classification) — automatic tagging and archiving of photos based on visual content. Categories are empty by default. Here's an example with two categories:
+The `classification` section configures [Auto-Classification](/features/auto-classification), which tags and archives photos automatically based on what is in them. Categories are empty by default. Here is an example with two of them:
 
 ```json
 "classification": {
@@ -331,7 +331,7 @@ See the [Auto-Classification docs](/features/auto-classification) for the full f
 :::
 
 :::danger Pet recognition model changes bypass the confirmation dialog
-`machineLearning.petRecognition.modelName` is destructive to change: every model has its own embedding space, so switching it **deletes all pet people and their embeddings and reprocesses the library**. The admin UI asks you to confirm first — editing this file does not, so the purge simply happens on the next start.
+`machineLearning.petRecognition.modelName` is destructive to change: every model has its own embedding space, so switching it **deletes all pet people and their embeddings and reprocesses the library**. The admin UI asks you to confirm first. Editing this file does not, so the purge just happens on the next start.
 
 If pet detection is disabled at that moment, nothing is rebuilt: the reprocess is deferred until detection is enabled again. See [Pet Recognition](/features/pet-recognition).
 :::
@@ -352,18 +352,18 @@ The `memories` section configures generated memory retention and which memory ty
 
 - `retentionDays` is the number of days to keep unsaved generated memory records. Set it to `0` to keep memory records forever. Saved memories are not removed by retention cleanup.
 - `types` is a per-type global availability map. Each key is a memory-type key; the value enables (`true`) or disables (`false`) that type for everyone. Omitted keys default to on. Valid keys are:
-  - `on_this_day` — "N years ago" memories
-  - `birthday` — birthday memories for named people
-  - `recent_trip` — recent trip memories
-  - `month_recap` — a past year's photos from this calendar month
-  - `favorites_throwback` — your favorite photos from this calendar month in a past year
-  - `on_this_day_place` — a past year's on-this-day photos concentrated in one place
-  - `season_recap` — a recap of a past meteorological season
-  - `people_together` — two people or pets often photographed together in a past year
-  - `video_moments` — videos filmed in this calendar month in a past year
-  - `trip_anniversary` — a past trip resurfaced on the anniversary of the day it began
-  - `themed` — photo themes like sunsets, food, and beach days, found automatically via smart search
-  - `person_throwback` — a warm chapter with someone who has not appeared in your photos for a while
+  - `on_this_day`: "N years ago" memories
+  - `birthday`: birthday memories for named people
+  - `recent_trip`: recent trip memories
+  - `month_recap`: a past year's photos from this calendar month
+  - `favorites_throwback`: your favorite photos from this calendar month in a past year
+  - `on_this_day_place`: a past year's on-this-day photos concentrated in one place
+  - `season_recap`: a recap of a past meteorological season
+  - `people_together`: two people or pets often photographed together in a past year
+  - `video_moments`: videos filmed in this calendar month in a past year
+  - `trip_anniversary`: a past trip resurfaced on the anniversary of the day it began
+  - `themed`: photo themes like sunsets, food, and beach days, found automatically via smart search
+  - `person_throwback`: a warm chapter with someone who has not appeared in your photos for a while
 
 For example, to disable recent trips globally and leave the rest on:
 
@@ -375,11 +375,11 @@ For example, to disable recent trips globally and leave the rest on:
 }
 ```
 
-`themeMaxDistance` is the maximum CLIP cosine distance for the `themed` memory type (sunsets, food, beach days, etc. — found via smart search, not tags). It only takes effect for values `0 < x < 2`; the default is `0.75`. Setting it to `0` disables the quality gate entirely, so every smart-search result within a themed year is accepted regardless of similarity.
+`themeMaxDistance` is the maximum CLIP cosine distance for the `themed` memory type (sunsets, food, beach days and the like, found by smart search instead of by tags). It only takes effect for values `0 < x < 2`; the default is `0.75`. Setting it to `0` disables the quality gate entirely, so every smart-search result within a themed year is accepted regardless of similarity.
 
-This is a **text-to-image** distance, so it sits far higher than the image-to-image thresholds used for duplicate detection (`0.01`) or facial recognition (`0.5`) — CLIP's modality gap means even a perfect textual match rarely scores below `~0.6`. Values under `0.5` will typically produce **no themed memories at all**. If themed memories stop appearing, raise this in small steps rather than lowering it. `themed` requires smart search to be enabled — see the [Memories docs](/features/memories).
+This is a **text-to-image** distance, so it sits far higher than the image-to-image thresholds used for duplicate detection (`0.01`) or facial recognition (`0.5`). CLIP's modality gap means even a perfect textual match rarely scores below `~0.6`. Values under `0.5` will typically produce **no themed memories at all**. If themed memories stop appearing, raise this in small steps rather than lowering it. `themed` requires smart search to be enabled; see the [Memories docs](/features/memories).
 
-`personThrowbackDormancyMonths` is how many months a person must be absent from your photos before the `person_throwback` memory type can resurface them. The default is `6`; valid values are `1`–`120`. Lower values surface more people — including some you still see regularly — while higher values concentrate the memory on people who have genuinely dropped out of your library. The gap itself is never shown in the memory and never affects ranking.
+`personThrowbackDormancyMonths` is how many months a person must be absent from your photos before the `person_throwback` memory type can resurface them. The default is `6`, and valid values run from `1` to `120`. Lower values surface more people, including some you still see regularly. Higher values concentrate the memory on people who have genuinely dropped out of your library. The gap itself is never shown in the memory and never affects ranking.
 
 The config file only controls **global availability**. Within each available type, every user can still enable or disable it for themselves in their account settings. Disabling a type globally removes it from every user's settings and immediately hides existing unsaved memories of that type (saved memories are kept).
 
@@ -391,9 +391,9 @@ See the [Memories docs](/features/memories) for details about how retention and 
 :::
 
 :::info Storage Usage
-`storageUsage.includeDerivatives` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. It defaults to `false`, matching upstream Immich, where only original files are counted. Turning it on changes both the figure shown to users and what their storage quota is enforced against, so the two can never disagree; it also reduces how much original media a user can upload within the same quota.
+`storageUsage.includeDerivatives` controls whether server-generated files (thumbnails and transcoded videos) count toward a user's storage usage. It defaults to `false`, matching upstream Immich, where only original files are counted. Turning it on changes both the figure shown to users and what their storage quota is enforced against, so the two can never disagree; it also reduces how much original media a user can upload within the same quota.
 
-Storage usage is cached per user rather than computed on every request, so the figure has to be recalculated after you change this setting. On a config file install there is no "save settings" moment to trigger that, so the server recalculates it at startup whenever the flag is on — after editing the config file, restart the server and the figure will be correct once the recalculation finishes. From then on it is kept up to date by the nightly `nightlyTasks.syncQuotaUsage` task. If you set `syncQuotaUsage` to `false`, the figure is only refreshed on the next restart.
+Storage usage is cached per user rather than computed on every request, so the figure has to be recalculated after you change this setting. On a config file install there is no "save settings" moment to trigger that, so the server recalculates it at startup whenever the flag is on. Edit the config file, restart the server, and the figure will be right once the recalculation finishes. From then on it is kept up to date by the nightly `nightlyTasks.syncQuotaUsage` task. If you set `syncQuotaUsage` to `false`, the figure is only refreshed on the next restart.
 :::
 
 ### Step 2 - Specify the file location

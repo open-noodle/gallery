@@ -5,7 +5,7 @@ Gallery is built with modern deployment practices in mind, and the backend is de
 Scaling can be useful for many reasons. Maybe you have a gaming PC that you want to use for transcoding and thumbnail generation, or perhaps you run a Kubernetes cluster across a handful of powerful servers that you want to make use of.
 
 :::info
-If you only have a single machine to run Gallery on, scaling to multiple containers is unlikely to provide any benefit. An Gallery container will run multiple background tasks at once, and you can increase their number from the admin panel.
+If you only have a single machine to run Gallery on, scaling to multiple containers is unlikely to provide any benefit. A Gallery container will run multiple background tasks at once, and you can increase their number from the admin panel.
 :::
 
 The details of how to scale across multiple machines will vary widely between different environments and require some knowledge to set up, and as such this guide gives no specific instructions. In some cases scaling up can be as easy as incrementing the amount of replicas on a Kubernetes deployment, in others it might need you to configure network tunnels or NFS mounts. The details are left as an exercise for the reader ;)
