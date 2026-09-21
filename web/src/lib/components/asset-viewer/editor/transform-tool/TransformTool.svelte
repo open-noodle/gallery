@@ -6,11 +6,6 @@
   import { mdiFlipHorizontal, mdiFlipVertical, mdiRotateLeft, mdiRotateRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
-  // Which panel is shown below Orientation — display-only, not sent anywhere. Edit and Crop are
-  // both still part of the same Transform tool/edit set regardless of which one is visible; see
-  // transform-manager.svelte.ts for where the actual Crop/Adjust edit data lives.
-  let mode = $state<'edit' | 'crop'>('edit');
-
   interface AspectRatioOption {
     label: string;
     value: string;
@@ -121,9 +116,9 @@
       class="w-full"
       shape="round"
       size="small"
-      onclick={() => (mode = 'edit')}
-      color={mode === 'edit' ? 'primary' : 'secondary'}
-      variant={mode === 'edit' ? 'filled' : 'outline'}
+      onclick={() => (transformManager.mode = 'edit')}
+      color={transformManager.mode === 'edit' ? 'primary' : 'secondary'}
+      variant={transformManager.mode === 'edit' ? 'filled' : 'outline'}
     >
       {$t('edit')}
     </Button>
@@ -131,15 +126,15 @@
       class="w-full"
       shape="round"
       size="small"
-      onclick={() => (mode = 'crop')}
-      color={mode === 'crop' ? 'primary' : 'secondary'}
-      variant={mode === 'crop' ? 'filled' : 'outline'}
+      onclick={() => (transformManager.mode = 'crop')}
+      color={transformManager.mode === 'crop' ? 'primary' : 'secondary'}
+      variant={transformManager.mode === 'crop' ? 'filled' : 'outline'}
     >
       {$t('crop')}
     </Button>
   </HStack>
 
-  {#if mode === 'edit'}
+  {#if transformManager.mode === 'edit'}
     <AdjustPanel />
   {:else}
     <!-- Aspect Ratio Grid -->

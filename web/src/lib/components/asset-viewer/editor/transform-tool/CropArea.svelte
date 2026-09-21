@@ -107,10 +107,17 @@
       class={[
         'overlay pointer-events-none absolute top-0 size-full transition-colors motion-reduce:transition-none',
         transformManager.isInteracting ? 'bg-black/30' : 'bg-black/56',
+        transformManager.mode !== 'crop' && 'invisible',
       ]}
       bind:this={transformManager.overlayEl}
     ></div>
-    <div class="crop-frame absolute border-2 border-white" bind:this={transformManager.cropFrame}>
+    <!-- `invisible` (not `{#if}`) so the frame stays mounted while Edit is showing - it keeps its
+    bound DOM ref and imperatively-set position/size (see draw() in transform-manager.svelte.ts),
+    which unmounting and remounting on every mode switch would otherwise reset to nothing. -->
+    <div
+      class={['crop-frame absolute border-2 border-white', transformManager.mode !== 'crop' && 'invisible']}
+      bind:this={transformManager.cropFrame}
+    >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class={[

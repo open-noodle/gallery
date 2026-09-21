@@ -48,6 +48,11 @@ class TransformManager implements EditToolManager {
   canReset: boolean = $derived.by(() => this.checkEdits());
   hasChanges: boolean = $state(false);
 
+  // Which panel is showing — Edit's sliders or Crop's aspect-ratio grid. Lives here, not as
+  // local state in TransformTool.svelte, because CropArea.svelte (a sibling component) needs it
+  // too, to hide the crop overlay/handles while Edit is showing.
+  mode = $state<'edit' | 'crop'>('edit');
+
   isInteracting = $state(false);
   isDragging = $state(false);
   animationFrame = $state<ReturnType<typeof requestAnimationFrame> | null>(null);
@@ -258,6 +263,7 @@ class TransformManager implements EditToolManager {
   }
 
   reset() {
+    this.mode = 'edit';
     this.isInteracting = false;
     this.animationFrame = null;
     this.dragAnchor = { x: 0, y: 0 };
