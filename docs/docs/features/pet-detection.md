@@ -1,48 +1,47 @@
 # Pet Detection
 
-Gallery can automatically detect cats and dogs in your photos using RF-DETR object
-detection. Paired with [Pet Recognition](/features/pet-recognition), your individual dogs and
-cats appear in the **People** section alongside human faces, so you can name them and browse
-every photo of a specific pet.
+Gallery can detect cats and dogs in your photos using RF-DETR object detection. Paired with
+[Pet Recognition](/features/pet-recognition), your individual dogs and cats appear in the
+**People** section alongside human faces, so you can name them and browse every photo of a
+specific pet.
 
-Detection on its own does not add anything to the People section. It records each pet it
-finds against a single per-species entry — one "dog", one "cat" — and those per-species
-entries are not displayed. See
-[What you can and cannot see](#what-you-can-and-cannot-see) before enabling it on its own.
+Detection on its own adds nothing to the People section. It records each pet it finds against
+a single per-species entry (one "dog", one "cat"), and those entries are never displayed. Read
+[What you can and cannot see](#what-you-can-and-cannot-see) before you enable it on its own.
 
 ## How It Works
 
 When a photo is uploaded or reprocessed, the machine learning service runs an RF-DETR model to
-detect pets. Each detected pet is cropped and recorded with its bounding box, the same
-way face detection records a human face.
+detect pets. Each detected pet is cropped and recorded with its bounding box, the same way face
+detection records a human face.
 
 Only **cats and dogs** are detected. Every other animal is discarded.
 
 The model still scores birds, horses, sheep and cows internally, and that is deliberate: it
-gives a horse a class of its own to win, so it is thrown away rather than being forced onto
-whichever of cat or dog happened to score highest. Removing those classes outright would file
-horses and cows under your dog entry instead of discarding them.
+gives a horse a class of its own to win, so the horse gets thrown away instead of being forced
+onto whichever of cat or dog happened to score highest. Remove those classes outright and
+horses and cows end up filed under your dog entry.
 
 Wild animals such as bears, zebras, giraffes and elephants are excluded from that scoring step
 as well. They are rare in a household photo library, and including them caused bear-like dog
-breeds — Newfoundlands, Keeshonds, Great Pyrenees — to be confidently mislabelled as bears.
+breeds (Newfoundlands, Keeshonds, Great Pyrenees) to be confidently mislabelled as bears.
 
 ## What you can and cannot see
 
 Detection records every pet it finds, but it is only browsable with Pet Recognition on.
 
-| What was detected                                                  | Where it ends up                                                 |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| A dog or cat, with [Pet Recognition](/features/pet-recognition) on | An individual pet in **People** — nameable, mergeable, browsable |
-| A dog or cat, with Pet Recognition off                             | A shared per-species entry, **not shown**                        |
-| Any other animal                                                   | Discarded — never recorded                                       |
+| What was detected                                                  | Where it ends up                                                |
+| ------------------------------------------------------------------ | --------------------------------------------------------------- |
+| A dog or cat, with [Pet Recognition](/features/pet-recognition) on | An individual pet in **People**: nameable, mergeable, browsable |
+| A dog or cat, with Pet Recognition off                             | A shared per-species entry, **not shown**                       |
+| Any other animal                                                   | Discarded, never recorded                                       |
 
-Per-species entries are stored, but the People page lists identities rather than raw person
-records, and a per-species entry is never given one. So with Pet Recognition switched off,
-**Pet Detection alone puts nothing in your People section** — it quietly records detections
-you have no way to view, rename or delete from the UI.
+Per-species entries are stored, but the People page lists identities, and a per-species entry is
+never given one. So with Pet Recognition switched off, **Pet Detection alone puts nothing in your
+People section**. It quietly records detections you have no way to view, rename or delete from
+the UI.
 
-If what you want is named pets, enable Pet Recognition too.
+If you want named pets, enable Pet Recognition too.
 
 ## Model Options
 
@@ -53,21 +52,21 @@ Two models are available:
 | `rfdetr-nano`  | 384×384 | Fastest      | Almost everyone. The default.              |
 | `rfdetr-small` | 512×512 | ~1.8× slower | Libraries with many small or distant pets. |
 
-The default is **rfdetr-nano**. On a benchmark of real pet photos it correctly identified the
-species in 98% of images, and it is more accurate than the previous YOLO11 models at every
-size while costing the same time per photo as the old default.
+The default is **rfdetr-nano**. On a benchmark of real pet photos it identified the species
+correctly in 98% of images, and it beats the previous YOLO11 models at every size while costing
+the same time per photo as the old default.
 
-`rfdetr-small` is worth choosing if your pets are often small in frame — in the background of
-a landscape, or across a room. On COCO it detects roughly 8% more small objects than the nano
-model.
+`rfdetr-small` is worth choosing if your pets are often small in frame: in the background of a
+landscape, or across a room. On COCO it detects roughly 8% more small objects than the nano
+model does.
 
 ## Accuracy
 
-Measured two ways: on **Oxford-IIIT Pet** (7,390 photos, sampled evenly across all 37 breeds),
-which represents the common case of a pet filling the frame; and on **COCO val2017**, which
-represents pets that are small, partly hidden, or in cluttered scenes.
+Measured two ways. Oxford-IIIT Pet (7,390 photos, sampled evenly across all 37 breeds) covers
+the common case of a pet filling the frame. COCO val2017 covers pets that are small, partly
+hidden, or in cluttered scenes.
 
-Species recall — the share of photos where the correct species was detected:
+Species recall is the share of photos where the correct species was detected:
 
 | Model                     | Pet portraits | Cluttered scenes | Small pets | Time per photo |
 | ------------------------- | ------------- | ---------------- | ---------- | -------------- |
@@ -81,14 +80,14 @@ slower, while costing about what the old default cost.
 The gap widens on harder photos: on cluttered scenes `rfdetr-nano` leads the old default by
 5.7 points rather than 2.5, and it finds more small pets at 384×384 than YOLO11 did at 640×640.
 
-Together with the RGB and letterboxing corrections that ship alongside the new model, end-to-end
-species recall on pet portraits moves from **84.8% to 98.1%**, and photos where no animal was
-detected at all fall from 10.0% to 0.7%.
+Together with the RGB and letterboxing corrections that ship alongside the new model,
+end-to-end species recall on pet portraits moves from 84.8% to **98.1%**, and photos where no
+animal was detected at all fall from 10.0% to 0.7%.
 
 :::note One thing to watch
 RF-DETR produces roughly twice as many low-confidence extra boxes per image as YOLO11 did. Much
-of that is an artefact of how the benchmark counts near-duplicate boxes on the same animal, but
-if you do see spurious detections, raising the **minimum confidence score** is the lever.
+of that is an artefact of how the benchmark counts near-duplicate boxes on the same animal. If
+you do see spurious detections, raise the minimum confidence score.
 :::
 
 ## Configuration
@@ -106,10 +105,10 @@ To detect pets in existing photos that were uploaded before pet detection was en
 1. Go to **Administration** > **Jobs**.
 2. Run the **Pet Detection** job for **Missing** assets.
 
-:::danger "All" is a destructive reset, not a top-up
+:::danger "All" wipes your pets before it re-detects
 Running the job for **All** assets (the **Reset** button) is a full reset: it **deletes every pet person and every pet detection first**, including any names you gave them and the copies projected into shared spaces, and only then re-detects. Names are not recoverable.
 
-The deletion happens even when pet detection is disabled — that is deliberate, so you can turn detection off and then clear out the pets it already created. But it means resetting while detection is off leaves you with no pets at all until you re-enable it and reset again.
+The deletion happens even when pet detection is disabled. That is deliberate, so you can turn detection off and then clear out the pets it already created. But it means resetting while detection is off leaves you with no pets at all until you re-enable it and reset again.
 
 **Missing** is the safe option, and the one you want here: it only processes assets that have never been through pet detection.
 :::
@@ -120,43 +119,41 @@ Earlier versions of Gallery used YOLO11 (`yolo11n`, `yolo11s`, `yolo11m`). If yo
 detection enabled before this release, here is exactly what changes.
 
 :::warning Your existing photos are not reprocessed automatically
-Nothing is re-detected, re-embedded or re-clustered on upgrade. The new model applies to
-**newly uploaded photos only** until you explicitly rebuild — so none of the accuracy above
-reaches the photos already in your library until you run a Reset.
+Nothing is re-detected, re-embedded or re-clustered on upgrade. The new model applies to **newly uploaded photos only** until you explicitly rebuild. None of the accuracy above reaches the photos already in your library until you run a Reset.
 
-This is deliberate: an automatic rebuild would delete every pet name you have set and put hours
-of machine-learning work on your server without asking.
+This is deliberate: an automatic rebuild would delete every pet name you have set and put hours of machine-learning work on your server without asking.
 :::
 
 ### What happens on its own
 
-- **Your model setting is migrated.** Any `yolo*` value becomes `rfdetr-nano` when the server
+- Your model setting is migrated. Any `yolo*` value becomes `rfdetr-nano` when the server
   starts. There is nothing to do, and the old names are no longer offered.
-- **The new model downloads on first use** — about 108 MB for `rfdetr-nano`, cached afterwards.
-- **New photos use RF-DETR immediately.**
+- The new model downloads on first use, about 108 MB for `rfdetr-nano`, and is cached
+  afterwards.
+- New photos use RF-DETR immediately.
 
 ### What does _not_ happen on its own
 
-- **Existing detections are left exactly as they were.** They were produced by the old model,
-  so they keep its mistakes. Nothing re-runs over them.
-- **Non-pet entries become permanent until you rebuild.** Any bear, zebra, giraffe or
-  elephant YOLO11 created — and any bird, horse, sheep or cow created before detection was
-  narrowed to cats and dogs — stays in your library as a per-species entry. Neither species is
+- Existing detections are left exactly as they were. They were produced by the old model, so
+  they keep its mistakes. Nothing re-runs over them.
+- Non-pet entries become permanent until you rebuild. Any bear, zebra, giraffe or elephant
+  YOLO11 created stays in your library as a per-species entry, and so does any bird, horse,
+  sheep or cow created before detection was narrowed to cats and dogs. Neither group is
   produced any more, so nothing will ever correct or replace them on its own, and because
   per-species entries are not shown in the People section, a Reset is the only thing that
   clears them.
-- **Individual pets are not re-clustered.** If you use [Pet Recognition](/features/pet-recognition),
+- Individual pets are not re-clustered. If you use [Pet Recognition](/features/pet-recognition),
   your existing pets keep the embeddings the old detector's crops produced.
-- **Your confidence threshold is not migrated.** This is the one to check. If you never changed
-  it, you get the new default of `0.3` and nothing more is needed. But if you _explicitly_ set a
-  value for YOLO11, it carries over — and the two models are calibrated differently, so the old
+- Your confidence threshold is not migrated. This is the one to check. If you never changed it,
+  you get the new default of `0.3` and nothing more is needed. But if you _explicitly_ set a
+  value for YOLO11, it carries over, and the two models are calibrated differently: the old
   default of `0.6` behaves roughly twice as strictly under RF-DETR and will miss pets. Open
   **Administration → Machine Learning Settings → Pet Detection** and set it back to `0.3` unless
   you have a reason not to.
 
 Until you rebuild, your library is in a mixed state: older photos carry YOLO11's detections and
 newer ones carry RF-DETR's. If you want the improved accuracy across your whole library, the
-Reset below is not optional — it is the only thing that applies it.
+Reset below is the only thing that applies it.
 
 ### Rebuilding
 
@@ -164,9 +161,7 @@ To re-detect everything with the new model, run **Administration → Jobs → Pe
 Reset**.
 
 :::danger Reset deletes your named pets
-Reset removes every pet person and detection first — including any names you gave them and the
-copies projected into shared spaces — and only then re-detects. Names are not recoverable. On a
-large library the rebuild takes a while, since every photo goes through the detector again.
+Reset removes every pet person and detection first, including any names you gave them and the copies projected into shared spaces, and only then re-detects. Names are not recoverable. On a large library the rebuild takes a while, since every photo goes through the detector again.
 :::
 
 If you use [Pet Recognition](/features/pet-recognition), the rebuild also re-embeds and
@@ -177,8 +172,8 @@ re-clusters your dogs and cats, so individual pets are rebuilt from scratch too.
 - Lower the confidence threshold if pets are being missed; raise it if you see spurious
   detections. The default of 0.3 works well for most libraries.
 - Detected pets can be renamed and merged in the People section, just like human faces.
-- A few unusually bear-like dogs may not be detected at all rather than being mislabelled.
-  This is intentional — see the note about wild animals above.
+- A few unusually bear-like dogs may be missed entirely instead of mislabelled. That is
+  intentional (see the note about wild animals above).
 
 ## Technical Implementation
 
@@ -197,52 +192,52 @@ re-clusters your dogs and cats, so individual pets are rebuilt from scratch too.
                 └──────────────────────────────────────────────┘
 ```
 
-1. **Preprocessing** — The preview image is decoded to RGB, resized to the model's input size
+1. **Preprocessing.** The preview image is decoded to RGB, resized to the model's input size
    (384 or 512), scaled to `[0,1]` and normalised with ImageNet statistics, then transposed to
    NCHW.
-2. **Inference** — ONNX Runtime runs the RF-DETR model, producing 300 object queries: box
+2. **Inference.** ONNX Runtime runs the RF-DETR model, producing 300 object queries: box
    coordinates plus class logits over the 91-class COCO label space.
-3. **Postprocessing** — Logits are passed through a sigmoid and restricted to the six domestic
+3. **Postprocessing.** Logits are passed through a sigmoid and restricted to the six domestic
    animal classes. The best class is taken per query, everything that is not a cat or a dog is
    dropped, and the rest is thresholded by the configured `minScore`. Boxes are converted from
    normalised centre/width/height to pixel corners and clipped to the image. No
-   non-maximum-suppression step is needed — RF-DETR's queries are already deduplicated.
+   non-maximum-suppression step is needed: RF-DETR's queries are already deduplicated.
 
-Models are downloaded from Hugging Face Hub on first use and cached locally. Inference
-supports CUDA, OpenVINO, CoreML, and CPU backends via ONNX Runtime.
+Models are downloaded from Hugging Face Hub on first use and cached locally. Inference supports
+CUDA, OpenVINO, CoreML, and CPU backends via ONNX Runtime.
 
 ### Database Changes
 
-Pet detection extends two existing tables rather than creating new ones:
+Pet detection extends two existing tables instead of creating new ones:
 
-- **`person`** — Added `type` column (VARCHAR, default `'person'`) to distinguish humans from
-  pets, and `species` column (VARCHAR, nullable) for the pet label (`'dog'` or `'cat'`).
-- **`asset_job_status`** — Added `petsDetectedAt` timestamp to track which assets have been
+- `person` gained a `type` column (VARCHAR, default `'person'`) to distinguish humans from pets,
+  and a `species` column (VARCHAR, nullable) for the pet label (`'dog'` or `'cat'`).
+- `asset_job_status` gained a `petsDetectedAt` timestamp to track which assets have been
   processed.
 
 Detected pets are stored as `person` rows with `type = 'pet'`. Each species creates one person
-entry per user (e.g., one "dog" person, one "cat" person), and individual detections are
-stored as `asset_face` rows with bounding box coordinates linked to that person. This reuses
-the existing face/person storage for thumbnails and bounding boxes.
+entry per user (e.g., one "dog" person, one "cat" person), and individual detections are stored
+as `asset_face` rows with bounding box coordinates linked to that person. This reuses the
+existing face/person storage for thumbnails and bounding boxes.
 
-Note that a per-species `person` row is never given a `face_identity`, and the People page
-queries identities rather than `person` rows directly — which is why these entries do not
-appear there. Only pets promoted to individuals by Pet Recognition receive one.
+A per-species `person` row is never given a `face_identity`, and the People page queries
+identities rather than the `person` table, which is why these entries do not appear there. Only
+pets promoted to individuals by Pet Recognition receive one.
 
 :::note Pet Recognition covers dogs and cats only
 When [Pet Recognition](/features/pet-recognition) is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. Since detection is limited to those two species, everything it records is eligible for recognition.
 
-Detection and recognition agree on scope by design: the recognition model is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Detecting species it could never individuate only produced entries that were recorded but never listed.
+Detection and recognition agree on scope by design: the recognition model is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Detecting species it could never tell apart only produced entries that were recorded and never listed.
 :::
 
 ### Job Flow
 
 Pet detection runs as a dedicated BullMQ queue (`petDetection`) with concurrency of 1:
 
-1. **On upload** — The job service automatically queues a `PetDetection` job alongside face
-   detection and smart search.
-2. **Manual re-run** — An admin can trigger `PetDetectionQueueAll` from the Jobs page, which
+1. **On upload.** The job service queues a `PetDetection` job alongside face detection and
+   smart search.
+2. **Manual re-run.** An admin can trigger `PetDetectionQueueAll` from the Jobs page, which
    streams all unprocessed assets and queues individual jobs.
-3. **Per-asset job** — Each job calls the ML service with the asset's preview file, creates or
-   reuses person entries per species, records `asset_face` bounding boxes, and queues
-   thumbnail generation for new pet persons.
+3. **Per-asset job.** Each job calls the ML service with the asset's preview file, creates or
+   reuses person entries per species, records `asset_face` bounding boxes, and queues thumbnail
+   generation for new pet persons.
