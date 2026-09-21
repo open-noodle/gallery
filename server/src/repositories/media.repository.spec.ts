@@ -6,6 +6,7 @@ import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto.js';
 import { Colorspace, ImageFormat } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
+import type { Bitmap } from 'src/types.js';
 import { automock } from 'test/utils.js';
 
 const getPixelColor = async (buffer: Buffer, x: number, y: number) => {
@@ -18,6 +19,16 @@ const getPixelColor = async (buffer: Buffer, x: number, y: number) => {
     g: data[idx + 1],
     b: data[idx + 2],
   };
+};
+
+const solidBitmap = (background: { r: number; g: number; b: number }, alpha = 1, width = 10, height = 10) =>
+  sharp({ create: { width, height, channels: 4, background: { ...background, alpha } } })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+const getBitmapPixel = ({ data, info }: Bitmap, x: number, y: number) => {
+  const idx = (y * info.width + x) * info.channels;
+  return { r: data[idx], g: data[idx + 1], b: data[idx + 2] };
 };
 
 const buildTestQuadImage = async () => {
@@ -163,6 +174,146 @@ describe(MediaRepository.name, () => {
       expect(await getPixelColor(bufferVertical, 10, 990)).toEqual({ r: 255, g: 0, b: 0 });
       // bottom-right should now be top-right (blue)
       expect(await getPixelColor(bufferVertical, 990, 990)).toEqual({ r: 0, g: 255, b: 0 });
+    });
+  });
+
+  describe('transform (adjust)', () => {
+    it('should apply exposure as a linear multiply with no offset', async () => {
+      const result = await sut['transform'](await solidBitmap({ r: 50, g: 100, b: 150 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { exposure: 50 } }],
+      });
+
+      // factor = 1 + 50/100 = 1.5
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 75, g: 150, b: 225 });
+    });
+
+    it('should clip exposure at 255', async () => {
+      const result = await sut['transform'](await solidBitmap({ r: 200, g: 200, b: 200 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { exposure: 100 } }],
+      });
+
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 255, g: 255, b: 255 });
+    });
+
+    it('should pivot contrast around the 8-bit midpoint (127.5)', async () => {
+      const result = await sut['transform'](await solidBitmap({ r: 200, g: 200, b: 200 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { contrast: 50 } }],
+      });
+
+      // amount = 1.5, offset = 127.5 * (1 - 1.5) = -63.75 -> 200 * 1.5 - 63.75 = 236.25
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 236, g: 236, b: 236 });
+    });
+
+    it('should use the same 8-bit midpoint for a P3 (rgb16 pipeline) decode', async () => {
+      // A wide-gamut source decodes through a 16-bit pipeline, but the bitmap transform() adjusts is 8-bit
+      // either way - a 16-bit midpoint here would push every pixel to black.
+      const png = await sharp({
+        create: { width: 10, height: 10, channels: 3, background: { r: 200, g: 200, b: 200 } },
+      })
+        .png()
+        .toBuffer();
+      const decoded = await sut.decodeImage(png, { colorspace: Colorspace.P3, processInvalidImages: false });
+
+      const result = await sut['transform'](decoded, {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { contrast: 50 } }],
+      });
+
+      expect(result.info.depth).toBe('uchar');
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 236, g: 236, b: 236 });
+    });
+
+    it('should fully desaturate to grayscale using CSS luminosity weights at saturation -100', async () => {
+      const result = await sut['transform'](await solidBitmap({ r: 200, g: 80, b: 40 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { saturation: -100 } }],
+      });
+
+      const pixel = getBitmapPixel(result, 5, 5);
+      expect(pixel.r).toBe(pixel.g);
+      expect(pixel.g).toBe(pixel.b);
+    });
+
+    it('should increase color channel separation at positive saturation', async () => {
+      const background = { r: 200, g: 80, b: 40 };
+      const saturated = await sut['transform'](await solidBitmap(background), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { saturation: 100 } }],
+      });
+
+      const saturatedPixel = getBitmapPixel(saturated, 5, 5);
+
+      // Boosting saturation should widen the spread between the dominant (r) and weakest (b) channel
+      expect(saturatedPixel.r - saturatedPixel.b).toBeGreaterThan(background.r - background.b);
+    });
+
+    it('should invert colors like CSS invert(1)', async () => {
+      const result = await sut['transform'](await solidBitmap({ r: 100, g: 50, b: 200 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { invert: true } }],
+      });
+
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 155, g: 205, b: 55 });
+    });
+
+    it('should invert semi-transparent pixels as straight alpha, not as premultiplied values', async () => {
+      // The scRGB edit pass flags its output as premultiplied while returning straight-alpha bytes. If adjust
+      // trusted that flag, sharp would un-premultiply r=100 at alpha≈0.5 to ~200 and invert it to ~55.
+      const result = await sut['transform'](await solidBitmap({ r: 100, g: 50, b: 200 }, 0.5), {
+        size: 5,
+        edits: [{ action: AssetEditAction.Adjust, parameters: { invert: true } }],
+      });
+
+      expect(getBitmapPixel(result, 2, 2)).toEqual({ r: 155, g: 205, b: 55 });
+    });
+
+    it('should combine exposure and contrast rather than letting one silently overwrite the other', async () => {
+      // sharp's `.linear(a, b)` is a single option slot, not a queue of operations - calling it
+      // twice (once for exposure, once for contrast) makes the second call silently discard the
+      // first entirely, rather than composing with it.
+      const result = await sut['transform'](await solidBitmap({ r: 100, g: 100, b: 100 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { exposure: 50, contrast: 50 } }],
+      });
+
+      // a = 1.5 * 1.5 = 2.25, b = 127.5 * (1 - 1.5) = -63.75 -> 100 * 2.25 - 63.75 = 161.25
+      // Neither value alone would be 161 (exposure alone gives 150, contrast alone gives 86) -
+      // this is only reachable if both actually took effect together.
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 161, g: 161, b: 161 });
+    });
+
+    it('should apply invert before exposure, so a negative exposure darkens an inverted image', async () => {
+      // Editing a scanned film negative: Invert undoes the negative first, and a *negative*
+      // exposure value must then darken the now-normal-looking image, not brighten it. sharp
+      // always negates last regardless of call order (`linear`/`negate` are single option slots,
+      // not a queue), so exposure's (a, b) is algebraically pre-adjusted here to simulate invert
+      // running first.
+      const invertedOnly = await sut['transform'](await solidBitmap({ r: 50, g: 50, b: 50 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { invert: true } }],
+      });
+      const invertedThenDarkened = await sut['transform'](await solidBitmap({ r: 50, g: 50, b: 50 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { exposure: -40, invert: true } }],
+      });
+
+      const invertedPixel = getBitmapPixel(invertedOnly, 5, 5);
+      const darkerPixel = getBitmapPixel(invertedThenDarkened, 5, 5);
+
+      expect(darkerPixel.r).toBeLessThan(invertedPixel.r);
+      expect(darkerPixel).toEqual({ r: 123, g: 123, b: 123 });
+    });
+
+    it('should be a no-op when the adjust edit has no parameters set', async () => {
+      const result = await sut['transform'](await solidBitmap({ r: 100, g: 150, b: 200 }), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: {} }],
+      });
+
+      expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 100, g: 150, b: 200 });
+    });
+
+    it('should exclude adjust from the affine (geometric) transform path', async () => {
+      // Adjust must never be treated as a spatial edit - a regression here would try to build
+      // an affine matrix from color parameters and throw, or silently distort the image.
+      const result = await sut['transform'](await solidBitmap({ r: 100, g: 100, b: 100 }, 1, 20, 10), {
+        edits: [{ action: AssetEditAction.Adjust, parameters: { invert: true } }],
+      });
+
+      expect(result.info.width).toBe(20);
+      expect(result.info.height).toBe(10);
     });
   });
 

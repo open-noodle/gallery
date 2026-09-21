@@ -6,6 +6,7 @@ export enum AssetEditAction {
   Rotate = 'rotate',
   Mirror = 'mirror',
   Trim = 'trim',
+  Adjust = 'adjust',
 }
 
 export const AssetEditActionSchema = z
@@ -59,25 +60,66 @@ const TrimParametersSchema = z
   })
   .meta({ id: 'TrimParameters' });
 
+// Ranges are -100..100 rather than, say, a raw multiplier, because the web
+// client's live preview and this server-side processing are both
+// deliberately implemented against the same reference (the CSS Filter
+// Effects spec) so a slider position previews exactly what gets saved. See
+// specs/2026-09-20-image-adjust-tool-design.md for the server-side formulas.
+const AdjustParametersSchema = z
+  .object({
+    exposure: z
+      .number()
+      .meta({ format: 'double' })
+      .min(-100)
+      .max(100)
+      .optional()
+      .describe('Exposure adjustment, -100 to 100'),
+    contrast: z
+      .number()
+      .meta({ format: 'double' })
+      .min(-100)
+      .max(100)
+      .optional()
+      .describe('Contrast adjustment, -100 to 100'),
+    saturation: z
+      .number()
+      .meta({ format: 'double' })
+      .min(-100)
+      .max(100)
+      .optional()
+      .describe('Saturation adjustment, -100 to 100'),
+    invert: z.boolean().optional().describe('Invert colors (for scanned film negatives)'),
+  })
+  .meta({ id: 'AdjustParameters' });
+
 // TODO: ideally we would use the discriminated union directly in the future not only for type support but also for validation and openapi generation
 const __AssetEditActionItemSchema = z.discriminatedUnion('action', [
   z.object({ action: AssetEditActionSchema.extract(['Crop']), parameters: CropParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Rotate']), parameters: RotateParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Mirror']), parameters: MirrorParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Trim']), parameters: TrimParametersSchema }),
+  z.object({ action: AssetEditActionSchema.extract(['Adjust']), parameters: AdjustParametersSchema }),
 ]);
 
 const AssetEditParametersSchema = z
-  .union([CropParametersSchema, RotateParametersSchema, MirrorParametersSchema, TrimParametersSchema], {
-    error: getExpectedKeysByActionMessage,
-  })
-  .describe('List of edit actions to apply (crop, rotate, mirror, or trim)');
+  .union(
+    [
+      CropParametersSchema,
+      RotateParametersSchema,
+      MirrorParametersSchema,
+      TrimParametersSchema,
+      AdjustParametersSchema,
+    ],
+    { error: getExpectedKeysByActionMessage },
+  )
+  .describe('List of edit actions to apply (crop, rotate, mirror, trim, or adjust)');
 
 const actionParameterMap = {
   [AssetEditAction.Crop]: CropParametersSchema,
   [AssetEditAction.Rotate]: RotateParametersSchema,
   [AssetEditAction.Mirror]: MirrorParametersSchema,
   [AssetEditAction.Trim]: TrimParametersSchema,
+  [AssetEditAction.Adjust]: AdjustParametersSchema,
 } as const;
 
 const actionParameterKeys = {
@@ -85,6 +127,7 @@ const actionParameterKeys = {
   [AssetEditAction.Rotate]: Object.keys(RotateParametersSchema.shape),
   [AssetEditAction.Mirror]: Object.keys(MirrorParametersSchema.shape),
   [AssetEditAction.Trim]: ['startTime', 'endTime'],
+  [AssetEditAction.Adjust]: Object.keys(AdjustParametersSchema.shape),
 } as const;
 
 function getExpectedKeysByActionMessage(): string {
@@ -158,3 +201,4 @@ export type CropParameters = z.infer<typeof CropParametersSchema>;
 export type TrimParameters = z.infer<typeof TrimParametersSchema>;
 export type RotateParameters = z.infer<typeof RotateParametersSchema>;
 export type MirrorParameters = z.infer<typeof MirrorParametersSchema>;
+export type AdjustParameters = z.infer<typeof AdjustParametersSchema>;
