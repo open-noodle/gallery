@@ -81,7 +81,7 @@ describe('FaceReviewDock — summary and actions', () => {
     expect(screen.getByTestId('bulk-owner')).toHaveTextContent('Move to owner');
     expect(screen.getByTestId('bulk-stay')).toHaveTextContent('Keep here');
     expect(screen.getByTestId('bulk-lock')).toHaveTextContent('Confirm & lock');
-    expect(screen.getByTestId('bulk-other')).toHaveTextContent('Move to person…');
+    expect(screen.getByTestId('bulk-other')).toHaveTextContent('Move to person...');
     expect(screen.getByTestId('bulk-unknown')).toHaveTextContent('Unknown person');
     expect(screen.getByTestId('bulk-detach')).toHaveTextContent('Not a face');
   });

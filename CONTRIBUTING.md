@@ -23,13 +23,13 @@ If you find bugs or other problems while working on something, we appreciate tha
 
 ## Use of Generative AI
 
-We **actively encourage** the use of LLMs and AI coding tools. Unlike some projects that ban AI-generated code, we believe these tools are a massive force multiplier when used correctly. The key ingredient isn't avoiding AI — it's having a clear spec.
+We encourage the use of LLMs and AI coding tools. Some projects ban AI-generated code; our experience is that these tools pay off when the person driving them has a clear spec.
 
-**All PRs must include a spec or design document** that describes _what_ the change does and _why_. This applies whether you wrote every line by hand, pair-programmed with an LLM, or let an agent do the heavy lifting. A well-written spec means reviewers can evaluate intent and correctness, not just syntax — and it turns out that's what matters regardless of who (or what) wrote the code.
+**All PRs must include a spec or design document** that describes _what_ the change does and _why_. That holds whether you wrote every line by hand, pair-programmed with an LLM, or handed the job to an agent. With a spec in front of them, reviewers can judge intent and correctness, which is what matters regardless of who (or what) wrote the code.
 
-**All PRs must also include tests.** We didn't get from 74% to 94% server test coverage by accident. Tests are how you prove your code works — spec says _what_, tests prove _that_. No tests, no merge.
+**All PRs must also include tests.** Server test coverage went from 74% to 94%, and not by accident. The spec says _what_ the code should do; the tests show that it does. No tests, no merge.
 
-In our experience, the "large amount of back-and-forth" that some projects attribute to LLM-generated code is really a symptom of missing specs and unclear requirements. Solve that, add tests, and the tooling becomes irrelevant.
+The "large amount of back-and-forth" that some projects blame on LLM-generated code is, in our experience, a symptom of missing specs and unclear requirements. Solve that, add tests, and it stops mattering which tool wrote the code.
 
 LLMs must not be used to fix GitHub issues labelled good first issue. These issues are generally not urgent, and are intended to be learning opportunities for new contributors to get familiar with the codebase. Whether you are a newcomer or not, fully automating the process of fixing this issue squanders the learning opportunity and doesn’t add much value to the project. Using LLMs to fix issues labelled as “good first issue” is forbidden, and those PRs will be closed automatically.
 
@@ -62,11 +62,11 @@ If you like helping others, answering Q&A discussions here on GitHub and replyin
 
 > Fork-maintainer reference. Gallery releases are separate from upstream Immich releases.
 
-Gallery uses a **two-phase release flow** so mobile app builds are already live on Play Store and App Store before server users see a new version. All workflows are **manually triggered** via `workflow_dispatch` and appear in the Actions tab as:
+Gallery uses a two-phase release flow, so mobile app builds are already live on Play Store and App Store before server users see a new version. Every workflow is triggered by hand via `workflow_dispatch`, and they appear in the Actions tab as:
 
-- **Release Mobile P1** — phase 1 (start of a full release)
-- **Release Gallery P2** — phase 2 (after mobile is live on stores)
-- **Release Gallery Server-only** — skip mobile entirely (use for server-only hotfixes)
+- Release Mobile P1 is phase 1, the start of a full release.
+- Release Gallery P2 is phase 2, run once mobile is live on the stores.
+- Release Gallery Server-only skips mobile entirely, for server-only hotfixes.
 
 ### Release Mobile P1 (`.github/workflows/gallery-release-mobile.yml`)
 
@@ -80,22 +80,22 @@ To test the Play Store upload without creating a release draft or uploading to T
 ### Release Gallery P2 (`.github/workflows/gallery-release.yml`)
 
 1. Maintainer triggers the workflow from the Actions tab. No inputs.
-2. The workflow discovers the pending draft from phase 1, reads the pinned version + SHA, and checks out at that exact SHA — so the server image matches the commit the mobile app was built from.
+2. The workflow discovers the pending draft from phase 1, reads the pinned version + SHA, and checks out at that exact SHA, so the server image matches the commit the mobile app was built from.
 3. `gallery-server` and `gallery-ml` images build (amd64 + arm64 matrix) and push to GHCR tagged with the version, the major version (`v4`), and `release`.
 4. Git tags are created: `vX.Y.Z` at the pinned SHA, and the floating `vN` + `release` tags move forward.
 5. The draft release is promoted to published (`--latest`). The APK attached in phase 1 becomes the public sideload download.
-6. `version.json` is uploaded to the S3 version endpoint — self-hosted instances polling this endpoint now show "new version available".
+6. `version.json` is uploaded to the S3 version endpoint. Self-hosted instances polling that endpoint now show "new version available".
 
 ### Release Gallery Server-only (`.github/workflows/gallery-release-server-only.yml`)
 
-Use for server / web / docs changes that don't affect the mobile app — ship without the ~24h mobile review wait. This is the right path for hotfixes and any change that doesn't ship new mobile binaries.
+Use this for server / web / docs changes that leave the mobile app alone: it ships without the ~24h mobile review wait. It is the right path for hotfixes and for anything that ships no new mobile binaries.
 
 1. Maintainer triggers the workflow from the Actions tab. Version auto-bumps from commits, or passed explicitly.
 2. Fails fast if a pending P1 mobile draft exists (version-number collision risk). Finish the mobile release first, or discard the draft.
 3. Builds and pushes server + ML images at `main` HEAD, tags the release, creates a public GitHub Release, flips the version endpoint.
 4. **No APK attached.** Release notes link to the previous release's APK for sideload users. Mobile users stay on the previous version.
 
-**Do NOT use server-only for major version bumps** or any change that breaks the mobile app's API contract — ship those through the normal P1 → P2 flow so mobile catches up.
+**Do NOT use server-only for major version bumps** or for any change that breaks the mobile app's API contract. Ship those through the normal P1 → P2 flow so mobile catches up.
 
 ### Version selection (Release Mobile P1 and Release Gallery Server-only)
 
@@ -104,27 +104,27 @@ Use for server / web / docs changes that don't affect the mobile app — ship wi
 - `BREAKING CHANGE` in commit body or `!` in commit prefix (e.g. `feat!:`) → **major** bump
 - Everything else (`fix:`, `docs:`, `chore:`, etc.) → **patch** bump
 
-If every commit since the last tag is `changelog:skip`, the workflow errors — there is nothing to release.
+If every commit since the last tag is `changelog:skip`, the workflow errors out: there is nothing to release.
 
 ### Design properties
 
-- Phase 2 builds from the draft's pinned SHA, not from `main`'s HEAD. Commits landing on main between the two phases are excluded from this release and ship in the next cycle.
-- Manual edits to the draft's release notes during the waiting period are preserved — phase 2 promotes without regenerating notes.
+- Phase 2 builds from the draft's pinned SHA. Commits that land on `main` between the two phases are excluded from this release and ship in the next cycle.
+- Edits you make to the draft's release notes during the waiting period survive: phase 2 promotes the draft without regenerating the notes.
 - All three workflows fail fast if triggered from any branch other than `main`.
 
 ### Triggering a release
 
 ```bash
-# Release Mobile P1 — auto-bump version from commit messages
+# Release Mobile P1: auto-bump version from commit messages
 gh workflow run gallery-release-mobile.yml --ref main
 
-# Release Mobile P1 — explicit version
+# Release Mobile P1: explicit version
 gh workflow run gallery-release-mobile.yml --ref main -f version=v4.2.6
 
-# Release Gallery P2 — promote (after mobile is live on both stores)
+# Release Gallery P2: promote (after mobile is live on both stores)
 gh workflow run gallery-release.yml --ref main
 
-# Release Gallery Server-only — ship server/web/docs without waiting for mobile
+# Release Gallery Server-only: ship server/web/docs without waiting for mobile
 gh workflow run gallery-release-server-only.yml --ref main
 ```
 

@@ -1,62 +1,58 @@
 # Dynamic Filter Suggestions
 
-When you apply a filter on the Photos page or inside an album, all other filter panels dynamically update to show only values that exist in the current result set. Every visible option is guaranteed to return results. Sections that could never filter anything in this scope stay out of the way entirely, and sections your current filters happen to have emptied grey out rather than sitting there uselessly.
+When you apply a filter on the Photos page or inside an album, the other filter panels update to show only values that exist in the current result set. Every option you can see will return something. A section that could never filter anything in this scope is hidden, and a section your current filters have emptied is greyed out.
 
 ## How it works
 
 Select any filter value and the other panels narrow immediately:
 
-1. Select **Germany** in Location -- People, Camera, and Tags panels update to show only values present in German photos. Rating and Media Type keep every star and every Photo/Video button visible -- see [What updates](#what-updates) -- but their whole section can hide or grey depending on what your German photos contain.
-2. Then select **Canon** in Camera -- the remaining panels narrow further to show only values for Canon photos taken in Germany
-3. Every combination is valid -- you can never select a filter that produces zero results
+1. Select **Germany** in Location. The People, Camera and Tags panels now show only values present in German photos. Rating and Media Type keep every star and every Photo/Video button visible (see [What updates](#what-updates)), but their whole section can hide or grey depending on what your German photos contain.
+2. Then select **Canon** in Camera. The remaining panels narrow again, to values for Canon photos taken in Germany.
+3. Every combination is valid. You can never pick a filter that produces zero results.
 
-This is called **faceted search** -- the same pattern used by Amazon, eBay, and other search-heavy applications.
+The pattern is called **faceted search**. Amazon and eBay do the same thing.
 
 ## What updates
 
-| Filter     | Options narrow with other filters?  | Whole section hidden when it cannot filter?            |
-| ---------- | ----------------------------------- | ------------------------------------------------------ |
-| People     | Yes                                 | Yes, unless unnamed faces exist                        |
-| Location   | Yes (countries)                     | Yes, when no photo has a location                      |
-| Camera     | Yes (makes)                         | Yes, when no photo has camera metadata                 |
-| Tags       | Yes                                 | Yes, when nothing is tagged                            |
-| Rating     | No -- all five stars always show    | Yes, when nothing is rated                             |
-| Media Type | No -- all three buttons always show | Yes, unless you have both photos and videos            |
-| Favorites  | n/a -- a toggle, not a list         | Yes, when nothing is favourited                        |
-| Albums     | n/a -- a toggle, not a list         | Yes, unless some photos are in albums and some are not |
-| Timeline   | Drives filtering                    | Never -- it greys out instead                          |
-| Text       | No -- free text                     | Never                                                  |
+| Filter     | Options narrow with other filters? | Whole section hidden when it cannot filter?            |
+| ---------- | ---------------------------------- | ------------------------------------------------------ |
+| People     | Yes                                | Yes, unless unnamed faces exist                        |
+| Location   | Yes (countries)                    | Yes, when no photo has a location                      |
+| Camera     | Yes (makes)                        | Yes, when no photo has camera metadata                 |
+| Tags       | Yes                                | Yes, when nothing is tagged                            |
+| Rating     | No, all five stars always show     | Yes, when nothing is rated                             |
+| Media Type | No, all three buttons always show  | Yes, unless you have both photos and videos            |
+| Favorites  | n/a, a toggle rather than a list   | Yes, when nothing is favourited                        |
+| Albums     | n/a, a toggle rather than a list   | Yes, unless some photos are in albums and some are not |
+| Timeline   | Drives filtering                   | Never; it greys out instead                            |
+| Text       | No, free text                      | Never                                                  |
 
 ## Sections you do not see
 
 A filter section only appears when it can change what you are looking at.
 
-- **Hidden.** Nothing in this library, album or space could ever populate the section -- you have no videos, so there is no Media Type section, and no way to filter by something you do not have. The section reappears on its own as soon as the content does.
+- **Hidden.** Nothing in this library, album or space could ever fill the section. You have no videos, so there is no Media Type section, and no way to filter by something you do not have. The section comes back on its own as soon as the content does.
 - **Greyed out, with `(0)`.** The section could normally filter, but the filters you have applied right now leave it nothing to offer. Clear or change a filter and it comes back.
 
 A section holding an active filter is never hidden or greyed, so you can always undo a selection.
 
-The greyed `(0)` state is a web detail. The mobile app's filter sheet has no in-between treatment: a section is either hidden (nothing to offer at all, in this scope) or shown normally -- a section merely emptied by your current filters still renders on mobile rather than dimming.
+The greyed `(0)` state is web only. The mobile filter sheet has no in-between: a section is either hidden, when it has nothing to offer in this scope at all, or shown normally. A section that your current filters merely emptied still renders on mobile instead of dimming.
 
 ## Orphaned selections
 
-If you select a value from a list -- a person, country, camera or tag -- and then apply another filter that removes it from the available options, the selected value stays visible but appears **dimmed**. This lets you see why your result set might be empty and undo the selection with one click.
+If you select a value from a list (a person, country, camera or tag) and then apply another filter that removes it from the available options, the value stays visible and turns **dimmed**. You can see why your result set may be empty, and undo the selection with one click.
 
 Rating stars and the Photo/Video buttons never dim or disappear individually: their meaning comes from their position, so a gap in the row would be misleading. When they cannot help, the whole section is hidden or greyed instead.
 
 ## Debouncing
 
-Filter changes are debounced to avoid excessive server requests:
+Filter changes are debounced so the server is not hit on every click. Clicking a person, country or tag waits 50ms, which batches rapid clicks. Selecting a year or month waits 200ms. Clearing all filters fires at once, with no debounce at all.
 
-- **Discrete selections** (clicking a person, country, tag): 50ms debounce to batch rapid clicks
-- **Temporal changes** (selecting a year or month): 200ms debounce
-- **Clearing all filters**: instant (0ms)
-
-Previous in-flight requests are automatically cancelled when a new filter change occurs.
+An in-flight request is cancelled as soon as a new filter change arrives.
 
 ## Architecture
 
-A single API endpoint (`GET /search/suggestions/filters`) returns all suggestion categories in one round trip. The server runs eight parallel facet queries -- one per category, including the favourites and album-membership presence checks -- each applying all active filters **except its own category**. This exclusion is what makes it faceted: selecting Germany still shows all countries that match the other filters, not just Germany. Album membership is one of those eight but issues two SQL probes internally (one asking whether any matching asset is already filed, one asking whether any is unfiled), so nine queries actually reach the database.
+A single API endpoint (`GET /search/suggestions/filters`) returns all suggestion categories in one round trip. The server runs eight facet queries in parallel, one per category, including the favourites and album-membership presence checks. Each query applies all active filters **except its own category**. That exclusion is what makes it faceted: selecting Germany still shows every country that matches the other filters. Album membership is one of the eight, but it issues two SQL probes internally (one asking whether any matching asset is already filed, one asking whether any is unfiled), so nine queries reach the database.
 
 For album detail pages, the same endpoint is scoped with `albumId`. Album scoping cannot be combined with `spaceId` or `withSharedSpaces`, because an album and a space are separate collection boundaries.
 
@@ -108,4 +104,4 @@ All eight facet queries share a common `buildFilteredAssetIds` helper that appli
 | Map          | Partial              | Uses individual providers plus active filters   |
 | Spaces       | Partial              | Uses individual providers plus active filters   |
 
-Map and Spaces pages can adopt the unified endpoint in the future with minimal changes -- the `suggestionsProvider` interface is generic and the endpoint supports `spaceId` scoping.
+Map and Spaces can move to the unified endpoint later with small changes: the `suggestionsProvider` interface is generic, and the endpoint already supports `spaceId` scoping.

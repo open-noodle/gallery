@@ -58,9 +58,9 @@ describe('PersonPicker', () => {
       expect(screen.getByText('Lena Hofer')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Move 3 faces to…')).toBeInTheDocument();
+    expect(screen.getByText('Move 3 faces to...')).toBeInTheDocument();
     expect(
-      screen.getByText("Any person or cluster in the library — not just this scan's suggestion."),
+      screen.getByText('Any person or cluster in the library, including ones this scan did not suggest.'),
     ).toBeInTheDocument();
   });
 

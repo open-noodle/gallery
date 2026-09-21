@@ -30,9 +30,9 @@ You can select which albums on your mobile device to back up to the server. You 
 
 ### Deduplication
 
-When you first select albums for backup, Gallery calculates a checksum for each file's content. This checksum identifies assets already on the server—whether uploaded via CLI, web interface, or another device. Files matching existing assets are skipped, preventing duplicate uploads and saving bandwidth.
+When you first select albums for backup, Gallery calculates a checksum for each file's content. The checksum identifies assets that are already on the server, whether they were uploaded via the CLI, the web interface, or another device. Files that match an existing asset are skipped, so nothing is uploaded twice.
 
-This also applies to assets that were resolved as visual duplicates via the [Duplicates Utility](/features/duplicates-utility#re-upload-prevention). When you keep one copy and trash the others, Gallery remembers the trashed files' checksums so the mobile app won't re-upload them.
+This also covers visual duplicates you resolved in the [Duplicates Utility](/features/duplicates-utility#re-upload-prevention). When you keep one copy and trash the rest, Gallery remembers the checksums of the trashed files, so the mobile app will not upload them again.
 
 ### Networking requirements
 

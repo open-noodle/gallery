@@ -1,10 +1,10 @@
 # Editing
 
-Gallery supports non-destructive editing of photos and videos. Edits never modify the original file — a new version is created with the edits applied, and you can always revert back to the original.
+Gallery supports non-destructive editing of photos and videos. An edit never modifies the original file. It creates a new version with the edits applied, and you can always revert to the original.
 
 ## Photo Editing
 
-Gallery supports the following photo edits:
+Gallery can apply these edits to a photo:
 
 - Cropping
 - Rotation
@@ -14,35 +14,35 @@ Gallery supports the following photo edits:
 
 ## Video Trimming
 
-Gallery supports non-destructive trimming of video assets. When you open the editor on a video, a trim-specific interface replaces the standard photo editor:
+Trimming a video is non-destructive too. Open the editor on a video and a trim interface replaces the photo editor:
 
-- **Timeline scrubber** — a horizontal bar below the video with draggable **in** and **out** handles to select the portion of the video to keep
-- **Sidebar controls** — displays the trimmed duration, in/out time inputs, and set in/out buttons
-- **Keyboard shortcuts** — press **I** to set the in point and **O** to set the out point at the current playback position. **Space** toggles play/pause within the trimmed region.
+- A timeline scrubber sits below the video, with draggable in and out handles that pick the portion to keep.
+- The sidebar shows the trimmed duration, in/out time inputs, and set in/out buttons.
+- Press **I** to set the in point and **O** to set the out point at the current playback position. **Space** toggles play/pause within the trimmed region.
 
 ### How It Works
 
-Trimming uses FFmpeg **stream copy** (`-c copy`), which means:
+Trimming uses FFmpeg stream copy (`-c copy`), so:
 
-- **Near-instant** — no re-encoding, so trimming completes in seconds regardless of video length
-- **Lossless** — video and audio quality are identical to the original
-- **Keyframe-aligned** — cut points land on the nearest keyframe, so the actual start/end may differ by a few frames from the exact position you selected
+- Nothing is re-encoded. A trim finishes in seconds no matter how long the video is.
+- Video and audio quality are identical to the original.
+- Cut points land on the nearest keyframe, so the real start and end can sit a few frames away from the position you picked.
 
-After saving, the video player serves the trimmed version. The thumbnail and displayed duration update automatically.
+After saving, the video player serves the trimmed version. The thumbnail and displayed duration update on their own.
 
 ### Re-trimming
 
-You can re-open the editor on a previously trimmed video and adjust the trim range. The timeline shows the full **original** duration, so you can widen the trim back toward the original length — you're never locked into a shorter version.
+You can re-open the editor on a trimmed video and adjust the range. The timeline still shows the full original duration, so you can widen the trim back toward the original length at any point. A trim never locks you into the shorter version.
 
 ### Limitations
 
-- **Local storage only** — trimming is not available for videos stored on S3/cloud storage
-- **Stream copy only** — no frame-accurate cuts (depends on keyframe spacing)
-- **No spatial edits on video** — crop, rotate, and mirror are image-only
+- Trimming is not available for videos stored on S3 or other cloud storage.
+- Cuts are not frame-accurate; the precision depends on keyframe spacing.
+- Crop, rotate and mirror are image-only.
 
 ## Quick Rotate
 
-You can quickly rotate images without opening the full editor. Quick-rotate is available in two places:
+You can rotate images without opening the full editor, from two places.
 
 ### Asset Viewer
 
@@ -50,7 +50,7 @@ When viewing a single image, a **Rotate Right** button appears in the toolbar. A
 
 The rotation is applied immediately and both the viewer and timeline thumbnail refresh in place.
 
-Rotations are **cumulative** — rotating right twice results in a 180° rotation. If the total rotation reaches a full 360°, the edit is automatically removed and the asset reverts to its original orientation.
+Rotations are cumulative: rotating right twice gives a 180° rotation. When the total reaches a full 360°, the edit is removed and the asset goes back to its original orientation.
 
 ### Multi-Select (Batch Rotate)
 
@@ -60,7 +60,7 @@ When selecting multiple assets in the timeline, you can rotate them all at once:
 2. Open the context menu (three dots)
 3. Choose **Rotate Right**, **Rotate Left**, or **Rotate 180°**
 
-Only image assets are rotated — videos are automatically skipped. Timeline thumbnails update automatically once the server finishes processing each asset.
+Only images are rotated; videos are skipped. Timeline thumbnails update once the server finishes processing each asset.
 
 ## Download
 
@@ -76,15 +76,15 @@ To revert an edited asset back to its original:
 2. Open the editor
 3. Remove all edits and save
 
-The asset will be restored to its original state and the thumbnail will update automatically.
+The asset is restored to its original state and the thumbnail updates on its own.
 
 ## Edited Asset Handling
 
-Edited assets are fully integrated throughout Gallery:
+Edits carry through the rest of Gallery:
 
-- **Thumbnails** update automatically after edits — no page refresh needed
-- **Video playback** serves the trimmed version when a trim edit exists
-- **Duration display** on video thumbnails reflects the trimmed length
-- **Album thumbnails** use the edited version of an asset when available
-- **Person thumbnails** correctly display the original (unedited) preview for face recognition accuracy
-- **Downloads** serve the edited version by default, with an option to download the original
+- Thumbnails update after an edit, with no page refresh.
+- Video playback serves the trimmed version when a trim edit exists.
+- The duration shown on a video thumbnail reflects the trimmed length.
+- Album thumbnails use the edited version of an asset when one exists.
+- Person thumbnails show the original, unedited preview, which keeps face recognition accurate.
+- Downloads serve the edited version by default, with an option to take the original.

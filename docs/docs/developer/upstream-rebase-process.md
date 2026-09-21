@@ -1,14 +1,13 @@
 # Upstream Rebase Process
 
-Gallery is a fork of Immich. Keeping the fork current is risky because Gallery
-has a large fork-owned surface area across server, web, mobile, machine
-learning, CI, generated clients, and database migrations. A clean Git conflict
-resolution is not enough: upstream can change extension points that compile but
-silently remove Gallery behavior.
+Gallery is a fork of Immich. Pulling upstream in is risky, because the fork owns
+code across server, web, mobile, machine learning, CI, generated clients, and
+database migrations. Resolving every Git conflict cleanly still leaves a hole:
+upstream can change an extension point in a way that compiles and silently drops
+Gallery behavior.
 
-This process keeps upstream syncs reviewable by making fork ownership explicit,
-planning the rebase in small batches, and running targeted audits after each
-batch.
+So the process writes fork ownership down, splits the rebase into small batches,
+and audits each batch. That is what keeps an upstream sync reviewable.
 
 ## Source Of Truth
 
@@ -73,7 +72,7 @@ make fork-ownership-coverage-check
 ```
 
 This target treats `last_verified_fork_head` as the reviewed floor for the
-manifest, not as a permanent lock to the current fork head. It:
+manifest. The value does not pin it to the current fork head. The check:
 
 1. Lists fork files with `git diff --name-only upstream/main...origin/main`.
 2. Checks that every fork file is covered by `docs/fork/ownership.yml`, unless
@@ -89,9 +88,9 @@ Baseline outcomes:
 - Baseline is not an ancestor of `origin/main`: the check fails because the
   manifest baseline does not describe the current fork history.
 
-The coverage check always runs against the full fork delta, not only files
-changed since the manifest baseline. The changed-since-baseline list is a review
-aid for manifest maintenance.
+The coverage check always runs against the full fork delta. Files changed since
+the manifest baseline are listed on their own, as a review aid for manifest
+maintenance.
 
 Broad optional manifest globs such as `mobile/**`, `docs/**`, or
 `server/src/**` are allowed as safety nets. Files changed after the manifest
@@ -120,9 +119,9 @@ $(git rev-parse --git-path upstream-preflight)
 It fails for blockers such as uncovered fork files, non-ancestor manifest
 baselines, CI invariant failures, package patch failures, and current fork
 integrity failures. It passes with warnings for ancestor baseline drift and
-broad optional coverage. Known upstream work such as mobile Drift renumbering,
-generated artifact review, and migration timestamp collisions is listed as
-planned resolution work.
+broad optional coverage. Known upstream work is listed as planned resolution work:
+mobile Drift renumbering, generated artifact review, migration timestamp
+collisions.
 
 You can still run the preflight report directly:
 
@@ -152,10 +151,10 @@ The preflight report includes:
 - recommended batch plan
 - fork surface reduction signals
 
-Review the report before rebasing. Pay particular attention to high-risk
-commits, direct overlaps, mobile Drift collisions, generated artifacts, and
-workflow changes. The fork-surface section is advisory and should be interpreted
-with the [fork surface guidelines](./fork-surface-guidelines.md).
+Read the report before rebasing, above all the high-risk commits, direct
+overlaps, mobile Drift collisions, generated artifacts, and workflow changes. The
+fork-surface section is advisory; read it alongside the
+[fork surface guidelines](./fork-surface-guidelines.md).
 
 ## Batch Plan
 
@@ -337,13 +336,13 @@ The post-rebase audit checks:
 - incoming upstream migration timestamps do not collide with Gallery migrations
 - generated OpenAPI, mobile OpenAPI, and SQL artifacts are reviewed
 
-A generated artifact issue is not automatically a bad rebase. It means the
-affected artifacts must be regenerated or explicitly reviewed before final push.
+A generated artifact issue does not on its own mean a bad rebase. It means those
+artifacts must be regenerated, or reviewed and signed off, before the final push.
 
 ## Mobile Drift
 
-Mobile Drift migrations are high risk because bad version handling can corrupt
-existing mobile databases.
+Mobile Drift migrations are high risk. Mishandle a version and you corrupt the
+databases already on people's phones.
 
 Run the full backlog check before rebasing:
 
@@ -471,7 +470,7 @@ planning signals:
 - `make upstream-postrebase-audit BATCH=01` reports only batch 01 generated
   artifacts
 
-Unexpected audit failures should stop the rebase until they are understood.
+Stop the rebase on any unexpected audit failure, until you understand it.
 
 ## Current Backlog Notes
 
@@ -508,8 +507,8 @@ Confirm the final branch contains:
 - all resolved conflicts
 - all regenerated artifacts needed by the rebase
 
-Prefer the `push-rebase` skill for the final force push so missing PR commits
-are detected before `origin/main` is updated.
+Use the `push-rebase` skill for the final force push: it catches missing PR
+commits before `origin/main` moves.
 
 If the branch has rolling state, `make upstream-rolling-final-check` must pass
 before using the `push-rebase` skill.

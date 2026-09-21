@@ -7,14 +7,14 @@
   type Props = {
     owners: SuspectedOwner[];
     value: string | null;
-    // The label for `value` when it is NOT one of `owners` — reachable through "Choose someone else…", which
+    // The label for `value` when it is NOT one of `owners` — reachable through "Choose someone else...", which
     // searches the whole library and can land on a person the scan never suggested. Without an <option> of its
     // own, a bound `value` that matches nothing in the list renders the control BLANK (the browser sets
     // selectedIndex -1) — the one control whose job is to say where the cluster is going would show nothing.
     valueLabel: string;
     onSelect: (ownerPersonId: string) => void;
     onChooseOther: () => void;
-    // Without a scanPerson to scope the picker's ownerId to, "Choose someone else…" has nowhere to send the
+    // Without a scanPerson to scope the picker's ownerId to, "Choose someone else..." has nowhere to send the
     // admin — the caller passes this so the button stops looking clickable in that state. The <select> itself
     // is unaffected: its own options come from `owners`, not from scanPerson.
     disabled?: boolean;
@@ -56,7 +56,7 @@
     </select>
   </label>
   <!-- A plain sibling button, NOT an <option> inside the select: an <option>'s value gets committed to the
-       <select> the moment it is activated, before any handler runs, so putting "Choose someone else…" there
+       <select> the moment it is activated, before any handler runs, so putting "Choose someone else..." there
        meant a dismissed picker left the control reading that placeholder forever — re-selecting the SAME
        option fires no further `change` event in a real browser, so the select could never be used again. A
        sibling button never touches the select's value at all, so there is nothing to revert. -->

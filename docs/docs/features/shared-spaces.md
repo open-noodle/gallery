@@ -1,27 +1,27 @@
 # Shared Spaces
 
-Shared Spaces are virtual libraries where multiple users can contribute, browse, and view photos together. Unlike [Partner Sharing](partner-sharing.md), which shares your entire library one-way, Shared Spaces let you create focused collaborative areas with fine-grained role-based access.
+Shared Spaces are virtual libraries that several people browse and add to together. [Partner Sharing](partner-sharing.md) hands over your whole library, one way. A Shared Space is narrower: you choose what goes in, and every member gets a role that decides what they can do with it.
 
 :::info Permissions Model
-Gallery enforces strict role-based access on every endpoint. Three roles — Owner, Editor, and Viewer — control what each member can do across asset viewing, search, download, people management, and space administration.
+Gallery checks the caller's role on every endpoint. The three roles (Owner, Editor and Viewer) decide what a member can do with assets, search, downloads, people and the space's own settings.
 :::
 
 ## Key Features
 
-- **Reference-based sharing** — Photos are linked into a space, not duplicated. Zero additional storage cost.
-- **Role-based access** — Three roles: Owner, Editor, and Viewer with different permissions.
-- **Multiple spaces** — Create as many spaces as you need (e.g., "Family", "Friends", "Vacation 2025").
-- **Works alongside existing sharing** — Partner sharing, album sharing, and shared links continue to work as before.
-- **Public links that match the space** — an Owner or Editor can share a link covering what the space shows, contributions included. See [Sharing from a Shared Space](sharing.md#sharing-from-a-shared-space).
-- **Web and mobile** — Full support on both web and the mobile app.
-- **Shared face recognition** — People detected across the space are browsable by all members.
-- **Activity log** — A feed of all actions taken in the space (photos added/removed, members joining/leaving, settings changes).
-- **New since last visit** — See what changed since you last opened a space, with badges and timeline dividers.
-- **Map view** — Browse geotagged photos from a space on an interactive map.
-- **Search within a space** — Smart search scoped to a single space's assets.
-- **Connected libraries** — Admins can link external libraries to spaces, automatically including all library photos.
-- **Space albums** — Link whole albums into a space and collaborate across owners. See [Space Albums](space-albums.md).
-- **Album folders** — Group a space's albums into nested folders so a busy space stays navigable. See [Space Album Folders](space-album-folders.md).
+- **Reference-based sharing.** Photos are linked into a space rather than copied, so a space costs no extra storage.
+- **Role-based access.** Owner, Editor and Viewer, each with different permissions.
+- **Multiple spaces.** Create as many as you need, for example "Family", "Friends" or "Vacation 2025".
+- **Works alongside existing sharing.** Partner sharing, album sharing and shared links keep working as before.
+- **Public links that match the space.** An Owner or Editor can share a link covering what the space shows, contributions included. See [Sharing from a Shared Space](sharing.md#sharing-from-a-shared-space).
+- **Web and mobile.** Full support on both web and the mobile app.
+- **Shared face recognition.** People detected across the space are browsable by all members.
+- **Activity log.** A feed of everything that happened in the space: photos added or removed, members joining or leaving, settings changes.
+- **New since last visit.** See what changed since you last opened a space, with badges and timeline dividers.
+- **Map view.** Browse a space's geotagged photos on an interactive map.
+- **Search within a space.** Smart search scoped to a single space's assets.
+- **Connected libraries.** Admins can link external libraries to spaces, which pulls in every photo the library holds.
+- **Space albums.** Link whole albums into a space and collaborate across owners. See [Space Albums](space-albums.md).
+- **Album folders.** Group a space's albums into nested folders so a busy space stays navigable. See [Space Album Folders](space-album-folders.md).
 
 ## Roles and Permissions
 
@@ -54,7 +54,7 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 other members' contributions needs the Owner or Editor role. See
 [Sharing from a Shared Space](sharing.md#sharing-from-a-shared-space).
 
-For album-specific permissions — linking and creating albums, contributing photos across owners, and controlling which albums appear in the space timeline — see [Space Albums](space-albums.md#roles-and-permissions).
+For album-specific permissions (linking and creating albums, contributing photos across owners, and controlling which albums appear in the space timeline) see [Space Albums](space-albums.md#roles-and-permissions).
 
 ## Creating a Space
 
@@ -74,13 +74,13 @@ For album-specific permissions — linking and creating albums, contributing pho
 
 ## Getting Started Banner
 
-When you create a new space, a 3-step onboarding checklist appears at the top of the space page (visible to the Owner only):
+When you create a space, a 3-step checklist appears at the top of the space page. Only the Owner sees it.
 
-1. **Add Photos** — Add your first photos to the space.
-2. **Invite Members** — Add at least one other user.
-3. **Set Cover** — Choose a cover photo for the space.
+1. **Add Photos.** Add your first photos to the space.
+2. **Invite Members.** Add at least one other user.
+3. **Set Cover.** Choose a cover photo for the space.
 
-The banner shows a progress bar and disappears once all three steps are complete. It can be collapsed if you want to dismiss it early.
+The banner carries a progress bar and disappears once all three steps are done. Collapse it if you want it gone early.
 
 ## Adding Members
 
@@ -108,7 +108,7 @@ Editors and Owners can add photos from their personal library into a shared spac
 
 1. Open the space.
 2. Click the **Add photos** button in the toolbar.
-3. Your personal timeline appears — select the photos you want to add.
+3. Your personal timeline appears. Select the photos you want to add.
 4. Click **Add** to link them into the space.
 
 ### Mobile
@@ -118,7 +118,7 @@ Editors and Owners can add photos from their personal library into a shared spac
 3. Select photos from your library.
 4. The selected photos are added to the space.
 
-Photos are linked by reference — they remain in your personal library and appear in the space for all members. Removing a photo from a space does not delete it from your library.
+Photos are linked by reference. They stay in your personal library and also show up in the space for every member. Removing a photo from a space does not delete it from your library.
 
 ## Got a Lot of Photos?
 
@@ -126,32 +126,32 @@ If you want to share a large part of your library with a space, there are two ap
 
 ### Option 1: Bulk Add All Photos
 
-Use **Add all my photos** from the overflow menu (⋮) in the space toolbar. This queues a background job that adds every photo in your library to the space in one go — no need to select anything manually. You'll get a notification when it's done. This is ideal when you want to share your entire library and don't mind adding everything at once.
+Use **Add all my photos** from the overflow menu (⋮) in the space toolbar. It queues a background job that adds every photo in your library to the space, with nothing to select by hand. You get a notification when it finishes. Pick this when you want your whole library in the space and do not mind it all arriving at once.
 
 - Available to **Editors** and **Owners**
-- Runs in the background — safe for libraries with hundreds of thousands of photos
-- Idempotent — running it again won't create duplicates
-- Only adds non-deleted, non-offline assets
+- Runs in the background, so it is safe for libraries with hundreds of thousands of photos
+- Idempotent: running it again will not create duplicates
+- Only adds assets that are neither deleted nor offline
 
 ### Option 2: Connect a Library
 
-If you're a server admin, you can [link an external library](#connected-libraries-admin) to the space instead. This keeps the space automatically in sync — new photos imported into the library appear in the space with zero delay. Unlike bulk add, connected libraries stay linked: future imports are included automatically.
+If you are a server admin, [link an external library](#connected-libraries-admin) to the space instead. The space then stays in sync on its own: new photos imported into the library show up in the space with no delay. The link persists, so future imports are included too.
 
 |                        | Bulk Add                    | Connected Library                  |
 | ---------------------- | --------------------------- | ---------------------------------- |
 | Who can use it         | Editors, Owners             | Server admins with Editor+ role    |
 | Adds existing photos   | Yes, all at once            | Yes, all at once                   |
-| Future photos included | No — run again to catch up  | Yes, automatically                 |
+| Future photos included | No, run again to catch up   | Yes, automatically                 |
 | Can disconnect later   | Remove photos manually      | Unlink in one click                |
 | Best for               | One-time "share everything" | Ongoing sync of an external source |
 
 ## Albums in a Space
 
-Beyond adding individual photos, Owners and Editors can link whole **albums** into a space. A linked album's photos appear in the space for all members and are organised on a dedicated **Albums** tab (with the same search / sort / group / view controls as your personal Albums page). Members can even collaborate across libraries by contributing photos they don't own into a shared album, and each album has its own switch for whether its photos join the space timeline.
+Owners and Editors can also link whole **albums** into a space. A linked album's photos appear in the space for all members, on a dedicated **Albums** tab with the same search, sort, group and view controls as your personal Albums page. Members can contribute photos they do not own into a shared album, so collaboration crosses library boundaries, and each album has its own switch for whether its photos join the space timeline.
 
 Viewers browse space albums read-only; linking, creating, editing, and contributing are Editor/Owner actions.
 
-For the full walkthrough — linking vs creating, cross-owner contributions, per-album timeline control, and the complete permissions table — see **[Space Albums](space-albums.md)**.
+For the full walkthrough (linking versus creating, cross-owner contributions, per-album timeline control, and the complete permissions table) see **[Space Albums](space-albums.md)**.
 
 ## Removing Photos from a Space
 
@@ -172,15 +172,15 @@ For the full walkthrough — linking vs creating, cross-owner contributions, per
 
 Stacks (for example a RAW + JPEG pair or a burst) are treated as a single unit in a space:
 
-- **Adding** any frame of a stack contributes the **whole stack**. The space collapses it to the stack cover with a badge showing the frame count, exactly like your main timeline — tap or click through to see every frame.
+- **Adding** any frame of a stack contributes the **whole stack**. The space collapses it to the stack cover with a badge showing the frame count, exactly like your main timeline. Tap or click through to see every frame.
 - **Removing** any frame removes the **whole stack**, so no hidden frames are left behind.
 - **Changing the cover** (promoting a different frame to primary) keeps the stack visible in the space.
 
-Only frames with space-eligible visibility are pulled in — Hidden and Locked frames are never added automatically.
+Only frames with space-eligible visibility are pulled in. Hidden and Locked frames are never added automatically.
 
 ## Timeline Integration
 
-Photos from a space you belong to are merged into your main Photos timeline alongside your own assets — that's what makes a space feel like part of your library instead of a separate silo. There are three independent switches that control this, each with exactly one job:
+Photos from a space you belong to are merged into your main Photos timeline alongside your own assets, which is what makes a space feel like part of your library. Three independent switches control this, each with exactly one job:
 
 | Switch                                      | Who can change it          | Controls                                                        |
 | ------------------------------------------- | -------------------------- | --------------------------------------------------------------- |
@@ -188,9 +188,9 @@ Photos from a space you belong to are merged into your main Photos timeline alon
 | **Hide this album from my timeline**        | Any member (yourself only) | This one album, in **your own** timeline                        |
 | **Hide this album from the space's photos** | Owners and Editors         | Whether the album appears in the space itself, for **everyone** |
 
-The first two are personal viewing preferences — open the space's or the album's **three-dot menu** (⋮) to toggle them. Nobody else can change what appears in your own timeline, and toggling them changes nothing about what other members see. The third is a shared setting on the album's kebab menu in the Albums tab; because it changes what the whole space shows, only Owners and Editors can flip it, and it never touches anyone's personal timeline.
+The first two are personal viewing preferences. Open the space's or the album's **three-dot menu** (⋮) to toggle them. Nobody else can change what appears in your own timeline, and toggling them changes nothing for other members. The third is a shared setting, on the album's kebab menu in the Albums tab. It changes what the whole space shows, so only Owners and Editors can flip it, and it never touches anyone's personal timeline.
 
-A photo disappears from your timeline only when **every** way it reaches you through a space is hidden by you — for example, a photo in two albums where you've only hidden one, or added to the space both directly and through a hidden album, still shows.
+A photo disappears from your timeline only when you have hidden **every** way it reaches you through a space. A photo in two albums where you hid only one still shows. So does a photo added to the space directly as well as through a hidden album.
 
 | Asset's space presence                                            | Shows in your timeline? |
 | ----------------------------------------------------------------- | ----------------------- |
@@ -202,13 +202,13 @@ A photo disappears from your timeline only when **every** way it reaches you thr
 | In a space you hid **and** a second space you show                | Yes                     |
 | In an album hidden from the space's photos, but not hidden by you | Yes                     |
 
-**Hiding is a tidiness feature, not a privacy feature.** It only changes what appears in _your own_ timeline (or, for the editor switch, the space's own Photos tab) — it never restricts anyone's access. Hidden photos stay fully visible in the space itself, in search, and in any shared links. If you need to actually restrict access, expire or delete the shared link, or unlink the album from the space instead.
+**Hiding tidies your view. It never restricts anyone's access.** It changes what appears in _your own_ timeline, or, for the editor switch, the space's own Photos tab. Hidden photos stay fully visible in the space itself, in search and in any shared link. To actually restrict access, expire or delete the shared link, or unlink the album from the space.
 
 ### Where hiding applies
 
-Hiding is a **timeline** preference, so it reaches the surfaces that make up your timeline — and deliberately nothing else:
+Hiding is a **timeline** preference, so it reaches the surfaces that make up your timeline, and deliberately nothing else:
 
-| Follows your hide                                | Ignores it — the photos stay             |
+| Follows your hide                                | Ignores it, the photos stay              |
 | ------------------------------------------------ | ---------------------------------------- |
 | Main **Photos** timeline (and its date scrubber) | The **space** itself, and album pages    |
 | **Folders** view                                 | **Search**, **Map**, the **People** page |
@@ -219,11 +219,11 @@ Trash, Archive and Favorites keep hidden photos on purpose: those are the places
 
 Memories and Folders follow the same "every path must be hidden" rule as the timeline, so a photo your timeline still shows is never quietly missing from a memory.
 
-Only your own photos and the space content you can see are affected. Photos shared with you by a **partner** are never removed by your hiding — that is their sharing setting, not yours.
+Only your own photos and the space content you can see are affected. Your hiding never removes photos a **partner** shared with you. Those follow their sharing setting.
 
 ### What the confirmation tells you
 
-Hiding asks for confirmation and states how many photos it will actually remove from your timeline. When that number is smaller than you expect — sometimes zero — the dialog also says how many stay, because they reach you by a path you have not hidden.
+Hiding asks for confirmation and states how many photos it will actually remove from your timeline. When that number is smaller than you expect, sometimes zero, the dialog also says how many stay because they reach you by a path you have not hidden.
 
 That is the usual surprise: a photo can be in a linked album _and_ in a linked external library, or added to the space directly as well. Hiding the album alone changes nothing for those photos until the other path is hidden too, so hide the whole space (or unlink the library) if you want them all gone.
 
@@ -233,8 +233,8 @@ That is the usual surprise: a photo can be in a linked album _and_ in a linked e
 
 Owners and Editors can rename a space or update its description and color at any time. There are two entry points:
 
-- **Overflow menu** — Open the space and click the **three-dot menu** (⋮) in the header, then select **Edit Space**.
-- **Cover ✎ button** — Click the **✎** (edit) button on the space cover, then choose **Edit Space** from the menu.
+- **Overflow menu.** Open the space and click the **three-dot menu** (⋮) in the header, then select **Edit Space**.
+- **Cover ✎ button.** Click the **✎** (edit) button on the space cover, then choose **Edit Space** from the menu.
 
 Both open the same modal, where you can update the name, description, and color, then click **Save**. Renames and other detail changes are recorded in the space's [activity log](#activity-log).
 
@@ -260,16 +260,16 @@ After setting a cover photo, you can adjust its vertical position within the her
 2. Drag the image up or down to frame it how you like.
 3. Click **Save** to keep the position, or **Cancel** to discard.
 
-The cover automatically enters reposition mode after selecting a new cover photo. Position is stored as a percentage (CSS-only — no server-side image processing) and resets when the cover photo changes.
+The cover enters reposition mode on its own after you pick a new cover photo. Position is stored as a percentage (CSS only, with no server-side image processing) and resets when the cover photo changes.
 
 ### Collage Cards
 
 On the spaces list page, each space card shows a collage of up to 4 recent photos. The layout adapts based on how many photos the space contains:
 
-- **No photos** — color gradient placeholder
-- **1 photo** — single full-bleed thumbnail
-- **2–3 photos** — asymmetric layout (3:2 split)
-- **4+ photos** — 2×2 grid
+- No photos: color gradient placeholder
+- 1 photo: single full-bleed thumbnail
+- 2 or 3 photos: asymmetric layout (3:2 split)
+- 4 or more photos: 2×2 grid
 
 ## Browsing Spaces
 
@@ -277,8 +277,8 @@ On the spaces list page, each space card shows a collage of up to 4 recent photo
 
 The spaces list page supports two view modes, toggled via icons in the toolbar:
 
-- **Grid view** (default) — album-style collage cards
-- **List view** — compact table with columns for name, role, photo count, member count, and last activity
+- Grid view, the default: album-style collage cards
+- List view: a compact table with columns for name, role, photo count, member count and last activity
 
 ### Sorting
 
@@ -286,7 +286,7 @@ Sort spaces by name, last activity, date created, or asset count. Click the same
 
 ### Pinning Spaces
 
-Pin frequently used spaces to the top of the list by right-clicking (web) and selecting **Pin to top**. Pinned spaces appear in a separate section above unpinned ones in both grid and list views. Pins are stored locally in the browser — they do not sync between devices.
+Pin frequently used spaces to the top of the list by right-clicking (web) and selecting **Pin to top**. Pinned spaces appear in a separate section above unpinned ones, in both grid and list views. Pins live in the browser's local storage, so they do not sync between devices.
 
 ## Activity Log
 
@@ -296,17 +296,17 @@ Every space has an activity log that tracks actions taken by members. Open it by
 
 The activity log records the following events:
 
-- **Photos added** — Who added photos, how many, with thumbnail previews of the first few.
-- **Photos removed** — Who removed photos and how many.
-- **Member joined** — Who joined the space, their role, and who invited them.
-- **Member left** — Who left the space voluntarily.
-- **Member removed** — Who was removed by the Owner.
-- **Role changed** — Whose role changed and from what to what (e.g., Viewer to Editor).
-- **Cover photo changed** — Who set a new cover photo.
-- **Space renamed** — The old and new name.
-- **Color changed** — When the space color was updated.
+- **Photos added.** Who added photos, how many, with thumbnail previews of the first few.
+- **Photos removed.** Who removed photos and how many.
+- **Member joined.** Who joined the space, their role, and who invited them.
+- **Member left.** Who left the space voluntarily.
+- **Member removed.** Who was removed by the Owner.
+- **Role changed.** Whose role changed and from what to what (e.g., Viewer to Editor).
+- **Cover photo changed.** Who set a new cover photo.
+- **Space renamed.** The old and new name.
+- **Color changed.** When the space color was updated.
 
-Events are grouped by day (Today, Yesterday, or the date) and displayed with different visual styles based on importance — photo additions and removals show thumbnail strips, member events show avatar rows, and settings changes appear as compact single-line entries.
+Events are grouped by day (Today, Yesterday, or the date). Their style varies with importance: photo additions and removals show thumbnail strips, member events show avatar rows, and settings changes appear as compact single-line entries.
 
 The log is paginated and loads 50 events at a time with a **Load more** button for older activity.
 
@@ -318,14 +318,14 @@ The **Members** tab in the side panel shows each member's contribution stats: ho
 
 Spaces track when each member last viewed them. When other members add photos while you're away, you'll see:
 
-- **On the spaces list** — A colored badge showing the number of new photos and the name of the last contributor (e.g., "5 new" with a pulsing dot indicator).
-- **Inside the space** — A sticky colored divider in the timeline marking where new photos begin, showing the count and date (e.g., "12 new · since Mar 15").
+- **On the spaces list.** A colored badge showing the number of new photos and the name of the last contributor (e.g., "5 new" with a pulsing dot indicator).
+- **Inside the space.** A sticky colored divider in the timeline marking where new photos begin, showing the count and date (e.g., "12 new · since Mar 15").
 
-This tracking is per-member — your "last viewed" timestamp updates each time you open the space.
+Tracking is per member: your "last viewed" timestamp updates each time you open the space.
 
 ## Search
 
-Use <kbd>Cmd</kbd>+<kbd>K</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> from a space detail page and submit the **Search for "…"** top result. Searches use smart/semantic search scoped to only that space's assets, so results are limited to photos within the space.
+Use <kbd>Cmd</kbd>+<kbd>K</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> from a space detail page and submit the **Search for "..."** top result. Searches use smart/semantic search scoped to only that space's assets, so results are limited to photos within the space.
 
 The search query is stored in the space URL as `q=...`. The sort control in the top bar switches between relevance, newest first, and oldest first, and the active search chip can clear the query without clearing your other filters.
 
@@ -335,7 +335,7 @@ View geotagged photos from a space on an interactive map. Click the **map icon**
 
 ## Shared Face Recognition
 
-When enabled, face recognition runs across all photos in the space. Detected people are browsable by all space members in the People section of the space, making it easy to find photos of specific people across everyone's contributions.
+When enabled, face recognition runs across all photos in the space. Every member can browse the detected people in the space's People section, which is how you find photos of one person across everyone's contributions.
 
 The Owner can toggle face recognition on or off from the space detail page header. When disabled, existing face data is preserved but hidden.
 
@@ -347,15 +347,15 @@ Space people are **separate** from the people in your personal library. When fac
 - Naming, merging, and hiding people in a space does not affect your personal people, and vice versa.
 - Each space maintains its own set of people, built from faces detected across all members' contributed photos.
 
-This separation ensures that members' personal libraries remain private while allowing collaborative face management within the space.
+The separation keeps each member's personal library private while face management inside the space stays collaborative.
 
 ### Merging People Across Owners
 
-Occasionally the same real person is split across more than one owner — for example a space person assembled from several members' photos, or a person tied to a [connected external library](#connected-libraries-admin). Merging those entries crosses an owner boundary, so it modifies people and faces owned by other users and may not be cleanly reversible.
+Occasionally the same real person is split across more than one owner: a space person assembled from several members' photos, say, or a person tied to a [connected external library](#connected-libraries-admin). Merging those entries crosses an owner boundary, so it modifies people and faces owned by other users, and it may not be cleanly reversible.
 
 Destructive cross-owner merges are **off by default** and gated by an instance-wide setting:
 
-- **When the setting is off**, a merge that only **re-points** another owner's or a space's single person onto the surviving identity still succeeds — nothing is deleted. What it blocks is a merge that would **combine two** of another user's people, or **combine two people in a space you cannot edit** (you are only a viewer, or not a member of it) — since that deletes one of the rows. This includes merging two people inside a space you cannot edit. Such a merge stops with a message noting that an administrator can enable the feature.
+- **When the setting is off**, a merge that only **re-points** another owner's or a space's single person onto the surviving identity still succeeds, because nothing is deleted. What it blocks is a merge that would **combine two** of another user's people, or **combine two people in a space you cannot edit** (you are only a viewer, or not a member of it), since that deletes one of the rows. This includes merging two people inside a space you cannot edit. Such a merge stops with a message noting that an administrator can enable the feature.
 - **A server admin enables the feature** by turning on **Cross-Owner People Merges** in [Server Settings](/administration/system-settings#cross-owner-people-merges). Once enabled, those combining merges become available to any user with merge access; the user is asked to confirm before the merge commits, since it deletes one of another owner's (or the space's) people.
 
 Merges that stay within a single owner (the usual Editor merge above) are unaffected.
@@ -395,11 +395,11 @@ When face recognition is enabled and new photos are added, a background job auto
 
 ### Why space people counts may differ from Explore
 
-You may notice that the number of people in a shared space is smaller than the number of people shown in your personal **Explore** page, even though every photo in the space contributes its faces. This is expected — space people clustering is more aggressive than personal clustering, by design.
+The number of people in a shared space is often smaller than the number on your personal **Explore** page, even though every photo in the space contributes its faces. That is expected. Space clustering is more aggressive than personal clustering, by design.
 
 **How personal face recognition works (Explore):**
 
-Face clustering runs per user. For each new face, Gallery finds the nearest existing face in the same user's library and, if they're similar enough, assigns both to the same person. Two people with strong resemblance but no connecting face will stay separate. The algorithm only ever adds — once two personal people exist, Gallery will not automatically merge them.
+Face clustering runs per user. For each new face, Gallery finds the nearest existing face in the same user's library and, if they're similar enough, assigns both to the same person. Two people with strong resemblance but no connecting face will stay separate. The algorithm only ever adds. Once two personal people exist, Gallery will not merge them on its own.
 
 **How shared space face recognition works:**
 
@@ -410,7 +410,7 @@ Shared spaces have to handle two things the personal pipeline doesn't:
 
 To make that work, the space runs an extra **space-person deduplication pass** after face matching. It compares every pair of space people and merges any two whose representative faces are within the similarity threshold. This pass runs repeatedly until no more merges happen.
 
-The pass is what lets cross-contributor bridging work (one "Dad" instead of two). As a side effect, it also merges look-alikes from a single contributor that the personal clustering had kept separate — so a space with one member's photos will usually show slightly fewer people than that member's Explore page.
+The pass is what lets cross-contributor bridging work (one "Dad" instead of two). As a side effect it also merges look-alikes from a single contributor that the personal clustering had kept apart, so a space holding one member's photos usually shows slightly fewer people than that member's Explore page.
 
 **Summary:**
 
@@ -421,7 +421,7 @@ The pass is what lets cross-contributor bridging work (one "Dad" instead of two)
 | Post-pass consolidation | No                                          | Yes (merges similar people across all contributors) |
 | Result                  | More separate entries, even for look-alikes | Fewer, more consolidated entries                    |
 
-In short: **personal clustering is cautious and keeps things separate; space clustering is opinionated and consolidates to keep the member-facing people list tidy.** Neither is wrong — they optimize for different goals.
+**Personal clustering is cautious and keeps entries apart. Space clustering consolidates, to keep the member-facing people list tidy.** They optimize for different goals.
 
 ## Space Colors
 
@@ -434,11 +434,11 @@ Ten colors are available, matching the user avatar color palette.
 
 ## Connected Libraries (Admin)
 
-Server administrators can link external libraries to shared spaces, making all photos from a library automatically appear in the space. This is ideal for sharing large existing photo collections (e.g., tens of thousands of photos from an external hard drive) without manually selecting individual photos.
+Server administrators can link external libraries to shared spaces. Every photo in the library then appears in the space automatically. This is the way to share a large existing collection, say tens of thousands of photos on an external hard drive, without picking photos one by one.
 
 ### How It Works
 
-When a library is linked to a space, all assets from that library are included in the space's timeline, asset count, map, and search results — resolved at query time with no data duplication. New photos imported into the library via future scans automatically appear in the space with zero delay.
+When a library is linked to a space, all assets from that library are included in the space's timeline, asset count, map and search results, resolved at query time with no data duplication. New photos that future scans import into the library appear in the space with no delay.
 
 Photos from linked libraries can coexist with manually added photos in the same space. If the same photo exists in both a linked library and as a manually added asset, it appears only once (automatic deduplication).
 
@@ -474,11 +474,11 @@ If face recognition is enabled on the space, a background job will automatically
 2. Click **Unlink** next to the library you want to remove.
 3. Confirm the removal.
 
-Library assets disappear from the space immediately. Any photos from that library that were also manually added to the space via **Add photos** will remain — unlinking only removes the automatic library link, not individual asset references.
+Library assets disappear from the space immediately. Any photos from that library that were also added to the space by hand via **Add photos** will remain: unlinking removes the automatic library link and leaves individual asset references in place.
 
 ### Permissions for Library Assets
 
-Space members can view, download, and browse library-linked assets just like manually added ones. Editors can update metadata on library-linked assets. The library owner retains full ownership of the underlying files.
+Space members browse and download library-linked assets exactly as they do ones added by hand. Editors can update metadata on library-linked assets. The library owner retains full ownership of the underlying files.
 
 :::warning
 Editing metadata on a library-linked asset requires the library's folder to be mounted **read-write**. Gallery writes these edits to an `.xmp` sidecar next to the original file, so on a read-only (`:ro`) mount the change is applied and then reverted shortly afterwards, with no error shown. This affects date and time, location, description, star rating and tags. See [Mount Docker Volumes](/features/libraries#mount-docker-volumes).
@@ -486,9 +486,9 @@ Editing metadata on a library-linked asset requires the library's folder to be m
 
 ### Limitations
 
-- **One-way only** — Photos added to the space by other members are not imported back into the library.
-- **All or nothing** — Linking a library includes all its assets. To share only specific photos, add them manually instead of linking the library.
-- **Admin-only** — Regular users cannot see or manage library links. They simply see the photos in the space.
+- **One-way only.** Photos other members add to the space are not imported back into the library.
+- **All or nothing.** Linking a library includes all its assets. To share only specific photos, add them by hand instead of linking the library.
+- **Admin-only.** Regular users cannot see or manage library links. They just see the photos in the space.
 
 ## Differences from Partner Sharing
 
@@ -497,7 +497,7 @@ Editing metadata on a library-linked asset requires the library's folder to be m
 | What is shared   | Entire library     | Specific photos you choose |
 | Direction        | One-way            | Multi-directional          |
 | Access control   | All-or-nothing     | Owner/Editor/Viewer roles  |
-| Multiple groups  | No                 | Yes — unlimited spaces     |
+| Multiple groups  | No                 | Yes, unlimited spaces      |
 | Storage cost     | None (same assets) | None (reference-based)     |
 | Face recognition | Separate           | Shared across space        |
 | Timeline merging | Partner toggle     | Per-space toggle           |
@@ -576,32 +576,32 @@ All tables prefixed `shared_space_` in the actual schema. Composite primary keys
 
 The feature follows the standard NestJS layered architecture:
 
-- **Controller** (`shared-space.controller.ts`) — 26 REST endpoints under `/shared-spaces`, with role-based permission checks.
-- **Service** (`shared-space.service.ts`) — Business logic including role validation (Owner > Editor > Viewer hierarchy), activity logging, and background job orchestration.
-- **Repository** (`shared-space.repository.ts`) — Kysely-based data access with 70+ methods covering all 8 tables.
+- **Controller** (`shared-space.controller.ts`). 26 REST endpoints under `/shared-spaces`, with role-based permission checks.
+- **Service** (`shared-space.service.ts`). Business logic including role validation (Owner > Editor > Viewer hierarchy), activity logging, and background job orchestration.
+- **Repository** (`shared-space.repository.ts`). Kysely-based data access with 70+ methods covering all 8 tables.
 
 ### Key Mechanisms
 
-**Reference-based sharing** — The `shared_space_asset` table is a pure junction table linking spaces to existing assets. No file duplication occurs; the same asset row is referenced by the space and the owner's library. For linked libraries, assets are resolved at query time via `shared_space_library` JOIN `asset.libraryId` — no rows are copied into `shared_space_asset`.
+**Reference-based sharing.** The `shared_space_asset` table is a pure junction table linking spaces to existing assets. No file duplication occurs; the same asset row is referenced by the space and the owner's library. For linked libraries, assets are resolved at query time via `shared_space_library` JOIN `asset.libraryId`, and no rows are copied into `shared_space_asset`.
 
-**Timeline integration** — Three independent switches, each with exactly one job: `shared_space_member.showInTimeline` (space → my timeline, mine alone), `shared_space_album_hidden` (album → my timeline, mine alone), and `shared_space_album.showInTimeline` (album → the space's own Photos tab, shared, editor-settable). Personal timeline resolution starts from `getSpaceIdsForTimeline(userId)` for spaces I show, then the `hiddenFromOwnTimeline` predicate builder (`shared-space-album-scope.ts`) subtracts assets whose only path into a space I'm a member of is one I've hidden — a photo disappears from a member's timeline only when _every_ path it has into a space is hidden by that member; any other visible path (a different album, a direct space add, a second space) keeps it showing. The two "my timeline" flags are private to their own owner: nobody else can change what appears in your library, which is what makes it safe for a per-user flag to subtract from a personal timeline. The space's own Photos tab is governed only by `shared_space_album.showInTimeline`, identically for every member — it never varies per user. None of the three switches restrict access; they only change what appears in a timeline or a tab. See `specs/2026-08-31-space-hide-from-timeline-design.md` for the full resolution semantics.
+**Timeline integration.** Three independent switches, each with exactly one job: `shared_space_member.showInTimeline` (space → my timeline, mine alone), `shared_space_album_hidden` (album → my timeline, mine alone), and `shared_space_album.showInTimeline` (album → the space's own Photos tab, shared, editor-settable). Personal timeline resolution starts from `getSpaceIdsForTimeline(userId)` for spaces I show. The `hiddenFromOwnTimeline` predicate builder (`shared-space-album-scope.ts`) then subtracts assets whose only path into a space I'm a member of is one I've hidden. A photo disappears from a member's timeline only when _every_ path it has into a space is hidden by that member; any other visible path (a different album, a direct space add, a second space) keeps it showing. The two "my timeline" flags are private to their own owner: nobody else can change what appears in your library, which is what makes it safe for a per-user flag to subtract from a personal timeline. The space's own Photos tab is governed only by `shared_space_album.showInTimeline`, identically for every member, and it never varies per user. None of the three switches restrict access; they only change what appears in a timeline or a tab. See `specs/2026-08-31-space-hide-from-timeline-design.md` for the full resolution semantics.
 
-**Activity log** — Every mutation (add/remove assets, member changes, metadata updates) inserts a row into `shared_space_activity` with a `type` enum and a `data` JSONB column for event-specific metadata (e.g., asset IDs, old/new values, who invited whom). The feed is paginated with a default page size of 50.
+**Activity log.** Every mutation (add/remove assets, member changes, metadata updates) inserts a row into `shared_space_activity` with a `type` enum and a `data` JSONB column for event-specific metadata (e.g., asset IDs, old/new values, who invited whom). The feed is paginated with a default page size of 50.
 
-**New since last visit** — The `lastViewedAt` timestamp on each membership is updated via `PATCH /shared-spaces/:id/view` when a user opens a space. The `newAssetCount` and `lastContributor` fields in the response DTO are computed by querying assets added after this timestamp.
+**New since last visit.** The `lastViewedAt` timestamp on each membership is updated via `PATCH /shared-spaces/:id/view` when a user opens a space. The `newAssetCount` and `lastContributor` fields in the response DTO are computed by querying assets added after this timestamp.
 
-**Face recognition (space-scoped)** — Space-scoped people are separate from personal people. When face recognition is enabled and assets are added, the service queues `SharedSpaceFaceMatch` jobs. Each job fetches face embeddings from the asset and runs a vectorchord similarity search (`<=>` operator) against existing space people. Matches within the configured distance threshold are linked; unmatched faces create new person entries. Person aliases allow each member to set their own display names for recognized people.
+**Face recognition (space-scoped).** Space-scoped people are separate from personal people. When face recognition is enabled and assets are added, the service queues `SharedSpaceFaceMatch` jobs. Each job fetches face embeddings from the asset and runs a vectorchord similarity search (`<=>` operator) against existing space people. Matches within the configured distance threshold are linked; unmatched faces create new person entries. Person aliases allow each member to set their own display names for recognized people.
 
-**Connected libraries (query-through)** — When an admin links a library to a space via the `shared_space_library` junction table, no asset data is copied. Instead, every query that resolves "assets in this space" uses a SQL `UNION` of two sources:
+**Connected libraries (query-through).** When an admin links a library to a space via the `shared_space_library` junction table, no asset data is copied. Instead, every query that resolves "assets in this space" uses a SQL `UNION` of two sources:
 
-1. **Manual assets** — `shared_space_asset` (individually added by members)
-2. **Library assets** — `shared_space_library` JOIN `asset` on `libraryId` (all assets belonging to the linked library)
+1. **Manual assets.** `shared_space_asset`, the rows members added individually.
+2. **Library assets.** `shared_space_library` JOIN `asset` on `libraryId`, every asset belonging to the linked library.
 
 The `UNION` (not `UNION ALL`) automatically deduplicates assets that appear in both sources. This query-through pattern is applied consistently across 14 query sites: asset counts, recent assets, new asset counts, map markers, timeline buckets (both `spaceId` and `timelineSpaceIds` paths), validation helpers (`isAssetInSpace`, `isFaceInSpace`), face-matching helpers (`getAssetIdsInSpace`, `getSpaceIdsForAsset`), and access control (`checkSpaceAccess`, `checkSpaceEditAccess`). All library-side UNION branches filter `asset.deletedAt IS NULL` and `asset.isOffline = false` to exclude deleted and offline assets.
 
 Face recognition for linked libraries uses two mechanisms:
 
-- **On link creation** — A `SharedSpaceLibraryFaceSync` orchestrator job batch-processes all library assets with detected faces (1000 at a time), reusing the extracted `processSpaceFaceMatch` method.
-- **On ongoing library scans** — The `handleSyncFiles` method in `LibraryService` checks if the scanned library is linked to any spaces and queues individual `SharedSpaceFaceMatch` jobs for newly imported assets.
+- **On link creation.** A `SharedSpaceLibraryFaceSync` orchestrator job batch-processes all library assets with detected faces, 1000 at a time, reusing the extracted `processSpaceFaceMatch` method.
+- **On ongoing library scans.** The `handleSyncFiles` method in `LibraryService` checks whether the scanned library is linked to any spaces and queues individual `SharedSpaceFaceMatch` jobs for newly imported assets.
 
 The admin-only "Libraries" tab in the space panel (`SpaceLinkedLibraries` component) provides the UI for linking and unlinking. The `linkedLibraries` field in `SharedSpaceResponseDto` is only populated when the requesting user is an admin.

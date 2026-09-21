@@ -248,7 +248,7 @@ jobs:
               lines.push('> [!WARNING]');
               if (resolveResult !== 'success') {
                 lines.push(
-                  `> Could not work out the next RC tag for [\`${short(headSha)}\`](${commitUrl(headSha)}) — the GHCR tag lookup failed, so nothing was built. See the [logs](${runUrl(context.runId)}).`,
+                  `> Could not work out the next RC tag for [\`${short(headSha)}\`](${commitUrl(headSha)}) (the GHCR tag lookup failed, so nothing was built). See the [logs](${runUrl(context.runId)}).`,
                 );
               } else {
                 const tagNote = rcTag ? ` (\`${rcTag}\`)` : '';
@@ -275,7 +275,7 @@ jobs:
                 : '';
 
               lines.push(
-                `**Latest RC** \`${latest.tag}\` — built from [\`${short(latest.sha)}\`](${commitUrl(latest.sha)}) · [build run](${runUrl(latest.runId)})`,
+                `**Latest RC** \`${latest.tag}\`, built from [\`${short(latest.sha)}\`](${commitUrl(latest.sha)}) · [build run](${runUrl(latest.runId)})`,
                 '',
                 '**Images published**',
                 '',
@@ -329,7 +329,7 @@ jobs:
 
             lines.push(
               '',
-              `_Last updated ${new Date().toUTCString()} — every push while the \`rc\`/\`rc-ml\` label is set publishes a new numbered RC. All \`pr-${prNumber}\` RC images are deleted when this PR closes._`,
+              `_Last updated ${new Date().toUTCString()}. Every push while the \`rc\`/\`rc-ml\` label is set publishes a new numbered RC. All \`pr-${prNumber}\` RC images are deleted when this PR closes._`,
             );
 
             const body = lines.join('\n');

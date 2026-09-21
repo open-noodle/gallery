@@ -101,19 +101,19 @@ After making a backup, please modify your `docker-compose.yml` file with the fol
 If you deviated from the defaults of pg14 or pgvectors0.2.0, you must adjust the pg major version and pgvecto.rs version. If you are still using the default `docker.io/tensorchord/pgvecto-rs:pg14-v0.2.0` image, you can just follow the changes above. For example, if the previous image is `docker.io/tensorchord/pgvecto-rs:pg16-v0.3.0`, the new image should be `ghcr.io/immich-app/postgres:16-vectorchord0.3.0-pgvectors0.3.0` instead of the image specified in the diff.
 :::
 
-After making these changes, you can start Gallery as normal. Gallery will make some changes to the DB during startup, which can take seconds to minutes to finish, depending on hardware and library size. In particular, it’s normal for the server logs to be seemingly stuck at `Reindexing clip_index` and `Reindexing face_index` for some time if you have over 100k assets in Gallery and/or Gallery is on a relatively weak server. If you see these logs and there are no errors, just give it time.
+After making these changes, you can start Gallery as normal. Gallery will make some changes to the DB during startup, which can take seconds to minutes to finish, depending on hardware and library size. In particular, it's normal for the server logs to be seemingly stuck at `Reindexing clip_index` and `Reindexing face_index` for some time if you have over 100k assets in Gallery and/or Gallery is on a relatively weak server. If you see these logs and there are no errors, just give it time.
 
 :::danger
 After switching to VectorChord, you should not downgrade Gallery below 1.133.0.
 :::
 
-Please don’t hesitate to contact us on [GitHub](https://github.com/open-noodle/gallery/discussions) or [Discord](https://discord.gg/cxBfbuxyG4) if you encounter migration issues.
+If you hit problems during the migration, contact us on [GitHub](https://github.com/open-noodle/gallery/discussions) or [Discord](https://discord.gg/cxBfbuxyG4).
 
 ### VectorChord FAQ
 
 #### I have a separate PostgreSQL instance shared with multiple services. How can I switch to VectorChord?
 
-Please see the [standalone PostgreSQL documentation](/administration/postgres-standalone#migrating-to-vectorchord) for migration instructions. The migration path will be different depending on whether you’re currently using pgvecto.rs or pgvector, as well as whether Gallery has superuser DB permissions.
+Please see the [standalone PostgreSQL documentation](/administration/postgres-standalone#migrating-to-vectorchord) for migration instructions. The migration path will be different depending on whether you're currently using pgvecto.rs or pgvector, as well as whether Gallery has superuser DB permissions.
 
 #### Why are so many lines removed from the `docker-compose.yml` file? Does this mean the health check is removed?
 
@@ -125,7 +125,7 @@ The new DB image includes pgvector and pgvecto.rs in addition to VectorChord, so
 
 #### Do I still need pgvecto.rs installed after migrating to VectorChord?
 
-pgvecto.rs only needs to be available during the migration, or if you need to restore from a backup that used pgvecto.rs. For a leaner DB and a smaller image, you can optionally switch to an image variant that doesn’t have pgvecto.rs installed after you’ve performed the migration and started Gallery: `ghcr.io/immich-app/postgres:14-vectorchord0.4.3`, changing the PostgreSQL version as appropriate.
+pgvecto.rs only needs to be available during the migration, or if you need to restore from a backup that used pgvecto.rs. For a leaner DB and a smaller image, you can optionally switch to an image variant that does not have pgvecto.rs installed, once you have performed the migration and started Gallery: `ghcr.io/immich-app/postgres:14-vectorchord0.4.3`, changing the PostgreSQL version as appropriate.
 
 #### Why does it matter whether my database is on an SSD or an HDD?
 

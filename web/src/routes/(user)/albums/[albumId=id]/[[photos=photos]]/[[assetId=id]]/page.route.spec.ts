@@ -309,10 +309,10 @@ describe('album detail filter panel route', () => {
     expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
 
     await user.click(screen.getByTestId('tags-item-tag-no-match'));
-    expect(screen.getByText('No photos available to add match your filters')).toBeInTheDocument();
+    expect(screen.getByText('None of the photos you can add match your filters')).toBeInTheDocument();
     await user.click(screen.getByText('Clear all filters'));
     await waitFor(() =>
-      expect(screen.queryByText('No photos available to add match your filters')).not.toBeInTheDocument(),
+      expect(screen.queryByText('None of the photos you can add match your filters')).not.toBeInTheDocument(),
     );
   });
 

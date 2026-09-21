@@ -44,7 +44,7 @@ import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
 // ---------------------------------------------------------------------------
-// Mocks (Task 10 — "Move to folder…" wiring)
+// Mocks (Task 10 — "Move to folder..." wiring)
 // ---------------------------------------------------------------------------
 
 class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
@@ -1310,7 +1310,7 @@ void main() {
   });
 
   // ---------------------------------------------------------------------
-  // Task 10 — "Move to folder…" wiring on the album card. The picker's
+  // Task 10 — "Move to folder..." wiring on the album card. The picker's
   // `picked` flag is the only thing that distinguishes a dismissal from
   // "picked the root" (both resolve folderId: null) — see teeth check #1
   // in the task report.
@@ -1339,7 +1339,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('space-album-card-menu-a1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Move to folder…'));
+    await tester.tap(find.text('Move to folder...'));
     await tester.pumpAndSettle();
 
     // Tap the modal barrier (outside the sheet) to dismiss without picking.
@@ -1373,7 +1373,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('space-album-card-menu-a1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Move to folder…'));
+    await tester.tap(find.text('Move to folder...'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('folder-option-trips')));
@@ -1385,7 +1385,7 @@ void main() {
 
   // ---------------------------------------------------------------------
   // Task 10 round 2 — folder CRUD: app-bar "New folder" and the folder
-  // card's ⋮ Rename / Move to folder… / Delete. Task 9's card already
+  // card's ⋮ Rename / Move to folder... / Delete. Task 9's card already
   // declares onRename/onMove/onDelete; this is where the page actually
   // wires them (they were previously left null — a fully-enabled, fully
   // dead ⋮ menu). Every `spaceAlbumActionsProvider` override here is a

@@ -44,7 +44,7 @@ describe('FaceActionsHelpModal — guided', () => {
     expect(screen.getByText('What do these actions do?')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Nothing changes until you press Apply. Every flagged face has to end in one of these six states — then this person leaves the cleanup queue for good.',
+        'Nothing changes until you press Apply. Every flagged face has to end in one of these six states. Then this person leaves the cleanup queue for good.',
       ),
     ).toBeInTheDocument();
   });
@@ -60,7 +60,7 @@ describe('FaceActionsHelpModal — guided', () => {
       ['owner', 'Move to owner'],
       ['stay', 'Keep here'],
       ['lock', 'Confirm & lock'],
-      ['other', 'Move to person…'],
+      ['other', 'Move to person...'],
       ['unknown', 'Unknown person'],
       ['detach', 'Not a face'],
     ] as const) {
@@ -97,7 +97,7 @@ describe('FaceActionsHelpModal — guided', () => {
       screen.getByText(/no future scan can flag it again, no matter who it comes to resemble/),
     ).toBeInTheDocument();
     expect(screen.getByText(/the next scan can flag the face again/)).toBeInTheDocument();
-    expect(screen.getByText(/its identity link is stripped/)).toBeInTheDocument();
+    expect(screen.getByText(/loses its identity link/)).toBeInTheDocument();
     expect(screen.getByText(/move into a new unnamed cluster of their own/)).toBeInTheDocument();
   });
 
@@ -105,8 +105,8 @@ describe('FaceActionsHelpModal — guided', () => {
   it('warns that Not a face retires the crop rather than returning it to the pool, and points at Unknown person', () => {
     renderModal(GUIDED);
 
-    expect(screen.getByText(/Use Unknown person instead if it IS a real face/)).toBeInTheDocument();
-    expect(screen.getByText(/gone from face recognition, not returned to the pool/)).toBeInTheDocument();
+    expect(screen.getByText(/If it IS a real face, use Unknown person instead/)).toBeInTheDocument();
+    expect(screen.getByText(/gone from face recognition and never comes back into the pool/)).toBeInTheDocument();
   });
 
   it('tells the admin the resolutions are undoable and that an emptied unnamed person is removed', () => {
@@ -133,7 +133,7 @@ describe('FaceActionsHelpModal — manual', () => {
     expect(screen.getByText('What do these actions do?')).toBeInTheDocument();
   });
 
-  it('names exactly this mode’s six actions: Keep (default), Move to person…, Confirm & lock, Unknown person, Not a face, Unmark', () => {
+  it('names exactly this mode’s six actions: Keep (default), Move to person..., Confirm & lock, Unknown person, Not a face, Unmark', () => {
     renderModal(MANUAL);
 
     // Scoped to each action's OWN row, not the shared `help-actions` container: "Keep" also appears inside
@@ -142,7 +142,7 @@ describe('FaceActionsHelpModal — manual', () => {
     // even if a row's own label vanished.
     for (const [id, name] of [
       ['keep', 'Keep'],
-      ['other', 'Move to person…'],
+      ['other', 'Move to person...'],
       ['lock', 'Confirm & lock'],
       ['unknown', 'Unknown person'],
       ['detach', 'Not a face'],
@@ -164,14 +164,14 @@ describe('FaceActionsHelpModal — manual', () => {
   it('explains that Keep writes nothing, unlike guided where every face is always stamped', () => {
     renderModal(MANUAL);
 
-    expect(screen.getByText(/there's no button for it, because you never have to select it/)).toBeInTheDocument();
-    expect(screen.getByText(/A kept face is never included in the Apply request/)).toBeInTheDocument();
+    expect(screen.getByText(/There's no button for it, because you never have to select it/)).toBeInTheDocument();
+    expect(screen.getByText(/A kept face is never sent with the Apply request/)).toBeInTheDocument();
   });
 
   it('warns Not a face is irreversible and points at Unknown as the opposite case', () => {
     renderModal(MANUAL);
 
-    expect(screen.getByText(/Use Unknown person instead if it IS a real face/)).toBeInTheDocument();
+    expect(screen.getByText(/If it IS a real face, use Unknown person instead/)).toBeInTheDocument();
   });
 
   it('every action explains its effect on apply', () => {
@@ -228,9 +228,7 @@ describe('FaceActionsHelpModal — mode-dependent copy', () => {
     guided.unmount();
 
     renderModal(MANUAL);
-    expect(
-      screen.getByText(/anyone in this library, or a brand-new person you create on the spot/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/anyone in this library, or a new person you create on the spot/)).toBeInTheDocument();
     expect(screen.queryByText(/instead of the one the scan suggested/)).not.toBeInTheDocument();
   });
 
@@ -248,13 +246,15 @@ describe('FaceActionsHelpModal — mode-dependent copy', () => {
     const guided = renderModal(GUIDED);
     const guidedUnknown = screen.getByText(/you don't know whose it is/).textContent;
     const guidedDetachBody = screen.getByText(/a poster, a statue, a reflection/).textContent;
-    const guidedDetachEffect = screen.getByText(/gone from face recognition, not returned to the pool/).textContent;
+    const guidedDetachEffect = screen.getByText(
+      /gone from face recognition and never comes back into the pool/,
+    ).textContent;
     guided.unmount();
 
     renderModal(MANUAL);
     expect(screen.getByText(/you don't know whose it is/).textContent).toBe(guidedUnknown);
     expect(screen.getByText(/a poster, a statue, a reflection/).textContent).toBe(guidedDetachBody);
-    expect(screen.getByText(/gone from face recognition, not returned to the pool/).textContent).toBe(
+    expect(screen.getByText(/gone from face recognition and never comes back into the pool/).textContent).toBe(
       guidedDetachEffect,
     );
   });
