@@ -23,7 +23,7 @@ import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 /// out correctly whether it receives 0, 1, 2, 3 or 4 covers -- an empty list
 /// falls back to a folder glyph rather than rendering broken/blank tiles.
 ///
-/// The overflow menu (Rename / Move to folder… / Delete) is keyed
+/// The overflow menu (Rename / Move to folder... / Delete) is keyed
 /// `space-album-folder-card-menu` and rendered only when [canEdit] is true
 /// (U-06) -- viewers get no management affordances at all.
 class SpaceAlbumFolderCard extends StatelessWidget {

@@ -19,18 +19,18 @@ Assets you uploaded through Gallery are preserved, as long as they exist in Immi
 
 ## 1. Back up your database
 
-Even if you plan to run the cleanup script, take a `pg_dump` first so you can roll back if something goes wrong.
+Take a `pg_dump` first, even if you plan to run the cleanup script. It is your way back if something goes wrong.
 
 ```bash
 docker exec immich_postgres pg_dump -U postgres -d immich \
   > gallery-pre-revert-$(date +%F).sql
 ```
 
-Store this file somewhere outside your Gallery install directory.
+Keep that file outside your Gallery install directory.
 
 ## 2. Stop the Gallery stack
 
-The cleanup script takes `ACCESS EXCLUSIVE` locks on many tables — a running server will either deadlock with it or race it. Stop every app container, but keep the database up so the script can connect:
+The cleanup script takes `ACCESS EXCLUSIVE` locks on many tables, so a running server will either deadlock with it or race it. Stop every app container, but keep the database up so the script can connect:
 
 ```bash
 docker compose stop immich-server immich-machine-learning
@@ -40,19 +40,19 @@ Leave `immich_postgres` (and `immich_redis`, if you run it) running.
 
 ## 3. Download the cleanup script
 
-**Use the script attached to the release you're actually running, not the copy on the `main` branch.** The script targets the exact set of Gallery-only tables, columns, and fork migrations for its release — `main` is always ahead, so its copy can drop things your schema doesn't have (or miss things it does) if your instance is even one release behind.
+**Use the script attached to the release you are actually running, not the copy on the `main` branch.** Each script targets the exact set of Gallery-only tables, columns and fork migrations for its own release. `main` is always ahead, so its copy can drop things your schema does not have, or miss things it does, if your instance is even one release behind.
 
 Find your version first: run [`immich-admin version`](/administration/server-commands#examples) in the `immich_server` container, or click the version number at the bottom of the sidebar in the Gallery web UI to open the About dialog.
 
-Then open that version's page on the [Gallery releases page](https://github.com/open-noodle/gallery/releases) — for example `https://github.com/open-noodle/gallery/releases/tag/v5.4.0` — and download the `revert-to-immich.sql` asset attached to it, either from the browser or with `curl`:
+Then open that version's page on the [Gallery releases page](https://github.com/open-noodle/gallery/releases), for example `https://github.com/open-noodle/gallery/releases/tag/v5.4.0`, and download the `revert-to-immich.sql` asset attached to it, either from the browser or with `curl`:
 
 ```bash
 curl -LO https://github.com/open-noodle/gallery/releases/download/v5.4.0/revert-to-immich.sql
 ```
 
-Replace `v5.4.0` with your own version. Every release since this asset was introduced ships one; if yours predates it, upgrade to the nearest later release first and use the script attached there.
+Replace `v5.4.0` with your own version. Every release since this asset was introduced ships one. If yours predates it, upgrade to the nearest later release first and use the script attached there.
 
-Read the script header before running it — it lists every table and column it will drop.
+Read the script header first. It lists every table and column the script will drop.
 
 ## 4. Run the cleanup script
 
@@ -77,7 +77,7 @@ Notes:
 
 ## 5. Switch your compose file to upstream Immich
 
-Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin a version close to the Immich release Gallery was last rebased from — you can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`.
+Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin a version close to the Immich release Gallery was last rebased from. You can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`.
 
 ```yaml title="docker-compose.yml"
 services:
@@ -94,7 +94,7 @@ services:
 
 Upstream Immich uses the same [postgres image](https://github.com/immich-app/base-images) as Gallery, so no database image change is needed.
 
-If you set any Gallery-only environment variables, remove them from your `.env` file — upstream Immich will log warnings about unknown settings otherwise.
+If you set any Gallery-only environment variables, remove them from your `.env` file, or upstream Immich will log warnings about unknown settings.
 
 ```yaml title=".env"
 #IMMICH_VERSION=v5
@@ -109,17 +109,17 @@ docker compose up -d
 docker compose logs -f immich-server
 ```
 
-Watch the server log. A successful boot ends with the usual Immich startup banner and no migration errors. If you see a "missing migration" or "corrupted migrations" error, the cleanup did not complete — restore your `pg_dump` from step 1 and open an issue on the Gallery repository with the full error output.
+Watch the server log. A successful boot ends with the usual Immich startup banner and no migration errors. If you see a "missing migration" or "corrupted migrations" error, the cleanup did not complete. Restore your `pg_dump` from step 1 and open an issue on the Gallery repository with the full error output.
 
 ## What was removed
 
-For transparency, here is what the cleanup script changes:
+Here is what the cleanup script changes:
 
-- **Drops Gallery-only tables**: `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`.
-- **Drops Gallery-added columns**: `person.type`, `person.species`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt`, `library.createId`.
-- **Drops Gallery-only functions and triggers** that reference the dropped tables.
-- **Strips the `classification` key** out of the `system-config` row in `system_metadata`.
-- **Deletes fork migration rows** from `kysely_migrations` and `migration_overrides`, so upstream Immich's migrator does not see them as unknown migrations.
-- **Rolls back upstream migrations that Gallery pulled in after the currently supported Immich tag** when needed. Gallery may be rebased onto upstream commits newer than the Immich release you switch back to, so the script also removes those migration rows and reverses their schema changes before vanilla Immich starts.
+- It drops the Gallery-only tables `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log` and `asset_duplicate_checksum`.
+- It drops the Gallery-added columns `person.type`, `person.species`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt` and `library.createId`.
+- It drops the Gallery-only functions and triggers that reference the dropped tables.
+- It strips the `classification` key out of the `system-config` row in `system_metadata`.
+- It deletes fork migration rows from `kysely_migrations` and `migration_overrides`, so upstream Immich's migrator does not see them as unknown migrations.
+- Where needed, it rolls back upstream migrations that Gallery pulled in after the currently supported Immich tag. Gallery may be rebased onto upstream commits newer than the Immich release you switch back to, so the script also removes those migration rows and reverses their schema changes before vanilla Immich starts.
 
-The script's own header documents every step in detail.
+The script header documents each step in detail.

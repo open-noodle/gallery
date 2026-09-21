@@ -25,7 +25,7 @@ The metrics in gallery are grouped into API (endpoint calls and response times),
 
 ### Gallery Metrics
 
-Gallery adds application metrics on top of the standard OpenTelemetry metrics:
+On top of the standard OpenTelemetry metrics, Gallery adds:
 
 - Asset counts and storage by type.
 - Per-user asset and storage metrics labeled by `user_id` only.
@@ -35,7 +35,7 @@ Gallery adds application metrics on top of the standard OpenTelemetry metrics:
 - Queue counts and oldest waiting, delayed, and failed job age.
 - Machine-learning request counts, latency histograms, active requests, model cache entries, and model load latency.
 
-Per-user metrics intentionally use `user_id` only. Names, emails, filenames, paths, search text, IP addresses, and request payloads are not exported as labels.
+Per-user metrics carry a `user_id` and nothing else. Names, emails, filenames, paths, search text, IP addresses and request payloads are never exported as labels.
 
 The dashboard and examples use the Prometheus-exported metric names:
 
@@ -64,12 +64,12 @@ The dashboard and examples use the Prometheus-exported metric names:
 Gallery will not expose server metrics endpoints by default. To enable them, add the `IMMICH_TELEMETRY_INCLUDE=all` environment variable to your `.env` file.
 
 :::tip
-`IMMICH_TELEMETRY_INCLUDE=all` enables all server telemetry groups. For a more granular configuration, enumerate the telemetry groups that should be included as a comma separated list, for example `IMMICH_TELEMETRY_INCLUDE=api,app,job`.
+`IMMICH_TELEMETRY_INCLUDE=all` enables every server telemetry group. For finer control, list only the groups you want, comma separated: `IMMICH_TELEMETRY_INCLUDE=api,app,job`.
 
-The starter dashboard expects `api`, `app`, and `job`. Add `host`, `io`, and `repo` if you also want the broader OpenTelemetry metrics. You can exclude specific server groups with `IMMICH_TELEMETRY_EXCLUDE`. For more information, refer to the [environment section](/install/environment-variables.md#prometheus).
+That is what the starter dashboard expects. Add `host`, `io` and `repo` if you also want the broader OpenTelemetry metrics. To go the other way, exclude specific groups with `IMMICH_TELEMETRY_EXCLUDE`. For more information, see the [environment section](/install/environment-variables.md#prometheus).
 :::
 
-The machine-learning service exposes its own `/metrics` endpoint on port `3003`. It is not controlled by `IMMICH_TELEMETRY_INCLUDE`; Prometheus collects those metrics only when you configure the machine-learning scrape target.
+The machine-learning service exposes its own `/metrics` endpoint on port `3003`. `IMMICH_TELEMETRY_INCLUDE` does not control it. Prometheus collects those metrics only once you add the machine-learning scrape target.
 
 The next step is to configure a new or existing Prometheus instance to scrape this endpoint. The following steps assume that you do not have an existing Prometheus instance, but the steps will be similar either way.
 
@@ -117,7 +117,7 @@ After bringing down the containers with `docker compose down` and back up with `
 :::note
 To see exactly what metrics are made available, you can additionally add `8081:8081` (API metrics) and `8082:8082` (microservices metrics) to the immich_server container's ports.
 Visiting the `/metrics` endpoint for these services will show the same raw data that Prometheus collects.
-The machine-learning service exposes `/metrics` on its regular `3003` service port, so expose `3003:3003` on the immich_machine_learning container if you also want to inspect those metrics from the host.
+The machine-learning service serves `/metrics` on its regular `3003` port, so add `3003:3003` to the immich_machine_learning container to inspect those from the host too.
 To configure these ports see [`IMMICH_API_METRICS_PORT` & `IMMICH_MICROSERVICES_METRICS_PORT`](/install/environment-variables/#general).
 :::
 
@@ -160,22 +160,22 @@ Gallery ships a starter dashboard at [`docker/grafana-dashboard.json`][dashboard
 
 The starter dashboard covers asset totals, storage, users, queue depth, queue staleness, smart-search embedding coverage, face/person counts, and machine-learning request/model metrics.
 
-You can edit the imported dashboard in Grafana and save your own copy. If you want repeatable setup instead of manual import, keep the dashboard JSON in your own configuration repository and provision it with [Grafana dashboard provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards).
+You can edit the imported dashboard in Grafana and save your own copy. For a repeatable setup, keep the dashboard JSON in your own configuration repository and provision it with [Grafana dashboard provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards).
 
 ### Troubleshooting
 
 If Prometheus or Grafana does not show data:
 
-- Run `docker compose up -d` after changing `.env`; a simple restart does not apply new environment variables.
+- Run `docker compose up -d` after changing `.env`. A plain restart does not pick up new environment variables.
 - In Prometheus, open **Status > Targets** and confirm the API, microservices, and machine-learning targets are `UP`.
 - Confirm the server container has `IMMICH_TELEMETRY_INCLUDE=all` or at least `IMMICH_TELEMETRY_INCLUDE=api,app,job`.
 - Confirm `./prometheus.yml` is in the same directory as your Compose file and is mounted into the Prometheus container.
-- If only machine-learning panels are empty, run a smart-search, facial-recognition, or classification task so the ML service has request and model activity to report.
+- If only the machine-learning panels are empty, run a smart-search, facial-recognition or classification task so the ML service has request and model activity to report.
 - If you exposed the metrics ports for inspection, check `http://localhost:8081/metrics`, `http://localhost:8082/metrics`, and `http://localhost:3003/metrics`.
 
-### Deferred Scope
+### Not Covered Yet
 
-Phase 1 does not add auth/IP metrics, upload throughput, face/CLIP score distributions, duplicate metrics, video transcode quality metrics, DB bloat metrics, geocoding/OCR coverage, new memory metrics, cache hit/miss internals, or custom CPU/memory/GPU/network metrics beyond existing host and infrastructure exporters. Those need separate product and privacy decisions.
+Gallery does not export auth/IP metrics, upload throughput, face/CLIP score distributions, duplicate metrics, video transcode quality metrics, DB bloat metrics, geocoding/OCR coverage, new memory metrics, cache hit/miss internals, or custom CPU/memory/GPU/network metrics beyond what the existing host and infrastructure exporters give you. Each of those needs its own product and privacy decision first.
 
 ## Structured Logging
 
