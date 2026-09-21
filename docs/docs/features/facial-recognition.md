@@ -32,20 +32,20 @@ It can be found from the app bar when you access the detail view of a person.
 
 ## Face Statistics
 
-Gallery can surface face count totals on the People pages so you can see how face recognition is progressing across your library at a glance.
+Gallery can show face count totals on the People pages, so you can see how far face recognition has got through your library.
 
 When enabled, you will see:
 
 - A face count next to the heading on the People page (e.g. `(124) · 8,432 faces`) and on each shared space's People page.
 - A face count next to the assets count on each person's detail page.
-- A small info icon next to the People page heading. Clicking it opens a panel breaking the totals down further:
-  - **Detected faces** — every face the face detection model has found in your library.
-  - **Assigned to visible people** — faces that have been clustered into people you can browse.
-  - **Named visible people** — visible people that you have given a name.
-  - **Assigned to hidden people** — faces clustered into people you have hidden from the People list.
-  - **Unassigned** — faces that haven't been linked to a person yet (they're either still being processed, below the _Minimum Recognized Faces_ threshold, or considered outliers).
+- A small info icon next to the People page heading. Clicking it opens a panel that breaks the totals down further:
+  - Detected faces: every face the face detection model has found in your library.
+  - Assigned to visible people: faces that have been clustered into people you can browse.
+  - Named visible people: visible people that you have given a name.
+  - Assigned to hidden people: faces clustered into people you have hidden from the People list.
+  - Unassigned: faces that haven't been linked to a person yet. They are either still being processed, below the _Minimum Recognized Faces_ threshold, or considered outliers.
 
-These numbers can be useful for confirming that face detection has finished running, deciding when to re-run facial recognition after tuning the settings, or understanding why a particular face hasn't been clustered yet.
+Use them to confirm that face detection has finished running, to decide when to re-run facial recognition after changing the settings, or to work out why one face has not been clustered yet.
 
 ### Enabling face statistics
 
@@ -59,10 +59,10 @@ services:
       IMMICH_PEOPLE_STATISTICS_ENABLED: 'true'
 ```
 
-The setting is a UI toggle only — it controls whether the counts and the info panel are rendered. Turning it off does not delete any data and you can flip it back on at any time.
+The setting is a UI toggle: it controls whether the counts and the info panel are rendered. Turning it off deletes nothing, and you can flip it back on whenever you like.
 
 :::tip
-If you find the totals distracting (for example on a casual family library where the exact face count isn't useful), you can leave the variable unset. The People pages will fall back to just showing the people count.
+If you find the totals distracting, for example on a family library where the exact face count tells you nothing, leave the variable unset. The People pages then show the people count on its own.
 :::
 
 ## Face Suggestions
