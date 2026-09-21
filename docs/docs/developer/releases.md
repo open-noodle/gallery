@@ -1,6 +1,6 @@
 # Releases
 
-Gallery uses **git tags as the single source of truth** for versioning. Mobile and server are released **independently** through two manual workflows. Versions are always supplied by hand — there is no automatic version bump and no push-to-`main` trigger.
+Gallery uses **git tags as the single source of truth** for versioning. Mobile and server are released **independently** through two manual workflows. Versions are always supplied by hand. There is no automatic version bump and no push-to-`main` trigger.
 
 ## The two release workflows
 
@@ -28,13 +28,13 @@ It builds and pushes multi-arch Docker images to `ghcr.io/open-noodle/`, moves t
 
 The three git tags:
 
-- `vX.Y.Z` — the specific version (e.g. `v5.0.0`)
-- `vX` — floats to the latest release in that major (e.g. `v5`)
-- `release` — always points to the latest server release
+- `vX.Y.Z`: the specific version (e.g. `v5.0.0`)
+- `vX`: floats to the latest release in that major (e.g. `v5`)
+- `release`: always points to the latest server release
 
 ## Keeping mobile and server in sync (optional)
 
-The workflows are decoupled by design — a server bugfix can ship without waiting on app-store review, and vice versa. When you _do_ want them aligned (e.g. a coordinated version):
+The workflows are decoupled by design: a server bugfix can ship without waiting on app-store review, and vice versa. When you _do_ want them aligned (e.g. a coordinated version):
 
 1. Run **Release Mobile** with the target version. Note the commit SHA it records.
 2. Promote the store builds and wait for them to go live.
@@ -44,9 +44,9 @@ If you don't need parity, just run **Release Gallery Server** from `main` with n
 
 ## Version in source files
 
-Source files (`package.json`, `pubspec.yaml`, `pyproject.toml`) contain the **upstream Immich version** — not the Gallery version. This avoids merge conflicts during upstream rebases. The branding script (`branding/scripts/apply-branding.sh`) overwrites these at build time with the Gallery version passed into the release workflow.
+Source files (`package.json`, `pubspec.yaml`, `pyproject.toml`) contain the **upstream Immich version**, not the Gallery version, which keeps upstream rebases free of merge conflicts. The branding script (`branding/scripts/apply-branding.sh`) overwrites these at build time with the Gallery version passed into the release workflow.
 
-In local development, the server reports the upstream Immich version. This is expected — branding only runs during CI builds.
+In local development the server reports the upstream Immich version. That is expected: branding only runs during CI builds.
 
 ## Docker image tags
 

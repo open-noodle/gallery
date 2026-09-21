@@ -182,7 +182,7 @@ describe('ClassificationSettings', () => {
 
     await waitFor(() => {
       expect(scanClassification).toHaveBeenCalled();
-      expect(toastManager.primary).toHaveBeenCalledWith('Rescan started — existing auto-tags will be re-evaluated');
+      expect(toastManager.primary).toHaveBeenCalledWith('Rescan started. Existing auto-tags will be re-evaluated.');
     });
   });
 
@@ -219,7 +219,9 @@ describe('ClassificationSettings', () => {
     expect(slider).toHaveAttribute('min', '0.01');
     expect(slider).toHaveAttribute('max', '1');
     expect(
-      screen.getByText('Start around 0.15-0.30, then lower for broader matches or raise for stricter matches.'),
+      screen.getByText(
+        'Start around 0.15-0.30, then lower it to match more loosely or raise it to match more strictly.',
+      ),
     ).toBeInTheDocument();
 
     await fireEvent.input(slider, { target: { value: '0.11' } });
