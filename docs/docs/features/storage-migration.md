@@ -1,29 +1,29 @@
 # Storage Migration
 
-Noodle Gallery includes a built-in tool for migrating files between disk and S3-compatible object storage. You can migrate all your existing files from disk to S3, or from S3 back to disk.
+Noodle Gallery has a built-in tool for moving files between disk and S3-compatible object storage. It runs in both directions: all your existing files from disk to S3, or from S3 back to disk.
 
 ## Features
 
-- **Bidirectional** — Migrate from disk to S3, or from S3 to disk.
-- **Configurable file types** — Choose which file types to migrate (originals, thumbnails, previews, full-size images, encoded videos, sidecars, person thumbnails, profile images).
-- **Pre-migration estimate** — See file counts and estimated data size before starting.
-- **Resumable** — If a migration is interrupted, simply start it again. Files already migrated are skipped automatically.
-- **Idempotent** — Running a migration multiple times is safe. Already-migrated files are detected and skipped.
-- **Rollback** — Every migration creates a batch ID. You can roll back an entire batch to restore the original file paths.
-- **Configurable concurrency** — Control how many files are migrated in parallel.
-- **Safe with concurrent uploads** — Uses optimistic concurrency to prevent conflicts with files being uploaded during migration.
+- Migrates in both directions, disk to S3 or S3 to disk.
+- You choose which file types to move: originals, thumbnails, previews, full-size images, encoded videos, sidecars, person thumbnails and profile images.
+- An estimate before you start shows file counts and the data size to expect.
+- An interrupted migration resumes. Start it again and the files already migrated are skipped.
+- Running a migration several times is safe. Already-migrated files are detected and skipped.
+- Every migration creates a batch ID, so you can roll a whole batch back to the original file paths.
+- You set how many files migrate in parallel.
+- Optimistic concurrency keeps the migration from colliding with files that are being uploaded while it runs.
 
 ## Prerequisites
 
-1. **S3 storage must be configured.** Set up your S3 environment variables as described in the [S3 Storage documentation](/features/s3-storage).
+1. Configure S3 storage. Set up your S3 environment variables as described in the [S3 Storage documentation](/features/s3-storage).
 
-2. **Set `IMMICH_STORAGE_BACKEND` to match the migration direction:**
-   - To migrate **to S3**: set `IMMICH_STORAGE_BACKEND=s3`
-   - To migrate **to disk**: set `IMMICH_STORAGE_BACKEND=disk`
+2. Set `IMMICH_STORAGE_BACKEND` to match the migration direction:
+   - To migrate to S3: set `IMMICH_STORAGE_BACKEND=s3`
+   - To migrate to disk: set `IMMICH_STORAGE_BACKEND=disk`
 
-   This ensures that new uploads during migration go to the correct backend.
+   New uploads made during the migration then go to the correct backend.
 
-3. **Restart Gallery** after changing environment variables.
+3. Restart Gallery after changing environment variables.
 
 ## Using the Admin UI
 
@@ -53,7 +53,7 @@ If you need to undo a migration:
 3. Click **Rollback**. This reverts all database path changes for that batch.
 
 :::warning
-Rollback only reverts the **database paths**. If you enabled "delete source files" during migration, the original files will have been removed and rollback cannot restore them. To fully revert, you would need to run a migration in the opposite direction.
+Rollback only reverts the **database paths**. If you enabled "delete source files" during the migration, the original files are gone and rollback cannot bring them back. To fully revert, run a migration in the opposite direction.
 :::
 
 ## Using the API
@@ -111,10 +111,10 @@ Reverts all path changes from the specified batch.
 
 ## Tips
 
-- **Back up your database** before starting a migration. While the migration is designed to be safe, a database backup provides an extra safety net.
-- **Start with a low concurrency** (e.g., 3-5) and increase if your system handles it well.
-- **Leave "delete source" off** for the first migration so you can verify everything works before removing source files.
-- **Only one migration can run at a time.** Starting a new migration while one is in progress will return an error.
+- Back up your database before you start. The migration is built to be safe, but a backup is a cheap extra net.
+- Start with a low concurrency (3 to 5) and raise it if your system handles it well.
+- Leave "delete source" off for the first migration, so you can check that everything works before removing source files.
+- Only one migration runs at a time. Starting a second one while the first is in progress returns an error.
 
 ## Technical Implementation
 
@@ -138,7 +138,7 @@ Migrations are tracked in a dedicated `storage_migration_log` table:
 └─────────────────────────────┘
 ```
 
-Each migrated file gets one log row. The `batchId` groups all files from a single migration run, enabling batch-level rollback.
+Each migrated file gets one log row. The `batchId` groups every file from a single run, so rollback can work a whole batch at a time.
 
 ### Job Architecture
 
@@ -161,16 +161,16 @@ Admin clicks "Start"
 └───────────────────┘     └───────────────────┘
 ```
 
-The orchestrator job streams file records from 8 different sources (assets, asset files by type, person thumbnails, user profile images), batches them, and queues individual migration jobs. The worker concurrency is set dynamically based on the user's input (1-20, default 5).
+The orchestrator job streams file records from 8 sources (assets, asset files by type, person thumbnails and user profile images), batches them and queues one migration job per file. Worker concurrency follows the value you set, from 1 to 20, default 5.
 
 ### Path Transformation
 
 The migration converts between absolute disk paths and relative S3 keys:
 
-- **Disk to S3**: Strip the media location prefix (e.g., `/usr/src/app/upload/library/...` becomes `library/...`)
-- **S3 to Disk**: Prepend the media location prefix
+- Disk to S3: strip the media location prefix, so `/usr/src/app/upload/library/...` becomes `library/...`
+- S3 to Disk: prepend the media location prefix
 
-The S3 storage backend uses relative paths while the disk backend uses absolute paths. This convention is what enables the [dual backend routing](/features/s3-storage#dual-backend-routing) to work transparently.
+The S3 storage backend uses relative paths, the disk backend absolute ones. That convention lets [dual backend routing](/features/s3-storage#dual-backend-routing) work transparently.
 
 ### Concurrency Safety
 
@@ -178,4 +178,4 @@ Each per-file job uses **optimistic concurrency** when updating the database: th
 
 ### Rollback
 
-Rollback reads all log entries for a given `batchId` and reverses each path update using the same optimistic concurrency pattern (UPDATE WHERE path = newPath, SET path = oldPath). If all reversals succeed, the log entries for that batch are deleted. If any fail, the log is preserved for debugging. Rollback does not move files — it only reverts database paths. If source files were deleted during migration, a reverse migration in the opposite direction is needed to restore the actual files.
+Rollback reads every log entry for a given `batchId` and reverses each path update with the same optimistic concurrency pattern (UPDATE WHERE path = newPath, SET path = oldPath). If all reversals succeed, the log entries for that batch are deleted. If any fail, the log is kept for debugging. Rollback never moves files. It only reverts database paths, so if source files were deleted during the migration you need a migration in the opposite direction to bring the files back.

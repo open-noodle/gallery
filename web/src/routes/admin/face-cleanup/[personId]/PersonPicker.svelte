@@ -13,7 +13,7 @@
 
   // Owner-scoped move-to-chosen-person picker (Slice 4). Reads the mockup
   // (specs/mockups/2026-07-10-face-cleanup-resolution-mockup.html #modalBg) as the visual source of truth:
-  // title "Move N faces to…", subtitle, a search box, owner-scoped rows (named people + unnamed clusters),
+  // title "Move N faces to...", subtitle, a search box, owner-scoped rows (named people + unnamed clusters),
   // a "Create new person" row once a query is typed, and a "No matches" empty state.
   export interface PersonPickerDestination {
     personId: string;

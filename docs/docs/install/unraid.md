@@ -10,7 +10,7 @@ This is a community contribution and not officially supported by the Immich team
 Community support can be found in the dedicated channel on the [Discord Server](https://discord.immich.app/).
 :::
 
-Gallery can easily be installed and updated on Unraid via:
+Gallery can be installed and updated on Unraid via:
 
 1. Community made template on the Unraid Community Apps
 2. [Docker Compose Manager](https://forums.unraid.net/topic/114415-plugin-docker-compose-manager/) plugin from the Unraid Community Apps
@@ -23,7 +23,7 @@ Gallery can easily be installed and updated on Unraid via:
 
 :::
 
-In order to install Gallery from the Unraid CA, you will need an existing Redis and PostgreSQL 14 container, If you do not already have Redis or PostgreSQL you can install them from the Unraid CA, just make sure you choose PostgreSQL **14**.
+To install Gallery from the Unraid CA you need an existing Redis container and an existing PostgreSQL 14 container. If you do not have them yet, install them from the Unraid CA, and make sure you choose PostgreSQL **14**.
 
 Once you have Redis and PostgreSQL running, search for Gallery on the Unraid CA, choose either of the templates listed and fill out the example variables.
 
