@@ -36,6 +36,33 @@
     return transforms.join(' ');
   });
 
+  // Matches the server-side formulas in media.repository.ts exactly (see
+  // specs/2026-09-20-image-adjust-tool-design.md) so this preview is what actually gets saved,
+  // not an approximation of it.
+  let imageFilter = $derived.by(() => {
+    // Order matches the server pipeline exactly (see applyAdjust's comment in
+    // media.repository.ts): saturation first, then invert, then exposure/contrast - so a
+    // negative exposure darkens an already-inverted (film negative) image instead of
+    // brightening it. CSS filter functions apply left-to-right, each on the previous one's
+    // output, so this order is what actually makes invert run conceptually first.
+    const filters: string[] = [];
+
+    if (transformManager.saturation !== 0) {
+      filters.push(`saturate(${Math.max(0, 1 + transformManager.saturation / 100)})`);
+    }
+    if (transformManager.invert) {
+      filters.push('invert(1)');
+    }
+    if (transformManager.exposure !== 0) {
+      filters.push(`brightness(${1 + transformManager.exposure / 100})`);
+    }
+    if (transformManager.contrast !== 0) {
+      filters.push(`contrast(${1 + transformManager.contrast / 100})`);
+    }
+
+    return filters.join(' ');
+  });
+
   const edges = [ResizeBoundary.Top, ResizeBoundary.Right, ResizeBoundary.Bottom, ResizeBoundary.Left];
   const corners = [
     ResizeBoundary.TopLeft,
@@ -74,6 +101,7 @@
       alt={$getAltText(toTimelineAsset(asset))}
       class="h-full transition-transform select-none motion-reduce:transition-none"
       style:transform={imageTransform}
+      style:filter={imageFilter}
     />
     <div
       class={[

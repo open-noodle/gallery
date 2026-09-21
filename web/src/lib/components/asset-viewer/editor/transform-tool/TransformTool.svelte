@@ -1,9 +1,15 @@
 <script lang="ts">
   import { shortcuts } from '$lib/actions/shortcut';
+  import AdjustPanel from '$lib/components/asset-viewer/editor/transform-tool/AdjustPanel.svelte';
   import { transformManager } from '$lib/managers/edit/transform-manager.svelte';
   import { Button, HStack, IconButton } from '@immich/ui';
   import { mdiFlipHorizontal, mdiFlipVertical, mdiRotateLeft, mdiRotateRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
+
+  // Which panel is shown below Orientation — display-only, not sent anywhere. Edit and Crop are
+  // both still part of the same Transform tool/edit set regardless of which one is visible; see
+  // transform-manager.svelte.ts for where the actual Crop/Adjust edit data lives.
+  let mode = $state<'edit' | 'crop'>('edit');
 
   interface AspectRatioOption {
     label: string;
@@ -110,39 +116,62 @@
     />
   </HStack>
 
-  <div class="mt-6 flex h-10 w-full items-center justify-between text-sm">
-    <h2>{$t('crop')}</h2>
-  </div>
+  <HStack class="mt-6">
+    <Button
+      class="w-full"
+      shape="round"
+      size="small"
+      onclick={() => (mode = 'edit')}
+      color={mode === 'edit' ? 'primary' : 'secondary'}
+      variant={mode === 'edit' ? 'filled' : 'outline'}
+    >
+      {$t('edit')}
+    </Button>
+    <Button
+      class="w-full"
+      shape="round"
+      size="small"
+      onclick={() => (mode = 'crop')}
+      color={mode === 'crop' ? 'primary' : 'secondary'}
+      variant={mode === 'crop' ? 'filled' : 'outline'}
+    >
+      {$t('crop')}
+    </Button>
+  </HStack>
 
-  <!-- Aspect Ratio Grid -->
-  <div class="mb-4 grid grid-cols-2">
-    {#each aspectRatios as ratio (ratio.value)}
-      <HStack>
-        <Button
-          class="m-2 size-14"
-          shape="round"
-          onclick={() => selectAspectRatio(ratio)}
-          aria-label={ratio.label}
-          color={ratioSelected(ratio) ? 'primary' : 'secondary'}
-          variant={ratioSelected(ratio) ? 'filled' : 'outline'}
-        >
-          {#if ratio.isFree}
-            <!-- Free crop icon with dashed border -->
-            <div
-              class="size-6 shrink-0 rounded-xs border-2 border-dashed {ratioSelected(ratio)
-                ? 'border-black'
-                : 'border-white'}"
-            ></div>
-          {:else}
-            <!-- Aspect ratio box -->
-            <div
-              class="shrink-0 rounded-xs border-2 {ratioSelected(ratio) ? 'border-black' : 'border-white'}"
-              style="width: {ratio.width}px; height: {ratio.height}px;"
-            ></div>
-          {/if}
-        </Button>
-        <span class="text-sm text-white">{ratio.label}</span>
-      </HStack>
-    {/each}
-  </div>
+  {#if mode === 'edit'}
+    <AdjustPanel />
+  {:else}
+    <!-- Aspect Ratio Grid -->
+    <div class="mt-6 mb-4 grid grid-cols-2">
+      {#each aspectRatios as ratio (ratio.value)}
+        <HStack>
+          <Button
+            class="m-2 size-14"
+            shape="round"
+            onclick={() => selectAspectRatio(ratio)}
+            aria-label={ratio.label}
+            color={ratioSelected(ratio) ? 'primary' : 'secondary'}
+            variant={ratioSelected(ratio) ? 'filled' : 'outline'}
+          >
+            {#if ratio.isFree}
+              <!-- Free crop icon with dashed border -->
+              <div
+                class="size-6 shrink-0 rounded-xs border-2 border-dashed {ratioSelected(ratio)
+                  ? 'border-black'
+                  : 'border-white'}"
+              ></div>
+            {:else}
+              <!-- Aspect ratio box -->
+              <div
+                class="shrink-0 rounded-xs border-2 {ratioSelected(ratio) ? 'border-black' : 'border-white'}"
+                style="width: {ratio.width}px; height: {ratio.height}px;"
+              ></div>
+            {/if}
+          </Button>
+          <span class="text-sm text-white">{ratio.label}</span>
+        </HStack>
+      {/each}
+    </div>
+  {/if}
 </div>

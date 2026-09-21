@@ -1,4 +1,11 @@
-import { AssetEditAction, AssetMediaSize, MirrorAxis, type AssetResponseDto, type CropParameters } from '@immich/sdk';
+import {
+  AssetEditAction,
+  AssetMediaSize,
+  MirrorAxis,
+  type AdjustParameters,
+  type AssetResponseDto,
+  type CropParameters,
+} from '@immich/sdk';
 import { clamp } from 'lodash-es';
 import { tick } from 'svelte';
 import { type EditActions, type EditToolManager } from '$lib/managers/edit/edit-manager.svelte';
@@ -68,6 +75,14 @@ class TransformManager implements EditToolManager {
     return newAngle < 0 ? newAngle + 360 : newAngle;
   });
 
+  // Color adjustments, not geometric — kept in this manager (rather than a separate one) because
+  // EditManager only ever submits the *selected* tool's edits, and Adjust is a mode inside the
+  // Transform tool's panel, not a second top-level tool. See specs/2026-09-20-image-adjust-tool-design.md.
+  exposure = $state(0);
+  contrast = $state(0);
+  saturation = $state(0);
+  invert = $state(false);
+
   edits = $derived.by(() => this.getEdits());
 
   setAspectRatio(aspectRatio: string) {
@@ -91,8 +106,13 @@ class TransformManager implements EditToolManager {
       Math.abs(this.previewImageSize.height - this.region.height) > 2 ||
       this.mirrorHorizontal ||
       this.mirrorVertical ||
-      this.normalizedRotation !== 0
+      this.normalizedRotation !== 0 ||
+      this.hasAdjustChanges()
     );
+  }
+
+  hasAdjustChanges() {
+    return this.exposure !== 0 || this.contrast !== 0 || this.saturation !== 0 || this.invert;
   }
 
   checkCropEdits() {
@@ -159,6 +179,18 @@ class TransformManager implements EditToolManager {
       });
     }
 
+    if (this.hasAdjustChanges()) {
+      edits.push({
+        action: AssetEditAction.Adjust,
+        parameters: {
+          ...(this.exposure !== 0 && { exposure: this.exposure }),
+          ...(this.contrast !== 0 && { contrast: this.contrast }),
+          ...(this.saturation !== 0 && { saturation: this.saturation }),
+          ...(this.invert && { invert: this.invert }),
+        },
+      });
+    }
+
     return edits;
   }
 
@@ -166,6 +198,10 @@ class TransformManager implements EditToolManager {
     this.imageRotation = 0;
     this.mirrorHorizontal = false;
     this.mirrorVertical = false;
+    this.exposure = 0;
+    this.contrast = 0;
+    this.saturation = 0;
+    this.invert = false;
     await tick();
 
     this.onImageLoad([]);
@@ -202,6 +238,14 @@ class TransformManager implements EditToolManager {
     this.mirrorHorizontal = normalizedTransformation.mirrorHorizontal;
     this.mirrorVertical = normalizedTransformation.mirrorVertical;
 
+    // Pre-populate the sliders from any existing Adjust edit, same as rotation/mirror above —
+    // always assigned (not conditionally skipped) so reopening after a reset also clears them.
+    const adjustParams = (edits.find((e) => e.action === 'adjust')?.parameters ?? {}) as AdjustParameters;
+    this.exposure = adjustParams.exposure ?? 0;
+    this.contrast = adjustParams.contrast ?? 0;
+    this.saturation = adjustParams.saturation ?? 0;
+    this.invert = adjustParams.invert ?? false;
+
     await tick();
 
     this.resizeCanvas();
@@ -225,6 +269,10 @@ class TransformManager implements EditToolManager {
     this.imageRotation = 0;
     this.mirrorHorizontal = false;
     this.mirrorVertical = false;
+    this.exposure = 0;
+    this.contrast = 0;
+    this.saturation = 0;
+    this.invert = false;
     this.region = { x: 0, y: 0, width: 100, height: 100 };
     this.cropImageSize = { width: 1000, height: 1000 };
     this.originalImageSize = { width: 1000, height: 1000 };
