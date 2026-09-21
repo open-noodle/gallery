@@ -5,7 +5,7 @@ sidebar_position: 11
 
 # Ubiquitous Language
 
-This document names the major Gallery concepts so discussions can start from product and domain language before dropping into component, file, or table names. Prefer these terms in issues, planning, code review, and debugging notes.
+This page names the major Gallery concepts, so a discussion can start in product and domain language before it drops into component, file or table names. Prefer these terms in issues, planning, code review and debugging notes.
 
 ## Top-down map
 
@@ -73,31 +73,31 @@ This document names the major Gallery concepts so discussions can start from pro
 
 ## People and recognition
 
-| Term                             | Definition                                                                                                                                                           | Aliases to avoid                |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| **Face**                         | A detected region on an asset that may be assigned to a person cluster.                                                                                              | Detection, face box             |
-| **Personal Person**              | A user-owned person or pet cluster in the personal people catalog.                                                                                                   | Global Person, owner person     |
-| **Space Person**                 | A Shared Space-level person or pet cluster made from faces on assets in that space.                                                                                  | Shared person, space face       |
-| **Face Identity**                | The internal sameness key for one real person or pet across Personal People and Space People.                                                                        | Global Person, universal person |
-| **Identity-linked face**         | A visible `asset_face` row linked to one Face Identity through `face_identity_face`.                                                                                 | Global face                     |
-| **Scoped person profile**        | A user-scoped `person` or space-scoped `shared_space_person` row that carries display metadata inside one permission boundary.                                       | Person record                   |
-| **Metadata inheritance**         | Copying permitted fields, such as name and birth date, from a source scoped profile into a target Space Person.                                                      | Metadata sync                   |
-| **Metadata contribution**        | A Space member's setting-controlled ability to publish selected Personal Person fields into a Space Person.                                                          | Name sharing                    |
-| **Identity-grouped person**      | A `/people`, filter, or search result that represents one accessible Face Identity and is rendered only from accessible scoped profiles.                             | Global person row               |
-| **Scoped primary profile**       | The accessible Personal Person or Space Person profile used as the navigation and thumbnail target for an identity-grouped person.                                   | Primary person                  |
-| **Scoped identity filter token** | An opaque profile-scoped filter value such as `person:<id>` or `space-person:<id>` that resolves to an accessible Face Identity without exposing `face_identity.id`. | Identity id                     |
-| **Representative face**          | The face used as the display image source for a person cluster.                                                                                                      | Thumbnail face                  |
-| **Person thumbnail**             | The rendered thumbnail for a Personal Person or Space Person, normally derived from a representative face.                                                           | Avatar, headshot                |
-| **Hidden person**                | A person cluster excluded from normal people lists and filters until explicitly requested.                                                                           | Invisible person                |
-| **Favorite person**              | A Personal Person pinned ahead of other personal people.                                                                                                             | Pinned person                   |
-| **Person alias**                 | A member-specific display override for a Space Person.                                                                                                               | Nickname                        |
-| **Person name override**         | The Space Person name that supersedes the linked Personal Person name inside that Shared Space.                                                                      | Space name, renamed person      |
-| **Pet person**                   | A person-like cluster whose type is pet and whose faces come from pet detection. Either a species bucket or an individual pet.                                       | Pet, animal tag                 |
-| **Species bucket**               | The one-pet-person-per-(owner, species) cluster the detector alone produces — one "dog", one "cat". The only form for species pet recognition cannot identify.       | Species person, pet bucket      |
-| **Individual pet**               | A pet person clustered from pet embeddings rather than species, so one row per real animal. Dogs and cats only, and only while pet recognition is enabled.           | Named pet, pet identity         |
-| **Face matching**                | The process that assigns faces to existing people or creates new people.                                                                                             | Recognition, clustering         |
-| **Space face matching**          | The Shared Space process that maps already-assigned personal faces into Space People and bridges across owners.                                                      | Space recognition               |
-| **Person dedup pass**            | A background pass that merges duplicate person clusters when embeddings indicate the same real-world subject.                                                        | Merge job                       |
+| Term                             | Definition                                                                                                                                                                   | Aliases to avoid                |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| **Face**                         | A detected region on an asset that may be assigned to a person cluster.                                                                                                      | Detection, face box             |
+| **Personal Person**              | A user-owned person or pet cluster in the personal people catalog.                                                                                                           | Global Person, owner person     |
+| **Space Person**                 | A Shared Space-level person or pet cluster made from faces on assets in that space.                                                                                          | Shared person, space face       |
+| **Face Identity**                | The internal sameness key for one real person or pet across Personal People and Space People.                                                                                | Global Person, universal person |
+| **Identity-linked face**         | A visible `asset_face` row linked to one Face Identity through `face_identity_face`.                                                                                         | Global face                     |
+| **Scoped person profile**        | A user-scoped `person` or space-scoped `shared_space_person` row that carries display metadata inside one permission boundary.                                               | Person record                   |
+| **Metadata inheritance**         | Copying permitted fields, such as name and birth date, from a source scoped profile into a target Space Person.                                                              | Metadata sync                   |
+| **Metadata contribution**        | A Space member's setting-controlled ability to publish selected Personal Person fields into a Space Person.                                                                  | Name sharing                    |
+| **Identity-grouped person**      | A `/people`, filter, or search result that represents one accessible Face Identity and is rendered only from accessible scoped profiles.                                     | Global person row               |
+| **Scoped primary profile**       | The accessible Personal Person or Space Person profile used as the navigation and thumbnail target for an identity-grouped person.                                           | Primary person                  |
+| **Scoped identity filter token** | An opaque profile-scoped filter value such as `person:<id>` or `space-person:<id>` that resolves to an accessible Face Identity without exposing `face_identity.id`.         | Identity id                     |
+| **Representative face**          | The face used as the display image source for a person cluster.                                                                                                              | Thumbnail face                  |
+| **Person thumbnail**             | The rendered thumbnail for a Personal Person or Space Person, normally derived from a representative face.                                                                   | Avatar, headshot                |
+| **Hidden person**                | A person cluster excluded from normal people lists and filters until explicitly requested.                                                                                   | Invisible person                |
+| **Favorite person**              | A Personal Person pinned ahead of other personal people.                                                                                                                     | Pinned person                   |
+| **Person alias**                 | A member-specific display override for a Space Person.                                                                                                                       | Nickname                        |
+| **Person name override**         | The Space Person name that supersedes the linked Personal Person name inside that Shared Space.                                                                              | Space name, renamed person      |
+| **Pet person**                   | A person-like cluster whose type is pet and whose faces come from pet detection. Either a species bucket or an individual pet.                                               | Pet, animal tag                 |
+| **Species bucket**               | The one-pet-person-per-(owner, species) cluster the detector alone produces: one "dog", one "cat". The only form available for species that pet recognition cannot identify. | Species person, pet bucket      |
+| **Individual pet**               | A pet person clustered from pet embeddings rather than species, so one row per real animal. Dogs and cats only, and only while pet recognition is enabled.                   | Named pet, pet identity         |
+| **Face matching**                | The process that assigns faces to existing people or creates new people.                                                                                                     | Recognition, clustering         |
+| **Space face matching**          | The Shared Space process that maps already-assigned personal faces into Space People and bridges across owners.                                                              | Space recognition               |
+| **Person dedup pass**            | A background pass that merges duplicate person clusters when embeddings indicate the same real-world subject.                                                                | Merge job                       |
 
 ## Search and filtering
 
