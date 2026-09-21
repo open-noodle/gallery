@@ -56,7 +56,7 @@ class _SyncBannerContent extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Syncing photos — the first load takes a moment. Future visits will be instant.',
+                'Syncing photos. The first load takes a moment; later visits are instant.',
                 style: theme.textTheme.bodyMedium,
               ),
             ),

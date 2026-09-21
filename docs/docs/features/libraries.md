@@ -120,7 +120,7 @@ The `ro` flag at the end only gives read-only access to the volumes. This protec
 :::
 
 :::warning
-A read-only mount also means **metadata cannot be edited** for that library. Date and time, location, description, star rating and tags are all written to the sidecar, so an edit made in the web UI is applied and then reverted shortly afterwards, with no error shown. Mount the folder read-write if you plan to edit metadata in Gallery. See the [FAQ](/FAQ#why-are-my-edits-to-files-not-being-saved-in-read-only-external-libraries) for the full trade-off.
+A read-only mount also means **metadata cannot be edited** for that library. Date and time, location, description, star rating and tags all live in the sidecar. Edit one in the web UI and the change is applied, then quietly reverted a moment later, with no error. Mount the folder read-write if you want to edit metadata in Gallery. The [FAQ](/FAQ#why-are-my-edits-to-files-not-being-saved-in-read-only-external-libraries) has the full trade-off.
 :::
 
 :::info

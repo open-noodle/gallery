@@ -14,7 +14,7 @@ After creating an album, you can access the sharing options by clicking on the s
 
 Album detail pages include the same filter panel used on the main Photos timeline. You can narrow an album by people, location, camera, tags, rating, media type, favorites, and date range. Filter suggestions are scoped to the current album, so visible options only reflect assets that are actually in that album.
 
-The **Add photos** picker also supports filters. This makes it easier to add a focused set of assets to a large album without leaving the album workflow.
+The **Add photos** picker has the same filters, so you can pick out a narrow set of assets for a large album without leaving the album.
 
 #### Web
 
@@ -52,9 +52,9 @@ You can create a public share link by selecting the photos or videos, or from th
 
 ### Sharing from a Shared Space
 
-A link created from inside a [Shared Space](shared-spaces.md) covers what the space shows, not just
-the photos you own. Contributions from other members are included, so the link matches what members
-see in the space.
+A link created from inside a [Shared Space](shared-spaces.md) covers everything the space shows.
+Photos other members contributed are part of it, so the link matches what members see in the
+space.
 
 Because publishing someone else's photo is a decision you make on their behalf, this is restricted
 and announced:
@@ -72,8 +72,8 @@ another member's photo only while:
 - you are still a member of the space.
 
 So a contributor who removes their photo from the space revokes it from the link at the same moment,
-without needing to know the link exists. Photos you own yourself are unaffected by any of this — they
-stay in the link either way. Deleting the space leaves the link working, reduced to your own photos.
+without needing to know the link exists. None of this touches photos you own yourself. They stay
+in the link either way. Deleting the space leaves the link working, reduced to your own photos.
 
 ### Customizing the public share link
 

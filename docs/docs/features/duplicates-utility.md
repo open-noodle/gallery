@@ -30,9 +30,9 @@ When resolving duplicates, metadata from trashed assets is automatically synchro
 
 ### Re-upload prevention
 
-When you resolve a duplicate group, Gallery preserves the checksums of the trashed assets in a tombstone table. This prevents the mobile app from re-uploading files that were already identified and resolved as duplicates.
+When you resolve a duplicate group, Gallery keeps the checksums of the trashed assets in a tombstone table, so the mobile app does not upload those files again.
 
-Without this, the mobile backup cycle would detect that a resolved duplicate's file no longer exists on the server (its checksum was removed when the trash was emptied) and re-upload it, causing the same duplicate to appear again in an endless loop.
+Without the tombstones you get a loop. The backup cycle sees that a resolved duplicate's file is gone from the server, because its checksum was removed when the trash was emptied, and uploads the file again. The same duplicate comes back.
 
 #### How it works
 
@@ -58,9 +58,9 @@ Phone has files A and B (visually similar, different checksums)
 
 #### Tombstone lifecycle
 
-- **Created** when a duplicate group is resolved and assets are trashed (only if at least one asset is kept)
-- **Cleaned up** automatically when:
-  - The kept asset is deleted (CASCADE — the duplicate content no longer exists on the server, so re-upload is allowed)
-  - A trashed asset is restored from trash (the original asset is back, so the tombstone is no longer needed)
-- **Not created** when all assets in a group are trashed (no surviving asset to reference)
-- **Not created** for manual deletions — only duplicate resolution creates tombstones, so manually deleted files can still be re-uploaded
+- Created when a duplicate group is resolved and assets are trashed, and only if at least one asset is kept.
+- Cleaned up automatically when:
+  - The kept asset is deleted (CASCADE). The duplicate content is no longer on the server, so re-upload is allowed.
+  - A trashed asset is restored from trash. The original asset is back, so the tombstone is no longer needed.
+- Not created when every asset in a group is trashed, since no surviving asset is left to point at.
+- Not created for manual deletions. Only duplicate resolution writes tombstones, so a file you delete by hand can be uploaded again.

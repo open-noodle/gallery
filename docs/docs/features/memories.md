@@ -1,10 +1,10 @@
 # Memories
 
-Gallery generates memory cards that resurface meaningful groups of photos on the web and mobile apps. Memories are created by the nightly **Generate memories** task and appear in the memory lane when they are due to be shown.
+Gallery builds memory cards that bring old groups of photos back to the surface, on the web and in the mobile apps. The nightly **Generate memories** task creates them, and they show up in the memory lane on the day they are due.
 
 ## Memory types
 
-Gallery supports two memory families:
+There are two memory families:
 
 | Type            | What it shows                                               | Title source                       |
 | --------------- | ----------------------------------------------------------- | ---------------------------------- |
@@ -19,7 +19,7 @@ Saved memories stay available after their normal display window. Hidden or delet
 
 Birthday memories are generated from people with a birthday set on their person record.
 
-Gallery looks for photos of that person up to the target day and prefers a cross-year throwback when enough history exists:
+Gallery looks for photos of that person up to the target day. When there is enough history, it prefers a throwback that spans several years:
 
 - At least 6 qualifying photos across at least 2 distinct years creates **Happy birthday, Name** with the subtitle **Photos from different years**.
 - If there is not enough cross-year history, Gallery can still create a smaller fallback from the 4 most recent qualifying photos, with the subtitle **Recent photos of Name**.
@@ -29,7 +29,7 @@ Each birthday memory is deduplicated by person and day, so rerunning the nightly
 
 ## Recent trip memories
 
-Recent trip memories find a place that looks unusual compared with your recent baseline.
+Recent trip memories look for a place that stands out from your recent baseline.
 
 The rule compares the last 30 days of location clusters with the preceding 90 days:
 
@@ -45,7 +45,7 @@ Because a trip surfaces at most once per place every 30 days, the card stays in 
 
 ### Trip photo curation
 
-Trip memories try to show representative photos instead of every near-duplicate burst:
+Trip memories show a few representative photos instead of every near-duplicate burst:
 
 - Photos taken within 2 minutes of the previous selected photo are collapsed.
 - Small trips keep up to 6 representative photos.
@@ -68,8 +68,8 @@ You can browse retained memories from **Memories** in the Library section of the
 
 Every memory type is controlled at two independent layers:
 
-- **Admin availability** — a global per-type switch controlled by the admin. A type that is disabled here is never generated for anyone and disappears from every user's settings.
-- **Per-user toggle** — for any type the admin leaves available, each user chooses whether they personally receive it.
+- **Admin availability** is a global per-type switch, set by the admin. A type that is disabled here is never generated for anyone and disappears from every user's settings.
+- The **per-user toggle** lets each user decide whether they personally receive any type the admin leaves available.
 
 A user receives a memory type only when it is **both** globally available **and** enabled in that user's own settings.
 
@@ -92,18 +92,18 @@ The built-in types each have a stable key used in configuration:
 
 All default to **on**.
 
-`themed` (Themes) additionally requires [Smart Search](/features/searching) to be enabled — it matches photos to a rotating monthly theme (sunsets, food, beach days, etc.) via CLIP embeddings. If smart search is disabled or the machine learning service is unavailable, Gallery simply skips the rule for that night; it does not surface an error.
+`themed` (Themes) also needs [Smart Search](/features/searching) enabled: it matches photos to a rotating monthly theme (sunsets, food, beach days, etc.) via CLIP embeddings. If smart search is off or the machine learning service is unavailable, Gallery skips the rule for that night. It does not raise an error.
 
 Two of these types are tunable in **Administration → Settings → Memories**, or via the [config file](/install/config-file):
 
-- **Theme match threshold** (`memories.themeMaxDistance`, default `0.75`) — how close a photo must be to the month's theme. This is a text-to-image CLIP distance, so it is much larger than a face-matching threshold; values under `0.5` usually yield no themed memories at all.
-- **Person throwback dormancy** (`memories.personThrowbackDormancyMonths`, default `6`) — how long someone must be absent from your photos before `person_throwback` can resurface them.
+- **Theme match threshold** (`memories.themeMaxDistance`, default `0.75`): how close a photo must be to the month's theme. This is a text-to-image CLIP distance, so it is much larger than a face-matching threshold; values under `0.5` usually yield no themed memories at all.
+- **Person throwback dormancy** (`memories.personThrowbackDormancyMonths`, default `6`): how long someone must be absent from your photos before `person_throwback` can resurface them.
 
 ### When each type appears
 
-Most generated types are anchored to a day of the month, so a new server does not produce all of them right away — a type only generates on its own day. Dates are evaluated in UTC.
+Most generated types are anchored to a day of the month, and a type only generates on its own day, so a new server does not produce all of them right away. Dates are evaluated in UTC.
 
-Once created, a memory stays in the memory lane on the home page for its visibility window. After the window closes the memory is still kept and remains browsable under **Memories** in the Library sidebar, it simply stops appearing on the home page.
+Once created, a memory stays in the memory lane on the home page for its visibility window. After the window closes the memory is kept and stays browsable under **Memories** in the Library sidebar; it just stops appearing on the home page.
 
 | Type key              | Generated on                                       | Stays in the memory lane for |
 | --------------------- | -------------------------------------------------- | ---------------------------- |
@@ -122,9 +122,9 @@ Once created, a memory stays in the memory lane on the home page for its visibil
 
 A type generates a memory only when your library has enough matching photos for it, so a qualifying day does not guarantee a card. The cap of 6 rule memories per day also applies, and it counts memories still inside their window from earlier days: when more qualify than there is room for, the highest-scoring cards win and the rest are skipped. **On this day** memories are not part of that cap.
 
-`on_this_day_place` is deliberately narrow, because it sits on top of what `on_this_day` already shows. A year counts towards it only if that year has at least 4 photos on this date and at least 60% of that year's geotagged photos for the day are in one place — and the memory is only created when **two or more** years qualify for the same place. One year in one city is what the plain **On this day** card already shows, so naming the city would add nothing; two years is a thing no other memory type says. The result is a single card covering all the qualifying years ("11 photos from 2021 and 2023"), with its photos drawn evenly from each year rather than from whichever year you shot most.
+`on_this_day_place` is deliberately narrow, because it sits on top of what `on_this_day` already shows. A year counts towards it only if that year has at least 4 photos on this date and at least 60% of that year's geotagged photos for the day are in one place, and the memory is only created when **two or more** years qualify for the same place. One year in one city is what the plain **On this day** card already shows, so naming the city would add nothing. Two years in one place is something no other memory type tells you. The result is a single card covering all the qualifying years ("11 photos from 2021 and 2023"), with its photos drawn evenly from each year rather than from whichever year you shot most.
 
-Because it then describes the same days as the plain **On this day** cards, it replaces them: for each year it covers at least 75% of that year's photos for the day, that year's plain card is removed instead of sitting next to it holding the same photos. Below 75% that year's plain card is kept, because the place card only holds photos from the one dominant city and dropping it would hide the rest of that day. This is decided per year, so one card can replace one of its years and leave another. A **saved** memory is never replaced, and only newly generated memories are affected — any duplicate pair already in your library stays until it ages out under `memories.retentionDays`.
+Because it then describes the same days as the plain **On this day** cards, it replaces them: for each year it covers at least 75% of that year's photos for the day, that year's plain card is removed instead of sitting next to it holding the same photos. Below 75% that year's plain card is kept, because the place card only holds photos from the one dominant city and dropping it would hide the rest of that day. This is decided per year, so one card can replace one of its years and leave another. A **saved** memory is never replaced, and only newly generated memories are affected. Any duplicate pair already in your library stays until it ages out under `memories.retentionDays`.
 
 ### Per-user toggles
 
@@ -137,7 +137,7 @@ Saved memories are always kept and shown, even after their type is later disable
 
 ### Admin settings
 
-You configure global memory availability and retention from **Administration → Settings → Memories**. If you run Gallery with a [config file](/install/config-file), the settings page is read-only and these values must be changed in the config file instead. Per-user toggles are stored per user and stay user-controlled even when a config file is in use — the config file only sets which types are globally available.
+You configure global memory availability and retention from **Administration → Settings → Memories**. If you run Gallery with a [config file](/install/config-file), the settings page is read-only and these values must be changed in the config file instead. Per-user toggles are stored per user and stay user-controlled even when a config file is in use: the config file only sets which types are globally available.
 
 | Setting                  | Default | Behavior                                                                                                               |
 | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -148,7 +148,7 @@ Disabling a type globally (for example `"recent_trip": false`) stops generation 
 
 Memory retention only removes unsaved memory records. Saved memories are kept regardless of age. Cleanup uses the memory display date (`showAt`) when available, otherwise it uses the memory creation date. Cleanup still removes links to hidden, archived, or deleted assets even when `memories.retentionDays` is `0`.
 
-The per-type switches only control which memory types are generated and shown. The global `nightlyTasks.generateMemories` setting controls whether the nightly task runs at all — turning it off disables every generated memory type regardless of the per-type and per-user settings.
+The per-type switches only control which memory types are generated and shown. The global `nightlyTasks.generateMemories` setting controls whether the nightly task runs at all. Turn it off and no generated memory type is produced, whatever the per-type and per-user settings say.
 
 #### Legacy `birthday` / `recentTrips` fields
 
@@ -157,7 +157,7 @@ Earlier versions exposed two booleans, `memories.birthday` and `memories.recentT
 - `memories.birthday` ⇒ `memories.types["birthday"]`
 - `memories.recentTrips` ⇒ `memories.types["recent_trip"]`
 
-Resolution precedence per type is: an explicit `types[key]` wins, otherwise the legacy boolean is used, otherwise the type defaults to on. Prefer the `types` map for new configuration — it also covers `on_this_day`, which the legacy fields could not control.
+Resolution precedence per type is: an explicit `types[key]` wins, otherwise the legacy boolean is used, otherwise the type defaults to on. Prefer the `types` map for new configuration, since it also covers `on_this_day`, which the legacy fields could not control.
 
 Example config-file override that keeps trips, turns off **On this day**, and keeps memory records forever:
 
@@ -181,4 +181,4 @@ The memory API exposes rule memories with:
 - a flexible `data` object containing the rule id, dedupe key, title, optional subtitle, score, and rule context
 - top-level `title` and `subtitle` fields for clients that render server-defined memory labels
 
-Classic **On this day** memories still require `data.year`. This keeps existing clients compatible while allowing new server-curated memory types to carry richer display metadata.
+Classic **On this day** memories still require `data.year`. Existing clients keep working, and new server-curated memory types can carry their own display metadata.

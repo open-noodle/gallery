@@ -904,7 +904,7 @@
             <div class="flex flex-1 flex-col items-center justify-center gap-2" data-testid="empty-state-message">
               <p class="text-sm text-(--fg-muted)">
                 {viewMode === AlbumPageViewMode.SELECT_ASSETS
-                  ? 'No photos available to add match your filters'
+                  ? 'None of the photos you can add match your filters'
                   : 'No photos match your filters'}
               </p>
               <button

@@ -29,8 +29,8 @@ Before enabling OAuth in Gallery, a new client application needs to be configure
 2. Configure Redirect URIs/Origins
 
    The **Sign-in redirect URIs** should include:
-   - `app.immich:///oauth-callback` — for logging in with OAuth from the [Mobile App](/features/mobile-app.mdx)
-   - `de.opennoodle.gallery:///oauth-callback` — the branded mobile callback. Register this **as well**; a future app release will switch to it, and registering it now means that release will Just Work.
+   - `app.immich:///oauth-callback` - for logging in with OAuth from the [Mobile App](/features/mobile-app.mdx)
+   - `de.opennoodle.gallery:///oauth-callback` - the branded mobile callback. Register it now as well: a future app release will switch to it, and that release will then work without you touching the provider again.
    - `http://DOMAIN:PORT/auth/login` - for logging in with OAuth from the Web Client
    - `http://DOMAIN:PORT/user-settings` - for manually linking OAuth in the Web Client
 
@@ -115,7 +115,7 @@ With these steps in place, you should be able to use OAuth from the [Mobile App]
 Gallery has a route (`/api/oauth/mobile-redirect`) that is already configured to forward requests to `app.immich:///oauth-callback`, and can be used for step 1.
 :::
 
-The Android app registers **both** `app.immich` and `de.opennoodle.gallery` as callback schemes, and the server accepts a callback on either, so both redirect URIs work. The app currently _sends_ `app.immich:///oauth-callback`; if you enable **Mobile Redirect URI Override**, the server bounces the browser back to that same URI.
+The Android app registers both `app.immich` and `de.opennoodle.gallery` as callback schemes, and the server accepts a callback on either, so both redirect URIs work. The app still sends `app.immich:///oauth-callback`. If you enable **Mobile Redirect URI Override**, the server bounces the browser back to that same URI.
 
 ## Example Configuration
 

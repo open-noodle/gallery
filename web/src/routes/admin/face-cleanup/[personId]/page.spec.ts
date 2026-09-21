@@ -1849,7 +1849,7 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
     // review. handleChooseOtherDestination early-returns with no scanPerson.ownerId to scope the picker to, so
     // the button must stop looking clickable rather than silently doing nothing while the page tells the admin
     // to pick a destination.
-    it('disables "Choose someone else…" when scanPerson failed to resolve, even with flagged faces present', async () => {
+    it('disables "Choose someone else..." when scanPerson failed to resolve, even with flagged faces present', async () => {
       vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan([]) as unknown as object);
 
       render(Page, { props: { data: makePageData() } });

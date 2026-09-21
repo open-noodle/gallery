@@ -17,9 +17,9 @@ Gallery 4.54.0 covers the changes shipped after `v4.53.0` through `v4.54.0`.
 
 ### Memories
 
-- Rule-based memories were added alongside classic **On this day** memories.
-- Birthday memories are generated from people with birthdays and enough qualifying photos.
-- Recent-trip memories are generated from location patterns that differ from the user's recent home baseline.
+- Gallery now builds rule-based memories alongside the classic **On this day** ones.
+- Birthday memories come from people who have a birthday set and enough qualifying photos.
+- Recent-trip memories come from location patterns that differ from your recent home baseline.
 - Rule memories include server-defined titles and subtitles for web and mobile clients.
 - Nightly generation tracks a separate rule-memory cursor, deduplicates by rule key, and caps rule memories per user per day.
 
@@ -34,7 +34,7 @@ Gallery 4.54.0 covers the changes shipped after `v4.53.0` through `v4.54.0`.
 - Large S3 archive downloads no longer open all object streams at once, avoiding socket exhaustion and stalled ZIP downloads.
 - Archive appends are serialized so S3-backed downloads finish reliably.
 - Deleting a user now cleans up user-scoped disk directories or S3 object prefixes.
-- S3 relative-path handling was audited across copy and cleanup paths.
+- We audited S3 relative-path handling across the copy and cleanup paths.
 
 ### Migration and release maintenance
 

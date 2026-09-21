@@ -98,7 +98,7 @@ void main() {
       await tester.pumpConsumerWidget(const ActiveFilterChip(spec: spec));
       await tester.pumpAndSettle();
 
-      expect(find.text('Favourites'), findsOneWidget);
+      expect(find.text('Favorites'), findsOneWidget);
       expect(find.text('filter_sheet_favourites'), findsNothing);
     });
 

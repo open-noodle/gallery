@@ -48,7 +48,7 @@ When a new asset is uploaded it kicks off a series of jobs, which include metada
 
 <img src={require('./img/admin-jobs.webp').default} width="60%" title="Admin jobs" />
 
-If Personal People and Global People do not match, start the **People identity maintenance** queue before resetting face recognition. This repair is safe to rerun and rebuilds the identity links used by Global People, people filters, search, map filters, and album filters. See [Face Identity Backfill](/developer/face-identity-backfill#troubleshooting-personal-and-global-people-drift) for the debugging flow.
+If Personal People and Global People do not match, start the **People identity maintenance** queue before resetting face recognition. The repair is safe to rerun. It rebuilds the identity links behind Global People, people filters, search, map filters, and album filters. See [Face Identity Backfill](/developer/face-identity-backfill#troubleshooting-personal-and-global-people-drift) for the debugging flow.
 
 Additionally, some jobs (such as [memories generation](/features/memories)) run on a schedule, which is every night at midnight by default. To change when they run or enable/disable a job navigate to System Settings -> [Nightly Tasks Settings](https://my.immich.app/admin/system-settings?isOpen=nightly-tasks).
 
@@ -77,4 +77,4 @@ graph TD
     K --> L[Pet Recognition]
 ```
 
-[Pet Detection](/features/pet-detection) and [Pet Recognition](/features/pet-recognition) are both disabled by default; with pet detection off, neither job does anything. Pet Recognition only runs for detections that carry an embedding, which is dogs and cats.
+[Pet Detection](/features/pet-detection) and [Pet Recognition](/features/pet-recognition) are both disabled by default. With pet detection off, neither job does anything. Pet Recognition only runs for detections that carry an embedding, which means dogs and cats.

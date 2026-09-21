@@ -1,6 +1,6 @@
 # XMP Sidecars
 
-Gallery supports XMP sidecar files — external `.xmp` files that store metadata for an image or video in XML format. During the metadata extraction job Gallery will read & import metadata from `.xmp` files, and during the Sidecar Write job it will _write_ metadata back to `.xmp`.
+Gallery supports XMP sidecar files: external `.xmp` files that store metadata for an image or video in XML format. During the metadata extraction job Gallery will read & import metadata from `.xmp` files, and during the Sidecar Write job it will _write_ metadata back to `.xmp`.
 
 :::tip
 Tools like Lightroom, Darktable, digiKam and other applications can also be configured to write changes to `.xmp` files, in order to avoid modifying the original file.
@@ -8,7 +8,7 @@ Tools like Lightroom, Darktable, digiKam and other applications can also be conf
 
 ## Metadata Fields
 
-Gallery does not support _all_ metadata fields. Below is a table showing what fields Gallery can _read_ and _write_. It's important to note that writes do not replace the entire file contents, but are merged together with any existing fields.
+Gallery does not support _all_ metadata fields. Below is a table showing what fields Gallery can _read_ and _write_. Writes do not replace the entire file contents; they are merged with any existing fields.
 
 :::info
 Gallery automatically queues a Sidecar Write job after editing the description, rating, or updating tags.
@@ -39,7 +39,7 @@ If both `.jpg.xmp` and `.xmp` are present, Gallery uses the **`.jpg.xmp`** file.
 ## CLI Support
 
 1. **Detect** – Gallery looks for a `.xmp` file placed next to each media file during upload.
-2. **Copy** – Both the media and the sidecar file are copied into Gallery’s internal library folder.  
+2. **Copy** – Both the media and the sidecar file are copied into Gallery's internal library folder.  
    The sidecar is renamed to match the internal filename template, e.g.:  
    `upload/library/<user>/YYYY/YYYY-MM-DD/IMG_0001.jpg`  
    `upload/library/<user>/YYYY/YYYY-MM-DD/IMG_0001.jpg.xmp`

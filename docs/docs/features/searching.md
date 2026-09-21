@@ -1210,9 +1210,9 @@ Feel free to make a feature request if there's a model you want to use that we d
 
 ### Relevance threshold
 
-When combining a text search with metadata filters (e.g., searching "forest" and filtering by a specific country), the results may include photos that match the filter but have little visual similarity to the search term. This happens because the search returns all photos matching the filter, ranked by similarity — even when the best match in that filtered set is poor.
+When combining a text search with metadata filters (e.g., searching "forest" and filtering by a specific country), the results may include photos that match the filter but have little visual similarity to the search term. This happens because the search returns every photo matching the filter, ranked by similarity, even when the best match in that filtered set is poor.
 
-The **max search distance** setting adds a hard cutoff: results with a cosine distance above the threshold are excluded, regardless of how many remain. If no results pass the threshold, the search returns zero results rather than irrelevant ones.
+The **max search distance** setting adds a hard cutoff: results with a cosine distance above the threshold are excluded, regardless of how many remain. If nothing passes the threshold, the search comes back empty instead of padded with poor matches.
 
 #### Configuration
 
@@ -1227,10 +1227,10 @@ Set `machineLearning.clip.maxDistance` in **Administration > Machine Learning > 
 
 #### Tuning tips
 
-- **Start at 0.75** and adjust based on your results. Lower values are stricter. If searches return nothing at 0.75, raise the threshold in small steps until relevant photos reappear — some libraries and CLIP models produce higher distances than others.
-- **Small changes can have a large effect.** CLIP embeddings tend to cluster in a narrow distance range rather than being spread evenly. This means a threshold change from, say, 0.75 to 0.80 may dramatically increase the number of results. This is normal — not a bug.
+- **Start at 0.75** and adjust based on your results. Lower values are stricter. If searches return nothing at 0.75, raise the threshold in small steps until relevant photos reappear. Some libraries and CLIP models produce higher distances than others.
+- **Small changes can have a large effect.** CLIP embeddings cluster in a narrow distance range instead of spreading evenly, so moving the threshold from, say, 0.75 to 0.80 can multiply the number of results. That is expected.
 - **Different CLIP models produce different distance distributions.** If you change your CLIP model, you may need to re-tune the threshold.
-- **Text-to-image vs. image-to-image searches** have different distance characteristics. Text queries typically produce higher distances (looser matches) than searching by a similar photo. If you use both search modes, pick a threshold that works for text queries — it will be permissive enough for image-based searches too.
+- **Text-to-image vs. image-to-image searches** have different distance characteristics. Text queries typically produce higher distances (looser matches) than searching by a similar photo. If you use both search modes, pick a threshold that works for text queries: it will be permissive enough for image-based searches too.
 
 [huggingface-clip]: https://huggingface.co/collections/immich-app/clip-654eaefb077425890874cd07
 [huggingface-multilingual-clip]: https://huggingface.co/collections/immich-app/multilingual-clip-654eb08c2382f591eeb8c2a7

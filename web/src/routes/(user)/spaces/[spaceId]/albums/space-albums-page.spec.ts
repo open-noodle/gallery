@@ -1217,14 +1217,14 @@ describe('Space albums page', () => {
       );
     });
 
-    // The kebab "Move to folder…" is the accessible route — HTML5 drag-and-drop works on
+    // The kebab "Move to folder..." is the accessible route — HTML5 drag-and-drop works on
     // neither touch nor keyboard, so this is the PRIMARY way to move an album, not a fallback.
     // Was previously uncovered at the page level: handleMoveAlbum and the onMove threading at
     // all three SpaceAlbumCard render sites could be deleted with the suite green.
     // No `folders` fixture here: SpaceAlbumFolderPickerModal is mocked out via modalManagerMock,
     // so no real folder list needs to render — and a real rendered folder card would ALSO offer
-    // a "Move to folder…" option in its own kebab (same i18n key), making `findByText` ambiguous.
-    it('kebab "Move to folder…" opens the picker and calls the move endpoint', async () => {
+    // a "Move to folder..." option in its own kebab (same i18n key), making `findByText` ambiguous.
+    it('kebab "Move to folder..." opens the picker and calls the move endpoint', async () => {
       modalManagerMock.show.mockResolvedValue({ folderId: 'trips' });
       const album = makeAlbum({ id: 'a1', albumName: 'Rome', folderId: null });
       renderPage([album], SharedSpaceRole.Editor);
@@ -1232,7 +1232,7 @@ describe('Space albums page', () => {
       const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
       expect(menuButton).not.toBeNull();
       await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText('Move to folder…'));
+      await fireEvent.click(await screen.findByText('Move to folder...'));
 
       await waitFor(() =>
         expect(modalManagerMock.show).toHaveBeenCalledWith(
@@ -1247,13 +1247,13 @@ describe('Space albums page', () => {
       );
     });
 
-    it('kebab "Move to folder…": dismissing the picker fires no request', async () => {
+    it('kebab "Move to folder...": dismissing the picker fires no request', async () => {
       modalManagerMock.show.mockResolvedValue(undefined);
       renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
 
       const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
       await fireEvent.click(menuButton!);
-      await fireEvent.click(await screen.findByText('Move to folder…'));
+      await fireEvent.click(await screen.findByText('Move to folder...'));
 
       await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
       expect(sdkMock.setSharedSpaceAlbumFolder).not.toHaveBeenCalled();

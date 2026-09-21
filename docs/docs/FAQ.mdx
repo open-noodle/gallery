@@ -228,7 +228,7 @@ Duplicate checking only exists for upload libraries, using the file hash. Furthe
 Images in read-write external libraries (the default) can be edited as normal.
 In read-only libraries (`:ro` in the `docker-compose.yml`), Gallery is unable to create the `.xmp` sidecar files to store edited file metadata.
 For this reason, the metadata (timestamp, location, description, star rating, etc.) cannot be edited for files in read-only external libraries.
-The edit is not rejected up front: it is applied, then reverted when the file is re-read, with no error shown.
+The edit appears to work at first: Gallery applies it, then reverts it when the file is re-read, and shows no error.
 
 ### How are deletions of files handled in external libraries?
 
@@ -522,6 +522,6 @@ The causes of possible corruption are many, but can include unexpected poweroffs
 
 ### Should I upgrade the database to a newer major version?
 
-We recommend using the same version of PostgreSQL as in our default docker-compose.yml, however newer versions are also supported. Do note that the major upgrade process is not as simple as just changing the version of the container image. See [the PostgreSQL documentation](https://www.postgresql.org/docs/current/upgrading.html) for more detail.
+We recommend the PostgreSQL version from our default docker-compose.yml. Newer versions work too, but a major version upgrade takes more than swapping the container image tag. See [the PostgreSQL documentation](https://www.postgresql.org/docs/current/upgrading.html) for the steps.
 
 [huggingface]: https://huggingface.co/immich-app

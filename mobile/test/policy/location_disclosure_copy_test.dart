@@ -12,7 +12,7 @@ void main() {
   const englishForegroundDisclosure =
       'Android requires precise location permission so Noodle Gallery can read the current Wi-Fi network name for automatic server switching. The Wi-Fi network name is saved on this device for matching, and your precise device location is not stored or shared.';
   const englishBackgroundDisclosure =
-      'Noodle Gallery uses background location permission to keep reading the Wi-Fi network name while automatic server switching runs in the background. The Wi-Fi network name is saved on this device for matching, and your precise device location is not stored or shared.';
+      'Noodle Gallery uses background location permission so it can keep reading the Wi-Fi network name while automatic server switching runs. The Wi-Fi network name is saved on this device for matching. Your precise device location is not stored or shared.';
 
   Map<String, dynamic> loadTranslations(String path) {
     final file = File(path);

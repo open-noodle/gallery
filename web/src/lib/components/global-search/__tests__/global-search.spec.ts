@@ -1840,10 +1840,10 @@ describe('prefix scoping — scoped rendering', () => {
     expect(screen.queryByText(/^cmdk_photos_heading$|^Photos$/i)).toBeNull();
   });
 
-  // The plan spec originally required the placeholder text to be exactly "Search…"
+  // The plan spec originally required the placeholder text to be exactly "Search..."
   // as a regression guard against hint bloat. svelte-i18n runs with fallbackLocale
   // 'dev' in tests, which renders literal i18n keys — so the existing
-  // `$t('cmdk_placeholder')` would render as `cmdk_placeholder`, not `Search…`.
+  // `$t('cmdk_placeholder')` would render as `cmdk_placeholder`, not `Search...`.
   // Adapt the assertion to accept either the literal key or the English label.
   // The regression guard (single-term placeholder with no hint suffix) still holds:
   // if someone appended hints, the placeholder text would no longer match.
@@ -1852,7 +1852,7 @@ describe('prefix scoping — scoped rendering', () => {
     render(GlobalSearch, { props: { manager } });
     const input = document.querySelector('input[role="combobox"], input[type="text"]') as HTMLInputElement | null;
     expect(input).not.toBeNull();
-    expect(input?.placeholder).toMatch(/^(cmdk_placeholder|Search Gallery|Search…)$/);
+    expect(input?.placeholder).toMatch(/^(cmdk_placeholder|Search Gallery|Search\.\.\.)$/);
   });
 
   it('scope all with mlHealthy=false shows ML banner', () => {
