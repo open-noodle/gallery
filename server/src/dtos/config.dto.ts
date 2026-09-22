@@ -15,6 +15,8 @@ import {
   HlsVideoResolutionSchema,
   ImageFormat,
   ImageFormatSchema,
+  ImagePresetPosition,
+  ImagePresetPositionSchema,
   LogLevel,
   LogLevelSchema,
   OAuthTokenEndpointAuthMethod,
@@ -46,6 +48,7 @@ import {
   galleryServerDefaults,
   galleryTopLevelDefaults,
 } from 'src/gallery/config.dto.js';
+import { IMAGE_PRESET_ASPECT_RATIO_PATTERN, IMAGE_PRESET_NAME_PATTERN } from 'src/utils/image-preset.js';
 
 const { Admin, User, Public } = ConfigVisibility;
 
@@ -103,6 +106,32 @@ const AdminConfigGeneratedImageSchema = z
     progressive: configBool.default(false).optional().describe('Progressive'),
   })
   .meta({ id: 'AdminConfigGeneratedImageDto' });
+
+// Gallery-fork: derived image presets — exact-dimension variants rendered on demand and cached.
+// A preset is an aspect ratio plus the widths a client may request; height is derived. See
+// specs/2026-09-22-derived-image-presets-design.md.
+const AdminConfigImagePresetSchema = z
+  .object({
+    aspectRatio: z
+      .string()
+      .regex(IMAGE_PRESET_ASPECT_RATIO_PATTERN, 'Aspect ratio must be W:H, e.g. 16:9')
+      .refine((value) => value.split(':').every((side) => Number(side) > 0), {
+        message: 'Aspect ratio sides must be positive',
+      })
+      .describe('Aspect ratio as W:H, e.g. "16:9" or "1:1". The output height is derived from it.'),
+    widths: z
+      .array(z.int().min(16).max(8192))
+      .min(1)
+      .max(32)
+      .refine((widths) => new Set(widths).size === widths.length, { message: 'Widths must be unique' })
+      .describe('Output widths (px) a client may request for this preset'),
+    position: ImagePresetPositionSchema.default(ImagePresetPosition.Center).describe(
+      'Where to crop from when the source aspect differs: center, or sharp attention/entropy',
+    ),
+    format: ImageFormatSchema.default(ImageFormat.Webp),
+    quality: z.int().min(1).max(100).default(80).describe('Quality'),
+  })
+  .meta({ id: 'AdminConfigImagePresetDto' });
 
 const AdminConfigFFmpegSchema = z
   .object({
@@ -366,6 +395,22 @@ const AdminConfigSchemaWithVisibility = z
           .meta({ id: 'AdminConfigGeneratedFullsizeImageDto' }),
         colorspace: ColorspaceSchema,
         extractEmbedded: configBool.describe('Extract embedded'),
+        presets: z
+          .record(z.string(), AdminConfigImagePresetSchema)
+          .default({})
+          // A key schema on the record would report every bad name as the opaque "Invalid key in record";
+          // this names the offending preset instead.
+          .superRefine((presets, ctx) => {
+            for (const name of Object.keys(presets)) {
+              if (!IMAGE_PRESET_NAME_PATTERN.test(name)) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: `Preset name "${name}" must be a lowercase slug (a-z, 0-9, -), max 32 characters`,
+                });
+              }
+            }
+          })
+          .describe('Derived image presets, keyed by name. Empty unless an admin adds one.'),
       })
       .meta({ id: 'AdminConfigImageDto' }),
     newVersionCheck: z
@@ -743,6 +788,7 @@ export const defaults = Object.freeze<SystemConfig>({
       quality: 80,
       progressive: false,
     },
+    presets: {},
   },
   newVersionCheck: {
     enabled: true,

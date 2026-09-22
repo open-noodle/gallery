@@ -73,15 +73,17 @@ describe('getKeysDeep', () => {
     ]);
   });
 
-  it('should treat memories.types as the only empty-object default in the config tree', () => {
-    // `emptyObjectsAsLeaves` exists for sparse override maps whose keys are data rather than
-    // schema. `memories.types` is currently the only such default, so if this stops holding the
-    // config key-diffing call sites in src/utils/config.ts need to be revisited.
+  it('should treat image.presets and memories.types as the only empty-object defaults in the config tree', () => {
+    // `emptyObjectsAsLeaves` exists for sparse maps whose keys are data rather than schema:
+    // `memories.types` (per-type overrides) and `image.presets` (admin-named derived image presets).
+    // Both must round-trip through src/utils/config.ts as known keys with an empty default, so if a
+    // third one appears, make sure the key-diffing there still treats it the same way.
     const withoutOption = getKeysDeep(defaults);
     const withOption = getKeysDeep(defaults, [], { emptyObjectsAsLeaves: true });
 
     expect(defaults.memories.types).toEqual({});
-    expect(withOption.filter((key) => !withoutOption.includes(key))).toEqual(['memories.types']);
+    expect(defaults.image.presets).toEqual({});
+    expect(withOption.filter((key) => !withoutOption.includes(key))).toEqual(['image.presets', 'memories.types']);
   });
 
   it('should enumerate the sibling memories settings regardless of emptyObjectsAsLeaves', () => {

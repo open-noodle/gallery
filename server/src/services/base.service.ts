@@ -495,6 +495,28 @@ export class BaseService {
   }
 
   /**
+   * After generating a file locally, uploads it to S3 if the write backend is S3.
+   * Returns the key to store in the DB.
+   */
+  protected async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service.js');
+    const writeBackend = StorageService.getWriteBackend();
+    if (!writeBackend || writeBackend instanceof DiskStorageBackend) {
+      // Disk mode: the file was already written to the final path
+      return localPath;
+    }
+    // S3 mode: upload the locally-generated file
+    const stream = this.storageRepository.createPlainReadStream(localPath);
+    await writeBackend.put(relativeKey, stream, { contentType });
+    // Clean up local temp file
+    await this.storageRepository.unlink(localPath).catch(() => {
+      /* ignore */
+    });
+    return relativeKey;
+  }
+
+  /**
    * Returns something ffmpeg/ffprobe can read directly: an absolute path as-is,
    * or a presigned URL for a storage-backend key. Unlike ensureLocalFile this
    * does NOT download the object, so it is safe to call inside a request handler.

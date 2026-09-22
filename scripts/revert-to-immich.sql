@@ -153,6 +153,7 @@ DROP TABLE IF EXISTS "shared_space_face_match_backfill_target" CASCADE;
 DROP TABLE IF EXISTS "shared_space_library_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "face_person_verdict" CASCADE;
+DROP TABLE IF EXISTS "asset_derived_file" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_audit" CASCADE;
@@ -558,6 +559,7 @@ DELETE FROM "kysely_migrations"
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  '1793400000000-AddAssetDerivedFile',
   -- #763 per-user favorites. Renumbered off 1784000000000/1784100000000 during the v3.2.0 rebase:
   -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
   '1794000000000-AddAssetFavoriteTables',
@@ -669,7 +671,7 @@ BEGIN
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
        'face_repair_scan_flagged_face', 'face_repair_lock',
        'pet_search',
-       'asset_favorite_audit', 'asset_favorite'
+       'asset_favorite_audit', 'asset_favorite', 'asset_derived_file'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;
