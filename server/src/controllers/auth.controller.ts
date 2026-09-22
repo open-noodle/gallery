@@ -56,6 +56,7 @@ export class AuthController {
     description: 'Login as the demo user. Only available when demo mode is enabled.',
     history: new HistoryBuilder().added('v1').beta('v1').stable('v2'),
   })
+  @Authenticated({ public: true })
   async demoLogin(
     @Res({ passthrough: true }) res: Response,
     @GetLoginDetails() loginDetails: LoginDetails,
