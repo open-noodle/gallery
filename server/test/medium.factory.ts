@@ -33,6 +33,7 @@ import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
+import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -716,6 +717,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     case ClassificationRepository:
+    case CleanupRepository:
     case TagRepository: {
       return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
@@ -750,6 +752,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case AssetRepository:
     case AssetJobRepository:
     case ClassificationRepository:
+    case CleanupRepository:
     case ConfigRepository:
     case CryptoRepository:
     case FaceIdentityRepository:
