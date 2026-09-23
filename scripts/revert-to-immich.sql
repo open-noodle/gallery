@@ -197,6 +197,11 @@ DROP TABLE IF EXISTS "asset_duplicate_checksum" CASCADE;
 DROP TABLE IF EXISTS "asset_favorite_audit" CASCADE;
 DROP TABLE IF EXISTS "asset_favorite" CASCADE;
 
+-- Library Cleanup (specs/2026-09-23-library-cleanup-design.md)
+DROP TABLE IF EXISTS "cleanup_decision" CASCADE;
+DROP TABLE IF EXISTS "cleanup_day_review" CASCADE;
+DROP TABLE IF EXISTS "asset_quality" CASCADE;
+
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
 --
@@ -239,6 +244,9 @@ ALTER TABLE "person"            DROP COLUMN IF EXISTS "type";
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "species";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "petsDetectedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "classifiedAt";
+ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "qualityAnalyzedAt";
+DROP INDEX IF EXISTS "asset_localMonthDay_idx";
+DROP INDEX IF EXISTS "asset_exif_fileSizeInByte_idx";
 ALTER TABLE "library"           DROP COLUMN IF EXISTS "createId";
 -- 1791000000000-RepointFaceReviewToPersonGroup added this unique index to make option M's
 -- one-person-per-group invariant a database fact. It lives on the upstream `person` table, so
@@ -322,6 +330,8 @@ DELETE FROM "migration_overrides"
    'index_shared_space_album_folder_nested_name_key',
    'index_shared_space_album_folder_root_name_key',
    'function_shared_space_album_folder_delete_audit',
+   'index_asset_localMonthDay_idx',
+   'index_asset_quality_ownerId_screenshot_idx',
    'trigger_asset_library_delete_audit',
    'trigger_classification_category_updatedAt',
    'trigger_face_identity_face_updatedAt',
@@ -558,6 +568,7 @@ DELETE FROM "kysely_migrations"
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  '1793400000000-AddCleanupTables',
   -- #763 per-user favorites. Renumbered off 1784000000000/1784100000000 during the v3.2.0 rebase:
   -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
   '1794000000000-AddAssetFavoriteTables',
@@ -669,7 +680,8 @@ BEGIN
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
        'face_repair_scan_flagged_face', 'face_repair_lock',
        'pet_search',
-       'asset_favorite_audit', 'asset_favorite'
+       'asset_favorite_audit', 'asset_favorite',
+       'cleanup_decision', 'cleanup_day_review', 'asset_quality'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;
