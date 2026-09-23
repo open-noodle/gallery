@@ -1,259 +1,497 @@
 # Library Cleanup — design
 
-Status: approved in brainstorming, 2026-09-23.
+Status: approved in brainstorming on 2026-09-23. Revised the same day after a claim-by-claim check against the
+codebase (see [Review corrections](#review-corrections)).
 Visual reference: `specs/mockups/2026-09-23-library-cleanup-mockups.html`. It is **binding for layout and
-interaction**; see [Visual reference](#visual-reference).
+interaction** — see [Visual reference](#visual-reference).
 
 ## Goal
 
-A place users come back to regularly that does two jobs at once:
+A place users return to regularly that does two jobs at once:
 
-1. **Relive** — a daily _rewind_ of every photo taken on today's date across all years, reviewed a day at a
-   time, until the whole library has been seen once.
-2. **Tidy** — a set of cleanup _queues_ (largest files, bursts, screenshots, blurry/botched photos, plus the
-   existing duplicates utility), each of which can be drained to zero.
+1. **Relive.** A daily _rewind_ of every photo taken on today's date in every past year, reviewed one date at a
+   time until the whole library has been seen once.
+2. **Tidy.** A set of cleanup _queues_ that can each be drained to zero: largest files, bursts, screenshots and
+   blurry or botched photos, plus the existing duplicates utility.
 
-Success: a user can open Cleanup, finish today's date in a few minutes, and act on a queue — and every action
-is reversible until the trash is emptied.
+Success means a user can open Cleanup, finish today's date in a few minutes and act on a queue. Every action
+can be undone until the trash is emptied.
 
 ## Scope
 
 **In v1**
 
-- Web only. Mobile reuses the same endpoints later.
-- Only the requesting user's **own** assets. Asset deletion is owner-only by design
-  (`specs/2026-03-23-spaces-permissions-matrix.md`); admin- or space-editor cleanup would change that model and
-  needs its own design.
-- Queues: **Space hogs**, **Bursts & series**, **Screenshots**, **Blurry & botched**, and **Duplicates**
-  (a link plus a count; the existing `/utilities/duplicates` page is not rebuilt).
-- Daily **Rewind** with a year **calendar** (reviewed days fill in) and a streak.
+- Web only. Mobile can later reuse the same endpoints.
+- Only the requesting user's **own** assets. Deleting an asset is owner-only by design
+  (`specs/2026-03-23-spaces-permissions-matrix.md`). Cleanup by admins or space editors would change that model
+  and needs its own design.
+- Queues: **Space hogs**, **Bursts & series**, **Screenshots**, **Blurry & botched**, and **Duplicates**. The
+  duplicates queue is a count plus a link; the existing `/utilities/duplicates` page is not rebuilt.
+- A daily **Rewind**, a year **calendar** where reviewed dates fill in, and a streak.
 - "Trash" always means the recoverable trash. Nothing is permanently deleted from Cleanup except through the
   existing "Empty trash" action.
 
 **Not in v1**
 
-- Receipts/documents, messenger saves, accidental short videos, live-photo motion stripping, low-res copies,
-  "shrink" (re-encode) for large videos, blur scoring for videos.
-- A "space freed this month" counter — once trash is emptied the assets are gone and attributing the freed
-  bytes to Cleanup would need a dedicated ledger. The hub shows "could still free X" and "trash holds Y".
-- Sidebar entry / badge.
+- Queues for receipts and documents, messenger saves, accidental short videos and low-resolution copies.
+- Stripping the motion part of live photos, shrinking (re-encoding) large videos, and blur scoring for videos.
+- A "space freed this month" counter. Once the trash is emptied the assets are gone, so crediting the freed
+  bytes to Cleanup would need a dedicated ledger. The hub shows "could still free X" and "trash holds Y"
+  instead.
+- A sidebar entry or badge.
+- Re-scoring edited assets (see [Quality analysis job](#quality-analysis-job)).
 
 ## Placement
 
-Cleanup is a new entry **inside the Utilities page**, at the top of "Organize your library" in
-`web/src/routes/(user)/utilities/UtilitiesMenu.svelte` — the only upstream file touched on the web side. The
-existing Duplicates, Large files, Geolocation and Workflows entries are unchanged.
+Cleanup is a new entry at the top of the "Organize your library" group in
+`web/src/routes/(user)/utilities/UtilitiesMenu.svelte`. The existing Duplicates, Large files, Geolocation and
+Workflows entries stay as they are. The Utilities sidebar item already stays highlighted for any path under
+`/utilities/...` (`sidebar-nav-item.svelte` does a prefix match), so the sidebar needs no change.
 
-| Route                                  | Page                                                                                               |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `/utilities/cleanup`                   | Hub: year calendar (hover-to-peek), queue rail with counts and bytes, "Rewind today", trash footer |
-| `/utilities/cleanup/rewind/[monthDay]` | Rewind for one date, grouped by year                                                               |
-| `/utilities/cleanup/[queue]`           | `space-hogs`, `bursts`, `screenshots`, `blurry`                                                    |
+| Route                                                                   | Page                                                                                                                         |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `/utilities/cleanup`                                                    | Hub: the year calendar with hover-to-peek, a queue rail showing counts and bytes, a "Rewind today" button and a trash footer |
+| `/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]` | Rewind for one date, grouped by year                                                                                         |
+| `/utilities/cleanup/[queue]/[[photos=photos]]/[[assetId=id]]`           | One queue page each for `space-hogs`, `bursts`, `screenshots` and `blurry`                                                   |
 
-The Duplicates card links to the existing `/utilities/duplicates`.
+The optional `[[photos=photos]]/[[assetId=id]]` segments open the existing asset viewer, following the pattern
+the large-files page uses. The Duplicates card links to the existing `/utilities/duplicates`.
+
+**Upstream files touched on the web side:**
+
+- `UtilitiesMenu.svelte`: one link.
+- `web/src/lib/route.ts`: the `Route.cleanup*` helpers. The fork already patches this file for spaces, import
+  and so on.
+- `web/src/lib/services/queue.service.ts` and `web/src/routes/admin/system-settings/JobSettings.svelte`: both
+  are `Record<QueueName, …>` and fail typecheck until the new queue has an entry.
+- `web/src/lib/constants.ts` (`ADMIN_VISIBLE_QUEUES`).
+- `i18n/*.json`.
 
 ## Visual reference
 
 The web UI must look and behave like `specs/mockups/2026-09-23-library-cleanup-mockups.html`. Open it in a
-browser; its tabs are the screens. It is built from Gallery's own palette and app shell, so translate it into
-`@immich/ui` components and Tailwind rather than copying its CSS. Where the mockup and this spec disagree, this
-spec wins: the mockup uses placeholder data and colour blocks instead of photos.
+browser; its tabs are the screens. The mockup is built from Gallery's own palette and app shell, so build it
+with `@immich/ui` components and Tailwind rather than copying its CSS. The mockup uses placeholder data and
+colour blocks instead of photos. Where it disagrees with this spec, the spec wins.
 
-| Mockup tab               | Route / component                               | Must match                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **2 · Hub**              | `/utilities/cleanup`                            | Two columns: the calendar card on the left (12 month rows × 31 day columns; shaded by photo count; reviewed days green; today outlined; legend below), with the hover **day peek** strip under it (date, count, thumbnail row, "Rewind this day"). On the right, a **queue rail** card: thumbnail, name, one-line description, count and "−bytes" on each row, and a trash footer with "Empty". The header holds the streak and days-reviewed subtitle, a "Could still free" chip and the primary "Rewind today" button. Stacks to one column below ~980px                                                                                                                                                                                 |
-| **3 · Daily rewind**     | `/utilities/cleanup/rewind/[monthDay]`          | Title "<date>, across N years"; Grid / One-at-a-time toggle (grid is the default); previous/next day buttons; progress bar with the keep/favourite/trash/untouched summary; "Hide reviewed" toggle. One section per year with a "N years ago · place · count" subheading and a "Keep all remaining" action. Mark styles: **green border + ✓** for keep, **pink border + ♥** for favourite, **greyed + red "TRASH" overlay** for trash, a primary focus ring. A sticky bottom **action bar** shows the shortcut legend, "Move N to trash" and "Finish day ✓". In one-at-a-time mode: a dark stage, four round buttons (trash / skip / favourite / keep), an up-next filmstrip and a hints card (burst, low sharpness) linking to the queues |
-| **4 · Bursts & series**  | `/utilities/cleanup/bursts`, `BurstGroupCard`   | One card per group: time range, "N shots · size" chip, a source chip (camera burst vs. same moment), place; actions Keep all / Stack instead / **Keep 1, trash N−1**. A thumbnail row where the suggested pick carries a **★ SHARPEST** badge and a keep mark, and the others are pre-marked trash; click to toggle. Page header: "Keep all on page" and "Accept suggestions on page (−bytes)"                                                                                                                                                                                                                                                                                                                                             |
-| **5 · Blurry & botched** | `/utilities/cleanup/blurry`, `QueueSelectGrid`  | Header actions "Not a problem (keep)" and "Trash N selected". A toolbar with reason chips (All / Blurry / Too dark / Overexposed, each with a count), the **strictness slider** (lenient, balanced, strict) and the "Hide photos with faces" toggle. A selectable grid with a reason badge on each tile. Screenshots uses the same component without the slider or reason chips                                                                                                                                                                                                                                                                                                                                                            |
-| **6 · Space hogs**       | `/utilities/cleanup/space-hogs`, `SpaceHogList` | A total in the header ("Your N largest files take up X, Y% of your library"); a Videos / Photos / All toggle; a min-size control. Rows: thumbnail (with ▶ for video), filename, "type · resolution · duration · year · album/favourite" signals, a size with a proportional bar, and Keep / Trash                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 1 · Hub A, 7 · Mobile    | —                                               | **Not to build.** Tab 1 is the rejected hub layout. Tab 7 is a direction for the later mobile release                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Mockup tab               | Route / component                               | Must match                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **2 · Hub**              | `/utilities/cleanup`                            | Two columns. **Left:** the calendar card, a grid of 12 month rows by 31 day columns. Cells are shaded by photo count, reviewed dates are green and today is outlined; a legend sits below. Under the card is the hover **day peek** strip: date, photo count, a row of thumbnails and a "Rewind this day" button. **Right:** a **queue rail** card. Each row shows a thumbnail, the queue name, a one-line description, a count and the space it would free ("−bytes"). A trash footer holds an "Empty" button. **Header:** the streak and days-reviewed subtitle, a "Could still free" chip and the primary "Rewind today" button. Below roughly 980px the two columns stack into one                                                                                                                                               |
+| **3 · Daily rewind**     | `/utilities/cleanup/rewind/[monthDay]`          | **Header:** the title "<date>, across N years", a Grid / One-at-a-time toggle (grid is the default), buttons for the previous and next date, a progress bar with a keep / favourite / trash / untouched summary, and a "Hide reviewed" toggle. **Body:** one section per year, headed "N years ago · place · count" with a "Keep all remaining" action. **Marks:** keep is a green border with ✓, favourite a pink border with ♥, trash a greyed tile with a red "TRASH" overlay; the focused tile gets a primary-colour ring. **Footer:** a sticky **action bar** with the shortcut legend, "Move N to trash" and "Finish day ✓". **One-at-a-time mode:** a dark stage, four round buttons (trash, skip, favourite, keep), a filmstrip of upcoming photos, and a hints card (burst, low sharpness) that links to the relevant queue |
+| **4 · Bursts & series**  | `/utilities/cleanup/bursts`, `BurstGroupCard`   | **Page header:** "Keep all on page" and "Accept suggestions on page (−bytes)". **Each group is a card:** the time range, an "N shots · size" chip, a source chip ("camera burst" or "same moment"), the place, and the actions Keep all / Stack instead / **Keep 1, trash N−1**. Its thumbnail row gives the suggested pick a **★ SHARPEST** badge and a keep mark, and pre-marks the others as trash. Clicking a thumbnail toggles its mark                                                                                                                                                                                                                                                                                                                                                                                         |
+| **5 · Blurry & botched** | `/utilities/cleanup/blurry`, `QueueSelectGrid`  | **Header actions:** "Not a problem (keep)" and "Trash N selected". **Toolbar:** reason chips with counts (All / Blurry / Too dark / Overexposed), the **strictness slider** (lenient / balanced / strict) and a "Hide photos with faces" toggle. **Body:** a grid of selectable tiles, each with a reason badge. Screenshots uses the same component without the slider or the reason chips                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **6 · Space hogs**       | `/utilities/cleanup/space-hogs`, `SpaceHogList` | **Header:** a total ("Your N largest files take up X, Y% of your library"), a Videos / Photos / All toggle and a minimum-size control. **Each row:** a thumbnail (▶ on videos), the filename, the signals "type · resolution · duration · year · album/favourite", the size with a proportional bar, and Keep / Trash buttons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1 · Hub A, 7 · Mobile    | —                                               | **Not to be built.** Tab 1 is the rejected hub layout. Tab 7 is a direction for the later mobile release                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-Required everywhere: the breadcrumb `Utilities / Cleanup / <page>`; the Utilities sidebar item stays active (there
-is no Cleanup sidebar item); counts and bytes use tabular figures; dark mode through the existing theme tokens.
+Required on every page:
+
+- The breadcrumb `Utilities / Cleanup / <page>`. The Utilities sidebar item stays active; there is no Cleanup
+  sidebar item.
+- Tabular figures for counts and byte sizes.
+- Dark mode through the existing theme tokens.
+- The calendar is a new 12 × 31 component. The existing `CalendarHeatmap.svelte` lays out by week, so it does
+  not fit and is not reused.
 
 ## Architecture: store facts, decide at query time
 
-Only blur/exposure needs pixels, so only that is precomputed — as raw **facts** (scores), never as queue
-**verdicts**. Queue membership, burst groups and size rankings are computed per request. Thresholds are query
-parameters, so the strictness slider and threshold tuning never require re-running a job.
+Only blur and exposure need to look at pixels, so only those are precomputed. They are stored as raw **facts**
+(scores), never as queue **verdicts**. Queue membership, burst groups and size rankings are computed on each
+request. Thresholds are passed as query parameters, so moving the strictness slider or tuning a threshold never
+requires re-running a job.
 
 ### Data model (fork-only migrations in `server/src/schema/migrations-gallery/`)
 
 **`asset_quality`** — one row per analysed asset.
 
-| Column                         | Type                               | Notes                                                            |
-| ------------------------------ | ---------------------------------- | ---------------------------------------------------------------- |
-| `assetId`                      | PK, FK → `asset` ON DELETE CASCADE |                                                                  |
-| `ownerId`                      | FK → `user` ON DELETE CASCADE      | Denormalised so per-owner counts never join through `asset`      |
-| `sharpness`                    | real, nullable                     | Laplacian variance on a 512px greyscale preview; null for videos |
-| `brightness`                   | real, nullable                     | Mean luminance 0–255                                             |
-| `clippedDark`, `clippedBright` | real, nullable                     | Fraction of pixels ≤ 8 / ≥ 247                                   |
-| `isScreenshot`                 | boolean                            | Heuristic, see below                                             |
-| `version`                      | smallint                           | Scoring-algorithm version; bumping it makes "Missing" re-analyse |
+| Column                         | Type                               | Notes                                                                                          |
+| ------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `assetId`                      | PK, FK → `asset` ON DELETE CASCADE |                                                                                                |
+| `ownerId`                      | FK → `user` ON DELETE CASCADE      | Copied from the asset so per-owner counts never have to join through `asset`                   |
+| `sharpness`                    | real, nullable                     | Variance of the Laplacian on a 512px greyscale preview. Null for videos and for failed decodes |
+| `brightness`                   | real, nullable                     | Mean brightness, 0–255                                                                         |
+| `clippedDark`, `clippedBright` | real, nullable                     | Share of pixels that are near-black (≤ 8) or near-white (≥ 247)                                |
+| `isScreenshot`                 | boolean, not null                  | Set by a heuristic, see below                                                                  |
+| `version`                      | smallint, not null                 | Version of the scoring algorithm. Bumping it makes "Missing" re-analyse the asset              |
 
-Indexes: `(ownerId, sharpness)`, partial `(ownerId) WHERE "isScreenshot"`.
+Indexes: `(ownerId, sharpness)`, and a partial index `(ownerId) WHERE "isScreenshot"`.
 
-**`cleanup_decision`** — a user's "keep" choices, so queues drain to zero.
+**`cleanup_decision`** — a user's "keep" choices, so that queues drain to zero.
 
-| Column                       | Type                                                                  |
-| ---------------------------- | --------------------------------------------------------------------- |
-| `userId`, `queue`, `assetId` | composite PK (both FKs ON DELETE CASCADE)                             |
-| `decision`                   | `'keep'` (trash is recorded by the trash itself, so it is not stored) |
-| `createdAt`                  | timestamptz                                                           |
+| Column                       | Type                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `userId`, `queue`, `assetId` | Composite PK. Both FKs are ON DELETE CASCADE                           |
+| `decision`                   | `'keep'`. Trash is not stored here because the trash itself records it |
+| `createdAt`                  | timestamptz                                                            |
 
-`queue` ∈ `rewind | space_hogs | bursts | screenshots | blurry`. Keep is **per queue**: "not blurry" does not
-mean "not a duplicate". A rewind keep also means "seen".
+`queue` is one of `rewind | space_hogs | bursts | screenshots | blurry`. A keep applies to **one queue only**:
+"not blurry" does not mean "not a duplicate". A keep in `rewind` also marks the photo as seen.
 
-**`cleanup_day_review`** — `userId` + `monthDay` (smallint, `month*100+day`, e.g. `923`, `229`) as PK,
-`reviewedAt` timestamptz (latest wins, which leaves room for a yearly re-review later).
+**`cleanup_day_review`** — records which dates the user has finished.
 
-**`asset_job_status.qualityAnalyzedAt`** — timestamptz, nullable; same pattern as `classifiedAt` /
-`petsDetectedAt`.
+- Primary key: `userId` plus `monthDay`, a smallint equal to `month*100+day` (e.g. `923` for 23 September,
+  `229` for 29 February).
+- `reviewedAt` (timestamptz): the latest completion wins, which leaves room for a yearly re-review later.
 
-**Indexes on upstream tables** (fork migrations):
+**`asset_job_status.qualityAnalyzedAt`**: a nullable timestamptz column, following the same pattern as
+`classifiedAt` and `petsDetectedAt`.
 
-- `asset`: partial expression index on `(ownerId, <month-day of localDateTime>)` where the asset is not trashed,
-  has timeline or archive visibility, is not offline and has no `libraryId`. The expression uses the same
-  `("localDateTime" AT TIME ZONE 'UTC')` form as the existing `asset_localDateTime_idx`, and the calendar query
-  must use it verbatim.
-- `asset_exif`: `("fileSizeInByte" DESC)`. It sits on an upstream table, so it needs a verbatim
-  `migration_overrides` row.
+**Indexes on upstream tables** (added by fork migrations, declared with `@Index` in the upstream table files,
+which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
 
-**Static guards** (both live in the server _unit_ suite; no medium test catches them):
+- `asset_localMonthDay_idx` on `asset`: a partial expression index.
+  - Columns: `("ownerId", ((extract(month from ("localDateTime" at time zone 'UTC')) * 100 + extract(day from ("localDateTime" at time zone 'UTC')))::smallint))`.
+  - Condition: `WHERE "deletedAt" IS NULL AND "visibility" IN ('timeline','archive') AND "isOffline" = false AND "libraryId" IS NULL`.
+  - It is an expression index, so the migration also inserts its `migration_overrides` row (precedent:
+    `1782000000000-AddAssetExifDescriptionTrigramIndex.ts`).
+  - The calendar and rewind queries must repeat this expression and condition **verbatim**; otherwise
+    PostgreSQL will not use the index.
+- `asset_exif_fileSizeInByte_idx`: a **plain** single-column btree on `asset_exif ("fileSizeInByte")`.
+  PostgreSQL can scan a btree backwards, so `ORDER BY … DESC` is served without declaring `DESC`. A plain
+  `columns` index needs no `migration_overrides` row (precedent: `person_personGroupId_key`).
 
-- `src/schema/revert-to-immich.spec.ts` is generative. Every new table and override needs its five blocks in
-  `scripts/revert-to-immich.sql`:
-  1. `DROP TABLE` in FK order
-  2. `DROP FUNCTION` (none expected)
-  3. the `migration_overrides` names, including the `asset_exif` size index override
-  4. the `fork_tables_left` list
-  5. the `kysely_migrations` delete list
-- `src/utils/shared-space-album-scope.guard.spec.ts`: only the id-only "which selected assets are in a Space"
-  lookup (used by the confirmation, see Edge cases) touches `shared_space_*`. It returns ids, not asset rows,
-  so it gets an explicit `VIS_ALLOWLIST` entry.
+**Other obligations for the migrations:**
+
+- Register every new migration in `server/src/schema/migrations-gallery/ORDER`. The CI job
+  `migration-order.yml` checks this list.
+- The schema decorators must match the migrations exactly. CI job `sql-schema-up-to-date` fails if
+  `migrations:generate` produces any diff, and the medium test `schema-drift.spec.ts` compares the schema in
+  code with the real database.
+- Update `scripts/revert-to-immich.sql`. The unit test `revert-to-immich.spec.ts` only checks a subset of this
+  script, so the real gate is CI job `gallery-revert-to-immich-validation.yml`, which boots upstream Immich after
+  running the revert. The script needs:
+  - `DROP TABLE` for `cleanup_decision`, `cleanup_day_review` and `asset_quality`, in foreign-key order.
+  - In step 4: `DROP COLUMN asset_job_status."qualityAnalyzedAt"` and `DROP INDEX` for both upstream-table
+    indexes.
+  - The `migration_overrides` name `index_asset_localMonthDay_idx`.
+  - Entries in the `fork_tables_left` list and the `kysely_migrations` delete list.
 
 ### Include and exclude rules (every queue, rewind and calendar)
 
-- Included: assets owned by the user, including **archived** ones (they still use storage).
-- Excluded: assets that are trashed, have `locked` or `hidden` visibility (the hidden ones include live-photo
-  motion parts), are offline, or belong to an **external library** (trashing those does not free the file).
+- **Included:** assets owned by the user with `deletedAt IS NULL`, including **archived** ones (they still use
+  storage).
+- **Excluded:**
+  - `visibility` of `hidden` (the motion part of a live photo) or `locked`.
+  - `isOffline`.
+  - Any asset with a `libraryId` (external library). Trashing those does not free the file on disk.
+- **Stacks:** an asset appears only if it is not in a stack or is the stack's primary. If the primary asset is
+  in the trash, the stack drops out of Cleanup until the primary is restored or the trash is emptied. When the
+  trash is emptied, the existing hard-delete path reassigns the primary.
+
+These rules live in one repository helper, `withCleanupScope(qb, userId)`, which every query uses. It writes
+the visibility filter as `AssetVisibility.Timeline` / `AssetVisibility.Archive`. That form also gives the
+shared-space guard its visibility marker.
 
 ### Quality analysis job
 
-- New `QueueName.QualityAnalysis` with `JobName.AssetAnalyzeQuality` and `AssetAnalyzeQualityQueueAll`.
-- Chained in `job.service.ts` `onDone` for `AssetGenerateThumbnails`, next to the fork's existing
-  `PetDetection` hook, so uploads are analysed automatically.
-- Admin Jobs card "Quality analysis" offers **Missing** and **All**. Missing covers a null `qualityAnalyzedAt`
-  or an older `version`. It streams the asset IDs rather than loading them all. Default concurrency is 2.
-- Per image:
-  1. Read the existing **preview** through the storage repository (so it works on S3). The original is never
-     read.
-  2. `sharp`: greyscale, resize to 512px on the long edge, take the raw buffer.
-  3. **Sharpness**: a 3×3 Laplacian (`0 1 0 / 1 -4 1 / 0 1 0`) in TypeScript, then its variance. This is done in
-     TypeScript because sharp's `convolve` clamps negative responses to 0–255, which corrupts the variance.
-  4. **Brightness** and **clipping** from the same buffer.
-- **`isScreenshot`**: the original filename matches a multi-locale pattern list (e.g. `Screenshot`,
-  `Screen Recording`, `Bildschirmfoto`, `Capture d'écran`, `Schermafbeelding`, `截屏`, `スクリーンショット`),
-  **or** there is no camera make/model **and** (the file is a PNG **or** its aspect ratio is ≥ 2.0).
-- Videos get only `isScreenshot`, which catches screen recordings. Their sharpness and brightness stay null.
+- **Registration**, modelled on Classification. A new `QueueName.QualityAnalysis` and the jobs
+  `JobName.AssetAnalyzeQuality` / `AssetAnalyzeQualityQueueAll`. The queue has to be registered everywhere the
+  code keys on `QueueName`:
+  - `enum.ts`
+  - the `JobItem` union in `types.ts`
+  - `galleryJobDefaults` in `gallery/config.dto.ts` (concurrency 2)
+  - `AdminConfigJobDto` in `dtos/config.dto.ts`
+  - `QueuesResponseLegacyDto` in `dtos/queue-legacy.dto.ts`
+  - `queue.service.ts`: the command switch and the "concurrency is configurable" set
+  - `services/index.ts`
+  - web: `ADMIN_VISIBLE_QUEUES`, `queue.service.ts` (icon, title, subtitle) and `JobSettings.svelte`
+  - `queue.service.spec.ts`, which expects every `QueueName`
+- **Chaining:** in `job.service.ts`, the `onDone` handler for `AssetGenerateThumbnails` queues the new job next
+  to the fork's existing `PetDetection` hook, so uploads are analysed automatically. External-library scans also
+  pass through this hook (`source: 'upload'`), so the handler skips assets that have a `libraryId`. The QueueAll
+  query excludes them as well.
+- **Admin Jobs card, "Quality analysis":**
+  - **Missing** picks assets where `qualityAnalyzedAt IS NULL`, or whose `asset_quality.version` is older than
+    the current one. Like the classification query, it inner-joins `asset_job_status`. It applies the scope
+    rules and streams the ids.
+  - **All** re-runs every asset.
+- **Per image:**
+  1. Resolve the **unedited preview**: `withFilePath(eb, AssetFileType.Preview)`, which defaults to
+     `isEdited = false`, the same file pet detection and OCR read. If there is no preview yet, return
+     `Skipped` without writing; the thumbnail chain will queue the job again.
+  2. `const { localPath, cleanup } = await this.ensureLocalFile(path)` from `BaseService`. It returns the path
+     unchanged on disk and downloads to a temporary file on S3. Call `cleanup()` in a `finally` block.
+  3. With `sharp(localPath)`: flatten any alpha channel, convert to greyscale, resize to 512px on the long edge
+     and read the raw buffer.
+  4. **Sharpness:** apply a 3×3 Laplacian (`0 1 0 / 1 -4 1 / 0 1 0`) in TypeScript over the interior pixels,
+     then take the variance. It is done in TypeScript because sharp's `convolve` clamps results to 0–255,
+     which destroys the negative responses. A flat image scores 0.
+  5. **Brightness** and **clipping** come from the same buffer.
+  6. Upsert `asset_quality`, then set `qualityAnalyzedAt`.
+  7. **If decoding fails:** write the row with null scores, still set `qualityAnalyzedAt`, and log a warning.
+     This prevents a "Missing" retry loop. Null scores never match a quality rule.
+- **`isScreenshot`**, all of it pure logic in a unit-tested function:
+  - The original filename matches a pattern list that covers several locales: `Screenshot`,
+    `Screen Shot`, `Screen Recording`, `Bildschirmfoto`, `Capture d'écran`, `Schermafbeelding`,
+    `Captura de pantalla`, `Screenshot_`, `截屏`, `スクリーンショット`;
+  - **or** there is no camera make or model **and** either the file is a PNG or its aspect ratio (long side over
+    short side) is at least 2.0.
+- **Videos** get only `isScreenshot`, which catches screen recordings. Their sharpness and brightness stay null.
+- **Edited assets are not re-scored.** The score describes the unedited preview, which is the same file other
+  analysis jobs read. The thumbnail job for an edit does not chain, and that is accepted for v1.
 
-### Queue rules (at query time)
+### Queue rules (applied at query time, on top of the scope rules)
 
-| Queue       | Rule                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Space hogs  | Order by `fileSizeInByte DESC, id`; optional `type` and `minSize` filters                                                                                                                                                                                                                                                                                              |
-| Bursts      | Photos ordered by `localDateTime`. A new group starts when the gap exceeds 2 s or `autoStackId` changes; groups need ≥ 2 members. Groups with no `autoStackId` must also pass a CLIP cosine-distance check against the first member, computed for the current page only. Stacked assets are excluded. Suggested keep: highest `sharpness`, then largest file           |
-| Screenshots | `isScreenshot`                                                                                                                                                                                                                                                                                                                                                         |
-| Blurry      | Reason `blurry`: `sharpness < threshold[strictness]`. `dark`: `brightness < 35 AND clippedDark > 0.5`. `bright`: `clippedBright > 0.4`. `hideFaces` (default **on**) excludes assets with any `asset_face`, to protect intentional shallow-focus portraits. The lenient, balanced and strict thresholds are **calibrated on a personal-instance clone before release** |
-| All         | Exclude assets with a `cleanup_decision` keep for that queue, and apply the include/exclude rules                                                                                                                                                                                                                                                                      |
+| Queue       | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Space hogs  | Sort by `fileSizeInByte DESC, id DESC`. `fileSizeInByte IS NOT NULL`. Optional filters: `type`, and `minSize` in bytes. For a live photo, the displayed size adds the motion part's size (joined through `livePhotoVideoId`)                                                                                                                                                                                                                                                                                                                                                               |
+| Bursts      | Images only, sorted by `localDateTime`. A new group starts when the gap exceeds 2 seconds or `autoStackId` changes; a group needs at least 2 members. A group without an `autoStackId` must also pass a CLIP check: each member's `smart_search.embedding <=>` distance to the first member must be ≤ 0.1. That check runs only for the current page. A member with no embedding makes the group fail the check. Stacked assets are excluded entirely. Assets with a `bursts` keep are excluded **before** grouping. Suggested keep: highest `sharpness`, then largest file, then earliest |
+| Screenshots | `asset_quality.isScreenshot`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Blurry      | Images only. The `reason` parameter is `blurry`, `dark`, `bright` or `all` (default `all`). `blurry`: `sharpness < T[strictness]`, where strictness is `lenient`, `balanced` (default) or `strict`. `dark`: `brightness < 35 AND clippedDark > 0.5`. `bright`: `clippedBright > 0.4`. `hideFaces` (default **on**) excludes assets that have any face with `deletedAt IS NULL AND isVisible`. The T values are constants in one place, calibrated on a clone of the personal instance before release                                                                                       |
+| Duplicates  | Count and bytes only, using a new query that mirrors `DuplicateRepository.getAll`'s filters: `duplicateId` set, default visibility, `deletedAt` null, `stackId` null, and groups of more than 1. Bytes = the sum of each group's sizes minus that group's largest file. The existing page does the resolving                                                                                                                                                                                                                                                                               |
+| All         | Exclude assets that have a `cleanup_decision` keep for that queue                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-Rewind and calendar use the month and day of `localDateTime`, the wall-clock time at capture. 29 February is its
-own date.
+Rewind and the calendar use the month and day of `localDateTime` (the wall-clock time at capture), through the
+index expression above. 29 February is a date of its own.
 
 ### API
 
-`CleanupController` → `CleanupService` → `CleanupRepository`. All endpoints are scoped to `auth.user.id`, with
-new permissions `cleanup.read` and `cleanup.update`.
+`CleanupController` → `CleanupService` → `CleanupRepository`. The repository is registered in
+`BASE_SERVICE_DEPENDENCIES` and the constructor list of `base.service.ts` (the fork's `ClassificationRepository`
+is the precedent), in `newTestService` in `test/utils.ts`, and in the real and mock repository switches of
+`medium.factory.ts`.
 
-| Endpoint                                   | Purpose                                                                                                                                                                                                                                                                                                                           |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /cleanup/queues/{queue}/count`        | `{count, bytes}`, plus `analysedPercent` for the blurry and screenshots queues. `duplicates` is counted through the duplicate repository. One request per card, all fired in parallel by the hub                                                                                                                                  |
-| `GET /cleanup/trash`                       | `{count, bytes}`                                                                                                                                                                                                                                                                                                                  |
-| `GET /cleanup/calendar?tz=`                | 366 × `{monthDay, assetCount, reviewedAt \| null}`, plus `{daysReviewed, streak}`. `tz` is the browser's IANA zone. **Streak** = the number of consecutive local calendar dates, ending today or yesterday, on which at least one day was completed (derived from `reviewedAt`). Catching up several days on one date counts once |
-| `GET /cleanup/rewind/{monthDay}?year=`     | One year at a time: `{id, type, localDateTime, thumbhash, ratio, fileSize, kept}` plus the list of years with counts                                                                                                                                                                                                              |
-| `POST /cleanup/rewind/{monthDay}/complete` | Upsert `cleanup_day_review`                                                                                                                                                                                                                                                                                                       |
-| `GET /cleanup/queues/{queue}`              | Keyset page (`cursor`, `limit`) with per-queue parameters. Bursts return `{groupId, source: 'burstId' \| 'timeWindow', assets[], suggestedKeepId}`                                                                                                                                                                                |
-| `PUT /cleanup/decisions`                   | `{queue, assetIds, decision: 'keep'}`                                                                                                                                                                                                                                                                                             |
-| `DELETE /cleanup/decisions`                | `{queue, assetIds}` — undo a keep                                                                                                                                                                                                                                                                                                 |
+- Every endpoint is scoped to `auth.user.id`. New permissions: `cleanup.read` and `cleanup.update`.
+- DTOs are Zod schemas. Every enum carries `.meta({ id })`: `CleanupQueue`, `CleanupDecision`,
+  `CleanupStrictness`, `CleanupBlurReason` and `CleanupBurstSource`. An anonymous enum on a request body
+  generates `Type2`-style names that break the Dart client.
+- `monthDay` is validated as a real calendar date (`229` is allowed; `230`, `431` and `1301` return 400). `tz`
+  must be a valid IANA timezone name.
+- Every endpoint that returns queue items also accepts `cursor`, `limit` (default 100, max 500) and returns
+  `nextCursor`.
 
-Reused unchanged: `DELETE /assets` (trash), `PUT /assets` (favourite), `POST /stacks` ("Stack instead"), and the
-trash empty endpoint. Trash semantics, audit rows and sync events therefore behave exactly as they do today.
+| Endpoint                                | Purpose                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /cleanup/queues/{queue}/count`     | Returns `{count, bytes, analysedPercent?}`. `queue` also accepts `duplicates`. `analysedPercent` is included for `blurry` and `screenshots`: analysed in-scope assets divided by all in-scope assets, or 100 when there are none. The hub sends one of these per card, all in parallel                                                       |
+| `GET /cleanup/trash`                    | Returns `{count, bytes}` for the user's trashed assets that are not in an external library                                                                                                                                                                                                                                                   |
+| `GET /cleanup/calendar?tz=`             | Returns 366 rows of `{monthDay, assetCount, reviewedAt \| null}`, plus `{daysReviewed, streak}`. **Streak** counts consecutive dates in the viewer's timezone, ending today or yesterday, on which at least one day was completed; catching up on several days in one sitting counts once. `daysReviewed` counts only dates that have photos |
+| `GET /cleanup/rewind/{monthDay}`        | Returns `{years: [{year, count}]}`, newest first                                                                                                                                                                                                                                                                                             |
+| `GET /cleanup/rewind/{monthDay}/{year}` | Returns that year's assets: `{id, type, localDateTime, thumbhash, ratio, fileSize, isFavorite, kept, city}`                                                                                                                                                                                                                                  |
+| `GET /cleanup/queues/{queue}`           | A keyset page of items, with the per-queue parameters above. Bursts returns `{groupId, source: 'burstId' \| 'timeWindow', assets[], suggestedKeepId}`. A group is never split across two pages: the scan keeps reading past the ~2,000-row window until it finds a gap                                                                       |
+| `POST /cleanup/commit`                  | Body: `{queue, trashIds[], favoriteIds[], keepIds[], completeMonthDay?}` (at most 1,000 ids per list). Returns `{trashed, favorited, kept, skipped[]}`. See below                                                                                                                                                                            |
+| `DELETE /cleanup/decisions`             | Body: `{queue, assetIds}`. Removes a keep                                                                                                                                                                                                                                                                                                    |
+| `POST /cleanup/in-spaces`               | Body: `{assetIds}` (at most 1,000). Returns `{assetIds}`: the subset of the caller's own ids that belong to any shared space. It is a POST so that long id lists do not have to fit in a URL                                                                                                                                                 |
+
+**Why `POST /cleanup/commit` exists instead of calling `DELETE /assets` directly.** `DELETE /assets` and
+`PUT /assets` are all-or-nothing: a single missing, foreign or locked id makes the whole batch return 400.
+Re-trashing an already-trashed id also overwrites `deletedAt`, which restarts its auto-empty clock.
+
+`CleanupService.commit` therefore:
+
+1. Filters every id list down to assets the caller owns that are still inside the cleanup scope. Everything
+   else goes into `skipped[]` with a reason (`not_found`, `not_owned`, `out_of_scope` or `already_trashed`)
+   instead of failing the request.
+2. For the remaining trash ids, does exactly what `AssetService.deleteAll` does for a non-forced delete:
+   `assetRepository.updateAll(ids, {deletedAt: now, status: Trashed})`, then emits `AssetTrashAll`. That keeps
+   websocket and sync behaviour identical.
+3. Sets `isFavorite` on the favourite ids.
+4. Upserts `keep` decisions for the keep ids and the favourite ids. A favourite is always a keep.
+5. Upserts `cleanup_day_review` if `completeMonthDay` is set.
+
+These run in that order. Steps 3–5 share one database transaction; the trash update and its event come first.
+The endpoint requires `cleanup.update`, which is documented as including the ability to trash the caller's own
+assets.
+
+**Reused as they are:** `POST /stacks` for "Stack instead", `POST /trash/restore/assets` for Undo, and
+`POST /trash/empty` for "Empty".
 
 ### Web
 
-- Components in `web/src/lib/components/cleanup/`: `CleanupCalendar` (a 12 × 31 grid shaded by photo count, with
-  reviewed and today states and a hover peek), `CleanupQueueRail`, `RewindYearSection`, `RewindGrid`,
-  `BurstGroupCard` (keep 1 and trash the rest / keep all / stack instead), `QueueSelectGrid` (screenshots and
-  blurry: trash selected / not a problem), `SpaceHogList`.
-- **Rewind batches its changes.** A `RewindSession` class (runes) holds keep, favourite and trash marks locally,
-  and `Z` undoes. "Move N to trash" and "Finish day" commit in this order:
-  1. `DELETE /assets` for trash marks
-  2. `PUT /assets` for favourites
-  3. `PUT /cleanup/decisions` for keeps and favourites
-  4. `…/complete`, for "Finish day" only
+- **Components** live in `web/src/lib/components/cleanup/`:
+  - `CleanupCalendar`: the 12 × 31 grid with shading, reviewed and today states, and the hover peek.
+  - `CleanupQueueRail`.
+  - `RewindYearSection` and `RewindGrid`.
+  - `BurstGroupCard`.
+  - `QueueSelectGrid`.
+  - `SpaceHogList`.
 
-  Commits go out in chunks of 1,000 IDs with a progress state. Leaving with uncommitted marks shows a
-  confirmation modal. Default mode is the grid by year; years load lazily as you scroll.
+  Tiles are square crops loaded lazily through the existing thumbnail URL helper, with the thumbhash as a
+  placeholder. `GalleryViewer` is not used, because it needs full `AssetResponseDto`s and a justified layout.
 
-- **Queue pages act immediately**, with the standard "Moved to trash · Undo" toast, matching the duplicates page.
-- **Shortcuts** via `$lib/actions/shortcut` and `ShortcutsModal`: `K` keep, `F` favourite, `Del` trash, arrows to
-  move, `Space` open in the asset viewer, `Z` undo, `Shift+Enter` finish day.
-- i18n: new `cleanup_*` keys in `en` plus the nine required locales. The admin Jobs card gets a label.
+- **Rewind marks locally, then commits.**
+  - A `RewindSession` class (Svelte runes) holds the keep, favourite and trash marks, with an undo stack
+    (`Z`).
+  - "Move N to trash" and "Finish day" send `POST /cleanup/commit`, in chunks of 1,000 ids, with a progress
+    state. They then report anything skipped ("3 photos had already changed and were skipped").
+  - "Finish day" sends `completeMonthDay` on its last chunk only.
+  - Leaving the page with marks that have not been committed shows a confirmation modal. So do the
+    previous/next-date buttons.
+  - Years load one at a time as the user scrolls. Grid is the default mode; one-at-a-time is a toggle.
+- **Queue pages** act immediately through `POST /cleanup/commit`. After a trash they show the toast
+  `assets_trashed_count` with an **Undo** button (5-second timeout). Undo calls `restoreAssets` for the ids that
+  were actually trashed. This is the existing `deleteAssets(…, onUndoDelete)` pattern in `lib/utils/actions.ts`.
+  The duplicates page shows no Undo, so it is not the model here.
+- **Group actions on Bursts** always resolve every member of the group. "Keep 1, trash N−1" and "Accept
+  suggestions" keep the marked photos and trash the rest. "Keep all" keeps every photo. "Stack instead" calls
+  `POST /stacks` with the suggested keep first, so it becomes the primary. A group therefore never comes back
+  half-resolved.
+- **Shortcuts** use `$lib/actions/shortcut`: `K` keep, `F` favourite, `Delete` trash, arrow keys to move,
+  `Space` to open the focused photo in the viewer, `Z` undo and `Shift+Enter` finish the day.
+  - Following the existing `assetViewerManager.isViewing ? [] : …` pattern, all of them are **turned off while
+    the asset viewer is open**, because the viewer already uses `z` for zoom and `Space` for video play/pause.
+  - `ShortcutsModal` receives the page's own list through its `shortcuts` prop.
+- **Confirmation for Space assets.** Before trashing, the page calls `POST /cleanup/in-spaces`, which returns
+  the ids that belong to any shared space through the direct (`shared_space_asset`) or album
+  (`shared_space_album` → `album_asset`, `album.deletedAt IS NULL`) route. The library route cannot apply,
+  because external-library assets are out of scope. If any ids come back, the confirmation says those photos
+  will disappear for Space members too.
+  - The query lives in `cleanup.repository.ts`. It returns ids only, so it gets a `VIS_ALLOWLIST` entry in
+    `shared-space-album-scope.guard.spec.ts` with that reason. It does not reference `shared_space_library`, so
+    `ALBUM_ALLOWLIST` is not needed.
+- **i18n:** new `cleanup_*` keys go into `en.json` and the nine required locales, sorted. `fork-string-parity`
+  requires every key in all nine. The admin Jobs card and `JobSettings` labels use i18n keys, not hard-coded
+  English.
 
-## Scale (500k+ assets per user)
+## Scale (users with 500,000+ assets)
 
-- No `OFFSET` anywhere. Keyset pagination on `(fileSizeInByte, id)` and `(localDateTime, id)`.
-- The hub renders immediately. Counts and calendar arrive as independent parallel requests, so a slow one never
-  blocks the others.
-- Bursts pages walk forward from the cursor in windows of about 2,000 photos using the index. The count is a
-  single ordered index pass with `lag()`. If that misses the budget in measurement, fall back to a per-user
-  cached count refreshed after quality analysis.
-- A rewind day at 500k assets is about 1,400 photos, so it is fetched a year at a time.
-- **Budget:** every cleanup endpoint under 300 ms at p95 for a 500k-asset user.
-- **Index safety check** (a required plan task):
-  - On a synthetic 500k seed (a dev `generate_series` script) and a personal-instance clone, capture
-    `EXPLAIN (ANALYZE, BUFFERS)` **before and after** the migrations for: timeline bucket list and bucket
-    contents, the legacy large-assets search, metadata search sorted by size, smart search, sync-stream asset
-    queries, and the duplicate nearest-neighbour search.
-  - A plan may change only on a query we meant to speed up.
-  - Also time a bulk-insert pass (an external-library scan) before and after.
-  - Run as the `gallery` role (`psql` as `postgres` misses `jit=off`).
-  - Expected cost: the `asset` partial expression index cannot match any existing query. The `asset_exif`
-    size index can only change size-sorted plans, and should improve them. Writes pay one extra index entry;
-    HOT updates are lost only on updates that change the indexed columns.
+- No `OFFSET` anywhere. Pagination uses keysets: `(fileSizeInByte, id)` and `(localDateTime, id)`.
+- The hub renders immediately. The counts, the trash total and the calendar are separate requests sent in
+  parallel, so a slow one never blocks the others.
+- Bursts pages walk forward from the cursor through the `(ownerId, localDateTime)` range, in windows of about
+  2,000 rows. A group that crosses a window edge is extended rather than split.
+  - The bursts **count** is one ordered pass using `lag()`.
+  - If that pass misses the time budget during measurement, fall back to a per-user cached count, refreshed
+    after quality analysis. The implementation plan records which option was chosen.
+- A single date at 500k assets holds about 1,400 photos, so rewind fetches them one year at a time.
+- **Time budget:** every cleanup endpoint must answer in under 300 ms at p95 for a user with 500k assets.
+- **Index safety check** (a required implementation task):
+  - On a synthetic seed of 500k assets (a dev script using `generate_series`) and on a clone of the personal
+    instance, capture `EXPLAIN (ANALYZE, BUFFERS)` **before and after** the migrations for these existing
+    queries: the timeline bucket list and bucket contents, the legacy large-assets search, metadata search
+    sorted by size, smart search, the sync-stream asset queries, and the duplicate nearest-neighbour search.
+  - Only a query we meant to speed up may change its plan.
+  - Also time a bulk insert (an external-library scan) before and after.
+  - Run everything as the `gallery` role; `psql` as `postgres` does not pick up `jit=off`.
+  - Expected cost:
+    - The partial expression index can only match a query that uses its exact expression.
+    - The plain `fileSizeInByte` index can only change plans that sort or filter by size, and should improve
+      them.
+    - Each write pays for one more index entry, and loses the in-place (HOT) update only when it changes an
+      indexed column.
 
 ## Edge cases
 
-- **Asset trashed or deleted elsewhere during a rewind session:** the commit skips missing or trashed IDs and
-  reports them, rather than failing the batch.
-- **Restored from trash:** the asset re-enters any queue it matches. This is intended.
-- **Live photos:** trashing the still trashes the motion part through the existing path. Sizes include the
-  motion file.
-- **Stacks:** excluded from Bursts. Elsewhere a stack is represented by its primary asset.
-- **Not yet analysed:** the Blurry and Screenshots cards show "Analysing… N% of library", never a misleading 0.
-- **Owned assets that are in a Space:** trashing removes them for Space members too (today's behaviour). The
-  confirmation says so when the selection contains such assets.
+| Case                                                                   | Behaviour                                                                                                                                                               |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Asset trashed or deleted elsewhere, or in another tab, before a commit | Reported in `skipped[]` (`already_trashed` / `not_found`). The rest of the batch succeeds and the UI reports how many were skipped                                      |
+| Ids of another user's assets sent to `commit`                          | Reported in `skipped[]` as `not_owned`. Nothing about those assets is revealed beyond their id                                                                          |
+| Locked, hidden, offline or external-library ids sent to `commit`       | Reported in `skipped[]` as `out_of_scope`                                                                                                                               |
+| Restored from the trash                                                | The asset returns to any queue it matches. This is intended                                                                                                             |
+| Keep decisions on assets that are later trashed or restored            | The keep stays. It still applies after a restore                                                                                                                        |
+| Live photo still trashed                                               | The motion part is **not** trashed; it stays hidden until the trash is emptied. Its size is still counted with the still                                                |
+| Stack primary in the trash                                             | The stack drops out of Cleanup until the primary is restored or the trash is emptied                                                                                    |
+| Capture date edited                                                    | The photo moves to its new date immediately, because dates are computed at query time. Decisions follow the asset                                                       |
+| User with no assets, or a date with no photos                          | The calendar shows 0 for that date and it cannot be completed. Counts are 0 and `analysedPercent` is 100                                                                |
+| Analysis not finished                                                  | The Blurry and Screenshots rows show "Analysing… N%", never a misleading 0                                                                                              |
+| No preview yet, or the preview is on S3                                | No preview: the job is Skipped and runs again through the thumbnail chain. S3: the preview goes through `ensureLocalFile`, with the temporary file removed in `finally` |
+| Preview that is corrupt or cannot be decoded                           | Null scores, `qualityAnalyzedAt` set, a warning logged, and no retry loop                                                                                               |
+| Flat or solid-colour photo                                             | Sharpness is 0, so it lands in Blurry. That is acceptable: such photos are almost always accidental                                                                     |
+| Photo with an alpha channel                                            | Flattened before scoring                                                                                                                                                |
+| Invalid `monthDay`, `tz` or enum value                                 | 400                                                                                                                                                                     |
+| More than 1,000 ids in one `commit` list                               | 400. The client splits into chunks                                                                                                                                      |
+| Asset without an embedding in a time-window burst                      | That group fails the CLIP check and is not shown. Groups formed from the camera's burst id are not affected                                                             |
+| Burst group straddling a page boundary                                 | Never split; the scan extends past the window                                                                                                                           |
+| Owned assets that are also in a Space                                  | The confirmation warns that trashing removes them for Space members too                                                                                                 |
+| Uncommitted rewind marks and the user navigates away                   | A confirmation modal appears                                                                                                                                            |
+| Asset viewer open                                                      | Cleanup shortcuts are turned off, so the viewer's own `z` and `Space` still work                                                                                        |
 
 ## Testing
 
-- **Server unit:** Laplacian variance on synthetic sharp and blurred buffers; clipping; the screenshot heuristic
-  table (filenames, EXIF, PNG, aspect ratio); service scoping and permissions.
-- **Server medium (real DB):** every queue query, including keyset pagination, keep exclusion, the
-  include/exclude rules and the burst 2 s boundary with and without `autoStackId`; calendar counts; day-complete
-  upsert; the migration static guards.
-- **Web unit:** `RewindSession` (mark, undo, commit order, chunking, partial failure); calendar states; the
-  unsaved-marks confirmation.
-- **E2E (Playwright):** hub → rewind → mark → commit → the asset is in trash; one queue keep and one queue trash
-  flow.
-- **Performance:** the index safety check and 300 ms budget above; blur threshold calibration on the personal
-  clone.
+**Server unit tests (vitest):**
+
+- The Laplacian variance on synthetic sharp versus box-blurred buffers, a flat buffer (0), and a buffer smaller
+  than 3×3.
+- The brightness and clipping thresholds.
+- A table of screenshot-heuristic cases: every pattern in the list, a camera JPEG, a PNG with no EXIF, the
+  aspect-ratio boundary at 2.0, and a video.
+- The `monthDay` and `tz` validators.
+- `CleanupService`:
+  - `commit` partitions ids into `skipped` for every reason, keeps its order, emits `AssetTrashAll` only for the
+    ids actually trashed, treats a favourite as a keep, and only upserts the completed date when it is set.
+  - The streak calculation, including gaps, today versus yesterday, several completions in one sitting, and a
+    timezone boundary.
+  - The quality job: the Skipped path when there is no preview, the S3 path (`ensureLocalFile` cleanup is called
+    even when scoring throws), the decode-failure path, a video, and an external-library asset.
+- **Controller specs** (the `controllerSetup` pattern): 400s for an invalid `monthDay`, `tz`, enum value, cursor
+  or oversized id list, and the permission metadata on every route.
+- `queue.service.spec.ts` updated for the new queue.
+
+**Server medium tests (real database), under `test/medium/specs/`:**
+
+- `repositories/cleanup.repository.spec.ts`:
+  - The scope rules, one fixture per exclusion: trashed, hidden, locked, offline, external library, another
+    owner, a stack that is not the primary, and a trashed primary.
+  - Keep exclusion applies per queue.
+  - Keyset pagination for every queue, with no duplicates and no gaps across pages.
+  - Space hogs ordering and the added live-photo size.
+  - Bursts: the 2-second boundary (2.0 s joins a group, just over does not), `autoStackId` changes, the
+    time-window CLIP check passing and failing, a missing embedding, a group straddling a window, and a keep
+    applied before grouping.
+  - Blurry: each reason, each strictness, `hideFaces` with a visible face, a deleted face and an invisible face.
+  - The duplicates count and bytes match `getAll`.
+  - Calendar counts, including 29 February and archived assets being counted.
+  - The id-only Space lookup, via the direct route and the album route, and a deleted album.
+- `services/cleanup.service.spec.ts`: `commit` end to end, which checks the asset is trashed, the event fires
+  and `skipped` is correct.
+- `schema-drift.spec.ts` passes with the new tables and indexes.
+
+**Static and CI gates:**
+
+- `revert-to-immich.spec.ts` passes, the ORDER manifest is updated, and `migrations:generate` produces no
+  diff.
+- `mise //:sql` query files are regenerated for the `@GenerateSql` methods.
+- `shared-space-album-scope.guard.spec.ts` passes.
+- OpenAPI, the TypeScript SDK and the Dart client are regenerated with `mise //:open-api`. The Dart client is
+  compiled by CI's Unit Test Mobile job.
+- The i18n tests pass: `fork-string-parity`, `placeholders` and sorting.
+
+**Web unit tests (vitest and testing-library):**
+
+- `RewindSession`: marking, the undo stack, splitting into chunks of 1,000, sending `completeMonthDay` only on
+  the last chunk, and reporting skipped ids.
+- `CleanupCalendar`: the cell states (none, shading, reviewed, today, 29 February) and the hover peek.
+- `BurstGroupCard`: the suggested pick, toggling, and every action resolving all members.
+- `QueueSelectGrid`: selection, and "Not a problem" sending keeps.
+- The shortcuts turn off while the viewer is open.
+- The unsaved-marks confirmation.
+- The Undo toast calls `restoreAssets` only for the ids actually trashed.
+
+**E2E:**
+
+- API (`e2e/src/specs/server/api/cleanup.e2e-spec.ts`):
+  - Every endpoint, both authenticated and not.
+  - Another user's ids end up in `skipped`.
+  - Commit followed by restore.
+- Web (`e2e/src/specs/web/cleanup.e2e-spec.ts`), following the precedent of `duplicates.e2e-spec.ts`:
+  - Utilities → Cleanup hub renders the calendar and the queue rail.
+  - Rewind: mark photos, move them to trash, and find them in the trash.
+  - Finish day: the date's calendar cell turns green.
+  - One queue: keep a photo and it disappears; trash a photo, then Undo.
+- Assertions use test ids; the visual-regression suite is not used.
+
+**Performance:** the index safety check and the 300 ms budget above, plus calibrating the blur thresholds on
+the personal instance clone.
+
+## Review corrections
+
+These corrections came from checking the first draft against the code on 2026-09-23. They are recorded so the
+reasons behind the design survive.
+
+1. `DELETE /assets` and `PUT /assets` fail the whole batch if any single id is missing, foreign or locked, and
+   re-trashing an already-trashed asset restarts its auto-empty clock. Hence the filtering `POST /cleanup/commit`.
+2. Trashing a live-photo still does **not** trash its motion part (the motion part is removed only when the
+   trash is emptied).
+3. `StorageRepository.readFile` only reads local disk, so it fails for previews on S3. The job uses
+   `BaseService.ensureLocalFile`.
+4. The thumbnail chain also runs for external-library assets, so the handler skips those. The chain does not
+   run after edits, so edited assets are not re-scored.
+5. A plain `fileSizeInByte` index serves `DESC` sorts on its own, so it needs no `migration_overrides` row. The
+   `DESC` index in the draft would have forced one.
+6. `revert-to-immich.spec.ts` checks less than the draft assumed. The real gate is the CI job that runs the
+   revert and boots upstream Immich. Step 4 of the script also needs to drop the new column and indexes.
+7. The duplicates page has no Undo. The Undo pattern is `deleteAssets(…, onUndoDelete)`.
+8. The asset viewer already binds `z` and `Space`, so the Cleanup shortcuts are turned off while it is open.
+   The viewer is opened through the `[[photos=photos]]/[[assetId=id]]` route segments.
+9. Adding a queue also touches `route.ts`, `web/.../queue.service.ts`, `JobSettings.svelte` and
+   `ADMIN_VISIBLE_QUEUES`, which the draft missed.
+10. DTOs are Zod schemas. Every enum needs `.meta({id})`, or the generated Dart client breaks.
+11. There was no id-only "is this asset in a Space" lookup, so a new one covers the direct and album routes.
