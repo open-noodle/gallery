@@ -4,7 +4,9 @@ import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
+import { CleanupCursor } from 'src/utils/cleanup.js';
 import { newMediumService } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
@@ -532,6 +534,670 @@ describe(CleanupRepository.name, () => {
       await ctx.newJobStatus({ assetId: assetB.id });
 
       await expect(sut.getAnalysedPercent(user.id, 'all')).resolves.toBe(50);
+    });
+  });
+
+  describe('getSpaceHogs', () => {
+    it('sorts by fileSizeInByte descending', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: small } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: small.id, fileSizeInByte: 1000 });
+      const { asset: big } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: big.id, fileSizeInByte: 3000 });
+      const { asset: medium } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: medium.id, fileSizeInByte: 2000 });
+
+      const { items, next } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 0 });
+      expect(items.map((i) => i.id)).toEqual([big.id, medium.id, small.id]);
+      expect(next).toBeNull();
+    });
+
+    it('minSize filters out smaller assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: small } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: small.id, fileSizeInByte: 1000 });
+      const { asset: big } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: big.id, fileSizeInByte: 5000 });
+
+      const { items } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 2000 });
+      expect(items.map((i) => i.id)).toEqual([big.id]);
+    });
+
+    it('type filters to image or video', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: image } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Image });
+      await ctx.newExif({ assetId: image.id, fileSizeInByte: 1000 });
+      const { asset: video } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
+      await ctx.newExif({ assetId: video.id, fileSizeInByte: 1000 });
+
+      const images = await sut.getSpaceHogs(user.id, { limit: 10, type: 'image', minSize: 0 });
+      expect(images.items.map((i) => i.id)).toEqual([image.id]);
+
+      const videos = await sut.getSpaceHogs(user.id, { limit: 10, type: 'video', minSize: 0 });
+      expect(videos.items.map((i) => i.id)).toEqual([video.id]);
+    });
+
+    it('excludes an asset with a null fileSizeInByte', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: noExif } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: withSize } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: withSize.id, fileSizeInByte: 1000 });
+
+      const { items } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 0 });
+      expect(items.map((i) => i.id)).toEqual([withSize.id]);
+      expect([noExif]).toHaveLength(1);
+    });
+
+    it('excludes a space_hogs keep but not a blurry keep', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: kept } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: kept.id, fileSizeInByte: 1000 });
+      const { asset: otherKeep } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: otherKeep.id, fileSizeInByte: 1000 });
+
+      await sut.upsertDecisions(user.id, CleanupQueue.SpaceHogs, [kept.id]);
+      await sut.upsertDecisions(user.id, CleanupQueue.Blurry, [otherKeep.id]);
+
+      const { items } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 0 });
+      expect(items.map((i) => i.id)).toEqual([otherKeep.id]);
+    });
+
+    it('excludes a non-primary stack member and includes the primary', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: primary } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: primary.id, fileSizeInByte: 1000 });
+      const { asset: secondary } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: secondary.id, fileSizeInByte: 1000 });
+      await ctx.newStack({ ownerId: user.id }, [primary.id, secondary.id]);
+
+      const { items } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 0 });
+      expect(items.map((i) => i.id)).toEqual([primary.id]);
+    });
+
+    it('drops the whole stack when the primary is trashed', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: primary } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: primary.id, fileSizeInByte: 1000 });
+      const { asset: secondary } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: secondary.id, fileSizeInByte: 1000 });
+      await ctx.newStack({ ownerId: user.id }, [primary.id, secondary.id]);
+      await ctx.softDeleteAsset(primary.id);
+
+      const { items } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 0 });
+      expect(items).toEqual([]);
+    });
+
+    it('paginates with no duplicates or loss across 3 pages', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const assets: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newExif({ assetId: asset.id, fileSizeInByte: 1000 + i * 100 });
+        assets.push(asset.id);
+      }
+
+      const seen: string[] = [];
+      let cursor: CleanupCursor | undefined;
+      let pages = 0;
+      for (;;) {
+        const { items, next }: { items: { id: string }[]; next: CleanupCursor | null } = await sut.getSpaceHogs(
+          user.id,
+          { limit: 2, type: 'all', minSize: 0, cursor },
+        );
+        seen.push(...items.map((i) => i.id));
+        pages++;
+        if (!next) {
+          break;
+        }
+        cursor = next;
+        if (pages > 10) {
+          throw new Error('pagination did not terminate');
+        }
+      }
+
+      expect(pages).toBe(3);
+      expect(seen).toHaveLength(5);
+      expect(new Set(seen)).toEqual(new Set(assets));
+    });
+
+    it('breaks ties on id for equal file sizes', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: a } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: a.id, fileSizeInByte: 1000 });
+      const { asset: b } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: b.id, fileSizeInByte: 1000 });
+
+      const [expectedFirst, expectedSecond] = [a.id, b.id].sort().toReversed();
+
+      const page1 = await sut.getSpaceHogs(user.id, { limit: 1, type: 'all', minSize: 0 });
+      expect(page1.items.map((i) => i.id)).toEqual([expectedFirst]);
+      expect(page1.next).not.toBeNull();
+
+      const page2 = await sut.getSpaceHogs(user.id, { limit: 1, type: 'all', minSize: 0, cursor: page1.next! });
+      expect(page2.items.map((i) => i.id)).toEqual([expectedSecond]);
+      expect(page2.next).toBeNull();
+    });
+  });
+
+  describe('getScreenshots', () => {
+    it('returns only assets where isScreenshot is true', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: screenshot } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: screenshot.id,
+        ownerId: user.id,
+        sharpness: 100,
+        brightness: 100,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: true,
+        version: 1,
+      });
+      const { asset: notScreenshot } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: notScreenshot.id,
+        ownerId: user.id,
+        sharpness: 100,
+        brightness: 100,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+
+      const { items } = await sut.getScreenshots(user.id, { limit: 10 });
+      expect(items.map((i) => i.id)).toEqual([screenshot.id]);
+    });
+
+    it('excludes unanalysed assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: unanalysed } = await ctx.newAsset({ ownerId: user.id });
+
+      const { items } = await sut.getScreenshots(user.id, { limit: 10 });
+      expect(items).toEqual([]);
+      expect([unanalysed]).toHaveLength(1);
+    });
+
+    it('paginates', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const base = new Date('2024-01-01T00:00:00Z');
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date(base.getTime() + i * 1000) });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          sharpness: 100,
+          brightness: 100,
+          clippedDark: 0,
+          clippedBright: 0,
+          isScreenshot: true,
+          version: 1,
+        });
+        ids.push(asset.id);
+      }
+
+      const page1 = await sut.getScreenshots(user.id, { limit: 2 });
+      expect(page1.items).toHaveLength(2);
+      expect(page1.next).not.toBeNull();
+      const page2 = await sut.getScreenshots(user.id, { limit: 2, cursor: page1.next! });
+      expect(page2.items).toHaveLength(1);
+      expect(page2.next).toBeNull();
+      expect([...page1.items, ...page2.items].map((i) => i.id).sort()).toEqual([...ids].sort());
+    });
+  });
+
+  describe('getBlurry', () => {
+    it('filters by strictness threshold', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const idBySharpness = new Map<number, string>();
+      for (const sharpness of [10, 50, 100, 500]) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          sharpness,
+          brightness: 200,
+          clippedDark: 0,
+          clippedBright: 0,
+          isScreenshot: false,
+          version: 1,
+        });
+        idBySharpness.set(sharpness, asset.id);
+      }
+
+      const lenient = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'lenient',
+        reason: 'blurry',
+        hideFaces: false,
+      });
+      expect(lenient.items.map((i) => i.id).toSorted()).toEqual([idBySharpness.get(10)!].toSorted());
+
+      const balanced = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'blurry',
+        hideFaces: false,
+      });
+      expect(balanced.items.map((i) => i.id).toSorted()).toEqual(
+        [idBySharpness.get(10)!, idBySharpness.get(50)!].toSorted(),
+      );
+
+      const strict = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'strict',
+        reason: 'blurry',
+        hideFaces: false,
+      });
+      expect(strict.items.map((i) => i.id).toSorted()).toEqual(
+        [idBySharpness.get(10)!, idBySharpness.get(50)!, idBySharpness.get(100)!].toSorted(),
+      );
+    });
+
+    it('reason dark requires both brightness and clippedDark thresholds', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: bothDark } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: bothDark.id,
+        ownerId: user.id,
+        sharpness: 1000,
+        brightness: 10,
+        clippedDark: 0.9,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+      const { asset: onlyBrightness } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: onlyBrightness.id,
+        ownerId: user.id,
+        sharpness: 1000,
+        brightness: 10,
+        clippedDark: 0.1,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+      const { asset: onlyClipped } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: onlyClipped.id,
+        ownerId: user.id,
+        sharpness: 1000,
+        brightness: 100,
+        clippedDark: 0.9,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+
+      const { items } = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'dark',
+        hideFaces: false,
+      });
+      expect(items.map((i) => i.id)).toEqual([bothDark.id]);
+    });
+
+    it('reason bright', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: bright } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: bright.id,
+        ownerId: user.id,
+        sharpness: 1000,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0.5,
+        isScreenshot: false,
+        version: 1,
+      });
+      const { asset: notBright } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: notBright.id,
+        ownerId: user.id,
+        sharpness: 1000,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0.1,
+        isScreenshot: false,
+        version: 1,
+      });
+
+      const { items } = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'bright',
+        hideFaces: false,
+      });
+      expect(items.map((i) => i.id)).toEqual([bright.id]);
+    });
+
+    it('hideFaces excludes only an asset with a visible, non-deleted face', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: withVisibleFace } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: withVisibleFace.id,
+        ownerId: user.id,
+        sharpness: 1,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+      await ctx.newAssetFace({ assetId: withVisibleFace.id, isVisible: true, deletedAt: null });
+
+      const { asset: withDeletedFace } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: withDeletedFace.id,
+        ownerId: user.id,
+        sharpness: 1,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+      await ctx.newAssetFace({ assetId: withDeletedFace.id, isVisible: true, deletedAt: new Date() });
+
+      const { asset: withInvisibleFace } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertQuality({
+        assetId: withInvisibleFace.id,
+        ownerId: user.id,
+        sharpness: 1,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+      await ctx.newAssetFace({ assetId: withInvisibleFace.id, isVisible: false, deletedAt: null });
+
+      const hidden = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'blurry',
+        hideFaces: true,
+      });
+      expect(new Set(hidden.items.map((i) => i.id))).toEqual(new Set([withDeletedFace.id, withInvisibleFace.id]));
+
+      const shown = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'blurry',
+        hideFaces: false,
+      });
+      expect(new Set(shown.items.map((i) => i.id))).toEqual(
+        new Set([withVisibleFace.id, withDeletedFace.id, withInvisibleFace.id]),
+      );
+    });
+
+    it('excludes videos', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: video } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
+      await sut.upsertQuality({
+        assetId: video.id,
+        ownerId: user.id,
+        sharpness: 1,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+
+      const { items } = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'blurry',
+        hideFaces: false,
+      });
+      expect(items).toEqual([]);
+    });
+  });
+
+  describe('countQueue', () => {
+    it('matches the list length for screenshots', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      for (let i = 0; i < 3; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          sharpness: 100,
+          brightness: 100,
+          clippedDark: 0,
+          clippedBright: 0,
+          isScreenshot: true,
+          version: 1,
+        });
+      }
+
+      const { items } = await sut.getScreenshots(user.id, { limit: 100 });
+      const { count } = await sut.countQueue(user.id, 'screenshots');
+      expect(count).toBe(items.length);
+      expect(count).toBe(3);
+    });
+
+    it('matches the list length for blurry', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      for (const sharpness of [10, 50]) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          sharpness,
+          brightness: 200,
+          clippedDark: 0,
+          clippedBright: 0,
+          isScreenshot: false,
+          version: 1,
+        });
+      }
+
+      const { items } = await sut.getBlurry(user.id, {
+        limit: 100,
+        strictness: 'balanced',
+        reason: 'all',
+        hideFaces: true,
+      });
+      const { count } = await sut.countQueue(user.id, 'blurry');
+      expect(count).toBe(items.length);
+      expect(count).toBe(2);
+    });
+  });
+
+  describe('countDuplicates', () => {
+    it('counts groups of more than one, sums reclaimable bytes, and skips a singleton', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const groupA = factory.uuid();
+      const { asset: a1 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupA });
+      await ctx.newExif({ assetId: a1.id, fileSizeInByte: 10 });
+      const { asset: a2 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupA });
+      await ctx.newExif({ assetId: a2.id, fileSizeInByte: 30 });
+
+      const groupB = factory.uuid();
+      const { asset: b1 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupB });
+      await ctx.newExif({ assetId: b1.id, fileSizeInByte: 5 });
+      const { asset: b2 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupB });
+      await ctx.newExif({ assetId: b2.id, fileSizeInByte: 5 });
+      const { asset: b3 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupB });
+      await ctx.newExif({ assetId: b3.id, fileSizeInByte: 5 });
+
+      const singleton = factory.uuid();
+      const { asset: s1 } = await ctx.newAsset({ ownerId: user.id, duplicateId: singleton });
+      await ctx.newExif({ assetId: s1.id, fileSizeInByte: 999 });
+
+      const { count, bytes } = await sut.countDuplicates(user.id);
+      expect(count).toBe(2);
+      expect(bytes).toBe(10 + 10);
+    });
+
+    it('excludes a trashed member from its group', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const groupId = factory.uuid();
+      const { asset: a1 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupId });
+      await ctx.newExif({ assetId: a1.id, fileSizeInByte: 100 });
+      const { asset: a2 } = await ctx.newAsset({ ownerId: user.id, duplicateId: groupId });
+      await ctx.newExif({ assetId: a2.id, fileSizeInByte: 200 });
+      await ctx.softDeleteAsset(a2.id);
+
+      const { count, bytes } = await sut.countDuplicates(user.id);
+      expect(count).toBe(0);
+      expect(bytes).toBe(0);
+    });
+  });
+
+  describe('getBurstWindow', () => {
+    it('returns ascending order by localDateTime then id', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const base = new Date('2024-01-01T00:00:00Z');
+      const { asset: a } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date(base.getTime() + 2000) });
+      const { asset: b } = await ctx.newAsset({ ownerId: user.id, localDateTime: base });
+
+      const rows = await sut.getBurstWindow(user.id, { limit: 10 });
+      expect(rows.map((r) => r.id)).toEqual([b.id, a.id]);
+    });
+
+    it('applies the after keyset', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const base = new Date('2024-01-01T00:00:00Z');
+      const { asset: a } = await ctx.newAsset({ ownerId: user.id, localDateTime: base });
+      const { asset: b } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date(base.getTime() + 1000) });
+
+      const rows = await sut.getBurstWindow(user.id, { limit: 10, afterLocalDateTime: base, afterId: a.id });
+      expect(rows.map((r) => r.id)).toEqual([b.id]);
+    });
+
+    it('excludes stacked (including the primary) and kept assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: primary } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: secondary } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newStack({ ownerId: user.id }, [primary.id, secondary.id]);
+      const { asset: kept } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertDecisions(user.id, CleanupQueue.Bursts, [kept.id]);
+      const { asset: normal } = await ctx.newAsset({ ownerId: user.id });
+
+      const rows = await sut.getBurstWindow(user.id, { limit: 10 });
+      const ids = rows.map((r) => r.id);
+      // Bursts uses a plain `stackId IS NULL` (brief), unlike the other queues' unstacked-or-primary
+      // rule: a stacked primary is still excluded, since it is already resolved into a stack.
+      expect(ids).not.toContain(secondary.id);
+      expect(ids).not.toContain(primary.id);
+      expect(ids).not.toContain(kept.id);
+      expect(ids).toContain(normal.id);
+    });
+
+    it('excludes videos', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
+      const { asset: image } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Image });
+
+      const rows = await sut.getBurstWindow(user.id, { limit: 10 });
+      expect(rows.map((r) => r.id)).toEqual([image.id]);
+    });
+  });
+
+  describe('getBurstClipDistances', () => {
+    it('computes distances from the group first member and omits ids without an embedding', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: close } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: far } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: missing } = await ctx.newAsset({ ownerId: user.id });
+
+      const dims = 512;
+      const firstEmbedding = `[${['1', ...Array.from({ length: dims - 1 }, () => '0')].join(',')}]`;
+      const closeEmbedding = `[${['0.99', '0.01', ...Array.from({ length: dims - 2 }, () => '0')].join(',')}]`;
+      const farEmbedding = `[${['0', '1', ...Array.from({ length: dims - 2 }, () => '0')].join(',')}]`;
+
+      await ctx.database.insertInto('smart_search').values({ assetId: first.id, embedding: firstEmbedding }).execute();
+      await ctx.database.insertInto('smart_search').values({ assetId: close.id, embedding: closeEmbedding }).execute();
+      await ctx.database.insertInto('smart_search').values({ assetId: far.id, embedding: farEmbedding }).execute();
+
+      const distances = await sut.getBurstClipDistances([[first.id, close.id, far.id, missing.id]]);
+
+      expect(distances.get(close.id)).toBeLessThan(0.1);
+      expect(distances.get(far.id)).toBeGreaterThan(0.1);
+      expect(distances.has(missing.id)).toBe(false);
+    });
+  });
+
+  describe('countBursts', () => {
+    it('groups by 2-second gaps and sums reclaimable bytes per group', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const base = new Date('2024-01-01T00:00:00Z');
+
+      for (let i = 0; i < 3; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date(base.getTime() + i * 500) });
+        await ctx.newExif({ assetId: asset.id, fileSizeInByte: 100 + i * 10 });
+      }
+
+      const later = new Date(base.getTime() + 3_600_000);
+      for (let i = 0; i < 2; i++) {
+        const { asset } = await ctx.newAsset({
+          ownerId: user.id,
+          localDateTime: new Date(later.getTime() + i * 500),
+        });
+        await ctx.newExif({ assetId: asset.id, fileSizeInByte: 200 + i * 10 });
+      }
+
+      const { asset: singleton } = await ctx.newAsset({
+        ownerId: user.id,
+        localDateTime: new Date(later.getTime() + 7_200_000),
+      });
+      await ctx.newExif({ assetId: singleton.id, fileSizeInByte: 999 });
+
+      const { count, bytes } = await sut.countBursts(user.id);
+      expect(count).toBe(2);
+      expect(bytes).toBe(210 + 200);
+    });
+  });
+
+  describe('getCleanupAssets', () => {
+    it('hydrates the given ids, scoped to the caller, with the bursts-queue kept flag', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: kept } = await ctx.newAsset({ ownerId: user.id });
+      await sut.upsertDecisions(user.id, CleanupQueue.Bursts, [kept.id]);
+      const { asset: foreign } = await ctx.newAsset({ ownerId: other.id });
+
+      const rows = await sut.getCleanupAssets(user.id, [plain.id, kept.id, foreign.id]);
+      expect(new Set(rows.map((r) => r.id))).toEqual(new Set([plain.id, kept.id]));
+      expect(rows.find((r) => r.id === kept.id)!.kept).toBe(true);
+      expect(rows.find((r) => r.id === plain.id)!.kept).toBe(false);
     });
   });
 });
