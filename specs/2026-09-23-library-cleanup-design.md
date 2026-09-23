@@ -173,7 +173,7 @@ which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
   - `visibility` of `hidden` (the motion part of a live photo) or `locked`.
   - `isOffline`.
   - Any asset with a `libraryId` (external library). Trashing those does not free the file on disk.
-- **Stacks:** an asset appears only if it is not in a stack or is the stack's primary. If the primary asset is
+- **Stacks (queues only):** in a queue, an asset appears only if it is not in a stack or is the stack's primary. **Rewind and the calendar show every in-scope asset, stack members included**: rewind is about seeing every photo, and leaving the stack rule out keeps the calendar count answerable from the partial index alone. If the primary asset is
   in the trash, the stack drops out of Cleanup until the primary is restored or the trash is emptied. When the
   trash is emptied, the existing hard-delete path reassigns the primary.
 
@@ -278,7 +278,7 @@ Re-trashing an already-trashed id also overwrites `deletedAt`, which restarts it
 `CleanupService.commit` therefore:
 
 1. Filters every id list down to assets the caller owns that are still inside the cleanup scope. Everything
-   else goes into `skipped[]` with a reason (`not_found`, `not_owned`, `out_of_scope` or `already_trashed`)
+   else goes into `skipped[]` with a reason (`not_found` (which also covers another user's ids, so that their existence is not confirmed), `out_of_scope` or `already_trashed`)
    instead of failing the request.
 2. For the remaining trash ids, does exactly what `AssetService.deleteAll` does for a non-forced delete:
    `assetRepository.updateAll(ids, {deletedAt: now, status: Trashed})`, then emits `AssetTrashAll`. That keeps
@@ -348,7 +348,7 @@ assets.
   parallel, so a slow one never blocks the others.
 - Bursts pages walk forward from the cursor through the `(ownerId, localDateTime)` range, in windows of about
   2,000 rows. A group that crosses a window edge is extended rather than split.
-  - The bursts **count** is one ordered pass using `lag()`.
+  - The bursts **count** is one ordered pass using `lag()`. It counts candidate groups **before** the per-page CLIP check, so it is an upper bound; the hub row labels it as "up to N".
   - If that pass misses the time budget during measurement, fall back to a per-user cached count, refreshed
     after quality analysis. The implementation plan records which option was chosen.
 - A single date at 500k assets holds about 1,400 photos, so rewind fetches them one year at a time.
@@ -373,7 +373,7 @@ assets.
 | Case                                                                   | Behaviour                                                                                                                                                               |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Asset trashed or deleted elsewhere, or in another tab, before a commit | Reported in `skipped[]` (`already_trashed` / `not_found`). The rest of the batch succeeds and the UI reports how many were skipped                                      |
-| Ids of another user's assets sent to `commit`                          | Reported in `skipped[]` as `not_owned`. Nothing about those assets is revealed beyond their id                                                                          |
+| Ids of another user's assets sent to `commit`                          | Reported in `skipped[]` as `not_found`, exactly like a missing id, so the response does not confirm that they exist                                                     |
 | Locked, hidden, offline or external-library ids sent to `commit`       | Reported in `skipped[]` as `out_of_scope`                                                                                                                               |
 | Restored from the trash                                                | The asset returns to any queue it matches. This is intended                                                                                                             |
 | Keep decisions on assets that are later trashed or restored            | The keep stays. It still applies after a restore                                                                                                                        |
@@ -495,3 +495,5 @@ reasons behind the design survive.
    `ADMIN_VISIBLE_QUEUES`, which the draft missed.
 10. DTOs are Zod schemas. Every enum needs `.meta({id})`, or the generated Dart client breaks.
 11. There was no id-only "is this asset in a Space" lookup, so a new one covers the direct and album routes.
+12. Stack filtering would stop the calendar being answered from the index alone, so rewind and the calendar include stack members; only the queues apply the primary-only rule.
+13. A separate `not_owned` reason would confirm that another user's asset id exists, so it is folded into `not_found`.
