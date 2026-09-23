@@ -635,6 +635,10 @@ export type JobItem =
   | { name: JobName.AssetClassifyQueueAll; data: IBaseJob }
   | { name: JobName.AssetClassify; data: IEntityJob }
 
+  // Library Cleanup
+  | { name: JobName.AssetAnalyzeQualityQueueAll; data: IBaseJob }
+  | { name: JobName.AssetAnalyzeQuality; data: IEntityJob }
+
   // Face Repair
   | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob };
 
