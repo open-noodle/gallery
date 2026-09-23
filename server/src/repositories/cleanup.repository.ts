@@ -9,6 +9,7 @@ import { MONTH_DAY_SQL } from 'src/schema/cleanup-sql.js';
 import { DB } from 'src/schema/index.js';
 import {
   BurstRow,
+  CLEANUP_BLURRY_DEFAULTS,
   CLEANUP_BLUR_THRESHOLDS,
   CLEANUP_BRIGHT,
   CLEANUP_DARK,
@@ -394,6 +395,56 @@ export class CleanupRepository {
       .execute();
   }
 
+  /**
+   * `commit`'s steps 3-5 (favourite, keep, complete-the-day) share one database transaction — the
+   * trash update and its `AssetTrashAll` event, which the caller runs first, are deliberately kept
+   * out of this transaction: they use `assetRepository`/`eventRepository`, and a trashed asset should
+   * land even if the day-review write fails for an unrelated reason.
+   */
+  @GenerateSql({
+    params: [
+      DummyValue.UUID,
+      CleanupQueue.Rewind,
+      { favoriteIds: [DummyValue.UUID], keepIds: [DummyValue.UUID], completeMonthDay: DummyValue.NUMBER },
+    ],
+  })
+  async applyCommitDecisions(
+    userId: string,
+    queue: CleanupQueue,
+    options: { favoriteIds: string[]; keepIds: string[]; completeMonthDay?: number },
+  ): Promise<void> {
+    const { favoriteIds, keepIds, completeMonthDay } = options;
+    const keepAll = [...new Set([...favoriteIds, ...keepIds])];
+
+    if (favoriteIds.length === 0 && keepAll.length === 0 && completeMonthDay === undefined) {
+      return;
+    }
+
+    const reviewedAt = new Date();
+
+    await this.db.transaction().execute(async (trx) => {
+      if (favoriteIds.length > 0) {
+        await trx.updateTable('asset').set({ isFavorite: true }).where('id', 'in', favoriteIds).execute();
+      }
+
+      if (keepAll.length > 0) {
+        await trx
+          .insertInto('cleanup_decision')
+          .values(keepAll.map((assetId) => ({ userId, queue, assetId, decision: CleanupDecisionType.Keep })))
+          .onConflict((oc) => oc.columns(['userId', 'queue', 'assetId']).doNothing())
+          .execute();
+      }
+
+      if (completeMonthDay !== undefined) {
+        await trx
+          .insertInto('cleanup_day_review')
+          .values({ userId, monthDay: completeMonthDay, reviewedAt })
+          .onConflict((oc) => oc.columns(['userId', 'monthDay']).doUpdateSet({ reviewedAt }))
+          .execute();
+      }
+    });
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, CleanupQueue.Rewind, [DummyValue.UUID]] })
   async deleteDecisions(userId: string, queue: CleanupQueue, assetIds: string[]): Promise<void> {
     if (assetIds.length === 0) {
@@ -705,9 +756,9 @@ export class CleanupRepository {
     userId: string,
     options: { strictness?: CleanupStrictnessValue; reason?: CleanupBlurReason; hideFaces?: boolean },
   ): Promise<{ count: number; bytes: number }> {
-    const strictness = options.strictness ?? 'balanced';
-    const reason = options.reason ?? 'all';
-    const hideFaces = options.hideFaces ?? true;
+    const strictness = options.strictness ?? CLEANUP_BLURRY_DEFAULTS.strictness;
+    const reason = options.reason ?? CLEANUP_BLURRY_DEFAULTS.reason;
+    const hideFaces = options.hideFaces ?? CLEANUP_BLURRY_DEFAULTS.hideFaces;
     const exprs = blurryExpressions(strictness);
 
     let qb = this.db
