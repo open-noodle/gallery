@@ -13,6 +13,7 @@ import {
 } from '@immich/sql-tools';
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
+import { CLEANUP_MONTH_DAY_INDEX_WHERE, MONTH_DAY_SQL } from 'src/schema/cleanup-sql.js';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums.js';
 import { asset_delete_audit, asset_library_delete_audit } from 'src/schema/functions.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
@@ -69,6 +70,12 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
   name: 'asset_id_timeline_notDeleted_idx',
   columns: ['id'],
   where: `visibility = 'timeline' AND "deletedAt" IS NULL`,
+})
+// gallery-fork: Library Cleanup calendar/rewind — see specs/2026-09-23-library-cleanup-design.md
+@Index({
+  name: 'asset_localMonthDay_idx',
+  expression: `"ownerId", ${MONTH_DAY_SQL}`,
+  where: CLEANUP_MONTH_DAY_INDEX_WHERE,
 })
 // For all assets, each originalpath must be unique per user and library
 export class AssetTable {
