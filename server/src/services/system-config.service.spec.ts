@@ -79,6 +79,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     [QueueName.IntegrityCheck]: { concurrency: 1 },
     [QueueName.Editor]: { concurrency: 2 },
     [QueueName.Classification]: { concurrency: 1 },
+    [QueueName.QualityAnalysis]: { concurrency: 2 },
   },
   backup: {
     database: {
