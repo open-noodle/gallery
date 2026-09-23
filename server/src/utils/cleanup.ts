@@ -14,6 +14,13 @@ export const CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE = 104_857_600;
 
 export type CleanupStrictnessValue = keyof typeof CLEANUP_BLUR_THRESHOLDS;
 
+/**
+ * Blurry queue defaults, matching the page's own defaults. Shared by the service's list path
+ * (`CleanupService.getQueue`) and the repository's `countBlurry`, so the hub card and the list page
+ * can never silently drift apart on what "default" means.
+ */
+export const CLEANUP_BLURRY_DEFAULTS = { strictness: 'balanced', reason: 'all', hideFaces: true } as const;
+
 export const CLEANUP_SCREENSHOT_PATTERNS =
   /(screen ?shot|screen recording|bildschirmfoto|capture d.écran|schermafbeelding|captura de pantalla|截屏|スクリーンショット)/i;
 
