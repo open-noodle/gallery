@@ -480,6 +480,17 @@ export class MediaRepository {
     return { width, height, isTransparent: hasAlpha };
   }
 
+  /** Library Cleanup: flattened greyscale pixels, long edge <= size, for sharpness/exposure scoring. */
+  async getGreyscalePixels(input: string, size: number): Promise<{ data: Buffer; width: number; height: number }> {
+    const { data, info } = await sharp(input, { failOn: 'error' })
+      .flatten({ background: '#000000' })
+      .greyscale()
+      .resize(size, size, { fit: 'inside', withoutEnlargement: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { data, width: info.width, height: info.height };
+  }
+
   private configureFfmpegCall(input: string, output: string | Writable, options: TranscodeCommand) {
     const ffmpegCall = ffmpeg(input, { niceness: 10 })
       .inputOptions(options.inputOptions)
