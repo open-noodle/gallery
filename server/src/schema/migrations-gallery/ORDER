@@ -65,6 +65,7 @@
 1793100000000-AddSharedSpaceAlbumFolderTable
 1793200000000-SharedSpaceAlbumFolderAuditTable
 1793300000000-ClearPreOptionMFaceRepairScans
+1793400000000-AddCleanupTables
 1794000000000-AddAssetFavoriteTables
 1794100000000-DropAssetIsFavoriteColumn
 1796000000000-AddAssetFaceCreatedBy

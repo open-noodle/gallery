@@ -23,6 +23,8 @@ import { AssetTable } from 'src/schema/tables/asset.table.js';
   using: 'gin',
   expression: 'f_unaccent("description") gin_trgm_ops',
 })
+// gallery-fork: Library Cleanup space hogs (a plain btree also serves ORDER BY ... DESC)
+@Index({ name: 'asset_exif_fileSizeInByte_idx', columns: ['fileSizeInByte'] })
 @UpdatedAtTrigger('asset_exif_updatedAt')
 export class AssetExifTable {
   @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', primary: true })
