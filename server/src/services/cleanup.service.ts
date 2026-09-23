@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JobOf } from 'src/types.js';
 import { OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
@@ -23,6 +23,7 @@ import {
   BurstGroup,
   BurstRow,
   CLEANUP_ANALYSIS_SIZE,
+  CLEANUP_BLURRY_DEFAULTS,
   CLEANUP_BURST_CLIP_MAX_DISTANCE,
   CLEANUP_BURST_GAP_MS,
   CLEANUP_BURST_WINDOW,
@@ -54,6 +55,35 @@ type CleanupCountOptions = {
 };
 
 const mapAsset = (row: CleanupAssetRow) => ({ ...row, localDateTime: row.localDateTime.toISOString() });
+
+/**
+ * `decodeCursor` only validates the generic on-the-wire shape (an array of strings/numbers). Each
+ * queue's keyset cursor has its own concrete shape, and a cursor that satisfies the generic check but
+ * not the concrete one would otherwise reach a repository query as `NaN`/`Invalid Date` and fail with
+ * a 500 instead of a 400. These re-validate per queue and throw `BadRequestException` on a mismatch.
+ */
+const decodeDateIdCursor = (raw: string): CleanupCursor => {
+  const cursor = decodeCursor(raw);
+  const [date, id] = cursor.v;
+  if (
+    cursor.v.length !== 2 ||
+    typeof date !== 'string' ||
+    typeof id !== 'string' ||
+    Number.isNaN(new Date(date).getTime())
+  ) {
+    throw new BadRequestException('Invalid cursor');
+  }
+  return cursor;
+};
+
+const decodeSizeIdCursor = (raw: string): CleanupCursor => {
+  const cursor = decodeCursor(raw);
+  const [size, id] = cursor.v;
+  if (cursor.v.length !== 2 || typeof size !== 'number' || typeof id !== 'string') {
+    throw new BadRequestException('Invalid cursor');
+  }
+  return cursor;
+};
 
 @Injectable()
 export class CleanupService extends BaseService {
@@ -130,15 +160,16 @@ export class CleanupService extends BaseService {
   async getQueue(auth: AuthDto, queue: CleanupListQueue, query: CleanupQueueQueryDto): Promise<CleanupQueuePageDto> {
     const userId = auth.user.id;
     const limit = query.limit ?? CLEANUP_PAGE_LIMIT.default;
-    const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
 
     if (queue === 'bursts') {
+      const cursor = query.cursor ? decodeDateIdCursor(query.cursor) : undefined;
       return this.getBurstQueue(userId, cursor, limit);
     }
 
     let page: { items: CleanupAssetRow[]; next: CleanupCursor | null };
     switch (queue) {
       case 'space_hogs': {
+        const cursor = query.cursor ? decodeSizeIdCursor(query.cursor) : undefined;
         page = await this.cleanupRepository.getSpaceHogs(userId, {
           cursor,
           limit,
@@ -148,16 +179,18 @@ export class CleanupService extends BaseService {
         break;
       }
       case 'screenshots': {
+        const cursor = query.cursor ? decodeDateIdCursor(query.cursor) : undefined;
         page = await this.cleanupRepository.getScreenshots(userId, { cursor, limit });
         break;
       }
       case 'blurry': {
+        const cursor = query.cursor ? decodeDateIdCursor(query.cursor) : undefined;
         page = await this.cleanupRepository.getBlurry(userId, {
           cursor,
           limit,
-          strictness: query.strictness ?? 'balanced',
-          reason: query.reason ?? 'all',
-          hideFaces: query.hideFaces ?? true,
+          strictness: query.strictness ?? CLEANUP_BLURRY_DEFAULTS.strictness,
+          reason: query.reason ?? CLEANUP_BLURRY_DEFAULTS.reason,
+          hideFaces: query.hideFaces ?? CLEANUP_BLURRY_DEFAULTS.hideFaces,
         });
         break;
       }
@@ -280,24 +313,40 @@ export class CleanupService extends BaseService {
     const hydrated = ids.length > 0 ? await this.cleanupRepository.getCleanupAssets(userId, ids) : [];
     const byId = new Map(hydrated.map((row) => [row.id, row]));
 
+    // A member can vanish between grouping and hydration (trashed, restored out of scope, etc. by a
+    // concurrent request). Drop the missing member rather than crash, and drop the whole group if
+    // fewer than 2 members survive — a "group" of 1 is not a burst.
+    const dtoGroups: CleanupQueuePageDto['groups'] = [];
+    for (const group of groups) {
+      const assets = group.assets.filter((asset) => byId.has(asset.id));
+      if (assets.length < 2) {
+        continue;
+      }
+      dtoGroups.push({
+        groupId: assets[0].id,
+        source: group.source,
+        assets: assets.map((asset) => mapAsset(byId.get(asset.id)!)),
+        suggestedKeepId: suggestKeep(assets),
+      });
+    }
+
     return {
       items: [],
-      groups: groups.map((group) => ({
-        groupId: group.assets[0].id,
-        source: group.source,
-        assets: group.assets.map((asset) => mapAsset(byId.get(asset.id)!)),
-        suggestedKeepId: suggestKeep(group.assets),
-      })),
+      groups: dtoGroups,
       nextCursor: reachedEnd || !nextCursor ? null : encodeCursor(nextCursor),
     };
   }
 
   async commit(auth: AuthDto, dto: CleanupCommitDto): Promise<CleanupCommitResponseDto> {
     const userId = auth.user.id;
-    const trashSet = new Set(dto.trashIds);
-    const favoriteIds = dto.favoriteIds.filter((id) => !trashSet.has(id));
-    const keepIds = dto.keepIds.filter((id) => !trashSet.has(id));
-    const all = [...new Set([...dto.trashIds, ...favoriteIds, ...keepIds])];
+    // Dedupe each incoming list first, so a client-side double-submit (or a duplicate id sent across
+    // trash/favourite/keep) never produces a duplicate in `trashed[]`, the `AssetTrashAll` event, or
+    // `favorited`.
+    const trashIds = [...new Set(dto.trashIds)];
+    const trashSet = new Set(trashIds);
+    const favoriteIds = [...new Set(dto.favoriteIds).difference(trashSet)];
+    const keepIds = [...new Set(dto.keepIds).difference(trashSet)];
+    const all = [...new Set([...trashIds, ...favoriteIds, ...keepIds])];
     const candidates = await this.cleanupRepository.getCommitCandidates(all);
     const rows = new Map(candidates.map((r) => [r.id, r]));
 
@@ -331,24 +380,25 @@ export class CleanupService extends BaseService {
         return false;
       });
 
-    const trash = partition(dto.trashIds);
+    const trash = partition(trashIds);
     const favorite = partition(favoriteIds);
     const keep = partition(keepIds);
 
+    // Step 1-2: trash + its event, ahead of and independent from the transaction below — a trashed
+    // asset should land even if the (unrelated) day-review write below fails.
     if (trash.length > 0) {
       await this.assetRepository.updateAll(trash, { deletedAt: new Date(), status: AssetStatus.Trashed });
       await this.eventRepository.emit('AssetTrashAll', { assetIds: trash, userId });
     }
-    if (favorite.length > 0) {
-      await this.assetRepository.updateAll(favorite, { isFavorite: true });
-    }
 
+    // Steps 3-5 (favourite, keep, complete-the-day) share one database transaction.
     const keepAll = [...new Set([...favorite, ...keep])];
-    if (keepAll.length > 0) {
-      await this.cleanupRepository.upsertDecisions(userId, dto.queue, keepAll);
-    }
-    if (dto.completeMonthDay !== undefined) {
-      await this.cleanupRepository.upsertDayReview(userId, dto.completeMonthDay, new Date());
+    if (favorite.length > 0 || keepAll.length > 0 || dto.completeMonthDay !== undefined) {
+      await this.cleanupRepository.applyCommitDecisions(userId, dto.queue, {
+        favoriteIds: favorite,
+        keepIds: keep,
+        completeMonthDay: dto.completeMonthDay,
+      });
     }
 
     return { trashed: trash, favorited: favorite.length, kept: keepAll.length, skipped };

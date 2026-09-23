@@ -1,7 +1,8 @@
+import { BadRequestException } from '@nestjs/common';
 import { AssetStatus, AssetType, AssetVisibility, CleanupQueue, JobName, JobStatus } from 'src/enum.js';
 import { CleanupAssetRow } from 'src/repositories/cleanup.repository.js';
 import { CleanupService } from 'src/services/cleanup.service.js';
-import { BurstRow, CLEANUP_BURST_WINDOW } from 'src/utils/cleanup.js';
+import { BurstRow, CLEANUP_BURST_WINDOW, decodeCursor, encodeCursor } from 'src/utils/cleanup.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
@@ -27,6 +28,8 @@ const hydrateFromRows = (mocks: ServiceMocks, rows: BurstRow[]) => {
     Promise.resolve(ids.map((id) => toCleanupRow(byId.get(id)!))),
   );
 };
+
+const cursor = (v: Array<string | number>) => encodeCursor({ v });
 
 describe(CleanupService.name, () => {
   let sut: CleanupService;
@@ -89,14 +92,15 @@ describe(CleanupService.name, () => {
       );
     });
 
-    it('does not emit or update when nothing is eligible', async () => {
+    it('does not emit, update, or write decisions when nothing is eligible', async () => {
       mocks.cleanup.getCommitCandidates.mockResolvedValue([]);
       await sut.commit(authStub.user1, { queue: CleanupQueue.Blurry, trashIds: ['x'], favoriteIds: [], keepIds: [] });
       expect(mocks.asset.updateAll).not.toHaveBeenCalled();
       expect(mocks.event.emit).not.toHaveBeenCalled();
+      expect(mocks.cleanup.applyCommitDecisions).not.toHaveBeenCalled();
     });
 
-    it('treats favourites as keeps and completes the day only when asked', async () => {
+    it('applies favourite/keep/complete-day writes through the one commit-decisions transaction', async () => {
       mocks.cleanup.getCommitCandidates.mockResolvedValue([row('a'), row('b')]);
       const res = await sut.commit(authStub.user1, {
         queue: CleanupQueue.Rewind,
@@ -105,20 +109,46 @@ describe(CleanupService.name, () => {
         keepIds: ['b'],
         completeMonthDay: 923,
       });
-      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['a'], { isFavorite: true });
-      expect(mocks.cleanup.upsertDecisions).toHaveBeenCalledWith(
-        userId,
-        CleanupQueue.Rewind,
-        expect.arrayContaining(['a', 'b']),
-      );
-      expect(mocks.cleanup.upsertDayReview).toHaveBeenCalledWith(userId, 923, expect.any(Date));
+      // The favourite update, the keep upsert, and the day-review upsert all go through a single
+      // repository call so they share one database transaction — no more direct `assetRepository`
+      // isFavorite update, and no more separate upsertDecisions/upsertDayReview calls from the service.
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
+      expect(mocks.cleanup.applyCommitDecisions).toHaveBeenCalledWith(userId, CleanupQueue.Rewind, {
+        favoriteIds: ['a'],
+        keepIds: ['b'],
+        completeMonthDay: 923,
+      });
       expect(res).toMatchObject({ favorited: 1, kept: 2 });
     });
 
-    it('never upserts a day review without completeMonthDay', async () => {
+    it('still trashes (and emits) ahead of the commit-decisions transaction', async () => {
+      mocks.cleanup.getCommitCandidates.mockResolvedValue([row('a'), row('b')]);
+      await sut.commit(authStub.user1, {
+        queue: CleanupQueue.Rewind,
+        trashIds: ['a'],
+        favoriteIds: ['b'],
+        keepIds: [],
+      });
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(
+        ['a'],
+        expect.objectContaining({ status: AssetStatus.Trashed }),
+      );
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetTrashAll', { assetIds: ['a'], userId });
+      expect(mocks.cleanup.applyCommitDecisions).toHaveBeenCalledWith(userId, CleanupQueue.Rewind, {
+        favoriteIds: ['b'],
+        keepIds: [],
+        completeMonthDay: undefined,
+      });
+    });
+
+    it('passes completeMonthDay through only when it was given', async () => {
       mocks.cleanup.getCommitCandidates.mockResolvedValue([row('a')]);
       await sut.commit(authStub.user1, { queue: CleanupQueue.Rewind, trashIds: [], favoriteIds: [], keepIds: ['a'] });
-      expect(mocks.cleanup.upsertDayReview).not.toHaveBeenCalled();
+      expect(mocks.cleanup.applyCommitDecisions).toHaveBeenCalledWith(userId, CleanupQueue.Rewind, {
+        favoriteIds: [],
+        keepIds: ['a'],
+        completeMonthDay: undefined,
+      });
     });
 
     it('does not let one id be both trashed and kept (trash wins)', async () => {
@@ -132,6 +162,29 @@ describe(CleanupService.name, () => {
       expect(res.trashed).toEqual(['a']);
       expect(res.kept).toBe(0);
       expect(res.favorited).toBe(0);
+      expect(mocks.cleanup.applyCommitDecisions).not.toHaveBeenCalled();
+    });
+
+    it('deduplicates ids so trashed/favorited/emitted lists never contain duplicates', async () => {
+      mocks.cleanup.getCommitCandidates.mockResolvedValue([row('a'), row('b')]);
+      const res = await sut.commit(authStub.user1, {
+        queue: CleanupQueue.Rewind,
+        trashIds: ['a', 'a'],
+        favoriteIds: ['b', 'b'],
+        keepIds: [],
+      });
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(
+        ['a'],
+        expect.objectContaining({ status: AssetStatus.Trashed }),
+      );
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetTrashAll', { assetIds: ['a'], userId });
+      expect(res.trashed).toEqual(['a']);
+      expect(res.favorited).toBe(1);
+      expect(mocks.cleanup.applyCommitDecisions).toHaveBeenCalledWith(userId, CleanupQueue.Rewind, {
+        favoriteIds: ['b'],
+        keepIds: [],
+        completeMonthDay: undefined,
+      });
     });
   });
 
@@ -386,6 +439,96 @@ describe(CleanupService.name, () => {
       expect(res.groups[0].assets).toHaveLength(CLEANUP_BURST_WINDOW + continuation.length);
       expect(res.groups[0].assets.at(-1)!.id).toBe('c1');
       expect(res.nextCursor).not.toBeNull();
+      // nextCursor must encode the last CONSUMED row — the very last row of the (extended) group
+      // that filled the limit, i.e. the continuation's last row, not some earlier window boundary.
+      const decoded = decodeCursor(res.nextCursor!);
+      const lastRow = continuation.at(-1)!;
+      expect(decoded.v).toEqual([lastRow.localDateTime.toISOString(), lastRow.id]);
+    });
+
+    it('continues to a second window when the first yields no valid groups', async () => {
+      // Window 1: CLEANUP_BURST_WINDOW singleton rows, each 3s apart — every gap exceeds
+      // CLEANUP_BURST_GAP_MS, so groupBursts never groups any of them (every "group" has length 1
+      // and is dropped). This also makes the window exactly full, so fetchBurstWindow probes ahead.
+      const window1: BurstRow[] = [];
+      for (let i = 0; i < CLEANUP_BURST_WINDOW; i++) {
+        window1.push(burstRow(`s${i}`, at(i * 3000)));
+      }
+      const lastWindow1Time = window1.at(-1)!.localDateTime.getTime();
+      // The extension probe: far enough past window 1's last row that fetchBurstWindow finds a real
+      // gap (reachedEnd: false) without folding this row into window 1.
+      const probe = [burstRow('probe', new Date(lastWindow1Time + 100_000))];
+      // Window 2: an actual burst pair, fetched by the next outer-loop iteration.
+      const f = burstRow('f', new Date(lastWindow1Time + 200_000), { autoStackId: 'stack1', sharpness: 5 });
+      const g = burstRow('g', new Date(lastWindow1Time + 201_000), { autoStackId: 'stack1', sharpness: 15 });
+
+      mocks.cleanup.getBurstWindow
+        .mockResolvedValueOnce(window1)
+        .mockResolvedValueOnce(probe)
+        .mockResolvedValueOnce([f, g]);
+      hydrateFromRows(mocks, [...window1, f, g]);
+
+      const res = await sut.getQueue(authStub.user1, 'bursts', {});
+
+      expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(3);
+      expect(res.groups).toHaveLength(1);
+      expect(res.groups[0].assets.map((a) => a.id)).toEqual(['f', 'g']);
+    });
+
+    it('drops a member missing from hydration and drops a group left with fewer than 2 members', async () => {
+      const a = burstRow('a', at(0), { autoStackId: 'stack1', sharpness: 5 });
+      const b = burstRow('b', at(1000), { autoStackId: 'stack1', sharpness: 15 });
+      const c = burstRow('c', at(2000), { autoStackId: 'stack1', sharpness: 25 });
+      const d = burstRow('d', at(50_000), { autoStackId: 'stack2', sharpness: 1 });
+      const e = burstRow('e', at(51_000), { autoStackId: 'stack2', sharpness: 2 });
+
+      const rows = [a, b, c, d, e];
+      mocks.cleanup.getBurstWindow.mockResolvedValueOnce(rows);
+      // 'b' vanishes from the a/b/c group (2 members survive, kept). 'd' vanishes from the d/e group
+      // (1 member survives, the whole group is dropped) — simulating a concurrent trash/restore
+      // between grouping and hydration.
+      mocks.cleanup.getCleanupAssets.mockResolvedValue([toCleanupRow(a), toCleanupRow(c), toCleanupRow(e)]);
+
+      const res = await sut.getQueue(authStub.user1, 'bursts', {});
+
+      expect(res.groups).toHaveLength(1);
+      expect(res.groups[0].groupId).toBe('a');
+      expect(res.groups[0].assets.map((x) => x.id)).toEqual(['a', 'c']);
+    });
+
+    describe('cursor validation', () => {
+      it('rejects a bursts cursor with the wrong shape', async () => {
+        await expect(sut.getQueue(authStub.user1, 'bursts', { cursor: cursor(['only-one']) })).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(sut.getQueue(authStub.user1, 'bursts', { cursor: cursor([123, 'id']) })).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(sut.getQueue(authStub.user1, 'bursts', { cursor: cursor(['not-a-date', 'id']) })).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(
+          sut.getQueue(authStub.user1, 'bursts', { cursor: cursor(['2024-01-01T00:00:00.000Z', 42]) }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('rejects a space_hogs cursor with the wrong shape', async () => {
+        await expect(
+          sut.getQueue(authStub.user1, 'space_hogs', { cursor: cursor(['not-a-number', 'id']) }),
+        ).rejects.toThrow(BadRequestException);
+        await expect(sut.getQueue(authStub.user1, 'space_hogs', { cursor: cursor([123]) })).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+
+      it('rejects a screenshots/blurry cursor with the wrong shape', async () => {
+        await expect(sut.getQueue(authStub.user1, 'screenshots', { cursor: cursor([123, 'id']) })).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(sut.getQueue(authStub.user1, 'blurry', { cursor: cursor(['id-only']) })).rejects.toThrow(
+          BadRequestException,
+        );
+      });
     });
   });
 });

@@ -27,7 +27,11 @@ const setup = (db?: Kysely<DB>) => {
 };
 
 const getAssetRow = (ctx: MediumTestContext, id: string) =>
-  ctx.database.selectFrom('asset').select(['id', 'status', 'deletedAt']).where('id', '=', id).executeTakeFirst();
+  ctx.database
+    .selectFrom('asset')
+    .select(['id', 'status', 'deletedAt', 'isFavorite'])
+    .where('id', '=', id)
+    .executeTakeFirst();
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
@@ -120,6 +124,69 @@ describe(CleanupService.name, () => {
       const reviews = await ctx.get(CleanupRepository).getDayReviews(user.id);
       expect(reviews).toHaveLength(1);
       expect(reviews[0].monthDay).toBe(923);
+    });
+
+    it('applies the favourite update, the keep decisions, and the day review together', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: keepAsset } = await ctx.newAsset({ ownerId: user.id });
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const res = await sut.commit(auth, {
+        queue: CleanupQueue.Rewind,
+        trashIds: [],
+        favoriteIds: [favAsset.id],
+        keepIds: [keepAsset.id],
+        completeMonthDay: 923,
+      });
+
+      expect(res).toMatchObject({ favorited: 1, kept: 2 });
+
+      const favRow = await getAssetRow(ctx, favAsset.id);
+      expect(favRow!.isFavorite).toBe(true);
+
+      const decisions = await ctx.database
+        .selectFrom('cleanup_decision')
+        .select(['assetId'])
+        .where('userId', '=', user.id)
+        .execute();
+      expect(decisions.map((d) => d.assetId).sort()).toEqual([favAsset.id, keepAsset.id].sort());
+
+      const reviews = await ctx.get(CleanupRepository).getDayReviews(user.id);
+      expect(reviews).toHaveLength(1);
+      expect(reviews[0].monthDay).toBe(923);
+    });
+
+    it('rolls back all three writes together when one of them fails', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: keepAsset } = await ctx.newAsset({ ownerId: user.id });
+      const auth = factory.auth({ user: { id: user.id } });
+
+      // completeMonthDay is a `smallint` column; a value outside its range makes the day-review
+      // insert fail at the database — proving the favourite update and the keep insert, which
+      // already succeeded earlier in the same transaction, are rolled back rather than left applied.
+      await expect(
+        sut.commit(auth, {
+          queue: CleanupQueue.Rewind,
+          trashIds: [],
+          favoriteIds: [favAsset.id],
+          keepIds: [keepAsset.id],
+          completeMonthDay: 999_999,
+        }),
+      ).rejects.toThrow();
+
+      const favRow = await getAssetRow(ctx, favAsset.id);
+      expect(favRow!.isFavorite).toBe(false);
+
+      const decisions = await ctx.database
+        .selectFrom('cleanup_decision')
+        .select(['assetId'])
+        .where('userId', '=', user.id)
+        .execute();
+      expect(decisions).toEqual([]);
     });
   });
 
