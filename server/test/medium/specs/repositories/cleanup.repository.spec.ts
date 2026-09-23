@@ -1028,6 +1028,81 @@ describe(CleanupRepository.name, () => {
     });
   });
 
+  describe('countQueue bytes include the live-photo motion part', () => {
+    it('space_hogs', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: motion } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      await ctx.newExif({ assetId: motion.id, fileSizeInByte: 500 });
+      const { asset: still } = await ctx.newAsset({ ownerId: user.id, livePhotoVideoId: motion.id });
+      await ctx.newExif({ assetId: still.id, fileSizeInByte: 1500 });
+
+      const { items } = await sut.getSpaceHogs(user.id, { limit: 10, type: 'all', minSize: 0 });
+      const listTotal = items.reduce((sum, item) => sum + item.fileSize, 0);
+      expect(listTotal).toBe(2000);
+
+      const { bytes } = await sut.countQueue(user.id, 'space_hogs', { minSize: 0 });
+      expect(bytes).toBe(listTotal);
+    });
+
+    it('screenshots', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: motion } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      await ctx.newExif({ assetId: motion.id, fileSizeInByte: 500 });
+      const { asset: still } = await ctx.newAsset({ ownerId: user.id, livePhotoVideoId: motion.id });
+      await ctx.newExif({ assetId: still.id, fileSizeInByte: 1500 });
+      await sut.upsertQuality({
+        assetId: still.id,
+        ownerId: user.id,
+        sharpness: 100,
+        brightness: 100,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: true,
+        version: 1,
+      });
+
+      const { items } = await sut.getScreenshots(user.id, { limit: 10 });
+      const listTotal = items.reduce((sum, item) => sum + item.fileSize, 0);
+      expect(listTotal).toBe(2000);
+
+      const { bytes } = await sut.countQueue(user.id, 'screenshots');
+      expect(bytes).toBe(listTotal);
+    });
+
+    it('blurry', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: motion } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
+      await ctx.newExif({ assetId: motion.id, fileSizeInByte: 500 });
+      const { asset: still } = await ctx.newAsset({ ownerId: user.id, livePhotoVideoId: motion.id });
+      await ctx.newExif({ assetId: still.id, fileSizeInByte: 1500 });
+      await sut.upsertQuality({
+        assetId: still.id,
+        ownerId: user.id,
+        sharpness: 1,
+        brightness: 200,
+        clippedDark: 0,
+        clippedBright: 0,
+        isScreenshot: false,
+        version: 1,
+      });
+
+      const { items } = await sut.getBlurry(user.id, {
+        limit: 10,
+        strictness: 'balanced',
+        reason: 'all',
+        hideFaces: true,
+      });
+      const listTotal = items.reduce((sum, item) => sum + item.fileSize, 0);
+      expect(listTotal).toBe(2000);
+
+      const { bytes } = await sut.countQueue(user.id, 'blurry');
+      expect(bytes).toBe(listTotal);
+    });
+  });
+
   describe('countDuplicates', () => {
     it('counts groups of more than one, sums reclaimable bytes, and skips a singleton', async () => {
       const { ctx, sut } = setup();
