@@ -10,6 +10,7 @@ import { AssetService } from 'src/services/asset.service.js';
 import { AuthAdminService } from 'src/services/auth-admin.service.js';
 import { AuthService } from 'src/services/auth.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
+import { CleanupService } from 'src/services/cleanup.service.js';
 import { CliService } from 'src/services/cli.service.js';
 import { ClusterGroupService } from 'src/services/cluster-group.service.js';
 import { DatabaseBackupService } from 'src/services/database-backup.service.js';
@@ -75,6 +76,7 @@ export const services = [
   AuthService,
   AuthAdminService,
   ClassificationService,
+  CleanupService,
   CliService,
   DatabaseBackupService,
   DatabaseService,
