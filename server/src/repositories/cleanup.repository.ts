@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely, SelectQueryBuilder, sql } from 'kysely';
+import { AliasableExpression, Expression, ExpressionBuilder, Kysely, SelectQueryBuilder, SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { CleanupAssetDto } from 'src/dtos/cleanup.dto.js';
@@ -7,8 +7,20 @@ import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CleanupDecision
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MONTH_DAY_SQL } from 'src/schema/cleanup-sql.js';
 import { DB } from 'src/schema/index.js';
-import { CLEANUP_QUALITY_VERSION } from 'src/utils/cleanup.js';
+import {
+  BurstRow,
+  CLEANUP_BLUR_THRESHOLDS,
+  CLEANUP_BRIGHT,
+  CLEANUP_DARK,
+  CLEANUP_QUALITY_VERSION,
+  CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE,
+  CleanupCursor,
+  CleanupStrictnessValue,
+} from 'src/utils/cleanup.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
+
+export type CleanupAssetTypeFilter = 'all' | 'image' | 'video';
+export type CleanupBlurReason = 'all' | 'blurry' | 'dark' | 'bright';
 
 /** Same shape as `CleanupAssetDto`, but `localDateTime` is a real `Date` (not yet serialised for the API). */
 export type CleanupAssetRow = Omit<CleanupAssetDto, 'localDateTime'> & { localDateTime: Date };
@@ -53,6 +65,142 @@ export const withCleanupScope = <O>(
 // PostgreSQL only uses the asset_localMonthDay_idx expression index when the query repeats
 // MONTH_DAY_SQL's expression exactly (structurally, table-qualification included).
 const monthDayExpr = sql<number>`${sql.raw(MONTH_DAY_SQL.replaceAll('"localDateTime"', '"asset"."localDateTime"'))}`;
+
+/**
+ * The `CleanupAssetDto` column list, shared by every query that returns `CleanupAssetRow`s
+ * (rewind and the queue lists). `kept` differs per caller: rewind checks its own decision, while
+ * queue list endpoints already exclude any keep for that queue at the WHERE level, so they pass a
+ * `false` literal.
+ */
+const cleanupAssetColumns = <E extends readonly unknown[]>(
+  eb: ExpressionBuilder<DB, 'asset' | 'asset_exif'>,
+  kept: AliasableExpression<SqlBool>,
+  ...extra: E
+) =>
+  [
+    'asset.id' as const,
+    'asset.type' as const,
+    'asset.originalFileName' as const,
+    'asset.localDateTime' as const,
+    sql<string | null>`encode("asset"."thumbhash", 'base64')`.as('thumbhash'),
+    eb.fn.coalesce('asset.width', 'asset_exif.exifImageWidth').as('width'),
+    eb.fn.coalesce('asset.height', 'asset_exif.exifImageHeight').as('height'),
+    'asset.duration' as const,
+    sql<number>`coalesce("asset_exif"."fileSizeInByte", 0) + coalesce((select e2."fileSizeInByte" from asset_exif e2 where e2."assetId" = asset."livePhotoVideoId"), 0)`.as(
+      'fileSize',
+    ),
+    'asset.isFavorite' as const,
+    eb
+      .exists(
+        eb
+          .selectFrom('album_asset')
+          .innerJoin('album', 'album.id', 'album_asset.albumId')
+          .whereRef('album_asset.assetId', '=', 'asset.id')
+          .where('album.deletedAt', 'is', null)
+          .select(sql.lit(1).as('one')),
+      )
+      .as('inAlbum'),
+    'asset_exif.city' as const,
+    kept.as('kept'),
+    ...extra,
+  ] as const;
+
+/** `exists` subquery for `cleanup_decision` — a keep row for `queue` on this asset. */
+const keptForQueue = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, queue: CleanupQueue) =>
+  eb.exists(
+    eb
+      .selectFrom('cleanup_decision')
+      .select(sql.lit(1).as('one'))
+      .whereRef('cleanup_decision.assetId', '=', 'asset.id')
+      .where('cleanup_decision.userId', '=', userId)
+      .where('cleanup_decision.queue', '=', sql.lit(queue)),
+  );
+
+/** `true` when the asset has no `cleanup_decision` keep row for `queue`. Every queue query applies this. */
+const notKeptForQueue = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, queue: CleanupQueue) =>
+  eb.not(keptForQueue(eb, userId, queue));
+
+/** Keyset predicate + ordering for the `(localDateTime DESC, id DESC)` queues (screenshots, blurry). */
+const applyLocalDateTimeCursor = <O>(qb: SelectQueryBuilder<DB, 'asset', O>, cursor: CleanupCursor | undefined) => {
+  if (!cursor) {
+    return qb;
+  }
+  const cursorDate = new Date(String(cursor.v[0]));
+  const cursorId = String(cursor.v[1]);
+  return qb.where((eb) =>
+    eb.or([
+      eb('asset.localDateTime', '<', cursorDate),
+      eb.and([eb('asset.localDateTime', '=', cursorDate), eb('asset.id', '<', cursorId)]),
+    ]),
+  );
+};
+
+/** Fetches `limit + 1` rows; when the extra row is present, drops it and builds `next` from the last kept row. */
+const paginate = <T extends { id: string }>(
+  rows: T[],
+  limit: number,
+  cursorOf: (row: T) => Array<string | number>,
+): { items: T[]; next: CleanupCursor | null } => {
+  if (rows.length > limit) {
+    const items = rows.slice(0, limit);
+    return { items, next: { v: cursorOf(items.at(-1)!) } };
+  }
+  return { items: rows, next: null };
+};
+
+const mapCleanupAssetRow = <T extends { fileSize: unknown; inAlbum: unknown; kept: unknown }>(row: T) => ({
+  ...row,
+  fileSize: Number(row.fileSize),
+  inAlbum: Boolean(row.inAlbum),
+  kept: Boolean(row.kept),
+});
+
+/** The three Blurry predicates, driven by the strictness/threshold constants from Task 1. */
+const blurryExpressions = (strictness: CleanupStrictnessValue) => {
+  const threshold = CLEANUP_BLUR_THRESHOLDS[strictness];
+  return {
+    isBlurry: sql<boolean>`asset_quality.sharpness < ${threshold}`,
+    isDark: sql<boolean>`(asset_quality.brightness < ${CLEANUP_DARK.maxBrightness} and asset_quality."clippedDark" > ${CLEANUP_DARK.minClippedDark})`,
+    isBright: sql<boolean>`asset_quality."clippedBright" > ${CLEANUP_BRIGHT.minClippedBright}`,
+  };
+};
+
+const resolveReasonFilter = (
+  reason: CleanupBlurReason,
+  exprs: ReturnType<typeof blurryExpressions>,
+): Expression<SqlBool> => {
+  switch (reason) {
+    case 'blurry': {
+      return exprs.isBlurry;
+    }
+    case 'dark': {
+      return exprs.isDark;
+    }
+    case 'bright': {
+      return exprs.isBright;
+    }
+    default: {
+      return sql<boolean>`(${exprs.isBlurry} or ${exprs.isDark} or ${exprs.isBright})`;
+    }
+  }
+};
+
+/** `hideFaces`: excludes assets with any visible, non-deleted face. */
+const applyHideFaces = <O>(qb: SelectQueryBuilder<DB, 'asset', O>, hideFaces: boolean) =>
+  qb.$if(hideFaces, (qb) =>
+    qb.where((eb) =>
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .select(sql.lit(1).as('one'))
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true),
+        ),
+      ),
+    ),
+  );
 
 @Injectable()
 export class CleanupRepository {
@@ -216,53 +364,14 @@ export class CleanupRepository {
     const qb = this.db
       .selectFrom('asset')
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select((eb) => [
-        'asset.id',
-        'asset.type',
-        'asset.originalFileName',
-        'asset.localDateTime',
-        sql<string | null>`encode("asset"."thumbhash", 'base64')`.as('thumbhash'),
-        eb.fn.coalesce('asset.width', 'asset_exif.exifImageWidth').as('width'),
-        eb.fn.coalesce('asset.height', 'asset_exif.exifImageHeight').as('height'),
-        'asset.duration',
-        sql<number>`coalesce("asset_exif"."fileSizeInByte", 0) + coalesce((select e2."fileSizeInByte" from asset_exif e2 where e2."assetId" = asset."livePhotoVideoId"), 0)`.as(
-          'fileSize',
-        ),
-        'asset.isFavorite',
-        eb
-          .exists(
-            eb
-              .selectFrom('album_asset')
-              .innerJoin('album', 'album.id', 'album_asset.albumId')
-              .whereRef('album_asset.assetId', '=', 'asset.id')
-              .where('album.deletedAt', 'is', null)
-              .select(sql.lit(1).as('one')),
-          )
-          .as('inAlbum'),
-        'asset_exif.city',
-        eb
-          .exists(
-            eb
-              .selectFrom('cleanup_decision')
-              .whereRef('cleanup_decision.assetId', '=', 'asset.id')
-              .where('cleanup_decision.userId', '=', userId)
-              .where('cleanup_decision.queue', '=', sql.lit(CleanupQueue.Rewind))
-              .select(sql.lit(1).as('one')),
-          )
-          .as('kept'),
-      ])
+      .select((eb) => cleanupAssetColumns(eb, keptForQueue(eb, userId, CleanupQueue.Rewind)))
       .where((eb) => eb(monthDayExpr, '=', sql.lit(monthDay)))
       .where(sql<boolean>`extract(year from ("asset"."localDateTime" at time zone 'UTC')) = ${year}`)
       .orderBy('asset.localDateTime')
       .orderBy('asset.id');
 
     const rows = await withCleanupScope(qb, userId).execute();
-    return rows.map((row) => ({
-      ...row,
-      fileSize: Number(row.fileSize),
-      inAlbum: Boolean(row.inAlbum),
-      kept: Boolean(row.kept),
-    }));
+    return rows.map((row) => mapCleanupAssetRow(row));
   }
 
   @GenerateSql({ params: [DummyValue.UUID, CleanupQueue.Rewind, [DummyValue.UUID]] })
@@ -407,5 +516,407 @@ export class CleanupRepository {
     }
 
     return (Number(row.analysed) / total) * 100;
+  }
+
+  @GenerateSql({
+    params: [DummyValue.UUID, { limit: DummyValue.NUMBER, type: 'all', minSize: DummyValue.NUMBER }],
+  })
+  async getSpaceHogs(
+    userId: string,
+    options: { cursor?: CleanupCursor; limit: number; type: CleanupAssetTypeFilter; minSize: number },
+  ): Promise<{ items: CleanupAssetRow[]; next: CleanupCursor | null }> {
+    const { cursor, limit, type, minSize } = options;
+
+    let qb = this.db
+      .selectFrom('asset')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) => cleanupAssetColumns(eb, sql.lit(false), 'asset_exif.fileSizeInByte as sortKey'))
+      .where('asset_exif.fileSizeInByte', 'is not', null)
+      .where('asset_exif.fileSizeInByte', '>=', minSize);
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.SpaceHogs));
+
+    if (type !== 'all') {
+      qb = qb.where('asset.type', '=', sql.lit(type === 'image' ? AssetType.Image : AssetType.Video));
+    }
+
+    qb = qb
+      .$if(!!cursor, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb('asset_exif.fileSizeInByte', '<', Number(cursor!.v[0])),
+            eb.and([
+              eb('asset_exif.fileSizeInByte', '=', Number(cursor!.v[0])),
+              eb('asset.id', '<', String(cursor!.v[1])),
+            ]),
+          ]),
+        ),
+      )
+      .orderBy('asset_exif.fileSizeInByte', 'desc')
+      .orderBy('asset.id', 'desc')
+      .limit(limit + 1);
+
+    const rows = await qb.execute();
+    const page = paginate(rows, limit, (row) => [Number(row.sortKey), row.id]);
+    return { items: page.items.map((row) => mapCleanupAssetRow(row)), next: page.next };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, { limit: DummyValue.NUMBER }] })
+  async getScreenshots(
+    userId: string,
+    options: { cursor?: CleanupCursor; limit: number },
+  ): Promise<{ items: CleanupAssetRow[]; next: CleanupCursor | null }> {
+    const { cursor, limit } = options;
+
+    let qb = this.db
+      .selectFrom('asset')
+      .innerJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) => cleanupAssetColumns(eb, sql.lit(false)))
+      .where('asset_quality.isScreenshot', '=', sql.lit(true));
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Screenshots));
+    qb = applyLocalDateTimeCursor(qb, cursor)
+      .orderBy('asset.localDateTime', 'desc')
+      .orderBy('asset.id', 'desc')
+      .limit(limit + 1);
+
+    const rows = await qb.execute();
+    const page = paginate(rows, limit, (row) => [row.localDateTime.toISOString(), row.id]);
+    return { items: page.items.map((row) => mapCleanupAssetRow(row)), next: page.next };
+  }
+
+  @GenerateSql({
+    params: [DummyValue.UUID, { limit: DummyValue.NUMBER, strictness: 'balanced', reason: 'all', hideFaces: true }],
+  })
+  async getBlurry(
+    userId: string,
+    options: {
+      cursor?: CleanupCursor;
+      limit: number;
+      strictness: CleanupStrictnessValue;
+      reason: CleanupBlurReason;
+      hideFaces: boolean;
+    },
+  ): Promise<{ items: CleanupAssetRow[]; next: CleanupCursor | null }> {
+    const { cursor, limit, strictness, reason, hideFaces } = options;
+    const exprs = blurryExpressions(strictness);
+    const { isBlurry, isDark, isBright } = exprs;
+
+    let qb = this.db
+      .selectFrom('asset')
+      .innerJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) =>
+        cleanupAssetColumns(
+          eb,
+          sql.lit(false),
+          'asset_quality.sharpness' as const,
+          sql<'blurry' | 'dark' | 'bright' | null>`case
+          when ${isBlurry} then 'blurry'
+          when ${isDark} then 'dark'
+          when ${isBright} then 'bright'
+          else null
+        end`.as('reason'),
+        ),
+      )
+      .where('asset.type', '=', sql.lit(AssetType.Image))
+      .where(resolveReasonFilter(reason, exprs));
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Blurry));
+    qb = applyHideFaces(qb, hideFaces);
+    qb = applyLocalDateTimeCursor(qb, cursor)
+      .orderBy('asset.localDateTime', 'desc')
+      .orderBy('asset.id', 'desc')
+      .limit(limit + 1);
+
+    const rows = await qb.execute();
+    const page = paginate(rows, limit, (row) => [row.localDateTime.toISOString(), row.id]);
+    return {
+      items: page.items.map((row) => {
+        const mapped = mapCleanupAssetRow(row);
+        return { ...mapped, reason: mapped.reason ?? undefined };
+      }),
+      next: page.next,
+    };
+  }
+
+  private async countSpaceHogs(
+    userId: string,
+    options: { minSize?: number; type?: CleanupAssetTypeFilter },
+  ): Promise<{ count: number; bytes: number }> {
+    const minSize = options.minSize ?? CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE;
+
+    let qb = this.db
+      .selectFrom('asset')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) => [
+        eb.fn.countAll<number>().as('count'),
+        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), sql.lit(0)).as('bytes'),
+      ])
+      .where('asset_exif.fileSizeInByte', 'is not', null)
+      .where('asset_exif.fileSizeInByte', '>=', minSize);
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.SpaceHogs));
+
+    if (options.type && options.type !== 'all') {
+      qb = qb.where('asset.type', '=', sql.lit(options.type === 'image' ? AssetType.Image : AssetType.Video));
+    }
+
+    const row = await qb.executeTakeFirstOrThrow();
+    return { count: Number(row.count), bytes: Number(row.bytes) };
+  }
+
+  private async countScreenshots(userId: string): Promise<{ count: number; bytes: number }> {
+    let qb = this.db
+      .selectFrom('asset')
+      .innerJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) => [
+        eb.fn.countAll<number>().as('count'),
+        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), sql.lit(0)).as('bytes'),
+      ])
+      .where('asset_quality.isScreenshot', '=', sql.lit(true));
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Screenshots));
+
+    const row = await qb.executeTakeFirstOrThrow();
+    return { count: Number(row.count), bytes: Number(row.bytes) };
+  }
+
+  private async countBlurry(
+    userId: string,
+    options: { strictness?: CleanupStrictnessValue; reason?: CleanupBlurReason; hideFaces?: boolean },
+  ): Promise<{ count: number; bytes: number }> {
+    const strictness = options.strictness ?? 'balanced';
+    const reason = options.reason ?? 'all';
+    const hideFaces = options.hideFaces ?? true;
+    const exprs = blurryExpressions(strictness);
+
+    let qb = this.db
+      .selectFrom('asset')
+      .innerJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) => [
+        eb.fn.countAll<number>().as('count'),
+        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), sql.lit(0)).as('bytes'),
+      ])
+      .where('asset.type', '=', sql.lit(AssetType.Image))
+      .where(resolveReasonFilter(reason, exprs));
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Blurry));
+    qb = applyHideFaces(qb, hideFaces);
+
+    const row = await qb.executeTakeFirstOrThrow();
+    return { count: Number(row.count), bytes: Number(row.bytes) };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, 'space_hogs', {}] })
+  async countQueue(
+    userId: string,
+    queue: 'space_hogs' | 'screenshots' | 'blurry',
+    options: {
+      strictness?: CleanupStrictnessValue;
+      reason?: CleanupBlurReason;
+      hideFaces?: boolean;
+      minSize?: number;
+      type?: CleanupAssetTypeFilter;
+    } = {},
+  ): Promise<{ count: number; bytes: number }> {
+    switch (queue) {
+      case 'space_hogs': {
+        return this.countSpaceHogs(userId, options);
+      }
+      case 'screenshots': {
+        return this.countScreenshots(userId);
+      }
+      case 'blurry': {
+        return this.countBlurry(userId, options);
+      }
+    }
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async countDuplicates(userId: string): Promise<{ count: number; bytes: number }> {
+    const row = await this.db
+      .with('g', (qb) =>
+        qb
+          .selectFrom('asset')
+          .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          .select([
+            'asset.duplicateId',
+            sql<number>`sum(coalesce("asset_exif"."fileSizeInByte", 0)) - max(coalesce("asset_exif"."fileSizeInByte", 0))`.as(
+              'reclaim',
+            ),
+          ])
+          .where('asset.ownerId', '=', userId)
+          .where('asset.duplicateId', 'is not', null)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', 'in', [sql.lit(AssetVisibility.Archive), sql.lit(AssetVisibility.Timeline)])
+          .where('asset.stackId', 'is', null)
+          .groupBy('asset.duplicateId')
+          .having((eb) => eb.fn.count('asset.id'), '>', 1),
+      )
+      .selectFrom('g')
+      .select((eb) => [
+        eb.fn.countAll<number>().as('count'),
+        eb.fn.coalesce(eb.fn.sum<number>('reclaim'), sql.lit(0)).as('bytes'),
+      ])
+      .executeTakeFirstOrThrow();
+
+    return { count: Number(row.count), bytes: Number(row.bytes) };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, { limit: DummyValue.NUMBER }] })
+  async getBurstWindow(
+    userId: string,
+    options: { afterLocalDateTime?: Date; afterId?: string; limit: number },
+  ): Promise<BurstRow[]> {
+    const { afterLocalDateTime, afterId, limit } = options;
+
+    let qb = this.db
+      .selectFrom('asset')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .leftJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .select((eb) => [
+        'asset.id',
+        'asset.localDateTime',
+        'asset_exif.autoStackId',
+        'asset_quality.sharpness',
+        eb.fn.coalesce('asset_exif.fileSizeInByte', sql.lit(0)).as('fileSize'),
+      ])
+      .where('asset.type', '=', sql.lit(AssetType.Image))
+      .where('asset.stackId', 'is', null);
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Bursts));
+
+    if (afterLocalDateTime && afterId) {
+      qb = qb.where((eb) =>
+        eb.or([
+          eb('asset.localDateTime', '>', afterLocalDateTime),
+          eb.and([eb('asset.localDateTime', '=', afterLocalDateTime), eb('asset.id', '>', afterId)]),
+        ]),
+      );
+    }
+
+    const rows = await qb.orderBy('asset.localDateTime', 'asc').orderBy('asset.id', 'asc').limit(limit).execute();
+    return rows.map((row) => ({
+      id: row.id,
+      localDateTime: row.localDateTime,
+      autoStackId: row.autoStackId,
+      sharpness: row.sharpness,
+      fileSize: Number(row.fileSize),
+    }));
+  }
+
+  @GenerateSql({ params: [[[DummyValue.UUID, DummyValue.UUID]]] })
+  async getBurstClipDistances(groups: string[][]): Promise<Map<string, number>> {
+    const ids: string[] = [];
+    const firsts: string[] = [];
+    for (const group of groups) {
+      if (group.length === 0) {
+        continue;
+      }
+      const [first] = group;
+      for (const id of group) {
+        ids.push(id);
+        firsts.push(first);
+      }
+    }
+
+    if (ids.length === 0) {
+      return new Map();
+    }
+
+    const { rows } = await sql<{ id: string; d: number }>`
+      select p.id, (a.embedding <=> b.embedding) as d
+      from unnest(${`{${ids}}`}::uuid[], ${`{${firsts}}`}::uuid[]) as p(id, first)
+      join smart_search a on a."assetId" = p.id
+      join smart_search b on b."assetId" = p.first
+    `.execute(this.db);
+
+    return new Map(rows.map((row) => [row.id, Number(row.d)]));
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async countBursts(userId: string): Promise<{ count: number; bytes: number }> {
+    const orderClause = sql`order by "asset"."localDateTime", "asset"."id"`;
+
+    const row = await this.db
+      .with('ordered', (qb) => {
+        const inner = qb
+          .selectFrom('asset')
+          .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          .select((eb) => [
+            'asset.id as id',
+            'asset.localDateTime as t',
+            'asset_exif.autoStackId as s',
+            eb.fn.coalesce('asset_exif.fileSizeInByte', sql.lit(0)).as('size'),
+            sql<Date | null>`lag("asset"."localDateTime") over (${orderClause})`.as('prevT'),
+            sql<string | null>`lag("asset_exif"."autoStackId") over (${orderClause})`.as('prevS'),
+          ])
+          .where('asset.type', '=', sql.lit(AssetType.Image))
+          .where('asset.stackId', 'is', null)
+          .where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Bursts));
+        return withCleanupScope(inner, userId, { queue: true });
+      })
+      .with('flagged', (qb) =>
+        qb.selectFrom('ordered').select([
+          'ordered.id',
+          'ordered.t',
+          'ordered.size',
+          sql<number>`case
+              when "prevT" is null or "t" - "prevT" > interval '2 seconds' or "prevS" is distinct from "s" then 1
+              else 0
+            end`.as('brk'),
+        ]),
+      )
+      .with('grouped', (qb) =>
+        qb
+          .selectFrom('flagged')
+          .select(['flagged.id', 'flagged.size', sql<number>`sum("brk") over (order by "t", "id")`.as('grp')]),
+      )
+      .with('sized', (qb) =>
+        qb
+          .selectFrom('grouped')
+          .select((eb) => [
+            'grouped.grp',
+            eb.fn.count<number>('grouped.id').as('n'),
+            eb.fn.sum<number>('grouped.size').as('total'),
+            eb.fn.max<number>('grouped.size').as('mx'),
+          ])
+          .groupBy('grouped.grp')
+          .having((eb) => eb.fn.count('grouped.id'), '>=', 2),
+      )
+      .selectFrom('sized')
+      .select([sql<number>`count(*)`.as('count'), sql<number>`coalesce(sum("total" - "mx"), 0)`.as('bytes')])
+      .executeTakeFirstOrThrow();
+
+    return { count: Number(row.count), bytes: Number(row.bytes) };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async getCleanupAssets(userId: string, ids: string[]): Promise<CleanupAssetRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    let qb = this.db
+      .selectFrom('asset')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select((eb) => cleanupAssetColumns(eb, keptForQueue(eb, userId, CleanupQueue.Bursts)))
+      .where('asset.id', 'in', ids);
+
+    qb = withCleanupScope(qb, userId, { queue: true });
+
+    const rows = await qb.execute();
+    return rows.map((row) => mapCleanupAssetRow(row));
   }
 }
