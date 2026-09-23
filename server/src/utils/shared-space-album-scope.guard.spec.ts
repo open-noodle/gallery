@@ -413,6 +413,11 @@ const VIS_ALLOWLIST: Record<string, string> = {
   // which was never gate-scanned before this arm's shared_space_album reference existed).
   'database.ts::inAlbums':
     'live-link EXISTS(shared_space_album) correlated on albumId+spaceId; link-existence check, no asset content (Task 9)',
+
+  // Library Cleanup (specs/2026-09-23-library-cleanup-design.md): POST /cleanup/in-spaces warns
+  // the caller before trashing an asset that also lives in a shared space.
+  'cleanup.repository.ts::getAssetIdsInSpaces':
+    'returns asset ids only (Library Cleanup Space-warning); caller already scoped to own assets',
 };
 
 const VIS_WINDOW = 50;
