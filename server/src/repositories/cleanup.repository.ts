@@ -67,6 +67,15 @@ export const withCleanupScope = <O>(
 const monthDayExpr = sql<number>`${sql.raw(MONTH_DAY_SQL.replaceAll('"localDateTime"', '"asset"."localDateTime"'))}`;
 
 /**
+ * Live-photo-inclusive file size: the still's own `fileSizeInByte` plus its motion part's, when one
+ * exists. Shared between `cleanupAssetColumns`' `fileSize` row column and every `countQueue` bytes
+ * sum, so a hub card's total always matches the sum of what the corresponding list page shows.
+ * Space hogs' own filter/sort stay on the asset's plain `fileSizeInByte` (index use) — only the
+ * reported byte totals include the motion part.
+ */
+const cleanupFileSizeExpr = sql<number>`coalesce("asset_exif"."fileSizeInByte", 0) + coalesce((select e2."fileSizeInByte" from asset_exif e2 where e2."assetId" = asset."livePhotoVideoId"), 0)`;
+
+/**
  * The `CleanupAssetDto` column list, shared by every query that returns `CleanupAssetRow`s
  * (rewind and the queue lists). `kept` differs per caller: rewind checks its own decision, while
  * queue list endpoints already exclude any keep for that queue at the WHERE level, so they pass a
@@ -86,9 +95,7 @@ const cleanupAssetColumns = <E extends readonly unknown[]>(
     eb.fn.coalesce('asset.width', 'asset_exif.exifImageWidth').as('width'),
     eb.fn.coalesce('asset.height', 'asset_exif.exifImageHeight').as('height'),
     'asset.duration' as const,
-    sql<number>`coalesce("asset_exif"."fileSizeInByte", 0) + coalesce((select e2."fileSizeInByte" from asset_exif e2 where e2."assetId" = asset."livePhotoVideoId"), 0)`.as(
-      'fileSize',
-    ),
+    cleanupFileSizeExpr.as('fileSize'),
     'asset.isFavorite' as const,
     eb
       .exists(
@@ -559,7 +566,12 @@ export class CleanupRepository {
 
     const rows = await qb.execute();
     const page = paginate(rows, limit, (row) => [Number(row.sortKey), row.id]);
-    return { items: page.items.map((row) => mapCleanupAssetRow(row)), next: page.next };
+    return {
+      // `sortKey` is an internal keyset column (the asset's own `fileSizeInByte`, distinct from the
+      // live-photo-inclusive `fileSize`) — strip it so returned rows match `CleanupAssetRow` exactly.
+      items: page.items.map(({ sortKey: _sortKey, ...row }) => mapCleanupAssetRow(row)),
+      next: page.next,
+    };
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { limit: DummyValue.NUMBER }] })
@@ -655,7 +667,7 @@ export class CleanupRepository {
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select((eb) => [
         eb.fn.countAll<number>().as('count'),
-        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), sql.lit(0)).as('bytes'),
+        eb.fn.coalesce(eb.fn.sum<number>(cleanupFileSizeExpr), sql.lit(0)).as('bytes'),
       ])
       .where('asset_exif.fileSizeInByte', 'is not', null)
       .where('asset_exif.fileSizeInByte', '>=', minSize);
@@ -678,7 +690,7 @@ export class CleanupRepository {
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select((eb) => [
         eb.fn.countAll<number>().as('count'),
-        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), sql.lit(0)).as('bytes'),
+        eb.fn.coalesce(eb.fn.sum<number>(cleanupFileSizeExpr), sql.lit(0)).as('bytes'),
       ])
       .where('asset_quality.isScreenshot', '=', sql.lit(true));
 
@@ -704,7 +716,7 @@ export class CleanupRepository {
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select((eb) => [
         eb.fn.countAll<number>().as('count'),
-        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), sql.lit(0)).as('bytes'),
+        eb.fn.coalesce(eb.fn.sum<number>(cleanupFileSizeExpr), sql.lit(0)).as('bytes'),
       ])
       .where('asset.type', '=', sql.lit(AssetType.Image))
       .where(resolveReasonFilter(reason, exprs));
@@ -792,9 +804,12 @@ export class CleanupRepository {
         eb.fn.coalesce('asset_exif.fileSizeInByte', sql.lit(0)).as('fileSize'),
       ])
       .where('asset.type', '=', sql.lit(AssetType.Image))
+      // Bursts excludes every stacked asset outright (including a stack's own primary) — unlike the
+      // other queues' unstacked-or-primary rule, so `withCleanupScope`'s `queue: true` stack-primary
+      // branch would be dead here; use the plain scope and this explicit predicate instead.
       .where('asset.stackId', 'is', null);
 
-    qb = withCleanupScope(qb, userId, { queue: true });
+    qb = withCleanupScope(qb, userId);
     qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Bursts));
 
     if (afterLocalDateTime && afterId) {
@@ -863,9 +878,11 @@ export class CleanupRepository {
             sql<string | null>`lag("asset_exif"."autoStackId") over (${orderClause})`.as('prevS'),
           ])
           .where('asset.type', '=', sql.lit(AssetType.Image))
+          // See getBurstWindow: bursts excludes every stacked asset outright (primary included), so
+          // the plain scope is used here rather than `queue: true`'s unstacked-or-primary rule.
           .where('asset.stackId', 'is', null)
           .where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Bursts));
-        return withCleanupScope(inner, userId, { queue: true });
+        return withCleanupScope(inner, userId);
       })
       .with('flagged', (qb) =>
         qb.selectFrom('ordered').select([
