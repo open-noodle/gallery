@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@types/micromatch": "^4.0.9",
-    "@types/node": "^24.12.2",
+    "@types/node": "^24.13.5",
     "prettier": "^3.7.4",
     "tsx": "^4.20.0",
     "typescript": "^6.0.0",
