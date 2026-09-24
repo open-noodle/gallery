@@ -12,6 +12,7 @@ sealed class CollectionTarget {
 
 /// A personal or shared album. Dispatches through the existing `addToAlbum`.
 final class AlbumTarget extends CollectionTarget {
+  // ignore: unused-code
   const AlbumTarget(this.album);
   final RemoteAlbum album;
 }

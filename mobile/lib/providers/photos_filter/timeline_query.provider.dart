@@ -17,6 +17,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provi
 import 'package:immich_mobile/providers/photos_filter/timeline_temporal_filter.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
+// ignore: unused-code
 final photosTimelineQueryProvider = Provider<TimelineService>((ref) {
   final filter = ref.watch(photosTimelineEffectiveFilterProvider);
   return buildPhotosTimelineQuery(ref, filter);

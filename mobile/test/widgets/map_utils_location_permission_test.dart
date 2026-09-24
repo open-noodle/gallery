@@ -7,6 +7,7 @@ import 'package:immich_mobile/utils/map_utils.dart' as legacy_map;
 import '../test_utils.dart';
 import '../widget_tester_extensions.dart';
 
+// ignore: unused-code
 typedef LocationChecker =
     Future<(Position?, LocationPermission?)> Function({required BuildContext context, bool silent});
 

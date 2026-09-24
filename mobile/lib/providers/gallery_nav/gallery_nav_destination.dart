@@ -4,6 +4,7 @@ import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 class GalleryNavDestination {
+  // ignore: unused-code
   final GalleryTabEnum tab;
   final String labelKey;
   final IconData idleIcon;

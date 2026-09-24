@@ -37,7 +37,9 @@ class SpaceDetailPage extends ConsumerStatefulWidget {
 
   const SpaceDetailPage({super.key, required this.spaceId});
 
+  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
+  // ignore: unused-code
   static double syncBannerTopSliverHeight({required bool isRemoteSyncing}) =>
       isRemoteSyncing ? kSyncStatusBannerSliverHeight : 0;
 

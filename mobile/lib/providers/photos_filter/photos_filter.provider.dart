@@ -92,6 +92,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void clearTags() => state = state.copyWith(tagIds: null);
 
+  // ignore: unused-code
   void clearDimension(Dimension d) {
     switch (d) {
       case Dimension.people:
