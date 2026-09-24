@@ -15,7 +15,7 @@
   import NightlyTasksSettings from './NightlyTasksSettings.svelte';
   import NotificationSettings from './NotificationSettings.svelte';
   import ServerSettings from './ServerSettings.svelte';
-  import StorageTemplateSettings from './StorageTemplateSettings.svelte';
+  import StorageTemplateSettings from '$lib/components/admin-settings/StorageTemplateSettings.svelte';
   import StorageUsageSettings from './StorageUsageSettings.svelte';
   import ThemeSettings from './ThemeSettings.svelte';
   import TrashSettings from './TrashSettings.svelte';
