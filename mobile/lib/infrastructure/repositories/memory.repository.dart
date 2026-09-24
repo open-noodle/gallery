@@ -24,7 +24,8 @@ class MemoryRepository extends DatabaseAccessor<Drift> with $MemoryRepositoryMix
             ),
           ])
           ..where(_db.memoryEntity.ownerId.equals(ownerId))
-          ..where(_db.memoryEntity.type.equalsValue(MemoryTypeEnum.onThisDay))
+          // Gallery: rule memories render on the lane; birthday (immich-30831) has no mobile title.
+          ..where(_db.memoryEntity.type.isInValues(const [MemoryTypeEnum.onThisDay, MemoryTypeEnum.rule]))
           ..where(_db.memoryEntity.deletedAt.isNull());
 
     if (onlyFavorites) {
