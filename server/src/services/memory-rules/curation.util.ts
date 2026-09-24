@@ -92,13 +92,7 @@ export const dominantBy = <T>(items: T[], key: (item: T) => string): DominantGro
     return { key: '', items: [], ratio: 0 };
   }
 
-  const groups = new Map<string, T[]>();
-  for (const item of items) {
-    const groupKey = key(item);
-    const group = groups.get(groupKey) ?? [];
-    group.push(item);
-    groups.set(groupKey, group);
-  }
+  const groups = Map.groupBy(items, key);
 
   let bestKey = '';
   let bestItems: T[] = [];
