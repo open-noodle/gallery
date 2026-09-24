@@ -71,14 +71,32 @@ describe(CleanupRepository.name, () => {
     it('uses asset_localMonthDay_idx for calendar counts and rewind years', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
-      const explain = (compiled: CompiledQuery) =>
-        ctx.database.transaction().execute(async (trx) => {
-          await sql`SET LOCAL enable_seqscan = off`.execute(trx);
-          const { rows } = await trx.executeQuery<{ 'QUERY PLAN': string }>(
-            CompiledQuery.raw(`EXPLAIN ${compiled.sql}`, [...compiled.parameters]),
-          );
-          return rows.map((r) => r['QUERY PLAN']).join('\n');
-        });
+      const rolledBack = new Error('rollback');
+      const explain = async (compiled: CompiledQuery) => {
+        let plan = '';
+        await ctx.database
+          .transaction()
+          .execute(async (trx) => {
+            await sql`SET LOCAL enable_seqscan = off`.execute(trx);
+            // On a near-empty table the Cleanup keyset index (asset_cleanup_localDateTime_idx, same
+            // partial condition, holds localDateTime) ties on cost with this one, and the planner
+            // picks either. Hide it for this transaction only (rolled back below): this test guards
+            // that the expression still matches asset_localMonthDay_idx. The 500k-asset measurement
+            // (Task 13) confirms the planner picks asset_localMonthDay_idx at scale.
+            await sql`DROP INDEX "asset_cleanup_localDateTime_idx"`.execute(trx);
+            const { rows } = await trx.executeQuery<{ 'QUERY PLAN': string }>(
+              CompiledQuery.raw(`EXPLAIN ${compiled.sql}`, [...compiled.parameters]),
+            );
+            plan = rows.map((r) => r['QUERY PLAN']).join('\n');
+            throw rolledBack;
+          })
+          .catch((error: unknown) => {
+            if (error !== rolledBack) {
+              throw error;
+            }
+          });
+        return plan;
+      };
       await expect(explain(sut.calendarCountsQuery(user.id).compile())).resolves.toContain('asset_localMonthDay_idx');
       await expect(explain(sut.rewindYearsQuery(user.id, 923).compile())).resolves.toContain('asset_localMonthDay_idx');
     });
@@ -757,6 +775,40 @@ describe(CleanupRepository.name, () => {
       expect(page2.next).toBeNull();
       expect([...page1.items, ...page2.items].map((i) => i.id).sort()).toEqual([...ids].sort());
     });
+
+    it('pages through screenshots that share a localDateTime without skipping or repeating any', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const same = new Date('2024-01-01T00:00:00Z');
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: same });
+        await sut.upsertQuality({
+          assetId: asset.id,
+          ownerId: user.id,
+          sharpness: 100,
+          brightness: 100,
+          clippedDark: 0,
+          clippedBright: 0,
+          isScreenshot: true,
+          version: 1,
+        });
+        ids.push(asset.id);
+      }
+
+      const seen: string[] = [];
+      let cursor: CleanupCursor | undefined;
+      for (let page = 0; page < 5; page++) {
+        const { items, next } = await sut.getScreenshots(user.id, { limit: 2, cursor });
+        seen.push(...items.map((item) => item.id));
+        if (!next) {
+          break;
+        }
+        cursor = next;
+      }
+      // (localDateTime DESC, id DESC): on a tie, ids come out in descending order.
+      expect(seen).toEqual(ids.toSorted().toReversed());
+    });
   });
 
   describe('getBlurry', () => {
@@ -1168,6 +1220,45 @@ describe(CleanupRepository.name, () => {
 
       const rows = await sut.getBurstWindow(user.id, { limit: 10, afterLocalDateTime: base, afterId: a.id });
       expect(rows.map((r) => r.id)).toEqual([b.id]);
+    });
+
+    it('breaks localDateTime ties on id when resuming after a cursor', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const base = new Date('2024-01-01T00:00:00Z');
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: base });
+        ids.push(asset.id);
+      }
+      const { asset: before } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date(base.getTime() - 1) });
+      ids.sort();
+
+      const rows = await sut.getBurstWindow(user.id, { limit: 10, afterLocalDateTime: base, afterId: ids[0] });
+      expect(rows.map((r) => r.id)).toEqual([ids[1], ids[2]]);
+      expect(rows.map((r) => r.id)).not.toContain(before.id);
+    });
+
+    it('pages through asset_cleanup_localDateTime_idx with the cursor as an index condition', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const compiled = sut
+        .burstWindowQuery(user.id, {
+          afterLocalDateTime: new Date('2024-01-01T00:00:00Z'),
+          afterId: user.id,
+          limit: 10,
+        })
+        .compile();
+      const plan = await ctx.database.transaction().execute(async (trx) => {
+        await sql`SET LOCAL enable_seqscan = off`.execute(trx);
+        await sql`SET LOCAL enable_sort = off`.execute(trx);
+        const { rows } = await trx.executeQuery<{ 'QUERY PLAN': string }>(
+          CompiledQuery.raw(`EXPLAIN ${compiled.sql}`, [...compiled.parameters]),
+        );
+        return rows.map((r) => r['QUERY PLAN']).join('\n');
+      });
+      expect(plan).toContain('asset_cleanup_localDateTime_idx');
+      expect(plan).toMatch(/Index Cond: .*ROW\("localDateTime", id\) > ROW\(/);
     });
 
     it('excludes stacked (including the primary) and kept assets', async () => {
