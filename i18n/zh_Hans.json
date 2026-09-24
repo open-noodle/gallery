@@ -1188,7 +1188,7 @@
   "cleanup_queue_space_hogs": "占空间大户",
   "cleanup_queue_space_hogs_description": "最大的视频和照片",
   "cleanup_queues": "队列",
-  "cleanup_reviewed_progress": "已检查 {done} / {total}",
+  "cleanup_reviewed_progress": "已检查 <b>{done}</b> / {total}",
   "cleanup_rewind": "回顾",
   "cleanup_rewind_this_day": "回顾这一天",
   "cleanup_rewind_title": "{date}，跨越 {count, plural, other {# 年}}",

@@ -43,12 +43,24 @@ describe('cleanupShortcuts', () => {
     expect(cleanupShortcuts(makeHandlers(), () => true)).toEqual([]);
   });
 
-  it('binds all ten keys when the viewer is closed', () => {
+  it('binds all eleven keys when the viewer is closed', () => {
     const keys = cleanupShortcuts(makeHandlers(), () => false).map(({ shortcut }) =>
       shortcut.shift ? `Shift+${shortcut.key}` : shortcut.key,
     );
     expect(keys.sort()).toEqual(
-      ['k', 'f', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'z', 'Shift+Enter'].sort(),
+      [
+        'k',
+        'f',
+        'Delete',
+        'Backspace',
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        ' ',
+        'z',
+        'Shift+Enter',
+      ].sort(),
     );
   });
 
@@ -56,6 +68,8 @@ describe('cleanupShortcuts', () => {
     ['k', {}, 'keep'],
     ['f', {}, 'favorite'],
     ['Delete', {}, 'trash'],
+    // The key labelled delete on a Mac keyboard sends Backspace.
+    ['Backspace', {}, 'trash'],
     ['ArrowLeft', {}, 'left'],
     ['ArrowRight', {}, 'right'],
     ['ArrowUp', {}, 'up'],

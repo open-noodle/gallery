@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Пожиратели места",
   "cleanup_queue_space_hogs_description": "Самые большие видео и фото",
   "cleanup_queues": "Очереди",
-  "cleanup_reviewed_progress": "Просмотрено: {done} из {total}",
+  "cleanup_reviewed_progress": "Просмотрено: <b>{done}</b> из {total}",
   "cleanup_rewind": "Обзор дня",
   "cleanup_rewind_this_day": "Пересмотреть этот день",
   "cleanup_rewind_title": "{date}, за {count, plural, one {# год} few {# года} many {# лет} other {# года}}",

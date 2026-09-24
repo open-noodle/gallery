@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Pożeracze miejsca",
   "cleanup_queue_space_hogs_description": "Największe filmy i zdjęcia",
   "cleanup_queues": "Kolejki",
-  "cleanup_reviewed_progress": "Przejrzane: {done} z {total}",
+  "cleanup_reviewed_progress": "Przejrzane: <b>{done}</b> z {total}",
   "cleanup_rewind": "Przegląd dnia",
   "cleanup_rewind_this_day": "Przejrzyj ten dzień",
   "cleanup_rewind_title": "{date}, na przestrzeni {count, plural, one {# roku} few {# lat} many {# lat} other {# roku}}",

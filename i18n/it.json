@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Mangia-spazio",
   "cleanup_queue_space_hogs_description": "Video e foto più pesanti",
   "cleanup_queues": "Code",
-  "cleanup_reviewed_progress": "{done} di {total} revisionate",
+  "cleanup_reviewed_progress": "<b>{done}</b> di {total} revisionate",
   "cleanup_rewind": "Rivedi",
   "cleanup_rewind_this_day": "Rivedi questo giorno",
   "cleanup_rewind_title": "{date}, in {count, plural, one {# anno} other {# anni}}",

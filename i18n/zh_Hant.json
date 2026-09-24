@@ -1191,7 +1191,7 @@
   "cleanup_queue_space_hogs": "空間大戶",
   "cleanup_queue_space_hogs_description": "最大的影片和相片",
   "cleanup_queues": "佇列",
-  "cleanup_reviewed_progress": "已檢查 {done} / {total}",
+  "cleanup_reviewed_progress": "已檢查 <b>{done}</b> / {total}",
   "cleanup_rewind": "回顧",
   "cleanup_rewind_this_day": "回顧這一天",
   "cleanup_rewind_title": "{date}，跨越 {count, plural, other {# 年}}",

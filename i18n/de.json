@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Speicherfresser",
   "cleanup_queue_space_hogs_description": "Größte Videos und Fotos",
   "cleanup_queues": "Warteschlangen",
-  "cleanup_reviewed_progress": "{done} von {total} überprüft",
+  "cleanup_reviewed_progress": "<b>{done}</b> von {total} überprüft",
   "cleanup_rewind": "Rückblick",
   "cleanup_rewind_this_day": "Diesen Tag durchgehen",
   "cleanup_rewind_title": "{date}, über {count, plural, one {# Jahr} other {# Jahre}}",

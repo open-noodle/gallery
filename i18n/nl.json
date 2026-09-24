@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Ruimtevreters",
   "cleanup_queue_space_hogs_description": "Grootste video's en foto's",
   "cleanup_queues": "Wachtrijen",
-  "cleanup_reviewed_progress": "{done} van {total} beoordeeld",
+  "cleanup_reviewed_progress": "<b>{done}</b> van {total} beoordeeld",
   "cleanup_rewind": "Terugkijken",
   "cleanup_rewind_this_day": "Deze dag terugkijken",
   "cleanup_rewind_title": "{date}, over {count, plural, one {# jaar} other {# jaar}}",

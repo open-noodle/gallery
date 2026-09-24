@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Space hogs",
   "cleanup_queue_space_hogs_description": "Largest videos and photos",
   "cleanup_queues": "Queues",
-  "cleanup_reviewed_progress": "{done} of {total} reviewed",
+  "cleanup_reviewed_progress": "<b>{done}</b> of {total} reviewed",
   "cleanup_rewind": "Rewind",
   "cleanup_rewind_this_day": "Rewind this day",
   "cleanup_rewind_title": "{date}, across {count, plural, one {# year} other {# years}}",

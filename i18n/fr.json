@@ -1193,7 +1193,7 @@
   "cleanup_queue_space_hogs": "Gros fichiers",
   "cleanup_queue_space_hogs_description": "Vidéos et photos les plus volumineuses",
   "cleanup_queues": "Files d'attente",
-  "cleanup_reviewed_progress": "{done} sur {total} vérifiées",
+  "cleanup_reviewed_progress": "<b>{done}</b> sur {total} vérifiées",
   "cleanup_rewind": "Rétrospective",
   "cleanup_rewind_this_day": "Revoir ce jour",
   "cleanup_rewind_title": "{date}, sur {count, plural, one {# an} other {# ans}}",

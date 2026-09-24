@@ -41,6 +41,8 @@ export const cleanupShortcuts = (handlers: CleanupShortcutHandlers, isViewing: (
     [{ key: 'k' }, handlers.keep],
     [{ key: 'f' }, handlers.favorite],
     [{ key: 'Delete' }, handlers.trash],
+    // Mac keyboards label Backspace as delete; the legend still says Delete.
+    [{ key: 'Backspace' }, handlers.trash],
     [{ key: 'ArrowLeft' }, handlers.left],
     [{ key: 'ArrowRight' }, handlers.right],
     [{ key: 'ArrowUp' }, handlers.up],

@@ -8,6 +8,7 @@
   import RewindYearSection from '$lib/components/cleanup/RewindYearSection.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { RewindSession, type RewindMark } from '$lib/managers/rewind-session.svelte';
+  import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
@@ -29,7 +30,7 @@
     type CleanupAssetDto,
     type CleanupRewindYearDto,
   } from '@immich/sdk';
-  import { Breadcrumbs, Button, Heading, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { Breadcrumbs, Button, Heading, IconButton, isModalOpen, modalManager, toastManager } from '@immich/ui';
   import { mdiCheck, mdiKeyboard, mdiSlashForward } from '@mdi/js';
   import { onMount, tick } from 'svelte';
   import { locale, t } from 'svelte-i18n';
@@ -373,6 +374,7 @@
     if (to?.route.id === page.route.id && to?.params?.monthDay === String(monthDay)) {
       return;
     }
+    const { type, delta } = navigation;
     navigation.cancel();
     if (!to) {
       return;
@@ -384,17 +386,29 @@
         confirmText: $t('leave'),
         confirmColor: 'danger',
       });
-      if (confirmed) {
-        bypassGuard = true;
-        await goto(to.url);
+      if (!confirmed) {
+        return;
+      }
+      bypassGuard = true;
+      // A cancelled back/forward leaves the history where it was, so replay the same step rather
+      // than pushing a new entry on top of it.
+      if (type === 'popstate' && delta) {
+        history.go(delta);
+      } else {
+        await goto(to.url, { replaceState: type === 'popstate' });
       }
     })();
   });
 
   const onBeforeUnload = (event: BeforeUnloadEvent) => {
-    if (session.hasUncommitted) {
-      event.preventDefault();
+    if (!session.hasUncommitted) {
+      return;
     }
+    event.preventDefault();
+    // Browsers that predate preventDefault() here only prompt when returnValue is set; the compat
+    // rule flags the (deprecated but universally supported) property itself.
+    // eslint-disable-next-line tscompat/tscompat
+    event.returnValue = '';
   };
 
   const legend = [
@@ -437,7 +451,8 @@
       undo: () => session.undo(),
       finish: () => void onFinishDay(),
     },
-    () => assetViewerManager.isViewing,
+    // Off while the viewer or any modal (the leave confirmation, the shortcuts list) is open.
+    () => assetViewerManager.isViewing || isModalOpen(),
   )}
 />
 
@@ -478,7 +493,7 @@
       <Button
         href={Route.cleanupRewind({ monthDay: previousDay })}
         size="small"
-        variant="outline"
+        variant="ghost"
         color="secondary"
         shape="round"
         title={$t('previous')}
@@ -489,7 +504,7 @@
       <Button
         href={Route.cleanupRewind({ monthDay: nextDay })}
         size="small"
-        variant="outline"
+        variant="ghost"
         color="secondary"
         shape="round"
         title={$t('next')}
@@ -503,8 +518,12 @@
   <div class="mb-1.5 flex flex-wrap items-center gap-3">
     <div class="min-w-50 flex-1">
       <div class="flex flex-wrap justify-between gap-x-3 text-xs tabular-nums">
-        <span class="font-medium" data-testid="cleanup-rewind-progress">
-          {$t('cleanup_reviewed_progress', { values: { done: reviewed, total } })}
+        <span data-testid="cleanup-rewind-progress">
+          <FormatMessage key="cleanup_reviewed_progress" values={{ done: reviewed, total }}>
+            {#snippet children({ tag, message })}
+              {#if tag === 'b'}<b>{message}</b>{:else}{message}{/if}
+            {/snippet}
+          </FormatMessage>
         </span>
         <span class="text-muted" data-testid="cleanup-rewind-summary">
           {$t('cleanup_marks_summary', {
@@ -570,7 +589,7 @@
       asset={current}
       mark={current ? session.marks.get(current.id) : undefined}
       index={Math.max(focusedIndex, 0) + 1}
-      total={flat.length + unloadedCount}
+      total={flat.length}
       upNext={flat.slice(Math.max(focusedIndex, 0) + 1, Math.max(focusedIndex, 0) + 1 + UP_NEXT)}
       marks={session.marks}
       onTrash={() => markCurrent('trash')}
