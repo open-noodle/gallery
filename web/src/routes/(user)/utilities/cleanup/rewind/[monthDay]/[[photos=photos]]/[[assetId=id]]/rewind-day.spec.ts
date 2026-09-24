@@ -279,6 +279,30 @@ describe('RewindDay', () => {
     expect(mocks.sdk.getCleanupAssetsInSpaces).not.toHaveBeenCalled();
   });
 
+  it('does not finish a date with no photos from the keyboard, just as the button is disabled', async () => {
+    renderDay([]);
+    expect(screen.getByTestId('cleanup-finish-day')).toBeDisabled();
+
+    await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+    expect(mocks.goto).not.toHaveBeenCalled();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+  });
+
+  it('finishes a date with photos from the keyboard', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
+    renderDay();
+
+    await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
+
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup'));
+    expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
+      cleanupCommitDto: expect.objectContaining({ completeMonthDay: 923 }),
+    });
+  });
+
   it('falls back to the hub when no other date needs a review', async () => {
     mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
     renderDay();
