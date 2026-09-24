@@ -553,6 +553,18 @@ ci_invariants:
       - server/src/services/memory.service.ts
     exceptions: []
 
+  # memory_entity.type is an index-persisted intEnum; installed apps hold the fork's `rule` at
+  # index 1. immich-30831 inserts `birthday` at index 1, so a rebase resolving toward upstream's
+  # order silently turns every synced rule memory into a birthday. The index test in
+  # memory_model_test.dart catches any reorder; this catches upstream's exact text at audit time.
+  - id: mobile-memory-type-enum-order
+    title: Mobile MemoryTypeEnum keeps rule at index 1
+    forbidden_patterns:
+      - "onThisDay,\n  birthday,"
+    paths:
+      - mobile/lib/domain/models/memory.model.dart
+    exceptions: []
+
   # immich-31456's mergePeople merges people for every other owner sharing a personGroupId. Gallery
   # adopted cluster groups inert: person_personGroupId_key makes the mapping 1:1 and
   # ClusterGroupController is unmounted, so that arm is unreachable and the fork's own
