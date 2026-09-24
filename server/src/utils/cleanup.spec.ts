@@ -6,6 +6,7 @@ import {
   encodeCursor,
   exposureStats,
   groupBursts,
+  isCleanupCursorTimestamp,
   isScreenshotCandidate,
   isValidMonthDay,
   isValidTimeZone,
@@ -189,6 +190,7 @@ const row = (
 ) => ({
   id,
   localDateTime: new Date(iso),
+  cursorT: iso,
   autoStackId,
   sharpness,
   fileSize,
@@ -227,7 +229,7 @@ describe('groupBursts', () => {
 
 describe('suggestKeep', () => {
   it('prefers sharpness, then size, then earliest', () => {
-    const base = { autoStackId: null };
+    const base = { autoStackId: null, cursorT: '' };
     expect(
       suggestKeep([
         { ...base, id: 'a', localDateTime: new Date(1), sharpness: 5, fileSize: 999 },
@@ -257,5 +259,22 @@ describe('cursor codec', () => {
   it('rejects garbage with BadRequest', () => {
     expect(() => decodeCursor('not-base64-json')).toThrow(BadRequestException);
     expect(() => decodeCursor(Buffer.from('{"x":1}').toString('base64url'))).toThrow(BadRequestException);
+  });
+});
+
+describe('isCleanupCursorTimestamp', () => {
+  it('accepts ISO UTC timestamps with 0-6 fractional digits', () => {
+    expect(isCleanupCursorTimestamp('2024-01-01T00:00:00Z')).toBe(true);
+    expect(isCleanupCursorTimestamp('2024-01-01T00:00:00.123Z')).toBe(true);
+    expect(isCleanupCursorTimestamp('2024-01-01T00:00:00.123456Z')).toBe(true);
+  });
+
+  it('rejects anything that is not a full-precision UTC timestamp', () => {
+    expect(isCleanupCursorTimestamp('not-a-date')).toBe(false);
+    expect(isCleanupCursorTimestamp('2024-01-01')).toBe(false);
+    expect(isCleanupCursorTimestamp('2024-01-01T00:00:00.1234567Z')).toBe(false);
+    expect(isCleanupCursorTimestamp('2024-01-01T00:00:00+02:00')).toBe(false);
+    expect(isCleanupCursorTimestamp("2024-01-01T00:00:00Z'; drop table asset; --")).toBe(false);
+    expect(isCleanupCursorTimestamp('2024-13-45T00:00:00Z')).toBe(false);
   });
 });
