@@ -208,16 +208,23 @@ export class CleanupService extends BaseService {
    * further windows while the boundary falls inside a burst (the last row of the fetched window
    * is within `CLEANUP_BURST_GAP_MS` of the next row) — so a group is never split across a page.
    * `reachedEnd` is true once a fetch comes back short, meaning there is nothing left to scan.
+   *
+   * When the extension probe finds a real gap, its rows are exactly the next window (same cursor,
+   * same limit), so they are returned as `lookahead` and the caller passes them back in instead of
+   * fetching them again — halving the queries per bursts page at 500k assets.
    */
   private async fetchBurstWindow(
     userId: string,
     after: { localDateTime?: Date; id?: string },
-  ): Promise<{ rows: BurstRow[]; reachedEnd: boolean }> {
-    let window = await this.cleanupRepository.getBurstWindow(userId, {
-      afterLocalDateTime: after.localDateTime,
-      afterId: after.id,
-      limit: CLEANUP_BURST_WINDOW,
-    });
+    lookahead?: BurstRow[],
+  ): Promise<{ rows: BurstRow[]; reachedEnd: boolean; lookahead?: BurstRow[] }> {
+    let window =
+      lookahead ??
+      (await this.cleanupRepository.getBurstWindow(userId, {
+        afterLocalDateTime: after.localDateTime,
+        afterId: after.id,
+        limit: CLEANUP_BURST_WINDOW,
+      }));
 
     if (window.length < CLEANUP_BURST_WINDOW) {
       return { rows: window, reachedEnd: true };
@@ -237,7 +244,7 @@ export class CleanupService extends BaseService {
 
       const gap = more[0].localDateTime.getTime() - last.localDateTime.getTime();
       if (gap > CLEANUP_BURST_GAP_MS) {
-        return { rows: window, reachedEnd: false };
+        return { rows: window, reachedEnd: false, lookahead: more };
       }
 
       window = [...window, ...more];
@@ -259,9 +266,12 @@ export class CleanupService extends BaseService {
     const groups: BurstGroup[] = [];
     let nextCursor: CleanupCursor | null = null;
     let reachedEnd = false;
+    let lookahead: BurstRow[] | undefined;
 
     while (groups.length < limit) {
-      const { rows: window, reachedEnd: windowReachedEnd } = await this.fetchBurstWindow(userId, after);
+      const fetched = await this.fetchBurstWindow(userId, after, lookahead);
+      const { rows: window, reachedEnd: windowReachedEnd } = fetched;
+      lookahead = fetched.lookahead;
       if (window.length === 0) {
         reachedEnd = true;
         break;

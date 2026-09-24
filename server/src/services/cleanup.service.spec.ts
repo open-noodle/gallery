@@ -455,24 +455,54 @@ describe(CleanupService.name, () => {
         window1.push(burstRow(`s${i}`, at(i * 3000)));
       }
       const lastWindow1Time = window1.at(-1)!.localDateTime.getTime();
-      // The extension probe: far enough past window 1's last row that fetchBurstWindow finds a real
-      // gap (reachedEnd: false) without folding this row into window 1.
-      const probe = [burstRow('probe', new Date(lastWindow1Time + 100_000))];
-      // Window 2: an actual burst pair, fetched by the next outer-loop iteration.
+      // The extension probe returns everything after window 1: a lone row far enough past window 1's
+      // last row that fetchBurstWindow finds a real gap (reachedEnd: false) without folding it into
+      // window 1, then an actual burst pair.
+      const probe = burstRow('probe', new Date(lastWindow1Time + 100_000));
       const f = burstRow('f', new Date(lastWindow1Time + 200_000), { autoStackId: 'stack1', sharpness: 5 });
       const g = burstRow('g', new Date(lastWindow1Time + 201_000), { autoStackId: 'stack1', sharpness: 15 });
 
-      mocks.cleanup.getBurstWindow
-        .mockResolvedValueOnce(window1)
-        .mockResolvedValueOnce(probe)
-        .mockResolvedValueOnce([f, g]);
+      mocks.cleanup.getBurstWindow.mockResolvedValueOnce(window1).mockResolvedValueOnce([probe, f, g]);
       hydrateFromRows(mocks, [...window1, f, g]);
 
       const res = await sut.getQueue(authStub.user1, 'bursts', {});
 
-      expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(3);
+      // The probe's rows are exactly the next window, so they are reused rather than fetched again.
+      expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(2);
       expect(res.groups).toHaveLength(1);
       expect(res.groups[0].assets.map((a) => a.id)).toEqual(['f', 'g']);
+      expect(res.nextCursor).toBeNull();
+    });
+
+    it('reuses a full extension probe as the next window and keeps paging from its end', async () => {
+      // Window 1 and the probe are both full windows of singletons 3 s apart; the probe starts after
+      // a real gap, so it becomes window 2 as-is and paging continues after ITS last row.
+      const window1: BurstRow[] = [];
+      const window2: BurstRow[] = [];
+      for (let i = 0; i < CLEANUP_BURST_WINDOW; i++) {
+        window1.push(burstRow(`a${i}`, at(i * 3000)));
+        window2.push(burstRow(`b${i}`, at((CLEANUP_BURST_WINDOW + i) * 3000)));
+      }
+      const end = window2.at(-1)!.localDateTime.getTime();
+      const f = burstRow('f', new Date(end + 100_000), { autoStackId: 'stack1', sharpness: 5 });
+      const g = burstRow('g', new Date(end + 101_000), { autoStackId: 'stack1', sharpness: 15 });
+
+      mocks.cleanup.getBurstWindow
+        .mockResolvedValueOnce(window1)
+        .mockResolvedValueOnce(window2)
+        .mockResolvedValueOnce([f, g]);
+      hydrateFromRows(mocks, [...window1, ...window2, f, g]);
+
+      const res = await sut.getQueue(authStub.user1, 'bursts', {});
+
+      expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(3);
+      const lastOfWindow2 = window2.at(-1)!;
+      expect(mocks.cleanup.getBurstWindow).toHaveBeenNthCalledWith(3, authStub.user1.user.id, {
+        afterLocalDateTime: lastOfWindow2.localDateTime,
+        afterId: lastOfWindow2.id,
+        limit: CLEANUP_BURST_WINDOW,
+      });
+      expect(res.groups.map((group) => group.assets.map((a) => a.id))).toEqual([['f', 'g']]);
     });
 
     it('drops a member missing from hydration and drops a group left with fewer than 2 members', async () => {
