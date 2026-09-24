@@ -22,6 +22,9 @@
 --   * Asset duplicate checksums
 --   * Library sync state (library_audit, library_user, library.createId)
 --   * Storage migration history
+--   * Library Cleanup progress: keep decisions (cleanup_decision), reviewed
+--     dates (cleanup_day_review) and quality-analysis scores (asset_quality,
+--     asset_job_status.qualityAnalyzedAt)
 --
 -- Assets you uploaded through Gallery are preserved as long as they are stored
 -- in Immich-native rows (asset, asset_exif, asset_face, etc.). If an asset
