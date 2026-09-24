@@ -1247,6 +1247,58 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
       expect(mocks.memory.delete).not.toHaveBeenCalled();
     });
+
+    it('F1b: a birthday row (immich-30831) does not claim, and does not sink a visible on_this_day card below its floor', async () => {
+      // An Immich 3.3+ import carries upstream-generated birthday memories. They are hidden from
+      // every client (spec 2026-09-24), and their photos are the ones taken on the birthday — the
+      // same photos as that day's on_this_day card. Unhandled, the birthday row has no type key,
+      // counts as visible, ranks as unmanaged (highest claim priority) and strips them.
+      const shared = ids('x', 2);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'birthday',
+          assets: [...shared, ...ids('b', 3)],
+          type: MemoryType.Birthday,
+          data: { personId: 'person-1', personName: 'Alice', year: 1990 },
+        }),
+        // Floor 3; losing the shared pair would leave 2 and delete it.
+        overlapRow({
+          id: 'otd',
+          assets: [...shared, ...ids('o', 2)],
+          type: MemoryType.OnThisDay,
+          data: { year: 2025 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
+    it('F1c: a saved birthday row is dropped too', async () => {
+      const shared = ids('x', 2);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'birthday',
+          assets: [...shared, ...ids('b', 3)],
+          type: MemoryType.Birthday,
+          data: { personId: 'person-1', personName: 'Alice', year: 1990 },
+          isSaved: true,
+        }),
+        overlapRow({
+          id: 'otd',
+          assets: [...shared, ...ids('o', 2)],
+          type: MemoryType.OnThisDay,
+          data: { year: 2025 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
   });
 
   describe('overlap backfill', () => {
