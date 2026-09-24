@@ -1,6 +1,14 @@
 # Pre-existing Postgres
 
+<<<<<<< origin/main
 While not officially recommended, it is possible to run Gallery using a pre-existing Postgres server. To use this setup, you should have a baseline level of familiarity with Postgres and the Linux command line. If you do not have these, we recommend using the default setup with a dedicated Postgres container.
+||||||| ca4637adc79
+While not officially recommended, it is possible to run Immich using a pre-existing Postgres server. To use this setup, you should have a baseline level of familiarity with Postgres and the Linux command line. If you do not have these, we recommend using the default setup with a dedicated Postgres container.
+=======
+import ComposeBuilder from '/docs/partials/_compose-builder.mdx';
+
+While not officially recommended, it is possible to run Immich using a pre-existing Postgres server. To use this setup, you should have a baseline level of familiarity with Postgres and the Linux command line. If you do not have these, we recommend using the default setup with a dedicated Postgres container.
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 By default, Gallery expects superuser permission on the Postgres database and requires certain extensions to be installed. This guide outlines the steps required to prepare a pre-existing Postgres server to be used by Gallery.
 
@@ -26,6 +34,8 @@ The current accepted range for VectorChord is `>= 0.3, < 2.0`.
 :::
 
 ## Specifying the connection URL
+
+<ComposeBuilder query="database.external=true" />
 
 You can connect to your pre-existing Postgres server by setting the `DB_URL` environment variable in the `.env` file.
 

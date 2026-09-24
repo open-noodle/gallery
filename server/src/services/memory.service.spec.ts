@@ -1,9 +1,18 @@
 import { BadRequestException } from '@nestjs/common';
+<<<<<<< origin/main
 import { DateTime, Settings } from 'luxon';
 import type { OnThisDayData, RuleMemoryData } from 'src/types.js';
 import { defaults } from 'src/dtos/config.dto.js';
 import { MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum.js';
 import { MemoryService, RULE_DAILY_LIMIT } from 'src/services/memory.service.js';
+||||||| ca4637adc79
+import type { OnThisDayData } from 'src/types.js';
+import { MemoryService } from 'src/services/memory.service.js';
+=======
+import { MemoryType } from 'src/enum.js';
+import { MemoryService } from 'src/services/memory.service.js';
+import { OnThisDayData } from 'src/types.js';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { MemoryFactory } from 'test/factories/memory.factory.js';
 import { getForMemory } from 'test/mappers.js';
@@ -1615,7 +1624,7 @@ describe(MemoryService.name, () => {
 
       await expect(
         sut.create(factory.auth({ user: { id: userId } }), {
-          type: memory.type,
+          type: MemoryType.OnThisDay,
           data: memory.data as OnThisDayData,
           memoryAt: memory.memoryAt,
           isSaved: memory.isSaved,
@@ -1645,7 +1654,7 @@ describe(MemoryService.name, () => {
 
       await expect(
         sut.create(factory.auth({ user: { id: userId } }), {
-          type: memory.type,
+          type: MemoryType.OnThisDay,
           data: memory.data as OnThisDayData,
           assetIds: memory.assets.map((asset) => asset.id),
           memoryAt: memory.memoryAt,
@@ -1665,7 +1674,7 @@ describe(MemoryService.name, () => {
 
       await expect(
         sut.create(factory.auth(), {
-          type: memory.type,
+          type: MemoryType.OnThisDay,
           data: memory.data as OnThisDayData,
           memoryAt: memory.memoryAt,
         }),

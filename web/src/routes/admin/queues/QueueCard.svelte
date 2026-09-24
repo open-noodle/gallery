@@ -70,7 +70,7 @@
   const jobTypeGridClasses = 'grid grid-cols-[minmax(0,1fr)_8rem_5rem] items-center gap-4 px-4 py-2';
 </script>
 
-<div class="sm:rounded-9 flex flex-col overflow-hidden rounded-2xl bg-gray-100 sm:flex-row dark:bg-immich-dark-gray">
+<div class="flex flex-col rounded-2xl bg-gray-100 sm:flex-row dark:bg-immich-dark-gray">
   <div class="flex w-full flex-col">
     {#if queue.isPaused}
       <QueueCardBadge color="warning">{$t('paused')}</QueueCardBadge>
@@ -174,7 +174,7 @@
       {/if}
     </div>
   </div>
-  <div class="flex w-full flex-row overflow-hidden sm:w-32 sm:flex-col">
+  <div class="flex w-full flex-row sm:w-32 sm:flex-col">
     {#if disabled}
       <QueueCardButton
         disabled={true}

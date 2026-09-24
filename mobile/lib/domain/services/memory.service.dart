@@ -1,16 +1,25 @@
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/memory.repository.dart';
+<<<<<<< origin/main
 import 'package:immich_mobile/repositories/memory_api.repository.dart';
 import 'package:logging/logging.dart';
+||||||| ca4637adc79
+import 'package:logging/logging.dart';
+=======
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 /// Accesses Memories; a specialized collection of assets with some novel display mechanism
 class MemoryService {
-  final log = Logger("MemoryService");
-
   final MemoryRepository _repository;
   final MemoryApiRepository _apiRepository;
 
+<<<<<<< origin/main
   MemoryService(this._repository, this._apiRepository);
+||||||| ca4637adc79
+  MemoryService(this._repository);
+=======
+  const MemoryService(this._repository);
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
   /// The memory lane: the viewer's own memories AND memories built from photos shared with
   /// them through a Space, matching the web memory lane (which calls the server).

@@ -157,6 +157,35 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
     }
   }
 
+  Future<void> updateAuthUsersV2(Iterable<SyncAuthUserV2> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final user in data) {
+          final companion = AuthUserEntityCompanion(
+            name: Value(user.name),
+            email: Value(user.email),
+            hasProfileImage: Value(user.hasProfileImage),
+            profileChangedAt: Value(user.profileChangedAt),
+            avatarColor: Value(user.avatarColor.orElse(null)?.toAvatarColor() ?? AvatarColor.primary),
+            isAdmin: Value(user.isAdmin),
+            pinCode: Value(user.pinCode),
+            quotaSizeInBytes: Value(user.quotaSizeInBytes ?? 0),
+            quotaUsageInBytes: Value(user.quotaUsageInBytes),
+          );
+
+          batch.insert(
+            _db.authUserEntity,
+            companion.copyWith(id: Value(user.id)),
+            onConflict: DoUpdate((_) => companion),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: SyncAuthUserV2', error, stack);
+      rethrow;
+    }
+  }
+
   Future<void> deleteUsersV1(Iterable<SyncUserDeleteV1> data) async {
     try {
       await _db.batch((batch) {
@@ -230,6 +259,8 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
     try {
       await _db.batch((batch) {
         for (final asset in data) {
+          // cannot use FK here, so manually cascade
+          batch.deleteWhere(_db.assetFaceEntity, (row) => row.assetId.equals(asset.assetId));
           batch.deleteWhere(_db.remoteAssetEntity, (row) => row.id.equals(asset.assetId));
         }
       });
@@ -1464,7 +1495,7 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
     }
   }
 
-  Future<void> updateAssetFacesV2(Iterable<SyncAssetFaceV2> data) async {
+  Future<void> updateAssetFacesV3(Iterable<SyncAssetFaceV3> data) async {
     try {
       await _db.batch((batch) {
         for (final assetFace in data) {
@@ -1490,7 +1521,7 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
         }
       });
     } catch (error, stack) {
-      _logger.severe('Error: updateAssetFacesV2', error, stack);
+      _logger.severe('Error: updateAssetFacesV3', error, stack);
       rethrow;
     }
   }
@@ -1636,7 +1667,12 @@ extension on AssetOrder {
 extension on MemoryType {
   MemoryTypeEnum toMemoryType() => switch (this) {
     MemoryType.onThisDay => MemoryTypeEnum.onThisDay,
+<<<<<<< origin/main
     MemoryType.rule => MemoryTypeEnum.rule,
+||||||| ca4637adc79
+=======
+    MemoryType.birthday => MemoryTypeEnum.birthday,
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   };
 }
 

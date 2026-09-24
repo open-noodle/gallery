@@ -1,3 +1,4 @@
+<<<<<<< origin/main
 import {
   getMembers,
   getPersonFaces,
@@ -11,11 +12,17 @@ import {
   type PersonFacePageResponseDto,
   type PersonResponseDto,
 } from '@immich/sdk';
+||||||| ca4637adc79
+import { updatePerson, type PersonResponseDto } from '@immich/sdk';
+=======
+import { updatePerson, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiCalendarEditOutline,
   mdiEyeOffOutline,
   mdiEyeOutline,
+  mdiFaceManProfile,
   mdiHeartMinusOutline,
   mdiHeartOutline,
 } from '@mdi/js';
@@ -103,6 +110,16 @@ export const getPersonActions = (
   };
 
   return { SetDateOfBirth, Favorite, Unfavorite, HidePerson, ShowPerson };
+};
+
+export const getPersonAssetActions = ($t: MessageFormatter, person: PersonResponseDto, asset: AssetResponseDto) => {
+  const SetFeaturedPhoto: ActionItem = {
+    title: $t('set_as_featured_photo'),
+    icon: mdiFaceManProfile,
+    onAction: () => handleSetFeaturedPhoto(person, asset.id),
+  };
+
+  return { SetFeaturedPhoto };
 };
 
 const handleFavoritePerson = async (person: { id: string }) => {
@@ -241,5 +258,17 @@ export const handleUpdatePersonBirthDate = async (person: PersonResponseDto, bir
     return true;
   } catch (error) {
     handleError(error, $t('errors.unable_to_save_date_of_birth'));
+  }
+};
+
+const handleSetFeaturedPhoto = async (person: PersonResponseDto, featureFaceAssetId: string) => {
+  const $t = await getFormatter();
+
+  try {
+    const response = await updatePerson({ id: person.id, personUpdateDto: { featureFaceAssetId } });
+    toastManager.primary($t('feature_photo_updated'));
+    eventManager.emit('PersonUpdate', response);
+  } catch (error) {
+    handleError(error, $t('errors.unable_to_set_feature_photo'));
   }
 };

@@ -14,14 +14,12 @@ class MemoryCard extends StatelessWidget {
   final String title;
   final bool showTitle;
   final bool isCurrent;
-  final Function()? onVideoEnded;
 
   const MemoryCard({
     required this.asset,
     required this.title,
     required this.showTitle,
     this.isCurrent = false,
-    this.onVideoEnded,
     super.key,
   });
 
@@ -65,8 +63,13 @@ class MemoryCard extends StatelessWidget {
                     key: ValueKey(asset.id),
                     asset: asset,
                     isCurrent: isCurrent,
+<<<<<<< origin/main
                     showControls: false,
                     forceAutoPlay: true,
+||||||| ca4637adc79
+                    showControls: false,
+=======
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
                     image: FullImage(asset, size: context.sizeData, fit: BoxFit.contain),
                   ),
                 ),

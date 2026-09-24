@@ -32,8 +32,13 @@
   import DeleteAssets from '$lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '$lib/components/timeline/actions/FavoriteAction.svelte';
+<<<<<<< origin/main
   import RemoveFromAlbum from '$lib/components/timeline/actions/RemoveFromAlbumAction.svelte';
   import RotateAction from '$lib/components/timeline/actions/RotateAction.svelte';
+||||||| ca4637adc79
+  import RemoveFromAlbum from '$lib/components/timeline/actions/RemoveFromAlbumAction.svelte';
+=======
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
@@ -130,8 +135,17 @@
   import { fly } from 'svelte/transition';
   import { SvelteMap } from 'svelte/reactivity';
   import type { PageData } from './$types';
+<<<<<<< origin/main
   import AlbumDescription from '$lib/components/album-page/AlbumDescription.svelte';
   import AlbumTitle from '$lib/components/album-page/AlbumTitle.svelte';
+||||||| ca4637adc79
+  import AlbumDescription from './AlbumDescription.svelte';
+  import AlbumTitle from './AlbumTitle.svelte';
+=======
+  import AlbumDescription from './AlbumDescription.svelte';
+  import AlbumTitle from './AlbumTitle.svelte';
+  import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
   interface Props {
     data: PageData;
@@ -274,6 +288,12 @@
     assetMultiSelectManager.clear();
   };
 
+  const onAlbumRemoveAssets = async ({ assetIds, albumIds }: { assetIds: string[]; albumIds: string[] }) => {
+    if (albumIds.includes(album.id)) {
+      await handleRemoveAssets(assetIds);
+    }
+  };
+
   const handleRemoveAssets = async (assetIds: string[]) => {
     if (showSearchResults) {
       removeSearchResults(searchResults, assetIds);
@@ -352,6 +372,7 @@
     }
   });
 
+<<<<<<< origin/main
   registerAlbumContext(() => album);
   registerSelectionContext({
     getAssets: () => (viewMode === AlbumPageViewMode.VIEW ? assetMultiSelectManager.assets : []),
@@ -428,6 +449,13 @@
       consumeTypedSearchNamesInto(page.url.pathname + page.url.search, albumPersonNames, albumTagNames);
     });
   });
+||||||| ca4637adc79
+  let album = $derived(data.album);
+  let albumId = $derived(album.id);
+=======
+  let album = $state(data.album);
+  let albumId = $derived(album.id);
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
   const containsEditors = $derived(album?.shared && album.albumUsers.some(({ role }) => role === AlbumUserRole.Editor));
   const albumUsers = $derived(showAlbumUsers && containsEditors ? album.albumUsers.map(({ user }) => user) : []);
@@ -717,12 +745,13 @@
     viewMode = AlbumPageViewMode.VIEW;
   };
 
-  const onAlbumAddAssets = async ({ albumIds }: { albumIds: string[] }) => {
+  const onAlbumAddAssets = async ({ albumIds, assetIds }: { albumIds: string[]; assetIds: string[] }) => {
     if (!albumIds.includes(album.id)) {
       return;
     }
 
-    await refreshAlbum();
+    album = { ...album, assetCount: album.assetCount + assetIds.length };
+
     timelineMultiSelectManager.clear();
     await setModeToView();
   };
@@ -770,6 +799,7 @@
   onSharedLinkDelete={refreshAlbum}
   {onAlbumDelete}
   {onAlbumAddAssets}
+  {onAlbumRemoveAssets}
   {onAlbumShare}
   {onAlbumUserUpdate}
   onAlbumUserDelete={refreshAlbum}
@@ -1041,7 +1071,7 @@
 
     {#if assetMultiSelectManager.selectionActive}
       <AssetSelectControlBar>
-        {@const Actions = getAssetBulkActions($t)}
+        {@const Actions = getAssetBulkActions($t, album)}
         <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
         <CreateSharedLink />
         <SelectAllAssets
@@ -1078,9 +1108,7 @@
             <TagAction menuItem />
           {/if}
 
-          {#if isOwned || assetMultiSelectManager.isAllUserOwned}
-            <RemoveFromAlbum menuItem bind:album onRemove={handleRemoveAssets} />
-          {/if}
+          <ActionMenuItem action={Actions.RemoveFromAlbum} />
           {#if assetMultiSelectManager.isAllUserOwned}
             <DeleteAssets menuItem onAssetDelete={handleRemoveAssets} onUndoDelete={handleUndoRemoveAssets} />
           {/if}

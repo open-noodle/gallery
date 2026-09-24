@@ -17,6 +17,7 @@ class PlaceDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< origin/main
     return TimelineRouteScope(
       timelineServiceBuilder: (ref, scope, groupBy) {
         final user = ref.watch(currentUserProvider);
@@ -30,6 +31,29 @@ class PlaceDetailPage extends StatelessWidget {
         withGroupingPill: true,
         appBar: MesmerizingSliverAppBar(title: place, icon: Icons.location_on),
       ),
+||||||| ca4637adc79
+    return ProviderScope(
+      overrides: [
+        timelineServiceProvider.overrideWith((ref) {
+          final timelineService = ref.watch(timelineFactoryProvider).place(place);
+          ref.onDispose(timelineService.dispose);
+          return timelineService;
+        }),
+      ],
+      child: Timeline(
+        appBar: MesmerizingSliverAppBar(title: place, icon: Icons.location_on),
+      ),
+=======
+    return ProviderScope(
+      overrides: [
+        timelineServiceProvider.overrideWith((ref) {
+          final timelineService = ref.watch(timelineFactoryProvider).place(place);
+          ref.onDispose(timelineService.dispose);
+          return timelineService;
+        }),
+      ],
+      child: Timeline(appBar: MesmerizingSliverAppBar(title: place)),
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     );
   }
 }

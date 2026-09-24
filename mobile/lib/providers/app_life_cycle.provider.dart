@@ -22,6 +22,8 @@ enum AppLifeCycleEnum { active, inactive, paused, resumed, detached, hidden }
 class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
   final Ref _ref;
   bool _wasPaused = false;
+  bool _firstLaunch = true;
+  bool _fullSyncPending = false;
 
   // Add operation coordination
   Completer<void>? _resumeOperation;
@@ -61,8 +63,14 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
   }
 
   Future<void> _performResume() async {
+    if (_firstLaunch) {
+      // a delta sync can miss photos taken after a background launch
+      _fullSyncPending = await _ref.read(backgroundWorkerFgServiceProvider).wasLaunchedInBackground();
+      _firstLaunch = false;
+    }
+
     // no need to resume because app was never really paused
-    if (!_wasPaused) {
+    if (!_wasPaused && !_fullSyncPending) {
       _log.info("Resume skipped, app was never paused");
       return;
     }
@@ -119,12 +127,34 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     final isAlbumLinkedSyncEnable = _ref.read(appConfigProvider).backup.syncAlbums;
 
     try {
+<<<<<<< origin/main
       final sync = backgroundManager.syncRemoteThenLocal(
         fullLocalSync: CurrentPlatform.isAndroid,
         shouldRunLocal: _shouldContinueOperation,
       );
       final syncSuccess = await sync.remoteSync;
       // #28983: refresh memories on resume (grafted onto fork's #513 deferred-sync restructure)
+||||||| ca4637adc79
+      bool syncSuccess = false;
+      await Future.wait([
+        _safeRun(() => backgroundManager.syncLocal(full: CurrentPlatform.isAndroid), "syncLocal"),
+        _safeRun(() async {
+          syncSuccess = await backgroundManager.syncRemote();
+        }, "syncRemote"),
+      ]);
+=======
+      bool syncSuccess = false;
+      await Future.wait([
+        _safeRun(() {
+          final full = CurrentPlatform.isAndroid || _fullSyncPending;
+          _fullSyncPending = false;
+          return backgroundManager.syncLocal(full: full);
+        }, "syncLocal"),
+        _safeRun(() async {
+          syncSuccess = await backgroundManager.syncRemote();
+        }, "syncRemote"),
+      ]);
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
       _ref.invalidate(memoryLaneProvider);
       _ref.invalidate(allMemoriesProvider);
 

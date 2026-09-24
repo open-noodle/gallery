@@ -151,7 +151,6 @@ const setup = async () => {
         session: 'oidc.session',
         interaction: 'oidc.interaction',
         resume: 'oidc.resume',
-        state: 'oidc.state',
       },
     },
     conformIdTokenClaims: false,

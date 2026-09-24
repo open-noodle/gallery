@@ -31,7 +31,6 @@
   import RotateAction from '$lib/components/timeline/actions/RotateAction.svelte';
   import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import StackAction from '$lib/components/timeline/actions/StackAction.svelte';
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
@@ -48,8 +47,14 @@
   import { removeSearchResults, selectAllSearchResults, updateSearchResults } from '$lib/utils/search-result-selection';
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
+<<<<<<< origin/main
   import { lang } from '$lib/stores/preferences.store';
+||||||| ca4637adc79
+=======
+  import { getStackBulkActions } from '$lib/services/stack.service';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
+<<<<<<< origin/main
   import {
     buildSearchablePageUrl,
     getSearchablePageFilterState,
@@ -62,6 +67,16 @@
     type OnLink,
     type OnUnlink,
   } from '$lib/utils/actions';
+||||||| ca4637adc79
+  import {
+    updateStackedAssetInTimeline,
+    updateUnstackedAssetInTimeline,
+    type OnLink,
+    type OnUnlink,
+  } from '$lib/utils/actions';
+=======
+  import { type OnLink, type OnUnlink } from '$lib/utils/actions';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import {
     buildPhotosTimelineOptions,
@@ -398,7 +413,6 @@
   const isTimelineEmpty = $derived(!!timelineManager?.isEmptyForOptions(options) && !hasActiveFilters);
 
   let selectedAssets = $derived(assetMultiSelectManager.assets);
-  let isAssetStackSelected = $derived(selectedAssets.length === 1 && !!selectedAssets[0].stack);
   let isLinkActionAvailable = $derived.by(() => {
     const isLivePhoto = selectedAssets.length === 1 && !!selectedAssets[0].livePhotoVideoId;
     const isLivePhotoCandidate =
@@ -722,6 +736,7 @@
 {#if assetMultiSelectManager.selectionActive}
   <AssetSelectControlBar>
     {@const Actions = getAssetBulkActions($t)}
+    {@const StackActions = getStackBulkActions($t)}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
 
     <CreateSharedLink />
@@ -740,6 +755,7 @@
 
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
+<<<<<<< origin/main
         {#if !showSearchResults && (assetMultiSelectManager.assets.length > 1 || isAssetStackSelected)}
           <StackAction
             unstack={isAssetStackSelected}
@@ -748,6 +764,20 @@
           />
         {/if}
         {#if !showSearchResults && isLinkActionAvailable}
+||||||| ca4637adc79
+        {#if assetMultiSelectManager.assets.length > 1 || isAssetStackSelected}
+          <StackAction
+            unstack={isAssetStackSelected}
+            onStack={(result) => updateStackedAssetInTimeline(timelineManager, result)}
+            onUnstack={(assets) => updateUnstackedAssetInTimeline(timelineManager, assets)}
+          />
+        {/if}
+        {#if isLinkActionAvailable}
+=======
+        <ActionMenuItem action={StackActions.Stack} />
+        <ActionMenuItem action={StackActions.Unstack} />
+        {#if isLinkActionAvailable}
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           <LinkLivePhotoAction
             menuItem
             unlink={assetMultiSelectManager.assets.length === 1}

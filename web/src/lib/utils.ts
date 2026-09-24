@@ -397,10 +397,46 @@ export const handlePromiseError = <T>(promise: Promise<T>): void => {
   promise.catch((error) => console.error(`[utils.ts]:handlePromiseError ${error}`, error));
 };
 
+<<<<<<< origin/main
 export { getMemorySubtitle, getMemoryTitle } from '$lib/utils/memory-card';
+||||||| ca4637adc79
+export const memoryLaneTitle = derived(t, ($t) => {
+  return (memory: MemoryResponseDto) => {
+    if (memory.type === MemoryType.OnThisDay) {
+      const now = new Date();
+      const memoryDate = new Date(memory.memoryAt);
+=======
+export const memoryLaneTitle = derived(t, ($t) => {
+  return (memory: MemoryResponseDto) => {
+    if (memory.type === MemoryType.OnThisDay) {
+      const now = DateTime.now();
+      const memoryDate = DateTime.fromISO(memory.memoryAt, { zone: 'utc' });
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
+<<<<<<< origin/main
 export const memoryLaneTitle = derived([t, locale], ([$t, $locale]) => {
   return (memory: MemoryResponseDto) => getMemoryTitle(memory, $t, new Date(), $locale);
+||||||| ca4637adc79
+      return memoryDate.getUTCDate() === now.getDate() && memoryDate.getUTCMonth() === now.getMonth()
+        ? $t('years_ago', { values: { years: now.getFullYear() - memory.data.year } })
+        : DateTime.fromJSDate(memoryDate).toLocaleString(DateTime.DATE_MED, { locale: get(locale) });
+    }
+
+    return $t('unknown');
+  };
+=======
+      return memoryDate.day === now.day && memoryDate.month === now.month
+        ? $t('years_ago', { values: { years: now.year - memory.data.year } })
+        : memoryDate.toLocaleString(DateTime.DATE_MED, { locale: get(locale) });
+    }
+
+    if (memory.type === MemoryType.Birthday && 'personName' in memory.data) {
+      return $t('birthday_memory_title', { values: { name: memory.data.personName } });
+    }
+
+    return $t('unknown');
+  };
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 });
 
 export const withError = async <T>(fn: () => Promise<T>): Promise<[undefined, T] | [unknown, undefined]> => {

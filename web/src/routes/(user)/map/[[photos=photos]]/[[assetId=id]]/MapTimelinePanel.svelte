@@ -13,7 +13,6 @@
   import LinkLivePhotoAction from '$lib/components/timeline/actions/LinkLivePhotoAction.svelte';
   import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import StackAction from '$lib/components/timeline/actions/StackAction.svelte';
   import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
@@ -24,6 +23,7 @@
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { getAssetBulkActions } from '$lib/services/asset.service';
+<<<<<<< origin/main
   import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
   import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import {
@@ -35,6 +35,21 @@
   import { buildMapTimelineOptions } from '$lib/utils/map-filter-options';
   import { type ActivatableTimelineBucket, getTimelineBucketZoomTarget } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
+||||||| ca4637adc79
+  import { mapSettings } from '$lib/stores/preferences.store';
+  import {
+    updateStackedAssetInTimeline,
+    updateUnstackedAssetInTimeline,
+    type OnLink,
+    type OnUnlink,
+  } from '$lib/utils/actions';
+  import { AssetVisibility } from '@immich/sdk';
+=======
+  import { getStackBulkActions } from '$lib/services/stack.service';
+  import { mapSettings } from '$lib/stores/preferences.store';
+  import { type OnLink, type OnUnlink } from '$lib/utils/actions';
+  import { AssetVisibility } from '@immich/sdk';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { ActionButton, CloseButton, CommandPaletteDefaultProvider, Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiImageMultiple } from '@mdi/js';
   import { ceil, floor } from 'lodash-es';
@@ -69,7 +84,6 @@
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let selectedAssets = $derived(assetMultiSelectManager.assets);
-  let isAssetStackSelected = $derived(selectedAssets.length === 1 && !!selectedAssets[0].stack);
   let isLinkActionAvailable = $derived.by(() => {
     const isLivePhoto = selectedAssets.length === 1 && !!selectedAssets[0].livePhotoVideoId;
     const isLivePhotoCandidate =
@@ -132,6 +146,7 @@
     `${floor(bbox.west, 6)},${floor(bbox.south, 6)},${ceil(bbox.east, 6)},${ceil(bbox.north, 6)}`,
   );
 
+<<<<<<< origin/main
   // No $mapSettings here: the cluster panel is scoped by the active filters and nothing else, so it
   // returns exactly the assets behind the pins. See buildMapTimelineOptions.
   const timelineOptions = $derived.by(() => {
@@ -139,6 +154,30 @@
       ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId),
       grouping: timelineGrouping,
     };
+||||||| ca4637adc79
+  const timelineOptions = $derived({
+    bbox: timelineBoundingBox,
+    visibility: $mapSettings.withPartners
+      ? AssetVisibility.Timeline
+      : $mapSettings.includeArchived
+        ? undefined
+        : AssetVisibility.Timeline,
+    isFavorite: $mapSettings.onlyFavorites || undefined,
+    withPartners: $mapSettings.withPartners || undefined,
+    assetFilter: selectedClusterIds,
+=======
+  const timelineOptions = $derived({
+    bbox: timelineBoundingBox,
+    visibility: $mapSettings.withPartners
+      ? AssetVisibility.Timeline
+      : $mapSettings.includeArchived
+        ? undefined
+        : AssetVisibility.Timeline,
+    isFavorite: $mapSettings.onlyFavorites || undefined,
+    withPartners: $mapSettings.withPartners || undefined,
+    withStacked: true,
+    assetFilter: selectedClusterIds,
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   });
 
   $effect.pre(() => {
@@ -180,17 +219,23 @@
       onEscape={handleEscape}
       assetInteraction={assetMultiSelectManager}
       showArchiveIcon
+<<<<<<< origin/main
       grouping={timelineGrouping}
       onGroupingChange={assetMultiSelectManager.selectionActive ? undefined : handleTimelineGroupingChange}
       onTimelineBucketActivate={handleTimelineBucketActivate}
       {temporalAnchor}
       onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
+||||||| ca4637adc79
+=======
+      withStacked
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     />
   </div>
 </aside>
 
 {#if assetMultiSelectManager.selectionActive}
   {@const Actions = getAssetBulkActions($t)}
+  {@const StackActions = getStackBulkActions($t)}
   <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
 
   <Portal target="body">
@@ -207,13 +252,8 @@
 
         <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
           <DownloadAction menuItem />
-          {#if assetMultiSelectManager.assets.length > 1 || isAssetStackSelected}
-            <StackAction
-              unstack={isAssetStackSelected}
-              onStack={(result) => updateStackedAssetInTimeline(timelineManager, result)}
-              onUnstack={(assets) => updateUnstackedAssetInTimeline(timelineManager, assets)}
-            />
-          {/if}
+          <ActionMenuItem action={StackActions.Stack} />
+          <ActionMenuItem action={StackActions.Unstack} />
           {#if isLinkActionAvailable}
             <LinkLivePhotoAction
               menuItem

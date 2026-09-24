@@ -29,7 +29,13 @@ export function generateMemory(config: MemoryConfig, assets: MockTimelineAsset[]
   return {
     id: memoryId,
     assets: assets.map((asset) => toAssetResponseDto(asset)),
+<<<<<<< origin/main
     data: { year: config.year } as MemoryResponseDto['data'],
+||||||| ca4637adc79
+    data: { year: config.year } as OnThisDayDto,
+=======
+    data: { year: config.year },
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     memoryAt: config.memoryAt,
     createdAt: config.createdAt ?? now,
     updatedAt: now,

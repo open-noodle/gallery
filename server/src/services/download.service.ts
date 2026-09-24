@@ -113,10 +113,12 @@ export class DownloadService extends BaseService {
       archive.assetIds.push(id);
       archive.size += Number(size || 0);
 
-      if (archive.size > targetSize) {
-        archives.push(archive);
-        archive = { size: 0, assetIds: [] };
+      if (archive.size <= targetSize) {
+        return;
       }
+
+      archives.push(archive);
+      archive = { size: 0, assetIds: [] };
     };
 
     for await (const asset of assets) {

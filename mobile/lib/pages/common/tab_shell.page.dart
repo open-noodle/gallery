@@ -150,6 +150,7 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     ref.invalidate(sharedSpacesProvider);
   }
 
+<<<<<<< origin/main
   // Library page
   if (section == TabShellSection.library) {
     ref.invalidate(localAlbumProvider);
@@ -158,6 +159,14 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     ref.invalidateServerPeopleLists();
   }
 
+||||||| ca4637adc79
+  // Library page
+  if (index == kLibraryTabIndex) {
+    ref.invalidate(localAlbumProvider);
+  }
+
+=======
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   ref.read(hapticFeedbackProvider.notifier).selectionClick();
   router.setActiveIndex(index);
   ref.read(tabProvider.notifier).state = _tabEnumForSection(section);

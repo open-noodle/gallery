@@ -26,8 +26,14 @@ class ArchivePage extends StatelessWidget {
         return ref.watch(timelineFactoryProvider).archive(user.id, groupBy: groupBy, temporalScope: scope);
       },
       child: Timeline(
+<<<<<<< origin/main
         withGroupingPill: true,
         appBar: MesmerizingSliverAppBar(title: context.t.archive, icon: Icons.archive_outlined),
+||||||| ca4637adc79
+        appBar: MesmerizingSliverAppBar(title: context.t.archive, icon: Icons.archive_outlined),
+=======
+        appBar: MesmerizingSliverAppBar(title: context.t.archive),
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         bottomSheet: const ArchiveBottomSheet(),
       ),
     );

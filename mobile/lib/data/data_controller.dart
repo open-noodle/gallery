@@ -64,10 +64,25 @@ class DataController {
     return (logDb, false);
   }
 
+  // ignore: unused-code
   late final PeopleDatabaseRepository peopleDb = PeopleDatabaseRepository(_db);
+<<<<<<< origin/main
   late final PersonApiRepository personApi = PersonApiRepository(_apiService);
+||||||| ca4637adc79
+  late final PersonApiRepository personApi = PersonApiRepository(PeopleApi(_apiClient));
+=======
+  // ignore: unused-code
+  late final PersonApiRepository personApi = PersonApiRepository(PeopleApi(_apiClient));
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
+<<<<<<< origin/main
   late final ActivityApiRepository activityApi = ActivityApiRepository(_apiService);
+||||||| ca4637adc79
+  late final ActivityApiRepository activityApi = ActivityApiRepository(ActivitiesApi(_apiClient));
+=======
+  // ignore: unused-code
+  late final ActivityApiRepository activityApi = ActivityApiRepository(ActivitiesApi(_apiClient));
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
   /// Direct database access for the logic that has not yet been migrated
   // TODO(rewrite): Remove once all repositories have been migrated
