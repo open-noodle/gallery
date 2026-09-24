@@ -1909,6 +1909,30 @@ void main() {
     expect(row.data, contains('"title":"Happy birthday, Alice"'));
   });
 
+  test('stores a birthday memory from sync as MemoryTypeEnum.birthday', () async {
+    await sut.updateUsersV1([_createUser()]);
+
+    await sut.updateMemoriesV1([
+      SyncMemoryV1(
+        createdAt: DateTime(2026, 4, 23),
+        data: {'personId': 'person-1', 'personName': 'Alice', 'year': 1990},
+        deletedAt: null,
+        hideAt: DateTime(2026, 4, 23, 23, 59),
+        id: 'memory-birthday-1',
+        isSaved: false,
+        memoryAt: DateTime(2026, 4, 23),
+        ownerId: 'user-1',
+        seenAt: null,
+        showAt: DateTime(2026, 4, 20),
+        type: MemoryType.birthday,
+        updatedAt: DateTime(2026, 4, 23),
+      ),
+    ]);
+
+    final query = db.memoryEntity.select()..where((tbl) => tbl.id.equals('memory-birthday-1'));
+    expect((await query.getSingle()).type, MemoryTypeEnum.birthday);
+  });
+
   // ---------------------------------------------------------------------------
   // SyncStreamRepository — SharedSpaceAlbum handlers (Phase 2B, Slice B1)
   // ---------------------------------------------------------------------------
