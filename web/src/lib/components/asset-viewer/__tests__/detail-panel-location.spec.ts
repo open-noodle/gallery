@@ -15,11 +15,17 @@ import DetailPanelLocation from '../DetailPanelLocation.svelte';
 // here BEFORE the row's outer <button> is dismantled (R3), so that "fixing" the row cannot silently
 // delete the second branch.
 
-const { gotoMock } = vi.hoisted(() => ({
+const { gotoMock, mockFeatureFlags } = vi.hoisted(() => ({
   gotoMock: vi.fn().mockResolvedValue(undefined),
+  mockFeatureFlags: { map: true },
 }));
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+
+// #1046 — the map pin is gated on the server's `map` feature flag.
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: { value: mockFeatureFlags },
+}));
 
 // The map pin resolves the CURRENT surface (space / album / map / photos) from `page.url`, so the
 // page has to be a reactive, per-test-settable stand-in. See reactive-page.mock.svelte.ts.
@@ -54,6 +60,7 @@ beforeEach(() => {
   gotoMock.mockResolvedValue(undefined);
   vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
   mockPage.reset('https://gallery.test/photos/asset-1');
+  mockFeatureFlags.map = true;
 });
 
 // R3 — the three branches of this component, pinned so nobody deletes the second one by accident.
@@ -320,5 +327,26 @@ describe('DetailPanelLocation edit + gating', () => {
     expect(screen.queryByLabelText(/^filter_by_location/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('view_in_map')).not.toBeInTheDocument();
     expect(gotoMock).not.toHaveBeenCalled();
+  });
+});
+
+// #1046 — with the map feature turned off, /map redirects to /photos, so the pin was a link that
+// silently bounced the user out of the viewer. It must not render at all.
+describe('DetailPanelLocation map feature flag', () => {
+  it('hides the map pin when the map feature is disabled', async () => {
+    mockFeatureFlags.map = false;
+
+    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+
+    await waitFor(() => expect(screen.getByTestId('detail-panel-location')).toBeInTheDocument());
+    expect(screen.getByLabelText('filter_by_location: Berlin')).toBeInTheDocument();
+    expect(screen.getByLabelText('edit_location')).toBeInTheDocument();
+    expect(screen.queryByLabelText('view_in_map')).not.toBeInTheDocument();
+  });
+
+  it('shows the map pin when the map feature is enabled', async () => {
+    renderWithTooltips(DetailPanelLocation, { asset: buildAsset(BERLIN), isOwner: true, canFilter: true });
+
+    expect(await screen.findByLabelText('view_in_map')).toBeInTheDocument();
   });
 });
