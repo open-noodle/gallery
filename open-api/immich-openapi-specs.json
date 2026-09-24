@@ -32978,6 +32978,7 @@
         "description": "Memory type",
         "enum": [
           "on_this_day",
+          "birthday",
           "rule"
         ],
         "type": "string"
