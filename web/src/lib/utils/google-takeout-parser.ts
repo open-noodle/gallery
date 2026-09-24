@@ -396,20 +396,22 @@ export function matchSidecarToMedia(sidecarPath: string, sidecarContent: string,
       continue;
     }
 
-    if (matchForgottenDuplicates(sidecarBasename, mediaBasename)) {
-      forgottenMatches.push(mediaPath);
-      if (!titleBasename) {
-        continue;
-      }
+    if (!matchForgottenDuplicates(sidecarBasename, mediaBasename)) {
+      continue;
+    }
 
-      if (mediaBasename === titleBasename) {
-        titleExactMatches.push(mediaPath);
-        continue;
-      }
+    forgottenMatches.push(mediaPath);
+    if (!titleBasename) {
+      continue;
+    }
 
-      if (matchEditedName(`${titleBasename}.json`, mediaBasename)) {
-        titleEditedMatches.push(mediaPath);
-      }
+    if (mediaBasename === titleBasename) {
+      titleExactMatches.push(mediaPath);
+      continue;
+    }
+
+    if (matchEditedName(`${titleBasename}.json`, mediaBasename)) {
+      titleEditedMatches.push(mediaPath);
     }
   }
 
