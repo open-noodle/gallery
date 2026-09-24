@@ -29,6 +29,7 @@ final driftSpaceEditableProvider = FutureProvider.family<bool, String>((ref, spa
   return repository.isSpaceEditor(spaceId, userId);
 });
 
+// ignore: unused-code
 final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((ref, key) async {
   final service = ref.watch(peopleServiceProvider);
   final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));

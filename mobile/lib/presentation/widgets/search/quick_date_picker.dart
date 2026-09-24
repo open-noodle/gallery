@@ -69,6 +69,7 @@ class CustomDateFilter extends DateFilterInputModel {
 
   CustomDateFilter(this.start, this.end);
 
+  // ignore: unused-code
   factory CustomDateFilter.fromRange(DateTimeRange<DateTime> range) {
     return CustomDateFilter(range.start, range.end);
   }
@@ -81,7 +82,9 @@ class CustomDateFilter extends DateFilterInputModel {
 
 enum _QuickPickerType { last1Month, last3Months, last9Months, year, custom }
 
+// ignore: unused-code
 class QuickDatePicker extends HookWidget {
+  // ignore: unused-code
   QuickDatePicker({super.key, required this.currentInput, required this.onSelect, required this.onRequestPicker})
     : _selection = _selectionFromModel(currentInput),
       _initialYear = _initialYearFromModel(currentInput);

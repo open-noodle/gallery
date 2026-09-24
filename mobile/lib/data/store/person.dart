@@ -32,6 +32,7 @@ extension type const PersonStore._(Provider<PersonMutations> _provider) implemen
   /// Get all known people, honoring the user's minimum detected face count preference
   ///
   /// **NOTE:** This only hits the local DB
+  // ignore: unused-code
   AutoDisposeStreamProvider<List<Person>> all() => _allProvider;
 }
 
@@ -80,12 +81,14 @@ class PersonMutations extends StoreMutations {
   // before any caller adopts Store.people for edits. Unused today, so this is latent.
 
   /// Update a person's name
+  // ignore: unused-code
   Future<int> updateName(String personId, String name) async {
     await read(personApiRepositoryProvider).update(personId, name: name);
     return read(_peopleDb).updateName(personId, name);
   }
 
   /// Update a person's birthday
+  // ignore: unused-code
   Future<int> updateBirthday(String personId, DateTime birthday) async {
     await read(personApiRepositoryProvider).update(personId, birthday: birthday);
     return read(_peopleDb).updateBirthday(personId, birthday);

@@ -11,6 +11,7 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 class RecentlyTakenPage extends StatelessWidget {
   const RecentlyTakenPage({super.key});
 
+  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
 
   @override

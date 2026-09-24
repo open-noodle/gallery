@@ -34,6 +34,7 @@ class PhotosFilterSearchNotifier extends StateNotifier<PhotosFilterSearchState> 
   bool _disposed = false;
 
   /// Resolves when the page-1 load kicked in the constructor settles.
+  // ignore: unused-code
   late final Future<void> firstLoad;
 
   PhotosFilterSearchNotifier({required SearchService search, required SearchFilter filter})
@@ -56,7 +57,9 @@ class PhotosFilterSearchNotifier extends StateNotifier<PhotosFilterSearchState> 
 
   // Pagination/loading accessors for tests that drive the notifier directly.
   // UI consumers read these off [PhotosFilterSearchState] via the provider.
+  // ignore: unused-code
   int? get nextPage => state.nextPage;
+  // ignore: unused-code
   bool get isLoading => state.isLoading;
 
   Future<void> loadMore() async {
