@@ -91,6 +91,7 @@ ScrollDrainAction decideScrollDrain({
 /// segment in the same month — timeline buckets are typically monthly (their
 /// date is the first of the month), so the month fallback is what usually
 /// matches an asset taken mid-month. Returns null when nothing matches.
+// ignore: unused-code
 int? findMatchingSegmentIndex(List<DateTime?> segmentDates, DateTime target) {
   for (var i = 0; i < segmentDates.length; i++) {
     final d = segmentDates[i];

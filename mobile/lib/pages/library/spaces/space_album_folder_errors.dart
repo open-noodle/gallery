@@ -32,6 +32,7 @@ class SpaceAlbumFolderErrors {
   /// depth must be tested first or every depth error would report as a folder-cap error. The
   /// server spec additionally pins that the depth message does not contain 'folders', so the two
   /// stay unambiguous even if this order were ever disturbed.
+  // ignore: unused-code
   static const matchOrder = ['depth', 'cap', 'nameTaken'];
 }
 

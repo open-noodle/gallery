@@ -32,8 +32,10 @@ class MemoryData {
 
   String? get title => raw['title'] as String?;
 
+  // ignore: unused-code
   String? get subtitle => raw['subtitle'] as String?;
 
+  // ignore: unused-code
   MemoryData copyWith({Map<String, dynamic>? raw}) {
     return MemoryData(raw ?? this.raw);
   }
