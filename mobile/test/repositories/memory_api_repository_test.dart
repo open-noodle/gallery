@@ -171,6 +171,21 @@ void main() {
       expect(result.single.isSaved, false);
     });
 
+    test('maps a birthday memory without throwing', () async {
+      stubMemories([
+        memoryDto(
+          'birthday-memory',
+          type: api.MemoryType.birthday,
+          data: const {'personId': 'person-1', 'personName': 'Alice', 'year': 1990},
+          assets: [assetDto('a')],
+        ),
+      ]);
+
+      final result = await sut.getMemoryLane();
+
+      expect(result.single.type, MemoryTypeEnum.birthday);
+    });
+
     // The server orders by memoryAt desc; the lane renders the list as-is, so any reordering
     // in the mapping would silently shuffle the carousel.
     test('preserves the order the server returned', () async {
