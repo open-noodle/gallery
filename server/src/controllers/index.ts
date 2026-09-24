@@ -17,6 +17,7 @@ import { AuthController } from 'src/controllers/auth.controller.js';
 // To reverse: restore the import and the array entry below, and drop `person_personGroupId_key`.
 // import { ClusterGroupController } from 'src/controllers/cluster-group.controller.js';
 import { ClassificationController } from 'src/controllers/classification.controller.js';
+import { CleanupController } from 'src/controllers/cleanup.controller.js';
 import { ConfigAdminController } from 'src/controllers/config-admin.controller.js';
 import { ConfigPublicController } from 'src/controllers/config-public.controller.js';
 import { ConfigUserController } from 'src/controllers/config-user.controller.js';
@@ -73,6 +74,7 @@ export const controllers = [
   AuthAdminController,
   // ClusterGroupController — see the note at the top of this file; intentionally not mounted.
   ClassificationController,
+  CleanupController,
   ConfigUserController,
   ConfigAdminController,
   ConfigPublicController,
