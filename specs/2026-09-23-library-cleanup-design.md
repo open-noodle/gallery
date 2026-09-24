@@ -29,7 +29,8 @@ can be undone until the trash is emptied.
   duplicates queue is a count plus a link; the existing `/utilities/duplicates` page is not rebuilt.
 - A daily **Rewind**, a year **calendar** where reviewed dates fill in, and a streak.
 - "Trash" always means the recoverable trash. Nothing is permanently deleted from Cleanup except through the
-  existing "Empty trash" action.
+  existing "Empty trash" action — unless the administrator has turned the trash off, in which case Cleanup
+  deletes permanently after an explicit confirmation, as the duplicates utility does (see Edge cases).
 
 **Not in v1**
 
@@ -410,6 +411,7 @@ assets.
 | Asset without an embedding in a time-window burst                      | That group fails the CLIP check and is not shown. Groups formed from the camera's burst id are not affected                                                             |
 | Burst group straddling a page boundary                                 | Never split; the scan extends past the window                                                                                                                           |
 | Owned assets that are also in a Space                                  | The confirmation warns that trashing removes them for Space members too                                                                                                 |
+| Trash turned off (`trash.enabled = false`)                             | `commit` deletes permanently (`AssetStatus.Deleted` + `AssetDeleteAll`), like the duplicates utility. Every web trash action asks "Permanently delete" first, the toast offers no Undo, and the hub hides the trash footer |
 | Uncommitted rewind marks and the user navigates away                   | A confirmation modal appears                                                                                                                                            |
 | Asset viewer open                                                      | Cleanup shortcuts are turned off, so the viewer's own `z` and `Space` still work                                                                                        |
 

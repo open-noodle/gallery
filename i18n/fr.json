@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "Mettre {count} à la corbeille",
   "cleanup_no_assets_found": "Aucun élément correspondant aux critères ci-dessus n'a été trouvé. Libérer de l'espace peut seulement supprimer les médias qui ont été sauvegardés sur le serveur",
   "cleanup_not_a_problem": "Pas de problème (conserver)",
+  "cleanup_permanent_delete_prompt": "La corbeille est désactivée sur ce serveur : {count, plural, one {cette photo sera supprimée} other {ces # photos seront supprimées}} définitivement. Cette action est irréversible.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# photo se trouve aussi dans un espace partagé et sera aussi supprimée pour les membres de l'espace.} other {# photos se trouvent aussi dans un espace partagé et seront aussi supprimées pour les membres de l'espace.}}",
   "cleanup_photo": "Photo",
   "cleanup_photo_position": "Photo {index} sur {total}",
   "cleanup_preview_title": "Éléments à supprimer ({count})",

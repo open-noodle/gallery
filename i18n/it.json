@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "Sposta {count} nel cestino",
   "cleanup_no_assets_found": "Nessuna risorsa trovata con i criteri specificati. Libera spazio può solo rimuovere le risorse che sono state salvate sul server",
   "cleanup_not_a_problem": "Nessun problema (mantieni)",
+  "cleanup_permanent_delete_prompt": "Il cestino è disattivato su questo server, quindi {count, plural, one {questa foto verrà eliminata} other {queste # foto verranno eliminate}} definitivamente. L'operazione non può essere annullata.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# foto è anche in uno Space condiviso e verrà rimossa anche per i membri dello Space.} other {# foto sono anche in uno Space condiviso e verranno rimosse anche per i membri dello Space.}}",
   "cleanup_photo": "Foto",
   "cleanup_photo_position": "Foto {index} di {total}",
   "cleanup_preview_title": "Risorse da rimuovere ({count})",

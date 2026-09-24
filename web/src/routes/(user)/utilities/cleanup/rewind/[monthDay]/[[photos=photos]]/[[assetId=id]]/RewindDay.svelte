@@ -12,7 +12,7 @@
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
-  import { confirmTrashInSpaces } from '$lib/utils/cleanup-actions';
+  import { confirmCleanupTrash, showRemovedToast } from '$lib/utils/cleanup-actions';
   import {
     browserTimeZone,
     dominantCity,
@@ -27,7 +27,6 @@
     commitCleanup,
     getCleanupCalendar,
     getCleanupRewindAssets,
-    restoreAssets,
     type CleanupAssetDto,
     type CleanupRewindYearDto,
   } from '@immich/sdk';
@@ -292,30 +291,6 @@
     }
   };
 
-  const showTrashedToast = (trashed: string[], onRestored?: () => void) => {
-    if (trashed.length === 0) {
-      return;
-    }
-    toastManager.primary(
-      {
-        description: $t('assets_trashed_count', { values: { count: trashed.length } }),
-        button: {
-          label: $t('undo'),
-          color: 'secondary',
-          onclick: async () => {
-            try {
-              await restoreAssets({ bulkIdsDto: { ids: trashed } });
-              onRestored?.();
-            } catch (error) {
-              handleError(error, $t('errors.unable_to_restore_assets'));
-            }
-          },
-        },
-      },
-      { timeout: 5000 },
-    );
-  };
-
   const showSkippedToast = (skipped: number) => {
     if (skipped > 0) {
       toastManager.warning($t('cleanup_skipped_count', { values: { count: skipped } }));
@@ -325,18 +300,19 @@
   const trashMarkedIds = () => [...session.marks].filter(([, mark]) => mark === 'trash').map(([id]) => id);
 
   /**
-   * Trashing a photo that is also in a shared space removes it for the space's members too, so the
-   * user confirms that first. Resolves to false when they cancel or the check fails; nothing has
-   * been committed then, and the marks stay.
+   * Trashing a photo that is also in a shared space removes it for the space's members too, and
+   * with the server's trash turned off the delete is permanent, so the user confirms either first.
+   * Resolves to false when they cancel or the check fails; nothing has been committed then, and
+   * the marks stay.
    */
-  const confirmSpaces = async () => {
+  const confirmTrash = async () => {
     const ids = trashMarkedIds();
     if (ids.length === 0) {
       return true;
     }
     checkingSpaces = true;
     try {
-      return await confirmTrashInSpaces(ids);
+      return await confirmCleanupTrash(ids);
     } catch (error) {
       handleError(error, $t('errors.unable_to_delete_assets'));
       return false;
@@ -349,14 +325,14 @@
     if (busy || session.counts.trash === 0) {
       return;
     }
-    if (!(await confirmSpaces())) {
+    if (!(await confirmTrash())) {
       return;
     }
     try {
       const { trashed, skipped } = await session.commitTrash();
       const removed = trashed.map((id) => assetById.get(id)).filter((asset) => asset !== undefined);
       removeAssets(trashed);
-      showTrashedToast(trashed, () => reinsertAssets(removed));
+      showRemovedToast(trashed, () => reinsertAssets(removed));
       showSkippedToast(skipped);
     } catch (error) {
       handleError(error, $t('errors.unable_to_delete_assets'));
@@ -367,13 +343,13 @@
     if (busy) {
       return;
     }
-    if (!(await confirmSpaces())) {
+    if (!(await confirmTrash())) {
       return;
     }
     try {
       const { trashed, skipped } = await session.finishDay();
       toastManager.success($t('cleanup_day_complete'));
-      showTrashedToast(trashed);
+      showRemovedToast(trashed);
       showSkippedToast(skipped);
     } catch (error) {
       handleError(error, $t('cleanup_finish_day_failed'));

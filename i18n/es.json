@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "Mover {count} a la papelera",
   "cleanup_no_assets_found": "No se encontraron recursos que coincidan con los criterios anteriores. Liberar espacio solo puede eliminar recursos respaldados en el servidor",
   "cleanup_not_a_problem": "No es un problema (conservar)",
+  "cleanup_permanent_delete_prompt": "La papelera está desactivada en este servidor, así que {count, plural, one {esta foto se borrará} other {estas # fotos se borrarán}} permanentemente. No se puede deshacer.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# foto también está en un Space compartido y se quitará también para los miembros del Space.} other {# fotos también están en un Space compartido y se quitarán también para los miembros del Space.}}",
   "cleanup_photo": "Foto",
   "cleanup_photo_position": "Foto {index} de {total}",
   "cleanup_preview_title": "{count} recursos a eliminar",

@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "{count} naar prullenbak verplaatsen",
   "cleanup_no_assets_found": "Er zijn geen bestanden gevonden die aan bovenstaande criteria voldoen. Free Up Space kan alleen bestanden verwijderen die op de server zijn geback-upt",
   "cleanup_not_a_problem": "Geen probleem (behouden)",
+  "cleanup_permanent_delete_prompt": "De prullenbak staat uit op deze server, dus {count, plural, one {deze foto wordt} other {deze # foto's worden}} permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# foto staat ook in een gedeelde Space en wordt ook voor de leden van de Space verwijderd.} other {# foto's staan ook in een gedeelde Space en worden ook voor de leden van de Space verwijderd.}}",
   "cleanup_photo": "Foto",
   "cleanup_photo_position": "Foto {index} van {total}",
   "cleanup_preview_title": "Bestanden te verwijderen ({count})",

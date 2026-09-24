@@ -400,9 +400,17 @@ export class CleanupService extends BaseService {
 
     // Step 1-2: trash + its event, ahead of and independent from the transaction below — a trashed
     // asset should land even if the (unrelated) day-review write below fails.
+    // With the trash disabled there is nothing to recover from, so — like the duplicates utility and
+    // `AssetService.deleteAll` with `force` — the delete is permanent rather than a soft-delete the
+    // nightly job would purge anyway. The web asks for a "permanently delete" confirmation first.
     if (trash.length > 0) {
-      await this.assetRepository.updateAll(trash, { deletedAt: new Date(), status: AssetStatus.Trashed });
-      await this.eventRepository.emit('AssetTrashAll', { assetIds: trash, userId });
+      const { trash: trashConfig } = await this.getConfig({ withCache: true });
+      const isForce = !trashConfig.enabled;
+      await this.assetRepository.updateAll(trash, {
+        deletedAt: new Date(),
+        status: isForce ? AssetStatus.Deleted : AssetStatus.Trashed,
+      });
+      await this.eventRepository.emit(isForce ? 'AssetDeleteAll' : 'AssetTrashAll', { assetIds: trash, userId });
     }
 
     // Steps 3-5 (favourite, keep, complete-the-day) share one database transaction.

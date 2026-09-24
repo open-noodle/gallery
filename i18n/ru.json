@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "Переместить в корзину ({count})",
   "cleanup_no_assets_found": "Не обнаружено объектов по указанным критериям. Освободить место можно только удалив объекты, которые загружены на сервер.",
   "cleanup_not_a_problem": "Всё в порядке (оставить)",
+  "cleanup_permanent_delete_prompt": "Корзина на этом сервере отключена, поэтому {count, plural, one {это фото будет удалено} few {эти # фото будут удалены} many {эти # фото будут удалены} other {эти # фото будут удалены}} навсегда. Это действие нельзя отменить.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# фото также находится в общем Space и исчезнет и для участников Space.} few {# фото также находятся в общем Space и исчезнут и для участников Space.} many {# фото также находятся в общем Space и исчезнут и для участников Space.} other {# фото также находятся в общем Space и исчезнут и для участников Space.}}",
   "cleanup_photo": "Фото",
   "cleanup_photo_position": "Фото {index} из {total}",
   "cleanup_preview_title": "Объекты для удаления ({count} шт.)",

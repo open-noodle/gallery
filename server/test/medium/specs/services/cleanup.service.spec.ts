@@ -2,11 +2,14 @@ import { Kysely } from 'kysely';
 import { AssetStatus, CleanupQueue } from 'src/enum.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { DB } from 'src/schema/index.js';
 import { CleanupService } from 'src/services/cleanup.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -16,7 +19,8 @@ let defaultDatabase: Kysely<DB>;
 const setup = (db?: Kysely<DB>) => {
   const { sut, ctx } = newMediumService(CleanupService, {
     database: db || defaultDatabase,
-    real: [AssetRepository, CleanupRepository],
+    // Config + system metadata: commit reads `trash.enabled` to choose soft- or force-delete.
+    real: [AssetRepository, CleanupRepository, ConfigRepository, SystemMetadataRepository],
     mock: [EventRepository, JobRepository, LoggingRepository],
   });
 
@@ -35,6 +39,10 @@ const getAssetRow = (ctx: MediumTestContext, id: string) =>
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
+});
+
+beforeEach(() => {
+  clearConfigCache();
 });
 
 describe(CleanupService.name, () => {
@@ -62,6 +70,37 @@ describe(CleanupService.name, () => {
       const row = await getAssetRow(ctx, asset.id);
       expect(row!.status).toBe(AssetStatus.Trashed);
       expect(row!.deletedAt).not.toBeNull();
+    });
+
+    it('deletes permanently when the trash is disabled', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const auth = factory.auth({ user: { id: user.id } });
+
+      const config = await ctx.getConfig();
+      await ctx.updateConfig({ ...config, trash: { ...config.trash, enabled: false } });
+      clearConfigCache();
+      try {
+        const res = await sut.commit(auth, {
+          queue: CleanupQueue.Rewind,
+          trashIds: [asset.id],
+          favoriteIds: [],
+          keepIds: [],
+        });
+
+        expect(res.trashed).toEqual([asset.id]);
+        expect(ctx.getMock(EventRepository).emit).toHaveBeenCalledWith('AssetDeleteAll', {
+          assetIds: [asset.id],
+          userId: user.id,
+        });
+        const row = await getAssetRow(ctx, asset.id);
+        expect(row!.status).toBe(AssetStatus.Deleted);
+        expect(row!.deletedAt).not.toBeNull();
+      } finally {
+        await ctx.updateConfig(config);
+        clearConfigCache();
+      }
     });
 
     it('skips an already-trashed asset without changing its deletedAt', async () => {

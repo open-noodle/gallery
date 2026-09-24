@@ -1186,6 +1186,8 @@
   "cleanup_move_to_trash": "將 {count} 項移至垃圾桶",
   "cleanup_no_assets_found": "找不到符合上述條件的項目。釋放空間功能僅能移除已備份至伺服器的項目",
   "cleanup_not_a_problem": "沒問題（保留）",
+  "cleanup_permanent_delete_prompt": "此伺服器已關閉垃圾桶，{count, plural, other {這 # 張相片將被永久刪除}}。此操作無法復原。",
+  "cleanup_permanent_delete_space_warning": "{count, plural, other {# 張相片也在共享 Space 中，Space 成員也將無法再看到這些相片。}}",
   "cleanup_photo": "相片",
   "cleanup_photo_position": "第 {index} 張，共 {total} 張",
   "cleanup_preview_title": "{count} 項需要移除的項目",

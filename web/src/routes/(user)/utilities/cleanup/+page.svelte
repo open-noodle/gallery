@@ -7,6 +7,7 @@
   import { handleEmptyTrash } from '$lib/services/trash.service';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { browserTimeZone, monthDayLabel, todayMonthDay } from '$lib/utils/cleanup';
+  import { isTrashEnabled } from '$lib/utils/cleanup-actions';
   import { handleError } from '$lib/utils/handle-error';
   import {
     CleanupCountQueue,
@@ -55,6 +56,8 @@
   };
 
   const today = todayMonthDay();
+  // With the trash turned off Cleanup deletes permanently, so the rail has no trash footer to show.
+  const showTrash = isTrashEnabled();
 
   let calendar = $state<CleanupCalendarResponseDto>();
   let trash = $state<CleanupTrashResponseDto>();
@@ -171,7 +174,7 @@
   };
 
   onMount(() => {
-    void Promise.all([loadCalendar(), loadTrash(), ...QUEUES.map((queue) => loadCount(queue))]);
+    void Promise.all([loadCalendar(), ...(showTrash ? [loadTrash()] : []), ...QUEUES.map((queue) => loadCount(queue))]);
     startPeek(today, 0);
   });
 
@@ -276,7 +279,7 @@
         </Card>
       </div>
 
-      <CleanupQueueRail {counts} {trash} {covers} onEmptyTrash={() => void onEmptyTrash()} />
+      <CleanupQueueRail {counts} {trash} {covers} {showTrash} onEmptyTrash={() => void onEmptyTrash()} />
     </div>
   </div>
 </UserPageLayout>

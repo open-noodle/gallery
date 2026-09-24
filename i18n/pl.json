@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "Przenieś do kosza ({count})",
   "cleanup_no_assets_found": "Nie znaleziono żadnych zasobów spełniających podane kryteria. Zwolnij Miejsce może usuwać jedynie zasoby, które posiadają kopię zapasową na serwerze",
   "cleanup_not_a_problem": "To nie problem (zachowaj)",
+  "cleanup_permanent_delete_prompt": "Kosz jest wyłączony na tym serwerze, więc {count, plural, one {to zdjęcie zostanie usunięte} few {te # zdjęcia zostaną usunięte} many {tych # zdjęć zostanie usuniętych} other {te # zdjęcia zostaną usunięte}} trwale. Tej operacji nie można cofnąć.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# zdjęcie jest też w udostępnionym Space i zostanie usunięte także dla członków Space.} few {# zdjęcia są też w udostępnionym Space i zostaną usunięte także dla członków Space.} many {# zdjęć jest też w udostępnionym Space i zostanie usuniętych także dla członków Space.} other {# zdjęcia jest też w udostępnionym Space i zostaną usunięte także dla członków Space.}}",
   "cleanup_photo": "Zdjęcie",
   "cleanup_photo_position": "Zdjęcie {index} z {total}",
   "cleanup_preview_title": "Zasoby do usunięcia ({count})",

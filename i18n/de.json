@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "{count} in den Papierkorb verschieben",
   "cleanup_no_assets_found": "Keine passenden Assets gefunden. Speicherbereinigung kann nur auf Assets angewendet werden, die bereits auf den Server gesichert wurden",
   "cleanup_not_a_problem": "Kein Problem (behalten)",
+  "cleanup_permanent_delete_prompt": "Der Papierkorb ist auf diesem Server deaktiviert, daher {count, plural, one {wird dieses Foto} other {werden diese # Fotos}} endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# Foto ist} other {# Fotos sind}} auch in einem geteilten Space und {count, plural, one {verschwindet} other {verschwinden}} auch für die Mitglieder des Space.",
   "cleanup_photo": "Foto",
   "cleanup_photo_position": "Foto {index} von {total}",
   "cleanup_preview_title": "Zu löschende Assets ({count})",

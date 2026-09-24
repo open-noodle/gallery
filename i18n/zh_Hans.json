@@ -1183,6 +1183,8 @@
   "cleanup_move_to_trash": "将 {count} 项移至回收站",
   "cleanup_no_assets_found": "未找到符合上述条件的文件。“释放空间”仅能移除已备份至服务器的文件",
   "cleanup_not_a_problem": "没问题（保留）",
+  "cleanup_permanent_delete_prompt": "此服务器已关闭回收站，{count, plural, other {这 # 张照片将被永久删除}}。此操作无法撤销。",
+  "cleanup_permanent_delete_space_warning": "{count, plural, other {# 张照片也在共享 Space 中，Space 成员也将无法再看到它们。}}",
   "cleanup_photo": "照片",
   "cleanup_photo_position": "第 {index} 张，共 {total} 张",
   "cleanup_preview_title": "待移除的照片/视频（{count}）",

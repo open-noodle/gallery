@@ -1188,6 +1188,8 @@
   "cleanup_move_to_trash": "Move {count} to trash",
   "cleanup_no_assets_found": "No assets found matching the criteria above. Free Up Space can only remove assets that have been backed up to the server",
   "cleanup_not_a_problem": "Not a problem (keep)",
+  "cleanup_permanent_delete_prompt": "The trash is turned off on this server, so {count, plural, one {this photo is} other {these # photos are}} deleted permanently. This cannot be undone.",
+  "cleanup_permanent_delete_space_warning": "{count, plural, one {# photo is} other {# photos are}} also in a shared space and will be removed for space members too.",
   "cleanup_photo": "Photo",
   "cleanup_photo_position": "Photo {index} of {total}",
   "cleanup_preview_title": "Assets to remove ({count})",
