@@ -38,6 +38,8 @@ import {
   encodeCursor,
   exposureStats,
   groupBursts,
+  isCleanupCursorId,
+  isCleanupCursorSize,
   isCleanupCursorTimestamp,
   isScreenshotCandidate,
   laplacianVariance,
@@ -68,7 +70,7 @@ const mapAsset = (row: CleanupAssetRow) => ({ ...row, localDateTime: row.localDa
 const decodeDateIdCursor = (raw: string): CleanupCursor => {
   const cursor = decodeCursor(raw);
   const [date, id] = cursor.v;
-  if (cursor.v.length !== 2 || typeof date !== 'string' || typeof id !== 'string' || !isCleanupCursorTimestamp(date)) {
+  if (cursor.v.length !== 2 || typeof date !== 'string' || !isCleanupCursorTimestamp(date) || !isCleanupCursorId(id)) {
     throw new BadRequestException('Invalid cursor');
   }
   return cursor;
@@ -77,7 +79,7 @@ const decodeDateIdCursor = (raw: string): CleanupCursor => {
 const decodeSizeIdCursor = (raw: string): CleanupCursor => {
   const cursor = decodeCursor(raw);
   const [size, id] = cursor.v;
-  if (cursor.v.length !== 2 || typeof size !== 'number' || typeof id !== 'string') {
+  if (cursor.v.length !== 2 || !isCleanupCursorSize(size) || !isCleanupCursorId(id)) {
     throw new BadRequestException('Invalid cursor');
   }
   return cursor;
