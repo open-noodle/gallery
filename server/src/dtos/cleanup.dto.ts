@@ -75,10 +75,14 @@ export class CleanupDecisionDeleteDto extends createZodDto(
 export class CleanupInSpacesDto extends createZodDto(z.object({ assetIds: ids }).meta({ id: 'CleanupInSpacesDto' })) {}
 
 const CleanupCountResponseSchema = z
-  .object({ count: z.int(), bytes: z.number(), analysedPercent: z.number().optional() })
+  .object({
+    count: z.int(),
+    bytes: z.number().meta({ format: 'double' }),
+    analysedPercent: z.number().meta({ format: 'double' }).optional(),
+  })
   .meta({ id: 'CleanupCountResponseDto' });
 const CleanupTrashResponseSchema = z
-  .object({ count: z.int(), bytes: z.number() })
+  .object({ count: z.int(), bytes: z.number().meta({ format: 'double' }) })
   .meta({ id: 'CleanupTrashResponseDto' });
 const CleanupCalendarDaySchema = z
   .object({ monthDay: z.int(), assetCount: z.int(), reviewedAt: z.string().nullable() })
@@ -98,14 +102,14 @@ export const CleanupAssetSchema = z
     thumbhash: z.string().nullable(),
     width: z.int().nullable(),
     height: z.int().nullable(),
-    duration: z.number().nullable(),
-    fileSize: z.number(),
+    duration: z.number().meta({ format: 'double' }).nullable(),
+    fileSize: z.number().meta({ format: 'double' }),
     isFavorite: z.boolean(),
     inAlbum: z.boolean(),
     city: z.string().nullable(),
     kept: z.boolean(),
     reason: CleanupBlurReasonSchema.optional(),
-    sharpness: z.number().nullable().optional(),
+    sharpness: z.number().meta({ format: 'double' }).nullable().optional(),
   })
   .meta({ id: 'CleanupAssetDto' });
 const CleanupRewindAssetsResponseSchema = z
