@@ -4,6 +4,7 @@ class SpaceAlbumFolder {
   const SpaceAlbumFolder({required this.id, required this.spaceId, required this.parentId, required this.name});
 
   final String id;
+  // ignore: unused-code
   final String spaceId;
   final String? parentId;
   final String name;
