@@ -1,3 +1,5 @@
+import { CleanupCountQueue, CleanupQueue, CleanupListQueue as SdkCleanupListQueue } from '@immich/sdk';
+
 export type CleanupQueueSlug = 'space-hogs' | 'bursts' | 'screenshots' | 'blurry';
 export type CleanupListQueue = 'space_hogs' | 'bursts' | 'screenshots' | 'blurry';
 
@@ -8,6 +10,29 @@ export const CLEANUP_QUEUE_SLUGS: Record<CleanupQueueSlug, CleanupListQueue> = {
   blurry: 'blurry',
 };
 export const slugToQueue = (slug: CleanupQueueSlug): CleanupListQueue => CLEANUP_QUEUE_SLUGS[slug];
+
+/** The SDK enums for a queue: listing, counting and committing each use their own. */
+export const CLEANUP_SDK_QUEUES: Record<
+  CleanupListQueue,
+  { list: SdkCleanupListQueue; count: CleanupCountQueue; commit: CleanupQueue }
+> = {
+  space_hogs: {
+    list: SdkCleanupListQueue.SpaceHogs,
+    count: CleanupCountQueue.SpaceHogs,
+    commit: CleanupQueue.SpaceHogs,
+  },
+  bursts: { list: SdkCleanupListQueue.Bursts, count: CleanupCountQueue.Bursts, commit: CleanupQueue.Bursts },
+  screenshots: {
+    list: SdkCleanupListQueue.Screenshots,
+    count: CleanupCountQueue.Screenshots,
+    commit: CleanupQueue.Screenshots,
+  },
+  blurry: { list: SdkCleanupListQueue.Blurry, count: CleanupCountQueue.Blurry, commit: CleanupQueue.Blurry },
+};
+
+/** Must match the server's default, which the hub's Space hogs count uses: 100 MiB. */
+export const CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE = 104_857_600;
+export const CLEANUP_SPACE_HOG_MIN_SIZES = [52_428_800, CLEANUP_SPACE_HOG_DEFAULT_MIN_SIZE, 524_288_000, 1_073_741_824];
 export const queueToSlug = (queue: CleanupListQueue): CleanupQueueSlug =>
   (Object.keys(CLEANUP_QUEUE_SLUGS) as CleanupQueueSlug[]).find((s) => CLEANUP_QUEUE_SLUGS[s] === queue)!;
 
@@ -98,3 +123,36 @@ export const monthDayShortLabel = (monthDay: number, locale: string) =>
   new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
     new Date(LEAP_YEAR, Math.floor(monthDay / 100) - 1, monthDay % 100),
   );
+
+export type BurstMark = 'keep' | 'trash';
+
+type BurstGroupLike = { suggestedKeepId: string; assets: Array<{ id: string }> };
+
+/** A burst photo's mark: whatever the user set, else keep for the suggested pick and trash for the rest. */
+export const burstMarkOf = (group: BurstGroupLike, marks: ReadonlyMap<string, BurstMark>, id: string): BurstMark =>
+  marks.get(id) ?? (id === group.suggestedKeepId ? 'keep' : 'trash');
+
+/** Splits every member of a burst group into keep and trash, by its current mark. */
+export const burstDecision = (group: BurstGroupLike, marks: ReadonlyMap<string, BurstMark>) => {
+  const keepIds: string[] = [];
+  const trashIds: string[] = [];
+  for (const { id } of group.assets) {
+    (burstMarkOf(group, marks, id) === 'keep' ? keepIds : trashIds).push(id);
+  }
+  return { keepIds, trashIds };
+};
+
+/**
+ * "12 Aug 2024 · 14:03:21 → 14:03:24". `localDateTime` is the wall-clock time at capture stored as
+ * if it were UTC, so it is formatted in UTC to show that time unchanged.
+ */
+export const burstTimeRange = (from: string, to: string, locale: string) => {
+  const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'UTC',
+  });
+  return `${date.format(new Date(from))} · ${time.format(new Date(from))} → ${time.format(new Date(to))}`;
+};
