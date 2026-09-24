@@ -52,6 +52,7 @@ class CollapsedSectionsNotifier extends Notifier<Set<FilterSectionId>> {
   @override
   Set<FilterSectionId> build() => ref.read(filterSectionPrefsProvider).loadCollapsed();
 
+  // ignore: unused-code
   bool isCollapsed(FilterSectionId id) => state.contains(id);
 
   void toggle(FilterSectionId id) {

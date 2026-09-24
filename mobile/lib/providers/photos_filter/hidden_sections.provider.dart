@@ -54,6 +54,7 @@ class HiddenSectionsNotifier extends Notifier<Set<FilterSectionId>> {
   @override
   Set<FilterSectionId> build() => ref.read(filterSectionVisibilityPrefsProvider).loadHidden();
 
+  // ignore: unused-code
   bool isVisible(FilterSectionId id) => !state.contains(id);
 
   void setVisible(FilterSectionId id, bool visible) {

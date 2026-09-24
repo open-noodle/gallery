@@ -87,6 +87,7 @@ List<FolderNode> buildFolderTree(List<SpaceAlbumFolder> folders) {
   return roots;
 }
 
+// ignore: unused-code
 List<SpaceAlbumFolder> folderPath(List<SpaceAlbumFolder> folders, String? folderId) {
   if (folderId == null) {
     return const [];
@@ -140,9 +141,11 @@ List<SpaceAlbum> _albumsInSubtree(List<SpaceAlbumFolder> folders, List<SpaceAlbu
   return albums.where((a) => a.folderId != null && ids.contains(a.folderId)).toList();
 }
 
+// ignore: unused-code
 int recursiveAlbumCount(List<SpaceAlbumFolder> folders, List<SpaceAlbum> albums, String folderId) =>
     _albumsInSubtree(folders, albums, folderId).length;
 
+// ignore: unused-code
 List<SpaceAlbum> folderPreviewAlbums(List<SpaceAlbumFolder> folders, List<SpaceAlbum> albums, String folderId) {
   // Filter, then sort, then take — in that exact order.
   //

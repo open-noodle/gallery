@@ -103,6 +103,7 @@ extension WhenQueryAccess on WhenQuery {
   };
 
   /// Returns the decade start year if this is a [WhenQuery.decade], else null.
+  // ignore: unused-code
   int? get decadeStartValue => switch (this) {
     _DecadeQuery(:final decadeStart) => decadeStart,
     _ => null,
