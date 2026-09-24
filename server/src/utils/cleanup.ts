@@ -5,6 +5,14 @@ export const CLEANUP_BURST_CLIP_MAX_DISTANCE = 0.1;
 /** Extra windows `fetchBurstWindow` may append while a burst straddles the window edge. */
 export const CLEANUP_BURST_MAX_EXTENSIONS = 10;
 export const CLEANUP_BURST_WINDOW = 2000;
+/**
+ * Burst-window queries one bursts page may start. A library with few bursts would otherwise scan to
+ * its end looking for `limit` groups (~250 windows at 500k assets). At ~13 ms per window query
+ * (500k seed), 8 windows cost ~105 ms; the worst case — a burst still straddling the last window's
+ * edge — adds up to `CLEANUP_BURST_MAX_EXTENSIONS` more, ~235 ms, still under the 300 ms budget. Past
+ * the cap the page ends early (possibly empty) with a cursor, and the client asks for the next one.
+ */
+export const CLEANUP_BURST_MAX_WINDOWS_PER_PAGE = 8;
 export const CLEANUP_BLUR_THRESHOLDS = { lenient: 25, balanced: 60, strict: 110 } as const;
 export const CLEANUP_DARK = { maxBrightness: 35, minClippedDark: 0.5 } as const;
 export const CLEANUP_BRIGHT = { minClippedBright: 0.4 } as const;
