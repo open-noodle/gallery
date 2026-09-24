@@ -384,12 +384,14 @@
   $effect(() => {
     for (const person of people) {
       const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
-      if (spaceId && !requestedSpaceRoles.has(spaceId)) {
-        requestedSpaceRoles.add(spaceId);
-        void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
-          editableSpaces.set(spaceId, editable);
-        });
+      if (!spaceId || requestedSpaceRoles.has(spaceId)) {
+        continue;
       }
+
+      requestedSpaceRoles.add(spaceId);
+      void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
+        editableSpaces.set(spaceId, editable);
+      });
     }
   });
   const canEditSpacePerson = (person: PersonResponseDto) => {
