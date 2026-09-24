@@ -32,6 +32,7 @@ class RemoteAlbumPage extends ConsumerStatefulWidget {
 
   const RemoteAlbumPage({super.key, required this.album});
 
+  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
 
   @override

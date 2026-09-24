@@ -15,6 +15,7 @@ class PeopleService {
 
   PeopleService(this._repository, this._personApiRepository, this._sharedSpaceApiRepository);
 
+  // ignore: unused-code
   Future<Person?> get(String personId) {
     return _repository.watchPerson(personId).first;
   }
@@ -42,6 +43,7 @@ class PeopleService {
   }
 
   /// Kept alongside [watch] as the offline-fallback path of [getAllPeopleWithSharedSpaces].
+  // ignore: unused-code
   Future<List<Person>> getAllPeople({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
     return _repository.getAllPeople(minFaces: minFaces, sortBy: sortBy);
   }

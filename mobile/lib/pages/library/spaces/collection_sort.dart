@@ -23,6 +23,7 @@ enum SpaceAlbumSortMode {
 
   const SpaceAlbumSortMode(this.storeIndex, this.label, this.defaultOrder);
 
+  // ignore: unused-code
   final int storeIndex;
   final String label;
   final SortOrder defaultOrder;
@@ -40,6 +41,7 @@ enum SpaceSortMode {
 
   const SpaceSortMode(this.storeIndex, this.label, this.defaultOrder);
 
+  // ignore: unused-code
   final int storeIndex;
   final String label;
   final SortOrder defaultOrder;
