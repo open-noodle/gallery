@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_tags_strip.widget.dart';
-import 'package:immich_mobile/providers/infrastructure/tag.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 import '../../../../widget_tester_extensions.dart';
 
-class _FakeTagNotifier extends TagNotifier {
-  final Set<Tag> tags;
-  _FakeTagNotifier(this.tags);
-
-  @override
-  Future<Set<Tag>> build() async => tags;
-}
-
 Tag _t(String id, String value) => Tag(id: id, value: value);
 
-List<Override> _overrides(Set<Tag> tags) => [tagProvider.overrideWith(() => _FakeTagNotifier(tags))];
+List<Override> _overrides(Set<Tag> tags) => [Store.tags.all().overrideWith((ref) async => tags.toList())];
 
 void main() {
   group('SelectedTagsStrip', () {

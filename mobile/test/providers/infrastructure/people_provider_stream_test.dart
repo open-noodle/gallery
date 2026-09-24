@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/db/main/dao/person.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/user_metadata.model.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/user_metadata.provider.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -62,7 +62,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         peopleServiceProvider.overrideWithValue(service),
-        userMetadataPreferencesProvider.overrideWith((ref) async => const Preferences(minimumFaces: 7)),
+        Store.userMetadata.preferences().overrideWith((ref) => Stream.value(const Preferences(minimumFaces: 7))),
       ],
     );
     addTearDown(container.dispose);
@@ -83,7 +83,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         peopleServiceProvider.overrideWithValue(service),
-        userMetadataPreferencesProvider.overrideWith((ref) async => null),
+        Store.userMetadata.preferences().overrideWith((ref) => Stream.value(null)),
       ],
     );
     addTearDown(container.dispose);
@@ -110,7 +110,7 @@ void main() {
       overrides: [
         driftProvider.overrideWithValue(ctx.db),
         apiServiceProvider.overrideWithValue(_MockApiService()),
-        userMetadataPreferencesProvider.overrideWith((ref) async => null),
+        Store.userMetadata.preferences().overrideWith((ref) => Stream.value(null)),
       ],
     );
     addTearDown(container.dispose);
