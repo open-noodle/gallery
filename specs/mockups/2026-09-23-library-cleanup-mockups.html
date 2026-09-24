@@ -241,6 +241,408 @@ button{font-family:inherit}
 .swbtns{display:flex;justify-content:center;gap:16px;padding:10px 0 18px}
 .swbtns span{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-size:20px;font-weight:700}
 
+/* ---------- recorded decisions ---------- */
+.decide{margin-top:26px;padding:20px 22px}
+.decide h2{font-size:20px;margin-bottom:4px}
+.qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:14px}
+.qq{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--subtle)}
+.qq h4{font-size:14px;margin-bottom:8px}
+
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr}.side{display:none}
+  .hero,.hubB,.one{grid-template-columns:1fr}
+  .hero-r{border-left:0;border-top:1px solid var(--primary-tint-2)}
+  .hog{grid-template-columns:60px minmax(0,1fr) auto}.hog .szcol{display:none}
+  .series .row{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .logo{width:auto}
+}
+</style>
+</head>
+<body>
+<div class="doc">
+  <div class="doc-head">
+    <div>
+      <h1>Library Cleanup: visual reference</h1>
+      <p>This is the visual reference for <code>specs/2026-09-23-library-cleanup-design.md</code>. Build what tabs <b>2–6</b> show. Tab 1 is the rejected hub layout, and tab 7 (mobile) is not in version 1; both are kept for context. Coloured blocks stand in for photos. Where this page and the spec disagree, the spec wins.</p>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-s="hubA">1 · Hub A <small>not chosen</small></button>
+    <button class="tab" role="tab" data-s="hubB" aria-selected="true">2 · Hub <small>calendar-first · chosen</small></button>
+    <button class="tab" role="tab" data-s="rewind">3 · Daily rewind</button>
+    <button class="tab" role="tab" data-s="bursts">4 · Bursts &amp; series</button>
+    <button class="tab" role="tab" data-s="blurry">5 · Blurry &amp; botched</button>
+    <button class="tab" role="tab" data-s="hogs">6 · Space hogs</button>
+    <button class="tab" role="tab" data-s="mobile">7 · Mobile <small>later, not v1</small></button>
+  </div>
+
+  <!-- =========================== HUB A (not chosen) =========================== -->
+  <section class="screen" id="hubA" hidden>
+    <div class="note" style="margin:0 0 12px;background:#fcecec;border-color:#f6d0d0;color:#7a1f1f"><b>Not chosen.</b> Kept for context only. The hub is tab 2.</div>
+    <div class="frame">
+      <div class="topbar"><div class="logo"><i></i>Gallery</div><div class="search">Search your photos</div><div class="avatar">P</div></div>
+      <div class="shell">
+        <aside class="side" data-side="cleanup"></aside>
+        <main class="main">
+          <div class="page-h">
+            <div><h2>Cleanup</h2><p class="muted">Relive a day, tidy as you go.</p></div>
+            <div class="right stats">
+              <div class="stat">Could still free<b class="num">14.9 GB</b></div>
+              <div class="stat">Library<b class="num">412 GB</b></div>
+            </div>
+          </div>
+          <div class="card hero">
+            <div class="hero-l">
+              <div class="eyebrow">Today's rewind</div>
+              <h3>23 September</h3>
+              <p class="muted">112 photos and 9 videos from <b>9 years</b>. You've reviewed <b>38</b> so far.</p>
+              <div class="years" data-years></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                <button class="btn primary">Continue rewind · 74 left</button>
+                <button class="btn ghost">Pick another day</button>
+              </div>
+            </div>
+            <div class="hero-r">
+              <div class="ring" style="--p:11"><div><b class="num">41</b><small>of 366 days<br>reviewed</small></div></div>
+              <div class="streak"><span class="muted">Current streak</span><b>6 days</b></div>
+              <div class="streak"><span class="muted">Photos reviewed</span><b class="num">5,120 / 48,907</b></div>
+              <div class="streak"><span class="muted">Trashed via rewind</span><b class="num">612</b></div>
+            </div>
+          </div>
+          <div class="section-h"><h3>Cleanup queues</h3><span class="muted">Each queue empties as you go. Anything you mark "keep" stays out of it for good.</span></div>
+          <div class="queues" data-queues></div>
+          <div class="card trashstrip">
+            <div class="ic">🗑</div>
+            <div><b>Trash holds 4.2 GB</b><div class="muted" style="font-size:12px">Nothing is freed until the trash is emptied. Items are deleted permanently after 30 days.</div></div>
+            <div style="margin-left:auto;display:flex;gap:8px"><button class="btn ghost sm">Review trash</button><button class="btn danger sm">Empty now</button></div>
+          </div>
+          <div class="section-h"><h3>Your year of rewinds</h3><span class="muted">One square per date. It fills in once you've reviewed that date across all years.</span></div>
+          <div class="card cal"><div class="calgrid" data-cal="small"></div></div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================== HUB (chosen: calendar-first) =========================== -->
+  <section class="screen" id="hubB">
+    <div class="frame">
+      <div class="topbar"><div class="logo"><i></i>Gallery</div><div class="search">Search your photos</div><div class="avatar">P</div></div>
+      <div class="shell">
+        <aside class="side" data-side="cleanup"></aside>
+        <main class="main">
+          <div class="page-h">
+            <div><div class="crumb"><a href="#">Utilities</a> / Cleanup</div><h2>Cleanup</h2><p class="muted">41 of 366 days reviewed · 6-day streak</p></div>
+            <div class="right"><span class="chip ok">Could still free 14.9 GB</span><button class="btn primary">Rewind today · 23 Sep</button></div>
+          </div>
+          <div class="hubB">
+            <div>
+              <div class="card cal bigcal"><div class="calgrid" data-cal="big"></div>
+                <div class="legend"><span><i style="background:#eceef3"></i>No photos</span><span><i style="background:#dfe3f5"></i><i style="background:#9aa6e0"></i><i style="background:#6d7bcd"></i>Photos to review</span><span><i style="background:var(--success)"></i>Reviewed</span><span><i style="outline:2px solid #191b22;background:#fff"></i>Today</span></div>
+              </div>
+              <div class="card dayPeek">
+                <div><div class="muted" style="font-size:12px">Hovering</div><b style="font-size:18px">4 July</b><div class="muted" style="font-size:12px">318 photos · 7 years</div></div>
+                <div class="thumbs" data-thumbs="14"></div>
+                <button class="btn primary sm">Rewind this day</button>
+              </div>
+            </div>
+            <div class="card qlist">
+              <div style="padding:14px 14px 8px"><h3 style="font-size:15px">Queues</h3></div>
+              <div data-qrows></div>
+              <div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="muted" style="font-size:12px">Trash: 4.2 GB</span><button class="btn danger sm">Empty</button></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <div class="note"><b>Build this hub.</b> You reach it from <b>Utilities → Cleanup</b>; there is no sidebar item. Each queue row and the calendar load independently, so they fill in separately. Rows show a count and the space they could free. The Duplicates row opens the existing <code>/utilities/duplicates</code> page. Blurry shows the analysing state until quality analysis has covered the library; Bursts shows "up to N". <b>Why calendar first:</b> the whole library becomes one visible, finite map, and the dark squares show where the backlog is.</div>
+  </section>
+
+  <!-- =========================== REWIND =========================== -->
+  <section class="screen" id="rewind" hidden>
+    <div class="frame">
+      <div class="topbar"><div class="logo"><i></i>Gallery</div><div class="search">Search your photos</div><div class="avatar">P</div></div>
+      <div class="shell">
+        <aside class="side" data-side="cleanup"></aside>
+        <main class="main">
+          <div class="crumb"><a href="#">Utilities</a> / <a href="#">Cleanup</a> / Rewind</div>
+          <div class="page-h" style="margin-bottom:8px">
+            <div><h2>23 September, across 9 years</h2></div>
+            <div class="right">
+              <div class="seg"><button class="on" data-mode="grid">Grid</button><button data-mode="one">One at a time</button></div>
+              <button class="btn ghost sm">‹ 22 Sep</button><button class="btn ghost sm">24 Sep ›</button>
+            </div>
+          </div>
+          <div class="rw-top">
+            <div class="prog"><div style="display:flex;justify-content:space-between;font-size:12px"><span><b>38</b> of 121 reviewed</span><span class="muted">3 kept · 2 ♥ · 9 to trash (148 MB) · 24 left as is</span></div><div class="bar"><span style="width:31%"></span></div></div>
+            <label class="chip"><input type="checkbox" checked style="margin:0"> Hide reviewed</label>
+          </div>
+          <div data-rw-grid>
+            <div class="yearsec" data-year="2024" data-where="Lisbon" data-n="18" data-done="1"></div>
+            <div class="yearsec" data-year="2021" data-where="Home" data-n="10"></div>
+            <div class="yearsec" data-year="2018" data-where="Porto" data-n="22"></div>
+          </div>
+          <div data-rw-one hidden>
+            <div class="one">
+              <div class="stage">
+                <div class="cap"><b>2018 · 7 years ago</b><br><small>Porto · 14:32 · photo 12 of 64</small></div>
+                <div class="ph" data-seed="41"><div class="img"></div></div>
+                <div class="btns">
+                  <button class="rb" style="background:var(--danger);color:#fff" title="Trash (Delete)">✕</button>
+                  <button class="rb" style="background:#fff" title="Skip (→)">→</button>
+                  <button class="rb" style="background:var(--pink);color:#fff" title="Favourite (F)">♥</button>
+                  <button class="rb" style="background:var(--success);color:#fff" title="Keep (K)">✓</button>
+                </div>
+              </div>
+              <div>
+                <div class="card" style="padding:14px;margin-bottom:12px"><b>Up next</b><div class="film" data-thumbs="8" style="margin-top:8px"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="actionbar">
+            <div class="keys"><span><span class="kbd">K</span> keep</span><span><span class="kbd">F</span> favourite</span><span><span class="kbd">Delete</span> trash</span><span><span class="kbd">←</span><span class="kbd">→</span> move</span><span><span class="kbd">Space</span> open</span><span><span class="kbd">Z</span> undo</span><span><span class="kbd">Shift+Enter</span> finish day</span></div>
+            <div class="right"><span class="muted">9 marked for trash</span><button class="btn danger sm">Move 9 to trash</button><button class="btn primary sm">Finish day ✓</button></div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <div class="note"><b>How rewind works:</b> nothing is final until you press "Move to trash", so marks are cheap and can be undone. <b>Keep</b> means "I've seen it; never suggest it again". Leaving a photo unmarked is fine. "Finish day" fills that day's square on the calendar. (Version 1 has no hints card in one-at-a-time mode.)</div>
+  </section>
+
+  <!-- =========================== BURSTS =========================== -->
+  <section class="screen" id="bursts" hidden>
+    <div class="frame">
+      <div class="topbar"><div class="logo"><i></i>Gallery</div><div class="search">Search your photos</div><div class="avatar">P</div></div>
+      <div class="shell">
+        <aside class="side" data-side="cleanup"></aside>
+        <main class="main">
+          <div class="crumb"><a href="#">Utilities</a> / <a href="#">Cleanup</a> / Bursts &amp; series</div>
+          <div class="page-h">
+            <div><h2>Bursts &amp; series</h2><p class="muted">212 series · pick the best, trash the rest · could free <b style="color:var(--success)">6.7 GB</b></p></div>
+            <div class="right"><button class="btn ghost">Keep all on page</button><button class="btn primary">Accept suggestions on page (−1.1 GB)</button></div>
+          </div>
+          <div data-series></div>
+        </main>
+      </div>
+    </div>
+    <div class="note"><b>Detection:</b> the camera's burst ID (<code>autoStackId</code>), <i>or</i> photos taken within about 2 seconds of each other that look visually very similar. The suggested pick is the sharpest photo. <b>Stack</b> is the "keep everything but hide the clutter" option.</div>
+  </section>
+
+  <!-- =========================== BLURRY =========================== -->
+  <section class="screen" id="blurry" hidden>
+    <div class="frame">
+      <div class="topbar"><div class="logo"><i></i>Gallery</div><div class="search">Search your photos</div><div class="avatar">P</div></div>
+      <div class="shell">
+        <aside class="side" data-side="cleanup"></aside>
+        <main class="main">
+          <div class="crumb"><a href="#">Utilities</a> / <a href="#">Cleanup</a> / Blurry &amp; botched</div>
+          <div class="page-h">
+            <div><h2>Blurry &amp; botched</h2><p class="muted">340 photos that look out of focus, too dark or blown out</p></div>
+            <div class="right"><button class="btn ghost">Not a problem (keep)</button><button class="btn danger">Trash 6 selected</button></div>
+          </div>
+          <div class="card toolbar">
+            <span class="chip new">All 340</span><span class="chip">Blurry 212</span><span class="chip">Too dark 97</span><span class="chip">Overexposed 31</span>
+            <span style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px" class="muted">Strictness <input type="range" min="0" max="2" value="1"> <b style="color:var(--fg)">Balanced</b></span>
+            <label class="chip"><input type="checkbox" checked style="margin:0"> Hide photos with faces</label>
+          </div>
+          <div class="sgrid" data-blurry></div>
+        </main>
+      </div>
+    </div>
+    <div class="note"><b>Scores:</b> a per-photo job computes sharpness and exposure over the existing preview image. The strictness slider only changes the threshold. "Hide photos with faces" guards against intentional shallow-focus portraits. Screenshots uses the same grid without the toolbar chips and slider.</div>
+  </section>
+
+  <!-- =========================== HOGS =========================== -->
+  <section class="screen" id="hogs" hidden>
+    <div class="frame">
+      <div class="topbar"><div class="logo"><i></i>Gallery</div><div class="search">Search your photos</div><div class="avatar">P</div></div>
+      <div class="shell">
+        <aside class="side" data-side="cleanup"></aside>
+        <main class="main">
+          <div class="crumb"><a href="#">Utilities</a> / <a href="#">Cleanup</a> / Space hogs</div>
+          <div class="page-h">
+            <div><h2>Space hogs</h2><p class="muted">Your 200 largest files take up <b>38.4 GB</b>, 9% of your library</p></div>
+            <div class="right"><div class="seg"><button class="on">Videos</button><button>Photos</button><button>All</button></div><button class="btn ghost">Min size: 100 MB ▾</button></div>
+          </div>
+          <div class="card" data-hogs></div>
+        </main>
+      </div>
+    </div>
+    <div class="note">Each row shows how old the file is and whether it's in an album or favourited, which are the "think twice" signals. <b>Later, not in version 1:</b> a "shrink" action that re-encodes to replace the original.</div>
+  </section>
+
+  <!-- =========================== MOBILE (later) =========================== -->
+  <section class="screen" id="mobile" hidden>
+    <div class="note" style="margin:0 0 12px;background:#fcecec;border-color:#f6d0d0;color:#7a1f1f"><b>Not in version 1.</b> A direction for the later mobile release, which reuses the same endpoints.</div>
+    <div class="phones">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><span>●●● 5G ▮</span></div>
+        <div class="content">
+          <div class="m-h">Cleanup</div>
+          <div class="m-hero">
+            <div style="font-size:11px;opacity:.8;font-weight:600;letter-spacing:.06em">TODAY'S REWIND</div>
+            <div style="font-size:20px;font-weight:700">23 September</div>
+            <div style="font-size:12px;opacity:.85">121 items · 9 years · 38 reviewed</div>
+            <div class="ys" data-thumbs="4"></div>
+            <div style="background:#fff;color:var(--primary);border-radius:999px;text-align:center;padding:8px;font-weight:700;font-size:13px">Continue · 83 left</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px"><b>Queues</b><span class="muted">Could still free 14.9 GB</span></div>
+          <div class="m-q">
+            <div><b>Space hogs</b><small>200 files</small><div class="g">38.4 GB</div></div>
+            <div><b>Bursts</b><small>212 series</small><div class="g">6.7 GB</div></div>
+            <div><b>Screenshots</b><small>1,284</small><div class="g">3.1 GB</div></div>
+            <div><b>Duplicates</b><small>86 groups</small><div class="g">2.1 GB</div></div>
+            <div><b>Blurry</b><small>340 photos</small><div class="g">1.2 GB</div></div>
+            <div style="background:var(--danger-tint);border-color:#f6d0d0"><b>Trash</b><small>Empty to free</small><div style="color:var(--danger);font-weight:600">4.2 GB</div></div>
+          </div>
+        </div>
+        <div class="tabbar"><span>Photos</span><span>Search</span><span>Spaces</span><span class="on">Library</span></div>
+      </div></div>
+      <div class="phone"><div class="scr dk">
+        <div class="sb"><span>9:41</span><span>●●● 5G ▮</span></div>
+        <div style="padding:4px 18px;display:flex;justify-content:space-between;align-items:center"><span>✕</span><b>23 Sep · 2018</b><span style="font-size:12px;opacity:.7">39/121</span></div>
+        <div style="margin:6px 18px;height:4px;border-radius:9px;background:#333"><div style="width:32%;height:100%;background:var(--success);border-radius:9px"></div></div>
+        <div class="swipe">
+          <div class="cardS back"><div class="ph" data-seed="77"><div class="img"></div></div></div>
+          <div class="cardS front"><div class="ph" data-seed="41"><div class="img"></div></div><div class="lbl">KEEP</div><div class="meta"><b>Porto</b><br><small style="opacity:.8">7 years ago · 14:32</small></div></div>
+        </div>
+        <div class="swbtns"><span style="background:#2a1618;color:var(--danger)">✕</span><span style="background:#222;color:#fff;font-size:15px">↶</span><span style="background:#2b1520;color:var(--pink)">♥</span><span style="background:#13261a;color:var(--success)">✓</span></div>
+        <div style="text-align:center;font-size:11px;opacity:.6;padding-bottom:14px">Swipe ← trash · → keep · ↑ favourite · tap to skip</div>
+      </div></div>
+    </div>
+  </section>
+
+  <div class="card decide">
+    <h2>Decisions (recorded 2026-09-23)</h2>
+    <div class="qs">
+      <div class="qq"><h4>Hub layout</h4><p>Calendar first (tab 2)</p></div>
+      <div class="qq"><h4>Default rewind mode</h4><p>Grid by year. "One at a time" stays as a toggle.</p></div>
+      <div class="qq"><h4>Name</h4><p>Cleanup</p></div>
+      <div class="qq"><h4>Where it lives</h4><p>An entry inside the Utilities page, at <code>/utilities/cleanup</code>. No sidebar item or badge.</p></div>
+      <div class="qq"><h4>Dropped</h4><p>The "Freed this month" counter</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+function paint(el,seed){
+  const r=rnd(seed),h=Math.floor(r()*360),h2=(h+40+Math.floor(r()*80))%360,y=30+Math.floor(r()*50);
+  const img=el.querySelector('.img')||el.appendChild(Object.assign(document.createElement('div'),{className:'img'}));
+  img.style.background=`radial-gradient(circle at ${20+r()*60}% ${20+r()*40}%, hsla(${(h+180)%360},70%,85%,.9) 0 ${6+r()*10}%, transparent ${14+r()*10}%),
+    linear-gradient(180deg, hsl(${h},55%,${62+r()*15}%) 0 ${y}%, hsl(${h2},40%,${35+r()*20}%) ${y}% 100%)`;
+}
+function ph(seed,cls='',inner=''){return `<div class="ph ${cls}" data-seed="${seed}"><div class="img"></div>${inner}</div>`}
+
+const sideHTML=`
+ <div class="nav"><span class="ic"></span>Photos</div>
+ <div class="nav"><span class="ic"></span>Explore</div>
+ <div class="nav"><span class="ic"></span>Map</div>
+ <div class="nav"><span class="ic"></span>Spaces</div>
+ <div class="nav"><span class="ic"></span>Sharing</div>
+ <div class="nav-sec">Library</div>
+ <div class="nav"><span class="ic"></span>Favorites</div>
+ <div class="nav"><span class="ic"></span>Albums</div>
+ <div class="nav"><span class="ic"></span>People</div>
+ <div class="nav"><span class="ic"></span>Archive</div>
+ <div class="nav"><span class="ic"></span>Trash</div>
+ <div class="nav on"><span class="ic"></span>Utilities</div>
+ <div class="storage">Storage<div class="bar"><span style="width:62%"></span></div>412 GB of 660 GB</div>`;
+document.querySelectorAll('[data-side]').forEach(s=>s.innerHTML=sideHTML);
+
+const yrs=[[2024,18,1],[2023,9,0],[2022,4,1],[2021,10,0],[2020,2,0],[2019,31,0],[2018,22,0],[2016,6,0],[2014,9,0]];
+document.querySelector('[data-years]').innerHTML=yrs.map(([y,n,d])=>`<div class="yr ${d?'done':''}"><div class="stack">${ph(y*3)}${ph(y*3+1)}${ph(y*3+2)}</div><b>${y}</b><span>${n} items · ${2025-y} yr${2025-y>1?'s':''} ago</span></div>`).join('');
+
+const queues=[
+  {t:'Space hogs',n:'142 files',g:'38.4 GB',cls:'',ex:'Largest videos and photos',s:500},
+  {t:'Bursts & series',n:'up to 212',g:'6.7 GB',cls:'',ex:'Pick the best, trash the rest',s:600},
+  {t:'Screenshots',n:'1,284',g:'3.1 GB',cls:'',ex:'Screenshots and screen recordings',s:700},
+  {t:'Duplicates',n:'86 groups',g:'2.1 GB',cls:'',ex:'Visually identical copies',s:800},
+  {t:'Blurry & botched',n:'340 so far',g:'1.2 GB',cls:'blur',ex:'Analysing… 72% of library',s:900},
+];
+document.querySelector('[data-queues]').innerHTML=queues.map(q=>`<div class="card q">
+  <div class="mosaic">${[0,1,2,3,4,5,6,7].map(i=>ph(q.s+i,q.cls)).join('')}</div>
+  <h4>${q.t}</h4>
+  <div class="muted" style="font-size:12px;margin-top:-6px">${q.ex}</div>
+  <div class="meta"><span><b class="num">${q.n}</b></span><span class="free num">−${q.g}</span></div>
+  <button class="btn ghost sm" style="justify-content:center">Review</button></div>`).join('');
+document.querySelector('[data-qrows]').innerHTML=queues.map(q=>`<div class="qrow">${ph(q.s,q.cls)}<div><b>${q.t}</b><small>${q.ex}</small></div><div class="n"><b class="num">${q.n}</b><br><span style="color:var(--success);font-weight:600">−${q.g}</span></div></div>`).join('');
+
+const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],dim=[31,29,31,30,31,30,31,31,30,31,30,31];
+function buildCal(el){
+  const r=rnd(7);let h='<div></div>';for(let d=1;d<=31;d++)h+=`<div class="dn">${d%5===0||d===1?d:''}</div>`;
+  months.forEach((m,mi)=>{h+=`<div class="m">${m}</div>`;for(let d=1;d<=31;d++){
+    if(d>dim[mi]){h+='<div class="c x"></div>';continue}
+    const v=r();const lvl=v<.07?0:v<.45?1:v<.75?2:v<.92?3:4;
+    const past=(mi<8)||(mi===8&&d<23);const reviewed=(mi===8&&d>=17&&d<23)||(past&&r()<.07)||(mi===6&&d===4);
+    const today=mi===8&&d===23;
+    h+=`<div class="c ${lvl?'l'+lvl:''} ${reviewed&&lvl?'r':''} ${today?'today':''}" title="${d} ${m}"></div>`}});
+  el.innerHTML=h;
+}
+document.querySelectorAll('[data-cal]').forEach(buildCal);
+document.querySelectorAll('[data-thumbs]').forEach((el,i)=>{el.innerHTML=Array.from({length:+el.dataset.thumbs},(_,k)=>ph(300+i*20+k)).join('')});
+
+const stateCycle=['','s-keep','s-fav','s-trash'];
+document.querySelectorAll('[data-rw-grid] .yearsec').forEach((sec,si)=>{
+  const y=+sec.dataset.year,n=+sec.dataset.n,done=sec.dataset.done;const r=rnd(y);
+  let cells='';for(let i=0;i<n;i++){
+    let st='';const v=r();
+    if(si===0){st=v<.6?'s-keep':v<.75?'s-fav':'s-trash'}
+    else if(si===1&&i<6){st=v<.5?'s-trash':v<.8?'s-keep':''}
+    const cls=(si===1&&i===6?'focus ':'')+(si===2&&(i===3||i===4||i===5)?'blur ':'')+st;
+    const dot=st==='s-keep'?'<span class="dot keep">✓</span>':st==='s-fav'?'<span class="dot fav">♥</span>':st==='s-trash'?'<span class="state">TRASH</span>':'';
+    const tag=(i%7===2?'<span class="tag">▶ 0:14</span>':'');
+    cells+=ph(y*10+i,cls,dot+tag);
+  }
+  sec.innerHTML=`<div class="yh"><h3>${y}</h3><span class="muted">${2025-y} years ago · ${sec.dataset.where} · ${n} items</span>${done?'<span class="chip ok done">Year reviewed</span>':'<button class="btn ghost sm done">Keep all remaining</button>'}</div><div class="pgrid">${cells}</div>`;
+});
+document.querySelector('[data-rw-grid]').addEventListener('click',e=>{
+  const p=e.target.closest('.ph');if(!p)return;
+  const cur=stateCycle.find(s=>s&&p.classList.contains(s))||'';p.classList.remove(...stateCycle.filter(Boolean));
+  p.querySelectorAll('.dot,.state').forEach(x=>x.remove());
+  const nx=stateCycle[(stateCycle.indexOf(cur)+1)%4];if(nx)p.classList.add(nx);
+  if(nx==='s-keep')p.insertAdjacentHTML('beforeend','<span class="dot keep">✓</span>');
+  if(nx==='s-fav')p.insertAdjacentHTML('beforeend','<span class="dot fav">♥</span>');
+  if(nx==='s-trash')p.insertAdjacentHTML('beforeend','<span class="state">TRASH</span>');
+});
+document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelector('[data-rw-grid]').hidden=b.dataset.mode!=='grid';
+  document.querySelector('[data-rw-one]').hidden=b.dataset.mode!=='one';
+}));
+
+const series=[
+  {when:'12 Aug 2024 · 14:03:21 → 14:03:24',n:8,mb:'31 MB',src:'Camera burst',best:3,where:'Lisbon'},
+  {when:'2 Jun 2023 · 09:12:05 → 09:12:07',n:5,mb:'18 MB',src:'Same moment, visually similar',best:1,where:'Home'},
+  {when:'24 Dec 2021 · 19:40:11 → 19:40:16',n:7,mb:'26 MB',src:'Camera burst',best:5,where:'Family dinner'},
+];
+document.querySelector('[data-series]').innerHTML=series.map((s,si)=>{
+  let row='';for(let i=0;i<8;i++){
+    if(i>=s.n){row+='<div></div>';continue}
+    const isBest=i===s.best;const b=(i===0||i===s.n-1)&&!isBest?'blur':'';
+    row+=ph(900+si*3,(isBest?'s-keep ':'s-trash ')+b,isBest?'<span class="best">★ SHARPEST</span><span class="dot keep">✓</span>':'<span class="state">TRASH</span>');
+  }
+  return `<div class="card series"><div class="sh"><b>${s.when}</b><span class="chip">${s.n} shots · ${s.mb}</span><span class="chip ${s.src==='Camera burst'?'':'warn'}">${s.src}</span><span class="muted" style="font-size:12px">${s.where}</span>
+   <div class="right"><button class="btn ghost sm">Keep all</button><button class="btn ghost sm">Stack instead</button><button class="btn primary sm">Keep 1, trash ${s.n-1}</button></div></div>
+   <div class="row">${row}</div><div class="foot">Click a photo to toggle keep or trash. You can keep more than one.</div></div>`}).join('');
+
+const reasons=[['Blurry','blur'],['Too dark','dark'],['Blurry','blur'],['Overexposed','bright'],['Blurry','blur'],['Too dark','dark']];
+let bh='';for(let i=0;i<18;i++){const [lbl,cls]=reasons[i%6];const sel=[0,2,4,7,9,13].includes(i);
+  bh+=ph(1200+i,cls,`<span class="sel ${sel?'on':''}"></span><span class="tr">${lbl}</span>`)}
+document.querySelector('[data-blurry]').innerHTML=bh;
+document.querySelector('[data-blurry]').addEventListener('click',e=>{const p=e.target.closest('.ph');if(p)p.querySelector('.sel').classList.toggle('on')});
+
+const hogs=[['VID_20190712_drone.mp4','Video · 3840×2160 · 11:42','2019 · in album',4.1],['IMG_4431.MOV','Video · 3840×2160 · 6:05','2022',2.3],['Birthday_full.mp4','Video · 1920×1080 · 22:10','2016 · ♥ favourite',1.9],['GX010233.MP4','Video · 5312×2988 · 3:40','2023',1.6],['PXL_20210101_night.mp4','Video · 3840×2160 · 2:58','2021',1.1],['DSC09921.ARW','Photo · 9504×6336','2020',0.12]];
+document.querySelector('[data-hogs]').innerHTML=hogs.map((h,i)=>`<div class="hog">${ph(1500+i,'',h[1].startsWith('Video')?'<span class="tag">▶</span>':'')}
+  <div style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h[0]}</b><small>${h[1]} · ${h[2]}</small></div>
+  <div class="szcol"><div class="sz num">${h[3]>=1?h[3]+' GB':(h[3]*1000)+' MB'}</div><div class="szbar"><span style="width:${h[3]/4.1*100}%"></span></div></div>
+  <div style="display:flex;gap:6px"><button class="btn ghost sm">Keep</button><button class="btn danger sm">Trash</button></div></div>`).join('');
+
+document.querySelectorAll('.ph').forEach(p=>paint(p,+p.dataset.seed||1));
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===t));
+  document.querySelectorAll('.screen').forEach(s=>s.hidden=s.id!==t.dataset.s);
+}));
 </script>
 </body>
 </html>
