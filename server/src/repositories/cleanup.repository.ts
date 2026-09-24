@@ -20,6 +20,12 @@ import {
 } from 'src/utils/cleanup.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
 
+/**
+ * `afterLocalDateTime` is the previous window's last `cursorT` (full precision). A `Date` is accepted
+ * for convenience but only carries milliseconds.
+ */
+export type BurstWindowOptions = { afterLocalDateTime?: string | Date; afterId?: string; limit: number };
+
 export type CleanupAssetTypeFilter = 'all' | 'image' | 'video';
 export type CleanupBlurReason = 'all' | 'blurry' | 'dark' | 'bright';
 
@@ -129,19 +135,26 @@ const notKeptForQueue = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, que
   eb.not(keptForQueue(eb, userId, queue));
 
 /**
- * Keyset predicate for the `(localDateTime DESC, id DESC)` queues (screenshots, blurry).
- *
- * Written as a row comparison rather than `a < x or (a = x and b < y)`: PostgreSQL turns a row
- * comparison into an index condition on `asset_cleanup_localDateTime_idx ("ownerId", "localDateTime", "id")`,
- * so a page deep in a 500k-asset library starts at the cursor instead of scanning from the top.
+ * The `(localDateTime, id)` keyset cursor timestamp at full (microsecond) precision. A JS `Date` only
+ * holds milliseconds, so a cursor built from one would re-admit (ascending) or skip (descending) rows
+ * whose `localDateTime` has sub-millisecond digits. Every `(t, id)` cursor is built from this column.
  */
+const cursorTExpr = sql<string>`to_char("asset"."localDateTime" at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+
+/**
+ * `("localDateTime", "id") <op> (cursorT::timestamptz, id)` — a row comparison, so PostgreSQL turns it
+ * into an index condition on `asset_cleanup_localDateTime_idx ("ownerId", "localDateTime", "id")` and
+ * a page deep in a 500k-asset library starts at the cursor instead of scanning from the top.
+ */
+const localDateTimeKeyset = (eb: ExpressionBuilder<DB, 'asset'>, op: '<' | '>', cursorT: string, id: string) =>
+  eb(eb.refTuple('asset.localDateTime', 'asset.id'), op, eb.tuple(sql<Date>`${cursorT}::timestamptz`, id));
+
+/** Keyset predicate for the `(localDateTime DESC, id DESC)` queues (screenshots, blurry). */
 const applyLocalDateTimeCursor = <O>(qb: SelectQueryBuilder<DB, 'asset', O>, cursor: CleanupCursor | undefined) => {
   if (!cursor) {
     return qb;
   }
-  const cursorDate = new Date(String(cursor.v[0]));
-  const cursorId = String(cursor.v[1]);
-  return qb.where((eb) => eb(eb.refTuple('asset.localDateTime', 'asset.id'), '<', eb.tuple(cursorDate, cursorId)));
+  return qb.where((eb) => localDateTimeKeyset(eb, '<', String(cursor.v[0]), String(cursor.v[1])));
 };
 
 /** Fetches `limit + 1` rows; when the extra row is present, drops it and builds `next` from the last kept row. */
@@ -637,7 +650,7 @@ export class CleanupRepository {
       .selectFrom('asset')
       .innerJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select((eb) => cleanupAssetColumns(eb, sql.lit(false)))
+      .select((eb) => cleanupAssetColumns(eb, sql.lit(false), cursorTExpr.as('cursorT')))
       .where('asset_quality.isScreenshot', '=', sql.lit(true));
 
     qb = withCleanupScope(qb, userId, { queue: true });
@@ -648,8 +661,8 @@ export class CleanupRepository {
       .limit(limit + 1);
 
     const rows = await qb.execute();
-    const page = paginate(rows, limit, (row) => [row.localDateTime.toISOString(), row.id]);
-    return { items: page.items.map((row) => mapCleanupAssetRow(row)), next: page.next };
+    const page = paginate(rows, limit, (row) => [row.cursorT, row.id]);
+    return { items: page.items.map(({ cursorT: _cursorT, ...row }) => mapCleanupAssetRow(row)), next: page.next };
   }
 
   @GenerateSql({
@@ -678,6 +691,7 @@ export class CleanupRepository {
           eb,
           sql.lit(false),
           'asset_quality.sharpness' as const,
+          cursorTExpr.as('cursorT'),
           sql<'blurry' | 'dark' | 'bright' | null>`case
           when ${isBlurry} then 'blurry'
           when ${isDark} then 'dark'
@@ -698,9 +712,9 @@ export class CleanupRepository {
       .limit(limit + 1);
 
     const rows = await qb.execute();
-    const page = paginate(rows, limit, (row) => [row.localDateTime.toISOString(), row.id]);
+    const page = paginate(rows, limit, (row) => [row.cursorT, row.id]);
     return {
-      items: page.items.map((row) => {
+      items: page.items.map(({ cursorT: _cursorT, ...row }) => {
         const mapped = mapCleanupAssetRow(row);
         return { ...mapped, reason: mapped.reason ?? undefined };
       }),
@@ -838,7 +852,7 @@ export class CleanupRepository {
   }
 
   /** Public, undecorated builder — used by `getBurstWindow` and by the index-usage medium test. */
-  burstWindowQuery(userId: string, options: { afterLocalDateTime?: Date; afterId?: string; limit: number }) {
+  burstWindowQuery(userId: string, options: BurstWindowOptions) {
     const { afterLocalDateTime, afterId, limit } = options;
 
     let qb = this.db
@@ -848,6 +862,7 @@ export class CleanupRepository {
       .select((eb) => [
         'asset.id',
         'asset.localDateTime',
+        cursorTExpr.as('cursorT'),
         'asset_exif.autoStackId',
         'asset_quality.sharpness',
         eb.fn.coalesce('asset_exif.fileSizeInByte', sql.lit(0)).as('fileSize'),
@@ -862,24 +877,21 @@ export class CleanupRepository {
     qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Bursts));
 
     if (afterLocalDateTime && afterId) {
-      // Row comparison, so the cursor is an index condition (see applyLocalDateTimeCursor).
-      qb = qb.where((eb) =>
-        eb(eb.refTuple('asset.localDateTime', 'asset.id'), '>', eb.tuple(afterLocalDateTime, afterId)),
-      );
+      // A `Date` (tests, legacy callers) only has millisecond precision; the service passes `cursorT`.
+      const cursorT = typeof afterLocalDateTime === 'string' ? afterLocalDateTime : afterLocalDateTime.toISOString();
+      qb = qb.where((eb) => localDateTimeKeyset(eb, '>', cursorT, afterId));
     }
 
     return qb.orderBy('asset.localDateTime', 'asc').orderBy('asset.id', 'asc').limit(limit);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { limit: DummyValue.NUMBER }] })
-  async getBurstWindow(
-    userId: string,
-    options: { afterLocalDateTime?: Date; afterId?: string; limit: number },
-  ): Promise<BurstRow[]> {
+  async getBurstWindow(userId: string, options: BurstWindowOptions): Promise<BurstRow[]> {
     const rows = await this.burstWindowQuery(userId, options).execute();
     return rows.map((row) => ({
       id: row.id,
       localDateTime: row.localDateTime,
+      cursorT: row.cursorT,
       autoStackId: row.autoStackId,
       sharpness: row.sharpness,
       fileSize: Number(row.fileSize),
@@ -919,8 +931,8 @@ export class CleanupRepository {
    * One ordered pass over the user's images (the spec's `lag()` count), shaped for 500k-asset
    * libraries: `lead()` marks the last row of each group, so singletons — almost every row — are
    * dropped before the second window and the `group by`, which then only see burst members. The
-   * earlier shape grouped every row and spilled a ~450k-group hash aggregate to disk (~380 ms at
-   * 500k assets vs ~240 ms p95 for this one; see the spec's "Scale" section).
+   * earlier shape grouped every row and spilled a ~450k-group hash aggregate to disk (p95 377 ms at
+   * 500k assets vs 239 ms for this one; see the spec's "Scale" section).
    */
   @GenerateSql({ params: [DummyValue.UUID] })
   async countBursts(userId: string): Promise<{ count: number; bytes: number }> {

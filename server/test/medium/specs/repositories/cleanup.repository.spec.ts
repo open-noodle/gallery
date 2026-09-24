@@ -10,6 +10,21 @@ import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
+
+/**
+ * Microsecond-precision timestamps (a JS `Date` cannot hold them): two rows share `.123457` so the id
+ * tie-break is exercised too. Written with raw SQL because every normal writer goes through a `Date`.
+ */
+const MICRO_TIMES = [
+  '2024-01-01 00:00:00.123456+00',
+  '2024-01-01 00:00:00.123457+00',
+  '2024-01-01 00:00:00.123457+00',
+  '2024-01-01 00:00:00.123458+00',
+  '2024-01-01 00:00:00.123459+00',
+];
+const setMicroLocalDateTime = (db: Kysely<DB>, id: string, time: string) =>
+  sql`update "asset" set "localDateTime" = ${time}::timestamptz where "id" = ${id}`.execute(db);
+
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,
@@ -776,6 +791,48 @@ describe(CleanupRepository.name, () => {
       expect([...page1.items, ...page2.items].map((i) => i.id).sort()).toEqual([...ids].sort());
     });
 
+    it.each([1, 2])(
+      'pages through screenshots with microsecond localDateTimes (limit %i) without skipping or repeating any',
+      async (limit) => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const rows: Array<{ id: string; time: string }> = [];
+        for (const time of MICRO_TIMES) {
+          const { asset } = await ctx.newAsset({ ownerId: user.id });
+          await setMicroLocalDateTime(ctx.database, asset.id, time);
+          await sut.upsertQuality({
+            assetId: asset.id,
+            ownerId: user.id,
+            sharpness: 100,
+            brightness: 100,
+            clippedDark: 0,
+            clippedBright: 0,
+            isScreenshot: true,
+            version: 1,
+          });
+          rows.push({ id: asset.id, time });
+        }
+
+        const seen: string[] = [];
+        let cursor: CleanupCursor | undefined;
+        for (let page = 0; page < 10; page++) {
+          const { items, next } = await sut.getScreenshots(user.id, { limit, cursor });
+          seen.push(...items.map((item) => item.id));
+          if (!next) {
+            break;
+          }
+          expect(String(next.v[0])).toMatch(/\.\d{6}Z$/);
+          cursor = next;
+        }
+
+        const expected = rows
+          .toSorted((a, b) => (a.time === b.time ? a.id.localeCompare(b.id) : a.time.localeCompare(b.time)))
+          .toReversed()
+          .map((row) => row.id);
+        expect(seen).toEqual(expected);
+      },
+    );
+
     it('pages through screenshots that share a localDateTime without skipping or repeating any', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
@@ -1221,6 +1278,38 @@ describe(CleanupRepository.name, () => {
       const rows = await sut.getBurstWindow(user.id, { limit: 10, afterLocalDateTime: base, afterId: a.id });
       expect(rows.map((r) => r.id)).toEqual([b.id]);
     });
+
+    it.each([1, 2])(
+      'pages through microsecond localDateTimes with cursorT (limit %i) without skipping or repeating any',
+      async (limit) => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const rows: Array<{ id: string; time: string }> = [];
+        for (const time of MICRO_TIMES) {
+          const { asset } = await ctx.newAsset({ ownerId: user.id });
+          await setMicroLocalDateTime(ctx.database, asset.id, time);
+          rows.push({ id: asset.id, time });
+        }
+
+        const seen: string[] = [];
+        let after: { afterLocalDateTime?: string; afterId?: string } = {};
+        for (let page = 0; page < 10; page++) {
+          const window = await sut.getBurstWindow(user.id, { ...after, limit });
+          seen.push(...window.map((row) => row.id));
+          if (window.length < limit) {
+            break;
+          }
+          const last = window.at(-1)!;
+          expect(last.cursorT).toMatch(/\.\d{6}Z$/);
+          after = { afterLocalDateTime: last.cursorT, afterId: last.id };
+        }
+
+        const expected = rows
+          .toSorted((a, b) => (a.time === b.time ? a.id.localeCompare(b.id) : a.time.localeCompare(b.time)))
+          .map((row) => row.id);
+        expect(seen).toEqual(expected);
+      },
+    );
 
     it('breaks localDateTime ties on id when resuming after a cursor', async () => {
       const { ctx, sut } = setup();

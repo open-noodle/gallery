@@ -73,7 +73,7 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
 })
 // gallery-fork: Library Cleanup calendar/rewind — see specs/2026-09-23-library-cleanup-design.md
 // The trailing "localDateTime" key lets the calendar count run as an index-only scan that reads the
-// stored month-day value instead of evaluating the expression per row (~260 ms -> ~40 ms at 500k assets).
+// stored month-day value instead of evaluating the expression per row (p95 279 ms -> 25 ms at 500k assets).
 @Index({
   name: 'asset_localMonthDay_idx',
   expression: `"ownerId", ${MONTH_DAY_SQL}, "localDateTime"`,

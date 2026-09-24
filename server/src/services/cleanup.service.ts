@@ -26,6 +26,7 @@ import {
   CLEANUP_BLURRY_DEFAULTS,
   CLEANUP_BURST_CLIP_MAX_DISTANCE,
   CLEANUP_BURST_GAP_MS,
+  CLEANUP_BURST_MAX_EXTENSIONS,
   CLEANUP_BURST_WINDOW,
   CLEANUP_PAGE_LIMIT,
   CLEANUP_QUALITY_VERSION,
@@ -36,6 +37,7 @@ import {
   encodeCursor,
   exposureStats,
   groupBursts,
+  isCleanupCursorTimestamp,
   isScreenshotCandidate,
   laplacianVariance,
   suggestKeep,
@@ -65,12 +67,7 @@ const mapAsset = (row: CleanupAssetRow) => ({ ...row, localDateTime: row.localDa
 const decodeDateIdCursor = (raw: string): CleanupCursor => {
   const cursor = decodeCursor(raw);
   const [date, id] = cursor.v;
-  if (
-    cursor.v.length !== 2 ||
-    typeof date !== 'string' ||
-    typeof id !== 'string' ||
-    Number.isNaN(new Date(date).getTime())
-  ) {
+  if (cursor.v.length !== 2 || typeof date !== 'string' || typeof id !== 'string' || !isCleanupCursorTimestamp(date)) {
     throw new BadRequestException('Invalid cursor');
   }
   return cursor;
@@ -212,16 +209,20 @@ export class CleanupService extends BaseService {
    * When the extension probe finds a real gap, its rows are exactly the next window (same cursor,
    * same limit), so they are returned as `lookahead` and the caller passes them back in instead of
    * fetching them again — halving the queries per bursts page at 500k assets.
+   *
+   * Safety net: at most `CLEANUP_BURST_MAX_EXTENSIONS` extra windows are appended (a pathological
+   * run of photos under 2 s apart would otherwise read the whole library into one page; such a run is
+   * split at the cap instead), and a returned row equal to the cursor row is dropped.
    */
   private async fetchBurstWindow(
     userId: string,
-    after: { localDateTime?: Date; id?: string },
+    after: { cursorT?: string; id?: string },
     lookahead?: BurstRow[],
   ): Promise<{ rows: BurstRow[]; reachedEnd: boolean; lookahead?: BurstRow[] }> {
     let window =
       lookahead ??
       (await this.cleanupRepository.getBurstWindow(userId, {
-        afterLocalDateTime: after.localDateTime,
+        afterLocalDateTime: after.cursorT,
         afterId: after.id,
         limit: CLEANUP_BURST_WINDOW,
       }));
@@ -230,16 +231,17 @@ export class CleanupService extends BaseService {
       return { rows: window, reachedEnd: true };
     }
 
-    for (;;) {
+    for (let extensions = 0; extensions < CLEANUP_BURST_MAX_EXTENSIONS; extensions++) {
       const last = window.at(-1)!;
-      const more = await this.cleanupRepository.getBurstWindow(userId, {
-        afterLocalDateTime: last.localDateTime,
+      const fetched = await this.cleanupRepository.getBurstWindow(userId, {
+        afterLocalDateTime: last.cursorT,
         afterId: last.id,
         limit: CLEANUP_BURST_WINDOW,
       });
+      const more = fetched.filter((row) => row.id !== last.id);
 
       if (more.length === 0) {
-        return { rows: window, reachedEnd: true };
+        return { rows: window, reachedEnd: fetched.length < CLEANUP_BURST_WINDOW };
       }
 
       const gap = more[0].localDateTime.getTime() - last.localDateTime.getTime();
@@ -248,10 +250,12 @@ export class CleanupService extends BaseService {
       }
 
       window = [...window, ...more];
-      if (more.length < CLEANUP_BURST_WINDOW) {
+      if (fetched.length < CLEANUP_BURST_WINDOW) {
         return { rows: window, reachedEnd: true };
       }
     }
+
+    return { rows: window, reachedEnd: false };
   }
 
   private async getBurstQueue(
@@ -259,8 +263,8 @@ export class CleanupService extends BaseService {
     cursor: CleanupCursor | undefined,
     limit: number,
   ): Promise<CleanupQueuePageDto> {
-    let after: { localDateTime?: Date; id?: string } = cursor
-      ? { localDateTime: new Date(String(cursor.v[0])), id: String(cursor.v[1]) }
+    let after: { cursorT?: string; id?: string } = cursor
+      ? { cursorT: String(cursor.v[0]), id: String(cursor.v[1]) }
       : {};
 
     const groups: BurstGroup[] = [];
@@ -298,7 +302,7 @@ export class CleanupService extends BaseService {
       for (const group of validGroups) {
         groups.push(group);
         const lastRow = group.assets.at(-1)!;
-        nextCursor = { v: [lastRow.localDateTime.toISOString(), lastRow.id] };
+        nextCursor = { v: [lastRow.cursorT, lastRow.id] };
         if (groups.length >= limit) {
           hitLimit = true;
           break;
@@ -310,8 +314,8 @@ export class CleanupService extends BaseService {
       }
 
       const lastWindowRow = window.at(-1)!;
-      after = { localDateTime: lastWindowRow.localDateTime, id: lastWindowRow.id };
-      nextCursor = { v: [lastWindowRow.localDateTime.toISOString(), lastWindowRow.id] };
+      after = { cursorT: lastWindowRow.cursorT, id: lastWindowRow.id };
+      nextCursor = { v: [lastWindowRow.cursorT, lastWindowRow.id] };
 
       if (windowReachedEnd) {
         reachedEnd = true;

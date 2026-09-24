@@ -426,7 +426,11 @@ select
       and "album"."deletedAt" is null
   ) as "inAlbum",
   "asset_exif"."city",
-  false as "kept"
+  false as "kept",
+  to_char(
+    "asset"."localDateTime" at time zone 'UTC',
+    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+  ) as "cursorT"
 from
   "asset"
   inner join "asset_quality" on "asset_quality"."assetId" = "asset"."id"
@@ -501,6 +505,10 @@ select
   "asset_exif"."city",
   false as "kept",
   "asset_quality"."sharpness",
+  to_char(
+    "asset"."localDateTime" at time zone 'UTC',
+    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+  ) as "cursorT",
   case
     when asset_quality.sharpness < $1 then 'blurry'
     when (
@@ -650,6 +658,10 @@ from
 select
   "asset"."id",
   "asset"."localDateTime",
+  to_char(
+    "asset"."localDateTime" at time zone 'UTC',
+    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+  ) as "cursorT",
   "asset_exif"."autoStackId",
   "asset_quality"."sharpness",
   coalesce("asset_exif"."fileSizeInByte", 0) as "fileSize"
