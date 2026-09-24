@@ -12,15 +12,30 @@
     duration?: number | null;
     alt?: string;
     class?: string;
-    /** Bottom-left badge, e.g. a blur reason or ★ SHARPEST. */
+    /** Tile shape; square by default. */
+    aspect?: string;
+    /** Bottom-left badge, e.g. a ▶ video tag. */
     badge?: Snippet;
+    /** Top-left corner, e.g. a selection circle or ★ SHARPEST. */
+    topLeft?: Snippet;
     /** Top-right corner, e.g. a selection or mark dot. */
     topRight?: Snippet;
     /** Full-tile overlay for keep / favourite / trash marks. */
     mark?: Snippet;
   };
 
-  let { id, thumbhash, duration, alt = '', class: className = '', badge, topRight, mark }: Props = $props();
+  let {
+    id,
+    thumbhash,
+    duration,
+    alt = '',
+    aspect = 'aspect-square',
+    class: className = '',
+    badge,
+    topLeft,
+    topRight,
+    mark,
+  }: Props = $props();
 
   let loaded = $state(false);
 
@@ -34,7 +49,7 @@
 </script>
 
 <div
-  class="relative aspect-square overflow-hidden rounded-md bg-gray-200 dark:bg-gray-700 {className}"
+  class="relative {aspect} overflow-hidden rounded-md bg-gray-200 dark:bg-gray-700 {className}"
   data-testid="cleanup-tile"
 >
   {#if thumbhash && !loaded}
@@ -57,6 +72,9 @@
   {/if}
   {#if badge}
     <div class="absolute bottom-1.5 left-1.5">{@render badge()}</div>
+  {/if}
+  {#if topLeft}
+    <div class="absolute top-1.5 left-1.5">{@render topLeft()}</div>
   {/if}
   {#if topRight}
     <div class="absolute top-1.5 right-1.5">{@render topRight()}</div>

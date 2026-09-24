@@ -12,6 +12,7 @@
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { Route } from '$lib/route';
   import { getByteUnitString } from '$lib/utils/byte-units';
+  import { confirmTrashInSpaces } from '$lib/utils/cleanup-actions';
   import {
     browserTimeZone,
     dominantCity,
@@ -72,6 +73,8 @@
   let hideReviewed = $state(true);
   let mode = $state<Mode>(readMode());
   let bypassGuard = false;
+  // True while the Space check for a trash commit is in flight, so a second press cannot start another.
+  let checkingSpaces = $state(false);
 
   // svelte-ignore state_referenced_locally
   const session = new RewindSession(monthDay, (dto) => commitCleanup({ cleanupCommitDto: dto }));
@@ -103,7 +106,7 @@
   );
   const focusedIndex = $derived(flat.findIndex((asset) => asset.id === session.focusedId));
   const current = $derived(focusedIndex === -1 ? flat[0] : flat[focusedIndex]);
-  const busy = $derived(session.progress !== null);
+  const busy = $derived(session.progress !== null || checkingSpaces);
   const previousDay = $derived(shiftMonthDay(monthDay, -1));
   const nextDay = $derived(shiftMonthDay(monthDay, 1));
 
@@ -319,8 +322,34 @@
     }
   };
 
+  const trashMarkedIds = () => [...session.marks].filter(([, mark]) => mark === 'trash').map(([id]) => id);
+
+  /**
+   * Trashing a photo that is also in a shared space removes it for the space's members too, so the
+   * user confirms that first. Resolves to false when they cancel or the check fails; nothing has
+   * been committed then, and the marks stay.
+   */
+  const confirmSpaces = async () => {
+    const ids = trashMarkedIds();
+    if (ids.length === 0) {
+      return true;
+    }
+    checkingSpaces = true;
+    try {
+      return await confirmTrashInSpaces(ids);
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_delete_assets'));
+      return false;
+    } finally {
+      checkingSpaces = false;
+    }
+  };
+
   const onMoveToTrash = async () => {
     if (busy || session.counts.trash === 0) {
+      return;
+    }
+    if (!(await confirmSpaces())) {
       return;
     }
     try {
@@ -336,6 +365,9 @@
 
   const onFinishDay = async () => {
     if (busy) {
+      return;
+    }
+    if (!(await confirmSpaces())) {
       return;
     }
     try {
