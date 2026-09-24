@@ -39,10 +39,12 @@ export class PetDetectionService extends BaseService {
     for await (const asset of assets) {
       jobs.push({ name: JobName.PetDetection, data: { id: asset.id } });
 
-      if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {
-        await this.jobRepository.queueAll(jobs);
-        jobs = [];
+      if (!(jobs.length >= JOBS_ASSET_PAGINATION_SIZE)) {
+        continue;
       }
+
+      await this.jobRepository.queueAll(jobs);
+      jobs = [];
     }
 
     await this.jobRepository.queueAll(jobs);
@@ -199,13 +201,15 @@ export class PetDetectionService extends BaseService {
       });
 
       const person = await this.personRepository.getByGroupIdOnly(personId);
-      if (person && !person.faceAssetId) {
-        await this.personRepository.update({ ownerId: person.ownerId, personGroupId: personId, faceAssetId: faceId });
-        thumbnailJobs.push({
-          name: JobName.PersonGenerateThumbnail,
-          data: { ownerId: person.ownerId, personGroupId: personId },
-        });
+      if (!person || person.faceAssetId) {
+        continue;
       }
+
+      await this.personRepository.update({ ownerId: person.ownerId, personGroupId: personId, faceAssetId: faceId });
+      thumbnailJobs.push({
+        name: JobName.PersonGenerateThumbnail,
+        data: { ownerId: person.ownerId, personGroupId: personId },
+      });
     }
 
     await this.jobRepository.queueAll(thumbnailJobs);

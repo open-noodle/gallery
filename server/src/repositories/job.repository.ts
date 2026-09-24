@@ -255,13 +255,15 @@ export class JobRepository {
     const removed: string[] = [];
     for (const jobId of activeIds) {
       const job = await queue.getJob(jobId);
-      if (!job) {
-        // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself
-        // issues, and LREM is not among them. The concrete client is ioredis, so
-        // cast to reach it rather than reimplementing LREM via a Lua script.
-        await (client as unknown as Pick<Redis, 'lrem'>).lrem(activeKey, 0, jobId);
-        removed.push(jobId);
+      if (job) {
+        continue;
       }
+
+      // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself
+      // issues, and LREM is not among them. The concrete client is ioredis, so
+      // cast to reach it rather than reimplementing LREM via a Lua script.
+      await (client as unknown as Pick<Redis, 'lrem'>).lrem(activeKey, 0, jobId);
+      removed.push(jobId);
     }
     return removed;
   }
@@ -434,13 +436,16 @@ export class JobRepository {
       }
 
       const removed = await redis.lrem(activeKey, 0, jobId);
-      if (removed > 0) {
-        removedCount += removed;
-        removedIds.push(jobId);
-        await redis.srem(queue.toKey('stalled'), jobId);
+      if (!(removed > 0)) {
+        continue;
       }
+
+      removedCount += removed;
+      removedIds.push(jobId);
+      await redis.srem(queue.toKey('stalled'), jobId);
     }
 
+    // eslint-disable-next-line unicorn/prefer-early-return
     if (removedCount > 0) {
       const sampleIds = removedIds.slice(0, 5).join(', ');
       const suffix = removedIds.length > 5 ? `${sampleIds}, ...` : sampleIds;

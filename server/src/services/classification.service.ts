@@ -78,10 +78,12 @@ export class ClassificationService extends BaseService {
     this.embeddingCache.clear();
     this.pendingEncodes.clear();
 
-    if (classificationChanged) {
-      await this.reconcileAutoTags(oldConfig.classification, newConfig.classification);
-      await this.systemMetadataRepository.set(SystemMetadataKey.ClassificationConfigState, newConfig.classification);
+    if (!classificationChanged) {
+      return;
     }
+
+    await this.reconcileAutoTags(oldConfig.classification, newConfig.classification);
+    await this.systemMetadataRepository.set(SystemMetadataKey.ClassificationConfigState, newConfig.classification);
   }
 
   private async reconcileAutoTags(previous: ClassificationConfig, current: ClassificationConfig) {
@@ -96,13 +98,15 @@ export class ClassificationService extends BaseService {
         continue;
       }
 
-      if (currentCategory.similarity > previousCategory.similarity) {
-        this.logger.log(
-          `Classification category "${previousCategory.name}" similarity increased ` +
-            `(${previousCategory.similarity} → ${currentCategory.similarity}); clearing auto-tag assignments`,
-        );
-        await this.classificationRepository.removeAutoTagAssignments(previousCategory.name);
+      if (!(currentCategory.similarity > previousCategory.similarity)) {
+        continue;
       }
+
+      this.logger.log(
+        `Classification category "${previousCategory.name}" similarity increased ` +
+          `(${previousCategory.similarity} → ${currentCategory.similarity}); clearing auto-tag assignments`,
+      );
+      await this.classificationRepository.removeAutoTagAssignments(previousCategory.name);
     }
   }
 
@@ -123,10 +127,12 @@ export class ClassificationService extends BaseService {
     let queue: Array<{ name: JobName.AssetClassify; data: { id: string } }> = [];
     for await (const asset of stream) {
       queue.push({ name: JobName.AssetClassify, data: { id: asset.id } });
-      if (queue.length >= 1000) {
-        await this.jobRepository.queueAll(queue);
-        queue = [];
+      if (!(queue.length >= 1000)) {
+        continue;
       }
+
+      await this.jobRepository.queueAll(queue);
+      queue = [];
     }
 
     await this.jobRepository.queueAll(queue);
@@ -176,6 +182,7 @@ export class ClassificationService extends BaseService {
         }
       }
 
+      // eslint-disable-next-line unicorn/prefer-continue
       if (bestSimilarity >= category.similarity) {
         const tags = await upsertTags(this.tagRepository, {
           userId: asset.ownerId,
