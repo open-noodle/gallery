@@ -8,7 +8,7 @@ Assets can be moved to the Locked Folder from the asset actions menu. Access to 
 
 Unlocking the Locked Folder temporarily gives the current session access to locked assets.
 
-While the session is unlocked, locked assets may also appear elsewhere in Immich where they are relevant, such as search results or utilities such as Review large files.
+While the session is unlocked, locked assets may also appear elsewhere in Gallery where they are relevant, such as search results or utilities such as Review large files.
 
 When the session is locked again, locked assets are hidden from those views.
 
@@ -22,4 +22,4 @@ Selecting **Lock** ends the elevated access immediately. Signing out also ends a
 
 ## Moving assets out of the Locked Folder
 
-Assets can be moved back out of the Locked Folder while the session is unlocked. Once moved out, they return to their normal visibility in Immich.
+Assets can be moved back out of the Locked Folder while the session is unlocked. Once moved out, they return to their normal visibility in Gallery.
