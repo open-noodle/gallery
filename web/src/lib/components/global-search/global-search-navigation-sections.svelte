@@ -31,10 +31,12 @@
     const byCategory = new SvelteMap<NavigationCategory, NavigationItem[]>();
     for (const item of status.items) {
       const arr = byCategory.get(item.category) ?? [];
-      if (arr.length < TOP_N) {
-        arr.push(item);
-        byCategory.set(item.category, arr);
+      if (!(arr.length < TOP_N)) {
+        continue;
       }
+
+      arr.push(item);
+      byCategory.set(item.category, arr);
     }
     return ORDER.filter(({ category }) => (byCategory.get(category)?.length ?? 0) > 0).map(
       ({ category, headingKey }) => ({
