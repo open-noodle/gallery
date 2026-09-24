@@ -42,20 +42,15 @@ const uuidAt = (i: number) => `00000000-0000-4000-8000-${i.toString().padStart(1
 
 /** A keyset-faithful `getBurstWindow` over an in-memory library sorted by (cursorT, id). */
 const serveBurstLibrary = (mocks: ServiceMocks, library: BurstRow[]) =>
-  mocks.cleanup.getBurstWindow.mockImplementation(
-    (
-      _userId: string,
-      { afterLocalDateTime, afterId, limit }: { afterLocalDateTime?: string; afterId?: string; limit: number },
-    ) => {
-      const start =
-        afterLocalDateTime === undefined
-          ? 0
-          : library.findIndex(
-              (row) => row.cursorT > afterLocalDateTime || (row.cursorT === afterLocalDateTime && row.id > afterId!),
-            );
-      return Promise.resolve(start === -1 ? [] : library.slice(start, start + limit));
-    },
-  );
+  mocks.cleanup.getBurstWindow.mockImplementation((_userId: string, { afterLocalDateTime, afterId, limit }) => {
+    // The service always passes the full-precision `cursorT` string.
+    const after = afterLocalDateTime === undefined ? undefined : String(afterLocalDateTime);
+    const start =
+      after === undefined
+        ? 0
+        : library.findIndex((row) => row.cursorT > after || (row.cursorT === after && row.id > afterId!));
+    return Promise.resolve(start === -1 ? [] : library.slice(start, start + limit));
+  });
 
 describe(CleanupService.name, () => {
   let sut: CleanupService;
