@@ -24,15 +24,29 @@ const isFormField = (target: EventTarget | null) => {
   );
 };
 
-type Binding = [ShortcutOptions['shortcut'], () => void];
+/**
+ * A focused button, link or role="button" element that is not an asset tile. Asset tiles are
+ * buttons too, but they carry `data-asset-id`; Space on a tile opens the viewer, while Space on
+ * any other control (Keep, Trash, Finish day, ...) must press that control.
+ */
+const isNonTileControl = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  target.dataset.assetId === undefined &&
+  target.matches('button, a[href], [role="button"], summary');
+
+/** `leaveControls`: skip the shortcut when a non-tile control has focus, so the key presses it. */
+type Binding = [ShortcutOptions['shortcut'], () => void, { leaveControls?: boolean }?];
 
 const bind = (bindings: Binding[]): ShortcutOptions[] =>
-  bindings.map(([shortcut, handler]) => ({
+  bindings.map(([shortcut, handler, options]) => ({
     shortcut,
     ignoreInputFields: false,
     preventDefault: false,
     onShortcut: (event) => {
       if (shouldIgnoreEvent(event) || isFormField(event.target)) {
+        return;
+      }
+      if (options?.leaveControls && isNonTileControl(event.target)) {
         return;
       }
       event.preventDefault();
@@ -45,8 +59,9 @@ const bind = (bindings: Binding[]): ShortcutOptions[] =>
  * open, because the viewer already uses `z` for zoom and Space for video play/pause.
  *
  * `shouldIgnoreEvent` only covers text-like inputs; checkboxes, selects and contenteditable
- * elements are ignored here too, so Space still toggles the "Hide reviewed" checkbox. The default
- * is only prevented once a shortcut actually runs.
+ * elements are ignored here too, so Space still toggles the "Hide reviewed" checkbox. Space also
+ * stays with a focused button or link that is not an asset tile, so it presses Keep, Trash or
+ * Finish day. The default is only prevented once a shortcut actually runs.
  */
 export const cleanupShortcuts = (handlers: CleanupShortcutHandlers, isViewing: () => boolean): ShortcutOptions[] => {
   if (isViewing()) {
@@ -63,7 +78,7 @@ export const cleanupShortcuts = (handlers: CleanupShortcutHandlers, isViewing: (
     [{ key: 'ArrowRight' }, handlers.right],
     [{ key: 'ArrowUp' }, handlers.up],
     [{ key: 'ArrowDown' }, handlers.down],
-    [{ key: ' ' }, handlers.open],
+    [{ key: ' ' }, handlers.open, { leaveControls: true }],
     [{ key: 'z' }, handlers.undo],
     [{ key: 'Enter', shift: true }, handlers.finish],
   ];
@@ -96,6 +111,6 @@ export const queueShortcuts = (handlers: QueueShortcutHandlers, isDisabled: () =
     [{ key: 'k' }, handlers.keep],
     [{ key: 'a' }, handlers.selectAll],
     [{ key: 'Escape' }, handlers.clear],
-    [{ key: ' ' }, handlers.open],
+    [{ key: ' ' }, handlers.open, { leaveControls: true }],
   ]);
 };
