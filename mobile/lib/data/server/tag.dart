@@ -2,14 +2,20 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/server/api_repository.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final tagApiRepositoryProvider = Provider((ref) => TagApiRepository(ref.watch(apiServiceProvider).tagsApi));
+// Gallery (#369): resolve `tagsApi` per call rather than capturing it at construction, like the
+// other data/server repositories — `ApiService.setEndpoint()` reassigns its *Api fields on login /
+// server switch, so a captured instance keeps pointing at the pre-login client.
+final tagApiRepositoryProvider = Provider((ref) => TagApiRepository(ref.watch(apiServiceProvider)));
 
 class TagApiRepository extends ApiRepository {
-  final TagsApi _api;
+  final ApiService _apiService;
 
-  const TagApiRepository(this._api);
+  const TagApiRepository(this._apiService);
+
+  TagsApi get _api => _apiService.tagsApi;
 
   /// Apply every tag in [tagIds] to every asset in [assetIds], returning the number of assets successfully tagged
   Future<int> bulkTagAssets(List<String> assetIds, List<String> tagIds) async {
