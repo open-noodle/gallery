@@ -1,12 +1,17 @@
 -- gallery-fork: Library Cleanup performance seed (specs/2026-09-23-library-cleanup-design.md, "Scale").
 --
--- DISPOSABLE DATABASES ONLY. Inserts 500,000 assets for perf user 1 and 50,000 for perf user 2 (so
--- owner filters matter), with asset_exif, asset_job_status, asset_face (~25% of images),
--- smart_search (1%), duplicates (2%) and burst runs (~2%). When the Cleanup schema is present it
--- also seeds asset_quality and marks every asset as quality-analysed; on a pre-Cleanup schema those
--- steps are skipped, so the same script seeds the "before" and "after" databases.
+-- DISPOSABLE DATABASES ONLY — never run it against a real instance. It is NOT re-runnable: it inserts
+-- fixed users/cluster groups and 550k assets with fixed checksums, so run it once on a freshly migrated
+-- throwaway database (drop and recreate the database to seed again). It lives under test/ so it is not
+-- shipped with the server package.
 --
--- usage: psql "$DB_URL" -v ON_ERROR_STOP=1 -f server/bin/seed-cleanup-perf.sql
+-- Inserts 500,000 assets for perf user 1 and 50,000 for perf user 2 (so owner filters matter), with
+-- asset_exif, asset_job_status, asset_face (~25% of images), smart_search (1%), duplicates (2%) and
+-- burst runs (~2%). When the Cleanup schema is present it also seeds asset_quality and marks every
+-- asset as quality-analysed; on a pre-Cleanup schema those steps are skipped, so the same script seeds
+-- the "before" and "after" databases of the index safety check.
+--
+-- usage: psql "$DB_URL" -v ON_ERROR_STOP=1 -f server/test/perf/seed-cleanup-perf.sql
 BEGIN;
 
 SELECT setseed(0.42);
