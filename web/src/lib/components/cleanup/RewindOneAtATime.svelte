@@ -57,8 +57,9 @@
     [CleanupBlurReason.Bright]: 'cleanup_hint_bright',
   };
 
-  // Each hint points at the queue that already collects photos like this one. `reason` is the
-  // Blurry queue's reason at its default strictness, so the link lands on a queue that shows it.
+  // Each hint points at the queue that collects photos like this one. `reason` is the Blurry
+  // queue's reason at its default strictness, but that queue also hides photos with faces and ones
+  // already kept there by default, so the link is a hint, not a promise the photo is listed.
   const hints = $derived.by(() => {
     const list: Array<{ testId: string; icon: string; label: Translations; queue: Translations; href: string }> = [];
     if (!asset) {

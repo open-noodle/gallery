@@ -25,6 +25,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { navigate } from '$lib/utils/navigation';
   import {
+    AssetTypeEnum,
     commitCleanup,
     getCleanupCalendar,
     getCleanupRewindAssets,
@@ -95,7 +96,10 @@
   const flat = $derived(sections.flatMap(({ visible }) => visible));
   // Measured over every loaded photo, not only the visible ones, so hiding a kept shot does not
   // stop its burst neighbour from being hinted.
-  const burstIds = $derived(burstMemberIds(loaded.flatMap(({ assets }) => assets)));
+  // The Bursts queue groups images only, so a video must not make a neighbouring photo a burst.
+  const burstIds = $derived(
+    burstMemberIds(loaded.flatMap(({ assets }) => assets).filter(({ type }) => type === AssetTypeEnum.Image)),
+  );
   const unloadedCount = $derived(
     years.filter(({ year }) => loaded.every((l) => l.year !== year)).reduce((sum, year) => sum + year.count, 0),
   );
