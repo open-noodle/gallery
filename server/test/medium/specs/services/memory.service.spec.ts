@@ -671,6 +671,7 @@ describe(MemoryService.name, () => {
       await addBirthdayAsset('2022-04-01T12:00:00Z');
       await addBirthdayAsset('2021-04-01T12:00:00Z');
       await addBirthdayAsset('2020-04-01T12:00:00Z');
+      await addBirthdayAsset('2019-04-23T12:00:00Z');
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -685,6 +686,17 @@ describe(MemoryService.name, () => {
           }),
         }),
       ]);
+
+      // Upstream's MemoryType.Birthday generator must not run alongside the rule (spec
+      // 2026-09-24). Alice satisfies upstream's criteria (named, birthDate set, a photo on a past
+      // birthday), so a dispatched upstream generator would write a second card here.
+      const upstreamBirthdays = await ctx.database
+        .selectFrom('memory')
+        .select('id')
+        .where('ownerId', '=', user.id)
+        .where('type', '=', MemoryType.Birthday)
+        .execute();
+      expect(upstreamBirthdays).toEqual([]);
     });
 
     it('creates a fallback birthday memory from four single-year Pierre photos', async () => {
@@ -997,7 +1009,12 @@ describe(MemoryService.name, () => {
     });
   });
 
-  describe('onMemoryCreate (birthday)', () => {
+  // Gallery keeps its own BirthdayMemoryRule as the only birthday generator; upstream's
+  // createBirthdayMemories is pulled but deliberately never dispatched
+  // (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). These cases assert
+  // upstream's generator, so they are skipped until the fork adopts it — re-enable them in the
+  // same change that deletes the `birthday-memory-generator-not-dispatched` invariant.
+  describe.skip('onMemoryCreate (birthday)', () => {
     it('should create a memory for the 3 days leading up to a birthday', async () => {
       const { sut, ctx } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
