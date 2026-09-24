@@ -5,6 +5,7 @@ import { CleanupService } from 'src/services/cleanup.service.js';
 import {
   BurstRow,
   CLEANUP_BURST_MAX_EXTENSIONS,
+  CLEANUP_BURST_MAX_WINDOWS_PER_PAGE,
   CLEANUP_BURST_WINDOW,
   decodeCursor,
   encodeCursor,
@@ -36,6 +37,25 @@ const hydrateFromRows = (mocks: ServiceMocks, rows: BurstRow[]) => {
 };
 
 const cursor = (v: Array<string | number>) => encodeCursor({ v });
+
+const uuidAt = (i: number) => `00000000-0000-4000-8000-${i.toString().padStart(12, '0')}`;
+
+/** A keyset-faithful `getBurstWindow` over an in-memory library sorted by (cursorT, id). */
+const serveBurstLibrary = (mocks: ServiceMocks, library: BurstRow[]) =>
+  mocks.cleanup.getBurstWindow.mockImplementation(
+    (
+      _userId: string,
+      { afterLocalDateTime, afterId, limit }: { afterLocalDateTime?: string; afterId?: string; limit: number },
+    ) => {
+      const start =
+        afterLocalDateTime === undefined
+          ? 0
+          : library.findIndex(
+              (row) => row.cursorT > afterLocalDateTime || (row.cursorT === afterLocalDateTime && row.id > afterId!),
+            );
+      return Promise.resolve(start === -1 ? [] : library.slice(start, start + limit));
+    },
+  );
 
 describe(CleanupService.name, () => {
   let sut: CleanupService;
@@ -562,6 +582,70 @@ describe(CleanupService.name, () => {
       expect(res.groups).toHaveLength(1);
       expect(res.groups[0].assets).toHaveLength(CLEANUP_BURST_WINDOW * (1 + CLEANUP_BURST_MAX_EXTENSIONS));
       expect(res.nextCursor).not.toBeNull();
+    });
+
+    describe('window cap per page', () => {
+      it('returns an empty page with a cursor once the cap is reached in a library with no bursts', async () => {
+        const library = Array.from(
+          { length: (CLEANUP_BURST_MAX_WINDOWS_PER_PAGE + 3) * CLEANUP_BURST_WINDOW },
+          (_, i) => burstRow(uuidAt(i), at(i * 3000)),
+        );
+        serveBurstLibrary(mocks, library);
+
+        const res = await sut.getQueue(authStub.user1, 'bursts', {});
+
+        expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(CLEANUP_BURST_MAX_WINDOWS_PER_PAGE);
+        expect(res.groups).toEqual([]);
+        expect(res.nextCursor).not.toBeNull();
+        // Probes are reused as the next window, so N queries cover N - 1 fully processed windows.
+        const lastScanned = library[(CLEANUP_BURST_MAX_WINDOWS_PER_PAGE - 1) * CLEANUP_BURST_WINDOW - 1];
+        expect(decodeCursor(res.nextCursor!).v).toEqual([lastScanned.cursorT, lastScanned.id]);
+        expect(mocks.cleanup.getCleanupAssets).not.toHaveBeenCalled();
+      });
+
+      it('pages through a sparse library across the cap without losing or repeating a group', async () => {
+        const W = CLEANUP_BURST_WINDOW;
+        const M = CLEANUP_BURST_MAX_WINDOWS_PER_PAGE;
+        const size = (2 * M + 3) * W;
+        // Pairs 1 s apart among singletons 3 s apart; one pair straddles the first page's cap boundary.
+        const pairStarts = new Set([10, (M - 1) * W - 1, (M - 1) * W + 5, 2 * M * W + 100, size - 2]);
+        const library: BurstRow[] = [];
+        let time = 0;
+        for (let i = 0; i < size; i++) {
+          const second = pairStarts.has(i - 1);
+          time += i === 0 ? 0 : second ? 1000 : 3000;
+          const stack = pairStarts.has(i) ? `stack-${i}` : second ? `stack-${i - 1}` : null;
+          library.push(burstRow(uuidAt(i), at(time), { autoStackId: stack }));
+        }
+        serveBurstLibrary(mocks, library);
+        hydrateFromRows(mocks, library);
+        const expected = [...pairStarts].toSorted((a, b) => a - b).map((i) => [uuidAt(i), uuidAt(i + 1)]);
+
+        const seen: string[][] = [];
+        const queriesPerPage: number[] = [];
+        let emptyPagesWithCursor = 0;
+        let nextCursor: string | undefined;
+        for (let page = 0; page < 50; page++) {
+          mocks.cleanup.getBurstWindow.mockClear();
+          const res = await sut.getQueue(authStub.user1, 'bursts', { cursor: nextCursor, limit: 100 });
+          queriesPerPage.push(mocks.cleanup.getBurstWindow.mock.calls.length);
+          seen.push(...res.groups.map((group) => group.assets.map((asset) => asset.id)));
+          if (res.groups.length === 0 && res.nextCursor) {
+            emptyPagesWithCursor++;
+          }
+          if (!res.nextCursor) {
+            break;
+          }
+          nextCursor = res.nextCursor;
+        }
+
+        expect(seen).toEqual(expected);
+        expect(queriesPerPage.length).toBeGreaterThan(2);
+        expect(emptyPagesWithCursor).toBeGreaterThan(0);
+        for (const queries of queriesPerPage) {
+          expect(queries).toBeLessThanOrEqual(M + CLEANUP_BURST_MAX_EXTENSIONS);
+        }
+      });
     });
 
     it('drops an extension row that repeats the cursor row', async () => {

@@ -27,6 +27,7 @@ import {
   CLEANUP_BURST_CLIP_MAX_DISTANCE,
   CLEANUP_BURST_GAP_MS,
   CLEANUP_BURST_MAX_EXTENSIONS,
+  CLEANUP_BURST_MAX_WINDOWS_PER_PAGE,
   CLEANUP_BURST_WINDOW,
   CLEANUP_PAGE_LIMIT,
   CLEANUP_QUALITY_VERSION,
@@ -213,19 +214,25 @@ export class CleanupService extends BaseService {
    * Safety net: at most `CLEANUP_BURST_MAX_EXTENSIONS` extra windows are appended (a pathological
    * run of photos under 2 s apart would otherwise read the whole library into one page; such a run is
    * split at the cap instead), and a returned row equal to the cursor row is dropped.
+   *
+   * `stats.queries` counts the window queries run, for the caller's per-page cap.
    */
   private async fetchBurstWindow(
     userId: string,
     after: { cursorT?: string; id?: string },
-    lookahead?: BurstRow[],
+    lookahead: BurstRow[] | undefined,
+    stats: { queries: number },
   ): Promise<{ rows: BurstRow[]; reachedEnd: boolean; lookahead?: BurstRow[] }> {
-    let window =
-      lookahead ??
-      (await this.cleanupRepository.getBurstWindow(userId, {
-        afterLocalDateTime: after.cursorT,
-        afterId: after.id,
+    const query = (options: { cursorT?: string; id?: string }) => {
+      stats.queries++;
+      return this.cleanupRepository.getBurstWindow(userId, {
+        afterLocalDateTime: options.cursorT,
+        afterId: options.id,
         limit: CLEANUP_BURST_WINDOW,
-      }));
+      });
+    };
+
+    let window = lookahead ?? (await query(after));
 
     if (window.length < CLEANUP_BURST_WINDOW) {
       return { rows: window, reachedEnd: true };
@@ -233,11 +240,7 @@ export class CleanupService extends BaseService {
 
     for (let extensions = 0; extensions < CLEANUP_BURST_MAX_EXTENSIONS; extensions++) {
       const last = window.at(-1)!;
-      const fetched = await this.cleanupRepository.getBurstWindow(userId, {
-        afterLocalDateTime: last.cursorT,
-        afterId: last.id,
-        limit: CLEANUP_BURST_WINDOW,
-      });
+      const fetched = await query({ cursorT: last.cursorT, id: last.id });
       const more = fetched.filter((row) => row.id !== last.id);
 
       if (more.length === 0) {
@@ -271,9 +274,18 @@ export class CleanupService extends BaseService {
     let nextCursor: CleanupCursor | null = null;
     let reachedEnd = false;
     let lookahead: BurstRow[] | undefined;
+    const stats = { queries: 0 };
 
     while (groups.length < limit) {
-      const fetched = await this.fetchBurstWindow(userId, after, lookahead);
+      // Cap the scan per page (a library with few bursts would otherwise read to its end here).
+      // Stopping between windows keeps every group whole; `nextCursor` already points past the last
+      // processed window, so the next page resumes exactly there. A held `lookahead` is dropped and
+      // refetched by that next page.
+      if (stats.queries >= CLEANUP_BURST_MAX_WINDOWS_PER_PAGE) {
+        break;
+      }
+
+      const fetched = await this.fetchBurstWindow(userId, after, lookahead, stats);
       const { rows: window, reachedEnd: windowReachedEnd } = fetched;
       lookahead = fetched.lookahead;
       if (window.length === 0) {

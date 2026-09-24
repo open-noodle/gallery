@@ -409,6 +409,57 @@ describe('bursts queue', () => {
     expect(screen.queryByTestId('cleanup-burst-g2')).toBeNull();
   });
 
+  describe('when the server ends a page early at its scan cap', () => {
+    // The footer sentinel stays in view, as it does when the page above it is short or empty.
+    class AlwaysVisible {
+      constructor(private readonly callback: IntersectionObserverCallback) {}
+      observe(target: Element) {
+        this.callback(
+          [{ isIntersecting: true, target } as IntersectionObserverEntry],
+          this as unknown as IntersectionObserver,
+        );
+      }
+      disconnect() {}
+      unobserve() {}
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('IntersectionObserver', AlwaysVisible);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('keeps loading through empty pages that carry a cursor, and stops at the end', async () => {
+      mocks.sdk.getCleanupQueue
+        .mockResolvedValueOnce({ items: [], groups: [], nextCursor: 'c1' })
+        .mockResolvedValueOnce({ items: [], groups: [], nextCursor: 'c2' })
+        .mockResolvedValueOnce({ items: [], groups: [group('g1', ['a', 'b'], 'a')], nextCursor: null });
+      renderWrapped(BurstsQueue, { title: 'cleanup_queue_bursts' });
+
+      await waitFor(() => expect(screen.getByTestId('cleanup-burst-g1')).toBeInTheDocument());
+      expect(mocks.sdk.getCleanupQueue).toHaveBeenCalledTimes(3);
+      expect(mocks.sdk.getCleanupQueue).toHaveBeenNthCalledWith(2, expect.objectContaining({ cursor: 'c1' }));
+      expect(mocks.sdk.getCleanupQueue).toHaveBeenNthCalledWith(3, expect.objectContaining({ cursor: 'c2' }));
+      expect(screen.queryByTestId('cleanup-queue-empty')).toBeNull();
+      expect(screen.queryByTestId('cleanup-queue-sentinel')).toBeNull();
+    });
+
+    it('shows the empty state only once the last page says there is nothing more', async () => {
+      mocks.sdk.getCleanupQueue
+        .mockResolvedValueOnce({ items: [], groups: [], nextCursor: 'c1' })
+        .mockResolvedValueOnce({ items: [], groups: [], nextCursor: null });
+      renderWrapped(BurstsQueue, { title: 'cleanup_queue_bursts' });
+
+      await waitFor(() => expect(screen.getByTestId('cleanup-queue-empty')).toBeInTheDocument());
+      expect(mocks.sdk.getCleanupQueue).toHaveBeenCalledTimes(2);
+      // Give any runaway reload a chance to show up before asserting there was none.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mocks.sdk.getCleanupQueue).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('marks the focused photo with the keyboard', async () => {
     renderBursts([group('g1', ['a', 'b'], 'a')]);
     await waitFor(() => expect(item('b')).toBeInTheDocument());
