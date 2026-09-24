@@ -262,7 +262,7 @@ describe('add to album/space entry points', () => {
 
   it('timeline bulk "+" opens the unified collection modal with the selected ids', () => {
     const action = getAssetBulkActions(((k: string) => k) as never).AddToAlbum;
-    action.onAction(action);
+    action.onAction({ action, event: new Event('click') });
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
       assetIds: ['x1', 'x2'],
       restrictToSpaceId: undefined,
@@ -271,7 +271,7 @@ describe('add to album/space entry points', () => {
 
   it('bulk "+" carries the space restriction through to the modal when the selection is not all-owned', () => {
     const action = getAssetBulkActions(((k: string) => k) as never, { restrictToSpaceId: 'space-1' }).AddToAlbum;
-    action.onAction(action);
+    action.onAction({ action, event: new Event('click') });
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
       assetIds: ['x1', 'x2'],
       restrictToSpaceId: 'space-1',
@@ -281,7 +281,7 @@ describe('add to album/space entry points', () => {
   it('single-photo viewer "+" opens the unified collection modal with the one id', () => {
     const asset = assetFactory.build({ id: 'single-1' });
     const action = getAssetActions(() => '', asset).AddToAlbum;
-    action.onAction(action);
+    action.onAction({ action, event: new Event('click') });
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['single-1'] });
   });
 
@@ -300,7 +300,7 @@ describe('add to album/space entry points', () => {
       const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
 
       const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
-      action.onAction(action);
+      action.onAction({ action, event: new Event('click') });
 
       expect(action.$if?.()).toBe(true);
       expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
@@ -314,7 +314,7 @@ describe('add to album/space entry points', () => {
       const asset = assetFactory.build({ id: 'mine', ownerId: 'editor-1' });
 
       const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
-      action.onAction(action);
+      action.onAction({ action, event: new Event('click') });
 
       expect(action.$if?.()).toBe(true);
       expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
@@ -340,7 +340,7 @@ describe('add to album/space entry points', () => {
       const asset = assetFactory.build({ id: 'partners-photo', ownerId: 'the-partner' });
 
       const action = getAssetActions(() => '', asset).AddToAlbum;
-      action.onAction(action);
+      action.onAction({ action, event: new Event('click') });
 
       expect(action.$if?.()).toBe(true);
       expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
