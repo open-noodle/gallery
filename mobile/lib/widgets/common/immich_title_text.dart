@@ -14,7 +14,7 @@ class ImmichTitleText extends StatelessWidget {
       style: TextStyle(
         fontSize: fontSize * 0.7,
         fontWeight: FontWeight.bold,
-        color: color ?? context.primaryColor,
+        color: context.primaryColor,
         letterSpacing: -1.0,
       ),
     );
