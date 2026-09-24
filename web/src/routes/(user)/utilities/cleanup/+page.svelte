@@ -46,9 +46,10 @@
     CleanupCountQueue.Blurry,
   ];
 
-  const LIST_QUEUES: Partial<Record<CleanupCountQueue, CleanupListQueue>> = {
+  // Queues whose first item doubles as the rail thumbnail. Bursts is left out on purpose: its
+  // grouping query is the heaviest, so its row keeps the icon tile.
+  const COVER_QUEUES: Partial<Record<CleanupCountQueue, CleanupListQueue>> = {
     [CleanupCountQueue.SpaceHogs]: CleanupListQueue.SpaceHogs,
-    [CleanupCountQueue.Bursts]: CleanupListQueue.Bursts,
     [CleanupCountQueue.Screenshots]: CleanupListQueue.Screenshots,
     [CleanupCountQueue.Blurry]: CleanupListQueue.Blurry,
   };
@@ -59,6 +60,7 @@
   let trash = $state<CleanupTrashResponseDto>();
   let counts = $state<Partial<Record<CleanupCountQueue, CleanupCountResponseDto>>>({});
   let covers = $state<Partial<Record<CleanupCountQueue, CleanupAssetDto>>>({});
+  let settledCounts = $state(0);
 
   type Peek = { monthDay: number; photos: number; years: number; assets: CleanupAssetDto[] };
   let peekDay = $state(today);
@@ -68,21 +70,20 @@
   const peekCache = new SvelteMap<number, Peek>();
 
   const lang = $derived($locale ?? 'en');
-  const couldStillFree = $derived.by(() => {
-    const loaded = Object.values(counts);
-    return loaded.length === 0 ? undefined : loaded.reduce((sum, count) => sum + count.bytes, 0);
-  });
+  // Shown only once every count has settled, so the figure never climbs while requests land.
+  const couldStillFree = $derived(
+    settledCounts < QUEUES.length ? undefined : Object.values(counts).reduce((sum, count) => sum + count.bytes, 0),
+  );
   const peekLoaded = $derived(peek?.monthDay === peekDay ? peek : undefined);
 
   const loadCover = async (queue: CleanupCountQueue) => {
-    const listQueue = LIST_QUEUES[queue];
+    const listQueue = COVER_QUEUES[queue];
     if (!listQueue) {
       return;
     }
     // Decorative only: the rail falls back to the queue icon when this fails.
     const page = await getCleanupQueue({ queue: listQueue, limit: 1 }).catch(() => undefined);
-    const group = page?.groups[0];
-    const cover = page?.items[0] ?? group?.assets.find(({ id }) => id === group.suggestedKeepId) ?? group?.assets[0];
+    const cover = page?.items[0];
     if (cover) {
       covers[queue] = cover;
     }
@@ -93,10 +94,12 @@
       const count = await getCleanupQueueCount({ queue });
       counts[queue] = count;
       if (count.count > 0) {
-        await loadCover(queue);
+        void loadCover(queue);
       }
     } catch (error) {
       handleError(error, $t('errors.failed_to_load_assets'));
+    } finally {
+      settledCounts++;
     }
   };
 
@@ -119,6 +122,9 @@
   const loadPeek = async (monthDay: number, signal: AbortSignal) => {
     const { years } = await getCleanupRewindYears({ monthDay }, { signal });
     const photos = years.reduce((sum, year) => sum + year.count, 0);
+    if (signal.aborted) {
+      return;
+    }
     let assets: CleanupAssetDto[] = [];
     if (years.length > 0) {
       // Years arrive most recent first.
@@ -131,10 +137,7 @@
     }
   };
 
-  const schedulePeek = (monthDay: number, delay = PEEK_DEBOUNCE_MS) => {
-    if (monthDay === peekDay && peek?.monthDay === monthDay) {
-      return;
-    }
+  const startPeek = (monthDay: number, delay: number) => {
     peekDay = monthDay;
     clearTimeout(peekTimer);
     peekAbort?.abort();
@@ -154,6 +157,14 @@
     }, delay);
   };
 
+  // Hovering then focusing the same cell must not abort and restart its request, so a day that is
+  // already loading or loaded is left alone.
+  const schedulePeek = (monthDay: number) => {
+    if (monthDay !== peekDay) {
+      startPeek(monthDay, PEEK_DEBOUNCE_MS);
+    }
+  };
+
   const onEmptyTrash = async () => {
     await handleEmptyTrash();
     await loadTrash();
@@ -161,7 +172,7 @@
 
   onMount(() => {
     void Promise.all([loadCalendar(), loadTrash(), ...QUEUES.map((queue) => loadCount(queue))]);
-    schedulePeek(today, 0);
+    startPeek(today, 0);
   });
 
   onDestroy(() => {
@@ -189,7 +200,12 @@
       </div>
 
       <div class="ms-auto flex flex-wrap items-center gap-2">
-        {#if couldStillFree !== undefined}
+        {#if couldStillFree === undefined}
+          <span
+            class="inline-block h-6 w-36 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"
+            data-testid="cleanup-could-still-free-pending"
+          ></span>
+        {:else}
           <span
             class="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium whitespace-nowrap text-success tabular-nums"
             data-testid="cleanup-could-still-free"
@@ -222,11 +238,12 @@
         <Card class="mt-3" data-testid="cleanup-day-peek">
           <div class="grid items-center gap-4 p-3.5 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
             <div class="min-w-0">
-              <Text fontWeight="semi-bold">{monthDayLabel(peekDay, lang)}</Text>
+              <Text size="tiny" color="muted">{$t('cleanup_day_peek_hovering')}</Text>
+              <Text class="text-lg/tight font-bold">{monthDayLabel(peekDay, lang)}</Text>
               <Text size="tiny" color="muted" class="tabular-nums">
                 {#if peekLoaded}
                   {$t('cleanup_day_peek_summary', {
-                    values: { photos: peekLoaded.photos.toLocaleString(lang), years: peekLoaded.years },
+                    values: { photos: peekLoaded.photos, years: peekLoaded.years },
                   })}
                 {:else}
                   <span class="inline-block h-3 w-24 animate-pulse rounded-sm bg-gray-200 align-middle dark:bg-gray-700"
@@ -252,7 +269,7 @@
               {/if}
             </div>
 
-            <Button href={Route.cleanupRewind({ monthDay: peekDay })} size="small" variant="outline" color="secondary">
+            <Button href={Route.cleanupRewind({ monthDay: peekDay })} size="small">
               {$t('cleanup_rewind_this_day')}
             </Button>
           </div>
