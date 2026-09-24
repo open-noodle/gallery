@@ -189,8 +189,6 @@ features:
       - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
       - server/src/dtos/gallery-map.dto.ts
-      - mobile/lib/providers/map/map_marker.provider.dart
-      - mobile/lib/services/map.service.dart
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
