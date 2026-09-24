@@ -26,10 +26,12 @@ export class BirthdayMemoryRule implements MemoryRule {
       for (const asset of assets) {
         const year = DateTime.fromJSDate(asset.localDateTime, { zone: 'utc' }).year;
         const ids = byYear.get(year) ?? [];
-        if (ids.length < 2) {
-          ids.push(asset.id);
-          byYear.set(year, ids);
+        if (!(ids.length < 2)) {
+          continue;
         }
+
+        ids.push(asset.id);
+        byYear.set(year, ids);
       }
 
       const assetIds = byYear

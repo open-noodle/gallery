@@ -99,11 +99,13 @@ describe('FaceRepairResolveRequestSchema', () => {
       ],
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.stay).toEqual([]);
-      expect(result.data.lock).toEqual([]);
-      expect(result.data.detach).toEqual([]);
+    if (!result.success) {
+      return;
     }
+
+    expect(result.data.stay).toEqual([]);
+    expect(result.data.lock).toEqual([]);
+    expect(result.data.detach).toEqual([]);
   });
 
   it('accepts an empty body beyond personId (defaults every bucket to [])', () => {

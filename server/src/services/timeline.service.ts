@@ -243,6 +243,7 @@ export class TimelineService extends BaseService {
       dto.withCoordinates = false;
     }
 
+    // eslint-disable-next-line unicorn/prefer-early-return
     if (dto.withSharedSpaces) {
       const requestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;
       const requestedFavorite = dto.isFavorite === true || dto.isFavorite === false;

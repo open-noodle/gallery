@@ -38,9 +38,11 @@ export const applyResolvedIdentityMetadata = async <T extends ResolvablePerson>(
   for (const person of people) {
     const identityId = identityByPersonId.get(person.id);
     const resolved = identityId ? resolvedByIdentity.get(identityId) : undefined;
-    if (resolved) {
-      person.name = resolved.name;
-      person.birthDate = resolved.birthDate;
+    if (!resolved) {
+      continue;
     }
+
+    person.name = resolved.name;
+    person.birthDate = resolved.birthDate;
   }
 };

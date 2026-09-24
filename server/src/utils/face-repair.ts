@@ -76,11 +76,13 @@ export const tallyReattribution = (currentPersonId: string, neighbors: Reattribu
       count > topOtherCount ||
       (count === topOtherCount && nearest < (topOtherNearest ?? Infinity)) ||
       (count === topOtherCount && nearest === topOtherNearest && personGroupId < topOtherPersonId!);
-    if (wins) {
-      topOtherPersonId = personGroupId;
-      topOtherCount = count;
-      topOtherNearest = nearest;
+    if (!wins) {
+      continue;
     }
+
+    topOtherPersonId = personGroupId;
+    topOtherCount = count;
+    topOtherNearest = nearest;
   }
 
   const own = byPerson.get(currentPersonId);

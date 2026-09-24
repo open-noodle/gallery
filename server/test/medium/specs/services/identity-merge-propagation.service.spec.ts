@@ -656,11 +656,13 @@ describe('IdentityMergePropagationService medium tests', () => {
       let heldFirst = false;
       vi.spyOn(personRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
-        if (!heldFirst && personIds.includes(personA.personGroupId) && personIds.includes(personB.personGroupId)) {
-          heldFirst = true;
-          firstLocked();
-          await firstCanFinish;
+        if (!(!heldFirst && personIds.includes(personA.personGroupId) && personIds.includes(personB.personGroupId))) {
+          return;
         }
+
+        heldFirst = true;
+        firstLocked();
+        await firstCanFinish;
       });
 
       const first = sut.mergePersonalPeople(factory.auth({ user }), personA.personGroupId, [personB.personGroupId]);
@@ -700,11 +702,13 @@ describe('IdentityMergePropagationService medium tests', () => {
       let heldFirst = false;
       vi.spyOn(personRepository, 'lockPeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
-        if (!heldFirst && personIds.includes(personA.personGroupId) && personIds.includes(personB.personGroupId)) {
-          heldFirst = true;
-          firstLocked();
-          await firstCanFinish;
+        if (!(!heldFirst && personIds.includes(personA.personGroupId) && personIds.includes(personB.personGroupId))) {
+          return;
         }
+
+        heldFirst = true;
+        firstLocked();
+        await firstCanFinish;
       });
 
       const first = sut.mergePersonalPeople(factory.auth({ user }), personA.personGroupId, [personB.personGroupId]);
@@ -783,11 +787,13 @@ describe('IdentityMergePropagationService medium tests', () => {
       let heldFirst = false;
       vi.spyOn(sharedSpaceRepository, 'lockSpacePeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
-        if (!heldFirst && personIds.includes(personA.id) && personIds.includes(personB.id)) {
-          heldFirst = true;
-          firstLocked();
-          await firstCanFinish;
+        if (!(!heldFirst && personIds.includes(personA.id) && personIds.includes(personB.id))) {
+          return;
         }
+
+        heldFirst = true;
+        firstLocked();
+        await firstCanFinish;
       });
 
       const first = sut.mergeSpacePeople(factory.auth({ user }), space.id, personA.id, [personB.id], ALLOW_MERGE);
@@ -826,11 +832,13 @@ describe('IdentityMergePropagationService medium tests', () => {
       let heldFirst = false;
       vi.spyOn(sharedSpaceRepository, 'lockSpacePeopleForMerge').mockImplementation(async (personIds, transaction) => {
         await originalLock(personIds, transaction);
-        if (!heldFirst && personIds.includes(personA.id) && personIds.includes(personB.id)) {
-          heldFirst = true;
-          firstLocked();
-          await firstCanFinish;
+        if (!(!heldFirst && personIds.includes(personA.id) && personIds.includes(personB.id))) {
+          return;
         }
+
+        heldFirst = true;
+        firstLocked();
+        await firstCanFinish;
       });
 
       const first = sut.mergeSpacePeople(factory.auth({ user }), space.id, personA.id, [personB.id], ALLOW_MERGE);
