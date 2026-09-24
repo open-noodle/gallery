@@ -660,6 +660,33 @@ describe(SyncService.name, () => {
       expect(memoryMessages).toHaveLength(2);
     });
 
+    it('should omit birthday memory upserts for every client, and still stream their deletes', async () => {
+      for (const types of [
+        [SyncRequestType.MemoriesV1],
+        [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1],
+      ]) {
+        const { writable, chunks } = makeWritable();
+
+        mocks.session.isPendingSyncReset.mockResolvedValue(false);
+        mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+        mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+        syncSubs.memory.getDeletes.mockReturnValue(makeStream([{ id: newUuid(), memoryId: 'm3' }]));
+        syncSubs.memory.getUpserts.mockReturnValue(
+          makeStream([
+            { updateId: newUuid(), id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+            { updateId: newUuid(), id: 'm3', ownerId: 'u1', type: MemoryType.Birthday },
+          ]),
+        );
+
+        await sut.stream(authStub.user1, writable, { types });
+
+        const messages = parseChunks(chunks);
+        const upserts = messages.filter((m: any) => m.type === SyncEntityType.MemoryV1);
+        expect(upserts.map((m: any) => m.data.type)).toEqual([MemoryType.OnThisDay]);
+        expect(messages.some((m: any) => m.type === SyncEntityType.MemoryDeleteV1)).toBe(true);
+      }
+    });
+
     it('should handle MemoryToAssetsV1 sync type', async () => {
       const { writable, chunks } = makeWritable();
       const deleteId = newUuid();
