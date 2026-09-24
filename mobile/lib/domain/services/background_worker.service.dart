@@ -15,7 +15,6 @@ import 'package:immich_mobile/domain/services/sync_stream.service.dart';
 // ignore: library_prefixes
 import 'package:immich_mobile/entities/store.entity.dart' as dbStore;
 import 'package:immich_mobile/extensions/platform_extensions.dart';
-import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/platform/background_worker_api.g.dart';
 import 'package:immich_mobile/platform/background_worker_lock_api.g.dart';
@@ -31,7 +30,6 @@ import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
 import 'package:immich_mobile/services/localization.service.dart';
-import 'package:immich_mobile/utils/background_downloader_recovery.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/wm_executor.dart';
@@ -136,7 +134,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
       );
 
       configureFileDownloaderNotifications();
-      scheduleBackgroundDownloaderRecovery();
 
       // Notify the host that the background worker service has been initialized and is ready to use
       unawaited(_backgroundHostApi.onInitialized());
@@ -279,14 +276,6 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
       _isCleanedUp = true;
       final nativeSyncApi = _ref?.read(nativeSyncApiProvider);
 
-      // Abort and drain in-flight HTTP requests first. On iOS the background
-      // isolate shares a native URLSession; if it is destroyed while a request
-      // is in flight, the cupertino_http delegate later calls back into the
-      // dead isolate and crashes (SIGABRT). Draining here makes their callbacks
-      // fire while the isolate is still alive, before the native side calls
-      // engine.destroyContext().
-      await NetworkRepository.shutdown();
-
       _logger.info("Cleaning up background worker");
       if (!_cancellationToken.isCompleted) {
         _cancellationToken.complete();
@@ -391,11 +380,6 @@ class BackgroundWorkerLockService {
 Future<void> backgroundSyncNativeEntrypoint() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-
-  // Track in-flight HTTP requests so they can be drained before this isolate is
-  // torn down. Must run before Bootstrap.initDomain (which calls
-  // NetworkRepository.init).
-  NetworkRepository.enableShutdownTracking();
 
   final (dataController, apiService) = await Bootstrap.initDomain(shouldBufferLogs: false, disableStoreWatching: true);
   await BackgroundWorkerBgService(dataController: dataController, apiService: apiService).init();
