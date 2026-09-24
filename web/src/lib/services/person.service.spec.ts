@@ -161,7 +161,7 @@ describe('getPersonActions', () => {
     vi.mocked(updateSpacePerson).mockResolvedValue(spacePersonResponse({ isHidden: true }));
 
     const { HidePerson } = getPersonActions($t, person);
-    await HidePerson.onAction(HidePerson);
+    await HidePerson.onAction({ action: HidePerson, event: new Event('click') });
 
     expect(updateSpacePerson).toHaveBeenCalledWith({
       id: 'space-1',
@@ -182,7 +182,7 @@ describe('getPersonActions', () => {
     vi.mocked(updateSpacePerson).mockResolvedValue(spacePersonResponse({ isHidden: false }));
 
     const { ShowPerson } = getPersonActions($t, person);
-    await ShowPerson.onAction(ShowPerson);
+    await ShowPerson.onAction({ action: ShowPerson, event: new Event('click') });
 
     expect(updateSpacePerson).toHaveBeenCalledWith({
       id: 'space-1',
@@ -201,7 +201,7 @@ describe('getPersonActions', () => {
     vi.mocked(updatePerson).mockResolvedValue(updated);
 
     const { HidePerson } = getPersonActions($t, person);
-    await HidePerson.onAction(HidePerson);
+    await HidePerson.onAction({ action: HidePerson, event: new Event('click') });
 
     expect(updatePerson).toHaveBeenCalledWith({ id: person.id, personUpdateDto: { isHidden: true } });
     expect(updateSpacePerson).not.toHaveBeenCalled();
@@ -217,7 +217,7 @@ describe('getPersonActions', () => {
     vi.mocked(updateSpacePerson).mockRejectedValue(error);
 
     const { HidePerson } = getPersonActions($t, person);
-    await HidePerson.onAction(HidePerson);
+    await HidePerson.onAction({ action: HidePerson, event: new Event('click') });
 
     expect(handleErrorSpy).toHaveBeenCalledWith(error, expect.any(String));
     expect(emitSpy).not.toHaveBeenCalled();
