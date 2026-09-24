@@ -65,6 +65,16 @@ afterAll(async () => {
   for (let i = 0; i < 20 && document.body.style.overflow === 'hidden'; i++) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
+
+  // Same race, second timer: a bits-ui dismissable layer (menu, popover) that is still mounted
+  // debounces its outside-interaction handler by 10ms, and that handler runs `instanceof Element`.
+  // A pointer event in a file's last test arms it; if teardown wins, CI fails with
+  // "ReferenceError: Element is not defined". Destroying the layer clears the timer, so a pending
+  // one implies a layer still registered here — wait out one debounce window in that case only.
+  const layers = (globalThis as { bitsDismissableLayers?: Map<unknown, unknown> }).bitsDismissableLayers;
+  if (layers && layers.size > 0) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 });
 
 Object.defineProperty(globalThis, 'matchMedia', {
