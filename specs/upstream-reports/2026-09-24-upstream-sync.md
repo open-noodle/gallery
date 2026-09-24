@@ -195,11 +195,35 @@ All of the following were run locally on the tip:
 
 ## CI results
 
-Full set dispatched on `9b54be5ec69`: Test, Static Code Analysis, Gallery Build Mobile, Docker,
-Rebase Smoke, Storage Migration Tests, Storage Migration E2E, Revert-to-Immich Validation, ML Smoke
-and Mobile Smoke.
+| Workflow                    | Head          | Result                                                                   |
+| --------------------------- | ------------- | ------------------------------------------------------------------------ |
+| Test                        | `9b54be5ec69` | **GREEN**, 22/22 jobs on attempt 2                                       |
+| Gallery Build Mobile        | `9b54be5ec69` | GREEN                                                                    |
+| Docker                      | `9b54be5ec69` | GREEN                                                                    |
+| Gallery Rebase Smoke        | `9b54be5ec69` | GREEN                                                                    |
+| Gallery ML Smoke            | `9b54be5ec69` | GREEN                                                                    |
+| Gallery Mobile Smoke        | `9b54be5ec69` | GREEN                                                                    |
+| Static Code Analysis        | `c42e00ed32a` | GREEN, after the DCM guard below                                         |
+| Revert-to-Immich Validation | `c42e00ed32a` | GREEN                                                                    |
+| Storage Migration Tests     | `c42e00ed32a` | **RED, external**: MinIO images withdrawn. Fixed on `main` by #1138      |
+| Storage Migration E2E       | `c42e00ed32a` | **RED, external**: same                                                  |
 
-_Results to be recorded when the runs complete._
+Three things made the first dispatch red, and none is a rebase regression:
+
+1. **Test Web**: the `bits-ui` teardown race described above, fixed in `9b54be5ec69`.
+2. **Static Code Analysis**: immich-31753 added `analyze:unused` (`dcm check-unused-code`) to
+   `mise //mobile:analyze --full`. DCM refuses to run on CI without `DCM_CI_KEY` / `DCM_EMAIL`, which
+   the fork does not have, so it exits 64 with a usage message (Shape E: upstream changed a shared
+   task the fork's workflow runs). Guarded like the fork's existing `analyze:dcm`, but skipping only
+   when `CI` is set, so a local `--full` run still gates. Fixed in `c42e00ed32a`.
+3. **GHCR `toomanyrequests`**: this hit Storage Migration, Revert validation and, on the second
+   attempt, the E2E Web Docker build. It cleared on re-run.
+
+**MinIO withdrew its container images on 2026-09-24.** `quay.io/minio/minio` returns 401 for every
+tag and `docker.io/minio/minio` no longer exists, while other quay.io images still pull. Both
+storage-migration workflows pull it, so they fail at "Start stack" on `main` too. **#1138** moves the
+fixture to `cgr.dev/chainguard/minio`, pinned by digest, with an `mc ready` healthcheck. Both
+workflows pass on that branch. Rolling picks it up at the next fork sync after it merges.
 
 ## Follow-up work
 
