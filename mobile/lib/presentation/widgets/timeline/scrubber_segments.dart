@@ -15,6 +15,7 @@ class ScrubberSegment {
     this.showSegment = false,
   });
 
+  // ignore: unused-code
   ScrubberSegment copyWith({DateTime? date, double? startOffset, String? scrollLabel, bool? showSegment}) {
     return ScrubberSegment(
       date: date ?? this.date,
