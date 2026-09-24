@@ -6,6 +6,10 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 part 'memory.model.freezed.dart';
 
 // TODO(agg23): Remove enum suffix
+// Gallery: `birthday` (immich-30831) is appended AFTER the fork's `rule`, not in upstream's
+// position. memory_entity.type persists the index and installed apps hold `rule` at 1, so
+// upstream's order would reinterpret every synced rule memory as a birthday.
+// See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
 enum MemoryTypeEnum {
   // do not change this order!
   onThisDay,
