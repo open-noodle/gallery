@@ -94,6 +94,12 @@ upstream-rolling-final-check:
 upstream-postrebase-audit:
 	$(UPSTREAM_PREFLIGHT) run postrebase-audit $(if $(BATCH),--batch $(BATCH),)
 
+# Review-only PR showing the rolling rebase as a diff against main (the rolling branch's own PR
+# re-adds the whole fork). Re-run to refresh it after the rolling branch moves.
+.PHONY: upstream-review-pr
+upstream-review-pr:
+	scripts/upstream-review-pr.sh $(if $(ROLLING),--rolling $(ROLLING),) $(if $(BASE),--base $(BASE),) $(if $(DRY_RUN),--dry-run,)
+
 .PHONY: mobile-drift-rebase-check
 mobile-drift-rebase-check:
 	$(UPSTREAM_PREFLIGHT) run mobile-drift-check $(if $(BATCH),--batch $(BATCH),)
