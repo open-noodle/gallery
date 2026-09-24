@@ -210,7 +210,9 @@ run = "if [ -n \"${DCM_CI_KEY:-}\" ] && [ -n \"${DCM_EMAIL:-}\" ]; then dcm anal
 
 [tasks."analyze:unused"]
 description = "Find unused code"
-run = "dcm check-unused-code lib test integration_test --concise"
+# Fork: DCM refuses to run on CI without a licence ("Both CI key and purchase email should be
+# provided"), and the fork has none. Skip there like analyze:dcm; local runs still gate.
+run = "if [ -n \"${CI:-}\" ] && { [ -z \"${DCM_CI_KEY:-}\" ] || [ -z \"${DCM_EMAIL:-}\" ]; }; then echo \"Skipping DCM unused-code check; DCM_CI_KEY and DCM_EMAIL are not configured.\"; else dcm check-unused-code lib test integration_test --concise; fi"
 
 [tasks."analyze-fix:dart"]
 description = "Auto-fix Dart analysis"
