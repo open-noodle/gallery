@@ -8,6 +8,7 @@ import {
   type PersonResponseDto,
   type SharedSpacePersonResponseDto,
 } from '@immich/sdk';
+import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -676,6 +677,83 @@ describe('Global people page', () => {
       });
     });
     expect(sdkMock.updatePerson).not.toHaveBeenCalled();
+  });
+
+  // #1099: the tile's "Add a name" field had no suggestions at all.
+  it('suggests existing people, including shared-space ones, while naming a tile', async () => {
+    const norgy = makePerson({
+      id: 'space-person-norgy',
+      name: 'Norgy',
+      isFavorite: undefined,
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-norgy', spaceId: 'space-1' },
+    });
+    const unnamed = makePerson({ id: 'p-unnamed', name: '' });
+    sdkMock.searchPerson.mockResolvedValue([norgy]);
+    vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen
+      .getAllByPlaceholderText('add_a_name')
+      .find((element) => (element as HTMLInputElement).value === '')!;
+    await user.click(input);
+    await user.type(input, 'Norg');
+
+    const option = await screen.findByRole('option', { name: 'Norgy' });
+    expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'Norg', withSharedSpaces: true });
+    expect(option.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/shared-spaces/space-1/people/space-person-norgy/thumbnail'),
+    );
+
+    await user.click(option);
+
+    await waitFor(() =>
+      expect(modalManager.show).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ personToMerge: unnamed, personToBeMergedInto: norgy }),
+      ),
+    );
+    // Declining a picked suggestion must not fall back to renaming the tile to the suggestion's name.
+    expect(sdkMock.updatePerson).not.toHaveBeenCalled();
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+  });
+
+  // #1100: the same-name check used to be skipped for space people, and searched only owned people.
+  it('offers to merge a space-primary tile renamed to an existing shared-space name', async () => {
+    const norgy = makePerson({
+      id: 'space-person-norgy',
+      name: 'Norgy',
+      isFavorite: undefined,
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-norgy', spaceId: 'space-1' },
+    });
+    const unnamed = makePerson({
+      id: 'space-person-unnamed',
+      name: '',
+      isFavorite: undefined,
+      primaryProfile: { type: Type.SpacePerson, id: 'space-person-unnamed', spaceId: 'space-1' },
+    });
+    sdkMock.searchPerson.mockResolvedValue([norgy]);
+    vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen
+      .getAllByPlaceholderText('add_a_name')
+      .find((element) => (element as HTMLInputElement).value === '')!;
+    await user.click(input);
+    await user.type(input, 'norgy');
+    await fireEvent.focusOut(input);
+
+    await waitFor(() =>
+      expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'norgy', withHidden: true, withSharedSpaces: true }),
+    );
+    await waitFor(() =>
+      expect(modalManager.show).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ personToMerge: unnamed, personToBeMergedInto: norgy }),
+      ),
+    );
   });
 
   it('blocks inline renames for space-primary rows when the user is a viewer', async () => {

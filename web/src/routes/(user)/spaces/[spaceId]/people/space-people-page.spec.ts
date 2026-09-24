@@ -6,6 +6,7 @@ import {
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
+import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -231,10 +232,116 @@ describe('Space people page', () => {
         sharedSpacePersonUpdateDto: { name: 'Aaron' },
       });
     });
-    expect(sdkMock.getSpacePeople).not.toHaveBeenCalled();
+    // Name lookups (suggestions, the same-name check) are expected; a full-list refresh is not.
+    for (const [query] of sdkMock.getSpacePeople.mock.calls) {
+      expect(query).toHaveProperty('name');
+    }
 
     const updatedInputs = screen.getAllByPlaceholderText('add_a_name');
     expect(updatedInputs[0]).toHaveValue('Aaron');
     expect(updatedInputs[1]).toHaveValue('Bob');
+  });
+
+  // #1099: the tile's "Add a name" field had no suggestions, so an existing identity was only
+  // reachable by typing its exact name.
+  it('suggests existing space people while typing a name and merges into the one picked', async () => {
+    const norgy = makeSpacePerson({ id: 'space-person-norgy', name: 'Norgy' });
+    const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([norgy]);
+    sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen.getAllByPlaceholderText('add_a_name')[1];
+    await user.click(input);
+    await user.type(input, 'Norg');
+
+    const option = await screen.findByRole('option', { name: 'Norgy' });
+    expect(option.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/shared-spaces/space-1/people/space-person-norgy/thumbnail'),
+    );
+    expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'space-1', name: 'Norg', named: true }),
+    );
+
+    await user.click(option);
+
+    await waitFor(() =>
+      expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'space-person-norgy',
+        sharedSpacePersonMergeDto: { ids: ['space-person-unnamed'] },
+      }),
+    );
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+  });
+
+  it('picks a suggestion with the keyboard', async () => {
+    const norgy = makeSpacePerson({ id: 'space-person-norgy', name: 'Norgy' });
+    const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([norgy]);
+    sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen.getAllByPlaceholderText('add_a_name')[1];
+    await user.click(input);
+    await user.type(input, 'Norg');
+    await screen.findByRole('option', { name: 'Norgy' });
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    await waitFor(() =>
+      expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith(
+        expect.objectContaining({ personId: 'space-person-norgy' }),
+      ),
+    );
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+  });
+
+  it('leaves the name unchanged when the merge for a picked suggestion is declined', async () => {
+    const norgy = makeSpacePerson({ id: 'space-person-norgy', name: 'Norgy' });
+    const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([norgy]);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen.getAllByPlaceholderText('add_a_name')[1];
+    await user.click(input);
+    await user.type(input, 'Norg');
+    await user.click(await screen.findByRole('option', { name: 'Norgy' }));
+
+    await waitFor(() => expect(modalManager.showDialog).toHaveBeenCalled());
+    expect(sdkMock.mergeSpacePeople).not.toHaveBeenCalled();
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+    expect(screen.getAllByPlaceholderText('add_a_name')[1]).toHaveValue('');
+  });
+
+  // #1100: typing an existing name exactly, without picking it, renamed straight through.
+  it('offers to merge when the typed name already belongs to another space person', async () => {
+    const norgy = makeSpacePerson({ id: 'space-person-norgy', name: 'Norgy' });
+    const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([norgy]);
+    sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen.getAllByPlaceholderText('add_a_name')[1];
+    await user.click(input);
+    await user.type(input, 'NORGY');
+    await fireEvent.focusOut(input);
+
+    await waitFor(() =>
+      expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'space-person-norgy',
+        sharedSpacePersonMergeDto: { ids: ['space-person-unnamed'] },
+      }),
+    );
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
   });
 });
