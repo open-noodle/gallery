@@ -48,15 +48,17 @@ function resolveRoute(pathname: string, dir = ROUTES_ROOT, segments = pathToSegm
       // Groups don't consume a segment — retry the same remaining segments.
       return true;
     }
-    if (isOptionalParam(name)) {
-      // Optional params may consume the next segment...
-      if (resolveRoute(pathname, join(dir, name), rest)) {
-        return true;
-      }
-      // ...or be skipped, leaving the segment for something deeper.
-      if (resolveRoute(pathname, join(dir, name), segments)) {
-        return true;
-      }
+    if (!isOptionalParam(name)) {
+      continue;
+    }
+
+    // Optional params may consume the next segment...
+    if (resolveRoute(pathname, join(dir, name), rest)) {
+      return true;
+    }
+    // ...or be skipped, leaving the segment for something deeper.
+    if (resolveRoute(pathname, join(dir, name), segments)) {
+      return true;
     }
   }
   return false;

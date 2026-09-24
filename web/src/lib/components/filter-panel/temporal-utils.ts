@@ -32,6 +32,7 @@ export function getMonthsForYear(buckets: Array<{ timeBucket: string; count: num
   const monthMap = new Map<number, number>();
   for (const b of buckets) {
     const d = new Date(b.timeBucket);
+    // eslint-disable-next-line unicorn/prefer-continue
     if (d.getUTCFullYear() === year) {
       const month = d.getUTCMonth() + 1;
       monthMap.set(month, (monthMap.get(month) ?? 0) + b.count);
