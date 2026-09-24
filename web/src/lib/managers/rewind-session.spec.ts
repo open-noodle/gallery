@@ -103,6 +103,32 @@ describe('RewindSession', () => {
     expect(s.progress).toBeNull();
   });
 
+  it('drops only the marks of chunks that committed before a later chunk failed', async () => {
+    const commit = vi
+      .fn()
+      .mockResolvedValueOnce({ trashed: [], favorited: 0, kept: 1000, skipped: [] })
+      .mockRejectedValueOnce(new Error('boom'));
+    const s = new RewindSession(923, commit);
+    const ids = Array.from({ length: 1500 }, (_, i) => `id-${i}`);
+    s.markMany(ids, 'keep');
+    s.mark('t', 'trash');
+
+    await expect(s.finishDay()).rejects.toThrow('boom');
+
+    // The first chunk (first 1000 keeps + the trash mark) landed; the rest stays for a retry.
+    expect(s.marks.has('id-0')).toBe(false);
+    expect(s.marks.has('id-999')).toBe(false);
+    expect(s.marks.has('t')).toBe(false);
+    expect(s.marks.get('id-1000')).toBe('keep');
+    expect(s.counts).toEqual({ keep: 500, fav: 0, trash: 0 });
+
+    commit.mockResolvedValue(ok());
+    await s.finishDay();
+    expect(commit).toHaveBeenCalledTimes(3);
+    expect(commit.mock.calls[2][0].keepIds).toEqual(ids.slice(1000));
+    expect(commit.mock.calls[2][0].completeMonthDay).toBe(923);
+  });
+
   it('keeps marks when the commit fails', async () => {
     const s = new RewindSession(923, vi.fn().mockRejectedValue(new Error('boom')));
     s.mark('t', 'trash');
