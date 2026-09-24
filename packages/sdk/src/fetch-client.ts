@@ -11320,6 +11320,7 @@ export enum MemorySearchOrder {
 }
 export enum MemoryType {
     OnThisDay = "on_this_day",
+    Birthday = "birthday",
     Rule = "rule"
 }
 export enum PartnerDirection {
