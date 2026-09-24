@@ -452,6 +452,55 @@ describe(MemoryService.name, () => {
         }),
       ]);
     });
+
+    // specs/2026-09-24-birthday-memories-upstream-coexistence-design.md: installed Gallery apps
+    // cannot decode MemoryType.Birthday, so no birthday row may reach the list or the count.
+    it('should exclude birthday memories from search and statistics, including saved ones', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { memory: onThisDay } = await ctx.newMemory({ ownerId: user.id });
+      const { memory: birthday } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Birthday,
+        data: { personId: factory.uuid(), personName: 'Alice', year: 1990 },
+      });
+      const { memory: savedBirthday } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Birthday,
+        data: { personId: factory.uuid(), personName: 'Bob', year: 1991 },
+        isSaved: true,
+      });
+      for (const { id } of [onThisDay, birthday, savedBirthday]) {
+        await ctx.newMemoryAsset({ memoryId: id!, assetId: asset.id });
+      }
+
+      const results = await sut.search(auth, {});
+      expect(results.map(({ id }) => id)).toEqual([onThisDay.id]);
+      // countAll comes back from Postgres as a bigint string; compare numerically.
+      expect(Number((await sut.statistics(auth, {})).total)).toBe(1);
+      await expect(sut.search(auth, { type: MemoryType.Birthday })).resolves.toEqual([]);
+      await expect(sut.get(auth, birthday.id!)).resolves.toEqual(expect.objectContaining({ id: birthday.id }));
+    });
+
+    it('should exclude a birthday memory reached through a shared space', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { memory } = await ctx.newMemory({
+        ownerId: owner.id,
+        type: MemoryType.Birthday,
+        data: { personId: factory.uuid(), personName: 'Alice', year: 1990 },
+      });
+      await ctx.newMemoryAsset({ memoryId: memory.id!, assetId: asset.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+
+      await expect(sut.search(factory.auth({ user: member }), {})).resolves.toEqual([]);
+    });
   });
 
   describe('onMemoryCreate', () => {
