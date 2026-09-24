@@ -20,6 +20,7 @@ class MonthCount {
 
 class DecadeBucket {
   final int decadeStart; // 2020 for the 2020s
+  // ignore: unused-code
   final int count;
   const DecadeBucket({required this.decadeStart, required this.count});
 }

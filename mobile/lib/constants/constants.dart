@@ -48,8 +48,11 @@ const String kImmichAppStoreLink = "https://apps.apple.com/app/id6761776289";
 const String kImmichPlayStoreLink = "https://play.google.com/store/apps/details?id=de.opennoodle.gallery";
 const String kImmichLatestRelease = "https://github.com/immich-app/immich/releases/latest";
 
+// ignore: unused-code
 const int kPhotoTabIndex = 0;
+// ignore: unused-code
 const int kSearchTabIndex = 1;
+// ignore: unused-code
 const int kSpacesTabIndex = 2;
 // ignore: unused-code
 const int kLibraryTabIndex = 3;
