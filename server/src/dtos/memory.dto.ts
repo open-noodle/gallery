@@ -68,6 +68,18 @@ const MemoryCreateSchema = z
     error: 'Invalid input: expected number, received undefined',
     path: ['data', 'year'],
   })
+  // immich-30831: a birthday memory must name its person. Same issues as upstream's
+  // superRefine so its controller spec passes verbatim; the fork keeps `data` free-form.
+  .superRefine((dto, ctx) => {
+    if (dto.type !== MemoryType.Birthday) {
+      return;
+    }
+    for (const key of ['personId', 'personName'] as const) {
+      if (dto.data[key] === undefined) {
+        ctx.addIssue({ code: 'custom', path: ['data', key], message: `Required for ${MemoryType.Birthday} memories` });
+      }
+    }
+  })
   .meta({ id: 'MemoryCreateDto' });
 
 const MemoryStatisticsResponseSchema = z
