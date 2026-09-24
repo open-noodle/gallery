@@ -15,7 +15,7 @@
     mdiImageMultipleOutline,
   } from '@mdi/js';
   import { DateTime } from 'luxon';
-  import { locale, t } from 'svelte-i18n';
+  import { locale, t, type Translations } from 'svelte-i18n';
 
   type Props = {
     asset?: CleanupAssetDto;
@@ -51,7 +51,7 @@
     inBurst = false,
   }: Props = $props();
 
-  const QUALITY_HINTS: Partial<Record<CleanupBlurReason, string>> = {
+  const QUALITY_HINTS: Partial<Record<CleanupBlurReason, Translations>> = {
     [CleanupBlurReason.Blurry]: 'cleanup_hint_blurry',
     [CleanupBlurReason.Dark]: 'cleanup_hint_dark',
     [CleanupBlurReason.Bright]: 'cleanup_hint_bright',
@@ -60,7 +60,7 @@
   // Each hint points at the queue that already collects photos like this one. `reason` is the
   // Blurry queue's reason at its default strictness, so the link lands on a queue that shows it.
   const hints = $derived.by(() => {
-    const list: Array<{ testId: string; icon: string; label: string; queue: string; href: string }> = [];
+    const list: Array<{ testId: string; icon: string; label: Translations; queue: Translations; href: string }> = [];
     if (!asset) {
       return list;
     }
