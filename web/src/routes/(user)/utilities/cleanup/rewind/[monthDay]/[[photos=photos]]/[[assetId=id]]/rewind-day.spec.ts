@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     restoreAssets: vi.fn(),
     getCleanupCalendar: vi.fn(),
     getCleanupRewindAssets: vi.fn(),
+    getCleanupAssetsInSpaces: vi.fn(),
   },
   goto: vi.fn(),
   navigate: vi.fn(),
@@ -100,6 +101,7 @@ describe('RewindDay', () => {
     mocks.sdk.commitCleanup.mockResolvedValue({ trashed: [], favorited: 0, kept: 0, skipped: [] });
     mocks.sdk.restoreAssets.mockResolvedValue(undefined);
     mocks.goto.mockResolvedValue(undefined);
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [] });
   });
 
   it('marks the focused tile from the keyboard and moves on to the next one', async () => {
@@ -183,6 +185,60 @@ describe('RewindDay', () => {
       },
     });
     expect(mocks.toast.success).toHaveBeenCalledWith('cleanup_day_complete');
+  });
+
+  it('warns about photos in a Space before moving them to the trash, and keeps the marks on cancel', async () => {
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.showDialog.mockResolvedValue(false);
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+
+    await waitFor(() =>
+      expect(mocks.showDialog).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'cleanup_space_warning' })),
+    );
+    expect(mocks.sdk.getCleanupAssetsInSpaces).toHaveBeenCalledWith({ cleanupInSpacesDto: { assetIds: ['a'] } });
+    expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
+  });
+
+  it('moves Space photos to the trash once the warning is confirmed', async () => {
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.showDialog.mockResolvedValue(true);
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+
+    await waitFor(() => expect(mocks.sdk.commitCleanup).toHaveBeenCalled());
+  });
+
+  it('warns about Space photos before finishing a day with trash marks, and stays put on cancel', async () => {
+    mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['a'] });
+    mocks.showDialog.mockResolvedValue(false);
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'Delete' });
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
+    expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+    expect(mocks.goto).not.toHaveBeenCalled();
+    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
+    expect(tile('bb')).toHaveAttribute('data-mark', 'keep');
+  });
+
+  it('does not ask about Spaces when finishing a day without trash marks', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalled());
+    expect(mocks.sdk.getCleanupAssetsInSpaces).not.toHaveBeenCalled();
   });
 
   it('falls back to the hub when no other date needs a review', async () => {

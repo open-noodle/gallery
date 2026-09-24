@@ -1,5 +1,10 @@
 import { shortcuts } from '$lib/actions/shortcut';
-import { cleanupShortcuts, type CleanupShortcutHandlers } from '$lib/components/cleanup/cleanup-shortcuts';
+import {
+  cleanupShortcuts,
+  queueShortcuts,
+  type CleanupShortcutHandlers,
+  type QueueShortcutHandlers,
+} from '$lib/components/cleanup/cleanup-shortcuts';
 
 const makeHandlers = (): CleanupShortcutHandlers => ({
   keep: vi.fn(),
@@ -128,5 +133,53 @@ describe('cleanupShortcuts', () => {
     expect(handlers.open).not.toHaveBeenCalled();
     expect(keep.defaultPrevented).toBe(false);
     expect(space.defaultPrevented).toBe(false);
+  });
+});
+
+describe('queueShortcuts', () => {
+  const makeQueueHandlers = (): QueueShortcutHandlers => ({
+    trash: vi.fn(),
+    keep: vi.fn(),
+    selectAll: vi.fn(),
+    clear: vi.fn(),
+    open: vi.fn(),
+  });
+
+  it('returns no shortcuts while the viewer or a modal is open', () => {
+    expect(queueShortcuts(makeQueueHandlers(), () => true)).toEqual([]);
+  });
+
+  it('binds Delete, Backspace, k, a, Escape and Space', () => {
+    const keys = queueShortcuts(makeQueueHandlers(), () => false).map(({ shortcut }) => shortcut.key);
+    expect(keys.sort()).toEqual(['Delete', 'Backspace', 'k', 'a', 'Escape', ' '].sort());
+  });
+
+  it('runs each handler and leaves form fields alone', () => {
+    const root = document.createElement('div');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    root.append(input);
+    document.body.append(root);
+    const handlers = makeQueueHandlers();
+    const action = shortcuts(
+      root,
+      queueShortcuts(handlers, () => false),
+    );
+
+    const pressed = press(root, 'Delete');
+    press(root, 'k');
+    press(root, 'a');
+    press(root, 'Escape');
+    press(root, ' ');
+    press(input, 'a');
+
+    expect(pressed.defaultPrevented).toBe(true);
+    expect(handlers.trash).toHaveBeenCalledTimes(1);
+    expect(handlers.keep).toHaveBeenCalledTimes(1);
+    expect(handlers.selectAll).toHaveBeenCalledTimes(1);
+    expect(handlers.clear).toHaveBeenCalledTimes(1);
+    expect(handlers.open).toHaveBeenCalledTimes(1);
+    action?.destroy?.();
+    root.remove();
   });
 });

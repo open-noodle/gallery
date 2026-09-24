@@ -1,4 +1,7 @@
 import {
+  burstDecision,
+  burstMarkOf,
+  burstTimeRange,
   chunk,
   CLEANUP_QUEUE_SLUGS,
   dominantCity,
@@ -66,5 +69,20 @@ describe('cleanup utils', () => {
   it('picks the most common city, ignoring missing ones', () => {
     expect(dominantCity([{ city: null }, { city: 'Porto' }, { city: 'Lisbon' }, { city: 'Porto' }])).toBe('Porto');
     expect(dominantCity([{ city: null }])).toBeNull();
+  });
+
+  it('marks the suggested burst pick keep and the rest trash until the user changes them', () => {
+    const group = { suggestedKeepId: 'b', assets: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] };
+    const marks = new Map([['c', 'keep' as const]]);
+
+    expect(burstMarkOf(group, marks, 'a')).toBe('trash');
+    expect(burstMarkOf(group, marks, 'b')).toBe('keep');
+    expect(burstDecision(group, marks)).toEqual({ keepIds: ['b', 'c'], trashIds: ['a'] });
+  });
+
+  it('formats a burst time range from the capture wall-clock times', () => {
+    expect(burstTimeRange('2024-08-12T14:03:21.000Z', '2024-08-12T14:03:24.000Z', 'en-GB')).toBe(
+      '12 Aug 2024 · 14:03:21 → 14:03:24',
+    );
   });
 });
