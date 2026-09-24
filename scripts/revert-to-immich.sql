@@ -208,6 +208,7 @@ ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "petsDetectedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "classifiedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "qualityAnalyzedAt";
 DROP INDEX IF EXISTS "asset_localMonthDay_idx";
+DROP INDEX IF EXISTS "asset_cleanup_localDateTime_idx";
 DROP INDEX IF EXISTS "asset_exif_fileSizeInByte_idx";
 ALTER TABLE "library"           DROP COLUMN IF EXISTS "createId";
 -- 1791000000000-RepointFaceReviewToPersonGroup added this unique index to make option M's
@@ -288,6 +289,7 @@ DELETE FROM "migration_overrides"
    'index_shared_space_album_folder_root_name_key',
    'function_shared_space_album_folder_delete_audit',
    'index_asset_localMonthDay_idx',
+   'index_asset_cleanup_localDateTime_idx',
    'index_asset_quality_ownerId_screenshot_idx',
    'trigger_asset_library_delete_audit',
    'trigger_classification_category_updatedAt',
