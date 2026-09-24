@@ -139,12 +139,22 @@ Indexes: `(ownerId, sharpness)`, and a partial index `(ownerId) WHERE "isScreens
 which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
 
 - `asset_localMonthDay_idx` on `asset`: a partial expression index.
-  - Columns: `("ownerId", ((extract(month from ("localDateTime" at time zone 'UTC')) * 100 + extract(day from ("localDateTime" at time zone 'UTC')))::smallint))`.
+  - Columns: `("ownerId", ((extract(month from ("localDateTime" at time zone 'UTC')) * 100 + extract(day from ("localDateTime" at time zone 'UTC')))::smallint), "localDateTime")`.
   - Condition: `WHERE "deletedAt" IS NULL AND "visibility" IN ('timeline','archive') AND "isOffline" = false AND "libraryId" IS NULL`.
   - It is an expression index, so the migration also inserts its `migration_overrides` row (precedent:
     `1782000000000-AddAssetExifDescriptionTrigramIndex.ts`).
   - The calendar and rewind queries must repeat this expression and condition **verbatim**; otherwise
     PostgreSQL will not use the index.
+  - The trailing `"localDateTime"` key makes the calendar count an index-only scan that reads the stored
+    month-day value. Without it, PostgreSQL evaluates the expression for every row: about 260 ms at 500k
+    assets, against about 40 ms with it (the performance check below).
+- `asset_cleanup_localDateTime_idx` on `asset`: a partial btree on `("ownerId", "localDateTime", "id")` with
+  the same condition as `asset_localMonthDay_idx`, so only Cleanup queries can use it. It serves the keyset
+  pages in `(localDateTime, id)` order: bursts windows, screenshots and blurry. Their cursors are written
+  as row comparisons (`("localDateTime", "id") > (x, y)`), which PostgreSQL turns into an index condition.
+  Without this index every bursts window was a sequential scan plus a sort, and a page of 100 burst groups
+  took about 1 s at 500k assets. The migration inserts its `migration_overrides` row, because it is a
+  partial index.
 - `asset_exif_fileSizeInByte_idx`: a **plain** single-column btree on `asset_exif ("fileSizeInByte")`.
   PostgreSQL can scan a btree backwards, so `ORDER BY … DESC` is served without declaring `DESC`. A plain
   `columns` index needs no `migration_overrides` row (precedent: `person_personGroupId_key`).
@@ -160,9 +170,9 @@ which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
   script, so the real gate is CI job `gallery-revert-to-immich-validation.yml`, which boots upstream Immich after
   running the revert. The script needs:
   - `DROP TABLE` for `cleanup_decision`, `cleanup_day_review` and `asset_quality`, in foreign-key order.
-  - In step 4: `DROP COLUMN asset_job_status."qualityAnalyzedAt"` and `DROP INDEX` for both upstream-table
+  - In step 4: `DROP COLUMN asset_job_status."qualityAnalyzedAt"` and `DROP INDEX` for all three upstream-table
     indexes.
-  - The `migration_overrides` name `index_asset_localMonthDay_idx`.
+  - The `migration_overrides` names `index_asset_localMonthDay_idx` and `index_asset_cleanup_localDateTime_idx`.
   - Entries in the `fork_tables_left` list and the `kysely_migrations` delete list.
 
 ### Include and exclude rules (every queue, rewind and calendar)

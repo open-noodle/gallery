@@ -128,19 +128,20 @@ const keptForQueue = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, queue:
 const notKeptForQueue = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, queue: CleanupQueue) =>
   eb.not(keptForQueue(eb, userId, queue));
 
-/** Keyset predicate + ordering for the `(localDateTime DESC, id DESC)` queues (screenshots, blurry). */
+/**
+ * Keyset predicate for the `(localDateTime DESC, id DESC)` queues (screenshots, blurry).
+ *
+ * Written as a row comparison rather than `a < x or (a = x and b < y)`: PostgreSQL turns a row
+ * comparison into an index condition on `asset_cleanup_localDateTime_idx ("ownerId", "localDateTime", "id")`,
+ * so a page deep in a 500k-asset library starts at the cursor instead of scanning from the top.
+ */
 const applyLocalDateTimeCursor = <O>(qb: SelectQueryBuilder<DB, 'asset', O>, cursor: CleanupCursor | undefined) => {
   if (!cursor) {
     return qb;
   }
   const cursorDate = new Date(String(cursor.v[0]));
   const cursorId = String(cursor.v[1]);
-  return qb.where((eb) =>
-    eb.or([
-      eb('asset.localDateTime', '<', cursorDate),
-      eb.and([eb('asset.localDateTime', '=', cursorDate), eb('asset.id', '<', cursorId)]),
-    ]),
-  );
+  return qb.where((eb) => eb(eb.refTuple('asset.localDateTime', 'asset.id'), '<', eb.tuple(cursorDate, cursorId)));
 };
 
 /** Fetches `limit + 1` rows; when the extra row is present, drops it and builds `next` from the last kept row. */
@@ -836,11 +837,8 @@ export class CleanupRepository {
     return { count: Number(row.count), bytes: Number(row.bytes) };
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, { limit: DummyValue.NUMBER }] })
-  async getBurstWindow(
-    userId: string,
-    options: { afterLocalDateTime?: Date; afterId?: string; limit: number },
-  ): Promise<BurstRow[]> {
+  /** Public, undecorated builder — used by `getBurstWindow` and by the index-usage medium test. */
+  burstWindowQuery(userId: string, options: { afterLocalDateTime?: Date; afterId?: string; limit: number }) {
     const { afterLocalDateTime, afterId, limit } = options;
 
     let qb = this.db
@@ -864,15 +862,21 @@ export class CleanupRepository {
     qb = qb.where((eb) => notKeptForQueue(eb, userId, CleanupQueue.Bursts));
 
     if (afterLocalDateTime && afterId) {
+      // Row comparison, so the cursor is an index condition (see applyLocalDateTimeCursor).
       qb = qb.where((eb) =>
-        eb.or([
-          eb('asset.localDateTime', '>', afterLocalDateTime),
-          eb.and([eb('asset.localDateTime', '=', afterLocalDateTime), eb('asset.id', '>', afterId)]),
-        ]),
+        eb(eb.refTuple('asset.localDateTime', 'asset.id'), '>', eb.tuple(afterLocalDateTime, afterId)),
       );
     }
 
-    const rows = await qb.orderBy('asset.localDateTime', 'asc').orderBy('asset.id', 'asc').limit(limit).execute();
+    return qb.orderBy('asset.localDateTime', 'asc').orderBy('asset.id', 'asc').limit(limit);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, { limit: DummyValue.NUMBER }] })
+  async getBurstWindow(
+    userId: string,
+    options: { afterLocalDateTime?: Date; afterId?: string; limit: number },
+  ): Promise<BurstRow[]> {
+    const rows = await this.burstWindowQuery(userId, options).execute();
     return rows.map((row) => ({
       id: row.id,
       localDateTime: row.localDateTime,
