@@ -2,6 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 
 export const CLEANUP_BURST_GAP_MS = 2000;
 export const CLEANUP_BURST_CLIP_MAX_DISTANCE = 0.1;
+/** Extra windows `fetchBurstWindow` may append while a burst straddles the window edge. */
+export const CLEANUP_BURST_MAX_EXTENSIONS = 10;
 export const CLEANUP_BURST_WINDOW = 2000;
 export const CLEANUP_BLUR_THRESHOLDS = { lenient: 25, balanced: 60, strict: 110 } as const;
 export const CLEANUP_DARK = { maxBrightness: 35, minClippedDark: 0.5 } as const;
@@ -138,7 +140,10 @@ export const computeStreak = (reviewedAt: Date[], tz: string, now: Date): number
 
 export type BurstRow = {
   id: string;
+  /** Millisecond `Date`, used for gap maths only. Never build a cursor from it — see `cursorT`. */
   localDateTime: Date;
+  /** Full-precision (microsecond) ISO timestamp from the database; the only safe keyset cursor value. */
+  cursorT: string;
   autoStackId: string | null;
   sharpness: number | null;
   fileSize: number;
@@ -178,6 +183,13 @@ export const suggestKeep = (group: BurstRow[]): string => {
 };
 
 export type CleanupCursor = { v: Array<string | number> };
+
+/**
+ * A `(localDateTime, id)` keyset cursor's timestamp: an ISO-8601 UTC string with up to microsecond
+ * precision, as produced by `CLEANUP_CURSOR_T_SQL`. Anything else is rejected before it reaches SQL.
+ */
+export const isCleanupCursorTimestamp = (value: string) =>
+  /^\d{4,6}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(value) && !Number.isNaN(new Date(value).getTime());
 export const encodeCursor = (value: CleanupCursor) => Buffer.from(JSON.stringify(value)).toString('base64url');
 export const decodeCursor = (value: string): CleanupCursor => {
   try {

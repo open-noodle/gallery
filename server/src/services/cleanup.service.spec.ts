@@ -2,7 +2,13 @@ import { BadRequestException } from '@nestjs/common';
 import { AssetStatus, AssetType, AssetVisibility, CleanupQueue, JobName, JobStatus } from 'src/enum.js';
 import { CleanupAssetRow } from 'src/repositories/cleanup.repository.js';
 import { CleanupService } from 'src/services/cleanup.service.js';
-import { BurstRow, CLEANUP_BURST_WINDOW, decodeCursor, encodeCursor } from 'src/utils/cleanup.js';
+import {
+  BurstRow,
+  CLEANUP_BURST_MAX_EXTENSIONS,
+  CLEANUP_BURST_WINDOW,
+  decodeCursor,
+  encodeCursor,
+} from 'src/utils/cleanup.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
@@ -349,6 +355,7 @@ describe(CleanupService.name, () => {
     const burstRow = (id: string, localDateTime: Date, over: Partial<BurstRow> = {}): BurstRow => ({
       id,
       localDateTime,
+      cursorT: localDateTime.toISOString(),
       autoStackId: null,
       sharpness: 0,
       fileSize: 100,
@@ -498,11 +505,66 @@ describe(CleanupService.name, () => {
       expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(3);
       const lastOfWindow2 = window2.at(-1)!;
       expect(mocks.cleanup.getBurstWindow).toHaveBeenNthCalledWith(3, authStub.user1.user.id, {
-        afterLocalDateTime: lastOfWindow2.localDateTime,
+        afterLocalDateTime: lastOfWindow2.cursorT,
         afterId: lastOfWindow2.id,
         limit: CLEANUP_BURST_WINDOW,
       });
       expect(res.groups.map((group) => group.assets.map((a) => a.id))).toEqual([['f', 'g']]);
+    });
+
+    it('caps the extension loop so a run with no gap cannot read the whole library into one page', async () => {
+      // Every window is full and continues the previous one 1 ms later — no gap ever appears.
+      let next = 0;
+      const fullWindow = () =>
+        Array.from({ length: CLEANUP_BURST_WINDOW }, () => {
+          const i = next++;
+          return burstRow(`r${i}`, at(i), { autoStackId: 'endless' });
+        });
+      mocks.cleanup.getBurstWindow.mockImplementation(() => Promise.resolve(fullWindow()));
+      mocks.cleanup.getCleanupAssets.mockImplementation((_userId: string, ids: string[]) =>
+        Promise.resolve(ids.map((id) => toCleanupRow(burstRow(id, at(Number(id.slice(1))))))),
+      );
+
+      const res = await sut.getQueue(authStub.user1, 'bursts', { limit: 1 });
+
+      // 1 initial window + CLEANUP_BURST_MAX_EXTENSIONS extensions, then the page is cut.
+      expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledTimes(1 + CLEANUP_BURST_MAX_EXTENSIONS);
+      expect(res.groups).toHaveLength(1);
+      expect(res.groups[0].assets).toHaveLength(CLEANUP_BURST_WINDOW * (1 + CLEANUP_BURST_MAX_EXTENSIONS));
+      expect(res.nextCursor).not.toBeNull();
+    });
+
+    it('drops an extension row that repeats the cursor row', async () => {
+      const rows: BurstRow[] = [];
+      for (let i = 0; i < CLEANUP_BURST_WINDOW; i++) {
+        rows.push(burstRow(`w${i}`, at(i * 3000)));
+      }
+      const last = rows.at(-1)!;
+      // A cursor that lost precision re-admits the boundary row; it must not be appended twice.
+      const f = burstRow('f', new Date(last.localDateTime.getTime() + 500), { autoStackId: null });
+      mocks.cleanup.getBurstWindow.mockResolvedValueOnce(rows).mockResolvedValueOnce([last, f]);
+      mocks.cleanup.getBurstClipDistances.mockResolvedValue(
+        new Map<string, number>([
+          [last.id, 0],
+          [f.id, 0],
+        ]),
+      );
+      hydrateFromRows(mocks, [...rows, f]);
+
+      const res = await sut.getQueue(authStub.user1, 'bursts', {});
+
+      expect(res.groups).toHaveLength(1);
+      expect(res.groups[0].assets.map((a) => a.id)).toEqual([last.id, 'f']);
+    });
+
+    it('passes a microsecond cursor through to the repository unchanged', async () => {
+      mocks.cleanup.getBurstWindow.mockResolvedValue([]);
+      await sut.getQueue(authStub.user1, 'bursts', { cursor: cursor(['2024-01-01T00:00:00.123456Z', 'id-1']) });
+      expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledWith(authStub.user1.user.id, {
+        afterLocalDateTime: '2024-01-01T00:00:00.123456Z',
+        afterId: 'id-1',
+        limit: CLEANUP_BURST_WINDOW,
+      });
     });
 
     it('drops a member missing from hydration and drops a group left with fewer than 2 members', async () => {

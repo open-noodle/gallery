@@ -146,15 +146,20 @@ which follows the precedent of `asset-exif.table.ts` and `person.table.ts`):
   - The calendar and rewind queries must repeat this expression and condition **verbatim**; otherwise
     PostgreSQL will not use the index.
   - The trailing `"localDateTime"` key makes the calendar count an index-only scan that reads the stored
-    month-day value. Without it, PostgreSQL evaluates the expression for every row: about 260 ms at 500k
-    assets, against about 40 ms with it (the performance check below).
+    month-day value. Without it, PostgreSQL evaluates the expression for every row: 279 ms p95 at 500k
+    assets, against 25 ms p95 with it (the performance check below).
 - `asset_cleanup_localDateTime_idx` on `asset`: a partial btree on `("ownerId", "localDateTime", "id")` with
   the same condition as `asset_localMonthDay_idx`, so only Cleanup queries can use it. It serves the keyset
   pages in `(localDateTime, id)` order: bursts windows, screenshots and blurry. Their cursors are written
   as row comparisons (`("localDateTime", "id") > (x, y)`), which PostgreSQL turns into an index condition.
   Without this index every bursts window was a sequential scan plus a sort, and a page of 100 burst groups
-  took about 1 s at 500k assets. The migration inserts its `migration_overrides` row, because it is a
-  partial index.
+  took 1,064 ms p95 at 500k assets (150 ms p95 with it). The migration inserts its `migration_overrides`
+  row, because it is a partial index.
+  - The cursor timestamp is the database's own microsecond value, selected as
+    `to_char(... 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` and compared as `::timestamptz`. A JS `Date` holds only
+    milliseconds, so a cursor built from one would repeat rows (ascending bursts) or skip them (descending
+    screenshots and blurry) for any `localDateTime` with sub-millisecond digits.
+  - The bursts window extension is capped at 10 extra windows, as a safety net against a run with no gap.
 - `asset_exif_fileSizeInByte_idx`: a **plain** single-column btree on `asset_exif ("fileSizeInByte")`.
   PostgreSQL can scan a btree backwards, so `ORDER BY … DESC` is served without declaring `DESC`. A plain
   `columns` index needs no `migration_overrides` row (precedent: `person_personGroupId_key`).
@@ -362,8 +367,9 @@ assets.
   - If that pass misses the time budget during measurement, fall back to a per-user cached count, refreshed
     after quality analysis. The implementation plan records which option was chosen.
   - Measured (2026-09-24, 500k synthetic seed): the first shape grouped every row and spilled a ~450k-group
-    hash aggregate to disk (~380 ms). Adding `lead()` to mark each group's last row lets the pass drop
-    singletons before grouping (~240 ms p95), so the live count was kept and no cache was added.
+    hash aggregate to disk (377 ms p95). Adding `lead()` to mark each group's last row lets the pass drop
+    singletons before grouping (239 ms p95; 248 ms at the endpoint), so the live count was kept and no cache
+    was added.
 - A single date at 500k assets holds about 1,400 photos, so rewind fetches them one year at a time.
 - **Time budget:** every cleanup endpoint must answer in under 300 ms at p95 for a user with 500k assets.
 - **Index safety check** (a required implementation task):
