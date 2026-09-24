@@ -70,6 +70,7 @@
           aria-label={asset.originalFileName}
           ondblclick={() => onOpen(asset.id)}
           data-testid="cleanup-rewind-stage-{asset.id}"
+          data-asset-id={asset.id}
           data-mark={mark ?? 'none'}
         >
           <img
