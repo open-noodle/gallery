@@ -29,12 +29,19 @@ class PeopleDetails extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
     final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));
     final ownedByCurrentUser = asset.ownerId == currentUserId;
     final assetKey = (id: asset.id, ownerId: asset.ownerId);
 
     final peopleFuture = ref.watch(Store.people.forAsset(assetKey));
+||||||| ca4637adc79
+    final peopleFuture = ref.watch(Store.people.forAsset(asset.id));
+=======
+    final people = ref.watch(Store.people.forAsset(asset.id));
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
     Future<void> showNameEditModal(Person person) async {
       await showDialog(
         context: context,
@@ -49,6 +56,24 @@ class PeopleDetails extends ConsumerWidget {
     }
 
     return peopleFuture.when(
+||||||| ca4637adc79
+    Future<void> showNameEditModal(Person person) async {
+      await showDialog(
+        context: context,
+        useRootNavigator: false,
+        builder: (BuildContext context) {
+          return PersonNameEditForm(person: person);
+        },
+      );
+
+      // TODO(agg23): Remove once state is properly reactive
+      ref.invalidate(Store.people.forAsset(asset.id));
+    }
+
+    return peopleFuture.when(
+=======
+    return people.when(
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
       data: (people) {
         return AnimatedCrossFade(
           firstChild: const SizedBox.shrink(),
@@ -85,7 +110,19 @@ class PeopleDetails extends ConsumerWidget {
                           ContextHelper(context).pop();
                           unawaited(context.pushRoute(PersonRoute(person: person)));
                         },
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
                         onNameTap: ownedByCurrentUser ? () => showNameEditModal(person) : null,
+||||||| ca4637adc79
+                        onNameTap: () => showNameEditModal(person),
+=======
+                        onNameTap: () => showDialog(
+                          context: context,
+                          useRootNavigator: false,
+                          builder: (BuildContext context) {
+                            return PersonNameEditForm(person: person);
+                          },
+                        ),
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
                       ),
                   ],
                 ),

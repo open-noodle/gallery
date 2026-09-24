@@ -74,7 +74,6 @@
     onAction?: OnAction;
     onUndoDelete?: OnUndoDelete;
     onClose?: (assetId: string) => void;
-    onRemoveFromAlbum?: (assetIds: string[]) => void;
     onRandom?: () => Promise<{ id: string } | undefined>;
     spaceId?: string;
     /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
@@ -93,7 +92,6 @@
     onAction,
     onUndoDelete,
     onClose,
-    onRemoveFromAlbum,
     onRandom,
     spaceId,
     space,
@@ -111,7 +109,15 @@
   const stackSelectedThumbnailSize = 65;
 
   let previewStackedAsset: AssetResponseDto | undefined = $state();
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   let stack: StackResponseDto | null = $state(null);
+||||||| ca4637adc79
+  let stack: StackResponseDto | null = $state(null);
+
+=======
+  let stack: StackResponseDto | undefined = $state();
+
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   const asset = $derived(previewStackedAsset ?? cursor.current);
   const nextAsset = $derived(cursor.nextAsset);
   const previousAsset = $derived(cursor.previousAsset);
@@ -135,7 +141,7 @@
     }
 
     if (!stack?.assets.some(({ id }) => id === asset.id)) {
-      stack = null;
+      stack = undefined;
     }
   };
 
@@ -164,6 +170,32 @@
     const restoredAsset = assets[0];
     await assetViewerManager.setAssetId(restoredAsset.id);
     await navigate({ targetRoute: 'current', assetId: restoredAsset.id });
+  };
+
+  const onStackCreate = (createdStack: StackResponseDto) => {
+    if (createdStack.assets.map((a) => a.id).includes(asset.id)) {
+      stack = createdStack;
+    }
+  };
+
+  const onStackUpdate = (updatedStack: StackResponseDto) => {
+    if (stack?.id !== updatedStack.id) {
+      return;
+    }
+
+    stack = updatedStack;
+    if (!stack.assets.map((a) => a.id).includes(asset.id)) {
+      // current asset was removed from stack, go to primary
+      cursor.current = stack.assets[0];
+    }
+  };
+
+  const onPersonThumbnailReady = async ({ id: personId }: { id: string }) => {
+    if (person && person.id !== personId) {
+      return;
+    }
+    faceManager.clear();
+    await faceManager.getAssetFaces(asset.id);
   };
 
   onMount(() => {
@@ -334,13 +366,14 @@
     preAction?.(action);
   };
 
-  const handleAction = async (action: Action) => {
+  const handleAction = (action: Action) => {
     switch (action.type) {
       case AssetAction.DELETE:
       case AssetAction.TRASH: {
         eventManager.emit('AssetsDelete', [asset.id]);
         break;
       }
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
       case AssetAction.REMOVE_ASSET_FROM_STACK: {
         stack = action.stack;
         if (stack) {
@@ -359,6 +392,27 @@
         eventManager.emit('AssetUpdate', cursor.current);
         break;
       }
+||||||| ca4637adc79
+      case AssetAction.REMOVE_ASSET_FROM_STACK: {
+        stack = action.stack;
+        if (stack) {
+          cursor.current = stack.assets[0];
+        }
+        break;
+      }
+      case AssetAction.STACK:
+      case AssetAction.SET_STACK_PRIMARY_ASSET: {
+        stack = action.stack;
+        break;
+      }
+      case AssetAction.SET_PERSON_FEATURED_PHOTO: {
+        const assetInfo = await getAssetInfo({ id: asset.id });
+        cursor.current = { ...asset, people: assetInfo.people };
+        eventManager.emit('AssetUpdate', cursor.current);
+        break;
+      }
+=======
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
       case AssetAction.RATING: {
         cursor.current = {
           ...asset,
@@ -367,10 +421,6 @@
             rating: action.rating,
           },
         };
-        break;
-      }
-      case AssetAction.UNSTACK: {
-        closeViewer();
         break;
       }
       // no default
@@ -498,7 +548,14 @@
 </script>
 
 <CommandPaletteDefaultProvider name={$t('assets')} actions={[Tag, TagPeople]} />
-<OnEvents {onAssetUpdate} {onAssetsUndoArchive} />
+<OnEvents
+  {onAssetUpdate}
+  {onAssetsUndoArchive}
+  {onStackCreate}
+  onStackDelete={() => closeViewer()}
+  {onStackUpdate}
+  {onPersonThumbnailReady}
+/>
 
 <svelte:document
   bind:fullscreenElement
@@ -526,7 +583,6 @@
         onAction={handleAction}
         {onUndoDelete}
         onClose={onClose ? () => onClose(stack?.primaryAssetId ?? asset.id) : undefined}
-        {onRemoveFromAlbum}
         {isPlayingOriginalVideo}
         {setPlayOriginalVideo}
         {space}
@@ -661,9 +717,8 @@
             style:bottom={stackedAsset.id === asset.id ? '0' : '-10px'}
           >
             <Thumbnail
-              imageClass={{ 'border-2 border-white': stackedAsset.id === asset.id }}
+              imageClass={stackedAsset.id === asset.id ? 'border-2 border-white' : 'brightness-70'}
               brokenAssetClass="text-xs"
-              dimmed={stackedAsset.id !== asset.id}
               asset={toTimelineAsset(stackedAsset)}
               onClick={() => {
                 cursor.current = stackedAsset;

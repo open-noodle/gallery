@@ -1,12 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { type Insertable, type Kysely, type OrderByDirection, type Updateable, sql } from 'kysely';
+import {
+  type ExpressionBuilder,
+  type Insertable,
+  type Kysely,
+  type OrderByDirection,
+  type Updateable,
+  sql,
+} from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { DateTime } from 'luxon';
 import { InjectKysely } from 'nestjs-kysely';
 import type { IBulkAsset } from 'src/types.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemorySearchDto } from 'src/dtos/memory.dto.js';
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 import { AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
+||||||| ca4637adc79
+import { AssetOrderWithRandom, AssetVisibility } from 'src/enum.js';
+=======
+import { AssetFileType, AssetOrderWithRandom, AssetVisibility } from 'src/enum.js';
+import { type YearMonthDay } from 'src/repositories/asset.repository.js';
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
 import { asUuid } from 'src/utils/database.js';
@@ -16,6 +30,9 @@ import {
   spaceAlbumAssetExists,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
+
+const asMakeDate = (eb: ExpressionBuilder<DB, 'asset'>, { year, month, day }: YearMonthDay) =>
+  eb.fn('make_date', [sql`${year}::int`, sql`${month}::int`, sql`${day}::int`]);
 
 @Injectable()
 export class MemoryRepository implements IBulkAsset {
@@ -267,6 +284,7 @@ export class MemoryRepository implements IBulkAsset {
       .execute();
   }
 
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   /**
    * Earliest day any memory becomes visible, across all owners — the start of the one-off
    * overlap backfill. `coalesce` mirrors `cleanup`, so a memory with no `showAt` still counts.
@@ -347,6 +365,67 @@ export class MemoryRepository implements IBulkAsset {
   // #1041: `viewerId`/`hiddenScope` are optional — `create`/`update` below return the object right
   // after the caller's own action and pass neither, so their SQL is unchanged. `get()` is the
   // read surface and is the one MemoryService resolves a scope for.
+||||||| ca4637adc79
+=======
+  private personAssets(ownerId: string, personGroupId: string) {
+    return this.db
+      .selectFrom('asset')
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.exists((qb) =>
+          qb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.personGroupId', '=', personGroupId)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true),
+        ),
+      )
+      .where((eb) =>
+        eb.exists((qb) =>
+          qb
+            .selectFrom('asset_file')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', '=', AssetFileType.Preview),
+        ),
+      );
+  }
+
+  @GenerateSql({
+    params: [DummyValue.UUID, DummyValue.UUID, { year: 2000, month: 1, day: 1 }, { year: 2025, month: 1, day: 1 }],
+  })
+  async getPersonBirthdayYears(
+    ownerId: string,
+    personGroupId: string,
+    birthDate: YearMonthDay,
+    until: YearMonthDay,
+  ): Promise<number[]> {
+    const rows = await this.personAssets(ownerId, personGroupId)
+      .where(sql`date_part('month', (asset."localDateTime" at time zone 'UTC')::date)::int`, '=', birthDate.month)
+      .where(sql`date_part('day', (asset."localDateTime" at time zone 'UTC')::date)::int`, '=', birthDate.day)
+      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '>=', asMakeDate(eb, birthDate)))
+      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '<', asMakeDate(eb, until)))
+      .select(sql<number>`date_part('year', (asset."localDateTime" at time zone 'UTC')::date)::int`.as('year'))
+      .distinct()
+      .orderBy(sql`year`, 'desc')
+      .execute();
+
+    return rows.map(({ year }) => year);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { year: 2000, month: 1, day: 1 }, 5] })
+  getPersonAssetsByDate(ownerId: string, personGroupId: string, date: YearMonthDay, limit: number) {
+    return this.personAssets(ownerId, personGroupId)
+      .select(['asset.id'])
+      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '=', asMakeDate(eb, date)))
+      .orderBy('asset.localDateTime', 'desc')
+      .limit(limit)
+      .execute();
+  }
+
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   @GenerateSql({ params: [DummyValue.UUID] })
   get(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
     return this.getByIdBuilder(id, viewerId, hiddenScope, visibleSpaceIds).executeTakeFirst();

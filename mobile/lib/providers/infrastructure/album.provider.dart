@@ -14,10 +14,10 @@ import 'package:immich_mobile/services/foreground_upload.service.dart';
 // ignore: import_rule_openapi
 import 'package:openapi/api.dart' show AlbumSharedSpaceLinkResponseDto;
 
-final localAlbumProvider = FutureProvider<List<LocalAlbum>>(
+final localAlbumProvider = StreamProvider<List<LocalAlbum>>(
   (ref) => LocalAlbumService(ref.watch(driftProvider).localAlbumRepository)
-      .getAll(sortBy: {SortLocalAlbumsBy.newestAsset})
-      .then((albums) => albums.where((album) => album.assetCount > 0).toList()),
+      .watchAll(sortBy: {SortLocalAlbumsBy.newestAsset})
+      .map((albums) => albums.where((album) => album.assetCount > 0).toList()),
 );
 
 final localAlbumThumbnailProvider = FutureProvider.family<LocalAsset?, String>(

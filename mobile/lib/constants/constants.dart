@@ -9,11 +9,9 @@ const int kLogTruncateLimit = 2000;
 
 // Sync
 const int kSyncEventBatchSize = 5000;
-const int kFetchLocalAssetsBatchSize = 40000;
 
 // Hash batch limits
 final int kBatchHashFileLimit = Platform.isIOS ? 32 : 512;
-const int kBatchHashSizeLimit = 1024 * 1024 * 1024; // 1GB
 
 // Secure storage keys
 const String kSecuredPinCode = "secured_pin_code";
@@ -52,7 +50,14 @@ const String kImmichLatestRelease = "https://github.com/immich-app/immich/releas
 
 const int kPhotoTabIndex = 0;
 const int kSearchTabIndex = 1;
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 const int kSpacesTabIndex = 2;
+||||||| ca4637adc79
+const int kAlbumTabIndex = 2;
+=======
+const int kAlbumTabIndex = 2;
+// ignore: unused-code
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 const int kLibraryTabIndex = 3;
 
 // Workaround for SQLite's variable limit (SQLITE_MAX_VARIABLE_NUMBER = 32766)

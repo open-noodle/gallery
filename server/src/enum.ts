@@ -123,8 +123,15 @@ export const TimeBucketSizeSchema = z
 export enum MemoryType {
   /** pictures taken on this day X years ago */
   OnThisDay = 'on_this_day',
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   /** server-defined rule memory */
   Rule = 'rule',
+||||||| ca4637adc79
+=======
+
+  /** pictures of a person, shown leading up to their birthday */
+  Birthday = 'birthday',
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 }
 
 export const MemoryTypeSchema = z.enum(MemoryType).describe('Memory type').meta({ id: 'MemoryType' });
@@ -1153,6 +1160,7 @@ export enum SyncRequestType {
   AssetMetadataV1 = 'AssetMetadataV1',
   AssetOcrV1 = 'AssetOcrV1',
   AuthUsersV1 = 'AuthUsersV1',
+  AuthUsersV2 = 'AuthUsersV2',
   MemoriesV1 = 'MemoriesV1',
   MemoryToAssetsV1 = 'MemoryToAssetsV1',
   PartnersV1 = 'PartnersV1',
@@ -1166,7 +1174,9 @@ export enum SyncRequestType {
   PeopleV1 = 'PeopleV1',
   /** @deprecated */
   AssetFacesV1 = 'AssetFacesV1',
+  /** @deprecated */
   AssetFacesV2 = 'AssetFacesV2',
+  AssetFacesV3 = 'AssetFacesV3',
   UserMetadataV1 = 'UserMetadataV1',
 
   // --- gallery-fork additions ---
@@ -1201,6 +1211,7 @@ export const SyncRequestTypeSchema = z
 
 export enum SyncEntityType {
   AuthUserV1 = 'AuthUserV1',
+  AuthUserV2 = 'AuthUserV2',
 
   UserV1 = 'UserV1',
   UserDeleteV1 = 'UserDeleteV1',
@@ -1270,8 +1281,11 @@ export enum SyncEntityType {
   PersonV1 = 'PersonV1',
   PersonDeleteV1 = 'PersonDeleteV1',
 
+  /** @deprecated */
   AssetFaceV1 = 'AssetFaceV1',
+  /** @deprecated */
   AssetFaceV2 = 'AssetFaceV2',
+  AssetFaceV3 = 'AssetFaceV3',
   AssetFaceDeleteV1 = 'AssetFaceDeleteV1',
 
   UserMetadataV1 = 'UserMetadataV1',

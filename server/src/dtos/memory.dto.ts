@@ -22,12 +22,15 @@ const MemorySearchSchema = z
   })
   .meta({ id: 'MemorySearchDto' });
 
-const OnThisDaySchema = z
+const MemoryDataSchema = z
   .object({
-    year: z.int().min(1000).max(9999).describe('Year for on this day memory'),
+    year: z.int().min(1000).max(9999).describe('Year of the memory'),
+    personId: z.uuidv4().optional().describe('Person ID (birthday memories)'),
+    personName: z.string().optional().describe('Name of the person when the memory was created (birthday memories)'),
   })
-  .meta({ id: 'OnThisDayDto' });
+  .meta({ id: 'MemoryDataDto' });
 
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 const MemoryDataSchema = z.record(z.string(), z.unknown()).describe('Memory data');
 
 const getMemoryDisplay = (type: MemoryType, data: Record<string, unknown>) => {
@@ -40,6 +43,11 @@ const getMemoryDisplay = (type: MemoryType, data: Record<string, unknown>) => {
     subtitle: typeof data.subtitle === 'string' ? data.subtitle : undefined,
   };
 };
+||||||| ca4637adc79
+type MemoryData = z.infer<typeof OnThisDaySchema>;
+=======
+type MemoryData = z.infer<typeof MemoryDataSchema>;
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 const MemoryUpdateSchema = nonEmptyPartial({
   isSaved: z.boolean().describe('Is memory saved'),
@@ -47,6 +55,7 @@ const MemoryUpdateSchema = nonEmptyPartial({
   memoryAt: isoDatetimeToDate.describe('Memory date'),
 }).meta({ id: 'MemoryUpdateDto' });
 
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 const MemoryCreateSchema = z
   .object({
     type: MemoryTypeSchema,
@@ -69,6 +78,57 @@ const MemoryCreateSchema = z
     path: ['data', 'year'],
   })
   .meta({ id: 'MemoryCreateDto' });
+||||||| ca4637adc79
+const MemoryCreateSchema = z
+  .object({
+    type: MemoryTypeSchema,
+    data: OnThisDaySchema,
+    memoryAt: isoDatetimeToDate.describe('Memory date'),
+    assetIds: z.array(z.uuidv4()).optional().describe('Asset IDs to associate with memory'),
+    isSaved: z.boolean().optional().describe('Is memory saved'),
+    seenAt: isoDatetimeToDate.optional().describe('Date when memory was seen'),
+    showAt: isoDatetimeToDate
+      .optional()
+      .describe('Date when memory should be shown')
+      .meta(new HistoryBuilder().added('v2.6.0').stable('v2.6.0').getExtensions()),
+    hideAt: isoDatetimeToDate
+      .optional()
+      .describe('Date when memory should be hidden')
+      .meta(new HistoryBuilder().added('v2.6.0').stable('v2.6.0').getExtensions()),
+  })
+  .meta({ id: 'MemoryCreateDto' });
+=======
+const MemoryCreateBaseSchema = z.object({
+  type: MemoryTypeSchema,
+  data: MemoryDataSchema,
+  memoryAt: isoDatetimeToDate.describe('Memory date'),
+  assetIds: z.array(z.uuidv4()).optional().describe('Asset IDs to associate with memory'),
+  isSaved: z.boolean().optional().describe('Is memory saved'),
+  seenAt: isoDatetimeToDate.optional().describe('Date when memory was seen'),
+  showAt: isoDatetimeToDate
+    .optional()
+    .describe('Date when memory should be shown')
+    .meta(new HistoryBuilder().added('v2.6.0').stable('v2.6.0').getExtensions()),
+  hideAt: isoDatetimeToDate
+    .optional()
+    .describe('Date when memory should be hidden')
+    .meta(new HistoryBuilder().added('v2.6.0').stable('v2.6.0').getExtensions()),
+});
+
+const MemoryCreateSchema = MemoryCreateBaseSchema.superRefine((dto, ctx) => {
+  if (dto.type === MemoryType.Birthday) {
+    for (const key of ['personId', 'personName'] as const) {
+      if (dto.data[key] === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['data', key],
+          message: `Required for ${MemoryType.Birthday} memories`,
+        });
+      }
+    }
+  }
+}).meta({ id: 'MemoryCreateDto' });
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 const MemoryStatisticsResponseSchema = z
   .object({
@@ -89,8 +149,13 @@ const MemoryResponseSchema = z
     ownerId: z.uuidv4().describe('Owner user ID'),
     type: MemoryTypeSchema,
     data: MemoryDataSchema,
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
     title: z.string().optional().describe('Server-defined display title'),
     subtitle: z.string().optional().describe('Server-defined display subtitle'),
+||||||| ca4637adc79
+    data: OnThisDaySchema,
+=======
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     isSaved: z.boolean().describe('Is memory saved'),
     assets: z.array(AssetResponseSchema),
   })

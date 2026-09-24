@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { shuffle } from 'lodash-es';
 import { DateTime } from 'luxon';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
 import type { MemoryRule, MemoryRuleCandidate } from 'src/services/memory-rules/memory-rule.interface.js';
@@ -16,6 +17,7 @@ import {
   mapMemory,
 } from 'src/dtos/memory.dto.js';
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
+import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import {
   getAdminAvailableMemoryTypeKeys,
@@ -32,6 +34,7 @@ import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences } from 'src/utils/preferences.js';
 
 const DAYS = 3;
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 /**
  * Cap on rule memories *visible* on a given day, so a multi-day recap holds its slot for its
  * whole window. Sized from the worst-case overlap of the current rules: the calendar-fixed
@@ -66,6 +69,12 @@ const isVisibleOn = (row: Pick<MemoryOverlapRow, 'showAt' | 'hideAt'>, target: D
   const end = target.endOf('day').toJSDate();
   return (row.showAt === null || row.showAt <= end) && (row.hideAt === null || row.hideAt >= start);
 };
+||||||| ca4637adc79
+=======
+const DAYS_UNTIL_BIRTHDAY = 3;
+const BIRTHDAY_MEMORY_ASSETS_PER_YEAR = 5;
+const MEMORY_ASSET_LIMIT = 25;
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 @Injectable()
 export class MemoryService extends BaseService {
@@ -104,7 +113,20 @@ export class MemoryService extends BaseService {
 
         this.logger.log(`Creating memories for ${target.toISO()}`);
         try {
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
           await Promise.all(onThisDayUsers.map((owner) => this.createOnThisDayMemories(owner.id, target)));
+||||||| ca4637adc79
+          await Promise.all(users.map((owner) => this.createOnThisDayMemories(owner.id, target)));
+=======
+          await Promise.all(
+            users.map((owner) =>
+              Promise.all([
+                this.createOnThisDayMemories(owner.id, target),
+                this.createBirthdayMemories(owner.id, target),
+              ]),
+            ),
+          );
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         } catch (error) {
           this.logger.error(`Failed to create memories for ${target.toISO()}: ${error}`);
         }
@@ -188,6 +210,7 @@ export class MemoryService extends BaseService {
     );
   }
 
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   /**
    * A memory may be stripped or deleted only when it is unambiguously one this job generated.
    * `MemoryType` has just two values and `POST /memories` accepts both, so a hand-made memory is
@@ -465,6 +488,69 @@ export class MemoryService extends BaseService {
     }
 
     return candidates;
+||||||| ca4637adc79
+=======
+  private async createBirthdayMemories(ownerId: string, target: DateTime) {
+    const people = await this.personRepository.forBirthdayMemories(ownerId, target);
+    if (people.length === 0) {
+      return;
+    }
+
+    const showAt = target.minus({ days: DAYS_UNTIL_BIRTHDAY }).startOf('day').toISO();
+    const hideAt = target.endOf('day').toISO();
+
+    await Promise.all(
+      people.map(async ({ personGroupId, name: personName, birthDate }) => {
+        const assets = await this.getBirthdayAssets(ownerId, personGroupId, birthDate, target);
+        if (assets.length === 0) {
+          return;
+        }
+
+        await this.memoryRepository.create(
+          {
+            ownerId,
+            type: MemoryType.Birthday,
+            data: { personId: personGroupId, personName, year: birthDate.year },
+            memoryAt: target.startOf('day').toISO()!,
+            showAt,
+            hideAt,
+          },
+          new Set(assets.map(({ id }) => id)),
+        );
+      }),
+    );
+  }
+
+  private async getBirthdayAssets(
+    ownerId: string,
+    personGroupId: string,
+    birthDate: YearMonthDay,
+    until: YearMonthDay,
+  ) {
+    const years = await this.memoryRepository.getPersonBirthdayYears(ownerId, personGroupId, birthDate, until);
+    if (years.length === 0) {
+      return [];
+    }
+
+    let birthdayYears = years;
+    let assetsPerYear = Math.min(BIRTHDAY_MEMORY_ASSETS_PER_YEAR, Math.floor(MEMORY_ASSET_LIMIT / years.length));
+
+    // Select random birthdays if there are more than 25 birthdays with assets
+    if (years.length > MEMORY_ASSET_LIMIT) {
+      birthdayYears = shuffle(years)
+        .slice(0, MEMORY_ASSET_LIMIT)
+        .sort((a, b) => b - a);
+      assetsPerYear = 1;
+    }
+
+    const assets = await Promise.all(
+      birthdayYears.map((year) =>
+        this.memoryRepository.getPersonAssetsByDate(ownerId, personGroupId, { ...birthDate, year }, assetsPerYear),
+      ),
+    );
+
+    return assets.flat();
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   }
 
   @OnJob({ name: JobName.MemoryCleanup, queue: QueueName.BackgroundTask })
@@ -525,8 +611,6 @@ export class MemoryService extends BaseService {
   }
 
   async create(auth: AuthDto, dto: MemoryCreateDto) {
-    // TODO validate type/data combination
-
     const assetIds = dto.assetIds || [];
     // Gallery: owner-only, for the reason spelled out at the addAssets call below.
     const allowedAssetIds = await this.accessRepository.asset.checkOwnerAccess(

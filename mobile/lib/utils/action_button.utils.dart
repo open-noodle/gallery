@@ -35,7 +35,6 @@ class ActionButtonContext {
   final BaseAsset asset;
   final bool isOwner;
   final bool isArchived;
-  final bool isTrashEnabled;
   final bool isInLockedView;
   final bool isStacked;
   final RemoteAlbum? currentAlbum;
@@ -49,7 +48,6 @@ class ActionButtonContext {
     required this.asset,
     required this.isOwner,
     required this.isArchived,
-    required this.isTrashEnabled,
     required this.isStacked,
     required this.isInLockedView,
     required this.currentAlbum,

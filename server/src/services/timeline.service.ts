@@ -238,6 +238,13 @@ export class TimelineService extends BaseService {
     if (auth.sharedLink && !auth.sharedLink.showExif) {
       dto.withCoordinates = false;
     }
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+||||||| ca4637adc79
+
+=======
+
+    // eslint-disable-next-line unicorn/prefer-early-return
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     if (dto.withPartners) {
       const isRequestedLocked = dto.visibility === AssetVisibility.Locked;
       const isRequestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;

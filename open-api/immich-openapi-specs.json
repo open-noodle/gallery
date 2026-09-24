@@ -32708,9 +32708,15 @@
             "type": "array"
           },
           "data": {
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
             "additionalProperties": {},
             "description": "Memory data",
             "type": "object"
+||||||| ca4637adc79
+            "$ref": "#/components/schemas/OnThisDayDto"
+=======
+            "$ref": "#/components/schemas/MemoryDataDto"
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           },
           "hideAt": {
             "description": "Date when memory should be hidden",
@@ -32777,6 +32783,30 @@
         ],
         "type": "object"
       },
+      "MemoryDataDto": {
+        "properties": {
+          "personId": {
+            "description": "Person ID (birthday memories)",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "personName": {
+            "description": "Name of the person when the memory was created (birthday memories)",
+            "type": "string"
+          },
+          "year": {
+            "description": "Year of the memory",
+            "maximum": 9999,
+            "minimum": 1000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year"
+        ],
+        "type": "object"
+      },
       "MemoryResponseDto": {
         "properties": {
           "assets": {
@@ -32793,9 +32823,15 @@
             "type": "string"
           },
           "data": {
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
             "additionalProperties": {},
             "description": "Memory data",
             "type": "object"
+||||||| ca4637adc79
+            "$ref": "#/components/schemas/OnThisDayDto"
+=======
+            "$ref": "#/components/schemas/MemoryDataDto"
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           },
           "deletedAt": {
             "description": "Deletion date",
@@ -32907,7 +32943,13 @@
         "description": "Memory type",
         "enum": [
           "on_this_day",
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
           "rule"
+||||||| ca4637adc79
+          "on_this_day"
+=======
+          "birthday"
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         ],
         "type": "string"
       },
@@ -41871,7 +41913,7 @@
         ],
         "type": "object"
       },
-      "SyncAssetFaceV2": {
+      "SyncAssetFaceV3": {
         "properties": {
           "assetId": {
             "description": "Asset ID",
@@ -42492,6 +42534,98 @@
         ],
         "type": "object"
       },
+      "SyncAuthUserV2": {
+        "properties": {
+          "avatarColor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserAvatarColor"
+              }
+            ],
+            "nullable": true
+          },
+          "deletedAt": {
+            "description": "User deleted at",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "nullable": true,
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "email": {
+            "description": "User email",
+            "type": "string"
+          },
+          "hasProfileImage": {
+            "description": "User has profile image",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "User ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "isAdmin": {
+            "description": "User is admin",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "User name",
+            "type": "string"
+          },
+          "oauthId": {
+            "description": "User OAuth ID",
+            "nullable": true,
+            "type": "string"
+          },
+          "pinCode": {
+            "description": "User pin code",
+            "nullable": true,
+            "type": "string"
+          },
+          "profileChangedAt": {
+            "description": "User profile changed at",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "quotaSizeInBytes": {
+            "description": "Quota size in bytes",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          },
+          "quotaUsageInBytes": {
+            "description": "Quota usage in bytes",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "storageLabel": {
+            "description": "User storage label",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "deletedAt",
+          "email",
+          "hasProfileImage",
+          "id",
+          "isAdmin",
+          "name",
+          "oauthId",
+          "pinCode",
+          "profileChangedAt",
+          "quotaSizeInBytes",
+          "quotaUsageInBytes",
+          "storageLabel"
+        ],
+        "type": "object"
+      },
       "SyncCompleteV1": {
         "properties": {},
         "type": "object"
@@ -42500,6 +42634,7 @@
         "description": "Sync entity type",
         "enum": [
           "AuthUserV1",
+          "AuthUserV2",
           "UserV1",
           "UserDeleteV1",
           "AssetV1",
@@ -42552,6 +42687,7 @@
           "PersonDeleteV1",
           "AssetFaceV1",
           "AssetFaceV2",
+          "AssetFaceV3",
           "AssetFaceDeleteV1",
           "UserMetadataV1",
           "UserMetadataDeleteV1",
@@ -42971,6 +43107,7 @@
           "AssetMetadataV1",
           "AssetOcrV1",
           "AuthUsersV1",
+          "AuthUsersV2",
           "MemoriesV1",
           "MemoryToAssetsV1",
           "PartnersV1",
@@ -42983,6 +43120,7 @@
           "PeopleV1",
           "AssetFacesV1",
           "AssetFacesV2",
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
           "UserMetadataV1",
           "SharedSpacesV1",
           "SharedSpaceMembersV1",
@@ -43000,6 +43138,12 @@
           "SharedSpaceAlbumAssetsV1",
           "SharedSpaceAlbumAssetExifsV1",
           "SharedSpaceAlbumHiddensV1"
+||||||| ca4637adc79
+          "UserMetadataV1"
+=======
+          "AssetFacesV3",
+          "UserMetadataV1"
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         ],
         "type": "string"
       },

@@ -9,7 +9,12 @@ part 'memory.model.freezed.dart';
 enum MemoryTypeEnum {
   // do not change this order!
   onThisDay,
+<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   rule,
+||||||| ca4637adc79
+=======
+  birthday,
+>>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 }
 
 // Fork (#418): the rule-based memories pipeline sends an arbitrary payload per rule
@@ -41,6 +46,7 @@ class MemoryData {
     return MemoryData(Map<String, dynamic>.from(map));
   }
 
+  @visibleForTesting
   String toJson() => json.encode(toMap());
 
   factory MemoryData.fromJson(String source) => MemoryData.fromMap(json.decode(source) as Map<String, dynamic>);
