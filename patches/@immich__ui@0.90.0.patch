@@ -12,7 +12,7 @@ index 3920100df9ac3e98746e81cd9b554d73f4278cc9..5cf5d36a162368cb1ee88dae0ac3c7e1
    </p>
  </a>
 diff --git a/dist/services/command-palette-manager.svelte.js b/dist/services/command-palette-manager.svelte.js
-index 064b6fa525cb3756d8dbd85c2d4338117037b38b..b68a350dc216282bf5a54e5432e0e07d8c59e3c6 100644
+index c6b4ed1e1cf5beebd5b7aebbde4fe98aa1dced92..63340f75d5cb02f6f93008bf2e9631819dde08ea 100644
 --- a/dist/services/command-palette-manager.svelte.js
 +++ b/dist/services/command-palette-manager.svelte.js
 @@ -103,11 +103,13 @@ class CommandPaletteManager {
