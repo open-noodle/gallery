@@ -432,6 +432,17 @@ describe('RewindDay', () => {
     expect(screen.queryByTestId('cleanup-rewind-hints')).toBeNull();
   });
 
+  it('does not hint at the Bursts queue for a photo taken within 2 s of a video only', async () => {
+    renderDay([
+      asset('a', { localDateTime: '2024-09-23T10:00:00.000Z' }),
+      asset('bb', { localDateTime: '2024-09-23T10:00:01.500Z', type: AssetTypeEnum.Video }),
+    ]);
+    await fireEvent.click(screen.getByTestId('cleanup-mode-one'));
+
+    expect(screen.getByTestId('cleanup-rewind-stage-a')).toBeVisible();
+    expect(screen.queryByTestId('cleanup-hint-burst')).toBeNull();
+  });
+
   it('remembers the chosen mode', async () => {
     renderDay();
 
