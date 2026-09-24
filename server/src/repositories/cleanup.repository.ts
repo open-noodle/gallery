@@ -595,11 +595,11 @@ export class CleanupRepository {
               ]),
               // The quality job skips an image without a preview (nothing to score until the
               // thumbnail job makes one), so it counts as done here; otherwise one image the
-              // thumbnailer cannot read would hold the figure below 100 for good.
-              eb.and([
-                eb('asset.type', '=', sql.lit(AssetType.Image)),
-                eb.not(eb.exists(withFilePath(eb, AssetFileType.Preview))),
-              ]),
+              // thumbnailer cannot read would hold the figure below 100 for good. `thumbhash` is
+              // written by that same thumbnail job and is on the row already being read: an exact
+              // `asset_file` preview check measured +55% at 500k assets as a join, and 7-10x as a
+              // correlated subquery (which rules out the parallel plan).
+              eb.and([eb('asset.type', '=', sql.lit(AssetType.Image)), eb('asset.thumbhash', 'is', null)]),
             ]),
           )
           .as('analysed'),
