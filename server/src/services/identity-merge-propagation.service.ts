@@ -336,6 +336,7 @@ export class IdentityMergePropagationService {
         db,
       );
 
+      // eslint-disable-next-line unicorn/prefer-continue
       if (targetNeedsFeatureFaceRepair) {
         const repairJob = await this.repairMissingPersonalFeatureFace(step.targetPersonId, db);
         if (repairJob) {

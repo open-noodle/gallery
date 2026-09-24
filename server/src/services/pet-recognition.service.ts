@@ -115,10 +115,12 @@ export class PetRecognitionService extends BaseService {
       for await (const face of this.personRepository.getUnassignedPetFaces()) {
         jobs.push({ name: JobName.PetRecognition, data: { id: face.id, deferred: false } });
 
-        if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {
-          await this.jobRepository.queueAll(jobs);
-          jobs = [];
+        if (!(jobs.length >= JOBS_ASSET_PAGINATION_SIZE)) {
+          continue;
         }
+
+        await this.jobRepository.queueAll(jobs);
+        jobs = [];
       }
       await this.jobRepository.queueAll(jobs);
     }
@@ -331,13 +333,15 @@ export class PetRecognitionService extends BaseService {
 
   private async setRepresentativeFaceIfMissing(personId: string, faceId: string): Promise<void> {
     const person = await this.personRepository.getByGroupIdOnly(personId);
-    if (person && !person.faceAssetId) {
-      await this.personRepository.update({ ownerId: person.ownerId, personGroupId: personId, faceAssetId: faceId });
-      await this.jobRepository.queue({
-        name: JobName.PersonGenerateThumbnail,
-        data: { ownerId: person.ownerId, personGroupId: personId },
-      });
+    if (!person || person.faceAssetId) {
+      return;
     }
+
+    await this.personRepository.update({ ownerId: person.ownerId, personGroupId: personId, faceAssetId: faceId });
+    await this.jobRepository.queue({
+      name: JobName.PersonGenerateThumbnail,
+      data: { ownerId: person.ownerId, personGroupId: personId },
+    });
   }
 
   private async queueSharedSpaceFaceMatchesForAsset(assetId: string): Promise<void> {
