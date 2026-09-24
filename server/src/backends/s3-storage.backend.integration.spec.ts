@@ -107,10 +107,12 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
       cacheControl: CacheControl.PrivateWithCache,
     });
     expect(strategy.type).toBe('redirect');
-    if (strategy.type === 'redirect') {
-      expect(strategy.url).toContain('test/presigned.txt');
-      expect(strategy.url).toContain('X-Amz');
+    if (strategy.type !== 'redirect') {
+      return;
     }
+
+    expect(strategy.url).toContain('test/presigned.txt');
+    expect(strategy.url).toContain('X-Amz');
   });
 
   it('deletePrefix sweeps objects across list-pagination and delete-batch boundaries', async () => {
@@ -166,6 +168,7 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
       cacheControl: CacheControl.PrivateWithCache,
     });
     expect(strategy.type).toBe('stream');
+    // eslint-disable-next-line unicorn/prefer-early-return
     if (strategy.type === 'stream') {
       const chunks: Buffer[] = [];
       for await (const chunk of strategy.stream) {

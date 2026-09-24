@@ -1293,7 +1293,7 @@ export class FaceRepairService extends BaseService {
     // `flaggedIds`: a face declined or locked in a PRIOR resolve is already settled and is filtered out of the
     // review UI, so the admin can never re-submit it here — measuring the drain against the raw snapshot would
     // strand a partially-resolved person in the console with a nonzero flagged count that can never clear.
-    const settlesFlaggedSnapshot = [...resolvable].every((assetFaceId) => settledFaceIds.has(assetFaceId));
+    const settlesFlaggedSnapshot = resolvable.isSubsetOf(settledFaceIds);
     if (entireCluster || settlesFlaggedSnapshot) {
       await this.faceRepairScanRepository.removePersonsFromLatestScan([personGroupId]);
     }

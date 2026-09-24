@@ -964,6 +964,7 @@ export class SharedSpaceService extends BaseService {
     });
 
     // Only queue face sync for newly created links (not duplicates)
+    // eslint-disable-next-line unicorn/prefer-early-return
     if (result) {
       const space = await this.sharedSpaceRepository.getById(spaceId);
       if (space?.faceRecognitionEnabled) {
