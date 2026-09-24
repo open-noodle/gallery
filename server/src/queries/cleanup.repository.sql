@@ -314,8 +314,23 @@ select
   count("asset"."id") filter (
     where
       (
-        "asset_job_status"."qualityAnalyzedAt" is not null
-        and "asset_quality"."version" >= $1
+        (
+          "asset_job_status"."qualityAnalyzedAt" is not null
+          and "asset_quality"."version" >= $1
+        )
+        or (
+          "asset"."type" = 'IMAGE'
+          and not exists (
+            select
+              "asset_file"."path"
+            from
+              "asset_file"
+            where
+              "asset_file"."assetId" = "asset"."id"
+              and "asset_file"."type" = 'preview'
+              and "asset_file"."isEdited" = false
+          )
+        )
       )
   ) as "analysed"
 from

@@ -33,6 +33,24 @@ const setup = (db?: Kysely<DB>) => {
   });
   return { ctx, sut: ctx.get(CleanupRepository) };
 };
+/** An image with a preview that the quality job has scored. */
+const analysedImage = async (ctx: ReturnType<typeof setup>['ctx'], sut: CleanupRepository, userId: string) => {
+  const { asset } = await ctx.newAsset({ ownerId: userId });
+  await ctx.newJobStatus({ assetId: asset.id });
+  await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `/preview/${asset.id}.jpg` });
+  await sut.upsertQuality({
+    assetId: asset.id,
+    ownerId: userId,
+    sharpness: 100,
+    brightness: 100,
+    clippedDark: 0,
+    clippedBright: 0,
+    isScreenshot: false,
+    version: 1,
+  });
+  return asset;
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -594,8 +612,47 @@ describe(CleanupRepository.name, () => {
       });
       const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newJobStatus({ assetId: assetB.id });
+      for (const assetId of [assetA.id, assetB.id]) {
+        await ctx.newAssetFile({ assetId, type: AssetFileType.Preview, path: `/preview/${assetId}.jpg` });
+      }
 
       await expect(sut.getAnalysedPercent(user.id, 'all')).resolves.toBe(50);
+    });
+
+    it('rounds down, so it never reads 100 before every asset is analysed', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await analysedImage(ctx, sut, user.id);
+      await analysedImage(ctx, sut, user.id);
+      const { asset: pending } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newJobStatus({ assetId: pending.id });
+      await ctx.newAssetFile({ assetId: pending.id, type: AssetFileType.Preview, path: '/preview/pending.jpg' });
+
+      // 2 of 3 is 66.67%: floored, not rounded up to 67 and not a float.
+      await expect(sut.getAnalysedPercent(user.id, 'image')).resolves.toBe(66);
+    });
+
+    it('counts an image the job skips for having no preview as done, so the figure can reach 100', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await analysedImage(ctx, sut, user.id);
+      // No preview (e.g. a format the thumbnail job cannot read): the quality job returns Skipped.
+      const { asset: noPreview } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newJobStatus({ assetId: noPreview.id });
+
+      await expect(sut.getAnalysedPercent(user.id, 'image')).resolves.toBe(100);
+      await expect(sut.getAnalysedPercent(user.id, 'all')).resolves.toBe(100);
+    });
+
+    it('still waits for a video, which the job analyses without a preview', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await analysedImage(ctx, sut, user.id);
+      const { asset: video } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
+      await ctx.newJobStatus({ assetId: video.id });
+
+      await expect(sut.getAnalysedPercent(user.id, 'all')).resolves.toBe(50);
+      await expect(sut.getAnalysedPercent(user.id, 'image')).resolves.toBe(100);
     });
   });
 
