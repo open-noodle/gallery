@@ -1371,6 +1371,7 @@ export class GlobalSearchManager {
     };
     for (const key of order) {
       const s = this.sections[key];
+      // eslint-disable-next-line unicorn/prefer-continue
       if (s.status === 'ok' && s.items.length > 0) {
         const first = s.items[0] as { id?: string; latitude?: number; longitude?: number };
         if (first.id !== undefined) {
