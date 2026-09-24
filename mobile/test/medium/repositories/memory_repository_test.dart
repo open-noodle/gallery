@@ -18,6 +18,23 @@ void main() {
   });
 
   group('getAll', () {
+    // immich-30831 narrowed this query to onThisDay only, which silently dropped every fork rule
+    // memory from the offline lane. immich-32165 removed the type filter again (mobile now titles
+    // birthdays); this pins that a rule memory stays on the lane if upstream ever narrows it again.
+    test('returns onThisDay and rule memories', () async {
+      final user = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: user.id);
+      final onThisDay = await ctx.newMemory(ownerId: user.id, type: MemoryTypeEnum.onThisDay);
+      final rule = await ctx.newMemory(ownerId: user.id, type: MemoryTypeEnum.rule);
+      for (final memory in [onThisDay, rule]) {
+        await ctx.newMemoryAsset(memoryId: memory.id, assetId: asset.id);
+      }
+
+      final result = await sut.getAll(user.id);
+
+      expect(result.map((m) => m.id), unorderedEquals([onThisDay.id, rule.id]));
+    });
+
     // #24745: memories created via the API have no showAt/hideAt. before the fix
     // the window filter (show_at <= now AND hide_at >= now) drops them because a
     // NULL comparison is never true.
