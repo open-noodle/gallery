@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/providers/infrastructure/tag.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Horizontal strip of currently-selected tag chips (full-path label).
 /// Hidden (zero-size) when no selections. Resolves each selected tag id to
-/// its full-path value via [tagProvider]; if a selected id isn't resolvable
+/// its full-path value via `Store.tags.all()`; if a selected id isn't resolvable
 /// (e.g. offline / not yet loaded), falls back to `filter_sheet_tag_fallback`
 /// so the chip stays visible and removable.
 class SelectedTagsStrip extends ConsumerWidget {
@@ -19,7 +19,7 @@ class SelectedTagsStrip extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final tagsById = {for (final t in ref.watch(tagProvider).valueOrNull ?? const {}) t.id: t.value};
+    final tagsById = {for (final t in ref.watch(Store.tags.all()).valueOrNull ?? const []) t.id: t.value};
 
     return SizedBox(
       height: 48,

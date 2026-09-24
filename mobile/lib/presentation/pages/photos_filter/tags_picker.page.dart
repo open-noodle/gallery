@@ -1,12 +1,12 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_tags_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/tags_picker_list.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/tags_picker_search_header.widget.dart';
-import 'package:immich_mobile/providers/infrastructure/tag.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/tags_picker.provider.dart';
 
 @RoutePage()
@@ -84,7 +84,7 @@ class _TagsPickerPageState extends ConsumerState<TagsPickerPage> {
           child: Center(
             child: TextButton.icon(
               key: const Key('tags-picker-retry'),
-              onPressed: () => ref.invalidate(tagProvider),
+              onPressed: () => ref.invalidate(Store.tags.all()),
               icon: const Icon(Icons.refresh_rounded),
               label: Text(context.t.filter_sheet_load_error_retry),
             ),
