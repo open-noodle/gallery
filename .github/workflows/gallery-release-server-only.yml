@@ -561,6 +561,19 @@ jobs:
               fi
               rm -f "$shipped"
 
+              # A commit only counts as a Gallery change if it carries OUR OWN
+              # PR number (1-4 digits). Two things otherwise slip into this range
+              # and both are noise, not news:
+              #   - rebase-reconciliation fixups pushed directly to the rolling
+              #     branch without a PR (a big rebase cycle produces dozens of
+              #     these, conventionally typed fix(...)/feat(...) same as real
+              #     work, so the feat|fix|perf split below can't tell them apart)
+              #   - upstream commits backported early, which keep Immich's own
+              #     commit message verbatim, PR number and all (5+ digits) -
+              #     these are upstream's work, not the fork's, regardless of
+              #     when they landed relative to base_new/base_old
+              gallery_all=$(echo "$gallery_all" | awk '{ if (match($0, /\(#[0-9]+\)$/)) { n = substr($0, RSTART+2, RLENGTH-3) + 0; if (n < 10000) print } }')
+
               upstream_commits=$(git log --pretty=format:'- %s' "${base_old}..${base_new}" || true)
             else
               # Fallback if upstream ever changes its release-commit convention:
