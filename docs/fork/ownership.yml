@@ -540,6 +540,19 @@ ci_invariants:
       - server/src/services/search.service.ts
     exceptions: []
 
+  # immich-30831 added a first-class MemoryType.Birthday generator. Gallery already ships a
+  # birthday memory (BirthdayMemoryRule), so upstream's createBirthdayMemories is pulled but never
+  # dispatched (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). A rebase that
+  # resolves onMemoriesCreate toward upstream re-enables it with no conflict and no type error.
+  # Adopting upstream's birthday is a deliberate project: delete this invariant in the same change.
+  - id: birthday-memory-generator-not-dispatched
+    title: Upstream's birthday memory generator stays undispatched
+    forbidden_patterns:
+      - 'this.createBirthdayMemories('
+    paths:
+      - server/src/services/memory.service.ts
+    exceptions: []
+
   # immich-31456's mergePeople merges people for every other owner sharing a personGroupId. Gallery
   # adopted cluster groups inert: person_personGroupId_key makes the mapping 1:1 and
   # ClusterGroupController is unmounted, so that arm is unreachable and the fork's own
