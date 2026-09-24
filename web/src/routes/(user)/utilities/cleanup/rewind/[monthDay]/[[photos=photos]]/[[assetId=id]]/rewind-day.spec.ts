@@ -1,0 +1,262 @@
+import { AssetTypeEnum, CleanupQueue, type CleanupAssetDto } from '@immich/sdk';
+import type { BeforeNavigate } from '@sveltejs/kit';
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { Component, ComponentProps } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import RewindDay from './RewindDay.svelte';
+
+const mocks = vi.hoisted(() => ({
+  sdk: {
+    commitCleanup: vi.fn(),
+    restoreAssets: vi.fn(),
+    getCleanupCalendar: vi.fn(),
+    getCleanupRewindAssets: vi.fn(),
+  },
+  goto: vi.fn(),
+  navigate: vi.fn(),
+  beforeNavigate: vi.fn(),
+  toast: { primary: vi.fn(), success: vi.fn(), warning: vi.fn(), danger: vi.fn(), info: vi.fn() },
+  showDialog: vi.fn(),
+}));
+
+vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks.sdk }));
+vi.mock('@immich/ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@immich/ui')>();
+  return {
+    ...original,
+    toastManager: mocks.toast,
+    modalManager: { ...original.modalManager, showDialog: mocks.showDialog },
+  };
+});
+vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
+vi.mock('$app/state', () => ({
+  page: { route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } },
+}));
+vi.mock('$lib/utils/navigation', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  navigate: mocks.navigate,
+}));
+
+const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
+  id,
+  city: 'Lisbon',
+  duration: null,
+  fileSize: 1000,
+  height: 100,
+  width: 100,
+  inAlbum: false,
+  isFavorite: false,
+  kept: false,
+  localDateTime: `2024-09-23T10:00:0${id.length}.000Z`,
+  originalFileName: `${id}.jpg`,
+  thumbhash: null,
+  type: AssetTypeEnum.Image,
+  ...overrides,
+});
+
+type DayProps = ComponentProps<typeof RewindDay>;
+
+const renderDay = (assets = [asset('a'), asset('bb'), asset('ccc')]) => {
+  const componentProps: DayProps = {
+    monthDay: 923,
+    years: [{ year: 2024, count: assets.length }],
+    firstYear: { year: 2024, assets },
+    title: 'cleanup_rewind',
+  };
+  return render(TestWrapper as Component<{ component: typeof RewindDay; componentProps: DayProps }>, {
+    component: RewindDay,
+    componentProps,
+  });
+};
+
+const tile = (id: string) => screen.getByTestId(`cleanup-rewind-tile-${id}`);
+const guard = () => mocks.beforeNavigate.mock.calls.at(-1)![0] as (navigation: BeforeNavigate) => void;
+
+const navigation = (to: { monthDay: string; assetId?: string } | null) => {
+  const cancel = vi.fn();
+  return {
+    cancel,
+    willUnload: false,
+    to: to && {
+      url: new URL(`https://gallery.test/utilities/cleanup/rewind/${to.monthDay}`),
+      route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' },
+      params: to,
+    },
+  } as unknown as BeforeNavigate & { cancel: typeof cancel };
+};
+
+describe('RewindDay', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    mocks.sdk.commitCleanup.mockResolvedValue({ trashed: [], favorited: 0, kept: 0, skipped: [] });
+    mocks.sdk.restoreAssets.mockResolvedValue(undefined);
+    mocks.goto.mockResolvedValue(undefined);
+  });
+
+  it('marks the focused tile from the keyboard and moves on to the next one', async () => {
+    renderDay();
+
+    await fireEvent.keyDown(document, { key: 'Delete' });
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
+    expect(tile('bb')).toHaveAttribute('data-mark', 'keep');
+    expect(tile('ccc')).toHaveAttribute('data-focused', 'true');
+  });
+
+  it('moves the trash marks to the trash, removes the tiles and puts them back on undo', async () => {
+    mocks.sdk.commitCleanup.mockResolvedValue({ trashed: ['a'], favorited: 0, kept: 0, skipped: [] });
+    renderDay();
+    await fireEvent.click(tile('a'));
+    await fireEvent.click(tile('a'));
+    await fireEvent.click(tile('a'));
+    await fireEvent.click(tile('bb'));
+
+    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+
+    await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull());
+    expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
+      cleanupCommitDto: { queue: CleanupQueue.Rewind, trashIds: ['a'], favoriteIds: [], keepIds: [] },
+    });
+    // The keep mark on "bb" stays local until the day is finished.
+    expect(tile('bb')).toHaveAttribute('data-mark', 'keep');
+
+    const [toast, options] = mocks.toast.primary.mock.calls[0];
+    expect(toast.description).toBe('assets_trashed_count');
+    expect(options).toEqual({ timeout: 5000 });
+    await toast.button.onclick();
+
+    expect(mocks.sdk.restoreAssets).toHaveBeenCalledWith({ bulkIdsDto: { ids: ['a'] } });
+    await waitFor(() => expect(tile('a')).toHaveAttribute('data-mark', 'none'));
+    const order = screen.getAllByTestId(/^cleanup-rewind-tile-/).map((el) => el.dataset.assetId);
+    expect(order).toEqual(['a', 'bb', 'ccc']);
+  });
+
+  it('reports skipped photos after a commit', async () => {
+    mocks.sdk.commitCleanup.mockResolvedValue({
+      trashed: [],
+      favorited: 0,
+      kept: 0,
+      skipped: [{ id: 'a', reason: 'already_trashed' }],
+    });
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+
+    await waitFor(() => expect(mocks.toast.warning).toHaveBeenCalledWith('cleanup_skipped_count'));
+    expect(mocks.toast.primary).not.toHaveBeenCalled();
+  });
+
+  it('finishes the day and moves on to the next date that still needs a review', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({
+      days: [
+        { monthDay: 923, assetCount: 3, reviewedAt: null },
+        { monthDay: 924, assetCount: 0, reviewedAt: null },
+        { monthDay: 925, assetCount: 4, reviewedAt: null },
+      ],
+      daysReviewed: 0,
+      streak: 0,
+    });
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup/rewind/925'));
+    expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
+      cleanupCommitDto: {
+        queue: CleanupQueue.Rewind,
+        trashIds: [],
+        favoriteIds: [],
+        keepIds: ['a'],
+        completeMonthDay: 923,
+      },
+    });
+    expect(mocks.toast.success).toHaveBeenCalledWith('cleanup_day_complete');
+  });
+
+  it('falls back to the hub when no other date needs a review', async () => {
+    mocks.sdk.getCleanupCalendar.mockResolvedValue({ days: [], daysReviewed: 0, streak: 0 });
+    renderDay();
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith('/utilities/cleanup'));
+  });
+
+  it('keeps the marks and stays put when finishing fails', async () => {
+    mocks.sdk.commitCleanup.mockRejectedValue(new Error('boom'));
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.sdk.commitCleanup).toHaveBeenCalled());
+    expect(mocks.goto).not.toHaveBeenCalled();
+    expect(tile('a')).toHaveAttribute('data-mark', 'keep');
+  });
+
+  it('asks before leaving the date with unsaved marks, but not when opening the viewer', async () => {
+    mocks.showDialog.mockResolvedValue(true);
+    renderDay();
+
+    const clean = navigation({ monthDay: '924' });
+    guard()(clean);
+    expect(clean.cancel).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    const viewer = navigation({ monthDay: '923', assetId: 'a' });
+    guard()(viewer);
+    expect(viewer.cancel).not.toHaveBeenCalled();
+
+    const leave = navigation({ monthDay: '924' });
+    guard()(leave);
+    expect(leave.cancel).toHaveBeenCalled();
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url));
+    expect(mocks.showDialog).toHaveBeenCalledWith(expect.objectContaining({ title: 'cleanup_unsaved_marks_title' }));
+  });
+
+  it('stays on the date when the user keeps their marks', async () => {
+    mocks.showDialog.mockResolvedValue(false);
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    const leave = navigation({ monthDay: '924' });
+    guard()(leave);
+
+    await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
+    expect(leave.cancel).toHaveBeenCalled();
+    expect(mocks.goto).not.toHaveBeenCalled();
+  });
+
+  it('opens the focused photo in the viewer with Space', async () => {
+    renderDay();
+
+    await fireEvent.keyDown(document, { key: ' ' });
+
+    expect(mocks.navigate).toHaveBeenCalledWith({ targetRoute: 'current', assetId: 'a' });
+  });
+
+  it('hides photos kept on an earlier visit until "Hide reviewed" is turned off', async () => {
+    renderDay([asset('a'), asset('bb', { kept: true })]);
+
+    expect(screen.queryByTestId('cleanup-rewind-tile-bb')).toBeNull();
+    await fireEvent.click(screen.getByTestId('cleanup-hide-reviewed'));
+
+    expect(tile('bb')).toHaveAttribute('data-mark', 'kept');
+  });
+
+  it('remembers the chosen mode', async () => {
+    renderDay();
+
+    await fireEvent.click(screen.getByTestId('cleanup-mode-one'));
+
+    expect(localStorage.getItem('cleanup.rewind.mode')).toBe('one');
+    expect(screen.getByTestId('cleanup-rewind-one')).toBeVisible();
+    expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull();
+  });
+});
