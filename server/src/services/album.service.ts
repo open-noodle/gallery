@@ -338,12 +338,14 @@ export class AlbumService extends BaseService {
         continue;
       }
       const spaceId = spaceByAsset.get(result.id);
-      if (spaceId) {
-        toInsert.push({ albumId, assetId: result.id, spaceId, addedById: auth.user.id });
-        result.success = true;
-        delete result.error;
-        contributedIds.add(result.id);
+      if (!spaceId) {
+        continue;
       }
+
+      toInsert.push({ albumId, assetId: result.id, spaceId, addedById: auth.user.id });
+      result.success = true;
+      delete result.error;
+      contributedIds.add(result.id);
     }
 
     if (toInsert.length > 0) {

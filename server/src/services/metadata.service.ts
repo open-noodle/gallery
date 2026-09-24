@@ -1122,6 +1122,7 @@ export class MetadataService extends BaseService {
       await this.personRepository.updateAll(missingWithFaceAsset);
     }
 
+    // eslint-disable-next-line unicorn/prefer-early-return
     if (facesToAdd.length > 0) {
       for (const face of facesToAdd) {
         const identity = await this.faceIdentityRepository.ensurePersonIdentity(face.personGroupId);

@@ -49,10 +49,12 @@ export class FaceSuggestionService extends BaseService {
     for (const { ownerId, personGroupId } of changeFeaturePhoto) {
       const assetFace = await this.personRepository.getRandomFace(personGroupId);
 
-      if (assetFace) {
-        await this.personRepository.update({ ownerId, personGroupId, faceAssetId: assetFace.id });
-        jobs.push({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
+      if (!assetFace) {
+        continue;
       }
+
+      await this.personRepository.update({ ownerId, personGroupId, faceAssetId: assetFace.id });
+      jobs.push({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
     }
 
     await this.jobRepository.queueAll(jobs);
@@ -285,7 +287,7 @@ export class FaceSuggestionService extends BaseService {
     const targetTokens = new Set([`person:${id}`, ...(person.identityId ? [`identity:${person.identityId}`] : [])]);
     for (const faceId of candidateFaceIds) {
       const negatives = negativeFaceTargets.get(faceId);
-      if (manualLinkedFaceIds.has(faceId) || (negatives && [...negatives].some((token) => targetTokens.has(token)))) {
+      if (manualLinkedFaceIds.has(faceId) || (negatives && !negatives.isDisjointFrom(targetTokens))) {
         bestByFace.delete(faceId);
       }
     }
@@ -305,10 +307,12 @@ export class FaceSuggestionService extends BaseService {
     let jobs: { name: JobName.PersonSuggestionScan; data: { id: string } }[] = [];
     for await (const person of this.personRepository.getScannablePeopleWithUnassignedFaces()) {
       jobs.push({ name: JobName.PersonSuggestionScan, data: { id: person.personGroupId } });
-      if (jobs.length === JOBS_ASSET_PAGINATION_SIZE) {
-        await this.jobRepository.queueAll(jobs);
-        jobs = [];
+      if (jobs.length !== JOBS_ASSET_PAGINATION_SIZE) {
+        continue;
       }
+
+      await this.jobRepository.queueAll(jobs);
+      jobs = [];
     }
     await this.jobRepository.queueAll(jobs);
     return JobStatus.Success;
@@ -383,7 +387,7 @@ export class FaceSuggestionService extends BaseService {
     ]);
     for (const faceId of candidateFaceIds) {
       const negatives = negativeFaceTargets.get(faceId);
-      if (manualLinkedFaceIds.has(faceId) || (negatives && [...negatives].some((token) => targetTokens.has(token)))) {
+      if (manualLinkedFaceIds.has(faceId) || (negatives && !negatives.isDisjointFrom(targetTokens))) {
         bestByFace.delete(faceId);
       }
     }
@@ -409,10 +413,12 @@ export class FaceSuggestionService extends BaseService {
     let jobs: { name: JobName.SpacePersonSuggestionScan; data: { id: string } }[] = [];
     for await (const person of this.sharedSpaceRepository.getScannableSpacePeopleWithUnassignedFaces()) {
       jobs.push({ name: JobName.SpacePersonSuggestionScan, data: { id: person.id } });
-      if (jobs.length === JOBS_ASSET_PAGINATION_SIZE) {
-        await this.jobRepository.queueAll(jobs);
-        jobs = [];
+      if (jobs.length !== JOBS_ASSET_PAGINATION_SIZE) {
+        continue;
       }
+
+      await this.jobRepository.queueAll(jobs);
+      jobs = [];
     }
     await this.jobRepository.queueAll(jobs);
     return JobStatus.Success;
