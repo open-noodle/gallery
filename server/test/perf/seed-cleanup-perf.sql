@@ -26,8 +26,9 @@ INSERT INTO "user" (id, email, name, "isAdmin", "clusterGroupId") VALUES
   ('00000000-0000-4000-8000-000000000002', 'perf2@example.com', 'perf2', false, '00000000-0000-4000-8000-0000000000c2')
 ON CONFLICT DO NOTHING;
 
--- Timestamps are truncated to milliseconds, like every localDateTime the server writes from a JS Date
--- (the Cleanup keyset cursors round-trip through a JS Date).
+-- Timestamps are truncated to milliseconds, like every localDateTime the server writes from a JS Date.
+-- (The Cleanup keyset cursors do not depend on this: they carry the database's own microsecond value
+-- as a `cursorT` string.)
 --
 -- Rows are laid out in blocks of 250. The first 3-8 rows of every block form a burst: IMAGE assets
 -- 300 ms apart (~2.2% of rows). Even blocks share an autoStackId (camera burst); odd blocks have none

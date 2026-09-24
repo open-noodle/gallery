@@ -277,4 +277,24 @@ describe('isCleanupCursorTimestamp', () => {
     expect(isCleanupCursorTimestamp("2024-01-01T00:00:00Z'; drop table asset; --")).toBe(false);
     expect(isCleanupCursorTimestamp('2024-13-45T00:00:00Z')).toBe(false);
   });
+
+  it('rejects impossible calendar dates that a JS Date would roll over', () => {
+    expect(isCleanupCursorTimestamp('2024-02-30T00:00:00Z')).toBe(false);
+    expect(isCleanupCursorTimestamp('2023-02-29T00:00:00Z')).toBe(false);
+    expect(isCleanupCursorTimestamp('2024-04-31T12:00:00.123456Z')).toBe(false);
+    expect(isCleanupCursorTimestamp('2024-01-01T24:00:00Z')).toBe(false);
+  });
+
+  it('accepts a leap day and a microsecond timestamp', () => {
+    expect(isCleanupCursorTimestamp('2024-02-29T00:00:00Z')).toBe(true);
+    expect(isCleanupCursorTimestamp('2024-02-29T23:59:59.999999Z')).toBe(true);
+  });
+
+  it('rejects years outside 0001-9999', () => {
+    expect(isCleanupCursorTimestamp('10000-01-01T00:00:00Z')).toBe(false);
+    expect(isCleanupCursorTimestamp('020240-01-01T00:00:00Z')).toBe(false);
+    // PostgreSQL has no year 0, though a JS Date accepts it.
+    expect(isCleanupCursorTimestamp('0000-01-01T00:00:00Z')).toBe(false);
+    expect(isCleanupCursorTimestamp('0001-01-01T00:00:00Z')).toBe(true);
+  });
 });
