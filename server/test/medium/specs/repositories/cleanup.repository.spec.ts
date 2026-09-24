@@ -236,6 +236,35 @@ describe(CleanupRepository.name, () => {
       const rows = await sut.getRewindAssets(user.id, 923, 2020);
       expect(rows.find((r) => r.id === still.id)!.fileSize).toBe(2000);
     });
+
+    it('carries the Blurry queue reason at the default strictness, for the one-at-a-time hints', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const d = new Date('2020-09-23T09:00:00Z');
+      const scores = {
+        blurry: { sharpness: 10, brightness: 120, clippedDark: 0, clippedBright: 0 },
+        dark: { sharpness: 500, brightness: 10, clippedDark: 0.9, clippedBright: 0 },
+        bright: { sharpness: 500, brightness: 240, clippedDark: 0, clippedBright: 0.9 },
+        // Blurry only under "strict" (110), not the default "balanced" (60).
+        fine: { sharpness: 100, brightness: 120, clippedDark: 0, clippedBright: 0 },
+      };
+      const ids: Record<string, string> = {};
+      for (const [name, score] of Object.entries(scores)) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: d });
+        await sut.upsertQuality({ assetId: asset.id, ownerId: user.id, ...score, isScreenshot: false, version: 1 });
+        ids[name] = asset.id;
+      }
+      const { asset: unscored } = await ctx.newAsset({ ownerId: user.id, localDateTime: d });
+
+      const rows = await sut.getRewindAssets(user.id, 923, 2020);
+      const reasonOf = (id: string) => rows.find((r) => r.id === id)!.reason;
+      expect(reasonOf(ids.blurry)).toBe('blurry');
+      expect(reasonOf(ids.dark)).toBe('dark');
+      expect(reasonOf(ids.bright)).toBe('bright');
+      expect(reasonOf(ids.fine)).toBeUndefined();
+      expect(reasonOf(unscored.id)).toBeUndefined();
+      expect(rows).toHaveLength(5);
+    });
   });
 
   describe('upsertDecisions / deleteDecisions', () => {
