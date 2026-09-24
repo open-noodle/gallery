@@ -344,7 +344,9 @@
   };
 
   const onFinishDay = async () => {
-    if (busy) {
+    // Same guard as the Finish day button: a date with no photos cannot be completed (Shift+Enter
+    // reaches here without the button's `disabled`).
+    if (busy || total === 0) {
       return;
     }
     if (!(await confirmTrash())) {
