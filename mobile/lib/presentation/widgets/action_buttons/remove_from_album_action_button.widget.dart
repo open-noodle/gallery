@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
-import 'package:immich_mobile/domain/models/events.model.dart';
-import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/base_action_button.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
@@ -32,10 +30,6 @@ class RemoveFromAlbumActionButton extends ConsumerWidget {
   Future<void> _onTap(BuildContext context, WidgetRef ref) async {
     if (!context.mounted) {
       return;
-    }
-
-    if (source == ActionSource.viewer) {
-      EventStream.shared.emit(const ViewerReloadAssetEvent());
     }
 
     final result = await ref.read(actionProvider.notifier).removeFromAlbum(source, albumId);
