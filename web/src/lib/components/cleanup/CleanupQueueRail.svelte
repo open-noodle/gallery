@@ -10,14 +10,7 @@
     type CleanupTrashResponseDto,
   } from '@immich/sdk';
   import { Button, Card, Heading, Icon, Text } from '@immich/ui';
-  import {
-    mdiBlur,
-    mdiCellphoneScreenshot,
-    mdiContentDuplicate,
-    mdiDeleteOutline,
-    mdiHarddisk,
-    mdiImageMultipleOutline,
-  } from '@mdi/js';
+  import { mdiBlur, mdiCellphoneScreenshot, mdiContentDuplicate, mdiHarddisk, mdiImageMultipleOutline } from '@mdi/js';
   import { locale, t } from 'svelte-i18n';
 
   type Props = {
@@ -70,6 +63,28 @@
 
   const formatBytes = (bytes: number) => getByteUnitString(bytes, $locale ?? undefined);
   const formatCount = (count: number) => count.toLocaleString($locale ?? undefined);
+  const isAnalysing = (analysedPercent?: number) => analysedPercent !== undefined && analysedPercent < 100;
+
+  // Units follow the mockup: files for space hogs, groups for duplicates, "up to" for bursts (a
+  // series can end up kept whole), and "so far" while quality analysis is still running.
+  const countLabel = (queue: CleanupCountQueue, { count, analysedPercent }: CleanupCountResponseDto) => {
+    switch (queue) {
+      case CleanupCountQueue.SpaceHogs: {
+        return $t('cleanup_queue_count_files', { values: { count } });
+      }
+      case CleanupCountQueue.Bursts: {
+        return $t('cleanup_up_to_count', { values: { count: formatCount(count) } });
+      }
+      case CleanupCountQueue.Duplicates: {
+        return $t('cleanup_queue_count_groups', { values: { count } });
+      }
+      default: {
+        return isAnalysing(analysedPercent)
+          ? $t('cleanup_queue_count_so_far', { values: { count: formatCount(count) } })
+          : formatCount(count);
+      }
+    }
+  };
 </script>
 
 <Card class="overflow-hidden" data-testid="cleanup-rail">
@@ -81,7 +96,7 @@
     {#each rows as row (row.queue)}
       {@const count = counts[row.queue]}
       {@const cover = covers[row.queue]}
-      {@const analysing = count?.analysedPercent !== undefined && count.analysedPercent < 100}
+      {@const analysing = isAnalysing(count?.analysedPercent)}
       <a
         href={hrefFor(row.queue)}
         data-testid="cleanup-queue-{row.queue}"
@@ -108,13 +123,7 @@
 
         {#if count}
           <span class="text-end text-xs">
-            <span class="block text-sm font-semibold tabular-nums">
-              {#if row.queue === CleanupCountQueue.Bursts}
-                {$t('cleanup_up_to_count', { values: { count: formatCount(count.count) } })}
-              {:else}
-                {formatCount(count.count)}
-              {/if}
-            </span>
+            <span class="block text-sm font-semibold tabular-nums">{countLabel(row.queue, count)}</span>
             {#if count.bytes > 0}
               <span class="font-semibold text-success tabular-nums">−{formatBytes(count.bytes)}</span>
             {/if}
@@ -129,25 +138,16 @@
     {/each}
   </div>
 
-  <div class="flex items-center gap-3 border-t bg-subtle px-4 py-3" data-testid="cleanup-trash-footer">
-    <span class="flex size-8 items-center justify-center rounded-lg bg-danger/10 text-danger">
-      <Icon icon={mdiDeleteOutline} size="18" />
-    </span>
-    <Text size="small" class="min-w-0 flex-1 truncate tabular-nums">
+  <div class="flex items-center justify-between gap-3 border-t px-4 py-3" data-testid="cleanup-trash-footer">
+    <Text size="tiny" color="muted" class="min-w-0 truncate tabular-nums">
       {#if trash}
         {$t('cleanup_trash_holds', { values: { size: formatBytes(trash.bytes) } })}
       {:else}
-        <span class="inline-block h-3.5 w-24 animate-pulse rounded-sm bg-gray-200 align-middle dark:bg-gray-700"></span>
+        <span class="inline-block h-3 w-24 animate-pulse rounded-sm bg-gray-200 align-middle dark:bg-gray-700"></span>
       {/if}
     </Text>
-    <Button
-      size="small"
-      variant="ghost"
-      color="danger"
-      disabled={!trash || trash.count === 0}
-      onclick={() => onEmptyTrash()}
-    >
-      {$t('empty_trash')}
+    <Button size="small" color="danger" disabled={!trash || trash.count === 0} onclick={() => onEmptyTrash()}>
+      {$t('cleanup_trash_empty')}
     </Button>
   </div>
 </Card>
