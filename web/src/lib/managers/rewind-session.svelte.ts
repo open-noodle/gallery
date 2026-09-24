@@ -106,7 +106,18 @@ export class RewindSession {
         trashed.push(...response.trashed);
         skipped += response.skipped.length;
         this.progress = { done: i + 1, total: calls };
+        // This chunk is on the server now; a retry after a later failure must not send it again.
+        for (const id of [...(trash[i] ?? []), ...(fav[i] ?? []), ...(keep[i] ?? [])]) {
+          this.marks.delete(id);
+        }
       }
+    } catch (error) {
+      // Undo steps may point at marks that are already committed, so they only survive a failure
+      // that committed nothing.
+      if (this.progress && this.progress.done > 0) {
+        this.#history = [];
+      }
+      throw error;
     } finally {
       this.progress = null;
     }

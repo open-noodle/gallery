@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   beforeNavigate: vi.fn(),
   toast: { primary: vi.fn(), success: vi.fn(), warning: vi.fn(), danger: vi.fn(), info: vi.fn() },
   showDialog: vi.fn(),
+  isModalOpen: vi.fn(),
 }));
 
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks.sdk }));
@@ -27,6 +28,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
     ...original,
     toastManager: mocks.toast,
     modalManager: { ...original.modalManager, showDialog: mocks.showDialog },
+    isModalOpen: mocks.isModalOpen,
   };
 });
 vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
@@ -73,11 +75,16 @@ const renderDay = (assets = [asset('a'), asset('bb'), asset('ccc')]) => {
 const tile = (id: string) => screen.getByTestId(`cleanup-rewind-tile-${id}`);
 const guard = () => mocks.beforeNavigate.mock.calls.at(-1)![0] as (navigation: BeforeNavigate) => void;
 
-const navigation = (to: { monthDay: string; assetId?: string } | null) => {
+const navigation = (
+  to: { monthDay: string; assetId?: string } | null,
+  extra: { type?: string; delta?: number } = {},
+) => {
   const cancel = vi.fn();
   return {
     cancel,
     willUnload: false,
+    type: 'link',
+    ...extra,
     to: to && {
       url: new URL(`https://gallery.test/utilities/cleanup/rewind/${to.monthDay}`),
       route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' },
@@ -216,7 +223,7 @@ describe('RewindDay', () => {
     const leave = navigation({ monthDay: '924' });
     guard()(leave);
     expect(leave.cancel).toHaveBeenCalled();
-    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url));
+    await waitFor(() => expect(mocks.goto).toHaveBeenCalledWith(leave.to!.url, { replaceState: false }));
     expect(mocks.showDialog).toHaveBeenCalledWith(expect.objectContaining({ title: 'cleanup_unsaved_marks_title' }));
   });
 
@@ -231,6 +238,48 @@ describe('RewindDay', () => {
     await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
     expect(leave.cancel).toHaveBeenCalled();
     expect(mocks.goto).not.toHaveBeenCalled();
+  });
+
+  it('ignores the shortcuts while a modal is open', async () => {
+    mocks.isModalOpen.mockReturnValue(true);
+    renderDay();
+
+    await fireEvent.keyDown(document, { key: 'k' });
+    await fireEvent.keyDown(document, { key: 'Enter', shiftKey: true });
+
+    expect(tile('a')).toHaveAttribute('data-mark', 'none');
+    expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+  });
+
+  it('replays a confirmed back-button navigation through history instead of pushing a new entry', async () => {
+    mocks.showDialog.mockResolvedValue(true);
+    const go = vi.spyOn(history, 'go').mockImplementation(() => {});
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    const back = navigation({ monthDay: '922' }, { type: 'popstate', delta: -1 });
+    guard()(back);
+
+    await waitFor(() => expect(go).toHaveBeenCalledWith(-1));
+    expect(back.cancel).toHaveBeenCalled();
+    expect(mocks.goto).not.toHaveBeenCalled();
+    go.mockRestore();
+  });
+
+  it('asks the browser to confirm unloading only while marks are unsaved', async () => {
+    renderDay();
+    const unload = () => {
+      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      dispatchEvent(event);
+      return event;
+    };
+
+    expect(unload().defaultPrevented).toBe(false);
+    await fireEvent.keyDown(document, { key: 'k' });
+    const event = unload();
+    expect(event.defaultPrevented).toBe(true);
+    // eslint-disable-next-line tscompat/tscompat
+    expect(event.returnValue).toBe('');
   });
 
   it('opens the focused photo in the viewer with Space', async () => {
