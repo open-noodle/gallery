@@ -621,6 +621,17 @@ describe(CleanupService.name, () => {
           BadRequestException,
         );
       });
+
+      it('rejects a cursor with an impossible date instead of passing it to SQL', async () => {
+        for (const queue of ['bursts', 'screenshots', 'blurry'] as const) {
+          await expect(
+            sut.getQueue(authStub.user1, queue, { cursor: cursor(['2024-02-30T00:00:00Z', 'id-1']) }),
+          ).rejects.toThrow(BadRequestException);
+        }
+        expect(mocks.cleanup.getBurstWindow).not.toHaveBeenCalled();
+        expect(mocks.cleanup.getScreenshots).not.toHaveBeenCalled();
+        expect(mocks.cleanup.getBlurry).not.toHaveBeenCalled();
+      });
     });
   });
 });

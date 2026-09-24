@@ -187,9 +187,18 @@ export type CleanupCursor = { v: Array<string | number> };
 /**
  * A `(localDateTime, id)` keyset cursor's timestamp: an ISO-8601 UTC string with up to microsecond
  * precision, as produced by `CLEANUP_CURSOR_T_SQL`. Anything else is rejected before it reaches SQL.
+ *
+ * A JS Date rolls impossible dates over (`2024-02-30` becomes 1 March), which PostgreSQL's
+ * `::timestamptz` cast would then reject with a 500, so the parsed value must round-trip to the same
+ * seconds. Cursors outside the years 0001-9999 are unsupported; EXIF cannot produce them in practice.
  */
-export const isCleanupCursorTimestamp = (value: string) =>
-  /^\d{4,6}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(value) && !Number.isNaN(new Date(value).getTime());
+export const isCleanupCursorTimestamp = (value: string) => {
+  if (!/^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
+};
 export const encodeCursor = (value: CleanupCursor) => Buffer.from(JSON.stringify(value)).toString('base64url');
 export const decodeCursor = (value: string): CleanupCursor => {
   try {
