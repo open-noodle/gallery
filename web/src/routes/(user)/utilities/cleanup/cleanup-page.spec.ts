@@ -14,7 +14,9 @@ const sdk = vi.hoisted(() => ({
   getCleanupRewindYears: vi.fn(),
   getCleanupRewindAssets: vi.fn(),
 }));
+const flags = vi.hoisted(() => ({ value: { trash: true } }));
 
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: flags }));
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...sdk }));
 
 vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
@@ -58,6 +60,7 @@ describe('Cleanup hub page', () => {
       daysReviewed: 1,
       streak: 1,
     });
+    flags.value.trash = true;
     sdk.getCleanupTrash.mockResolvedValue({ count: 2, bytes: 100 });
     sdk.getCleanupQueueCount.mockImplementation(({ queue }: { queue: CleanupCountQueue }) =>
       Promise.resolve(COUNTS[queue]),
@@ -82,6 +85,15 @@ describe('Cleanup hub page', () => {
     expect(screen.getByTestId('cleanup-could-still-free')).toHaveTextContent('cleanup_could_still_free');
     expect(screen.getAllByTestId(/^cleanup-queue-(?!skeleton)/)).toHaveLength(5);
     expect(screen.getByText('cleanup_trash_holds')).toBeInTheDocument();
+  });
+
+  it('leaves out the trash footer and its request when the trash is turned off', async () => {
+    flags.value.trash = false;
+    renderPage();
+
+    await waitFor(() => expect(sdk.getCleanupQueueCount).toHaveBeenCalledTimes(5));
+    expect(sdk.getCleanupTrash).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('cleanup-trash-footer')).toBeNull();
   });
 
   it('links "Rewind today" to today\'s rewind', () => {

@@ -98,6 +98,36 @@ describe(CleanupService.name, () => {
       );
     });
 
+    it('soft-deletes into the trash when the trash is enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ trash: { enabled: true, days: 30 } });
+      mocks.cleanup.getCommitCandidates.mockResolvedValue([row('a')]);
+      await sut.commit(authStub.user1, { queue: CleanupQueue.Blurry, trashIds: ['a'], favoriteIds: [], keepIds: [] });
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['a'], {
+        deletedAt: expect.any(Date),
+        status: AssetStatus.Trashed,
+      });
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetTrashAll', { assetIds: ['a'], userId });
+      expect(mocks.event.emit).not.toHaveBeenCalledWith('AssetDeleteAll', expect.anything());
+    });
+
+    it('deletes permanently, like the duplicates utility, when the trash is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ trash: { enabled: false } });
+      mocks.cleanup.getCommitCandidates.mockResolvedValue([row('a'), row('b')]);
+      const res = await sut.commit(authStub.user1, {
+        queue: CleanupQueue.Rewind,
+        trashIds: ['a', 'b'],
+        favoriteIds: [],
+        keepIds: [],
+      });
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['a', 'b'], {
+        deletedAt: expect.any(Date),
+        status: AssetStatus.Deleted,
+      });
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetDeleteAll', { assetIds: ['a', 'b'], userId });
+      expect(mocks.event.emit).not.toHaveBeenCalledWith('AssetTrashAll', expect.anything());
+      expect(res.trashed).toEqual(['a', 'b']);
+    });
+
     it('does not emit, update, or write decisions when nothing is eligible', async () => {
       mocks.cleanup.getCommitCandidates.mockResolvedValue([]);
       await sut.commit(authStub.user1, { queue: CleanupQueue.Blurry, trashIds: ['x'], favoriteIds: [], keepIds: [] });

@@ -5,7 +5,7 @@ Library Cleanup helps you work through a large library in short sessions. It doe
 - **Rewind** shows you every photo taken on one calendar date, across all past years, so you can look back at them and decide what to keep.
 - **Queues** collect photos that are likely candidates for removal: very large files, bursts, screenshots, and blurry or badly exposed shots. Each queue can be worked down to zero.
 
-Nothing in Cleanup deletes a photo permanently. Photos you remove go to the trash, where you can restore them until the trash is emptied.
+Nothing in Cleanup deletes a photo permanently. Photos you remove go to the trash, where you can restore them until the trash is emptied. The one exception is a server where the administrator has turned the trash off: there, Cleanup deletes photos permanently, and asks you to confirm a permanent delete every time.
 
 ## Where to find it
 
@@ -70,6 +70,8 @@ Every photo removed through Cleanup goes to the regular trash. You can restore i
 Storage is only freed when the trash is emptied, either with the **Empty** button on the Cleanup page, from the Trash page, or when items are removed automatically after the trash retention period.
 
 If a photo you are about to trash is also in a [Shared Space](./shared-spaces.md), Gallery warns you first: trashing it removes it for the other members of that space as well.
+
+If the trash is turned off on your server, there is no trash to restore from. Every Cleanup action that would move photos to the trash asks you to confirm a **permanent delete** instead, no **Undo** is offered afterwards, and the Cleanup page does not show a trash size or **Empty** button.
 
 ## Which photos are included
 
