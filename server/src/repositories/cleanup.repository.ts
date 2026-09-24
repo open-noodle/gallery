@@ -588,9 +588,18 @@ export class CleanupRepository {
         eb.fn
           .count<number>('asset.id')
           .filterWhere((eb) =>
-            eb.and([
-              eb('asset_job_status.qualityAnalyzedAt', 'is not', null),
-              eb('asset_quality.version', '>=', CLEANUP_QUALITY_VERSION),
+            eb.or([
+              eb.and([
+                eb('asset_job_status.qualityAnalyzedAt', 'is not', null),
+                eb('asset_quality.version', '>=', CLEANUP_QUALITY_VERSION),
+              ]),
+              // The quality job skips an image without a preview (nothing to score until the
+              // thumbnail job makes one), so it counts as done here; otherwise one image the
+              // thumbnailer cannot read would hold the figure below 100 for good.
+              eb.and([
+                eb('asset.type', '=', sql.lit(AssetType.Image)),
+                eb.not(eb.exists(withFilePath(eb, AssetFileType.Preview))),
+              ]),
             ]),
           )
           .as('analysed'),
@@ -607,7 +616,8 @@ export class CleanupRepository {
       return 100;
     }
 
-    return (Number(row.analysed) / total) * 100;
+    // Floored so the figure only reads 100 once every asset is done, and is a whole number for the UI.
+    return Math.floor((Number(row.analysed) / total) * 100);
   }
 
   @GenerateSql({
