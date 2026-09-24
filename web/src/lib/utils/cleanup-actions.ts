@@ -9,6 +9,7 @@ import {
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { chunk } from '$lib/utils/cleanup';
 import { handleError } from '$lib/utils/handle-error';
 
@@ -26,12 +27,24 @@ export type CleanupCommitResult = {
 type OnIds = (ids: string[]) => void;
 
 /**
- * Trashing an owned photo that is also in a shared space removes it for the space's members too.
- * Asks the server which of `ids` are in a space and, if any are, asks the user to confirm.
+ * Whether Cleanup's "trash" is the recoverable trash. With the server's trash turned off, the
+ * commit endpoint deletes permanently instead (the duplicates utility does the same), so every
+ * trash action asks for a "permanently delete" confirmation and never offers Undo.
+ */
+export const isTrashEnabled = () => featureFlagsManager.value.trash;
+
+/**
+ * Confirms a Cleanup trash before anything is committed.
+ *
+ * - Trashing an owned photo that is also in a shared space removes it for the space's members too,
+ *   so the server is asked which of `ids` are in a space; if any are, the user confirms.
+ * - With the trash turned off the delete is permanent, so the user always confirms, with the Space
+ *   sentence added when it applies.
+ *
  * Resolves to true when the trash may go ahead. Throws when the lookup fails, so callers never
  * trash without having checked.
  */
-export const confirmTrashInSpaces = async (ids: string[]): Promise<boolean> => {
+export const confirmCleanupTrash = async (ids: string[]): Promise<boolean> => {
   if (ids.length === 0) {
     return true;
   }
@@ -41,11 +54,25 @@ export const confirmTrashInSpaces = async (ids: string[]): Promise<boolean> => {
     const response = await getCleanupAssetsInSpaces({ cleanupInSpacesDto: { assetIds } });
     count += response.assetIds.length;
   }
+
+  const $t = get(t);
+  if (!isTrashEnabled()) {
+    const sentences = [$t('cleanup_permanent_delete_prompt', { values: { count: ids.length } })];
+    if (count > 0) {
+      sentences.push($t('cleanup_permanent_delete_space_warning', { values: { count } }));
+    }
+    return modalManager.showDialog({
+      title: $t('permanently_delete'),
+      prompt: sentences.join(' '),
+      confirmText: $t('permanently_delete'),
+      confirmColor: 'danger',
+    });
+  }
+
   if (count === 0) {
     return true;
   }
 
-  const $t = get(t);
   return modalManager.showDialog({
     prompt: $t('cleanup_space_warning', { values: { count } }),
     confirmText: $t('trash'),
@@ -53,18 +80,30 @@ export const confirmTrashInSpaces = async (ids: string[]): Promise<boolean> => {
   });
 };
 
-const showTrashedToast = (trashed: string[], onRestored: OnIds) => {
+/**
+ * Reports what a Cleanup commit removed. A trash gets a 5-second Undo that restores exactly the
+ * ids the server trashed; a permanent delete (trash turned off) has nothing to restore, so it gets
+ * a plain notice and no Undo.
+ */
+export const showRemovedToast = (removed: string[], onRestored?: OnIds) => {
+  if (removed.length === 0) {
+    return;
+  }
   const $t = get(t);
+  if (!isTrashEnabled()) {
+    toastManager.primary($t('permanently_deleted_assets_count', { values: { count: removed.length } }));
+    return;
+  }
   toastManager.primary(
     {
-      description: $t('assets_trashed_count', { values: { count: trashed.length } }),
+      description: $t('assets_trashed_count', { values: { count: removed.length } }),
       button: {
         label: $t('undo'),
         color: 'secondary',
         onclick: async () => {
           try {
-            await restoreAssets({ bulkIdsDto: { ids: trashed } });
-            onRestored(trashed);
+            await restoreAssets({ bulkIdsDto: { ids: removed } });
+            onRestored?.(removed);
           } catch (error) {
             handleError(error, $t('errors.unable_to_restore_assets'));
           }
@@ -78,9 +117,9 @@ const showTrashedToast = (trashed: string[], onRestored: OnIds) => {
 /**
  * Sends one queue decision — photos to trash and photos to keep — through `POST /cleanup/commit`,
  * split into requests of at most 1,000 ids per list. Anything trashed is reported through
- * `onRemoved` with a 5-second Undo toast that restores exactly the ids the server trashed.
+ * `onRemoved` and `showRemovedToast`: an Undo toast, or a permanent-delete notice with the trash off.
  *
- * Resolves to undefined when the user cancels the Space warning or the check itself fails; in both
+ * Resolves to undefined when the user cancels the confirmation or the check itself fails; in both
  * cases nothing has been committed.
  */
 export const commitWithUndo = async (
@@ -92,7 +131,7 @@ export const commitWithUndo = async (
   const $t = get(t);
 
   try {
-    if (!(await confirmTrashInSpaces(trashIds))) {
+    if (!(await confirmCleanupTrash(trashIds))) {
       return;
     }
   } catch (error) {
@@ -127,7 +166,7 @@ export const commitWithUndo = async (
 
   if (result.trashed.length > 0) {
     onRemoved(result.trashed);
-    showTrashedToast(result.trashed, onRestored);
+    showRemovedToast(result.trashed, onRestored);
   }
   if (result.skipped.length > 0) {
     toastManager.warning($t('cleanup_skipped_count', { values: { count: result.skipped.length } }));
@@ -136,7 +175,7 @@ export const commitWithUndo = async (
   return result;
 };
 
-/** Trashes `ids` from a queue page, after the Space warning, with an Undo toast. */
+/** Trashes `ids` from a queue page after the confirmation; see `showRemovedToast` for the Undo. */
 export const trashWithUndo = (queue: CleanupQueue, ids: string[], onRemoved: OnIds, onRestored: OnIds) =>
   commitWithUndo(queue, { trashIds: ids }, onRemoved, onRestored);
 

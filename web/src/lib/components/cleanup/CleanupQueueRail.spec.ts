@@ -82,4 +82,16 @@ describe('CleanupQueueRail', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'cleanup_trash_empty' }));
     expect(onEmptyTrash).toHaveBeenCalledOnce();
   });
+
+  it('hides the trash footer when the trash is turned off', () => {
+    render(CleanupQueueRail, {
+      counts: loaded,
+      trash: { count: 0, bytes: 0 },
+      showTrash: false,
+      onEmptyTrash: vi.fn(),
+    });
+
+    expect(screen.queryByTestId('cleanup-trash-footer')).toBeNull();
+    expect(screen.getByTestId('cleanup-queue-space_hogs')).toBeVisible();
+  });
 });

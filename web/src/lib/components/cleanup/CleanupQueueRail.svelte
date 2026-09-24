@@ -18,10 +18,12 @@
     trash?: CleanupTrashResponseDto;
     /** Optional cover asset per queue; rows without one show the queue icon. */
     covers?: Partial<Record<CleanupCountQueue, CleanupAssetDto | undefined>>;
+    /** False when the server's trash is turned off: Cleanup then deletes permanently and there is no trash. */
+    showTrash?: boolean;
     onEmptyTrash: () => void;
   };
 
-  let { counts, trash, covers = {}, onEmptyTrash }: Props = $props();
+  let { counts, trash, covers = {}, showTrash = true, onEmptyTrash }: Props = $props();
 
   const rows = [
     {
@@ -138,16 +140,18 @@
     {/each}
   </div>
 
-  <div class="flex items-center justify-between gap-3 border-t px-4 py-3" data-testid="cleanup-trash-footer">
-    <Text size="tiny" color="muted" class="min-w-0 truncate tabular-nums">
-      {#if trash}
-        {$t('cleanup_trash_holds', { values: { size: formatBytes(trash.bytes) } })}
-      {:else}
-        <span class="inline-block h-3 w-24 animate-pulse rounded-sm bg-gray-200 align-middle dark:bg-gray-700"></span>
-      {/if}
-    </Text>
-    <Button size="small" color="danger" disabled={!trash || trash.count === 0} onclick={() => onEmptyTrash()}>
-      {$t('cleanup_trash_empty')}
-    </Button>
-  </div>
+  {#if showTrash}
+    <div class="flex items-center justify-between gap-3 border-t px-4 py-3" data-testid="cleanup-trash-footer">
+      <Text size="tiny" color="muted" class="min-w-0 truncate tabular-nums">
+        {#if trash}
+          {$t('cleanup_trash_holds', { values: { size: formatBytes(trash.bytes) } })}
+        {:else}
+          <span class="inline-block h-3 w-24 animate-pulse rounded-sm bg-gray-200 align-middle dark:bg-gray-700"></span>
+        {/if}
+      </Text>
+      <Button size="small" color="danger" disabled={!trash || trash.count === 0} onclick={() => onEmptyTrash()}>
+        {$t('cleanup_trash_empty')}
+      </Button>
+    </div>
+  {/if}
 </Card>

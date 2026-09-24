@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   showDialog: vi.fn(),
   isModalOpen: vi.fn(),
   auth: { authenticated: false, user: { quotaUsageInBytes: 0 } },
+  flags: { value: { trash: true } },
 }));
 
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks.sdk }));
@@ -45,6 +46,7 @@ vi.mock('$lib/utils/navigation', async (importOriginal) => ({
   navigate: mocks.navigate,
 }));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mocks.auth }));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
 
 const asset = (id: string, overrides: Partial<CleanupAssetDto> = {}): CleanupAssetDto => ({
   id,
@@ -84,6 +86,7 @@ beforeEach(() => {
   );
   mocks.sdk.restoreAssets.mockResolvedValue(undefined);
   mocks.showDialog.mockResolvedValue(true);
+  mocks.flags.value.trash = true;
 });
 
 describe('blurry queue', () => {
@@ -294,6 +297,21 @@ describe('space hogs queue', () => {
     expect(mocks.sdk.commitCleanup).toHaveBeenCalledWith({
       cleanupCommitDto: { queue: CleanupQueue.SpaceHogs, keepIds: ['b'] },
     });
+  });
+
+  it('asks for a permanent delete, and offers no Undo, when the trash is turned off', async () => {
+    mocks.flags.value.trash = false;
+    mocks.sdk.getCleanupQueue.mockResolvedValue(page(hogs));
+    renderWrapped(SpaceHogsQueue, { title: 'cleanup_queue_space_hogs' });
+    await waitFor(() => expect(screen.getByTestId('cleanup-hog-row-a')).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByTestId('cleanup-hog-trash-a'));
+
+    await waitFor(() => expect(screen.queryByTestId('cleanup-hog-row-a')).toBeNull());
+    expect(mocks.showDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'cleanup_permanent_delete_prompt', confirmText: 'permanently_delete' }),
+    );
+    expect(mocks.toast.primary).toHaveBeenCalledExactlyOnceWith('permanently_deleted_assets_count');
   });
 
   it('reloads from the first page when the type or minimum size changes', async () => {

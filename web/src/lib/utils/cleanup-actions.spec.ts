@@ -1,5 +1,5 @@
 import { CleanupQueue, CleanupSkipReason } from '@immich/sdk';
-import { commitWithUndo, confirmTrashInSpaces, keep, stackGroup, trashWithUndo } from '$lib/utils/cleanup-actions';
+import { commitWithUndo, confirmCleanupTrash, keep, stackGroup, trashWithUndo } from '$lib/utils/cleanup-actions';
 
 const mocks = vi.hoisted(() => ({
   sdk: {
@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   toast: { primary: vi.fn(), warning: vi.fn(), success: vi.fn(), danger: vi.fn(), info: vi.fn() },
   showDialog: vi.fn(),
   handleError: vi.fn(),
+  flags: { value: { trash: true } },
 }));
 
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks.sdk }));
@@ -19,6 +20,7 @@ vi.mock('@immich/ui', () => ({
   modalManager: { showDialog: mocks.showDialog },
 }));
 vi.mock('$lib/utils/handle-error', () => ({ handleError: mocks.handleError }));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
 
 const ids = (count: number, prefix = 'id') => Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
 
@@ -31,6 +33,7 @@ describe('cleanup actions', () => {
     );
     mocks.sdk.restoreAssets.mockResolvedValue(undefined);
     mocks.showDialog.mockResolvedValue(true);
+    mocks.flags.value.trash = true;
   });
 
   describe('trashWithUndo', () => {
@@ -159,16 +162,69 @@ describe('cleanup actions', () => {
     });
   });
 
-  describe('confirmTrashInSpaces', () => {
+  describe('confirmCleanupTrash', () => {
     it('checks at most 1,000 ids per request', async () => {
-      await confirmTrashInSpaces(ids(1200));
+      await confirmCleanupTrash(ids(1200));
 
       expect(mocks.sdk.getCleanupAssetsInSpaces).toHaveBeenCalledTimes(2);
     });
 
     it('proceeds without a request when there is nothing to trash', async () => {
-      await expect(confirmTrashInSpaces([])).resolves.toBe(true);
+      await expect(confirmCleanupTrash([])).resolves.toBe(true);
       expect(mocks.sdk.getCleanupAssetsInSpaces).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('with the trash turned off', () => {
+    beforeEach(() => {
+      mocks.flags.value.trash = false;
+    });
+
+    it('always asks for a permanent delete, even when nothing is in a Space', async () => {
+      mocks.showDialog.mockResolvedValue(false);
+
+      const result = await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
+
+      expect(mocks.showDialog).toHaveBeenCalledWith({
+        title: 'permanently_delete',
+        prompt: 'cleanup_permanent_delete_prompt',
+        confirmText: 'permanently_delete',
+        confirmColor: 'danger',
+      });
+      expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+      expect(result).toBeUndefined();
+    });
+
+    it('adds the Space sentence to the one permanent-delete confirmation', async () => {
+      mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: ['b'] });
+
+      await trashWithUndo(CleanupQueue.Blurry, ['a', 'b'], vi.fn(), vi.fn());
+
+      expect(mocks.showDialog).toHaveBeenCalledTimes(1);
+      expect(mocks.showDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: 'cleanup_permanent_delete_prompt cleanup_permanent_delete_space_warning',
+          confirmText: 'permanently_delete',
+        }),
+      );
+    });
+
+    it('reports a permanent delete without an Undo button once confirmed', async () => {
+      const onRemoved = vi.fn();
+
+      await trashWithUndo(CleanupQueue.SpaceHogs, ['a'], onRemoved, vi.fn());
+
+      expect(mocks.sdk.commitCleanup).toHaveBeenCalledTimes(1);
+      expect(onRemoved).toHaveBeenCalledWith(['a']);
+      expect(mocks.toast.primary).toHaveBeenCalledExactlyOnceWith('permanently_deleted_assets_count');
+      expect(mocks.sdk.restoreAssets).not.toHaveBeenCalled();
+    });
+
+    it('asks nothing when a decision only keeps photos', async () => {
+      await commitWithUndo(CleanupQueue.Bursts, { keepIds: ['a'] }, vi.fn(), vi.fn());
+
+      expect(mocks.showDialog).not.toHaveBeenCalled();
+      expect(mocks.toast.primary).not.toHaveBeenCalled();
     });
   });
 

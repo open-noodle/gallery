@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   toast: { primary: vi.fn(), success: vi.fn(), warning: vi.fn(), danger: vi.fn(), info: vi.fn() },
   showDialog: vi.fn(),
   isModalOpen: vi.fn(),
+  flags: { value: { trash: true } },
 }));
 
 vi.mock('@immich/sdk', async (importOriginal) => ({ ...(await importOriginal<object>()), ...mocks.sdk }));
@@ -33,6 +34,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
   };
 });
 vi.mock('$app/navigation', () => ({ goto: mocks.goto, beforeNavigate: mocks.beforeNavigate }));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: mocks.flags }));
 vi.mock('$app/state', () => ({
   page: { route: { id: '/(user)/utilities/cleanup/rewind/[monthDay]/[[photos=photos]]/[[assetId=id]]' } },
 }));
@@ -102,6 +104,7 @@ describe('RewindDay', () => {
     mocks.sdk.restoreAssets.mockResolvedValue(undefined);
     mocks.goto.mockResolvedValue(undefined);
     mocks.sdk.getCleanupAssetsInSpaces.mockResolvedValue({ assetIds: [] });
+    mocks.flags.value.trash = true;
   });
 
   it('marks the focused tile from the keyboard and moves on to the next one', async () => {
@@ -141,6 +144,41 @@ describe('RewindDay', () => {
     await waitFor(() => expect(tile('a')).toHaveAttribute('data-mark', 'none'));
     const order = screen.getAllByTestId(/^cleanup-rewind-tile-/).map((el) => el.dataset.assetId);
     expect(order).toEqual(['a', 'bb', 'ccc']);
+  });
+
+  it('asks for a permanent delete, with no Undo, when the trash is turned off', async () => {
+    mocks.flags.value.trash = false;
+    mocks.showDialog.mockResolvedValue(true);
+    mocks.sdk.commitCleanup.mockResolvedValue({ trashed: ['a'], favorited: 0, kept: 0, skipped: [] });
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-move-to-trash'));
+
+    await waitFor(() => expect(screen.queryByTestId('cleanup-rewind-tile-a')).toBeNull());
+    expect(mocks.showDialog).toHaveBeenCalledWith({
+      title: 'permanently_delete',
+      prompt: 'cleanup_permanent_delete_prompt',
+      confirmText: 'permanently_delete',
+      confirmColor: 'danger',
+    });
+    expect(mocks.toast.primary).toHaveBeenCalledWith('permanently_deleted_assets_count');
+    expect(mocks.toast.primary).not.toHaveBeenCalledWith(expect.objectContaining({ button: expect.anything() }));
+  });
+
+  it('commits nothing when the permanent delete is cancelled', async () => {
+    mocks.flags.value.trash = false;
+    mocks.showDialog.mockResolvedValue(false);
+    renderDay();
+    await fireEvent.keyDown(document, { key: 'Delete' });
+    await fireEvent.keyDown(document, { key: 'k' });
+
+    await fireEvent.click(screen.getByTestId('cleanup-finish-day'));
+
+    await waitFor(() => expect(mocks.showDialog).toHaveBeenCalled());
+    expect(mocks.sdk.commitCleanup).not.toHaveBeenCalled();
+    expect(mocks.goto).not.toHaveBeenCalled();
+    expect(tile('a')).toHaveAttribute('data-mark', 'trash');
   });
 
   it('reports skipped photos after a commit', async () => {
