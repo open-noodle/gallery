@@ -31,6 +31,7 @@ import 'package:immich_mobile/utils/space_link_album_candidates.dart';
 /// Empty state shown when no candidates are available.
 @RoutePage()
 class SpaceLinkAlbumPage extends HookConsumerWidget {
+  // ignore: unused-code
   final String spaceId;
   final List<String> linkedAlbumIds;
 

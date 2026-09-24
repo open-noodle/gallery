@@ -36,6 +36,7 @@ class TimelineOverviewRepresentativeCacheNotifier extends Notifier<Map<String, T
     return const {};
   }
 
+  // ignore: unused-code
   BaseAsset? assetFor(String key) => state[key]?.asset;
 
   /// Resolve and cache the representative for [key] (bucket's first asset at [index]).

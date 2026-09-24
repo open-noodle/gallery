@@ -15,6 +15,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_i
 class DeepSectionScaffold<T> extends StatefulWidget {
   final FilterSectionId sectionId;
   final String titleKey;
+  // ignore: unused-code
   final String emptyCaptionKey;
   final AsyncValue<List<T>> items;
   final VoidCallback? onRetry;

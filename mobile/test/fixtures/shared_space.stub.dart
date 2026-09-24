@@ -59,6 +59,7 @@ abstract final class SharedSpaceStub {
     faceRecognitionEnabled: const Optional.present(true),
   );
 
+  // ignore: unused-code
   static final space2 = SharedSpaceResponseDto(
     id: 'space-2',
     name: 'Travel 2024',
@@ -71,6 +72,7 @@ abstract final class SharedSpaceStub {
     faceRecognitionEnabled: const Optional.present(false),
   );
 
+  // ignore: unused-code
   static final spaceWithMembers = SharedSpaceResponseDto(
     id: 'space-3',
     name: 'Team Project',
@@ -96,6 +98,7 @@ abstract final class SharedSpaceStub {
     newAssetCount: const Optional.present(5),
   );
 
+  // ignore: unused-code
   static final emptySpace = SharedSpaceResponseDto(
     id: 'space-empty',
     name: 'Empty Space',

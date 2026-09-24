@@ -104,6 +104,7 @@ class SpaceAlbumRepository extends DatabaseAccessor<Drift> with $SpaceAlbumRepos
     });
   }
 
+  // ignore: unused-code
   Future<void> deleteLink({required String spaceId, required String albumId}) {
     return (_db.delete(
       _db.sharedSpaceAlbumLinkEntity,

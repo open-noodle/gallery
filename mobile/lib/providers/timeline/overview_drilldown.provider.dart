@@ -25,4 +25,5 @@ final sharedTimelineOverviewDrilldownProvider = Provider<TimelineOverviewDrilldo
   // sets the ROUTE-LOCAL mode rather than the root one.
 }, dependencies: [timelineZoomAnchorProvider, timelineOverviewModeProvider]);
 
+// ignore: unused-code
 final photosTimelineOverviewDrilldownProvider = sharedTimelineOverviewDrilldownProvider;
