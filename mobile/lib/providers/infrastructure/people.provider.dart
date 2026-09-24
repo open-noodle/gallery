@@ -1,9 +1,9 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/server/person.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/user_metadata.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 
@@ -37,7 +37,7 @@ final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, Str
 
 final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((ref, sortBy) async* {
   final service = ref.watch(peopleServiceProvider);
-  final prefs = await ref.watch(userMetadataPreferencesProvider.future);
+  final prefs = await ref.watch(Store.userMetadata.preferences().future);
   yield* service.watch(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
 
@@ -54,7 +54,7 @@ final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((
 final driftGetAllPeopleWithSharedSpacesProvider =
     FutureProvider.family<List<Person>, ({PeopleSortBy sortBy, PeopleFilterBy filterBy})>((ref, key) async {
       final service = ref.watch(peopleServiceProvider);
-      final prefs = await ref.watch(userMetadataPreferencesProvider.future);
+      final prefs = await ref.watch(Store.userMetadata.preferences().future);
       return service.getAllPeopleWithSharedSpaces(
         minFaces: prefs?.minimumFaces ?? 3,
         sortBy: key.sortBy,

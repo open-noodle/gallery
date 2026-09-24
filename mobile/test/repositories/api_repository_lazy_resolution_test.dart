@@ -11,8 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:immich_mobile/data/server/activity.dart';
 import 'package:immich_mobile/data/server/person.dart';
+import 'package:immich_mobile/data/server/tag.dart';
 import 'package:immich_mobile/infrastructure/repositories/search_api.repository.dart';
-import 'package:immich_mobile/infrastructure/repositories/tags_api.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/user_api.repository.dart';
 import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
@@ -62,16 +62,16 @@ void main() {
     apiService = _MockApiService();
   });
 
-  test('TagsApiRepository resolves tagsApi lazily', () async {
+  test('TagApiRepository resolves tagsApi lazily', () async {
     final oldApi = _MockTagsApi();
     final newApi = _MockTagsApi();
     when(() => apiService.tagsApi).thenReturn(oldApi);
-    final repo = TagsApiRepository(apiService);
+    final repo = TagApiRepository(apiService);
 
     when(() => apiService.tagsApi).thenReturn(newApi);
     when(() => newApi.getAllTags()).thenAnswer((_) async => []);
 
-    await repo.getAllTags();
+    await repo.getAll();
 
     verify(() => newApi.getAllTags()).called(1);
     verifyNever(() => oldApi.getAllTags());
