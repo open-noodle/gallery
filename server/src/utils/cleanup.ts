@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import z from 'zod';
 
 export const CLEANUP_BURST_GAP_MS = 2000;
 export const CLEANUP_BURST_CLIP_MAX_DISTANCE = 0.1;
@@ -207,6 +208,11 @@ export const isCleanupCursorTimestamp = (value: string) => {
   const parsed = new Date(value);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
 };
+/** A keyset cursor's id half: the same `z.uuid()` check the Cleanup DTOs apply to asset ids. */
+export const isCleanupCursorId = (value: unknown): value is string => z.uuid().safeParse(value).success;
+/** Space hogs' cursor size: a byte count, so a non-negative safe integer (`bigint` column). */
+export const isCleanupCursorSize = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export const encodeCursor = (value: CleanupCursor) => Buffer.from(JSON.stringify(value)).toString('base64url');
 export const decodeCursor = (value: string): CleanupCursor => {
   try {

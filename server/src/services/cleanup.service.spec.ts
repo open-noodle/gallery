@@ -673,10 +673,10 @@ describe(CleanupService.name, () => {
 
     it('passes a microsecond cursor through to the repository unchanged', async () => {
       mocks.cleanup.getBurstWindow.mockResolvedValue([]);
-      await sut.getQueue(authStub.user1, 'bursts', { cursor: cursor(['2024-01-01T00:00:00.123456Z', 'id-1']) });
+      await sut.getQueue(authStub.user1, 'bursts', { cursor: cursor(['2024-01-01T00:00:00.123456Z', uuidAt(1)]) });
       expect(mocks.cleanup.getBurstWindow).toHaveBeenCalledWith(authStub.user1.user.id, {
         afterLocalDateTime: '2024-01-01T00:00:00.123456Z',
-        afterId: 'id-1',
+        afterId: uuidAt(1),
         limit: CLEANUP_BURST_WINDOW,
       });
     });
@@ -739,12 +739,48 @@ describe(CleanupService.name, () => {
       it('rejects a cursor with an impossible date instead of passing it to SQL', async () => {
         for (const queue of ['bursts', 'screenshots', 'blurry'] as const) {
           await expect(
-            sut.getQueue(authStub.user1, queue, { cursor: cursor(['2024-02-30T00:00:00Z', 'id-1']) }),
+            sut.getQueue(authStub.user1, queue, { cursor: cursor(['2024-02-30T00:00:00Z', uuidAt(1)]) }),
           ).rejects.toThrow(BadRequestException);
         }
         expect(mocks.cleanup.getBurstWindow).not.toHaveBeenCalled();
         expect(mocks.cleanup.getScreenshots).not.toHaveBeenCalled();
         expect(mocks.cleanup.getBlurry).not.toHaveBeenCalled();
+      });
+
+      it('rejects a cursor whose id is not a UUID instead of passing it to SQL', async () => {
+        for (const queue of ['bursts', 'screenshots', 'blurry'] as const) {
+          await expect(
+            sut.getQueue(authStub.user1, queue, { cursor: cursor(['2024-01-01T00:00:00Z', 'not-a-uuid']) }),
+          ).rejects.toThrow(BadRequestException);
+        }
+        await expect(
+          sut.getQueue(authStub.user1, 'space_hogs', { cursor: cursor([1000, 'not-a-uuid']) }),
+        ).rejects.toThrow(BadRequestException);
+        expect(mocks.cleanup.getBurstWindow).not.toHaveBeenCalled();
+        expect(mocks.cleanup.getScreenshots).not.toHaveBeenCalled();
+        expect(mocks.cleanup.getBlurry).not.toHaveBeenCalled();
+        expect(mocks.cleanup.getSpaceHogs).not.toHaveBeenCalled();
+      });
+
+      it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 2])(
+        'rejects a space_hogs cursor with size %s instead of passing it to SQL',
+        async (size) => {
+          await expect(
+            sut.getQueue(authStub.user1, 'space_hogs', { cursor: cursor([size, uuidAt(1)]) }),
+          ).rejects.toThrow(BadRequestException);
+          expect(mocks.cleanup.getSpaceHogs).not.toHaveBeenCalled();
+        },
+      );
+
+      it('accepts a well-formed space_hogs cursor, including size 0', async () => {
+        mocks.cleanup.getSpaceHogs.mockResolvedValue({ items: [], next: null });
+        for (const size of [0, 104_857_600]) {
+          await sut.getQueue(authStub.user1, 'space_hogs', { cursor: cursor([size, uuidAt(1)]) });
+          expect(mocks.cleanup.getSpaceHogs).toHaveBeenLastCalledWith(
+            authStub.user1.user.id,
+            expect.objectContaining({ cursor: { v: [size, uuidAt(1)] } }),
+          );
+        }
       });
     });
   });
