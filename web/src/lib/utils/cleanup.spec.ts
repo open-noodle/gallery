@@ -11,6 +11,7 @@ import {
   parseMonthDay,
   queueToSlug,
   shadeLevel,
+  shadeScale,
   shiftMonthDay,
   slugToQueue,
   todayMonthDay,
@@ -22,13 +23,27 @@ describe('cleanup utils', () => {
     expect(todayMonthDay(new Date(2024, 1, 29))).toBe(229);
   });
   it('labels a month/day', () => expect(monthDayLabel(923, 'en')).toBe('September 23'));
-  it('shades by fraction of max', () => {
-    expect(shadeLevel(0, 10)).toBe(0);
-    expect(shadeLevel(1, 10)).toBe(1);
-    expect(shadeLevel(5, 10)).toBe(2);
-    expect(shadeLevel(7, 10)).toBe(3);
-    expect(shadeLevel(10, 10)).toBe(4);
-    expect(shadeLevel(3, 0)).toBe(0);
+  it('shades by quartile of the dates that have photos', () => {
+    const scale = shadeScale([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(shadeLevel(0, scale)).toBe(0);
+    expect(shadeLevel(1, scale)).toBe(1);
+    expect(shadeLevel(2, scale)).toBe(1);
+    expect(shadeLevel(3, scale)).toBe(2);
+    expect(shadeLevel(5, scale)).toBe(3);
+    expect(shadeLevel(8, scale)).toBe(4);
+    expect(shadeLevel(3, shadeScale([]))).toBe(0);
+  });
+  it('keeps shading ordinary dates apart when one date holds far more photos than the rest', () => {
+    const counts = [...Array.from({ length: 364 }, (_, i) => 20 + i), 5125];
+    const scale = shadeScale(counts);
+    const levels = new Set(counts.map((count) => shadeLevel(count, scale)));
+    expect(levels).toEqual(new Set([1, 2, 3, 4]));
+    expect(shadeLevel(20, scale)).toBe(1);
+    expect(shadeLevel(5125, scale)).toBe(4);
+  });
+  it('shades every date darkest when they all hold the same number of photos', () => {
+    const scale = shadeScale([7, 7, 7]);
+    expect(shadeLevel(7, scale)).toBe(4);
   });
   it('maps slugs', () => {
     expect(slugToQueue('space-hogs')).toBe('space_hogs');
