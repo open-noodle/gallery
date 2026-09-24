@@ -23,33 +23,13 @@
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { getAssetBulkActions } from '$lib/services/asset.service';
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+  import { getStackBulkActions } from '$lib/services/stack.service';
   import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
   import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
-  import {
-    updateStackedAssetInTimeline,
-    updateUnstackedAssetInTimeline,
-    type OnLink,
-    type OnUnlink,
-  } from '$lib/utils/actions';
+  import { type OnLink, type OnUnlink } from '$lib/utils/actions';
   import { buildMapTimelineOptions } from '$lib/utils/map-filter-options';
   import { type ActivatableTimelineBucket, getTimelineBucketZoomTarget } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
-||||||| ca4637adc79
-  import { mapSettings } from '$lib/stores/preferences.store';
-  import {
-    updateStackedAssetInTimeline,
-    updateUnstackedAssetInTimeline,
-    type OnLink,
-    type OnUnlink,
-  } from '$lib/utils/actions';
-  import { AssetVisibility } from '@immich/sdk';
-=======
-  import { getStackBulkActions } from '$lib/services/stack.service';
-  import { mapSettings } from '$lib/stores/preferences.store';
-  import { type OnLink, type OnUnlink } from '$lib/utils/actions';
-  import { AssetVisibility } from '@immich/sdk';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { ActionButton, CloseButton, CommandPaletteDefaultProvider, Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiImageMultiple } from '@mdi/js';
   import { ceil, floor } from 'lodash-es';
@@ -146,38 +126,14 @@
     `${floor(bbox.west, 6)},${floor(bbox.south, 6)},${ceil(bbox.east, 6)},${ceil(bbox.north, 6)}`,
   );
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   // No $mapSettings here: the cluster panel is scoped by the active filters and nothing else, so it
   // returns exactly the assets behind the pins. See buildMapTimelineOptions.
   const timelineOptions = $derived.by(() => {
     return {
       ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId),
+      withStacked: true,
       grouping: timelineGrouping,
     };
-||||||| ca4637adc79
-  const timelineOptions = $derived({
-    bbox: timelineBoundingBox,
-    visibility: $mapSettings.withPartners
-      ? AssetVisibility.Timeline
-      : $mapSettings.includeArchived
-        ? undefined
-        : AssetVisibility.Timeline,
-    isFavorite: $mapSettings.onlyFavorites || undefined,
-    withPartners: $mapSettings.withPartners || undefined,
-    assetFilter: selectedClusterIds,
-=======
-  const timelineOptions = $derived({
-    bbox: timelineBoundingBox,
-    visibility: $mapSettings.withPartners
-      ? AssetVisibility.Timeline
-      : $mapSettings.includeArchived
-        ? undefined
-        : AssetVisibility.Timeline,
-    isFavorite: $mapSettings.onlyFavorites || undefined,
-    withPartners: $mapSettings.withPartners || undefined,
-    withStacked: true,
-    assetFilter: selectedClusterIds,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   });
 
   $effect.pre(() => {
@@ -219,16 +175,12 @@
       onEscape={handleEscape}
       assetInteraction={assetMultiSelectManager}
       showArchiveIcon
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+      withStacked
       grouping={timelineGrouping}
       onGroupingChange={assetMultiSelectManager.selectionActive ? undefined : handleTimelineGroupingChange}
       onTimelineBucketActivate={handleTimelineBucketActivate}
       {temporalAnchor}
       onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-||||||| ca4637adc79
-=======
-      withStacked
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     />
   </div>
 </aside>

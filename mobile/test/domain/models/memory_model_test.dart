@@ -24,4 +24,15 @@ void main() {
       expect(data.title, isNull);
     });
   });
+
+  group('MemoryTypeEnum', () {
+    // memory_entity.type is an index-persisted intEnum. Installed apps store `rule` as 1, so the
+    // fork appends upstream's `birthday` after it (spec 2026-09-24). Reordering corrupts rows.
+    test('keeps the persisted index of every member', () {
+      expect(MemoryTypeEnum.onThisDay.index, 0);
+      expect(MemoryTypeEnum.rule.index, 1);
+      expect(MemoryTypeEnum.birthday.index, 2);
+      expect(MemoryTypeEnum.values, hasLength(3));
+    });
+  });
 }

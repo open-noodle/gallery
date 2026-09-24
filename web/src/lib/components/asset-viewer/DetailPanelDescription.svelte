@@ -47,7 +47,6 @@
   };
 </script>
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 {#snippet filterButton()}
   {#if canFilter && filterableDescription}
     <IconButton
@@ -58,39 +57,6 @@
       color="secondary"
       variant="ghost"
       onclick={() => applyContextualFilter({ description: filterableDescription })}
-||||||| ca4637adc79
-{#if isOwner}
-  <section class="mt-10 px-4">
-    <Textarea
-      bind:value={description}
-      class="max-h-40 resize-none border-b border-gray-500 bg-transparent pl-0 ring-0 outline-none focus:border-b-2 focus:border-immich-primary focus:ring-0 dark:bg-transparent dark:focus:border-immich-dark-primary"
-      rows={1}
-      grow
-      shape="rectangle"
-      onfocusout={handleFocusOut}
-      placeholder={$t('add_a_description')}
-      data-testid="autogrow-textarea"
-      {@attach fromAction(shortcut, () => ({
-        shortcut: { key: 'Enter', ctrl: true },
-        onShortcut: (e) => e.currentTarget.blur(),
-      }))}
-=======
-{#if isOwner}
-  <section class="mt-10 px-4">
-    <Textarea
-      bind:value={description}
-      class="max-h-40 resize-none border-b border-gray-500 bg-transparent ps-0 ring-0 outline-none focus:border-b-2 focus:border-immich-primary focus:ring-0 dark:bg-transparent dark:focus:border-immich-dark-primary"
-      rows={1}
-      grow
-      shape="rectangle"
-      onfocusout={handleFocusOut}
-      placeholder={$t('add_a_description')}
-      data-testid="autogrow-textarea"
-      {@attach fromAction(shortcut, () => ({
-        shortcut: { key: 'Enter', ctrl: true },
-        onShortcut: (e) => e.currentTarget.blur(),
-      }))}
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     />
   {/if}
 {/snippet}
@@ -100,7 +66,7 @@
     <div class="min-w-0 flex-1">
       <Textarea
         bind:value={description}
-        class="max-h-40 resize-none border-b border-gray-500 bg-transparent pl-0 ring-0 outline-none focus:border-b-2 focus:border-immich-primary focus:ring-0 dark:bg-transparent dark:focus:border-immich-dark-primary"
+        class="max-h-40 resize-none border-b border-gray-500 bg-transparent ps-0 ring-0 outline-none focus:border-b-2 focus:border-immich-primary focus:ring-0 dark:bg-transparent dark:focus:border-immich-dark-primary"
         rows={1}
         grow
         shape="rectangle"

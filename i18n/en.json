@@ -40,17 +40,11 @@
   "add_to_albums": "Add to albums",
   "add_to_albums_count": "Add to albums ({count})",
   "add_to_bottom_bar": "Add to",
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   "add_to_collection_restricted_to_space": "Your selection includes photos owned by other members, so only albums in this space can accept them.",
   "add_to_collections_count": "Add to {count}",
   "add_to_shared_album": "Add to shared album",
   "add_to_space": "Add to space",
-  "add_upload_to_stack": "Add upload to stack",
-||||||| ca4637adc79
-  "add_upload_to_stack": "Add upload to stack",
-=======
   "add_upload_to_stack": "Upload and {isStack, select, true {add to stack} other {create stack}}",
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   "add_url": "Add URL",
   "add_user": "Add user",
   "added_to_archive": "Added to archive",
@@ -792,16 +786,12 @@
     "storage_template_settings": "Storage Template",
     "storage_template_settings_description": "Manage the folder structure and file name of the upload asset",
     "storage_template_user_label": "<code>{label}</code> is the user's Storage Label",
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+    "storage_template_variables": "Template variables",
     "storage_usage_derivatives_refresh_hint": "Usage is recalculated once when you change this setting, then kept up to date by the nightly Sync quota usage task. If that nightly task is disabled, only the reconciliation of derivative bytes stops.",
     "storage_usage_include_derivatives_setting": "Include cached files in storage usage",
     "storage_usage_include_derivatives_setting_description": "Count thumbnails and transcoded videos toward each user's storage usage. The figure users see and the number their quota is enforced against both change, so the two can never disagree. Off by default, like upstream, where only original files count.",
     "storage_usage_settings": "Storage usage",
     "storage_usage_settings_description": "Choose whether server-generated files count toward user storage usage",
-||||||| ca4637adc79
-=======
-    "storage_template_variables": "Template variables",
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     "system_settings": "System Settings",
     "tag_cleanup_job": "Tag cleanup",
     "template_email_available_tags": "You can use the following variables in your template: {tags}",

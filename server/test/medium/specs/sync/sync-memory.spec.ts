@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
@@ -47,6 +47,26 @@ describe(SyncEntityType.MemoryV1, () => {
 
     await ctx.syncAckAll(auth, response);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.MemoriesV1]);
+  });
+
+  it('should not sync a birthday memory to a fork-aware client, and still complete', async () => {
+    const { auth, user, ctx } = await setup();
+    const { memory } = await ctx.newMemory({ ownerId: user.id });
+    await ctx.newMemory({
+      ownerId: user.id,
+      type: MemoryType.Birthday,
+      data: { personId: 'person-1', personName: 'Alice', year: 1990 },
+    });
+
+    const types = [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1];
+    const response = await ctx.syncStream(auth, types);
+    expect(response).toEqual([
+      expect.objectContaining({ type: SyncEntityType.MemoryV1, data: expect.objectContaining({ id: memory.id }) }),
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+
+    await ctx.syncAckAll(auth, response);
+    await ctx.assertSyncIsComplete(auth, types);
   });
 
   it('should detect and sync a deleted memory', async () => {

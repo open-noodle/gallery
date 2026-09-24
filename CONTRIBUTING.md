@@ -17,17 +17,11 @@ If you are looking for something to work on, there are discussions and issues wi
 
 We usually do not assign issues to new contributors, since it happens often that a PR is never even opened. Again, reach out on Discord if you fear putting a lot of time into fixing an issue, but ending up with a duplicate PR.
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-## Use of Generative AI
-||||||| ca4637adc79
-## Use of generative AI
-=======
 ### Opening new issues
 
 If you find bugs or other problems while working on something, we appreciate that you open an issue, if there is no open issue covering the problem yet. To make it easier to debug and fix the issue, please read and fill out the whole issue template.
 
-## Use of generative AI
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+## Use of Generative AI
 
 We encourage the use of LLMs and AI coding tools. Some projects ban AI-generated code; our experience is that these tools pay off when the person driving them has a clear spec.
 

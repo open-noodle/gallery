@@ -13,11 +13,11 @@ class PlaceDetailPage extends StatelessWidget {
 
   const PlaceDetailPage({super.key, required this.place});
 
+  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
     return TimelineRouteScope(
       timelineServiceBuilder: (ref, scope, groupBy) {
         final user = ref.watch(currentUserProvider);
@@ -27,33 +27,7 @@ class PlaceDetailPage extends StatelessWidget {
         final users = ref.watch(timelineUsersProvider).valueOrNull ?? [user.id];
         return ref.watch(timelineFactoryProvider).place(place, users, user.id, groupBy: groupBy, temporalScope: scope);
       },
-      child: Timeline(
-        withGroupingPill: true,
-        appBar: MesmerizingSliverAppBar(title: place, icon: Icons.location_on),
-      ),
-||||||| ca4637adc79
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final timelineService = ref.watch(timelineFactoryProvider).place(place);
-          ref.onDispose(timelineService.dispose);
-          return timelineService;
-        }),
-      ],
-      child: Timeline(
-        appBar: MesmerizingSliverAppBar(title: place, icon: Icons.location_on),
-      ),
-=======
-    return ProviderScope(
-      overrides: [
-        timelineServiceProvider.overrideWith((ref) {
-          final timelineService = ref.watch(timelineFactoryProvider).place(place);
-          ref.onDispose(timelineService.dispose);
-          return timelineService;
-        }),
-      ],
-      child: Timeline(appBar: MesmerizingSliverAppBar(title: place)),
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+      child: Timeline(withGroupingPill: true, appBar: MesmerizingSliverAppBar(title: place)),
     );
   }
 }

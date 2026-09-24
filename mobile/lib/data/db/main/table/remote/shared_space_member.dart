@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
 import 'package:immich_mobile/data/db/main/table/user/user.dart';
+import 'package:immich_mobile/data/db/util/datetime_clamp_type.dart';
 import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 class SharedSpaceMemberEntity extends Table with DriftDefaultsMixin {
@@ -12,7 +13,7 @@ class SharedSpaceMemberEntity extends Table with DriftDefaultsMixin {
 
   TextColumn get role => text()();
 
-  DateTimeColumn get joinedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get joinedAt => customType(clampedDateTime).withDefault(currentDateAndTime)();
 
   BoolColumn get showInTimeline => boolean().withDefault(const Constant(true))();
 

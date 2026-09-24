@@ -13,21 +13,7 @@
     SortOrder,
     type AlbumViewSettings,
   } from '$lib/stores/preferences.store';
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-  import {
-    getSelectedAlbumGroupOption,
-    isAlbumEditor,
-    sortAlbums,
-    stringToSortOrder,
-    type AlbumGroup,
-  } from '$lib/utils/album-utils';
-  import type { ContextMenuPosition } from '$lib/utils/context-menu';
-||||||| ca4637adc79
   import { getSelectedAlbumGroupOption, sortAlbums, stringToSortOrder, type AlbumGroup } from '$lib/utils/album-utils';
-  import type { ContextMenuPosition } from '$lib/utils/context-menu';
-=======
-  import { getSelectedAlbumGroupOption, sortAlbums, stringToSortOrder, type AlbumGroup } from '$lib/utils/album-utils';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { AlbumUserRole, type AlbumResponseDto, type SharedLinkResponseDto } from '@immich/sdk';
   import { groupBy } from 'lodash-es';
@@ -173,27 +159,6 @@
     albumGroupIds = groupedAlbums.map(({ id }) => id);
   });
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-  // Editing follows the server's Permission.AlbumUpdate (owner ∪ editor). Delete stays
-  // owner-only because Permission.AlbumDelete is. Share stays owner-only because this menu
-  // has always gated it that way — the server's Permission.AlbumShare is actually owner ∪
-  // editor, so the UI is deliberately the stricter of the two, and widening it is not this
-  // change's business. `allowEdit` gates all of them — only /albums passes it, and a list
-  // that opted out of editing must not sprout an Edit entry.
-  let canEditSelectedAlbum = $derived(
-    allowEdit && !!selectedAlbum && isAlbumEditor(selectedAlbum, authManager.user.id),
-  );
-  let isSelectedAlbumOwner = $derived(
-    allowEdit && !!selectedAlbum && selectedAlbum.albumUsers[0].user.id === authManager.user.id,
-  );
-
-||||||| ca4637adc79
-  let showFullContextMenu = $derived(
-    allowEdit && selectedAlbum && selectedAlbum.albumUsers[0].user.id === authManager.user.id,
-  );
-
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   onMount(async () => {
     if (allowEdit) {
       await removeAlbumsIfEmpty();
@@ -251,33 +216,3 @@
   <!-- Empty Message -->
   {@render empty?.()}
 {/if}
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-
-<!-- Context Menu -->
-<RightClickContextMenu title={$t('album_options')} {...contextMenuPosition} {isOpen} onClose={closeAlbumContextMenu}>
-  {#if canEditSelectedAlbum}
-    <MenuOption icon={mdiRenameOutline} text={$t('edit_album')} onClick={() => handleSelect('edit')} />
-  {/if}
-  {#if isSelectedAlbumOwner}
-    <MenuOption icon={mdiShareVariantOutline} text={$t('share')} onClick={() => handleSelect('share')} />
-  {/if}
-  <MenuOption icon={mdiDownload} text={$t('download')} onClick={() => handleSelect('download')} />
-  {#if isSelectedAlbumOwner}
-    <MenuOption icon={mdiDeleteOutline} text={$t('delete')} onClick={() => handleSelect('delete')} />
-  {/if}
-</RightClickContextMenu>
-||||||| ca4637adc79
-
-<!-- Context Menu -->
-<RightClickContextMenu title={$t('album_options')} {...contextMenuPosition} {isOpen} onClose={closeAlbumContextMenu}>
-  {#if showFullContextMenu}
-    <MenuOption icon={mdiRenameOutline} text={$t('edit_album')} onClick={() => handleSelect('edit')} />
-    <MenuOption icon={mdiShareVariantOutline} text={$t('share')} onClick={() => handleSelect('share')} />
-  {/if}
-  <MenuOption icon={mdiDownload} text={$t('download')} onClick={() => handleSelect('download')} />
-  {#if showFullContextMenu}
-    <MenuOption icon={mdiDeleteOutline} text={$t('delete')} onClick={() => handleSelect('delete')} />
-  {/if}
-</RightClickContextMenu>
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71

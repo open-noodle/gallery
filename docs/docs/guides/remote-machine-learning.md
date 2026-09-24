@@ -1,14 +1,8 @@
 # Remote Machine Learning
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-To alleviate [performance issues on low-memory systems](/FAQ.mdx#why-is-gallery-slow-on-low-memory-systems-like-the-raspberry-pi) like the Raspberry Pi, you may also host Gallery's machine learning container on a more powerful system, such as your laptop or desktop computer. The server container will send requests containing the image preview to the remote machine learning container for processing. The machine learning container does not persist this data or associate it with a particular user.
-||||||| ca4637adc79
-To alleviate [performance issues on low-memory systems](/FAQ.mdx#why-is-immich-slow-on-low-memory-systems-like-the-raspberry-pi) like the Raspberry Pi, you may also host Immich's machine learning container on a more powerful system, such as your laptop or desktop computer. The server container will send requests containing the image preview to the remote machine learning container for processing. The machine learning container does not persist this data or associate it with a particular user.
-=======
 import ComposeBuilder from '/docs/partials/_compose-builder.mdx';
 
-To alleviate [performance issues on low-memory systems](/FAQ.mdx#why-is-immich-slow-on-low-memory-systems-like-the-raspberry-pi) like the Raspberry Pi, you may also host Immich's machine learning container on a more powerful system, such as your laptop or desktop computer. The server container will send requests containing the image preview to the remote machine learning container for processing. The machine learning container does not persist this data or associate it with a particular user.
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+To alleviate [performance issues on low-memory systems](/FAQ.mdx#why-is-gallery-slow-on-low-memory-systems-like-the-raspberry-pi) like the Raspberry Pi, you may also host Gallery's machine learning container on a more powerful system, such as your laptop or desktop computer. The server container will send requests containing the image preview to the remote machine learning container for processing. The machine learning container does not persist this data or associate it with a particular user.
 
 :::info
 Smart Search and Face Detection will use this feature, but Facial Recognition will not. This is because Facial Recognition uses the _outputs_ of these models that have already been saved to the database. As such, its processing is between the server container and the database.

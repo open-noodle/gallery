@@ -141,6 +141,12 @@ const parseChunks = (chunks: string[]) => {
 const makeSub = () => ({
   getDeletes: vi.fn().mockReturnValue(makeStream([])),
   getUpserts: vi.fn().mockReturnValue(makeStream([])),
+  // immich-31591 split assetFace's stream accessors by version. They live on the shared
+  // sub-mock so a future sub that gains them is covered without editing this again.
+  getDeletesV2: vi.fn().mockReturnValue(makeStream([])),
+  getUpsertsV2: vi.fn().mockReturnValue(makeStream([])),
+  getDeletesV3: vi.fn().mockReturnValue(makeStream([])),
+  getUpsertsV3: vi.fn().mockReturnValue(makeStream([])),
   getBackfill: vi.fn().mockReturnValue(makeStream([])),
   getCreatedAfter: vi.fn().mockResolvedValue([]),
   getAlbumUsers: vi.fn().mockResolvedValue([{ userId: 'u1', role: AlbumUserRole.Owner }]),
@@ -654,6 +660,33 @@ describe(SyncService.name, () => {
       expect(memoryMessages).toHaveLength(2);
     });
 
+    it('should omit birthday memory upserts for every client, and still stream their deletes', async () => {
+      for (const types of [
+        [SyncRequestType.MemoriesV1],
+        [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1],
+      ]) {
+        const { writable, chunks } = makeWritable();
+
+        mocks.session.isPendingSyncReset.mockResolvedValue(false);
+        mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+        mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+        syncSubs.memory.getDeletes.mockReturnValue(makeStream([{ id: newUuid(), memoryId: 'm3' }]));
+        syncSubs.memory.getUpserts.mockReturnValue(
+          makeStream([
+            { updateId: newUuid(), id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+            { updateId: newUuid(), id: 'm3', ownerId: 'u1', type: MemoryType.Birthday },
+          ]),
+        );
+
+        await sut.stream(authStub.user1, writable, { types });
+
+        const messages = parseChunks(chunks);
+        const upserts = messages.filter((m: any) => m.type === SyncEntityType.MemoryV1);
+        expect(upserts.map((m: any) => m.data.type)).toEqual([MemoryType.OnThisDay]);
+        expect(messages.some((m: any) => m.type === SyncEntityType.MemoryDeleteV1)).toBe(true);
+      }
+    });
+
     it('should handle MemoryToAssetsV1 sync type', async () => {
       const { writable, chunks } = makeWritable();
       const deleteId = newUuid();
@@ -716,8 +749,8 @@ describe(SyncService.name, () => {
       mocks.session.isPendingSyncReset.mockResolvedValue(false);
       mocks.syncCheckpoint.getAll.mockResolvedValue([]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
-      syncSubs.assetFace.getDeletes.mockReturnValue(makeStream([{ id: deleteId, assetFaceId: 'f1' }]));
-      syncSubs.assetFace.getUpserts.mockReturnValue(
+      syncSubs.assetFace.getDeletesV2.mockReturnValue(makeStream([{ id: deleteId, assetFaceId: 'f1' }]));
+      syncSubs.assetFace.getUpsertsV2.mockReturnValue(
         makeStream([{ updateId, id: 'f1', assetId: 'a1', personId: 'p1', deletedAt: null, isVisible: true }]),
       );
 
@@ -726,6 +759,26 @@ describe(SyncService.name, () => {
       const messages = parseChunks(chunks);
       expect(messages.some((m: any) => m.type === SyncEntityType.AssetFaceDeleteV1)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.AssetFaceV2)).toBe(true);
+    });
+
+    it('should handle AssetFacesV3 sync type', async () => {
+      const { writable, chunks } = makeWritable();
+      const deleteId = newUuid();
+      const updateId = newUuid();
+
+      mocks.session.isPendingSyncReset.mockResolvedValue(false);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+      mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+      syncSubs.assetFace.getDeletesV3.mockReturnValue(makeStream([{ id: deleteId, assetFaceId: 'f1' }]));
+      syncSubs.assetFace.getUpsertsV3.mockReturnValue(
+        makeStream([{ updateId, id: 'f1', assetId: 'a1', personId: 'p1', deletedAt: null, isVisible: true }]),
+      );
+
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.AssetFacesV3] });
+
+      const messages = parseChunks(chunks);
+      expect(messages.some((m: any) => m.type === SyncEntityType.AssetFaceDeleteV1)).toBe(true);
+      expect(messages.some((m: any) => m.type === SyncEntityType.AssetFaceV3)).toBe(true);
     });
 
     it('should reject deprecated AssetFacesV1 sync type', async () => {

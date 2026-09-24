@@ -438,16 +438,14 @@ export class AssetMediaService extends BaseService {
     } catch (error: Error | any) {
       try {
         await this.assetRepository.remove({ id: asset.id });
-        if (backendFiles.length > 0) {
-          for (const file of backendFiles) {
-            try {
-              await writeBackend?.delete(file);
-            } catch (deleteError: Error | any) {
-              this.logger.error(
-                `Failed to delete incomplete upload file ${file} for asset ${asset.id}: ${deleteError}`,
-                deleteError?.stack,
-              );
-            }
+        for (const file of backendFiles) {
+          try {
+            await writeBackend?.delete(file);
+          } catch (deleteError: Error | any) {
+            this.logger.error(
+              `Failed to delete incomplete upload file ${file} for asset ${asset.id}: ${deleteError}`,
+              deleteError?.stack,
+            );
           }
         }
       } catch (deleteError: Error | any) {

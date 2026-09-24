@@ -32708,15 +32708,9 @@
             "type": "array"
           },
           "data": {
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
             "additionalProperties": {},
             "description": "Memory data",
             "type": "object"
-||||||| ca4637adc79
-            "$ref": "#/components/schemas/OnThisDayDto"
-=======
-            "$ref": "#/components/schemas/MemoryDataDto"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           },
           "hideAt": {
             "description": "Date when memory should be hidden",
@@ -32783,30 +32777,6 @@
         ],
         "type": "object"
       },
-      "MemoryDataDto": {
-        "properties": {
-          "personId": {
-            "description": "Person ID (birthday memories)",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
-            "type": "string"
-          },
-          "personName": {
-            "description": "Name of the person when the memory was created (birthday memories)",
-            "type": "string"
-          },
-          "year": {
-            "description": "Year of the memory",
-            "maximum": 9999,
-            "minimum": 1000,
-            "type": "integer"
-          }
-        },
-        "required": [
-          "year"
-        ],
-        "type": "object"
-      },
       "MemoryResponseDto": {
         "properties": {
           "assets": {
@@ -32823,15 +32793,9 @@
             "type": "string"
           },
           "data": {
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
             "additionalProperties": {},
             "description": "Memory data",
             "type": "object"
-||||||| ca4637adc79
-            "$ref": "#/components/schemas/OnThisDayDto"
-=======
-            "$ref": "#/components/schemas/MemoryDataDto"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           },
           "deletedAt": {
             "description": "Deletion date",
@@ -32943,13 +32907,8 @@
         "description": "Memory type",
         "enum": [
           "on_this_day",
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+          "birthday",
           "rule"
-||||||| ca4637adc79
-          "on_this_day"
-=======
-          "birthday"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         ],
         "type": "string"
       },
@@ -43120,7 +43079,7 @@
           "PeopleV1",
           "AssetFacesV1",
           "AssetFacesV2",
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+          "AssetFacesV3",
           "UserMetadataV1",
           "SharedSpacesV1",
           "SharedSpaceMembersV1",
@@ -43138,12 +43097,6 @@
           "SharedSpaceAlbumAssetsV1",
           "SharedSpaceAlbumAssetExifsV1",
           "SharedSpaceAlbumHiddensV1"
-||||||| ca4637adc79
-          "UserMetadataV1"
-=======
-          "AssetFacesV3",
-          "UserMetadataV1"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         ],
         "type": "string"
       },

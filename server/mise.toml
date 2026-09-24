@@ -3,20 +3,10 @@ run = "pnpm install --filter immich --frozen-lockfile"
 
 [tasks.build]
 env._.path = "./node_modules/.bin"
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-# TODO we shouldn't technically need tsc-alias, but the nestjs tsconfig paths resolution is broken right now with ESM
-# remove when https://github.com/nestjs/nest-cli/pull/3545 has been released
 run = [
-  "nest build && tsc-alias",
+  "nest build",
   "node bin/sync-gallery-migrations.mjs",
 ]
-||||||| ca4637adc79
-# TODO we shouldn't technically need tsc-alias, but the nestjs tsconfig paths resolution is broken right now with ESM
-# remove when https://github.com/nestjs/nest-cli/pull/3545 has been released
-run = "nest build && tsc-alias"
-=======
-run = "nest build"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 [tasks.test]
 env._.path = "./node_modules/.bin"

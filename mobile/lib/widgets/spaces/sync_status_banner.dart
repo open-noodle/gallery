@@ -31,7 +31,9 @@ class SyncStatusBanner extends ConsumerWidget {
 }
 
 /// Sliver wrapper around [SyncStatusBanner] for use inside a `CustomScrollView`.
+// ignore: unused-code
 class SyncStatusBannerSliver extends StatelessWidget {
+  // ignore: unused-code
   const SyncStatusBannerSliver({super.key});
 
   @override

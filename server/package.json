@@ -12,14 +12,8 @@
     "helmet.json"
   ],
   "scripts": {
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-    "build": "nest build && tsc-alias",
-    "postbuild": "node bin/sync-gallery-migrations.mjs",
-||||||| ca4637adc79
-    "build": "nest build && tsc-alias",
-=======
     "build": "nest build",
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+    "postbuild": "node bin/sync-gallery-migrations.mjs",
     "format": "prettier --cache --check .",
     "format:fix": "prettier --cache --write --list-different .",
     "start": "pnpm run start:dev",

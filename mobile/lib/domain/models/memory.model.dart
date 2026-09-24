@@ -6,15 +6,15 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 part 'memory.model.freezed.dart';
 
 // TODO(agg23): Remove enum suffix
+// Gallery: `birthday` (immich-30831) is appended AFTER the fork's `rule`, not in upstream's
+// position. memory_entity.type persists the index and installed apps hold `rule` at 1, so
+// upstream's order would reinterpret every synced rule memory as a birthday.
+// See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
 enum MemoryTypeEnum {
   // do not change this order!
   onThisDay,
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
   rule,
-||||||| ca4637adc79
-=======
   birthday,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 }
 
 // Fork (#418): the rule-based memories pipeline sends an arbitrary payload per rule
@@ -32,8 +32,10 @@ class MemoryData {
 
   String? get title => raw['title'] as String?;
 
+  // ignore: unused-code
   String? get subtitle => raw['subtitle'] as String?;
 
+  // ignore: unused-code
   MemoryData copyWith({Map<String, dynamic>? raw}) {
     return MemoryData(raw ?? this.raw);
   }

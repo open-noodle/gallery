@@ -20,7 +20,6 @@ import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
 import { PersonTable } from 'src/schema/tables/person.table.js';
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
 import {
   asUuid,
   dummy,
@@ -29,15 +28,10 @@ import {
   removeUndefinedKeys,
   withFilePath,
 } from 'src/utils/database.js';
+import { isLeapDayObserved } from 'src/utils/date.js';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';
 import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge.js';
-||||||| ca4637adc79
-import { asUuid, dummy, inSharedAlbum, removeUndefinedKeys, withFilePath } from 'src/utils/database.js';
-=======
-import { asUuid, dummy, inSharedAlbum, removeUndefinedKeys, withFilePath } from 'src/utils/database.js';
-import { isLeapDayObserved } from 'src/utils/date.js';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
 import {
   spaceAssetPathBranches,
@@ -659,7 +653,42 @@ export class PersonRepository {
       .stream();
   }
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
+  @GenerateSql(
+    { params: [DummyValue.UUID, { year: 2025, month: 1, day: 1 }] },
+    { name: 'leap day fallback', params: [DummyValue.UUID, { year: 2025, month: 2, day: 28 }] },
+  )
+  async forBirthdayMemories(ownerId: string, { year, month, day }: YearMonthDay) {
+    const isLeapDayBirthday = isLeapDayObserved({ year, month, day });
+
+    const people = await this.db
+      .selectFrom('person')
+      .select(['person.personGroupId', 'person.name'])
+      .select(sql<number>`date_part('year', person."birthDate")::int`.as('birthYear'))
+      .select(sql<number>`date_part('month', person."birthDate")::int`.as('birthMonth'))
+      .select(sql<number>`date_part('day', person."birthDate")::int`.as('birthDay'))
+      .where('person.ownerId', '=', ownerId)
+      .where('person.isHidden', '=', false)
+      .where('person.name', '!=', '')
+      .where('person.birthDate', 'is not', null)
+      .where((eb) => {
+        const bornOn = (month: number, day: number) =>
+          eb.and([
+            eb(sql`date_part('month', person."birthDate")::int`, '=', month),
+            eb(sql`date_part('day', person."birthDate")::int`, '=', day),
+          ]);
+
+        return isLeapDayBirthday ? eb.or([bornOn(month, day), bornOn(2, 29)]) : bornOn(month, day);
+      })
+      .where(sql`date_part('year', person."birthDate")::int`, '<', year)
+      .execute();
+
+    return people.map(({ personGroupId, name, birthYear, birthMonth, birthDay }) => ({
+      personGroupId,
+      name,
+      birthDate: { year: birthYear, month: birthMonth, day: birthDay },
+    }));
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, { month: 4, day: 23 }] })
   getBirthdaysForDay(ownerId: string, { month, day }: { month: number; day: number }) {
     return this.db
@@ -720,43 +749,6 @@ export class PersonRepository {
       .orderBy('person.personGroupId', 'asc')
       .limit(limit)
       .execute();
-||||||| ca4637adc79
-=======
-  @GenerateSql(
-    { params: [DummyValue.UUID, { year: 2025, month: 1, day: 1 }] },
-    { name: 'leap day fallback', params: [DummyValue.UUID, { year: 2025, month: 2, day: 28 }] },
-  )
-  async forBirthdayMemories(ownerId: string, { year, month, day }: YearMonthDay) {
-    const isLeapDayBirthday = isLeapDayObserved({ year, month, day });
-
-    const people = await this.db
-      .selectFrom('person')
-      .select(['person.personGroupId', 'person.name'])
-      .select(sql<number>`date_part('year', person."birthDate")::int`.as('birthYear'))
-      .select(sql<number>`date_part('month', person."birthDate")::int`.as('birthMonth'))
-      .select(sql<number>`date_part('day', person."birthDate")::int`.as('birthDay'))
-      .where('person.ownerId', '=', ownerId)
-      .where('person.isHidden', '=', false)
-      .where('person.name', '!=', '')
-      .where('person.birthDate', 'is not', null)
-      .where((eb) => {
-        const bornOn = (month: number, day: number) =>
-          eb.and([
-            eb(sql`date_part('month', person."birthDate")::int`, '=', month),
-            eb(sql`date_part('day', person."birthDate")::int`, '=', day),
-          ]);
-
-        return isLeapDayBirthday ? eb.or([bornOn(month, day), bornOn(2, 29)]) : bornOn(month, day);
-      })
-      .where(sql`date_part('year', person."birthDate")::int`, '<', year)
-      .execute();
-
-    return people.map(({ personGroupId, name, birthYear, birthMonth, birthDay }) => ({
-      personGroupId,
-      name,
-      birthDate: { year: birthYear, month: birthMonth, day: birthDay },
-    }));
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   }
 
   @GenerateSql()

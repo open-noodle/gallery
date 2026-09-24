@@ -709,12 +709,8 @@ export type RuleMemoryData = {
 
 export interface MemoryDataByType {
   [MemoryType.OnThisDay]: OnThisDayData;
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-  [MemoryType.Rule]: RuleMemoryData;
-||||||| ca4637adc79
-=======
   [MemoryType.Birthday]: BirthdayData;
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  [MemoryType.Rule]: RuleMemoryData;
 }
 
 export type MemoryDataOf<T extends MemoryType = MemoryType> = MemoryDataByType[T];

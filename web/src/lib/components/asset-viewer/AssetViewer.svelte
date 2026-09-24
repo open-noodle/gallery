@@ -109,15 +109,7 @@
   const stackSelectedThumbnailSize = 65;
 
   let previewStackedAsset: AssetResponseDto | undefined = $state();
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-  let stack: StackResponseDto | null = $state(null);
-||||||| ca4637adc79
-  let stack: StackResponseDto | null = $state(null);
-
-=======
   let stack: StackResponseDto | undefined = $state();
-
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   const asset = $derived(previewStackedAsset ?? cursor.current);
   const nextAsset = $derived(cursor.nextAsset);
   const previousAsset = $derived(cursor.previousAsset);
@@ -373,46 +365,6 @@
         eventManager.emit('AssetsDelete', [asset.id]);
         break;
       }
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-      case AssetAction.REMOVE_ASSET_FROM_STACK: {
-        stack = action.stack;
-        if (stack) {
-          cursor.current = stack.assets[0];
-        }
-        break;
-      }
-      case AssetAction.STACK:
-      case AssetAction.SET_STACK_PRIMARY_ASSET: {
-        stack = action.stack;
-        break;
-      }
-      case AssetAction.SET_PERSON_FEATURED_PHOTO: {
-        const assetInfo = await getAssetInfo({ id: asset.id, spaceId });
-        cursor.current = { ...asset, people: assetInfo.people };
-        eventManager.emit('AssetUpdate', cursor.current);
-        break;
-      }
-||||||| ca4637adc79
-      case AssetAction.REMOVE_ASSET_FROM_STACK: {
-        stack = action.stack;
-        if (stack) {
-          cursor.current = stack.assets[0];
-        }
-        break;
-      }
-      case AssetAction.STACK:
-      case AssetAction.SET_STACK_PRIMARY_ASSET: {
-        stack = action.stack;
-        break;
-      }
-      case AssetAction.SET_PERSON_FEATURED_PHOTO: {
-        const assetInfo = await getAssetInfo({ id: asset.id });
-        cursor.current = { ...asset, people: assetInfo.people };
-        eventManager.emit('AssetUpdate', cursor.current);
-        break;
-      }
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
       case AssetAction.RATING: {
         cursor.current = {
           ...asset,

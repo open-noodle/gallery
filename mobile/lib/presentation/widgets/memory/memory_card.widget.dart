@@ -63,13 +63,7 @@ class MemoryCard extends StatelessWidget {
                     key: ValueKey(asset.id),
                     asset: asset,
                     isCurrent: isCurrent,
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-                    showControls: false,
                     forceAutoPlay: true,
-||||||| ca4637adc79
-                    showControls: false,
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
                     image: FullImage(asset, size: context.sizeData, fit: BoxFit.contain),
                   ),
                 ),

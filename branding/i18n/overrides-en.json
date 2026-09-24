@@ -11,6 +11,7 @@
     "maintenance_restore_backup_different_version": "This backup was created with a different version of Noodle Gallery!",
     "maintenance_settings_description": "Put Noodle Gallery into maintenance mode.",
     "notification_email_from_address_description": "Sender email address, for example: \"Noodle Gallery <noreply@example.com>\". Make sure to use an address you're allowed to send emails from.",
+    "storage_template_option_none_description": "Keep the folder structure Noodle Gallery uses by default",
     "theme_custom_css_settings_description": "Cascading Style Sheets allow the design of Noodle Gallery to be customized.",
     "theme_settings_description": "Manage customization of the Noodle Gallery web interface"
   },

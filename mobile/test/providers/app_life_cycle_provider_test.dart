@@ -251,6 +251,9 @@ void main() {
     expect(memoryLaneBuilds, 2);
   });
 
+  // immich-31557's background-launch cases, adapted: the fork's #513 schedules the local sync
+  // through syncRemoteThenLocal(fullLocalSync:), so these assert that flag instead of upstream's
+  // direct syncLocal(full:) call. The true/false expectations are upstream's, unchanged.
   test('first resume runs when the app was launched in the background', () async {
     when(() => fgService.wasLaunchedInBackground()).thenAnswer((_) async => true);
     websocket.throwOnConnect = false;
@@ -260,12 +263,16 @@ void main() {
     expect(lifeCycle.state, AppLifeCycleEnum.resumed);
     expect(serverVersionCount, 1);
     expect(websocket.connectCount, 1);
-    verify(() => backgroundSync.syncLocal(full: true)).called(1);
+    verify(
+      () => backgroundSync.syncRemoteThenLocal(fullLocalSync: true, shouldRunLocal: any(named: 'shouldRunLocal')),
+    ).called(1);
 
     await lifeCycle.handleAppPause();
     await lifeCycle.handleAppResume();
 
-    verify(() => backgroundSync.syncLocal(full: false)).called(1);
+    verify(
+      () => backgroundSync.syncRemoteThenLocal(fullLocalSync: false, shouldRunLocal: any(named: 'shouldRunLocal')),
+    ).called(1);
   });
 
   test('a background launch does not resume twice without a pause', () async {
@@ -277,7 +284,9 @@ void main() {
 
     expect(serverVersionCount, 1);
     expect(websocket.connectCount, 1);
-    verify(() => backgroundSync.syncLocal(full: true)).called(1);
+    verify(
+      () => backgroundSync.syncRemoteThenLocal(fullLocalSync: true, shouldRunLocal: any(named: 'shouldRunLocal')),
+    ).called(1);
   });
 
   test('pause before the first sync keeps the full sync for the next resume', () async {
@@ -290,7 +299,9 @@ void main() {
 
     await lifeCycle.handleAppResume();
 
-    verify(() => backgroundSync.syncLocal(full: true)).called(1);
+    verify(
+      () => backgroundSync.syncRemoteThenLocal(fullLocalSync: true, shouldRunLocal: any(named: 'shouldRunLocal')),
+    ).called(1);
   });
 
   test('first resume is skipped on a normal launch', () async {

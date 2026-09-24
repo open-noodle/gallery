@@ -48,16 +48,13 @@ const String kImmichAppStoreLink = "https://apps.apple.com/app/id6761776289";
 const String kImmichPlayStoreLink = "https://play.google.com/store/apps/details?id=de.opennoodle.gallery";
 const String kImmichLatestRelease = "https://github.com/immich-app/immich/releases/latest";
 
-const int kPhotoTabIndex = 0;
-const int kSearchTabIndex = 1;
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-const int kSpacesTabIndex = 2;
-||||||| ca4637adc79
-const int kAlbumTabIndex = 2;
-=======
-const int kAlbumTabIndex = 2;
 // ignore: unused-code
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+const int kPhotoTabIndex = 0;
+// ignore: unused-code
+const int kSearchTabIndex = 1;
+// ignore: unused-code
+const int kSpacesTabIndex = 2;
+// ignore: unused-code
 const int kLibraryTabIndex = 3;
 
 // Workaround for SQLite's variable limit (SQLITE_MAX_VARIABLE_NUMBER = 32766)

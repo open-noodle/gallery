@@ -898,10 +898,12 @@ export class PersonService extends BaseService {
         data: { spaceId, assetId },
       });
 
-      if (jobs.length >= JOBS_ASSET_PAGINATION_SIZE) {
-        await this.jobRepository.queueAll(jobs);
-        jobs = [];
+      if (!(jobs.length >= JOBS_ASSET_PAGINATION_SIZE)) {
+        continue;
       }
+
+      await this.jobRepository.queueAll(jobs);
+      jobs = [];
     }
 
     if (jobs.length > 0) {

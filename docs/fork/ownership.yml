@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 690fd44e12c573418b40ae4ea5bbffbb86aaeacb
+  last_verified_fork_head: 9e0824cbcfd9f661ff8bd9eeedcaf8a289cf9b7c
 
 coverage_ignore:
   - specs/**
@@ -189,8 +189,6 @@ features:
       - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
       - server/src/dtos/gallery-map.dto.ts
-      - mobile/lib/providers/map/map_marker.provider.dart
-      - mobile/lib/services/map.service.dart
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -540,6 +538,31 @@ ci_invariants:
       - server/src/services/search.service.ts
     exceptions: []
 
+  # immich-30831 added a first-class MemoryType.Birthday generator. Gallery already ships a
+  # birthday memory (BirthdayMemoryRule), so upstream's createBirthdayMemories is pulled but never
+  # dispatched (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). A rebase that
+  # resolves onMemoriesCreate toward upstream re-enables it with no conflict and no type error.
+  # Adopting upstream's birthday is a deliberate project: delete this invariant in the same change.
+  - id: birthday-memory-generator-not-dispatched
+    title: Upstream's birthday memory generator stays undispatched
+    forbidden_patterns:
+      - 'this.createBirthdayMemories('
+    paths:
+      - server/src/services/memory.service.ts
+    exceptions: []
+
+  # memory_entity.type is an index-persisted intEnum; installed apps hold the fork's `rule` at
+  # index 1. immich-30831 inserts `birthday` at index 1, so a rebase resolving toward upstream's
+  # order silently turns every synced rule memory into a birthday. The index test in
+  # memory_model_test.dart catches any reorder; this catches upstream's exact text at audit time.
+  - id: mobile-memory-type-enum-order
+    title: Mobile MemoryTypeEnum keeps rule at index 1
+    forbidden_patterns:
+      - "onThisDay,\n  birthday,"
+    paths:
+      - mobile/lib/domain/models/memory.model.dart
+    exceptions: []
+
   # immich-31456's mergePeople merges people for every other owner sharing a personGroupId. Gallery
   # adopted cluster groups inert: person_personGroupId_key makes the mapping 1:1 and
   # ClusterGroupController is unmounted, so that arm is unreachable and the fork's own
@@ -563,7 +586,7 @@ patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'
     version_source: pnpm-workspace.yaml
-    expected_patch: patches/@immich__ui@0.86.0.patch
+    expected_patch: patches/@immich__ui@0.90.0.patch
     required_check: fork-patches-check
 
 risk_patterns:

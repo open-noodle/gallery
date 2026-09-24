@@ -12,6 +12,7 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 class FavoritePage extends StatelessWidget {
   const FavoritePage({super.key});
 
+  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
 
   @override
@@ -26,14 +27,8 @@ class FavoritePage extends StatelessWidget {
         return ref.watch(timelineFactoryProvider).favorite(user.id, groupBy: groupBy, temporalScope: scope);
       },
       child: Timeline(
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
         withGroupingPill: true,
-        appBar: MesmerizingSliverAppBar(title: context.t.favorites, icon: Icons.favorite_outline),
-||||||| ca4637adc79
-        appBar: MesmerizingSliverAppBar(title: context.t.favorites, icon: Icons.favorite_outline),
-=======
         appBar: MesmerizingSliverAppBar(title: context.t.favorites),
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         bottomSheet: const FavoriteBottomSheet(),
       ),
     );

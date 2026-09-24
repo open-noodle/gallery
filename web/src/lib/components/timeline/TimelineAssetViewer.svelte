@@ -202,16 +202,10 @@
   const LazyAssetViewer = lazyComponent(() => import('$lib/components/asset-viewer/AssetViewer.svelte'));
 </script>
 
-<<<<<<< 3c07ab4ea989bdba899e93409d1f23f2dbc889d1
-{#if LazyAssetViewer.current}
-  {@const AssetViewer = LazyAssetViewer.current}
-||||||| ca4637adc79
-{#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
-=======
 <OnEvents {onAlbumRemoveAssets} />
 
-{#await import('$lib/components/asset-viewer/AssetViewer.svelte') then { default: AssetViewer }}
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+{#if LazyAssetViewer.current}
+  {@const AssetViewer = LazyAssetViewer.current}
   <AssetViewer
     {withStacked}
     cursor={assetCursor}

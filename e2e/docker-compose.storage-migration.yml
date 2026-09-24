@@ -1,22 +1,16 @@
 services:
   minio:
     container_name: immich-e2e-minio
-    # MinIO withdrew its own images from quay.io and Docker Hub on 2026-09-24. Chainguard's build
-    # is current and still ships `mc`, which the tests exec into this container. Its free tier only
-    # publishes `latest`, so pin the index digest to keep runs reproducible.
-    image: cgr.dev/chainguard/minio:latest@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
+    image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-      # Lets the healthcheck's `mc ready local` reach the server without a prior `mc alias set`.
-      MC_HOST_local: http://minioadmin:minioadmin@localhost:9000
     ports:
       - 9000:9000
       - 9001:9001
     healthcheck:
-      # The Chainguard image has no curl.
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD-SHELL', 'curl -f http://localhost:9000/minio/health/live || exit 1']
       interval: 5s
       timeout: 5s
       retries: 10

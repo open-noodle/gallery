@@ -439,14 +439,16 @@ export class AssetService extends BaseService {
     // to decide whether to purge — a re-affirm (Hidden→Hidden, Locked→Locked) re-emits the same tombstone,
     // which is harmless (idempotent) and is exactly what lets a retry after a failed emit converge.
     const purgeIds = ids;
-    if (purgeIds.length > 0) {
-      await this.sharedSpaceRepository.emitDirectAssetVisibilityPurge(purgeIds);
-      if (nextVisibility === AssetVisibility.Hidden) {
-        // Locked's album removal is handled by removeAssetsFromAll above → no album tombstone for Locked.
-        await this.sharedSpaceRepository.emitAlbumAssetVisibilityPurge(purgeIds);
-      }
-      await this.sharedSpaceRepository.emitLibraryAssetVisibilityPurge(purgeIds);
+    if (purgeIds.length === 0) {
+      return;
     }
+
+    await this.sharedSpaceRepository.emitDirectAssetVisibilityPurge(purgeIds);
+    if (nextVisibility === AssetVisibility.Hidden) {
+      // Locked's album removal is handled by removeAssetsFromAll above → no album tombstone for Locked.
+      await this.sharedSpaceRepository.emitAlbumAssetVisibilityPurge(purgeIds);
+    }
+    await this.sharedSpaceRepository.emitLibraryAssetVisibilityPurge(purgeIds);
   }
 
   async copy(

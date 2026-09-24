@@ -1832,6 +1832,12 @@ export class SyncService extends BaseService {
     const upsertType = SyncEntityType.MemoryV1;
     const upserts = this.syncRepository.memory.getUpserts({ ...options, ack: checkpointMap[upsertType] });
     for await (const { updateId, ...data } of upserts) {
+      // Birthday rows (immich-30831; carried in by Immich 3.3+ imports) are withheld from every
+      // client: installed Gallery apps cannot decode the type and would abort the whole sync.
+      // See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
+      if (data.type === MemoryType.Birthday) {
+        continue;
+      }
       if (!isForkAwareClient && data.type !== MemoryType.OnThisDay) {
         continue;
       }

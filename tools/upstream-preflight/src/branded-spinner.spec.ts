@@ -39,7 +39,7 @@ const SWAPPED_SET = [
   'lib/components/asset-viewer/DetailPanel.svelte',
   'lib/components/assets/thumbnail/VideoThumbnail.svelte',
   'lib/elements/SearchBar.svelte',
-  'routes/admin/system-settings/StorageTemplateSettings.svelte',
+  // StorageTemplateSettings left the set: immich-31531's rework renders no spinner at all.
   'routes/admin/system-settings/TemplateSettings.svelte',
   'routes/admin/queues/[name]/QueueGraph.svelte',
   'routes/(user)/user-settings/OauthSettings.svelte',
