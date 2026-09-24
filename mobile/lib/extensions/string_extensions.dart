@@ -1,6 +1,7 @@
 import 'package:diacritic/diacritic.dart' as diacritic;
 
 extension StringExtension on String {
+  // ignore: unused-code
   String? get nullIfEmpty => isEmpty ? null : this;
 
   String removeDiacritics() => diacritic.removeDiacritics(this);
