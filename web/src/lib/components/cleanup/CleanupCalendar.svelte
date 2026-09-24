@@ -31,22 +31,30 @@
     l4: 'bg-primary/90',
     reviewed: 'bg-green-500',
   };
+  // A reviewed day with few photos reads lighter, as in the mockup.
+  const REVIEWED_LIGHT_CLASS = 'bg-green-500/55';
 
   const lang = $derived($locale ?? 'en');
   const byMonthDay = $derived(new Map(days.map((day) => [day.monthDay, day])));
   const max = $derived(Math.max(0, ...days.map((day) => day.assetCount)));
   const monthFormatter = $derived(new Intl.DateTimeFormat(lang, { month: 'short' }));
 
+  // A day without photos has nothing to review, so it never shows as reviewed.
+  const isReviewed = (day: CleanupCalendarDayDto | undefined) => !!day?.reviewedAt && day.assetCount > 0;
+
   const cellState = (day: CleanupCalendarDayDto | undefined): CellState => {
-    if (day?.reviewedAt) {
-      return 'reviewed';
-    }
     const level = shadeLevel(day?.assetCount ?? 0, max);
-    return level === 0 ? 'none' : `l${level}`;
+    if (level === 0) {
+      return 'none';
+    }
+    return isReviewed(day) ? 'reviewed' : `l${level}`;
   };
 
+  const cellClass = (day: CleanupCalendarDayDto | undefined, state: CellState) =>
+    state === 'reviewed' && shadeLevel(day?.assetCount ?? 0, max) <= 2 ? REVIEWED_LIGHT_CLASS : stateClasses[state];
+
   const cellLabel = (monthDay: number, day: CleanupCalendarDayDto | undefined) =>
-    $t(day?.reviewedAt ? 'cleanup_calendar_day_label_reviewed' : 'cleanup_calendar_day_label', {
+    $t(isReviewed(day) ? 'cleanup_calendar_day_label_reviewed' : 'cleanup_calendar_day_label', {
       values: { date: monthDayLabel(monthDay, lang), count: day?.assetCount ?? 0 },
     });
 </script>
@@ -75,9 +83,10 @@
             data-state={state}
             data-today={monthDay === today ? 'true' : undefined}
             aria-label={cellLabel(monthDay, day)}
-            class="aspect-square rounded-sm transition-transform hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-primary {stateClasses[
-              state
-            ]} {monthDay === today ? 'outline-2 outline-offset-1 outline-dark dark:outline-light' : ''}"
+            class="aspect-square rounded-sm transition-transform hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-primary {cellClass(
+              day,
+              state,
+            )} {monthDay === today ? 'outline-2 outline-offset-1 outline-dark dark:outline-light' : ''}"
             onmouseenter={() => onPeek(monthDay)}
             onfocus={() => onPeek(monthDay)}
             onclick={() => onOpen(monthDay)}

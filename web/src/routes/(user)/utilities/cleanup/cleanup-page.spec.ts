@@ -1,6 +1,6 @@
 import { CleanupCountQueue, type CleanupCountResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen, waitFor, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { todayMonthDay } from '$lib/utils/cleanup';
@@ -38,7 +38,19 @@ const renderPage = () => {
   });
 };
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
+};
+
+const asset = (id: string) => ({ id, thumbhash: null, originalFileName: `${id}.jpg` });
+
 describe('Cleanup hub page', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     sdk.getCleanupCalendar.mockResolvedValue({
@@ -91,5 +103,83 @@ describe('Cleanup hub page', () => {
       { monthDay: todayMonthDay(), year: 2024 },
       expect.anything(),
     );
+  });
+
+  it('holds the "Could still free" figure until every count has settled', async () => {
+    const bursts = deferred<CleanupCountResponseDto>();
+    sdk.getCleanupQueueCount.mockImplementation(({ queue }: { queue: CleanupCountQueue }) =>
+      queue === CleanupCountQueue.Bursts ? bursts.promise : Promise.resolve(COUNTS[queue]),
+    );
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('cleanup-queue-space_hogs')).toHaveTextContent('cleanup_queue_count_files'),
+    );
+    expect(screen.getByTestId('cleanup-could-still-free-pending')).toBeInTheDocument();
+    expect(screen.queryByTestId('cleanup-could-still-free')).not.toBeInTheDocument();
+
+    bursts.resolve(COUNTS[CleanupCountQueue.Bursts]);
+    await waitFor(() => expect(screen.getByTestId('cleanup-could-still-free')).toBeInTheDocument());
+    expect(screen.queryByTestId('cleanup-could-still-free-pending')).not.toBeInTheDocument();
+  });
+
+  it('fetches row covers for every list queue except bursts', async () => {
+    renderPage();
+
+    await waitFor(() => expect(sdk.getCleanupQueue).toHaveBeenCalledTimes(3));
+    const queues = sdk.getCleanupQueue.mock.calls.map(([args]) => (args as { queue: string }).queue);
+    expect(new Set(queues)).toEqual(new Set(['blurry', 'screenshots', 'space_hogs']));
+  });
+
+  it('peeks only the last day hovered within the debounce, dropping the earlier one', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const slow = deferred<{ years: { year: number; count: number }[] }>();
+    sdk.getCleanupRewindYears.mockImplementation(({ monthDay }: { monthDay: number }) =>
+      monthDay === 101 ? slow.promise : Promise.resolve({ years: [{ year: 2024, count: 1 }] }),
+    );
+    sdk.getCleanupRewindAssets.mockImplementation(({ monthDay }: { monthDay: number }) =>
+      Promise.resolve({ assets: [asset(`day-${monthDay}`)] }),
+    );
+    renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+    sdk.getCleanupRewindYears.mockClear();
+
+    // 102 then 103 inside the 150 ms window: only 103 is fetched
+    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-102'));
+    await vi.advanceTimersByTimeAsync(100);
+    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-103'));
+    await vi.advanceTimersByTimeAsync(150);
+    expect(sdk.getCleanupRewindYears.mock.calls.map(([args]) => args)).toEqual([{ monthDay: 103 }]);
+    expect(screen.getByAltText('day-103.jpg')).toBeInTheDocument();
+
+    // 101's request is still in flight when 104 starts: its late answer is dropped
+    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-101'));
+    await vi.advanceTimersByTimeAsync(150);
+    await fireEvent.mouseEnter(screen.getByTestId('cleanup-cal-104'));
+    await vi.advanceTimersByTimeAsync(150);
+    slow.resolve({ years: [{ year: 2020, count: 9 }] });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByAltText('day-104.jpg')).toBeInTheDocument();
+    expect(screen.queryByAltText('day-101.jpg')).not.toBeInTheDocument();
+    expect(sdk.getCleanupRewindAssets).not.toHaveBeenCalledWith(
+      expect.objectContaining({ monthDay: 101 }),
+      expect.anything(),
+    );
+  });
+
+  it('does not restart the peek when the hovered cell then receives focus', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+    sdk.getCleanupRewindYears.mockClear();
+
+    const cell = screen.getByTestId('cleanup-cal-102');
+    await fireEvent.mouseEnter(cell);
+    await vi.advanceTimersByTimeAsync(150);
+    await fireEvent.focus(cell);
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(sdk.getCleanupRewindYears).toHaveBeenCalledTimes(1);
+    expect((sdk.getCleanupRewindYears.mock.calls[0][1] as { signal: AbortSignal }).signal.aborted).toBe(false);
   });
 });
