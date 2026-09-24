@@ -479,7 +479,8 @@ describe(MemoryService.name, () => {
       const results = await sut.search(auth, {});
       expect(results.map(({ id }) => id)).toEqual([onThisDay.id]);
       // countAll comes back from Postgres as a bigint string; compare numerically.
-      expect(Number((await sut.statistics(auth, {})).total)).toBe(1);
+      const statistics = await sut.statistics(auth, {});
+      expect(Number(statistics.total)).toBe(1);
       await expect(sut.search(auth, { type: MemoryType.Birthday })).resolves.toEqual([]);
       await expect(sut.get(auth, birthday.id!)).resolves.toEqual(expect.objectContaining({ id: birthday.id }));
     });
