@@ -1,46 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/tags_picker.page.dart';
-import 'package:immich_mobile/providers/infrastructure/tag.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/tags_picker.provider.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-class _FakeTagNotifier extends TagNotifier {
-  final Set<Tag> tags;
-  _FakeTagNotifier(this.tags);
-
-  @override
-  Future<Set<Tag>> build() async => tags;
-}
-
-/// Throws on the first `build()`, succeeds on every subsequent one — lets a
-/// test prove that tapping "retry" performs a genuine refetch (not just a
-/// cosmetic re-render of already-cached data). `ref.invalidate(tagProvider)`
-/// re-runs `build()` on this same notifier instance, so a plain mutable
-/// field is enough to track the attempt count.
-class _FlakyTagNotifier extends TagNotifier {
-  final Set<Tag> tags;
-  int calls = 0;
-  _FlakyTagNotifier(this.tags);
-
-  @override
-  Future<Set<Tag>> build() async {
-    calls++;
-    if (calls == 1) {
-      throw Exception('network down');
-    }
-    return tags;
-  }
-}
-
 Tag _t(String id, String value) => Tag(id: id, value: value);
 
-List<Override> _overrides(Set<Tag> tags) => [tagProvider.overrideWith(() => _FakeTagNotifier(tags))];
+List<Override> _overrides(Set<Tag> tags) => [Store.tags.all().overrideWith((ref) async => tags.toList())];
 
 void main() {
   group('TagsPickerPage', () {
@@ -87,7 +59,7 @@ void main() {
   });
 
   group('TagsPickerPage rows + search', () {
-    testWidgets('lists tags from the full tagProvider, each with leaf + full-path subtitle', (tester) async {
+    testWidgets('lists tags from the full Store.tags.all(), each with leaf + full-path subtitle', (tester) async {
       await tester.pumpConsumerWidget(
         const TagsPickerPage(),
         overrides: _overrides({_t('t1', 'Travel/Italy/Rome'), _t('t2', 'Food')}),
@@ -188,11 +160,20 @@ void main() {
   });
 
   group('TagsPickerPage error state', () {
-    testWidgets('renders a tappable retry; tapping invalidates tagProvider and refetches', (tester) async {
+    testWidgets('renders a tappable retry; tapping invalidates Store.tags.all() and refetches', (tester) async {
+      // Throws on the first fetch, succeeds on every later one — proves that tapping "retry"
+      // performs a genuine refetch (invalidate re-runs this override), not a cosmetic re-render.
+      var calls = 0;
       await tester.pumpConsumerWidget(
         const TagsPickerPage(),
         overrides: [
-          tagProvider.overrideWith(() => _FlakyTagNotifier({_t('t1', 'Food')})),
+          Store.tags.all().overrideWith((ref) async {
+            calls++;
+            if (calls == 1) {
+              throw Exception('network down');
+            }
+            return [_t('t1', 'Food')];
+          }),
         ],
       );
       await tester.pumpAndSettle();
