@@ -393,6 +393,21 @@ describe('RewindDay', () => {
     expect(tile('bb')).toHaveAttribute('data-mark', 'kept');
   });
 
+  it('hints at the Bursts queue in one-at-a-time mode only for a photo taken within 2 s of another', async () => {
+    renderDay([
+      asset('a', { localDateTime: '2024-09-23T10:00:00.000Z' }),
+      asset('bb', { localDateTime: '2024-09-23T10:00:01.500Z' }),
+      asset('ccc', { localDateTime: '2024-09-23T18:00:00.000Z' }),
+    ]);
+    await fireEvent.click(screen.getByTestId('cleanup-mode-one'));
+
+    expect(screen.getByTestId('cleanup-hint-burst')).toBeVisible();
+
+    await fireEvent.click(screen.getByTestId('cleanup-rewind-next-ccc'));
+    expect(screen.getByTestId('cleanup-rewind-stage-ccc')).toBeVisible();
+    expect(screen.queryByTestId('cleanup-rewind-hints')).toBeNull();
+  });
+
   it('remembers the chosen mode', async () => {
     renderDay();
 

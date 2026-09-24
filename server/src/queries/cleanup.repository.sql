@@ -182,10 +182,20 @@ select
       "cleanup_decision"."assetId" = "asset"."id"
       and "cleanup_decision"."userId" = $1
       and "cleanup_decision"."queue" = 'rewind'
-  ) as "kept"
+  ) as "kept",
+  case
+    when asset_quality.sharpness < $2 then 'blurry'
+    when (
+      asset_quality.brightness < $3
+      and asset_quality."clippedDark" > $4
+    ) then 'dark'
+    when asset_quality."clippedBright" > $5 then 'bright'
+    else null
+  end as "reason"
 from
   "asset"
   left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+  left join "asset_quality" on "asset_quality"."assetId" = "asset"."id"
 where
   (
     (
@@ -204,12 +214,12 @@ where
     year
     from
       ("asset"."localDateTime" at time zone 'UTC')
-  ) = $2
+  ) = $6
   and "asset"."deletedAt" is null
   and "asset"."visibility" in ('timeline', 'archive')
   and "asset"."isOffline" = false
   and "asset"."libraryId" is null
-  and "asset"."ownerId" = $3
+  and "asset"."ownerId" = $7
 order by
   "asset"."localDateTime",
   "asset"."id"

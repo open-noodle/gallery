@@ -15,6 +15,7 @@
   import { confirmCleanupTrash, showRemovedToast } from '$lib/utils/cleanup-actions';
   import {
     browserTimeZone,
+    burstMemberIds,
     dominantCity,
     monthDayLabel,
     monthDayShortLabel,
@@ -92,6 +93,9 @@
     })),
   );
   const flat = $derived(sections.flatMap(({ visible }) => visible));
+  // Measured over every loaded photo, not only the visible ones, so hiding a kept shot does not
+  // stop its burst neighbour from being hinted.
+  const burstIds = $derived(burstMemberIds(loaded.flatMap(({ assets }) => assets)));
   const unloadedCount = $derived(
     years.filter(({ year }) => loaded.every((l) => l.year !== year)).reduce((sum, year) => sum + year.count, 0),
   );
@@ -600,6 +604,7 @@
       total={flat.length}
       upNext={flat.slice(Math.max(focusedIndex, 0) + 1, Math.max(focusedIndex, 0) + 1 + UP_NEXT)}
       marks={session.marks}
+      inBurst={current ? burstIds.has(current.id) : false}
       onTrash={() => markCurrent('trash')}
       onSkip={() => step(1)}
       onFavorite={() => markCurrent('fav')}

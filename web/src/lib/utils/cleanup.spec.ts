@@ -1,5 +1,6 @@
 import {
   burstDecision,
+  burstMemberIds,
   burstMarkOf,
   burstTimeRange,
   chunk,
@@ -84,5 +85,20 @@ describe('cleanup utils', () => {
     expect(burstTimeRange('2024-08-12T14:03:21.000Z', '2024-08-12T14:03:24.000Z', 'en-GB')).toBe(
       '12 Aug 2024 · 14:03:21 → 14:03:24',
     );
+  });
+
+  it('finds the photos taken within 2 s of another one, whatever the input order', () => {
+    const at = (id: string, time: string) => ({ id, localDateTime: `2024-08-12T${time}Z` });
+    const ids = burstMemberIds([
+      at('lone', '09:00:00.000'),
+      at('b2', '14:03:22.000'),
+      at('b1', '14:03:21.000'),
+      // Exactly 2 s after b2 still counts, like the server's gap rule.
+      at('b3', '14:03:24.000'),
+      at('late', '14:03:26.001'),
+    ]);
+
+    expect([...ids].sort()).toEqual(['b1', 'b2', 'b3']);
+    expect(burstMemberIds([at('only', '10:00:00.000')]).size).toBe(0);
   });
 });

@@ -187,6 +187,15 @@ const blurryExpressions = (strictness: CleanupStrictnessValue) => {
   };
 };
 
+/** The first Blurry reason an asset meets (blurry, then dark, then bright), or null. Needs `asset_quality` joined. */
+const blurReasonExpr = ({ isBlurry, isDark, isBright }: ReturnType<typeof blurryExpressions>) =>
+  sql<'blurry' | 'dark' | 'bright' | null>`case
+          when ${isBlurry} then 'blurry'
+          when ${isDark} then 'dark'
+          when ${isBright} then 'bright'
+          else null
+        end`;
+
 const resolveReasonFilter = (
   reason: CleanupBlurReason,
   exprs: ReturnType<typeof blurryExpressions>,
@@ -381,19 +390,30 @@ export class CleanupRepository {
     return rows.map((row) => ({ year: Number(row.year), count: Number(row.count) }));
   }
 
+  /**
+   * `reason` is the Blurry queue's reason at the default strictness, so one-at-a-time mode can hint
+   * that a photo also sits in that queue. It is null (dropped) for an unscored asset.
+   */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER, DummyValue.NUMBER] })
   async getRewindAssets(userId: string, monthDay: number, year: number): Promise<CleanupAssetRow[]> {
     const qb = this.db
       .selectFrom('asset')
       .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select((eb) => cleanupAssetColumns(eb, keptForQueue(eb, userId, CleanupQueue.Rewind)))
+      .leftJoin('asset_quality', 'asset_quality.assetId', 'asset.id')
+      .select((eb) =>
+        cleanupAssetColumns(
+          eb,
+          keptForQueue(eb, userId, CleanupQueue.Rewind),
+          blurReasonExpr(blurryExpressions(CLEANUP_BLURRY_DEFAULTS.strictness)).as('reason'),
+        ),
+      )
       .where((eb) => eb(monthDayExpr, '=', sql.lit(monthDay)))
       .where(sql<boolean>`extract(year from ("asset"."localDateTime" at time zone 'UTC')) = ${year}`)
       .orderBy('asset.localDateTime')
       .orderBy('asset.id');
 
     const rows = await withCleanupScope(qb, userId).execute();
-    return rows.map((row) => mapCleanupAssetRow(row));
+    return rows.map(({ reason, ...row }) => ({ ...mapCleanupAssetRow(row), reason: reason ?? undefined }));
   }
 
   @GenerateSql({ params: [DummyValue.UUID, CleanupQueue.Rewind, [DummyValue.UUID]] })
@@ -680,7 +700,6 @@ export class CleanupRepository {
   ): Promise<{ items: CleanupAssetRow[]; next: CleanupCursor | null }> {
     const { cursor, limit, strictness, reason, hideFaces } = options;
     const exprs = blurryExpressions(strictness);
-    const { isBlurry, isDark, isBright } = exprs;
 
     let qb = this.db
       .selectFrom('asset')
@@ -692,12 +711,7 @@ export class CleanupRepository {
           sql.lit(false),
           'asset_quality.sharpness' as const,
           cursorTExpr.as('cursorT'),
-          sql<'blurry' | 'dark' | 'bright' | null>`case
-          when ${isBlurry} then 'blurry'
-          when ${isDark} then 'dark'
-          when ${isBright} then 'bright'
-          else null
-        end`.as('reason'),
+          blurReasonExpr(exprs).as('reason'),
         ),
       )
       .where('asset.type', '=', sql.lit(AssetType.Image))
