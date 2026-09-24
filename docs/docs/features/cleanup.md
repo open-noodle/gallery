@@ -20,7 +20,7 @@ The Cleanup page shows:
 
 ## Rewind and the calendar
 
-The calendar has one row per month and one cell per day. A cell is shaded by how many photos you took on that date across all years. Dates you have finished are shown in green, and today is outlined. Hover over a date to preview its photos, then choose **Rewind this day** to open it.
+The calendar has one row per month and one cell per day. A cell is shaded by how many photos you took on that date across all years, compared with your other dates, so one very busy date does not wash out the rest. Dates you have finished are shown in green, and today is outlined. Hover over a date to preview its photos, then choose **Rewind this day** to open it.
 
 A rewind page lists the date's photos grouped by year, newest year first. For each photo you can:
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { monthDayLabel, shadeLevel } from '$lib/utils/cleanup';
+  import { monthDayLabel, shadeLevel, shadeScale } from '$lib/utils/cleanup';
   import type { CleanupCalendarDayDto } from '@immich/sdk';
   import { Text } from '@immich/ui';
   import { locale, t } from 'svelte-i18n';
@@ -25,10 +25,10 @@
 
   const stateClasses: Record<CellState, string> = {
     none: 'bg-gray-200 dark:bg-gray-700',
-    l1: 'bg-primary/20',
-    l2: 'bg-primary/40',
-    l3: 'bg-primary/60',
-    l4: 'bg-primary/90',
+    l1: 'bg-primary/35',
+    l2: 'bg-primary/55',
+    l3: 'bg-primary/75',
+    l4: 'bg-primary',
     reviewed: 'bg-green-500',
   };
   // A reviewed day with few photos reads lighter, as in the mockup.
@@ -36,14 +36,14 @@
 
   const lang = $derived($locale ?? 'en');
   const byMonthDay = $derived(new Map(days.map((day) => [day.monthDay, day])));
-  const max = $derived(Math.max(0, ...days.map((day) => day.assetCount)));
+  const scale = $derived(shadeScale(days.map((day) => day.assetCount)));
   const monthFormatter = $derived(new Intl.DateTimeFormat(lang, { month: 'short' }));
 
   // A day without photos has nothing to review, so it never shows as reviewed.
   const isReviewed = (day: CleanupCalendarDayDto | undefined) => !!day?.reviewedAt && day.assetCount > 0;
 
   const cellState = (day: CleanupCalendarDayDto | undefined): CellState => {
-    const level = shadeLevel(day?.assetCount ?? 0, max);
+    const level = shadeLevel(day?.assetCount ?? 0, scale);
     if (level === 0) {
       return 'none';
     }
@@ -51,7 +51,7 @@
   };
 
   const cellClass = (day: CleanupCalendarDayDto | undefined, state: CellState) =>
-    state === 'reviewed' && shadeLevel(day?.assetCount ?? 0, max) <= 2 ? REVIEWED_LIGHT_CLASS : stateClasses[state];
+    state === 'reviewed' && shadeLevel(day?.assetCount ?? 0, scale) <= 2 ? REVIEWED_LIGHT_CLASS : stateClasses[state];
 
   const cellLabel = (monthDay: number, day: CleanupCalendarDayDto | undefined) =>
     $t(isReviewed(day) ? 'cleanup_calendar_day_label_reviewed' : 'cleanup_calendar_day_label', {
@@ -105,10 +105,10 @@
   </span>
   <span class="flex items-center gap-1.5">
     <span class="flex gap-0.5">
-      <i class="inline-block size-3 rounded-sm bg-primary/20"></i>
-      <i class="inline-block size-3 rounded-sm bg-primary/40"></i>
-      <i class="inline-block size-3 rounded-sm bg-primary/60"></i>
-      <i class="inline-block size-3 rounded-sm bg-primary/90"></i>
+      <i class="inline-block size-3 rounded-sm bg-primary/35"></i>
+      <i class="inline-block size-3 rounded-sm bg-primary/55"></i>
+      <i class="inline-block size-3 rounded-sm bg-primary/75"></i>
+      <i class="inline-block size-3 rounded-sm bg-primary"></i>
     </span>
     {$t('cleanup_legend_to_review')}
   </span>
