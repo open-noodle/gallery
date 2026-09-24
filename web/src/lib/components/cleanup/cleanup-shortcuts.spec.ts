@@ -183,3 +183,106 @@ describe('queueShortcuts', () => {
     root.remove();
   });
 });
+
+describe('Space on a focused control', () => {
+  const makeControl = (kind: 'button' | 'link' | 'role-button') => {
+    if (kind === 'button') {
+      return Object.assign(document.createElement('button'), { type: 'button' });
+    }
+    if (kind === 'link') {
+      return Object.assign(document.createElement('a'), { href: '/trash' });
+    }
+    const div = document.createElement('div');
+    div.setAttribute('role', 'button');
+    div.tabIndex = 0;
+    return div;
+  };
+
+  const makeTile = () => {
+    const tile = Object.assign(document.createElement('button'), { type: 'button' });
+    tile.dataset.assetId = 'asset-1';
+    return tile;
+  };
+
+  let root: HTMLDivElement;
+  let destroy: (() => void) | undefined;
+
+  beforeEach(() => {
+    root = document.createElement('div');
+    document.body.append(root);
+  });
+
+  afterEach(() => {
+    destroy?.();
+    root.remove();
+  });
+
+  const setups = [
+    [
+      'cleanupShortcuts (rewind)',
+      () => {
+        const handlers = makeHandlers();
+        destroy = shortcuts(
+          root,
+          cleanupShortcuts(handlers, () => false),
+        )?.destroy;
+        return handlers;
+      },
+    ],
+    [
+      'queueShortcuts (queues)',
+      () => {
+        const handlers: QueueShortcutHandlers = {
+          trash: vi.fn(),
+          keep: vi.fn(),
+          selectAll: vi.fn(),
+          clear: vi.fn(),
+          open: vi.fn(),
+        };
+        destroy = shortcuts(
+          root,
+          queueShortcuts(handlers, () => false),
+        )?.destroy;
+        return handlers;
+      },
+    ],
+  ] as const;
+
+  describe.each(setups)('%s', (_, setup) => {
+    it.each(['button', 'link', 'role-button'] as const)(
+      'leaves Space to a focused non-tile %s: no viewer, default not prevented',
+      (kind) => {
+        const handlers = setup();
+        const control = makeControl(kind);
+        root.append(control);
+
+        const event = press(control, ' ');
+
+        expect(handlers.open).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
+      },
+    );
+
+    it('still opens the viewer when Space is pressed on a focused asset tile', () => {
+      const handlers = setup();
+      const tile = makeTile();
+      root.append(tile);
+
+      const event = press(tile, ' ');
+
+      expect(handlers.open).toHaveBeenCalledTimes(1);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('still runs the other shortcuts from a focused non-tile button', () => {
+      const handlers = setup();
+      const control = makeControl('button');
+      root.append(control);
+
+      const event = press(control, 'k');
+
+      expect(handlers.keep).toHaveBeenCalledTimes(1);
+      expect(event.defaultPrevented).toBe(true);
+    });
+  });
+});
