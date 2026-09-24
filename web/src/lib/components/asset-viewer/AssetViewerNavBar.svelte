@@ -84,14 +84,10 @@
     onAction: () => setPlayOriginalVideo(!isPlayingOriginalVideo),
   });
 
-<<<<<<< origin/main
-  const Actions = $derived(getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space }));
-||||||| ca4637adc79
-  const Actions = $derived(getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }));
-=======
-  const Actions = $derived(getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, album));
+  const Actions = $derived(
+    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space, album }),
+  );
   const StackActions = $derived(getStackActions($t, stack, asset));
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   const sharedLink = getSharedLink();
 </script>
 

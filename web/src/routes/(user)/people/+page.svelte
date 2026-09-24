@@ -223,6 +223,46 @@
     }
   };
 
+  const handleHidePerson = async (detail: PersonResponseDto) => {
+    try {
+      const updatedPerson = await updatePerson({
+        id: detail.id,
+        personUpdateDto: { isHidden: true },
+      });
+
+      people = people.map((person: PersonResponseDto) => {
+        if (person.id === updatedPerson.id) {
+          return updatedPerson;
+        }
+        return person;
+      });
+
+      toastManager.primary($t('changed_visibility_successfully'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_hide_person'));
+    }
+  };
+
+  const handleToggleFavorite = async (detail: PersonResponseDto) => {
+    try {
+      const updatedPerson = await updatePerson({
+        id: detail.id,
+        personUpdateDto: { isFavorite: !detail.isFavorite },
+      });
+
+      people = people.map((person: PersonResponseDto) => {
+        if (person.id === updatedPerson.id) {
+          return updatedPerson;
+        }
+        return person;
+      });
+
+      toastManager.primary(updatedPerson.isFavorite ? $t('added_to_favorites') : $t('removed_from_favorites'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: detail.isFavorite } }));
+    }
+  };
+
   const handleMergePeople = async (detail: PersonResponseDto) => {
     await goto(Route.viewPerson(detail, { previousRoute: Route.people(), action: 'merge' }));
   };
@@ -344,12 +384,14 @@
   $effect(() => {
     for (const person of people) {
       const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
-      if (spaceId && !requestedSpaceRoles.has(spaceId)) {
-        requestedSpaceRoles.add(spaceId);
-        void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
-          editableSpaces.set(spaceId, editable);
-        });
+      if (!spaceId || requestedSpaceRoles.has(spaceId)) {
+        continue;
       }
+
+      requestedSpaceRoles.add(spaceId);
+      void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
+        editableSpaces.set(spaceId, editable);
+      });
     }
   });
   const canEditSpacePerson = (person: PersonResponseDto) => {
@@ -529,7 +571,6 @@
           icon={mdiDotsVertical}
           title={$t('show_person_options')}
         >
-<<<<<<< origin/main
           <MenuOption onClick={() => handleHidePerson(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
           <ActionMenuItem action={Actions.SetDateOfBirth} />
           <MenuOption
@@ -541,36 +582,6 @@
             onClick={() => handleToggleFavorite(person)}
             icon={person.isFavorite ? mdiHeartMinusOutline : mdiHeartOutline}
             text={person.isFavorite ? $t('unfavorite') : $t('to_favorite')}
-||||||| ca4637adc79
-          <PeopleCard
-            {person}
-            onMergePeople={() => handleMergePeople(person)}
-            onHidePerson={() => handleHidePerson(person)}
-            onToggleFavorite={() => handleToggleFavorite(person)}
-          />
-
-          <input
-            type="text"
-            class="mt-2 w-full rounded-2xl border-gray-100 bg-white py-2 text-center text-sm text-primary placeholder-gray-400 dark:border-gray-900 dark:bg-immich-dark-gray"
-            value={person.name}
-            placeholder={$t('add_a_name')}
-            use:shortcut={{ shortcut: { key: 'Enter' }, onShortcut: (e) => e.currentTarget.blur() }}
-            onfocusin={() => onNameChangeInputFocus(person)}
-            onfocusout={() => onNameChangeSubmit(newName, person)}
-            oninput={(event) => onNameChangeInputUpdate(event)}
-=======
-          <PeopleCard {person} onMergePeople={() => handleMergePeople(person)} />
-
-          <input
-            type="text"
-            class="mt-2 w-full rounded-2xl border-gray-100 bg-white py-2 text-center text-sm text-primary placeholder-gray-400 dark:border-gray-900 dark:bg-immich-dark-gray"
-            value={person.name}
-            placeholder={$t('add_a_name')}
-            use:shortcut={{ shortcut: { key: 'Enter' }, onShortcut: (e) => e.currentTarget.blur() }}
-            onfocusin={() => onNameChangeInputFocus(person)}
-            onfocusout={() => onNameChangeSubmit(newName, person)}
-            oninput={(event) => onNameChangeInputUpdate(event)}
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           />
         </ButtonContextMenu>
       {/snippet}

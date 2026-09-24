@@ -13,6 +13,7 @@ import 'package:immich_mobile/providers/server_info.provider.dart';
 ///   fallback: Text('OCR is not available'),
 /// )
 /// ```
+// ignore: unused-code
 class FeatureCheck extends ConsumerWidget {
   /// A function that extracts the specific feature flag from ServerFeatures
   final bool Function(ServerFeatures) feature;
@@ -23,6 +24,7 @@ class FeatureCheck extends ConsumerWidget {
   /// Optional widget to display when the feature is disabled
   final Widget? fallback;
 
+  // ignore: unused-code
   const FeatureCheck({super.key, required this.feature, required this.child, this.fallback});
 
   @override

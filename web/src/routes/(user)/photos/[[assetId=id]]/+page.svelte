@@ -47,36 +47,16 @@
   import { removeSearchResults, selectAllSearchResults, updateSearchResults } from '$lib/utils/search-result-selection';
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
-<<<<<<< origin/main
-  import { lang } from '$lib/stores/preferences.store';
-||||||| ca4637adc79
-=======
   import { getStackBulkActions } from '$lib/services/stack.service';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  import { lang } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
-<<<<<<< origin/main
   import {
     buildSearchablePageUrl,
     getSearchablePageFilterState,
     getSearchablePageState,
   } from '$lib/utils/searchable-page-search';
   import { consumeTypedSearchNamesInto } from '$lib/utils/typed-search/typed-search-name-cache';
-  import {
-    updateStackedAssetInTimeline,
-    updateUnstackedAssetInTimeline,
-    type OnLink,
-    type OnUnlink,
-  } from '$lib/utils/actions';
-||||||| ca4637adc79
-  import {
-    updateStackedAssetInTimeline,
-    updateUnstackedAssetInTimeline,
-    type OnLink,
-    type OnUnlink,
-  } from '$lib/utils/actions';
-=======
   import { type OnLink, type OnUnlink } from '$lib/utils/actions';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import {
     buildPhotosTimelineOptions,
@@ -755,29 +735,11 @@
 
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
-<<<<<<< origin/main
-        {#if !showSearchResults && (assetMultiSelectManager.assets.length > 1 || isAssetStackSelected)}
-          <StackAction
-            unstack={isAssetStackSelected}
-            onStack={(result) => updateStackedAssetInTimeline(timelineManager, result)}
-            onUnstack={(assets) => updateUnstackedAssetInTimeline(timelineManager, assets)}
-          />
+        {#if !showSearchResults}
+          <ActionMenuItem action={StackActions.Stack} />
+          <ActionMenuItem action={StackActions.Unstack} />
         {/if}
         {#if !showSearchResults && isLinkActionAvailable}
-||||||| ca4637adc79
-        {#if assetMultiSelectManager.assets.length > 1 || isAssetStackSelected}
-          <StackAction
-            unstack={isAssetStackSelected}
-            onStack={(result) => updateStackedAssetInTimeline(timelineManager, result)}
-            onUnstack={(assets) => updateUnstackedAssetInTimeline(timelineManager, assets)}
-          />
-        {/if}
-        {#if isLinkActionAvailable}
-=======
-        <ActionMenuItem action={StackActions.Stack} />
-        <ActionMenuItem action={StackActions.Unstack} />
-        {#if isLinkActionAvailable}
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
           <LinkLivePhotoAction
             menuItem
             unlink={assetMultiSelectManager.assets.length === 1}

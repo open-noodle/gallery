@@ -127,34 +127,16 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     final isAlbumLinkedSyncEnable = _ref.read(appConfigProvider).backup.syncAlbums;
 
     try {
-<<<<<<< origin/main
+      // immich-31557: a delta sync can miss photos taken after a background launch, so force a
+      // full local sync once. The flag is consumed when the sync is scheduled.
+      final fullLocalSync = CurrentPlatform.isAndroid || _fullSyncPending;
+      _fullSyncPending = false;
       final sync = backgroundManager.syncRemoteThenLocal(
-        fullLocalSync: CurrentPlatform.isAndroid,
+        fullLocalSync: fullLocalSync,
         shouldRunLocal: _shouldContinueOperation,
       );
       final syncSuccess = await sync.remoteSync;
       // #28983: refresh memories on resume (grafted onto fork's #513 deferred-sync restructure)
-||||||| ca4637adc79
-      bool syncSuccess = false;
-      await Future.wait([
-        _safeRun(() => backgroundManager.syncLocal(full: CurrentPlatform.isAndroid), "syncLocal"),
-        _safeRun(() async {
-          syncSuccess = await backgroundManager.syncRemote();
-        }, "syncRemote"),
-      ]);
-=======
-      bool syncSuccess = false;
-      await Future.wait([
-        _safeRun(() {
-          final full = CurrentPlatform.isAndroid || _fullSyncPending;
-          _fullSyncPending = false;
-          return backgroundManager.syncLocal(full: full);
-        }, "syncLocal"),
-        _safeRun(() async {
-          syncSuccess = await backgroundManager.syncRemote();
-        }, "syncRemote"),
-      ]);
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
       _ref.invalidate(memoryLaneProvider);
       _ref.invalidate(allMemoriesProvider);
 

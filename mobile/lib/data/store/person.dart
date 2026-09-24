@@ -5,16 +5,8 @@ import 'package:immich_mobile/data/store/user_metadata.dart';
 import 'package:immich_mobile/data/store/util/cache.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
-<<<<<<< origin/main
-// TODO(rewrite): Remove once user metadata is a store entry of its own
-import 'package:immich_mobile/providers/infrastructure/user_metadata.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:logging/logging.dart';
-||||||| ca4637adc79
-// TODO(rewrite): Remove once user metadata is a store entry of its own
-import 'package:immich_mobile/providers/infrastructure/user_metadata.provider.dart';
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 /// People representing collections of faces and assets
 ///
@@ -30,24 +22,17 @@ extension type const PersonStore._(Provider<PersonMutations> _provider) implemen
 
   /// Get the people present in the asset keyed by [key.id], honoring [key.ownerId].
   ///
-<<<<<<< origin/main
   /// The local sync DB only ever receives faces for assets the viewer owns (see
   /// AGENTS.md), so for an asset owned by someone else this routes to the server's
   /// asset-info endpoint instead, matching web's on-demand resolution. See issue #727.
   ///
   /// **NOTE:** This is not reactive to changes
   AutoDisposeFutureProvider<List<Person>> forAsset(({String id, String ownerId}) key) => _forAssetProvider(key);
-||||||| ca4637adc79
-  /// **NOTE:** This is not reactive to changes, and only hits the local DB
-  AutoDisposeFutureProvider<List<Person>> forAsset(String assetId) => _forAssetProvider(assetId);
-=======
-  /// **NOTE:** This is only reactive to the local DB
-  AutoDisposeStreamProvider<List<Person>> forAsset(String assetId) => _forAssetProvider(assetId);
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
   /// Get all known people, honoring the user's minimum detected face count preference
   ///
   /// **NOTE:** This only hits the local DB
+  // ignore: unused-code
   AutoDisposeStreamProvider<List<Person>> all() => _allProvider;
 }
 
@@ -57,7 +42,6 @@ final _byIdProvider = StreamProvider.autoDispose.family<Person?, String>(
   (ref, personId) => ref.watch(_peopleDb).watchPerson(personId).distinct(),
 );
 
-<<<<<<< origin/main
 final _log = Logger('PersonStore');
 
 final _forAssetProvider = FutureProvider.autoDispose.family<List<Person>, ({String id, String ownerId})>((
@@ -76,17 +60,8 @@ final _forAssetProvider = FutureProvider.autoDispose.family<List<Person>, ({Stri
       return const [];
     }
   }
-  return ref.watch(_peopleDb).getAssetPeople(key.id);
+  return ref.watch(_peopleDb).watchPeopleForAsset(key.id).first;
 });
-||||||| ca4637adc79
-final _forAssetProvider = FutureProvider.autoDispose.family<List<Person>, String>(
-  (ref, assetId) => ref.watch(_peopleDb).getAssetPeople(assetId),
-);
-=======
-final _forAssetProvider = StreamProvider.autoDispose.family<List<Person>, String>(
-  (ref, assetId) => ref.watch(_peopleDb).watchPeopleForAsset(assetId).distinct(const ListEquality<Person>().equals),
-);
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 
 final _allProvider = StreamProvider.autoDispose<List<Person>>((ref) async* {
   final prefs = await ref.watch(UserMetadataStore.instance.preferences().future);
@@ -106,12 +81,14 @@ class PersonMutations extends StoreMutations {
   // before any caller adopts Store.people for edits. Unused today, so this is latent.
 
   /// Update a person's name
+  // ignore: unused-code
   Future<int> updateName(String personId, String name) async {
     await read(personApiRepositoryProvider).update(personId, name: name);
     return read(_peopleDb).updateName(personId, name);
   }
 
   /// Update a person's birthday
+  // ignore: unused-code
   Future<int> updateBirthday(String personId, DateTime birthday) async {
     await read(personApiRepositoryProvider).update(personId, birthday: birthday);
     return read(_peopleDb).updateBirthday(personId, birthday);

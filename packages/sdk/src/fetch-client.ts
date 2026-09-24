@@ -2267,36 +2267,14 @@ export type MapReverseGeocodeResponseDto = {
     /** State/Province name */
     state: string | null;
 };
-<<<<<<< origin/main
-||||||| ca4637adc79
-export type OnThisDayDto = {
-    /** Year for on this day memory */
-    year: number;
-};
-=======
-export type MemoryDataDto = {
-    /** Person ID (birthday memories) */
-    personId?: string;
-    /** Name of the person when the memory was created (birthday memories) */
-    personName?: string;
-    /** Year of the memory */
-    year: number;
-};
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 export type MemoryResponseDto = {
     assets: AssetResponseDto[];
     /** Creation date */
     createdAt: string;
-<<<<<<< origin/main
     /** Memory data */
     data: {
         [key: string]: any;
     };
-||||||| ca4637adc79
-    data: OnThisDayDto;
-=======
-    data: MemoryDataDto;
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     /** Deletion date */
     deletedAt?: string;
     /** Date when memory should be hidden */
@@ -2324,16 +2302,10 @@ export type MemoryResponseDto = {
 export type MemoryCreateDto = {
     /** Asset IDs to associate with memory */
     assetIds?: string[];
-<<<<<<< origin/main
     /** Memory data */
     data: {
         [key: string]: any;
     };
-||||||| ca4637adc79
-    data: OnThisDayDto;
-=======
-    data: MemoryDataDto;
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     /** Date when memory should be hidden */
     hideAt?: string;
     /** Is memory saved */
@@ -11319,13 +11291,8 @@ export enum MemorySearchOrder {
 }
 export enum MemoryType {
     OnThisDay = "on_this_day",
-<<<<<<< origin/main
+    Birthday = "birthday",
     Rule = "rule"
-||||||| ca4637adc79
-    OnThisDay = "on_this_day"
-=======
-    Birthday = "birthday"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 }
 export enum PartnerDirection {
     SharedBy = "shared-by",
@@ -11620,7 +11587,7 @@ export enum SyncRequestType {
     PeopleV1 = "PeopleV1",
     AssetFacesV1 = "AssetFacesV1",
     AssetFacesV2 = "AssetFacesV2",
-<<<<<<< origin/main
+    AssetFacesV3 = "AssetFacesV3",
     UserMetadataV1 = "UserMetadataV1",
     SharedSpacesV1 = "SharedSpacesV1",
     SharedSpaceMembersV1 = "SharedSpaceMembersV1",
@@ -11643,12 +11610,6 @@ export enum TimeBucketSize {
     Year = "year",
     Month = "month",
     Day = "day"
-||||||| ca4637adc79
-    UserMetadataV1 = "UserMetadataV1"
-=======
-    AssetFacesV3 = "AssetFacesV3",
-    UserMetadataV1 = "UserMetadataV1"
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 }
 export enum AssetOrderBy {
     TakenAt = "takenAt",

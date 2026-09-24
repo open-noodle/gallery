@@ -183,13 +183,7 @@ class Drift extends $Drift {
   }
 
   @override
-<<<<<<< origin/main
-  int get schemaVersion => 38;
-||||||| ca4637adc79
-  int get schemaVersion => 31;
-=======
-  int get schemaVersion => 34;
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  int get schemaVersion => 41;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -452,14 +446,20 @@ class Drift extends $Drift {
                   TableMigration(v38.sharedSpaceAlbumLinkEntity, newColumns: [v38.sharedSpaceAlbumLinkEntity.folderId]),
                 );
               },
-              from31To32: (m, v32) async {
-                await m.addColumn(v32.localAssetEntity, v32.localAssetEntity.previousChecksum);
+              // Upstream immich-31577 added local_asset.previous_checksum at its drift v32,
+              // which collides with the fork's v32 (the created_at index). Renumbered here to
+              // v39 — the next version after the fork's v38 — because installed clients already
+              // ran the fork's v32-v38 and must not re-run them under new numbers.
+              from38To39: (m, v39) async {
+                await m.addColumn(v39.localAssetEntity, v39.localAssetEntity.previousChecksum);
               },
-              from32To33: (m, v33) async {
-                // Removed foreign key constraints on asset_face.assetId and asset_face.personId
-                await m.alterTable(TableMigration(v33.assetFaceEntity));
+              // Upstream immich-31615 removed the asset_face FK constraints at its drift v33,
+              // and immich-30490 healed out-of-range datetimes at its v34. Both collide with the
+              // fork's shipped v33/v34, so they are renumbered here to v40 and v41.
+              from39To40: (m, v40) async {
+                await m.alterTable(TableMigration(v40.assetFaceEntity));
               },
-              from33To34: (m, v34) async {
+              from40To41: (m, v41) async {
                 await _healV33DateTimes(this);
               },
             ),
@@ -510,6 +510,16 @@ const _v33DateTimeColumns = <String, List<String>>{
   'person_entity': ['created_at', 'updated_at', 'birth_date'],
   'asset_face_entity': ['deleted_at'],
   'settings': ['updated_at'],
+  // gallery-fork: the fork's own tables adopted clampedDateTime in the same change, so
+  // they carry the same pre-clamp exposure and are healed here too. Column lists are
+  // derived from each table's clampedDateTime getters.
+  'library_entity': ['created_at', 'updated_at'],
+  'shared_space_entity': ['last_activity_at', 'created_at', 'updated_at'],
+  'shared_space_member_entity': ['joined_at'],
+  'shared_space_library_entity': ['created_at'],
+  'shared_space_album_entity': ['created_at', 'updated_at'],
+  'shared_space_album_link_entity': ['created_at', 'updated_at'],
+  'shared_space_album_folder_entity': ['created_at', 'updated_at'],
 };
 
 // Rewrites datetime text sqlite date functions cannot handle: signed extended

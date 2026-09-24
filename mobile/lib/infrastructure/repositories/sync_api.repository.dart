@@ -85,9 +85,12 @@ class SyncApiRepository {
           SyncRequestType.partnerStacksV1,
           SyncRequestType.userMetadataV1,
           SyncRequestType.peopleV1,
-<<<<<<< origin/main
-          serverVersion.supports(.assetFacesV2) ? SyncRequestType.assetFacesV2 : SyncRequestType.assetFacesV1,
-          if (serverVersion.supports(.assetOcr)) SyncRequestType.assetOcrV1,
+          serverVersion.supports(.syncAssetFacesV3)
+              ? SyncRequestType.assetFacesV3
+              : serverVersion.supports(.syncAssetFacesV2)
+              ? SyncRequestType.assetFacesV2
+              : SyncRequestType.assetFacesV1,
+          if (serverVersion.supports(.syncAssetOcrV1)) SyncRequestType.assetOcrV1,
           // --- gallery-fork: shared-space + library sync types ---
           //
           // PR 1 added the server emitters and the mobile dispatch handlers but
@@ -151,17 +154,6 @@ class SyncApiRepository {
             ...(_spaceAlbumSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson())))
           else if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0))
             ..._legacySpaceAlbumSyncTypes,
-||||||| ca4637adc79
-          serverVersion.supports(.assetFacesV2) ? SyncRequestType.assetFacesV2 : SyncRequestType.assetFacesV1,
-          if (serverVersion.supports(.assetOcr)) SyncRequestType.assetOcrV1,
-=======
-          serverVersion.supports(.syncAssetFacesV3)
-              ? SyncRequestType.assetFacesV3
-              : serverVersion.supports(.syncAssetFacesV2)
-              ? SyncRequestType.assetFacesV2
-              : SyncRequestType.assetFacesV1,
-          if (serverVersion.supports(.syncAssetOcrV1)) SyncRequestType.assetOcrV1,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
         ],
       ).toJson(),
     );

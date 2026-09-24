@@ -232,5 +232,6 @@ class MemoryApiRepository extends ApiRepository {
   static MemoryTypeEnum _toMemoryType(MemoryType type) => switch (type) {
     MemoryType.onThisDay => MemoryTypeEnum.onThisDay,
     MemoryType.rule => MemoryTypeEnum.rule,
+    MemoryType.birthday => MemoryTypeEnum.birthday,
   };
 }

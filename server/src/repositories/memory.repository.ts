@@ -13,14 +13,8 @@ import { InjectKysely } from 'nestjs-kysely';
 import type { IBulkAsset } from 'src/types.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemorySearchDto } from 'src/dtos/memory.dto.js';
-<<<<<<< origin/main
-import { AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
-||||||| ca4637adc79
-import { AssetOrderWithRandom, AssetVisibility } from 'src/enum.js';
-=======
-import { AssetFileType, AssetOrderWithRandom, AssetVisibility } from 'src/enum.js';
+import { AssetFileType, AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
 import { asUuid } from 'src/utils/database.js';
@@ -102,53 +96,60 @@ export class MemoryRepository implements IBulkAsset {
 
   /** Serves `GET /memories`. Follows upstream's contract: `isUpcoming` alone scopes `showAt`. */
   private accessibleSearchBuilder(userId: string, dto: MemorySearchDto) {
-    return this.baseSearchBuilder(dto, { hideUnshownByDefault: false }).where((eb) =>
-      eb.or([
-        eb('memory.ownerId', '=', userId),
-        eb.exists(
-          eb
-            .selectFrom('memory_asset')
-            .innerJoin('asset', 'asset.id', 'memory_asset.assetId')
-            .select('memory_asset.assetId')
-            .whereRef('memory_asset.memoriesId', '=', 'memory.id')
-            .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-            .where('asset.deletedAt', 'is', null)
-            .where((eb) =>
-              eb.or([
-                eb('asset.ownerId', '=', userId),
-                eb.exists(
-                  eb
-                    .selectFrom('partner')
-                    .select('partner.sharedById')
-                    .where('partner.sharedWithId', '=', userId)
-                    .whereRef('partner.sharedById', '=', 'asset.ownerId'),
+    return (
+      this.baseSearchBuilder(dto, { hideUnshownByDefault: false })
+        // Gallery generates birthday memories as rules; a MemoryType.Birthday row (an Immich 3.3+
+        // import, or an API create) would abort an installed app's decode. See
+        // specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
+        .where('memory.type', '!=', MemoryType.Birthday)
+        .where((eb) =>
+          eb.or([
+            eb('memory.ownerId', '=', userId),
+            eb.exists(
+              eb
+                .selectFrom('memory_asset')
+                .innerJoin('asset', 'asset.id', 'memory_asset.assetId')
+                .select('memory_asset.assetId')
+                .whereRef('memory_asset.memoriesId', '=', 'memory.id')
+                .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+                .where('asset.deletedAt', 'is', null)
+                .where((eb) =>
+                  eb.or([
+                    eb('asset.ownerId', '=', userId),
+                    eb.exists(
+                      eb
+                        .selectFrom('partner')
+                        .select('partner.sharedById')
+                        .where('partner.sharedWithId', '=', userId)
+                        .whereRef('partner.sharedById', '=', 'asset.ownerId'),
+                    ),
+                    eb.exists(
+                      eb
+                        .selectFrom('shared_space_asset')
+                        .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+                        .select('shared_space_asset.assetId')
+                        .where('shared_space_member.userId', '=', userId)
+                        .whereRef('shared_space_asset.assetId', '=', 'asset.id'),
+                    ),
+                    eb.exists(
+                      eb
+                        .selectFrom('shared_space_library')
+                        .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+                        .select('shared_space_library.libraryId')
+                        .where('shared_space_member.userId', '=', userId)
+                        .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                        .where('asset.isOffline', '=', false),
+                    ),
+                    spaceAlbumAssetExists(eb, {
+                      correlateAssetId: 'asset.id',
+                      scope: { memberUserId: userId },
+                      albumTimelineGate: 'space-tab',
+                    }),
+                  ]),
                 ),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_asset')
-                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
-                    .select('shared_space_asset.assetId')
-                    .where('shared_space_member.userId', '=', userId)
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id'),
-                ),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_library')
-                    .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
-                    .select('shared_space_library.libraryId')
-                    .where('shared_space_member.userId', '=', userId)
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('asset.isOffline', '=', false),
-                ),
-                spaceAlbumAssetExists(eb, {
-                  correlateAssetId: 'asset.id',
-                  scope: { memberUserId: userId },
-                  albumTimelineGate: 'space-tab',
-                }),
-              ]),
             ),
-        ),
-      ]),
+          ]),
+        )
     );
   }
 
@@ -238,6 +239,64 @@ export class MemoryRepository implements IBulkAsset {
       .execute();
   }
 
+  private personAssets(ownerId: string, personGroupId: string) {
+    return this.db
+      .selectFrom('asset')
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.exists((qb) =>
+          qb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.assetId', '=', 'asset.id')
+            .where('asset_face.personGroupId', '=', personGroupId)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true),
+        ),
+      )
+      .where((eb) =>
+        eb.exists((qb) =>
+          qb
+            .selectFrom('asset_file')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', '=', AssetFileType.Preview),
+        ),
+      );
+  }
+
+  @GenerateSql({
+    params: [DummyValue.UUID, DummyValue.UUID, { year: 2000, month: 1, day: 1 }, { year: 2025, month: 1, day: 1 }],
+  })
+  async getPersonBirthdayYears(
+    ownerId: string,
+    personGroupId: string,
+    birthDate: YearMonthDay,
+    until: YearMonthDay,
+  ): Promise<number[]> {
+    const rows = await this.personAssets(ownerId, personGroupId)
+      .where(sql`date_part('month', (asset."localDateTime" at time zone 'UTC')::date)::int`, '=', birthDate.month)
+      .where(sql`date_part('day', (asset."localDateTime" at time zone 'UTC')::date)::int`, '=', birthDate.day)
+      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '>=', asMakeDate(eb, birthDate)))
+      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '<', asMakeDate(eb, until)))
+      .select(sql<number>`date_part('year', (asset."localDateTime" at time zone 'UTC')::date)::int`.as('year'))
+      .distinct()
+      .orderBy(sql`year`, 'desc')
+      .execute();
+
+    return rows.map(({ year }) => year);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { year: 2000, month: 1, day: 1 }, 5] })
+  getPersonAssetsByDate(ownerId: string, personGroupId: string, date: YearMonthDay, limit: number) {
+    return this.personAssets(ownerId, personGroupId)
+      .select(['asset.id'])
+      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '=', asMakeDate(eb, date)))
+      .orderBy('asset.localDateTime', 'desc')
+      .limit(limit)
+      .execute();
+  }
+
   /**
    * Memories of one owner whose visible window overlaps `window`, with the asset ids they
    * actually render. The asset filters MUST stay identical to `search` — floors are measured
@@ -284,7 +343,6 @@ export class MemoryRepository implements IBulkAsset {
       .execute();
   }
 
-<<<<<<< origin/main
   /**
    * Earliest day any memory becomes visible, across all owners — the start of the one-off
    * overlap backfill. `coalesce` mirrors `cleanup`, so a memory with no `showAt` still counts.
@@ -365,67 +423,6 @@ export class MemoryRepository implements IBulkAsset {
   // #1041: `viewerId`/`hiddenScope` are optional — `create`/`update` below return the object right
   // after the caller's own action and pass neither, so their SQL is unchanged. `get()` is the
   // read surface and is the one MemoryService resolves a scope for.
-||||||| ca4637adc79
-=======
-  private personAssets(ownerId: string, personGroupId: string) {
-    return this.db
-      .selectFrom('asset')
-      .where('asset.ownerId', '=', ownerId)
-      .where('asset.visibility', '=', AssetVisibility.Timeline)
-      .where('asset.deletedAt', 'is', null)
-      .where((eb) =>
-        eb.exists((qb) =>
-          qb
-            .selectFrom('asset_face')
-            .whereRef('asset_face.assetId', '=', 'asset.id')
-            .where('asset_face.personGroupId', '=', personGroupId)
-            .where('asset_face.deletedAt', 'is', null)
-            .where('asset_face.isVisible', 'is', true),
-        ),
-      )
-      .where((eb) =>
-        eb.exists((qb) =>
-          qb
-            .selectFrom('asset_file')
-            .whereRef('asset_file.assetId', '=', 'asset.id')
-            .where('asset_file.type', '=', AssetFileType.Preview),
-        ),
-      );
-  }
-
-  @GenerateSql({
-    params: [DummyValue.UUID, DummyValue.UUID, { year: 2000, month: 1, day: 1 }, { year: 2025, month: 1, day: 1 }],
-  })
-  async getPersonBirthdayYears(
-    ownerId: string,
-    personGroupId: string,
-    birthDate: YearMonthDay,
-    until: YearMonthDay,
-  ): Promise<number[]> {
-    const rows = await this.personAssets(ownerId, personGroupId)
-      .where(sql`date_part('month', (asset."localDateTime" at time zone 'UTC')::date)::int`, '=', birthDate.month)
-      .where(sql`date_part('day', (asset."localDateTime" at time zone 'UTC')::date)::int`, '=', birthDate.day)
-      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '>=', asMakeDate(eb, birthDate)))
-      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '<', asMakeDate(eb, until)))
-      .select(sql<number>`date_part('year', (asset."localDateTime" at time zone 'UTC')::date)::int`.as('year'))
-      .distinct()
-      .orderBy(sql`year`, 'desc')
-      .execute();
-
-    return rows.map(({ year }) => year);
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { year: 2000, month: 1, day: 1 }, 5] })
-  getPersonAssetsByDate(ownerId: string, personGroupId: string, date: YearMonthDay, limit: number) {
-    return this.personAssets(ownerId, personGroupId)
-      .select(['asset.id'])
-      .where((eb) => eb(sql`(asset."localDateTime" at time zone 'UTC')::date`, '=', asMakeDate(eb, date)))
-      .orderBy('asset.localDateTime', 'desc')
-      .limit(limit)
-      .execute();
-  }
-
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   @GenerateSql({ params: [DummyValue.UUID] })
   get(id: string, viewerId?: string, hiddenScope?: TimelineHiddenScope, visibleSpaceIds: string[] = []) {
     return this.getByIdBuilder(id, viewerId, hiddenScope, visibleSpaceIds).executeTakeFirst();

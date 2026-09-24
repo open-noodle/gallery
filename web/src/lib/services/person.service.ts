@@ -1,4 +1,3 @@
-<<<<<<< origin/main
 import {
   getMembers,
   getPersonFaces,
@@ -9,14 +8,10 @@ import {
   updateRepresentativeFace,
   updateSpacePerson,
   updateSpacePersonRepresentativeFace,
+  type AssetResponseDto,
   type PersonFacePageResponseDto,
   type PersonResponseDto,
 } from '@immich/sdk';
-||||||| ca4637adc79
-import { updatePerson, type PersonResponseDto } from '@immich/sdk';
-=======
-import { updatePerson, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiCalendarEditOutline,

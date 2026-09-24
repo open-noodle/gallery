@@ -1667,12 +1667,8 @@ extension on AssetOrder {
 extension on MemoryType {
   MemoryTypeEnum toMemoryType() => switch (this) {
     MemoryType.onThisDay => MemoryTypeEnum.onThisDay,
-<<<<<<< origin/main
-    MemoryType.rule => MemoryTypeEnum.rule,
-||||||| ca4637adc79
-=======
     MemoryType.birthday => MemoryTypeEnum.birthday,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+    MemoryType.rule => MemoryTypeEnum.rule,
   };
 }
 

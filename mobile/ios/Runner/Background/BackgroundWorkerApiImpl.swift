@@ -22,7 +22,12 @@ class BackgroundWorkerApiImpl: BackgroundWorkerFgHostApi {
     print("BackgroundWorkerApiImpl:disableUploadWorker Disabled background workers")
   }
   
-<<<<<<< origin/main
+  func wasLaunchedInBackground() throws -> Bool {
+    return BackgroundWorkerApiImpl.launchedInBackground
+  }
+
+  // Stays false until iOS runs one of the background tasks
+  private static var launchedInBackground = false
   // Same intent as upstream #30574 (derive the BGTaskScheduler ids from Info.plist rather than
   // hard-coding them), but keep the fork's non-crashing form from #627: upstream force-unwraps
   // both the plist lookup (`as!`) and the suffix match (`!`), which traps at launch if the key is
@@ -34,21 +39,6 @@ class BackgroundWorkerApiImpl: BackgroundWorkerFgHostApi {
     permittedTaskIDs.first { $0.hasSuffix(".refreshUpload") } ?? "app.alextran.immich.background.refreshUpload"
   private static let processingTaskID =
     permittedTaskIDs.first { $0.hasSuffix(".processingUpload") } ?? "app.alextran.immich.background.processingUpload"
-||||||| ca4637adc79
-  private static let taskIDs = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as! [String]
-  private static let refreshTaskID = taskIDs.first { $0.hasSuffix(".refreshUpload") }!
-  private static let processingTaskID = taskIDs.first { $0.hasSuffix(".processingUpload") }!
-=======
-  func wasLaunchedInBackground() throws -> Bool {
-    return BackgroundWorkerApiImpl.launchedInBackground
-  }
-
-  // Stays false until iOS runs one of the background tasks
-  private static var launchedInBackground = false
-  private static let taskIDs = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as! [String]
-  private static let refreshTaskID = taskIDs.first { $0.hasSuffix(".refreshUpload") }!
-  private static let processingTaskID = taskIDs.first { $0.hasSuffix(".processingUpload") }!
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   private static let taskSemaphore = DispatchSemaphore(value: 1)
 
   public static func registerBackgroundWorkers() {

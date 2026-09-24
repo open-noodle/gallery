@@ -1,10 +1,6 @@
 <script lang="ts">
-<<<<<<< origin/main
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-||||||| ca4637adc79
-=======
   import { scrollMemory } from '$lib/actions/scroll-memory';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import { memoryManager } from '$lib/managers/memory-manager.svelte';
   import { userPreferencesManager } from '$lib/managers/user-preferences-manager.svelte';

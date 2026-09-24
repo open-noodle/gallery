@@ -7,20 +7,12 @@ import {
   editAsset,
   getAssetEdits,
   getAssetInfo,
-<<<<<<< origin/main
-  removeAssetEdits,
-||||||| ca4637adc79
-=======
   removeAssetFromAlbum,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  removeAssetEdits,
   runAssetJobs,
   updateAsset,
-<<<<<<< origin/main
-  type AssetEditActionItemDto,
-||||||| ca4637adc79
-=======
   type AlbumResponseDto,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  type AssetEditActionItemDto,
   type AssetJobsDto,
   type AssetResponseDto,
 } from '@immich/sdk';
@@ -74,11 +66,11 @@ import { downloadUrl } from '$lib/utils';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 
-<<<<<<< origin/main
 export const getAssetBulkActions = (
   $t: MessageFormatter,
   {
     restrictToSpaceId,
+    album,
   }: {
     /**
      * Set when the selection contains assets the user does not own: the add-to-collection
@@ -86,13 +78,13 @@ export const getAssetBulkActions = (
      * that can accept the non-owned assets (#764 contribution).
      */
     restrictToSpaceId?: string;
+    /**
+     * The album whose page is showing this selection. Upstream passed it positionally; it moved
+     * into this bag so the fork's restrictToSpaceId and it can coexist. Gates RemoveFromAlbum.
+     */
+    album?: AlbumResponseDto;
   } = {},
 ) => {
-||||||| ca4637adc79
-export const getAssetBulkActions = ($t: MessageFormatter) => {
-=======
-export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseDto) => {
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   const ownedAssets = assetMultiSelectManager.ownedAssets;
   const isAlbumOwner = album?.albumUsers[0].user.id === authManager.user.id;
 
@@ -161,21 +153,21 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
 export const getAssetActions = (
   $t: MessageFormatter,
   asset: AssetResponseDto & { stackPrimaryAssetId?: string },
-<<<<<<< origin/main
   {
     space,
+    album,
   }: {
     /**
      * The shared space this asset is being viewed through, when the viewer sits on a space
      * surface. Drives the add-to-album gating below; absent everywhere else.
      */
     space?: { id: string; canWrite: boolean };
+    /**
+     * The album this asset is being viewed through. Upstream passed it positionally; it moved
+     * into this bag so the fork's `space` and it can coexist. Gates RemoveFromAlbum.
+     */
+    album?: AlbumResponseDto;
   } = {},
-||||||| ca4637adc79
-export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto & { stackPrimaryAssetId?: string }) => {
-=======
-  album?: AlbumResponseDto,
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 ) => {
   const sharedLink = getSharedLink();
   const authUser = authManager.authenticated ? authManager.user : undefined;

@@ -8,7 +8,6 @@ import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
@@ -150,23 +149,13 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     ref.invalidate(sharedSpacesProvider);
   }
 
-<<<<<<< origin/main
   // Library page
   if (section == TabShellSection.library) {
-    ref.invalidate(localAlbumProvider);
     // The local list is a Drift stream now, so upstream's invalidate of it is correctly gone.
     // The server-backed lists are NOT reactive and must still be invalidated here.
     ref.invalidateServerPeopleLists();
   }
 
-||||||| ca4637adc79
-  // Library page
-  if (index == kLibraryTabIndex) {
-    ref.invalidate(localAlbumProvider);
-  }
-
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   ref.read(hapticFeedbackProvider.notifier).selectionClick();
   router.setActiveIndex(index);
   ref.read(tabProvider.notifier).state = _tabEnumForSection(section);

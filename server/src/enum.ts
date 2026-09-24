@@ -123,15 +123,11 @@ export const TimeBucketSizeSchema = z
 export enum MemoryType {
   /** pictures taken on this day X years ago */
   OnThisDay = 'on_this_day',
-<<<<<<< origin/main
-  /** server-defined rule memory */
-  Rule = 'rule',
-||||||| ca4637adc79
-=======
 
   /** pictures of a person, shown leading up to their birthday */
   Birthday = 'birthday',
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
+  /** server-defined rule memory */
+  Rule = 'rule',
 }
 
 export const MemoryTypeSchema = z.enum(MemoryType).describe('Memory type').meta({ id: 'MemoryType' });

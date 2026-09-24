@@ -1,14 +1,4 @@
 <script lang="ts">
-<<<<<<< origin/main:web/src/routes/admin/system-settings/StorageTemplateSettings.svelte
-  import SupportedDatetimePanel from './SupportedDatetimePanel.svelte';
-  import SupportedVariablesPanel from './SupportedVariablesPanel.svelte';
-  import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
-||||||| ca4637adc79:web/src/lib/components/admin-settings/StorageTemplateSettings.svelte
-  import SupportedDatetimePanel from '$lib/components/admin-settings/SupportedDatetimePanel.svelte';
-  import SupportedVariablesPanel from '$lib/components/admin-settings/SupportedVariablesPanel.svelte';
-  import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71:web/src/lib/components/admin-settings/StorageTemplateSettings.svelte
   import SettingInputField from '$lib/components/shared-components/settings/SettingInputField.svelte';
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
@@ -21,28 +11,13 @@
   import { Route } from '$lib/route';
   import { handleSystemConfigSave } from '$lib/services/system-config.service';
   import { getStorageTemplateOptions, type SystemConfigTemplateStorageOptionDto } from '@immich/sdk';
-<<<<<<< origin/main:web/src/routes/admin/system-settings/StorageTemplateSettings.svelte
-  import { Heading, Link, Text } from '@immich/ui';
-||||||| ca4637adc79:web/src/lib/components/admin-settings/StorageTemplateSettings.svelte
-  import { Heading, Link, LoadingSpinner, Text } from '@immich/ui';
-=======
   import { Code, Heading, IconButton, Link, modalManager, Text } from '@immich/ui';
   import { mdiInformationOutline } from '@mdi/js';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71:web/src/lib/components/admin-settings/StorageTemplateSettings.svelte
   import handlebar from 'handlebars';
   import * as luxon from 'luxon';
   import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
-<<<<<<< origin/main:web/src/routes/admin/system-settings/StorageTemplateSettings.svelte
-  import { createBubbler, preventDefault } from 'svelte/legacy';
-  import { fade } from 'svelte/transition';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-||||||| ca4637adc79:web/src/lib/components/admin-settings/StorageTemplateSettings.svelte
-  import { createBubbler, preventDefault } from 'svelte/legacy';
-  import { fade } from 'svelte/transition';
-=======
   import { fade, slide } from 'svelte/transition';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71:web/src/lib/components/admin-settings/StorageTemplateSettings.svelte
 
   type Props = {
     minified?: boolean;

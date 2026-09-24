@@ -11,11 +11,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { PartnerRepository } from 'src/repositories/partner.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
-<<<<<<< origin/main
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-||||||| ca4637adc79
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -55,7 +51,24 @@ const create = async (ctx: ReturnType<typeof setup>['ctx']) => {
   return { memory, asset, user };
 };
 
-<<<<<<< origin/main
+const newPersonAsset = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  { ownerId, personGroupId, localDateTime }: { ownerId: string; personGroupId: string; localDateTime?: string },
+) => {
+  const assetRepo = ctx.get(AssetRepository);
+  const { asset } = await ctx.newAsset({ ownerId, localDateTime: localDateTime ?? '2024-06-13T12:00:00.000Z' });
+  await Promise.all([
+    ctx.newExif({ assetId: asset.id, make: 'Canon' }),
+    ctx.newJobStatus({ assetId: asset.id }),
+    ctx.newAssetFace({ assetId: asset.id, personGroupId }),
+    assetRepo.upsertFiles([
+      { assetId: asset.id, type: AssetFileType.Preview, path: '/path/to/preview.jpg' },
+      { assetId: asset.id, type: AssetFileType.Thumbnail, path: '/path/to/thumbnail.jpg' },
+    ]),
+  ]);
+  return asset;
+};
+
 const seedRuleAsset = async (
   ctx: ReturnType<typeof setup>['ctx'],
   {
@@ -123,25 +136,6 @@ const seedDormantPersonChapter = async (
   }
 
   return { person, chapterAssetIds };
-||||||| ca4637adc79
-=======
-const newPersonAsset = async (
-  ctx: ReturnType<typeof setup>['ctx'],
-  { ownerId, personGroupId, localDateTime }: { ownerId: string; personGroupId: string; localDateTime?: string },
-) => {
-  const assetRepo = ctx.get(AssetRepository);
-  const { asset } = await ctx.newAsset({ ownerId, localDateTime: localDateTime ?? '2024-06-13T12:00:00.000Z' });
-  await Promise.all([
-    ctx.newExif({ assetId: asset.id, make: 'Canon' }),
-    ctx.newJobStatus({ assetId: asset.id }),
-    ctx.newAssetFace({ assetId: asset.id, personGroupId }),
-    assetRepo.upsertFiles([
-      { assetId: asset.id, type: AssetFileType.Preview, path: '/path/to/preview.jpg' },
-      { assetId: asset.id, type: AssetFileType.Thumbnail, path: '/path/to/thumbnail.jpg' },
-    ]),
-  ]);
-  return asset;
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
 };
 
 describe(MemoryService.name, () => {
@@ -284,15 +278,11 @@ describe(MemoryService.name, () => {
     defaultDatabase = await getKyselyDB();
   });
 
-<<<<<<< origin/main
   // Each test opens its own connection pool (up to 10 conns) via getKyselyDB() and nothing
   // previously closed it, so pools accumulated for the lifetime of the whole file. With enough
   // tests in one file that exhausts Postgres's max_connections ("sorry, too many clients
   // already"). Close the pool after every test so at most one test's connections are open at a
   // time.
-||||||| ca4637adc79
-=======
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   afterEach(async () => {
     await defaultDatabase.destroy();
   });
@@ -461,6 +451,56 @@ describe(MemoryService.name, () => {
           assets: [expect.objectContaining({ id: asset.id })],
         }),
       ]);
+    });
+
+    // specs/2026-09-24-birthday-memories-upstream-coexistence-design.md: installed Gallery apps
+    // cannot decode MemoryType.Birthday, so no birthday row may reach the list or the count.
+    it('should exclude birthday memories from search and statistics, including saved ones', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { memory: onThisDay } = await ctx.newMemory({ ownerId: user.id });
+      const { memory: birthday } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Birthday,
+        data: { personId: factory.uuid(), personName: 'Alice', year: 1990 },
+      });
+      const { memory: savedBirthday } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Birthday,
+        data: { personId: factory.uuid(), personName: 'Bob', year: 1991 },
+        isSaved: true,
+      });
+      for (const { id } of [onThisDay, birthday, savedBirthday]) {
+        await ctx.newMemoryAsset({ memoryId: id!, assetId: asset.id });
+      }
+
+      const results = await sut.search(auth, {});
+      expect(results.map(({ id }) => id)).toEqual([onThisDay.id]);
+      // countAll comes back from Postgres as a bigint string; compare numerically.
+      const statistics = await sut.statistics(auth, {});
+      expect(Number(statistics.total)).toBe(1);
+      await expect(sut.search(auth, { type: MemoryType.Birthday })).resolves.toEqual([]);
+      await expect(sut.get(auth, birthday.id!)).resolves.toEqual(expect.objectContaining({ id: birthday.id }));
+    });
+
+    it('should exclude a birthday memory reached through a shared space', async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      const { memory } = await ctx.newMemory({
+        ownerId: owner.id,
+        type: MemoryType.Birthday,
+        data: { personId: factory.uuid(), personName: 'Alice', year: 1990 },
+      });
+      await ctx.newMemoryAsset({ memoryId: memory.id!, assetId: asset.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+
+      await expect(sut.search(factory.auth({ user: member }), {})).resolves.toEqual([]);
     });
   });
 
@@ -681,6 +721,7 @@ describe(MemoryService.name, () => {
       await addBirthdayAsset('2022-04-01T12:00:00Z');
       await addBirthdayAsset('2021-04-01T12:00:00Z');
       await addBirthdayAsset('2020-04-01T12:00:00Z');
+      await addBirthdayAsset('2019-04-23T12:00:00Z');
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -695,6 +736,17 @@ describe(MemoryService.name, () => {
           }),
         }),
       ]);
+
+      // Upstream's MemoryType.Birthday generator must not run alongside the rule (spec
+      // 2026-09-24). Alice satisfies upstream's criteria (named, birthDate set, a photo on a past
+      // birthday), so a dispatched upstream generator would write a second card here.
+      const upstreamBirthdays = await ctx.database
+        .selectFrom('memory')
+        .select('id')
+        .where('ownerId', '=', user.id)
+        .where('type', '=', MemoryType.Birthday)
+        .execute();
+      expect(upstreamBirthdays).toEqual([]);
     });
 
     it('creates a fallback birthday memory from four single-year Pierre photos', async () => {
@@ -1004,6 +1056,290 @@ describe(MemoryService.name, () => {
 
       const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
       expect(memories).toEqual([]);
+    });
+  });
+
+  // Gallery keeps its own BirthdayMemoryRule as the only birthday generator; upstream's
+  // createBirthdayMemories is pulled but deliberately never dispatched
+  // (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). These cases assert
+  // upstream's generator, so they are skipped until the fork adopts it — re-enable them in the
+  // same change that deletes the `birthday-memory-generator-not-dispatched` invariant.
+  describe.skip('onMemoryCreate (birthday)', () => {
+    it('should create a memory for the 3 days leading up to a birthday', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const birthday = DateTime.fromObject({ year: 2025, month: 6, day: 13 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+      const asset = await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      expect(memories[0]).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          ownerId: user.id,
+          type: 'birthday',
+          data: { personId: person.personGroupId, personName: 'Alice', year: 1990 },
+          memoryAt: birthday.startOf('day').toJSDate(),
+          showAt: birthday.minus({ days: 3 }).startOf('day').toJSDate(),
+          hideAt: birthday.endOf('day').toJSDate(),
+          assets: [expect.objectContaining({ id: asset.id })],
+        }),
+      );
+    });
+
+    it('should create a memory on the birthday itself', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 13 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      expect(memories[0]).toEqual(
+        expect.objectContaining({
+          showAt: now.minus({ days: 3 }).startOf('day').toJSDate(),
+          hideAt: now.endOf('day').toJSDate(),
+        }),
+      );
+    });
+
+    it('should not create a birthday memory twice for the same birthday', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+    });
+
+    it('should not create a birthday memory for a hidden person', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({
+        ownerId: user.id,
+        name: 'Alice',
+        birthDate: '1990-06-13',
+        isHidden: true,
+      });
+      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(0);
+    });
+
+    it('should not create a birthday memory for an unnamed person', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: '', birthDate: '1990-06-13' });
+      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(0);
+    });
+
+    it('should only include assets taken on the birthday itself', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+      const onBirthday = await newPersonAsset(ctx, {
+        ownerId: user.id,
+        personGroupId: person.personGroupId,
+        localDateTime: '2024-06-13T12:00:00.000Z',
+      });
+      await newPersonAsset(ctx, {
+        ownerId: user.id,
+        personGroupId: person.personGroupId,
+        localDateTime: '2024-06-12T12:00:00.000Z',
+      });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      expect(memories[0].assets.map(({ id }) => id)).toEqual([onBirthday.id]);
+    });
+
+    it('should not create a birthday memory for a person without any assets', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(0);
+    });
+
+    it('should include at most 5 assets from a single year, newest first', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+
+      const assetIds: string[] = [];
+      for (let hour = 1; hour <= 7; hour++) {
+        const asset = await newPersonAsset(ctx, {
+          ownerId: user.id,
+          personGroupId: person.personGroupId,
+          localDateTime: `2024-06-13T${hour.toString().padStart(2, '0')}:00:00.000Z`,
+        });
+        assetIds.push(asset.id);
+      }
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      const memoryAssetIds = memories[0].assets.map(({ id }) => id).sort();
+      expect(memoryAssetIds).toEqual(assetIds.slice(-5).sort());
+    });
+
+    it('should split the asset budget evenly across years, keeping the newest assets of each year', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+
+      const assetIdsByYear: Record<number, string[]> = {};
+      for (let year = 2019; year <= 2024; year++) {
+        assetIdsByYear[year] = [];
+        for (let hour = 1; hour <= 5; hour++) {
+          const asset = await newPersonAsset(ctx, {
+            ownerId: user.id,
+            personGroupId: person.personGroupId,
+            localDateTime: `${year}-06-13T${hour.toString().padStart(2, '0')}:00:00.000Z`,
+          });
+          assetIdsByYear[year].push(asset.id);
+        }
+      }
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      // 6 birthdays share the budget of 25 assets, so each birthday includes its 4 newest assets
+      expect(memories[0].assets.length).toBe(24);
+      const memoryAssetIds = new Set(memories[0].assets.map(({ id }) => id));
+      for (let year = 2019; year <= 2024; year++) {
+        const [oldest, ...newest] = assetIdsByYear[year];
+        for (const assetId of newest) {
+          expect(memoryAssetIds.has(assetId)).toBe(true);
+        }
+        expect(memoryAssetIds.has(oldest)).toBe(false);
+      }
+    });
+
+    it('should include one asset from each of 25 random birthdays when there are more than 25', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
+
+      for (let year = 1997; year <= 2024; year++) {
+        await newPersonAsset(ctx, {
+          ownerId: user.id,
+          personGroupId: person.personGroupId,
+          localDateTime: `${year}-06-13T12:00:00.000Z`,
+        });
+        await newPersonAsset(ctx, {
+          ownerId: user.id,
+          personGroupId: person.personGroupId,
+          localDateTime: `${year}-06-13T08:00:00.000Z`,
+        });
+      }
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      // 28 birthdays exist, so 25 of them are sampled with one asset each
+      expect(memories[0].assets.length).toBe(25);
+      const years = new Set(memories[0].assets.map(({ localDateTime }) => new Date(localDateTime).getUTCFullYear()));
+      expect(years.size).toBe(25);
+    });
+
+    it('should celebrate a leap-day birthday on February 28th in non-leap years', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 2, day: 25 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1992-02-29' });
+      await newPersonAsset(ctx, {
+        ownerId: user.id,
+        personGroupId: person.personGroupId,
+        localDateTime: '2024-02-29T12:00:00.000Z',
+      });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(1);
+      expect(memories[0]).toEqual(
+        expect.objectContaining({
+          data: { personId: person.personGroupId, personName: 'Alice', year: 1992 },
+          memoryAt: DateTime.fromObject({ year: 2025, month: 2, day: 28 }, { zone: 'utc' }).toJSDate(),
+        }),
+      );
+    });
+
+    it('should not create a birthday memory when the birthday is more than 3 days away', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-20' });
+      await newPersonAsset(ctx, {
+        ownerId: user.id,
+        personGroupId: person.personGroupId,
+        localDateTime: '2024-06-20T12:00:00.000Z',
+      });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
+      expect(memories.length).toBe(0);
     });
   });
 
@@ -2146,285 +2482,6 @@ describe(MemoryService.name, () => {
       // Only 2 assets — below the on_this_day floor of 3 — so once `managed`, the sweep deletes
       // it exactly as it would a generated card.
       expect(stillThere).toBeUndefined();
-    });
-  });
-
-  describe('onMemoryCreate (birthday)', () => {
-    it('should create a memory for the 3 days leading up to a birthday', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const birthday = DateTime.fromObject({ year: 2025, month: 6, day: 13 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-      const asset = await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      expect(memories[0]).toEqual(
-        expect.objectContaining({
-          id: expect.any(String),
-          ownerId: user.id,
-          type: 'birthday',
-          data: { personId: person.personGroupId, personName: 'Alice', year: 1990 },
-          memoryAt: birthday.startOf('day').toJSDate(),
-          showAt: birthday.minus({ days: 3 }).startOf('day').toJSDate(),
-          hideAt: birthday.endOf('day').toJSDate(),
-          assets: [expect.objectContaining({ id: asset.id })],
-        }),
-      );
-    });
-
-    it('should create a memory on the birthday itself', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 13 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      expect(memories[0]).toEqual(
-        expect.objectContaining({
-          showAt: now.minus({ days: 3 }).startOf('day').toJSDate(),
-          hideAt: now.endOf('day').toJSDate(),
-        }),
-      );
-    });
-
-    it('should not create a birthday memory twice for the same birthday', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-    });
-
-    it('should not create a birthday memory for a hidden person', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({
-        ownerId: user.id,
-        name: 'Alice',
-        birthDate: '1990-06-13',
-        isHidden: true,
-      });
-      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(0);
-    });
-
-    it('should not create a birthday memory for an unnamed person', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: '', birthDate: '1990-06-13' });
-      await newPersonAsset(ctx, { ownerId: user.id, personGroupId: person.personGroupId });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(0);
-    });
-
-    it('should only include assets taken on the birthday itself', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-      const onBirthday = await newPersonAsset(ctx, {
-        ownerId: user.id,
-        personGroupId: person.personGroupId,
-        localDateTime: '2024-06-13T12:00:00.000Z',
-      });
-      await newPersonAsset(ctx, {
-        ownerId: user.id,
-        personGroupId: person.personGroupId,
-        localDateTime: '2024-06-12T12:00:00.000Z',
-      });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      expect(memories[0].assets.map(({ id }) => id)).toEqual([onBirthday.id]);
-    });
-
-    it('should not create a birthday memory for a person without any assets', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(0);
-    });
-
-    it('should include at most 5 assets from a single year, newest first', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-
-      const assetIds: string[] = [];
-      for (let hour = 1; hour <= 7; hour++) {
-        const asset = await newPersonAsset(ctx, {
-          ownerId: user.id,
-          personGroupId: person.personGroupId,
-          localDateTime: `2024-06-13T${hour.toString().padStart(2, '0')}:00:00.000Z`,
-        });
-        assetIds.push(asset.id);
-      }
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      const memoryAssetIds = memories[0].assets.map(({ id }) => id).sort();
-      expect(memoryAssetIds).toEqual(assetIds.slice(-5).sort());
-    });
-
-    it('should split the asset budget evenly across years, keeping the newest assets of each year', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-
-      const assetIdsByYear: Record<number, string[]> = {};
-      for (let year = 2019; year <= 2024; year++) {
-        assetIdsByYear[year] = [];
-        for (let hour = 1; hour <= 5; hour++) {
-          const asset = await newPersonAsset(ctx, {
-            ownerId: user.id,
-            personGroupId: person.personGroupId,
-            localDateTime: `${year}-06-13T${hour.toString().padStart(2, '0')}:00:00.000Z`,
-          });
-          assetIdsByYear[year].push(asset.id);
-        }
-      }
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      // 6 birthdays share the budget of 25 assets, so each birthday includes its 4 newest assets
-      expect(memories[0].assets.length).toBe(24);
-      const memoryAssetIds = new Set(memories[0].assets.map(({ id }) => id));
-      for (let year = 2019; year <= 2024; year++) {
-        const [oldest, ...newest] = assetIdsByYear[year];
-        for (const assetId of newest) {
-          expect(memoryAssetIds.has(assetId)).toBe(true);
-        }
-        expect(memoryAssetIds.has(oldest)).toBe(false);
-      }
-    });
-
-    it('should include one asset from each of 25 random birthdays when there are more than 25', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-13' });
-
-      for (let year = 1997; year <= 2024; year++) {
-        await newPersonAsset(ctx, {
-          ownerId: user.id,
-          personGroupId: person.personGroupId,
-          localDateTime: `${year}-06-13T12:00:00.000Z`,
-        });
-        await newPersonAsset(ctx, {
-          ownerId: user.id,
-          personGroupId: person.personGroupId,
-          localDateTime: `${year}-06-13T08:00:00.000Z`,
-        });
-      }
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      // 28 birthdays exist, so 25 of them are sampled with one asset each
-      expect(memories[0].assets.length).toBe(25);
-      const years = new Set(memories[0].assets.map(({ localDateTime }) => new Date(localDateTime).getUTCFullYear()));
-      expect(years.size).toBe(25);
-    });
-
-    it('should celebrate a leap-day birthday on February 28th in non-leap years', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 2, day: 25 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1992-02-29' });
-      await newPersonAsset(ctx, {
-        ownerId: user.id,
-        personGroupId: person.personGroupId,
-        localDateTime: '2024-02-29T12:00:00.000Z',
-      });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(1);
-      expect(memories[0]).toEqual(
-        expect.objectContaining({
-          data: { personId: person.personGroupId, personName: 'Alice', year: 1992 },
-          memoryAt: DateTime.fromObject({ year: 2025, month: 2, day: 28 }, { zone: 'utc' }).toJSDate(),
-        }),
-      );
-    });
-
-    it('should not create a birthday memory when the birthday is more than 3 days away', async () => {
-      const { sut, ctx } = setup();
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2025, month: 6, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', birthDate: '1990-06-20' });
-      await newPersonAsset(ctx, {
-        ownerId: user.id,
-        personGroupId: person.personGroupId,
-        localDateTime: '2024-06-20T12:00:00.000Z',
-      });
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Birthday });
-      expect(memories.length).toBe(0);
     });
   });
 

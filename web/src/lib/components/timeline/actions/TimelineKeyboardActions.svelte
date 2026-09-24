@@ -13,13 +13,7 @@
   import AssetDeleteConfirmModal from '$lib/modals/AssetDeleteConfirmModal.svelte';
   import NavigateToDateModal from '$lib/modals/NavigateToDateModal.svelte';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-<<<<<<< origin/main
-||||||| ca4637adc79
-  import { Route } from '$lib/route';
-=======
-  import { Route } from '$lib/route';
   import { handleStack } from '$lib/services/stack.service';
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
   import { keyboardManager } from '$lib/stores/keyboard-manager.svelte';
   import { showDeleteModal } from '$lib/stores/preferences.store';
   import { searchStore } from '$lib/stores/search.svelte';

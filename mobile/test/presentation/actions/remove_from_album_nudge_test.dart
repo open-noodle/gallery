@@ -184,7 +184,6 @@ void main() {
     asset: asset,
     isOwner: true,
     isArchived: false,
-    isTrashEnabled: true,
     isStacked: false,
     isInLockedView: false,
     currentAlbum: album(),

@@ -37,16 +37,7 @@ class PeopleDatabaseRepository extends DatabaseAccessor<Drift> with $PeopleDatab
     return query.map((row) => row.toDto()).watch();
   }
 
-<<<<<<< origin/main
   JoinedSelectStatement _allPeopleQuery({required int minFaces, required PeopleSortBy sortBy}) {
-||||||| ca4637adc79
-  Stream<List<Person>> watch({int minFaces = 3}) {
-=======
-  /// All known people with a known associated face and asset
-  ///
-  /// If [minFaces] is provided (defaults to 3), restrict to people having at least that many unique face entries
-  Stream<List<Person>> watchAll({int minFaces = 3}) {
->>>>>>> e598e108966814fe8f70f81cd2a47c66dd5e7c71
     final people = _db.personEntity;
     final faces = _db.assetFaceEntity;
     final assets = _db.remoteAssetEntity;
@@ -76,7 +67,7 @@ class PeopleDatabaseRepository extends DatabaseAccessor<Drift> with $PeopleDatab
       });
   }
 
-  Stream<List<Person>> watch({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
+  Stream<List<Person>> watchAll({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
     final people = _db.personEntity;
     return _allPeopleQuery(minFaces: minFaces, sortBy: sortBy).map((row) => row.readTable(people).toDto()).watch();
   }
