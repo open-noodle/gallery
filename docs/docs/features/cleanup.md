@@ -33,7 +33,7 @@ Marks are only saved when you choose **Move N to trash** or **Finish day**. Fini
 
 Other controls on the rewind page:
 
-- **Grid** or **One at a time**: grid is the default. One at a time shows a single large photo with the next few photos below it.
+- **Grid** or **One at a time**: grid is the default. One at a time shows a single large photo with the next few photos below it. When the photo looks blurry, too dark or overexposed, or was taken within two seconds of another photo, a **Hints** card links to the Blurry & botched or Bursts & series queue.
 - **Hide reviewed** (on by default): hides photos you kept in an earlier session.
 - **Keep all remaining**: keeps every unmarked photo in a year.
 - The arrow buttons move to the previous or next date.

@@ -1,10 +1,19 @@
 <script lang="ts">
   import CleanupTile from '$lib/components/cleanup/CleanupTile.svelte';
   import type { RewindMark } from '$lib/managers/rewind-session.svelte';
+  import { Route } from '$lib/route';
   import { getAssetMediaUrl } from '$lib/utils';
-  import { AssetMediaSize, type CleanupAssetDto } from '@immich/sdk';
+  import { AssetMediaSize, CleanupBlurReason, type CleanupAssetDto } from '@immich/sdk';
   import { Card, Icon, Text } from '@immich/ui';
-  import { mdiArrowRight, mdiCheck, mdiClose, mdiHeart } from '@mdi/js';
+  import {
+    mdiArrowRight,
+    mdiBlur,
+    mdiCheck,
+    mdiChevronRight,
+    mdiClose,
+    mdiHeart,
+    mdiImageMultipleOutline,
+  } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { locale, t } from 'svelte-i18n';
 
@@ -22,10 +31,60 @@
     onKeep: () => void;
     onSelect: (id: string) => void;
     onOpen: (id: string) => void;
+    /** Whether `asset` was taken within the burst gap of another photo of the date (see `burstMemberIds`). */
+    inBurst?: boolean;
   };
 
-  let { asset, mark, index, total, upNext, marks, onTrash, onSkip, onFavorite, onKeep, onSelect, onOpen }: Props =
-    $props();
+  let {
+    asset,
+    mark,
+    index,
+    total,
+    upNext,
+    marks,
+    onTrash,
+    onSkip,
+    onFavorite,
+    onKeep,
+    onSelect,
+    onOpen,
+    inBurst = false,
+  }: Props = $props();
+
+  const QUALITY_HINTS: Partial<Record<CleanupBlurReason, string>> = {
+    [CleanupBlurReason.Blurry]: 'cleanup_hint_blurry',
+    [CleanupBlurReason.Dark]: 'cleanup_hint_dark',
+    [CleanupBlurReason.Bright]: 'cleanup_hint_bright',
+  };
+
+  // Each hint points at the queue that already collects photos like this one. `reason` is the
+  // Blurry queue's reason at its default strictness, so the link lands on a queue that shows it.
+  const hints = $derived.by(() => {
+    const list: Array<{ testId: string; icon: string; label: string; queue: string; href: string }> = [];
+    if (!asset) {
+      return list;
+    }
+    if (inBurst) {
+      list.push({
+        testId: 'cleanup-hint-burst',
+        icon: mdiImageMultipleOutline,
+        label: 'cleanup_hint_burst',
+        queue: 'cleanup_queue_bursts',
+        href: Route.cleanupQueue({ queue: 'bursts' }),
+      });
+    }
+    const quality = asset.reason ? QUALITY_HINTS[asset.reason] : undefined;
+    if (quality) {
+      list.push({
+        testId: 'cleanup-hint-quality',
+        icon: mdiBlur,
+        label: quality,
+        queue: 'cleanup_queue_blurry',
+        href: Route.cleanupQueue({ queue: 'blurry' }),
+      });
+    }
+    return list;
+  });
 
   // localDateTime is the wall-clock capture time serialised as UTC, so it is read back in UTC.
   const taken = $derived(asset ? DateTime.fromISO(asset.localDateTime, { zone: 'utc' }) : undefined);
@@ -100,27 +159,54 @@
     {/if}
   </div>
 
-  <Card>
-    <div class="p-3.5">
-      <Text size="small" fontWeight="bold">{$t('cleanup_up_next')}</Text>
-      <div class="mt-2 grid grid-cols-4 gap-1">
-        {#each upNext as next (next.id)}
-          {@const nextMark = marks.get(next.id)}
-          <button
-            type="button"
-            class="block rounded-md"
-            aria-label={next.originalFileName}
-            data-testid="cleanup-rewind-next-{next.id}"
-            onclick={() => onSelect(next.id)}
-          >
-            <CleanupTile
-              id={next.id}
-              thumbhash={next.thumbhash}
-              class={nextMark === 'trash' ? '[&_img]:brightness-60 [&_img]:grayscale' : ''}
-            />
-          </button>
-        {/each}
+  <div class="flex flex-col gap-3">
+    <Card>
+      <div class="p-3.5">
+        <Text size="small" fontWeight="bold">{$t('cleanup_up_next')}</Text>
+        <div class="mt-2 grid grid-cols-4 gap-1">
+          {#each upNext as next (next.id)}
+            {@const nextMark = marks.get(next.id)}
+            <button
+              type="button"
+              class="block rounded-md"
+              aria-label={next.originalFileName}
+              data-testid="cleanup-rewind-next-{next.id}"
+              onclick={() => onSelect(next.id)}
+            >
+              <CleanupTile
+                id={next.id}
+                thumbhash={next.thumbhash}
+                class={nextMark === 'trash' ? '[&_img]:brightness-60 [&_img]:grayscale' : ''}
+              />
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
-  </Card>
+    </Card>
+
+    {#if hints.length > 0}
+      <Card>
+        <div class="p-3.5" data-testid="cleanup-rewind-hints">
+          <Text size="small" fontWeight="bold">{$t('cleanup_hints')}</Text>
+          <ul class="mt-2 flex flex-col gap-2.5">
+            {#each hints as hint (hint.testId)}
+              <li class="flex items-start gap-2 text-xs" data-testid={hint.testId}>
+                <Icon icon={hint.icon} size="16" class="mt-px shrink-0 text-muted" />
+                <span class="min-w-0">
+                  <span class="block">{$t(hint.label)}</span>
+                  <a
+                    href={hint.href}
+                    class="inline-flex items-center gap-0.5 font-semibold text-primary hover:underline"
+                  >
+                    {$t(hint.queue)}
+                    <Icon icon={mdiChevronRight} size="14" />
+                  </a>
+                </span>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </Card>
+    {/if}
+  </div>
 </div>

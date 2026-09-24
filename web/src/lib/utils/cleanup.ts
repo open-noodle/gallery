@@ -124,6 +124,29 @@ export const monthDayShortLabel = (monthDay: number, locale: string) =>
     new Date(LEAP_YEAR, Math.floor(monthDay / 100) - 1, monthDay % 100),
   );
 
+/** Must match the server's `CLEANUP_BURST_GAP_MS`: shots at most this far apart form a burst. */
+export const CLEANUP_BURST_GAP_MS = 2000;
+
+/**
+ * The ids of photos taken within `CLEANUP_BURST_GAP_MS` of another photo in `assets`. Rewind's
+ * one-at-a-time hints use it to point at the Bursts queue; it is the time rule only, without the
+ * server's CLIP check, so it is a hint rather than a promise that the photo is in that queue.
+ */
+export const burstMemberIds = (assets: Array<{ id: string; localDateTime: string }>) => {
+  // `map` already copies, so sorting in place does not touch the caller's array.
+  const sorted = assets.map(({ id, localDateTime }) => ({ id, time: Date.parse(localDateTime) }));
+  sorted.sort((a, b) => a.time - b.time);
+  const ids = new Set<string>();
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].time - sorted[i - 1].time > CLEANUP_BURST_GAP_MS) {
+      continue;
+    }
+    ids.add(sorted[i - 1].id);
+    ids.add(sorted[i].id);
+  }
+  return ids;
+};
+
 export type BurstMark = 'keep' | 'trash';
 
 type BurstGroupLike = { suggestedKeepId: string; assets: Array<{ id: string }> };
