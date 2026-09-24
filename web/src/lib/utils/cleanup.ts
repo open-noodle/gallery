@@ -43,18 +43,32 @@ export const monthDayLabel = (monthDay: number, locale: string) =>
     new Date(2000, Math.floor(monthDay / 100) - 1, monthDay % 100),
   );
 
-export const shadeLevel = (count: number, max: number): 0 | 1 | 2 | 3 | 4 => {
+export type ShadeScale = { quartiles: [number, number, number]; max: number };
+
+/**
+ * Quartiles of the dates that have photos. Shading by rank rather than by fraction of the busiest
+ * date keeps ordinary dates apart when one date (a big trip, an import day) holds far more photos.
+ */
+export const shadeScale = (counts: number[]): ShadeScale => {
+  const sorted = counts.filter((count) => count > 0).sort((a, b) => a - b);
+  const at = (p: number) => sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? 0;
+  return { quartiles: [at(0.25), at(0.5), at(0.75)], max: sorted.at(-1) ?? 0 };
+};
+
+export const shadeLevel = (count: number, { quartiles: [q1, q2, q3], max }: ShadeScale): 0 | 1 | 2 | 3 | 4 => {
   if (count <= 0 || max <= 0) {
     return 0;
   }
-  const ratio = count / max;
-  if (ratio <= 0.25) {
+  if (count >= max) {
+    return 4;
+  }
+  if (count <= q1) {
     return 1;
   }
-  if (ratio <= 0.5) {
+  if (count <= q2) {
     return 2;
   }
-  if (ratio <= 0.75) {
+  if (count <= q3) {
     return 3;
   }
   return 4;
