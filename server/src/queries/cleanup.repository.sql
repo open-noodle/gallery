@@ -707,7 +707,17 @@ with
         order by
           "asset"."localDateTime",
           "asset"."id"
-      ) as "prevS"
+      ) as "prevS",
+      lead("asset"."localDateTime") over (
+        order by
+          "asset"."localDateTime",
+          "asset"."id"
+      ) as "nextT",
+      lead("asset_exif"."autoStackId") over (
+        order by
+          "asset"."localDateTime",
+          "asset"."id"
+      ) as "nextS"
     from
       "asset"
       left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
@@ -740,7 +750,13 @@ with
         or "t" - "prevT" > interval '2 seconds'
         or "prevS" is distinct from "s" then 1
         else 0
-      end as "brk"
+      end as "brk",
+      case
+        when "nextT" is null
+        or "nextT" - "t" > interval '2 seconds'
+        or "nextS" is distinct from "s" then 1
+        else 0
+      end as "lastInGroup"
     from
       "ordered"
   ),
@@ -755,6 +771,11 @@ with
       ) as "grp"
     from
       "flagged"
+    where
+      not (
+        "brk" = 1
+        and "lastInGroup" = 1
+      )
   ),
   "sized" as (
     select

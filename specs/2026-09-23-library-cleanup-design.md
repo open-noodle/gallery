@@ -351,6 +351,9 @@ assets.
   - The bursts **count** is one ordered pass using `lag()`. It counts candidate groups **before** the per-page CLIP check, so it is an upper bound; the hub row labels it as "up to N".
   - If that pass misses the time budget during measurement, fall back to a per-user cached count, refreshed
     after quality analysis. The implementation plan records which option was chosen.
+  - Measured (2026-09-24, 500k synthetic seed): the first shape grouped every row and spilled a ~450k-group
+    hash aggregate to disk (~380 ms). Adding `lead()` to mark each group's last row lets the pass drop
+    singletons before grouping (~240 ms p95), so the live count was kept and no cache was added.
 - A single date at 500k assets holds about 1,400 photos, so rewind fetches them one year at a time.
 - **Time budget:** every cleanup endpoint must answer in under 300 ms at p95 for a user with 500k assets.
 - **Index safety check** (a required implementation task):

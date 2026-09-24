@@ -911,6 +911,13 @@ export class CleanupRepository {
     return new Map(rows.map((row) => [row.id, Number(row.d)]));
   }
 
+  /**
+   * One ordered pass over the user's images (the spec's `lag()` count), shaped for 500k-asset
+   * libraries: `lead()` marks the last row of each group, so singletons — almost every row — are
+   * dropped before the second window and the `group by`, which then only see burst members. The
+   * earlier shape grouped every row and spilled a ~450k-group hash aggregate to disk (~380 ms at
+   * 500k assets vs ~240 ms p95 for this one; see the spec's "Scale" section).
+   */
   @GenerateSql({ params: [DummyValue.UUID] })
   async countBursts(userId: string): Promise<{ count: number; bytes: number }> {
     const orderClause = sql`order by "asset"."localDateTime", "asset"."id"`;
@@ -927,6 +934,8 @@ export class CleanupRepository {
             eb.fn.coalesce('asset_exif.fileSizeInByte', sql.lit(0)).as('size'),
             sql<Date | null>`lag("asset"."localDateTime") over (${orderClause})`.as('prevT'),
             sql<string | null>`lag("asset_exif"."autoStackId") over (${orderClause})`.as('prevS'),
+            sql<Date | null>`lead("asset"."localDateTime") over (${orderClause})`.as('nextT'),
+            sql<string | null>`lead("asset_exif"."autoStackId") over (${orderClause})`.as('nextS'),
           ])
           .where('asset.type', '=', sql.lit(AssetType.Image))
           // See getBurstWindow: bursts excludes every stacked asset outright (primary included), so
@@ -944,12 +953,19 @@ export class CleanupRepository {
               when "prevT" is null or "t" - "prevT" > interval '2 seconds' or "prevS" is distinct from "s" then 1
               else 0
             end`.as('brk'),
+          sql<number>`case
+              when "nextT" is null or "nextT" - "t" > interval '2 seconds' or "nextS" is distinct from "s" then 1
+              else 0
+            end`.as('lastInGroup'),
         ]),
       )
+      // A row that both starts and ends its group is a singleton. Every remaining group still
+      // starts with a `brk = 1` row, so the running sum below keeps groups distinct.
       .with('grouped', (qb) =>
         qb
           .selectFrom('flagged')
-          .select(['flagged.id', 'flagged.size', sql<number>`sum("brk") over (order by "t", "id")`.as('grp')]),
+          .select(['flagged.id', 'flagged.size', sql<number>`sum("brk") over (order by "t", "id")`.as('grp')])
+          .where(sql<boolean>`not ("brk" = 1 and "lastInGroup" = 1)`),
       )
       .with('sized', (qb) =>
         qb

@@ -1257,6 +1257,30 @@ describe(CleanupRepository.name, () => {
       expect(count).toBe(2);
       expect(bytes).toBe(210 + 200);
     });
+
+    it('splits adjacent groups on an autoStackId change and ignores singletons between and around them', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const base = new Date('2024-01-01T00:00:00Z').getTime();
+      const add = async (offsetMs: number, fileSizeInByte: number, autoStackId: string | null) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date(base + offsetMs) });
+        await ctx.newExif({ assetId: asset.id, fileSizeInByte, autoStackId });
+      };
+
+      await add(0, 5, null); // leading singleton
+      await add(10_000, 100, 'stack-a'); // group A
+      await add(10_500, 110, 'stack-a');
+      await add(11_000, 200, 'stack-b'); // group B: within 2 s of A, but a different camera burst
+      await add(11_500, 220, 'stack-b');
+      await add(12_000, 7, null); // singleton: within 2 s of B, but not part of its burst
+      await add(60_000, 300, null); // group C, the last rows of the library
+      await add(60_500, 310, null);
+      await add(61_000, 320, null);
+
+      const { count, bytes } = await sut.countBursts(user.id);
+      expect(count).toBe(3);
+      expect(bytes).toBe(100 + 200 + (300 + 310));
+    });
   });
 
   describe('getCleanupAssets', () => {
