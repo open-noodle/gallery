@@ -1,4 +1,4 @@
-import { DateTime } from 'luxon';
+import { DateTime, IANAZone } from 'luxon';
 import { isoDateToDate, isoDatetimeToDate } from 'src/validation.js';
 
 /**
@@ -26,6 +26,8 @@ export const mergeTimeZone = (dateTimeOriginal?: string | null, timeZone?: strin
     : undefined;
 };
 
+const canonicalZone = (zone: string) => new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions().timeZone;
+
 /**
  * The zone the server runs in (the `TZ` env var, else the system zone), or null
  * when that is UTC under any alias, so a UTC server stores no zone as before.
@@ -35,7 +37,20 @@ export const getServerTimeZone = (): string | null => {
   if (!zone) {
     return null;
   }
+
   // Node reports TZ=GMT as the offset ID '+00:00' rather than 'UTC'
-  const canonical = new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions().timeZone;
-  return canonical === 'UTC' || /^[+-]00:?00$/.test(canonical) ? null : zone;
+  const canonical = canonicalZone(zone);
+  if (canonical === 'UTC' || /^[+-]00:?00$/.test(canonical)) {
+    return null;
+  }
+
+  // Node reports the legacy ICU name (TZ=Asia/Kolkata -> Asia/Calcutta), which
+  // the mobile app's zone database lacks. Keep the configured spelling when it
+  // names the same zone; it matches the current names geo-tz stores for GPS.
+  const configured = process.env.TZ;
+  if (configured && IANAZone.isValidZone(configured) && canonicalZone(configured) === canonical) {
+    return configured;
+  }
+
+  return zone;
 };

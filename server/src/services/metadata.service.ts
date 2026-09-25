@@ -677,7 +677,7 @@ export class MetadataService extends BaseService {
         //
         // this is especially important in the case of UTC+0 where exiftool-vendored does not return tz/zone fields
         // and as such the tags aren't overwritten when returning all tags.
-        for (const tag of ['zone', 'tz', 'tzSource'] as const) {
+        for (const tag of ['zone', 'tz', 'tzSource', 'zoneSource'] as const) {
           delete mediaTags[tag];
         }
       }
@@ -1160,7 +1160,8 @@ export class MetadataService extends BaseService {
 
     // timezone
     let timeZone = exifTags.zone ?? null;
-    if (timeZone === null && (dateTime?.rawValue?.endsWith('Z') || dateTime?.rawValue?.endsWith('+00:00'))) {
+    const hasExplicitUtcOffset = dateTime?.rawValue?.endsWith('Z') || dateTime?.rawValue?.endsWith('+00:00');
+    if (timeZone === null && hasExplicitUtcOffset) {
       // exiftool-vendored returns "no timezone" information even though "+00:00" might be set explicitly
       // https://github.com/photostructure/exiftool-vendored.js/issues/203
       timeZone = 'UTC+0';
@@ -1168,16 +1169,18 @@ export class MetadataService extends BaseService {
 
     // exiftool assumed UTC only to parse a zone-less QuickTime timestamp: the
     // instant is right but the zone is unknown, so use the server's TZ as
-    // documented. Issue #1147.
+    // documented. Issue #1147. exiftool reports the same source when the date
+    // says +00:00 or Z outright (e.g. an iPhone video recorded in Lisbon);
+    // that UTC came from the file, so keep it.
+    // exiftool-vendored's types deprecate tzSource for zoneSource, but 35.x only sets tzSource.
+    const zoneSource = exifTags.zoneSource ?? exifTags.tzSource;
     const serverTimeZone = getServerTimeZone();
-    if (exifTags.tzSource === defaultVideosToUTC && serverTimeZone) {
+    if (zoneSource === defaultVideosToUTC && !hasExplicitUtcOffset && serverTimeZone) {
       timeZone = serverTimeZone;
     }
 
     if (timeZone) {
-      this.logger.verbose(
-        `Found timezone ${timeZone} via ${exifTags.tzSource} for asset ${asset.id}: ${asset.originalPath}`,
-      );
+      this.logger.verbose(`Found timezone ${timeZone} via ${zoneSource} for asset ${asset.id}: ${asset.originalPath}`);
     } else {
       this.logger.debug(`No timezone information found for asset ${asset.id}: ${asset.originalPath}`);
     }

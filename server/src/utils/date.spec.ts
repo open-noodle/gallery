@@ -46,6 +46,18 @@ describe('getServerTimeZone', () => {
     expect(getServerTimeZone()).toBe('America/Port_of_Spain');
   });
 
+  // Node resolves these to their legacy ICU names (Asia/Calcutta, ...), which
+  // the mobile app's time zone database does not know.
+  it.each(['Asia/Kolkata', 'Europe/Kyiv', 'Asia/Ho_Chi_Minh'])('should keep the configured spelling of %s', (zone) => {
+    process.env.TZ = zone;
+    expect(getServerTimeZone()).toBe(zone);
+  });
+
+  it('should not return a TZ value that is not itself a zone name', () => {
+    process.env.TZ = ':America/New_York';
+    expect(getServerTimeZone()).toBe('America/New_York');
+  });
+
   it('should return a zone whose offset is 0 for part of the year', () => {
     process.env.TZ = 'Europe/London';
     expect(getServerTimeZone()).toBe('Europe/London');
