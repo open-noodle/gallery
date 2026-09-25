@@ -9,8 +9,22 @@ Gallery can apply these edits to a photo:
 - Cropping
 - Rotation
 - Mirroring
+- Adjustments (exposure, contrast, saturation, invert)
 
 <img src={require('./img/web-edit-interface.webp').default} title="Web edit interface" />
+
+## Adjustments
+
+A toggle at the top of the editor panel switches between **Edit** (adjustment sliders) and **Crop** (the aspect-ratio grid). Both are part of the same edit, so you can crop and adjust an image in a single save.
+
+The **Edit** panel provides four controls:
+
+- **Exposure** — brightens or darkens the image
+- **Contrast** — increases or decreases the difference between light and dark areas
+- **Saturation** — increases or decreases color intensity; fully desaturating produces a grayscale image
+- **Invert** — a toggle that inverts colors, useful for viewing scanned film negatives as positives
+
+Double-click (or double-tap) a slider to reset just that value to its default. Adjustments are matched to the same formulas as the CSS `filter` property, so the live preview while dragging a slider is an exact preview of the saved result, not an approximation.
 
 ## Video Trimming
 

@@ -1678,5 +1678,8 @@ extension on api.AssetEditAction {
     // previously fell through the `_ => AssetEditAction.other` arm that upstream
     // dropped when openapi-generator v7.24 made these enums exhaustive.
     api.AssetEditAction.trim => AssetEditAction.other,
+    // gallery-fork: `adjust` (exposure/contrast/saturation/invert, #1124) is web-only
+    // for now — same as trim, no mobile UI or local model exists for it yet.
+    api.AssetEditAction.adjust => AssetEditAction.other,
   };
 }
