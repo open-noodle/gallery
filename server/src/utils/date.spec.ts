@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { asDateString, asDateTimeString, asLocalTime, isLeapDayObserved } from 'src/utils/date.js';
+import { asDateString, asDateTimeString, asLocalTime, getServerTimeZone, isLeapDayObserved } from 'src/utils/date.js';
 
 describe('asDateString', () => {
   afterEach(() => {
@@ -70,5 +70,35 @@ describe('asLocalTime', () => {
   it('should keep the wall-clock time and reinterpret it as UTC', () => {
     const date = DateTime.fromISO('2026-10-06T08:00:00', { zone: 'America/New_York' }) as DateTime<true>;
     expect(asLocalTime(date).toISOString()).toBe('2026-10-06T08:00:00.000Z');
+  });
+});
+
+describe('getServerTimeZone', () => {
+  afterEach(() => {
+    process.env.TZ = 'UTC';
+  });
+
+  it('should return the IANA zone the server runs in', () => {
+    process.env.TZ = 'America/Port_of_Spain';
+    expect(getServerTimeZone()).toBe('America/Port_of_Spain');
+  });
+
+  it('should return a zone whose offset is 0 for part of the year', () => {
+    process.env.TZ = 'Europe/London';
+    expect(getServerTimeZone()).toBe('Europe/London');
+  });
+
+  it.each(['UTC', 'Etc/UTC', 'Etc/GMT', 'GMT', 'Etc/Universal'])(
+    'should return null when the server runs in %s',
+    (zone) => {
+      process.env.TZ = zone;
+      expect(getServerTimeZone()).toBeNull();
+    },
+  );
+
+  it('should return null when TZ is not a zone the runtime understands', () => {
+    // Node falls back to UTC and reports no zone name
+    process.env.TZ = 'not-a-zone';
+    expect(getServerTimeZone()).toBeNull();
   });
 });
