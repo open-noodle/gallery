@@ -399,6 +399,42 @@ describe(MetadataService.name, () => {
         });
       });
 
+      it('should keep a video whose date says +00:00 explicitly in UTC', async () => {
+        // e.g. an iPhone video recorded in Lisbon: exiftool still reports
+        // tzSource 'defaultVideosToUTC', but this UTC came from the file.
+        vi.stubEnv('TZ', 'America/Port_of_Spain');
+        const { sut, ctx } = setupWithMedia();
+        const { filePath } = await createTestVideo({ 'Keys:CreationDate': '2026:09:24 20:57:57+00:00' });
+
+        await expect(extractDates(ctx, sut, { originalPath: filePath, type: AssetType.Video })).resolves.toEqual({
+          dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+          timeZone: 'UTC',
+          localDateTime: new Date('2026-09-24T20:57:57.000Z'),
+        });
+      });
+
+      it('should show a video with no date at all in the server time zone', async () => {
+        vi.stubEnv('TZ', 'America/Port_of_Spain');
+        const { sut, ctx } = setupWithMedia();
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        ctx.getMock(StorageRepository).stat.mockResolvedValue({
+          size: 123_456,
+          mtime: instant,
+          mtimeMs: instant.valueOf(),
+          birthtimeMs: instant.valueOf(),
+        } as Stats);
+        // the fixture's QuickTime dates are all 0000:00:00 00:00:00
+        const { filePath } = await createTestVideo({});
+
+        await expect(
+          extractDates(ctx, sut, { originalPath: filePath, type: AssetType.Video, fileCreatedAt: instant }),
+        ).resolves.toEqual({
+          dateTimeOriginal: instant,
+          timeZone: 'America/Port_of_Spain',
+          localDateTime: new Date('2026-09-24T21:07:27.000Z'),
+        });
+      });
+
       it('should keep a video with no zone in its metadata in UTC when the server runs in UTC', async () => {
         vi.stubEnv('TZ', 'UTC');
         const { sut, ctx } = setupWithMedia();
