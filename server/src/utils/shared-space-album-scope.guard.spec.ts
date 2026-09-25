@@ -176,9 +176,6 @@ const ALBUM_ALLOWLIST: Record<string, string> = {
   // Album-ABSENCE gate (keeps plain non-space album assets visible) — references
   // asset/library absence by design, never an album access arm.
   'database.ts::albumSharedSpaceScope': 'album-absence gate, not an album access arm',
-  // Pre-existing intentional RBAC gap: AssetUpdate/edit has no space-album arm
-  // (space editors can add/remove but not metadata-edit linked-album assets).
-  'access.repository.ts::checkSpaceEditAccess': 'known RBAC gap: AssetUpdate has no space-album arm (pre-existing)',
   // GET /shared-spaces/:id/map-markers unions direct+library only. Visibility-gated
   // (visibleSpaceAssetVisibilities) so no leak — but album-linked markers are absent.
   // Pre-existing album-completeness gap, tracked separately; NOT a visibility hole.

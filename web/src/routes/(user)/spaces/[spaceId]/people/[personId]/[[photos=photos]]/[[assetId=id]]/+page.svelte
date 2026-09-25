@@ -815,7 +815,7 @@
     <SelectionToolbar
       {timelineManager}
       assetInteraction={assetMultiSelectManager}
-      space={{ id: space.id, canWrite: isEditor }}
+      space={{ id: space.id, canWrite: isEditor, members }}
       downloadFilename={`${person.name || space.name || 'immich'}.zip`}
       onRemove={handleRemoveAssets}
       onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
