@@ -25,3 +25,17 @@ export const mergeTimeZone = (dateTimeOriginal?: string | null, timeZone?: strin
     ? DateTime.fromISO(dateTimeOriginal, { zone: 'UTC' }).setZone(timeZone ?? undefined)
     : undefined;
 };
+
+/**
+ * The zone the server runs in (the `TZ` env var, else the system zone), or null
+ * when that is UTC under any alias, so a UTC server stores no zone as before.
+ */
+export const getServerTimeZone = (): string | null => {
+  const zone = DateTime.local().zoneName;
+  if (!zone) {
+    return null;
+  }
+  // Node reports TZ=GMT as the offset ID '+00:00' rather than 'UTC'
+  const canonical = new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions().timeZone;
+  return canonical === 'UTC' || /^[+-]00:?00$/.test(canonical) ? null : zone;
+};

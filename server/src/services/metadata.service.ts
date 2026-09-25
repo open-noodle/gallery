@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ContainerDirectoryItem, ExifDateTime, Tags } from 'exiftool-vendored';
+import { ContainerDirectoryItem, ExifDateTime, Tags, defaultVideosToUTC } from 'exiftool-vendored';
 import { Insertable } from 'kysely';
 import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration, FixedOffsetZone } from 'luxon';
@@ -34,7 +34,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { getAssetFiles } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
-import { mergeTimeZone } from 'src/utils/date.js';
+import { getServerTimeZone, mergeTimeZone } from 'src/utils/date.js';
 import { parseDurationToSeconds } from 'src/utils/duration.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, isFaceImportEnabled } from 'src/utils/misc.js';
@@ -1166,9 +1166,17 @@ export class MetadataService extends BaseService {
       timeZone = 'UTC+0';
     }
 
+    // exiftool assumed UTC only to parse a zone-less QuickTime timestamp: the
+    // instant is right but the zone is unknown, so use the server's TZ as
+    // documented. Issue #1147.
+    const serverTimeZone = getServerTimeZone();
+    if (exifTags.tzSource === defaultVideosToUTC && serverTimeZone) {
+      timeZone = serverTimeZone;
+    }
+
     if (timeZone) {
       this.logger.verbose(
-        `Found timezone ${timeZone} via ${exifTags.zoneSource} for asset ${asset.id}: ${asset.originalPath}`,
+        `Found timezone ${timeZone} via ${exifTags.tzSource} for asset ${asset.id}: ${asset.originalPath}`,
       );
     } else {
       this.logger.debug(`No timezone information found for asset ${asset.id}: ${asset.originalPath}`);
@@ -1214,7 +1222,11 @@ export class MetadataService extends BaseService {
       this.logger.debug(
         `No exif date time found, falling back on ${earliestDate.toISO()}, earliest of file creation and modification for asset ${asset.id}: ${asset.originalPath}`,
       );
-      dateTimeOriginal = localDateTime = earliestDate;
+      // The file carries no date, so keep its local time in whatever zone we
+      // know, falling back to the server's TZ as documented. Issue #1147.
+      timeZone ??= serverTimeZone;
+      dateTimeOriginal = earliestDate.setZone(timeZone ?? 'UTC');
+      localDateTime = dateTimeOriginal.setZone('UTC', { keepLocalTime: true });
     }
 
     this.logger.verbose(`Found local date time ${localDateTime.toISO()} for asset ${asset.id}: ${asset.originalPath}`);
