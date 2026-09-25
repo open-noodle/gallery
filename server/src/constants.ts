@@ -236,6 +236,7 @@ export const endpointTags: Record<ApiTag, string> = {
     'A workflow is a set of actions that run whenever a triggering event occurs. Workflows also can include filters to further limit execution.',
   [ApiTag.Classification]:
     'Endpoints for managing auto-classification categories that automatically tag and archive photos based on CLIP similarity.',
+  [ApiTag.Cleanup]: 'Endpoints for reviewing and clearing out space hogs, bursts, screenshots, and blurry photos.',
 };
 
 export const AUDIO_ENCODER: Record<AudioCodec, string> = {

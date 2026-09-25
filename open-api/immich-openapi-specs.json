@@ -7197,6 +7197,625 @@
         ]
       }
     },
+    "/cleanup/calendar": {
+      "get": {
+        "description": "Return per-day asset counts and review state for every calendar date, plus the review streak.",
+        "operationId": "getCleanupCalendar",
+        "parameters": [
+          {
+            "name": "tz",
+            "required": true,
+            "in": "query",
+            "description": "Viewer time zone",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupCalendarResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the cleanup calendar",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/commit": {
+      "post": {
+        "description": "Trash, favourite and keep the given asset ids for a queue, skipping ids the caller cannot act on instead of failing the whole batch, and optionally mark a rewind date reviewed.",
+        "operationId": "commitCleanup",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupCommitDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupCommitResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Commit cleanup decisions",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.update",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/decisions": {
+      "delete": {
+        "description": "Remove a keep decision for the given asset ids in a queue.",
+        "operationId": "deleteCleanupDecisions",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupDecisionDeleteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete cleanup decisions",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.update",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/in-spaces": {
+      "post": {
+        "description": "Return the subset of the given asset ids, owned by the caller, that belong to any shared space.",
+        "operationId": "getCleanupAssetsInSpaces",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupInSpacesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupInSpacesResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get which cleanup assets are in a shared space",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/queues/{queue}": {
+      "get": {
+        "description": "Return a keyset page of a cleanup queue, using cursor-based pagination.",
+        "operationId": "getCleanupQueue",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hideFaces",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "minSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "queue",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupListQueue"
+            }
+          },
+          {
+            "name": "reason",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupBlurReason"
+            }
+          },
+          {
+            "name": "strictness",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupStrictness"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupAssetTypeFilter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupQueuePageDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get a cleanup queue page",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/queues/{queue}/count": {
+      "get": {
+        "description": "Return the count and total size of a cleanup queue, honouring the same filters as the list route so the hub can show a matching count per card.",
+        "operationId": "getCleanupQueueCount",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hideFaces",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "minSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "queue",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupCountQueue"
+            }
+          },
+          {
+            "name": "reason",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupBlurReason"
+            }
+          },
+          {
+            "name": "strictness",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupStrictness"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CleanupAssetTypeFilter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupCountResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get a cleanup queue count",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/rewind/{monthDay}": {
+      "get": {
+        "description": "Return the years, newest first, that have assets on this calendar date.",
+        "operationId": "getCleanupRewindYears",
+        "parameters": [
+          {
+            "name": "monthDay",
+            "required": true,
+            "in": "path",
+            "description": "Calendar date as month*100+day, e.g. 923",
+            "schema": {
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupRewindYearsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get rewind years for a date",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/rewind/{monthDay}/{year}": {
+      "get": {
+        "description": "Return the assets on this calendar date in this year.",
+        "operationId": "getCleanupRewindAssets",
+        "parameters": [
+          {
+            "name": "monthDay",
+            "required": true,
+            "in": "path",
+            "description": "Calendar date as month*100+day, e.g. 923",
+            "schema": {
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "minimum": 1800,
+              "maximum": 9999,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupRewindAssetsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get rewind assets for a date and year",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/cleanup/trash": {
+      "get": {
+        "description": "Return the count and total size of the caller’s trashed assets that are not in an external library.",
+        "operationId": "getCleanupTrash",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupTrashResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get cleanup trash totals",
+        "tags": [
+          "Cleanup"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.3.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.3.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "cleanup.read",
+        "x-immich-state": "Alpha"
+      }
+    },
     "/config": {
       "get": {
         "description": "Retrieve the system configuration properties that are visible to logged in users.",
@@ -25929,6 +26548,10 @@
     {
       "name": "Classification",
       "description": "Endpoints for managing auto-classification categories that automatically tag and archive photos based on CLIP similarity."
+    },
+    {
+      "name": "Cleanup",
+      "description": "Endpoints for reviewing and clearing out space hogs, bursts, screenshots, and blurry photos."
     }
   ],
   "servers": [
@@ -26744,6 +27367,9 @@
           "petDetection": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
+          "qualityAnalysis": {
+            "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
+          },
           "search": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
@@ -26776,6 +27402,7 @@
           "ocr",
           "peopleBackfill",
           "petDetection",
+          "qualityAnalysis",
           "search",
           "sidecar",
           "smartSearch",
@@ -29597,6 +30224,503 @@
         ],
         "type": "string"
       },
+      "CleanupAssetDto": {
+        "properties": {
+          "city": {
+            "nullable": true,
+            "type": "string"
+          },
+          "duration": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "fileSize": {
+            "format": "double",
+            "type": "number"
+          },
+          "height": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "type": "string"
+          },
+          "inAlbum": {
+            "type": "boolean"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "kept": {
+            "type": "boolean"
+          },
+          "localDateTime": {
+            "type": "string"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/CleanupBlurReason"
+          },
+          "sharpness": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "thumbhash": {
+            "nullable": true,
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/AssetTypeEnum"
+          },
+          "width": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "city",
+          "duration",
+          "fileSize",
+          "height",
+          "id",
+          "inAlbum",
+          "isFavorite",
+          "kept",
+          "localDateTime",
+          "originalFileName",
+          "thumbhash",
+          "type",
+          "width"
+        ],
+        "type": "object"
+      },
+      "CleanupAssetTypeFilter": {
+        "enum": [
+          "all",
+          "image",
+          "video"
+        ],
+        "type": "string"
+      },
+      "CleanupBlurReason": {
+        "enum": [
+          "all",
+          "blurry",
+          "dark",
+          "bright"
+        ],
+        "type": "string"
+      },
+      "CleanupBurstGroupDto": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupAssetDto"
+            },
+            "type": "array"
+          },
+          "groupId": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CleanupBurstSource"
+          },
+          "suggestedKeepId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assets",
+          "groupId",
+          "source",
+          "suggestedKeepId"
+        ],
+        "type": "object"
+      },
+      "CleanupBurstSource": {
+        "enum": [
+          "burstId",
+          "timeWindow"
+        ],
+        "type": "string"
+      },
+      "CleanupCalendarDayDto": {
+        "properties": {
+          "assetCount": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "monthDay": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "reviewedAt": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetCount",
+          "monthDay",
+          "reviewedAt"
+        ],
+        "type": "object"
+      },
+      "CleanupCalendarResponseDto": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupCalendarDayDto"
+            },
+            "type": "array"
+          },
+          "daysReviewed": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "streak": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "days",
+          "daysReviewed",
+          "streak"
+        ],
+        "type": "object"
+      },
+      "CleanupCommitDto": {
+        "properties": {
+          "completeMonthDay": {
+            "description": "Calendar date as month*100+day, e.g. 923",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "favoriteIds": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "keepIds": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/CleanupQueue"
+          },
+          "trashIds": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "queue"
+        ],
+        "type": "object"
+      },
+      "CleanupCommitResponseDto": {
+        "properties": {
+          "favorited": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "kept": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupSkippedDto"
+            },
+            "type": "array"
+          },
+          "trashed": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "favorited",
+          "kept",
+          "skipped",
+          "trashed"
+        ],
+        "type": "object"
+      },
+      "CleanupCountQueue": {
+        "description": "Queue to count",
+        "enum": [
+          "space_hogs",
+          "bursts",
+          "screenshots",
+          "blurry",
+          "duplicates"
+        ],
+        "type": "string"
+      },
+      "CleanupCountResponseDto": {
+        "properties": {
+          "analysedPercent": {
+            "format": "double",
+            "type": "number"
+          },
+          "bytes": {
+            "format": "double",
+            "type": "number"
+          },
+          "count": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bytes",
+          "count"
+        ],
+        "type": "object"
+      },
+      "CleanupDecisionDeleteDto": {
+        "properties": {
+          "assetIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/CleanupQueue"
+          }
+        },
+        "required": [
+          "assetIds",
+          "queue"
+        ],
+        "type": "object"
+      },
+      "CleanupInSpacesDto": {
+        "properties": {
+          "assetIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetIds"
+        ],
+        "type": "object"
+      },
+      "CleanupInSpacesResponseDto": {
+        "properties": {
+          "assetIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetIds"
+        ],
+        "type": "object"
+      },
+      "CleanupListQueue": {
+        "description": "Queue to list",
+        "enum": [
+          "space_hogs",
+          "bursts",
+          "screenshots",
+          "blurry"
+        ],
+        "type": "string"
+      },
+      "CleanupQueue": {
+        "description": "Cleanup queue",
+        "enum": [
+          "rewind",
+          "space_hogs",
+          "bursts",
+          "screenshots",
+          "blurry"
+        ],
+        "type": "string"
+      },
+      "CleanupQueuePageDto": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupBurstGroupDto"
+            },
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupAssetDto"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "groups",
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "CleanupRewindAssetsResponseDto": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupAssetDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assets"
+        ],
+        "type": "object"
+      },
+      "CleanupRewindYearDto": {
+        "properties": {
+          "count": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "year": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "year"
+        ],
+        "type": "object"
+      },
+      "CleanupRewindYearsResponseDto": {
+        "properties": {
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupRewindYearDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "years"
+        ],
+        "type": "object"
+      },
+      "CleanupSkipReason": {
+        "enum": [
+          "not_found",
+          "out_of_scope",
+          "already_trashed"
+        ],
+        "type": "string"
+      },
+      "CleanupSkippedDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/CleanupSkipReason"
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "CleanupStrictness": {
+        "enum": [
+          "lenient",
+          "balanced",
+          "strict"
+        ],
+        "type": "string"
+      },
+      "CleanupTrashResponseDto": {
+        "properties": {
+          "bytes": {
+            "format": "double",
+            "type": "number"
+          },
+          "count": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bytes",
+          "count"
+        ],
+        "type": "object"
+      },
       "Colorspace": {
         "description": "Colorspace",
         "enum": [
@@ -32045,7 +33169,9 @@
           "SharedSpaceAlbumGrantReconcileSweep",
           "SharedSpaceIdentityReconciliationSweep",
           "AssetClassifyQueueAll",
-          "AssetClassify"
+          "AssetClassify",
+          "AssetAnalyzeQualityQueueAll",
+          "AssetAnalyzeQuality"
         ],
         "type": "string"
       },
@@ -34624,6 +35750,8 @@
           "userConfig.read",
           "duplicate.read",
           "duplicate.delete",
+          "cleanup.read",
+          "cleanup.update",
           "face.create",
           "face.read",
           "face.update",
@@ -35668,7 +36796,8 @@
           "integrityCheck",
           "editor",
           "storageBackendMigration",
-          "classification"
+          "classification",
+          "qualityAnalysis"
         ],
         "type": "string"
       },
@@ -35839,6 +36968,9 @@
           "petRecognition": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "qualityAnalysis": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "search": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -35881,6 +37013,7 @@
           "peopleBackfill",
           "petDetection",
           "petRecognition",
+          "qualityAnalysis",
           "search",
           "sidecar",
           "smartSearch",

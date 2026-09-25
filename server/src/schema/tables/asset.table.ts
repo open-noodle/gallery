@@ -13,6 +13,7 @@ import {
 } from '@immich/sql-tools';
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
+import { CLEANUP_MONTH_DAY_INDEX_WHERE, MONTH_DAY_SQL } from 'src/schema/cleanup-sql.js';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums.js';
 import { asset_delete_audit, asset_library_delete_audit } from 'src/schema/functions.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
@@ -69,6 +70,21 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
   name: 'asset_id_timeline_notDeleted_idx',
   columns: ['id'],
   where: `visibility = 'timeline' AND "deletedAt" IS NULL`,
+})
+// gallery-fork: Library Cleanup calendar/rewind — see specs/2026-09-23-library-cleanup-design.md
+// The trailing "localDateTime" key lets the calendar count run as an index-only scan that reads the
+// stored month-day value instead of evaluating the expression per row (p95 279 ms -> 25 ms at 500k assets).
+@Index({
+  name: 'asset_localMonthDay_idx',
+  expression: `"ownerId", ${MONTH_DAY_SQL}, "localDateTime"`,
+  where: CLEANUP_MONTH_DAY_INDEX_WHERE,
+})
+// gallery-fork: Library Cleanup keyset paging (bursts windows, screenshots, blurry). Same partial condition
+// as asset_localMonthDay_idx, so only Cleanup queries (which repeat it as literals) can use it.
+@Index({
+  name: 'asset_cleanup_localDateTime_idx',
+  columns: ['ownerId', 'localDateTime', 'id'],
+  where: CLEANUP_MONTH_DAY_INDEX_WHERE,
 })
 // For all assets, each originalpath must be unique per user and library
 export class AssetTable {

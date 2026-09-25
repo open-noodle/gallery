@@ -226,6 +226,7 @@ export class JobService extends BaseService {
           { name: JobName.AssetDetectFaces, data: item.data },
           { name: JobName.Ocr, data: item.data },
           { name: JobName.PetDetection, data: item.data },
+          { name: JobName.AssetAnalyzeQuality, data: item.data },
         ];
 
         if (asset.type === AssetType.Video) {

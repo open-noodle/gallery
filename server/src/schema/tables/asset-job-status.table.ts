@@ -23,4 +23,8 @@ export class AssetJobStatusTable {
 
   @Column({ type: 'timestamp with time zone', nullable: true })
   classifiedAt!: Timestamp | null;
+
+  // gallery-fork: Library Cleanup quality analysis
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  qualityAnalyzedAt!: Timestamp | null;
 }

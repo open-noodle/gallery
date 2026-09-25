@@ -195,6 +195,7 @@ export type AdminConfigJobDto = {
     ocr: AdminConfigJobSettingsDto;
     peopleBackfill: AdminConfigJobSettingsDto;
     petDetection: AdminConfigJobSettingsDto;
+    qualityAnalysis: AdminConfigJobSettingsDto;
     search: AdminConfigJobSettingsDto;
     sidecar: AdminConfigJobSettingsDto;
     smartSearch: AdminConfigJobSettingsDto;
@@ -1931,6 +1932,91 @@ export type ValidateAccessTokenResponseDto = {
     /** Authentication status */
     authStatus: boolean;
 };
+export type CleanupCalendarDayDto = {
+    assetCount: number;
+    monthDay: number;
+    reviewedAt: string | null;
+};
+export type CleanupCalendarResponseDto = {
+    days: CleanupCalendarDayDto[];
+    daysReviewed: number;
+    streak: number;
+};
+export type CleanupCommitDto = {
+    /** Calendar date as month*100+day, e.g. 923 */
+    completeMonthDay?: number;
+    favoriteIds?: string[];
+    keepIds?: string[];
+    queue: CleanupQueue;
+    trashIds?: string[];
+};
+export type CleanupSkippedDto = {
+    id: string;
+    reason: CleanupSkipReason;
+};
+export type CleanupCommitResponseDto = {
+    favorited: number;
+    kept: number;
+    skipped: CleanupSkippedDto[];
+    trashed: string[];
+};
+export type CleanupDecisionDeleteDto = {
+    assetIds: string[];
+    queue: CleanupQueue;
+};
+export type CleanupInSpacesDto = {
+    assetIds: string[];
+};
+export type CleanupInSpacesResponseDto = {
+    assetIds: string[];
+};
+export type CleanupAssetDto = {
+    city: string | null;
+    duration: number | null;
+    fileSize: number;
+    height: number | null;
+    id: string;
+    inAlbum: boolean;
+    isFavorite: boolean;
+    kept: boolean;
+    localDateTime: string;
+    originalFileName: string;
+    reason?: CleanupBlurReason;
+    sharpness?: number | null;
+    thumbhash: string | null;
+    "type": AssetTypeEnum;
+    width: number | null;
+};
+export type CleanupBurstGroupDto = {
+    assets: CleanupAssetDto[];
+    groupId: string;
+    source: CleanupBurstSource;
+    suggestedKeepId: string;
+};
+export type CleanupQueuePageDto = {
+    groups: CleanupBurstGroupDto[];
+    items: CleanupAssetDto[];
+    nextCursor: string | null;
+};
+export type CleanupCountResponseDto = {
+    analysedPercent?: number;
+    bytes: number;
+    count: number;
+};
+export type CleanupRewindYearDto = {
+    count: number;
+    year: number;
+};
+export type CleanupRewindYearsResponseDto = {
+    years: CleanupRewindYearDto[];
+};
+export type CleanupRewindAssetsResponseDto = {
+    assets: CleanupAssetDto[];
+};
+export type CleanupTrashResponseDto = {
+    bytes: number;
+    count: number;
+};
 export type UserConfigFFmpegRealtimeDto = {
     /** Enable real-time HLS transcoding (alpha) */
     enabled: boolean;
@@ -2176,6 +2262,7 @@ export type QueuesResponseLegacyDto = {
     peopleBackfill: QueueResponseLegacyDto;
     petDetection: QueueResponseLegacyDto;
     petRecognition: QueueResponseLegacyDto;
+    qualityAnalysis: QueueResponseLegacyDto;
     search: QueueResponseLegacyDto;
     sidecar: QueueResponseLegacyDto;
     smartSearch: QueueResponseLegacyDto;
@@ -6717,6 +6804,157 @@ export function scanClassification(opts?: Oazapfts.RequestOpts) {
     }));
 }
 /**
+ * Get the cleanup calendar
+ */
+export function getCleanupCalendar({ tz }: {
+    tz: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupCalendarResponseDto;
+    }>(`/cleanup/calendar${QS.query(QS.explode({
+        tz
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Commit cleanup decisions
+ */
+export function commitCleanup({ cleanupCommitDto }: {
+    cleanupCommitDto: CleanupCommitDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupCommitResponseDto;
+    }>("/cleanup/commit", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: cleanupCommitDto
+    })));
+}
+/**
+ * Delete cleanup decisions
+ */
+export function deleteCleanupDecisions({ cleanupDecisionDeleteDto }: {
+    cleanupDecisionDeleteDto: CleanupDecisionDeleteDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/cleanup/decisions", oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: cleanupDecisionDeleteDto
+    })));
+}
+/**
+ * Get which cleanup assets are in a shared space
+ */
+export function getCleanupAssetsInSpaces({ cleanupInSpacesDto }: {
+    cleanupInSpacesDto: CleanupInSpacesDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupInSpacesResponseDto;
+    }>("/cleanup/in-spaces", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: cleanupInSpacesDto
+    })));
+}
+/**
+ * Get a cleanup queue page
+ */
+export function getCleanupQueue({ cursor, hideFaces, limit, minSize, queue, reason, strictness, $type }: {
+    cursor?: string;
+    hideFaces?: boolean;
+    limit?: number;
+    minSize?: number;
+    queue: CleanupListQueue;
+    reason?: CleanupBlurReason;
+    strictness?: CleanupStrictness;
+    $type?: CleanupAssetTypeFilter;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupQueuePageDto;
+    }>(`/cleanup/queues/${encodeURIComponent(queue)}${QS.query(QS.explode({
+        cursor,
+        hideFaces,
+        limit,
+        minSize,
+        reason,
+        strictness,
+        "type": $type
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get a cleanup queue count
+ */
+export function getCleanupQueueCount({ cursor, hideFaces, limit, minSize, queue, reason, strictness, $type }: {
+    cursor?: string;
+    hideFaces?: boolean;
+    limit?: number;
+    minSize?: number;
+    queue: CleanupCountQueue;
+    reason?: CleanupBlurReason;
+    strictness?: CleanupStrictness;
+    $type?: CleanupAssetTypeFilter;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupCountResponseDto;
+    }>(`/cleanup/queues/${encodeURIComponent(queue)}/count${QS.query(QS.explode({
+        cursor,
+        hideFaces,
+        limit,
+        minSize,
+        reason,
+        strictness,
+        "type": $type
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get rewind years for a date
+ */
+export function getCleanupRewindYears({ monthDay }: {
+    monthDay: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupRewindYearsResponseDto;
+    }>(`/cleanup/rewind/${encodeURIComponent(monthDay)}`, {
+        ...opts
+    }));
+}
+/**
+ * Get rewind assets for a date and year
+ */
+export function getCleanupRewindAssets({ monthDay, year }: {
+    monthDay: number;
+    year: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupRewindAssetsResponseDto;
+    }>(`/cleanup/rewind/${encodeURIComponent(monthDay)}/${encodeURIComponent(year)}`, {
+        ...opts
+    }));
+}
+/**
+ * Get cleanup trash totals
+ */
+export function getCleanupTrash(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: CleanupTrashResponseDto;
+    }>("/cleanup/trash", {
+        ...opts
+    }));
+}
+/**
  * Get the configuration with user visibility
  */
 export function getUserConfig(opts?: Oazapfts.RequestOpts) {
@@ -11015,6 +11253,8 @@ export enum Permission {
     UserConfigRead = "userConfig.read",
     DuplicateRead = "duplicate.read",
     DuplicateDelete = "duplicate.delete",
+    CleanupRead = "cleanup.read",
+    CleanupUpdate = "cleanup.update",
     FaceCreate = "face.create",
     FaceRead = "face.read",
     FaceUpdate = "face.update",
@@ -11195,6 +11435,51 @@ export enum AssetMediaSize {
     Preview = "preview",
     Thumbnail = "thumbnail"
 }
+export enum CleanupQueue {
+    Rewind = "rewind",
+    SpaceHogs = "space_hogs",
+    Bursts = "bursts",
+    Screenshots = "screenshots",
+    Blurry = "blurry"
+}
+export enum CleanupSkipReason {
+    NotFound = "not_found",
+    OutOfScope = "out_of_scope",
+    AlreadyTrashed = "already_trashed"
+}
+export enum CleanupListQueue {
+    SpaceHogs = "space_hogs",
+    Bursts = "bursts",
+    Screenshots = "screenshots",
+    Blurry = "blurry"
+}
+export enum CleanupBlurReason {
+    All = "all",
+    Blurry = "blurry",
+    Dark = "dark",
+    Bright = "bright"
+}
+export enum CleanupStrictness {
+    Lenient = "lenient",
+    Balanced = "balanced",
+    Strict = "strict"
+}
+export enum CleanupAssetTypeFilter {
+    All = "all",
+    Image = "image",
+    Video = "video"
+}
+export enum CleanupBurstSource {
+    BurstId = "burstId",
+    TimeWindow = "timeWindow"
+}
+export enum CleanupCountQueue {
+    SpaceHogs = "space_hogs",
+    Bursts = "bursts",
+    Screenshots = "screenshots",
+    Blurry = "blurry",
+    Duplicates = "duplicates"
+}
 export enum SourceType {
     MachineLearning = "machine-learning",
     Exif = "exif",
@@ -11248,7 +11533,8 @@ export enum QueueName {
     IntegrityCheck = "integrityCheck",
     Editor = "editor",
     StorageBackendMigration = "storageBackendMigration",
-    Classification = "classification"
+    Classification = "classification",
+    QualityAnalysis = "qualityAnalysis"
 }
 export enum QueueCommand {
     Start = "start",
@@ -11377,7 +11663,9 @@ export enum JobName {
     SharedSpaceAlbumGrantReconcileSweep = "SharedSpaceAlbumGrantReconcileSweep",
     SharedSpaceIdentityReconciliationSweep = "SharedSpaceIdentityReconciliationSweep",
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
-    AssetClassify = "AssetClassify"
+    AssetClassify = "AssetClassify",
+    AssetAnalyzeQualityQueueAll = "AssetAnalyzeQualityQueueAll",
+    AssetAnalyzeQuality = "AssetAnalyzeQuality"
 }
 export enum QueueJobStatus {
     Active = "active",
