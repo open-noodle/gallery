@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { Route } from '$lib/route';
   import { getSearchablePageFilterState, getSearchablePageState } from '$lib/utils/searchable-page-search';
   import { t } from 'svelte-i18n';
@@ -82,13 +83,16 @@
               active: path.startsWith(`${base}/libraries`),
             }
           : undefined,
-        {
-          key: 'map',
-          label: $t('map'),
-          href: mapHref,
-          external: true,
-          active: false,
-        },
+        // #1046 — with the map feature off, /map redirects to /photos and would bounce the user out.
+        featureFlagsManager.value.map
+          ? {
+              key: 'map',
+              label: $t('map'),
+              href: mapHref,
+              external: true,
+              active: false,
+            }
+          : undefined,
         {
           key: 'members',
           label: $t('members'),
