@@ -745,6 +745,15 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
               onLoading: () =>
                   widget.loadingWidget ??
                   CustomScrollView(
+                    // Deliberately NOT primary. A vertical scroll view with no controller of its
+                    // own inherits the enclosing PrimaryScrollController — here the timeline's
+                    // own [_scrollController] — and attaches its fresh position to it. The
+                    // segments reload (and so render this placeholder for a frame) whenever
+                    // [timelineArgsProvider] changes, which a device rotation does; that attach
+                    // would fire [_restoreAssetPosition] while the new segments are still
+                    // loading, discarding the position the grid is about to be restored to and
+                    // leaving the user back at the top of the timeline.
+                    primary: false,
                     slivers: [
                       if (widget.appBar != null) widget.appBar!,
                       const SliverFillRemaining(hasScrollBody: false, child: Center(child: ImmichLoadingIndicator())),
