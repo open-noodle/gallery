@@ -10,6 +10,7 @@ import { Writable } from 'node:stream';
 import sharp, { Sharp } from 'sharp';
 import type {
   DecodeToBufferOptions,
+  GenerateDerivedImageOptions,
   GenerateThumbhashOptions,
   GenerateThumbnailOptions,
   ImageDimensions,
@@ -183,6 +184,23 @@ export class MediaRepository {
         // this is default in libvips (except the threshold is 90), but we need to set it manually in sharp
         chromaSubsampling: options.quality >= 80 ? '4:4:4' : '4:2:0',
         progressive: options.progressive,
+      })
+      .toFile(output);
+  }
+
+  // Gallery-fork: derived image presets. Unlike generateThumbnail, which scales by the shortest edge and
+  // keeps the source aspect, this produces exactly width x height by scaling to cover and cropping the
+  // overflow at `position`. See specs/2026-09-22-derived-image-presets-design.md.
+  async generateDerivedImage(
+    input: string | Buffer,
+    options: GenerateDerivedImageOptions,
+    output: string,
+  ): Promise<void> {
+    await this.getImageDecodingPipeline(input, options)
+      .resize(options.width, options.height, { fit: 'cover', position: options.position })
+      .toFormat(options.format, {
+        quality: options.quality,
+        chromaSubsampling: options.quality >= 80 ? '4:4:4' : '4:2:0',
       })
       .toFile(output);
   }

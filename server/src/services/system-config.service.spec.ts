@@ -266,6 +266,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     fullsize: { enabled: false, format: ImageFormat.Jpeg, quality: 80, progressive: false },
     colorspace: Colorspace.P3,
     extractEmbedded: false,
+    presets: {},
   },
   newVersionCheck: {
     enabled: true,
@@ -501,6 +502,72 @@ describe(SystemConfigService.name, () => {
       await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { types: {} },
       });
+    });
+
+    // Gallery-fork: derived image presets. See specs/2026-09-22-derived-image-presets-design.md.
+    it('should default image.presets to empty so a stock install renders nothing extra', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({ image: { presets: {} } });
+    });
+
+    it('should accept a derived image preset and fill in position, format and quality', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        image: { presets: { landscape: { aspectRatio: '16:9', widths: [1600, 1280, 960, 640, 320] } } },
+      });
+
+      const result = await sut.getAdminConfig();
+
+      expect(result.image.presets).toEqual({
+        landscape: {
+          aspectRatio: '16:9',
+          widths: [1600, 1280, 960, 640, 320],
+          position: 'center',
+          format: 'webp',
+          quality: 80,
+        },
+      });
+    });
+
+    it('should reject a derived image preset with a malformed aspect ratio', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ image: { presets: { hero: { aspectRatio: '16x9', widths: [1600] } } } }),
+      );
+
+      await expect(sut.getAdminConfig()).rejects.toThrow('[image.presets.hero.aspectRatio] Aspect ratio must be W:H');
+    });
+
+    it('should reject a derived image preset with a zero side, duplicate widths or an empty width list', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ image: { presets: { hero: { aspectRatio: '0:9', widths: [1600] } } } }),
+      );
+      await expect(sut.getAdminConfig()).rejects.toThrow(
+        '[image.presets.hero.aspectRatio] Aspect ratio sides must be positive',
+      );
+
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ image: { presets: { hero: { aspectRatio: '16:9', widths: [1600, 1600] } } } }),
+      );
+      await expect(sut.getAdminConfig()).rejects.toThrow('[image.presets.hero.widths] Widths must be unique');
+
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ image: { presets: { hero: { aspectRatio: '16:9', widths: [] } } } }),
+      );
+      await expect(sut.getAdminConfig()).rejects.toThrow('[image.presets.hero.widths]');
+    });
+
+    it('should reject a derived image preset whose name is not a URL-safe slug', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ image: { presets: { 'Blog Hero': { aspectRatio: '16:9', widths: [1600] } } } }),
+      );
+
+      await expect(sut.getAdminConfig()).rejects.toThrow(
+        '[image.presets] Preset name "Blog Hero" must be a lowercase slug (a-z, 0-9, -), max 32 characters',
+      );
     });
 
     it('should default themeMaxDistance to 0.75', async () => {

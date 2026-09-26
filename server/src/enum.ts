@@ -647,6 +647,19 @@ export enum ImageFormat {
 
 export const ImageFormatSchema = z.enum(ImageFormat).describe('Image format').meta({ id: 'ImageFormat' });
 
+// Gallery-fork: where a derived image preset takes its crop from when the source aspect ratio
+// differs from the preset's. Maps 1:1 onto sharp's `position` strategies for `fit: 'cover'`.
+export enum ImagePresetPosition {
+  Center = 'center',
+  Attention = 'attention',
+  Entropy = 'entropy',
+}
+
+export const ImagePresetPositionSchema = z
+  .enum(ImagePresetPosition)
+  .describe('Crop position for derived image presets')
+  .meta({ id: 'ImagePresetPosition' });
+
 export enum RawExtractedFormat {
   Jpeg = 'jpeg',
   Jxl = 'jxl',
@@ -970,6 +983,9 @@ export enum JobName {
 
   MemoryCleanup = 'MemoryCleanup',
   MemoryGenerate = 'MemoryGenerate',
+
+  // Gallery-fork: drops cached derived images whose preset/width no longer exists in config.
+  AssetDerivedFileCleanup = 'AssetDerivedFileCleanup',
 
   NotificationsCleanup = 'NotificationsCleanup',
 

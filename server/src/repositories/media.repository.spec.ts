@@ -1,9 +1,10 @@
 import { mkdtempDisposableSync, statSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto.js';
-import { Colorspace, ImageFormat } from 'src/enum.js';
+import { Colorspace, ImageFormat, ImagePresetPosition } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
 import { automock } from 'test/utils.js';
@@ -339,6 +340,110 @@ describe(MediaRepository.name, () => {
       );
 
       expect(statSync(file).blksize).toBeGreaterThan(0);
+    });
+  });
+
+  // Gallery-fork: derived image presets. See specs/2026-09-22-derived-image-presets-design.md.
+  describe('generateDerivedImage', () => {
+    let dir: string;
+
+    beforeEach(async () => {
+      dir = await mkdtemp(join(tmpdir(), 'derived-'));
+    });
+
+    afterEach(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    const base = { colorspace: Colorspace.Srgb, processInvalidImages: false };
+
+    it('should produce exactly the requested dimensions from a wider source', async () => {
+      const input = await sharp({ create: { width: 3000, height: 2000, channels: 3, background: '#336699' } })
+        .png()
+        .toBuffer();
+      const output = join(dir, 'out.tmp');
+
+      await sut.generateDerivedImage(
+        input,
+        {
+          ...base,
+          width: 1600,
+          height: 900,
+          position: ImagePresetPosition.Center,
+          format: ImageFormat.Webp,
+          quality: 80,
+        },
+        output,
+      );
+
+      const metadata = await sharp(output).metadata();
+      expect(metadata).toEqual(expect.objectContaining({ width: 1600, height: 900, format: 'webp' }));
+    });
+
+    it('should produce a square from a portrait source and honour the format', async () => {
+      const input = await sharp({ create: { width: 2000, height: 3000, channels: 3, background: '#996633' } })
+        .png()
+        .toBuffer();
+      const output = join(dir, 'out.tmp');
+
+      await sut.generateDerivedImage(
+        input,
+        {
+          ...base,
+          width: 1024,
+          height: 1024,
+          position: ImagePresetPosition.Attention,
+          format: ImageFormat.Jpeg,
+          quality: 85,
+        },
+        output,
+      );
+
+      const metadata = await sharp(output).metadata();
+      expect(metadata).toEqual(expect.objectContaining({ width: 1024, height: 1024, format: 'jpeg' }));
+    });
+
+    it('should crop, not letterbox: the centre crop of a two-colour source keeps only the middle band', async () => {
+      // Left third red, middle third green, right third blue; a 1:1 centre crop of a 3:1 image is all green.
+      const third = (color: string) =>
+        sharp({ create: { width: 300, height: 300, channels: 3, background: color } })
+          .png()
+          .toBuffer();
+      const input = await sharp({ create: { width: 900, height: 300, channels: 3, background: '#000000' } })
+        .composite([
+          { input: await third('#ff0000'), left: 0, top: 0 },
+          { input: await third('#00ff00'), left: 300, top: 0 },
+          { input: await third('#0000ff'), left: 600, top: 0 },
+        ])
+        .png()
+        .toBuffer();
+      const output = join(dir, 'out.tmp');
+
+      await sut.generateDerivedImage(
+        input,
+        {
+          ...base,
+          width: 100,
+          height: 100,
+          position: ImagePresetPosition.Center,
+          format: ImageFormat.Jpeg,
+          quality: 100,
+        },
+        output,
+      );
+
+      const { data, info } = await sharp(output).raw().toBuffer({ resolveWithObject: true });
+      expect(info).toEqual(expect.objectContaining({ width: 100, height: 100 }));
+      for (const [x, y] of [
+        [2, 2],
+        [50, 50],
+        [97, 97],
+      ]) {
+        const index = (y * info.width + x) * info.channels;
+        expect(data[index + 1]).toBeGreaterThan(200); // green
+        expect(data[index]).toBeLessThan(60); // no red
+        expect(data[index + 2]).toBeLessThan(60); // no blue
+      }
     });
   });
 });

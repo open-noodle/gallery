@@ -310,6 +310,8 @@ export class QueueService extends BaseService {
         { name: JobName.SessionCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.AuditTableCleanup },
+        // Gallery-fork: derived image presets — drop cached variants whose preset/width left config.
+        { name: JobName.AssetDerivedFileCleanup },
         // L8: low-frequency backstop for the album-grant reconcile mechanism — sweeps every
         // album with a live grant, independent of which code path created/removed it. Grouped
         // with the other cleanup/maintenance jobs so disabling nightlyTasks.databaseCleanup

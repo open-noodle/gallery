@@ -5,8 +5,10 @@ import {
   AssetVisibility,
   getAssetInfo,
   getMyUser,
+  ImageFormat,
   LoginResponseDto,
   SharedLinkType,
+  updateConfig,
 } from '@immich/sdk';
 import { exiftool } from 'exiftool-vendored';
 import { DateTime } from 'luxon';
@@ -657,6 +659,107 @@ describe('/asset', () => {
       const exifData = await readTags(body, 'thumbnail.jpg');
       expect(exifData).not.toHaveProperty('GPSLongitude');
       expect(exifData).not.toHaveProperty('GPSLatitude');
+    });
+
+    // Gallery-fork: derived image presets. See specs/2026-09-22-derived-image-presets-design.md.
+    describe('with a derived image preset (image.presets)', () => {
+      beforeAll(async () => {
+        const config = await utils.getSystemConfig(admin.accessToken);
+        await updateConfig(
+          {
+            adminConfigDto: {
+              ...config,
+              image: {
+                ...config.image,
+                presets: {
+                  landscape: { aspectRatio: '16:9', widths: [640, 320] },
+                  square: { aspectRatio: '1:1', widths: [320], format: ImageFormat.Jpeg },
+                },
+              },
+            },
+          },
+          { headers: asBearerAuth(admin.accessToken) },
+        );
+      });
+
+      afterAll(async () => {
+        await utils.resetAdminConfig(admin.accessToken);
+      });
+
+      it('should render exactly the preset dimensions and format', async () => {
+        const { status, body, type } = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=landscape&width=640`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+
+        expect(status).toBe(200);
+        expect(type).toBe('image/webp');
+        const metadata = await sharp(body).metadata();
+        expect(metadata.width).toBe(640);
+        expect(metadata.height).toBe(360);
+      });
+
+      it('should serve the same bytes from the cache on a repeat request', async () => {
+        const first = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=landscape&width=320`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        const second = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=landscape&width=320`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(Buffer.compare(first.body, second.body)).toBe(0);
+      });
+
+      it('should crop to a square when the preset says so', async () => {
+        const { status, body, type } = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=square&width=320`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+
+        expect(status).toBe(200);
+        expect(type).toBe('image/jpeg');
+        const metadata = await sharp(body).metadata();
+        expect(metadata.width).toBe(320);
+        expect(metadata.height).toBe(320);
+      });
+
+      it('should not carry gps data into a derived image', async () => {
+        const { status, body } = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=square&width=320`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+
+        expect(status).toBe(200);
+        const exifData = await readTags(body, 'derived.jpg');
+        expect(exifData).not.toHaveProperty('GPSLongitude');
+        expect(exifData).not.toHaveProperty('GPSLatitude');
+      });
+
+      it('should reject a width that is not configured for the preset', async () => {
+        const { status, body } = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=landscape&width=641`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest(expect.stringContaining('Width 641 is not configured')));
+      });
+
+      it('should reject an unknown preset', async () => {
+        const { status, body } = await request(app)
+          .get(`/assets/${locationAsset.id}/thumbnail?preset=portrait&width=640`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest(expect.stringContaining('Unknown image preset')));
+      });
+
+      it('should require authentication like any other thumbnail', async () => {
+        const { status, body } = await request(app).get(
+          `/assets/${locationAsset.id}/thumbnail?preset=landscape&width=640`,
+        );
+
+        expect(status).toBe(401);
+        expect(body).toEqual(errorDto.unauthorized);
+      });
     });
   });
 

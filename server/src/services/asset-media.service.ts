@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import sanitize from 'sanitize-filename';
 import type { UploadFile, UploadRequest } from 'src/types.js';
@@ -21,11 +22,13 @@ import {
 } from 'src/dtos/asset-media.dto.js';
 import { AssetDownloadOriginalDto } from 'src/dtos/asset.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
+import { SystemConfig } from 'src/dtos/config.dto.js';
 import {
   AssetFileType,
   AssetVisibility,
   CacheControl,
   ChecksumAlgorithm,
+  ExifOrientation,
   JobName,
   Permission,
   StorageFolder,
@@ -38,6 +41,7 @@ import { requireUploadAccess } from 'src/utils/access.js';
 import { asUploadRequest, onBeforeLink } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { ImmichMediaResponse, getFileNameWithoutExtension, getFilenameExtension } from 'src/utils/file.js';
+import { ResolvedImagePreset, resolveImagePreset, selectDerivedImageSource } from 'src/utils/image-preset.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { fromChecksum } from 'src/utils/request.js';
 
@@ -216,6 +220,12 @@ export class AssetMediaService extends BaseService {
       dto.edited = true;
     }
 
+    // Gallery-fork: derived image presets take over the endpoint when `preset` is given; `size` is
+    // then irrelevant because the preset fixes the output dimensions.
+    if (dto.preset !== undefined || dto.width !== undefined) {
+      return this.viewDerivedImage(auth, id, dto);
+    }
+
     const size = (dto.size ?? AssetMediaSize.THUMBNAIL) as unknown as AssetFileType;
     const { originalPath, originalFileName, path } = await this.assetRepository.getForThumbnail(
       id,
@@ -243,6 +253,103 @@ export class AssetMediaService extends BaseService {
     const fileName = `${fileNameBase}_${size}${getFilenameExtension(path)}`;
 
     return this.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache, fileName);
+  }
+
+  /**
+   * Gallery-fork: `GET /assets/:id/thumbnail?preset=<name>&width=<px>`. Renders an exact-dimension
+   * variant on first request, caches it on disk (or the S3 write backend) and serves it from the cache
+   * afterwards. Only (preset, width) pairs present in config are ever rendered, so the cache can hold
+   * at most |presets| x |widths| files per asset. See specs/2026-09-22-derived-image-presets-design.md.
+   */
+  private async viewDerivedImage(auth: AuthDto, id: string, dto: AssetMediaOptionsDto): Promise<ImmichMediaResponse> {
+    const config = await this.getConfig({ withCache: true });
+    const resolved = resolveImagePreset(config.image.presets, dto.preset, dto.width);
+    const isEdited = dto.edited ?? false;
+
+    const asset = await this.assetRepository.getForDerivedImage(id);
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    const cached = await this.assetRepository.getDerivedFile({
+      assetId: id,
+      preset: resolved.name,
+      width: resolved.width,
+      isEdited,
+    });
+    const path = cached?.path ?? (await this.renderDerivedImage(asset, resolved, isEdited, config));
+
+    const fileNameBase =
+      auth.sharedLink && !auth.sharedLink.showExif ? id : getFileNameWithoutExtension(asset.originalFileName);
+    const fileName = `${fileNameBase}_${resolved.name}_${resolved.width}${getFilenameExtension(path)}`;
+
+    return this.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache, fileName);
+  }
+
+  private async renderDerivedImage(
+    asset: NonNullable<Awaited<ReturnType<AssetMediaService['assetRepository']['getForDerivedImage']>>>,
+    { name, width, height, preset }: ResolvedImagePreset,
+    isEdited: boolean,
+    config: SystemConfig,
+  ): Promise<string> {
+    const source = selectDerivedImageSource(
+      asset,
+      { width, height },
+      { previewSize: config.image.preview.size, edited: isEdited, isWebSupportedImage: mimeTypes.isWebSupportedImage },
+    );
+    if (!source) {
+      // Thumbnails have not been generated yet (or failed); the same outcome the plain endpoint gives.
+      throw new NotFoundException('Asset media not found');
+    }
+
+    const filename = `${asset.id}_${name}_${width}${isEdited ? '_edited' : ''}.${preset.format}`;
+    const outputPath = StorageCore.getNestedPath(StorageFolder.Thumbnails, asset.ownerId, filename);
+    const relativeKey = StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, asset.ownerId, filename);
+    this.storageCore.ensureFolders(outputPath);
+
+    // Render to a temp file and rename into place so a concurrent reader never sees a half-written
+    // variant. Two simultaneous first requests both render and both rename; the second upsert wins and
+    // the only cost is one duplicated render.
+    const tempPath = `${outputPath}.tmp-${randomUUID()}`;
+    const { localPath, cleanup } = await this.ensureLocalFile(source.path);
+    try {
+      await this.mediaRepository.generateDerivedImage(
+        localPath,
+        {
+          width,
+          height,
+          position: preset.position,
+          format: preset.format,
+          quality: preset.quality,
+          colorspace: config.image.colorspace,
+          processInvalidImages: false,
+          // Generated files are already rotated; only an original still carries its EXIF orientation.
+          orientation: source.kind === 'original' ? (source.orientation as ExifOrientation | undefined) : undefined,
+        },
+        tempPath,
+      );
+      await this.storageRepository.rename(tempPath, outputPath);
+    } catch (error) {
+      await this.storageRepository.unlink(tempPath).catch(() => {
+        /* the temp file may never have been created */
+      });
+      throw error;
+    } finally {
+      await cleanup();
+    }
+
+    const storedPath = await this.persistFile(outputPath, relativeKey, mimeTypes.lookup(outputPath));
+    await this.assetRepository.upsertDerivedFile({
+      assetId: asset.id,
+      preset: name,
+      width,
+      height,
+      isEdited,
+      path: storedPath,
+    });
+
+    this.logger.debug(`Rendered derived image ${name}@${width} (${source.kind}) for asset ${asset.id}`);
+    return storedPath;
   }
 
   async playbackVideo(auth: AuthDto, id: string, range?: string): Promise<ImmichMediaResponse> {

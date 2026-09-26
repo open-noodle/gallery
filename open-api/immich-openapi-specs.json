@@ -6101,6 +6101,16 @@
             }
           },
           {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "description": "Derived image preset name (see system config image.presets). Requires width.",
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+              "type": "string"
+            }
+          },
+          {
             "name": "size",
             "required": false,
             "in": "query",
@@ -6121,6 +6131,18 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "width",
+            "required": false,
+            "in": "query",
+            "description": "Output width in pixels; must be one of the widths configured for the preset",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "type": "integer",
+              "minimum": 0
             }
           }
         ],
@@ -26619,6 +26641,14 @@
           "fullsize": {
             "$ref": "#/components/schemas/AdminConfigGeneratedFullsizeImageDto"
           },
+          "presets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AdminConfigImagePresetDto"
+            },
+            "default": {},
+            "description": "Derived image presets, keyed by name. Empty unless an admin adds one.",
+            "type": "object"
+          },
           "preview": {
             "$ref": "#/components/schemas/AdminConfigGeneratedImageDto"
           },
@@ -26632,6 +26662,47 @@
           "fullsize",
           "preview",
           "thumbnail"
+        ],
+        "type": "object"
+      },
+      "AdminConfigImagePresetDto": {
+        "properties": {
+          "aspectRatio": {
+            "description": "Aspect ratio as W:H, e.g. \"16:9\" or \"1:1\". The output height is derived from it.",
+            "pattern": "^\\d{1,4}:\\d{1,4}$",
+            "type": "string"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ImageFormat",
+            "default": "webp"
+          },
+          "position": {
+            "$ref": "#/components/schemas/ImagePresetPosition",
+            "default": "center",
+            "description": "Where to crop from when the source aspect differs: center, or sharp attention/entropy"
+          },
+          "quality": {
+            "default": 80,
+            "description": "Quality",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "widths": {
+            "description": "Output widths (px) a client may request for this preset",
+            "items": {
+              "maximum": 8192,
+              "minimum": 16,
+              "type": "integer"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "aspectRatio",
+          "widths"
         ],
         "type": "object"
       },
@@ -31866,6 +31937,15 @@
         ],
         "type": "string"
       },
+      "ImagePresetPosition": {
+        "description": "Crop position for derived image presets",
+        "enum": [
+          "center",
+          "attention",
+          "entropy"
+        ],
+        "type": "string"
+      },
       "IntegrityReport": {
         "description": "Integrity report type",
         "enum": [
@@ -31991,6 +32071,7 @@
           "HlsSessionCleanup",
           "MemoryCleanup",
           "MemoryGenerate",
+          "AssetDerivedFileCleanup",
           "NotificationsCleanup",
           "NotifyUserSignup",
           "NotifyAlbumInvite",
