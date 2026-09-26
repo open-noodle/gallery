@@ -6,6 +6,7 @@ import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/presentation/widgets/games/photo_guesser_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/local_album_thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
@@ -136,19 +137,23 @@ class _CollectionCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: 16),
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverToBoxAdapter(
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _SpacesCollectionCard(),
-            _PeopleCollectionCard(),
-            _PlacesCollectionCard(),
-            _LocalAlbumsCollectionCard(),
-            AlbumsCollectionCard(),
-            _MemoriesCollectionCard(),
+            const _SpacesCollectionCard(),
+            const _PeopleCollectionCard(),
+            const _PlacesCollectionCard(),
+            const _LocalAlbumsCollectionCard(),
+            const AlbumsCollectionCard(),
+            const _MemoriesCollectionCard(),
+            // The push lives here rather than inside PhotoGuesserCard: a widget test has no
+            // auto_route Router, so `context.pushRoute` cannot be driven from one, and keeping it
+            // out of the card is what leaves the card testable.
+            PhotoGuesserCard(onTap: () => context.pushRoute(const PhotoGuesserRoute())),
           ],
         ),
       ),

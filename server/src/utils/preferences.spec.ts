@@ -40,6 +40,10 @@ const getDefaultPreferences = (): UserPreferences => ({
     enabled: true,
     sidebarWeb: false,
   },
+  photoGuesser: {
+    includePartners: false,
+    includeSpaces: false,
+  },
   ratings: {
     enabled: false,
   },
@@ -79,6 +83,13 @@ describe('getPreferences', () => {
     // live on `enabled` alone since #455, so taking upstream's default would remove it for
     // every existing user. Nothing else in CI detects that.
     expect(getPreferences([]).memories.sidebarWeb).toBe(true);
+  });
+
+  // The daily is generated lazily on first read, so the server must know the toggles at that
+  // moment. In browser local storage they would diverge per device and two devices would race to
+  // generate different dailies, with the unique index picking a winner arbitrarily.
+  it('defaults PhotoGuesser sources to own photos only', () => {
+    expect(getPreferences([]).photoGuesser).toEqual({ includePartners: false, includeSpaces: false });
   });
 
   it('should return default preferences when no preferences metadata item exists', () => {

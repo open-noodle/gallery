@@ -18,6 +18,7 @@ import { DownloadService } from 'src/services/download.service.js';
 import { DuplicateService } from 'src/services/duplicate.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
+import { GameService } from 'src/services/game.service.js';
 import { HlsService } from 'src/services/hls.service.js';
 import { IntegrityService } from 'src/services/integrity.service.js';
 import { JobService } from 'src/services/job.service.js';
@@ -82,6 +83,7 @@ export const services = [
   DuplicateService,
   FaceRepairService,
   FaceSuggestionService,
+  GameService,
   IntegrityService,
   HlsService,
   JobService,
