@@ -634,6 +634,7 @@ describe('Spaces person detail page', () => {
   it('edits the space person name from the detail header', async () => {
     const person = makePerson({ name: '' });
     sdkMock.updateSpacePerson.mockResolvedValue({ ...person, name: 'Alice' });
+    sdkMock.getSpacePeople.mockResolvedValue([]);
     renderPage({ person });
 
     await userEvent.click(screen.getByText('add_a_name'));
@@ -641,12 +642,63 @@ describe('Spaces person detail page', () => {
     await userEvent.type(input, 'Alice');
     await userEvent.keyboard('{Enter}');
 
-    expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith({
-      id: 'space-1',
-      personId: 'person-1',
-      sharedSpacePersonUpdateDto: { name: 'Alice' },
-    });
+    await waitFor(() =>
+      expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        sharedSpacePersonUpdateDto: { name: 'Alice' },
+      }),
+    );
     expect(await screen.findByText('Alice')).toBeInTheDocument();
+    expect(modalManager.showDialog).not.toHaveBeenCalled();
+  });
+
+  // #1100: typing a name the space already has, without picking it from the dropdown, used to rename
+  // straight through and leave two people with the same name.
+  it('offers to merge into the space person that already has the typed name', async () => {
+    const person = makePerson({ id: 'person-1', name: '' });
+    const existingPerson = makePerson({ id: 'person-2', name: 'Norgy' });
+    sdkMock.getSpacePeople.mockResolvedValue([existingPerson]);
+    sdkMock.mergeSpacePeople.mockResolvedValue(undefined as never);
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'norgy');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() =>
+      expect(sdkMock.mergeSpacePeople).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-2',
+        sharedSpacePersonMergeDto: { ids: ['person-1'] },
+      }),
+    );
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+    expect(gotoMock).toHaveBeenCalledWith(expect.stringContaining('/spaces/space-1/people/person-2'), {
+      replaceState: true,
+    });
+  });
+
+  it('renames anyway when the merge into the same-named space person is declined', async () => {
+    const person = makePerson({ id: 'person-1', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'person-2', name: 'Norgy' })]);
+    sdkMock.updateSpacePerson.mockResolvedValue({ ...person, name: 'Norgy' });
+    vi.mocked(modalManager.showDialog).mockResolvedValue(false);
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'Norgy');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() =>
+      expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        sharedSpacePersonUpdateDto: { name: 'Norgy' },
+      }),
+    );
+    expect(sdkMock.mergeSpacePeople).not.toHaveBeenCalled();
   });
 
   it('shows matching named space people while editing an unnamed person', async () => {

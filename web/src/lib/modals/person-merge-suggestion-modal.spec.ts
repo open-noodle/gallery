@@ -75,6 +75,35 @@ describe('PersonMergeSuggestionModal', () => {
     expect(sdkMock.mergePersonLegacy).not.toHaveBeenCalled();
   });
 
+  // #1100: a space editor renaming a space person to an existing space person's name owns neither side,
+  // so the owner-only legacy merge would be refused.
+  it('uses scoped identity repair when both sides are space primary profiles', async () => {
+    render(PersonMergeSuggestionModal, {
+      personToMerge: person({
+        id: 'space-person-new',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-new', spaceId: 'space-1' },
+      }),
+      personToBeMergedInto: person({
+        id: 'space-person-norgy',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-norgy', spaceId: 'space-1' },
+      }),
+      potentialMergePeople: [],
+      onClose: vi.fn(),
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'yes' }));
+
+    await waitFor(() =>
+      expect(sdkMock.mergeScopedPeople).toHaveBeenCalledWith({
+        mergeScopedPeopleDto: {
+          target: { type: 'space-person', id: 'space-person-norgy', spaceId: 'space-1' },
+          sources: [{ type: 'space-person', id: 'space-person-new', spaceId: 'space-1' }],
+        },
+      }),
+    );
+    expect(sdkMock.mergePersonLegacy).not.toHaveBeenCalled();
+  });
+
   it('keeps legacy personal merge when both sides are personal profiles', async () => {
     render(PersonMergeSuggestionModal, {
       personToMerge: person({ id: 'person-source' }),
