@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import FaceCrop from '$lib/components/faces-page/face-crop.svelte';
+  import SuggestionAssetDetails from '$lib/components/faces-page/suggestion-asset-details.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { getContentMetrics } from '$lib/utils/container-utils';
   import { handleError } from '$lib/utils/handle-error';
@@ -310,6 +312,16 @@
               <div data-testid="suggestion-highlight-placeholder" class="hidden"></div>
             {/if}
           </div>
+
+          <!-- #1039: the reviewer used to right-click the photo and open it in a new tab just to find the
+               date. `spaceId` comes from the ROUTE, not from the person: `spaceId` is a param only the
+               /spaces/… review has, and it decides which of two differently-permissioned asset routes the
+               link may point at. -->
+          <SuggestionAssetDetails
+            assetId={current.assetId}
+            fileCreatedAt={current.fileCreatedAt}
+            spaceId={page.params.spaceId}
+          />
 
           <div class="mx-auto flex items-end gap-6">
             <div class="flex flex-col items-center gap-1">
