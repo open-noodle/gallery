@@ -26,6 +26,7 @@ import { DuplicateController } from 'src/controllers/duplicate.controller.js';
 import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller.js';
 import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller.js';
 import { FaceController } from 'src/controllers/face.controller.js';
+import { FamilyController } from 'src/controllers/family.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
 import { IntegrityAdminController } from 'src/controllers/integrity-admin.controller.js';
 import { JobController } from 'src/controllers/job.controller.js';
@@ -82,6 +83,7 @@ export const controllers = [
   FaceController,
   FaceRepairAdminController,
   FaceSuggestionController,
+  FamilyController,
   GalleryMapController,
   IntegrityAdminController,
   JobController,

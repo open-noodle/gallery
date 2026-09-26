@@ -78,6 +78,18 @@ export const GalleryMemoriesSchema = z
   })
   .meta({ id: 'AdminConfigMemoriesDto' });
 
+// Gallery-fork: family relationships — see D2 in the family-relationships design. `enabled`
+// gates the whole feature; `defaultAccess` applies to users with no explicit family_access row.
+// Off by default so an upgrade behaves exactly as it did before.
+export const GalleryFamilyTreeSchema = z
+  .object({
+    enabled: galleryConfigBool.describe('Enable family relationships'),
+    defaultAccess: z
+      .enum(['none', 'view', 'contribute'])
+      .describe('Family tree access for users without an explicit grant'),
+  })
+  .meta({ id: 'AdminConfigFamilyTreeDto' });
+
 // Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
 export const GalleryStorageUsageSchema = z
   .object({
@@ -181,4 +193,10 @@ export const galleryTopLevelDefaults = {
   // Gallery-fork: defaults to false, so out of the box storage usage matches upstream Immich
   // and counts original files only.
   storageUsage: { includeDerivatives: false },
+  // Gallery-fork: off by default so an upgrade behaves exactly as it did before the feature
+  // existed, and nobody inherits access until an admin opts in.
+  familyTree: {
+    enabled: false,
+    defaultAccess: 'none' as const,
+  },
 };

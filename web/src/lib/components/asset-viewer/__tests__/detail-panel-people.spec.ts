@@ -373,3 +373,197 @@ describe('DetailPanelPeople gating (E2)', () => {
     expect(screen.getByRole('link').getAttribute('href')).toContain(`/people/${PERSON_UUID}`);
   });
 });
+
+// Slice 9 (family-relationships) — D5.3 A3/A4/A12. `familyRelationLabel` is a derived,
+// viewer-specific string ("your niece") this component only ever RENDERS — it is never computed
+// here (see the family-relationships design's D4). It is not (yet) part of the generated
+// `PersonResponseDto`, so fixtures below attach it directly via a cast, exactly like every other
+// field in this file that isn't in the real DTO.
+describe('DetailPanelPeople family relation labels (Slice 9)', () => {
+  const NIECE_UUID = 'aaaaaaaa-0000-4000-8000-000000000010';
+  const CASPER_UUID = 'aaaaaaaa-0000-4000-8000-000000000011';
+
+  it('labels each face with how that person relates to the viewer', async () => {
+    faceManagerMock.people = [
+      {
+        id: NIECE_UUID,
+        name: 'Juno',
+        birthDate: null,
+        isHidden: false,
+        thumbnailPath: '/t',
+        familyRelationLabel: 'your niece',
+      } as PersonResponseDto,
+    ];
+
+    renderWithTooltips(DetailPanelPeople, {
+      asset: buildAsset(),
+      isOwner: true,
+      previousRoute: '/photos',
+      canFilter: true,
+    });
+
+    await waitFor(() => expect(screen.getByText('Juno')).toBeInTheDocument());
+    expect(screen.getByTestId('detail-panel-person-relation')).toHaveTextContent('your niece');
+  });
+
+  // The explicit "added line, not replacement" guard (A3): a person with both a recorded
+  // birthdate AND a known relation shows BOTH lines, name/relation/age, with the age line
+  // untouched by the relation's presence.
+  it('shows the relation and the age together when the person has both', async () => {
+    faceManagerMock.people = [
+      {
+        id: NIECE_UUID,
+        name: 'Juno',
+        birthDate: '2000-01-01',
+        isHidden: false,
+        thumbnailPath: '/t',
+        familyRelationLabel: "sibling's child",
+      } as PersonResponseDto,
+    ];
+
+    renderWithTooltips(DetailPanelPeople, {
+      asset: assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', localDateTime: '2024-01-01T00:00:00.000Z' }),
+      isOwner: true,
+      previousRoute: '/photos',
+      canFilter: true,
+    });
+
+    await waitFor(() => expect(screen.getByText('Juno')).toBeInTheDocument());
+    expect(screen.getByTestId('detail-panel-person-relation')).toHaveTextContent("sibling's child");
+    // The age line — computed independently of the relation — is still there, not replaced.
+    // (svelte-i18n's `$t` isn't interpolated in this test environment, so it renders the raw key;
+    // that the key renders at all is what proves the age line survived alongside the relation.)
+    expect(screen.getByText('age_years')).toBeInTheDocument();
+  });
+
+  // Casper: a known person the component CAN show, but with no recorded relationship. The
+  // mockup's own notes call this the normal case — the grid must not go ragged trying to force
+  // uniformity, and per the design this line is simply absent for Casper rather than a dash.
+  it('leaves a face unlabelled when no relationship is known', async () => {
+    faceManagerMock.people = [
+      {
+        id: NIECE_UUID,
+        name: 'Juno',
+        birthDate: null,
+        isHidden: false,
+        thumbnailPath: '/t',
+        familyRelationLabel: 'your niece',
+      } as PersonResponseDto,
+      {
+        id: CASPER_UUID,
+        name: 'Casper',
+        birthDate: null,
+        isHidden: false,
+        thumbnailPath: '/t',
+        familyRelationLabel: null,
+      } as PersonResponseDto,
+    ];
+
+    renderWithTooltips(DetailPanelPeople, {
+      asset: buildAsset(),
+      isOwner: true,
+      previousRoute: '/photos',
+      canFilter: true,
+    });
+
+    await waitFor(() => expect(screen.getByText('Casper')).toBeInTheDocument());
+    // The positive control lives right here in the same render: Juno's line proves the
+    // component labels when it has data, so Casper having none is a real negative, not an
+    // artefact of a renderer that never labels anything.
+    const relations = screen.getAllByTestId('detail-panel-person-relation');
+    expect(relations).toHaveLength(1);
+    expect(relations[0]).toHaveTextContent('your niece');
+  });
+
+  // A12 — with no family access, the panel looks exactly as it does today: no relation lines
+  // anywhere, for anyone, even though every other affordance (name, avatar) renders normally.
+  it('renders no relation lines when the viewer has no family access', async () => {
+    faceManagerMock.people = [
+      { id: NIECE_UUID, name: 'Juno', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
+      { id: CASPER_UUID, name: 'Casper', birthDate: null, isHidden: false, thumbnailPath: '/t' } as PersonResponseDto,
+    ];
+
+    renderWithTooltips(DetailPanelPeople, {
+      asset: buildAsset(),
+      isOwner: true,
+      previousRoute: '/photos',
+      canFilter: true,
+    });
+
+    await waitFor(() => expect(screen.getByText('Juno')).toBeInTheDocument());
+    expect(screen.getByText('Casper')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('detail-panel-person-relation')).toHaveLength(0);
+  });
+
+  // The positive control for A12: the SAME shape of render as the no-access test immediately
+  // above, but with relation data present — proving the component can and does label faces when
+  // it has something to show, so the no-access test above is a real negative rather than a
+  // component that never labels anyone.
+  it('labels faces when the viewer has view access', async () => {
+    faceManagerMock.people = [
+      {
+        id: NIECE_UUID,
+        name: 'Juno',
+        birthDate: null,
+        isHidden: false,
+        thumbnailPath: '/t',
+        familyRelationLabel: 'your niece',
+      } as PersonResponseDto,
+      {
+        id: CASPER_UUID,
+        name: 'Casper',
+        birthDate: null,
+        isHidden: false,
+        thumbnailPath: '/t',
+        familyRelationLabel: 'your cousin',
+      } as PersonResponseDto,
+    ];
+
+    renderWithTooltips(DetailPanelPeople, {
+      asset: buildAsset(),
+      isOwner: true,
+      previousRoute: '/photos',
+      canFilter: true,
+    });
+
+    await waitFor(() => expect(screen.getByText('Juno')).toBeInTheDocument());
+    const relations = screen.queryAllByTestId('detail-panel-person-relation');
+    expect(relations).toHaveLength(2);
+    expect(relations.map((el) => el.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining('your niece'), expect.stringContaining('your cousin')]),
+    );
+  });
+
+  // A3's breakpoint half: past 6 people the grid switches to grid-cols-4/text-xs, and a long
+  // relation must truncate with an ellipsis rather than wrap and blow out row height. This is
+  // the crowded case named explicitly as the one worth testing — not the roomy 6-person mockup.
+  it('truncates a long relation rather than wrapping when more than six people are shown', async () => {
+    const longRelation = 'your second cousin once removed on your mother’s side';
+    faceManagerMock.people = Array.from({ length: 7 }, (_, index) => ({
+      id: `aaaaaaaa-0000-4000-8000-0000000000${20 + index}`,
+      name: `Person ${index}`,
+      birthDate: null,
+      isHidden: false,
+      thumbnailPath: '/t',
+      familyRelationLabel: index === 0 ? longRelation : null,
+    })) as PersonResponseDto[];
+
+    renderWithTooltips(DetailPanelPeople, {
+      asset: buildAsset(),
+      isOwner: true,
+      previousRoute: '/photos',
+      canFilter: true,
+    });
+
+    await waitFor(() => expect(screen.getByText('Person 0')).toBeInTheDocument());
+
+    const relation = screen.getByTestId('detail-panel-person-relation');
+    expect(relation).toHaveTextContent(longRelation);
+    expect(relation.className).toContain('truncate');
+    expect(relation.className).toContain('text-xs');
+
+    const grid = relation.closest('.grid');
+    expect(grid?.className).toContain('grid-cols-4');
+    expect(grid?.className).toContain('gap-2');
+  });
+});
