@@ -223,6 +223,8 @@ features:
     domains: [server, ml, database]
     owned_paths:
       - machine-learning/immich_ml/models/pet_detection/**
+      - machine-learning/immich_ml/models/pet_recognition/**
+      - machine-learning/immich_ml/models/gallery_hosted.py
       - server/src/services/pet-detection.service.ts
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
