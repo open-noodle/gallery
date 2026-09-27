@@ -2261,7 +2261,8 @@ class TestPetDetection:
 
     def test_legacy_model_path_is_onnx_only(self, mocker: MockerFixture) -> None:
         detector = PetDetector("rfdetr-nano", cache_dir="test_cache", model_format=ModelFormat.RKNN)
-        mocker.patch.object(Path, "is_file", side_effect=lambda: False)
+        # only the legacy ONNX file exists: an unguarded fallback would hand RKNN an .onnx path
+        mocker.patch.object(Path, "is_file", autospec=True, side_effect=lambda path: path.suffix == ".onnx")
 
         assert detector.model_path.suffix == ".rknn"
 
