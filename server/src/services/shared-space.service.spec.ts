@@ -7092,7 +7092,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.person.getFaceById).toHaveBeenCalledWith(faceId, { viewingUserId: auth.user.id });
       expect(mocks.asset.getForThumbnail).toHaveBeenCalledWith(assetId, AssetFileType.Preview, false);
       expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
-        Buffer.from('decoded-image'),
+        { data: Buffer.from('decoded-image'), info: { width: 500, height: 400, channels: 3 } },
         expect.objectContaining({
           colorspace: expect.any(String),
           format: ImageFormat.Jpeg,
