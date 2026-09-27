@@ -227,7 +227,23 @@ and "requires Flutter SDK version 3.47.2". Running the task's steps directly wit
 
 ## CI results
 
-_Pending._
+All on `2f87a00bbb8`:
+
+| Workflow                    | Result                                                               |
+| --------------------------- | -------------------------------------------------------------------- |
+| Test                        | GREEN                                                                |
+| Static Code Analysis        | GREEN                                                                |
+| Gallery Build Mobile        | GREEN                                                                |
+| Gallery Mobile Smoke        | GREEN                                                                |
+| Gallery Rebase Smoke        | GREEN                                                                |
+| Docker                      | GREEN                                                                |
+| Gallery ML Smoke            | GREEN                                                                |
+| Storage Migration Tests     | GREEN — first green since the MinIO withdrawal, via #1138            |
+| Revert-to-Immich Validation | GREEN                                                                |
+| Storage Migration E2E       | GREEN on attempt 2; attempt 1 died on GHCR `toomanyrequests` at pull |
+
+The two waves were dispatched ~2 minutes apart, with 20–30 s between dispatches; one registry rate
+limit still hit, before any test ran, and cleared on re-run.
 
 ## Follow-up work
 
