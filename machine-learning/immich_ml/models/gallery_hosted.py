@@ -16,6 +16,10 @@ class GalleryHostedModel(InferenceModel):
     Upstream's `download()` fetches `{settings.model_organization}/{name}` at `settings.model_revision`, and keeps each
     revision in its own cache folder once one is set. Neither applies to these repositories, which carry none of
     upstream's revisions: they always fetch `main`, into the unversioned folder existing installs already have.
+
+    Graph preparation is not covered: `sessions/ort.py` keys fp16 conversion and graph rewrites for accelerators off the
+    global `settings.legacy_models`, so setting `MACHINE_LEARNING_MODEL_REVISION` applies them to these models too,
+    which were never validated that way.
     """
 
     def download(self) -> None:
