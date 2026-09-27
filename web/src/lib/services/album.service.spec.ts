@@ -1,9 +1,14 @@
 // album.service.spec.ts
-import { BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
+import { AlbumUserRole, BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
 import type { BulkIdResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
-import { addAssetsToAlbumWithOutcome, handleLinkAlbumToSpace, notifyAddToAlbum } from './album.service';
+import {
+  addAssetsToAlbumWithOutcome,
+  getAlbumActions,
+  handleLinkAlbumToSpace,
+  notifyAddToAlbum,
+} from './album.service';
 
 const linkAlbum = vi.fn();
 const showModal = vi.fn();
@@ -24,7 +29,7 @@ vi.mock('@immich/sdk', async (orig) => ({
 vi.mock('$lib/managers/event-manager.svelte', () => ({
   eventManager: { emit: (...a: unknown[]) => emit(...a), on: () => () => {} },
 }));
-vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { params: {} } }));
+vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { params: {}, user: { id: 'me' } } }));
 
 vi.mock('@immich/ui', async (orig) => ({
   ...(await orig<typeof import('@immich/ui')>()),
@@ -189,5 +194,38 @@ describe('addAssetsToAlbumWithOutcome', () => {
     expect(outcome).toEqual({ ok: false, addedIds: [], deniedIds: [] });
     expect(emit).not.toHaveBeenCalled();
     expect(handleError).toHaveBeenCalled();
+  });
+});
+
+describe('getAlbumActions Leave', () => {
+  const $t = ((key: string) => key) as unknown as Parameters<typeof getAlbumActions>[0];
+  const album = (albumUsers: Array<{ id: string; role: AlbumUserRole }>) =>
+    ({ id: 'album-1', albumUsers: albumUsers.map(({ id, role }) => ({ user: { id }, role })) }) as AlbumResponseDto;
+  const canLeave = (a: AlbumResponseDto) => getAlbumActions($t, a).Leave.$if?.() ?? true;
+
+  it('is offered to an album user the album was shared with', () => {
+    expect(
+      canLeave(
+        album([
+          { id: 'owner', role: AlbumUserRole.Owner },
+          { id: 'me', role: AlbumUserRole.Viewer },
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it('is not offered to the owner', () => {
+    expect(canLeave(album([{ id: 'me', role: AlbumUserRole.Owner }]))).toBe(false);
+  });
+
+  it('is not offered to a reader who reaches the album only through a Space link', () => {
+    expect(
+      canLeave(
+        album([
+          { id: 'owner', role: AlbumUserRole.Owner },
+          { id: 'someone-else', role: AlbumUserRole.Editor },
+        ]),
+      ),
+    ).toBe(false);
   });
 });
