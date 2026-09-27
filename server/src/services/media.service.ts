@@ -659,7 +659,7 @@ export class MediaService extends BaseService {
         inputImage = originalLocal.localPath;
       }
 
-      const { data: decodedImage, info } = await this.mediaRepository.decodeImage(inputImage, {
+      const decoded = await this.mediaRepository.decodeImage(inputImage, {
         colorspace: image.colorspace,
         processInvalidImages: process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true',
         // if this is an extracted image, it may not have orientation metadata
@@ -672,7 +672,6 @@ export class MediaService extends BaseService {
       const thumbnailOptions: GenerateThumbnailOptions = {
         colorspace: image.colorspace,
         format: ImageFormat.Jpeg,
-        raw: info,
         quality: image.thumbnail.quality,
         progressive: false,
         processInvalidImages: false,
@@ -681,14 +680,17 @@ export class MediaService extends BaseService {
           {
             action: AssetEditAction.Crop,
             parameters: this.getCrop(
-              { old: { width: oldWidth, height: oldHeight }, new: { width: info.width, height: info.height } },
+              {
+                old: { width: oldWidth, height: oldHeight },
+                new: { width: decoded.info.width, height: decoded.info.height },
+              },
               { x1, y1, x2, y2 },
             ),
           },
         ],
       };
 
-      await this.mediaRepository.generateThumbnail(decodedImage, thumbnailOptions, thumbnailPath);
+      await this.mediaRepository.generateThumbnail(decoded, thumbnailOptions, thumbnailPath);
 
       // Persist person thumbnail to S3 if needed
       const relativeKey = StorageCore.getRelativePersonThumbnailPath({ ownerId, personGroupId });
