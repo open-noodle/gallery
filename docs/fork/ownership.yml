@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 9e0824cbcfd9f661ff8bd9eeedcaf8a289cf9b7c
+  last_verified_fork_head: f0f2c2ef8f11f616c6bb46d7203f0e8ea997bab1
 
 coverage_ignore:
   - specs/**
@@ -314,6 +314,7 @@ features:
       - server/bin/sync-gallery-migrations.mjs
       - tools/upstream-preflight/**
       - scripts/spec-citation-check.sh
+      - scripts/upstream-review-pr.sh
       - Template/**
     upstream_extension_paths:
       - .github/workflows/**
