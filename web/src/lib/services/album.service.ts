@@ -111,10 +111,16 @@ export const getAlbumActions = ($t: MessageFormatter, album: AlbumResponseDto) =
     onAction: () => modalManager.show(AlbumEditModal, { album }),
   };
 
+  // Gallery: gate on membership, not just non-ownership. A Space member can reach an album through its Space link
+  // without being an album user, and the server rejects leaving an album you were never shared into.
+  const isNonOwnerMember = album.albumUsers.some(
+    ({ user, role }) => user.id === authManager.user.id && role !== AlbumUserRole.Owner,
+  );
+
   const Leave: ActionItem = {
     title: $t('leave_album'),
     icon: mdiExitToApp,
-    $if: () => !isOwned,
+    $if: () => isNonOwnerMember,
     onAction: () => handleLeaveAlbum(album),
   };
 
