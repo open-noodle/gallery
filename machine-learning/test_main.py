@@ -1855,6 +1855,15 @@ def stub_model() -> mock.MagicMock:
     return model
 
 
+def _graph_session(batches: tuple[int, ...] = (2, 1)) -> mock.Mock:
+    """A stub session that is also its only graph, as upstream's `stub_session` fixture builds one. `batches` are
+    the batch sizes a non-dynamic provider would admit."""
+    session = mock.Mock()
+    session.batches = batches
+    session.for_shape.return_value = session
+    return session
+
+
 class TestPetDetectionModelSource:
     def test_resolves_rfdetr_models(self) -> None:
         assert get_model_source("rfdetr-nano") == ModelSource.RFDETR
@@ -1891,7 +1900,7 @@ class TestPetDetection:
     def _detector(mocker: MockerFixture, min_score: float = 0.3, input_size: int = 384) -> PetDetector:
         mocker.patch.object(PetDetector, "load")
         detector = PetDetector("rfdetr-nano", min_score=min_score, cache_dir="test_cache")
-        session = mock.Mock()
+        session = _graph_session()
         model_input = mock.Mock()
         model_input.name = "input"
         model_input.shape = [1, 3, input_size, input_size]
@@ -1933,7 +1942,7 @@ class TestPetDetection:
         """
         for size in (384, 512):
             detector = PetDetector("rfdetr-small", cache_dir="test_cache")
-            session = mock.Mock()
+            session = _graph_session()
             model_input = mock.Mock()
             model_input.name = "input"
             model_input.shape = [1, 3, size, size]
@@ -2175,13 +2184,14 @@ class TestPetDetection:
         results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
         assert len(results) == 300
 
-    def test_configure_updates_min_score(self, mocker: MockerFixture) -> None:
-        """Spec #23."""
-        mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("rfdetr-nano", min_score=0.6, cache_dir="test_cache")
-        assert detector.min_score == 0.6
-        detector.configure(minScore=0.3)
-        assert detector.min_score == 0.3
+    def test_min_score_follows_each_request(self, mocker: MockerFixture) -> None:
+        """Spec #23. The model cache hands every request the instance the first one built, so a threshold the
+        admin changes afterwards must come from the request itself, never from construction."""
+        detector = self._detector(mocker, min_score=0.6)
+        detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 18, 0.5)])
+
+        assert detector.predict(Image.new("RGB", (100, 100))) == []
+        assert len(detector.predict(Image.new("RGB", (100, 100)), minScore=0.3)) == 1
 
     def test_min_score_from_kwargs(self, mocker: MockerFixture) -> None:
         """Spec #23, constructor form."""
@@ -2218,14 +2228,42 @@ class TestPetDetection:
         assert detector.model_path.name == "model.onnx"
 
     def test_download_targets_expected_repo(self, mocker: MockerFixture) -> None:
-        """Spec #25."""
-        mocker.patch.object(PetDetector, "load")
+        """Spec #25. Goes through `download()`, the entry point `load()` uses, so an override the base class
+        stops calling fails here."""
+        mocker.patch.object(settings, "model_revision", "v2")  # upstream's revisions do not exist in our org
         detector = PetDetector("rfdetr-nano", cache_dir="test_cache")
-        snapshot_download = mocker.patch("huggingface_hub.snapshot_download")
+        mocker.patch.object(PetDetector, "cached", new_callable=mock.PropertyMock, side_effect=[False, True])
+        snapshot_download = mocker.patch("immich_ml.models.gallery_hosted.snapshot_download")
 
-        detector._download()
+        detector.download()
 
-        assert snapshot_download.call_args[0][0] == "open-noodle/rfdetr-nano"
+        snapshot_download.assert_called_once_with(
+            "open-noodle/rfdetr-nano",
+            cache_dir=detector.cache_dir,
+            local_dir=detector.cache_dir,
+            ignore_patterns=["*.armnn", "*.rknn"],
+        )
+
+    def test_default_cache_dir_ignores_model_revision(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(settings, "model_revision", "v2")
+        detector = PetDetector("rfdetr-nano")
+
+        assert detector.cache_dir == settings.cache_folder / "pet-detection" / "rfdetr-nano"
+
+    def test_download_raises_when_the_format_is_missing(self, mocker: MockerFixture) -> None:
+        """A repository with nothing in this format must raise, which is what sends a model back to ONNX."""
+        detector = PetDetector("rfdetr-nano", cache_dir="test_cache", model_format=ModelFormat.RKNN)
+        mocker.patch.object(PetDetector, "cached", new_callable=mock.PropertyMock, return_value=False)
+        mocker.patch("immich_ml.models.gallery_hosted.snapshot_download")
+
+        with pytest.raises(FileNotFoundError):
+            detector.download()
+
+    def test_legacy_model_path_is_onnx_only(self, mocker: MockerFixture) -> None:
+        detector = PetDetector("rfdetr-nano", cache_dir="test_cache", model_format=ModelFormat.RKNN)
+        mocker.patch.object(Path, "is_file", side_effect=lambda: False)
+
+        assert detector.model_path.suffix == ".rknn"
 
 
 class TestPetRecognition:
@@ -2236,15 +2274,15 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 20, "y1": 20, "x2": 40, "y2": 40}, "score": 0.8, "label": "cat"},
         ]
 
-    def test_recognizer_returns_one_embedding_per_pet(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    def test_recognizer_returns_one_embedding_per_pet(self, pil_image: Image.Image, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         recognizer.session.run.return_value = [np.random.rand(2, 512).astype(np.float32)]
         pets = self._pets()
 
-        results = recognizer.predict(cv_image, pets)
+        results = recognizer.predict(pil_image, pets)
 
         assert isinstance(results, list)
         assert len(results) == 2
@@ -2258,13 +2296,13 @@ class TestPetRecognition:
             assert isinstance(embedding, list)
             assert len(embedding) == 512
 
-    def test_recognizer_returns_empty_for_no_pets(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    def test_recognizer_returns_empty_for_no_pets(self, pil_image: Image.Image, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
 
-        results = recognizer.predict(cv_image, [])
+        results = recognizer.predict(pil_image, [])
 
         assert results == []
         recognizer.session.run.assert_not_called()
@@ -2272,15 +2310,12 @@ class TestPetRecognition:
     def test_recognizer_preprocesses_rgb_imagenet_224(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
 
-        # cv2 image is BGR: B=10, G=100, R=200. A B/R mix-up would swap these two channels.
-        image = np.zeros((50, 50, 3), dtype=np.uint8)
-        image[:, :, 0] = 10
-        image[:, :, 1] = 100
-        image[:, :, 2] = 200
+        # R=200, G=100, B=10. A B/R mix-up would swap the first and last channels.
+        image = Image.new("RGB", (50, 50), (200, 100, 10))
         pets: PetDetectionOutput = [
             {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.9, "label": "dog"},
         ]
@@ -2305,13 +2340,13 @@ class TestPetRecognition:
     def test_recognizer_crops_each_bounding_box(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         recognizer.session.run.return_value = [np.random.rand(2, 512).astype(np.float32)]
 
         image = np.zeros((100, 100, 3), dtype=np.uint8)
-        image[0:50, 0:50] = (255, 0, 0)  # region A: BGR pure blue
-        image[50:100, 50:100] = (0, 0, 255)  # region B: BGR pure red
+        image[0:50, 0:50] = (0, 0, 255)  # region A: pure blue (arrays are RGB, as decode_pil reads them)
+        image[50:100, 50:100] = (255, 0, 0)  # region B: pure red
         pets: PetDetectionOutput = [
             {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.9, "label": "dog"},
             {"boundingBox": {"x1": 50, "y1": 50, "x2": 100, "y2": 100}, "score": 0.8, "label": "cat"},
@@ -2325,17 +2360,17 @@ class TestPetRecognition:
 
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
-        # region A is pure blue (BGR) -> after BGR->RGB, R and G are 0, B is 255
+        # region A is pure blue: R and G are 0, B is 255
         assert blob[0, 0, 0, 0] == pytest.approx((0 / 255 - mean[0]) / std[0], abs=1e-4)
         assert blob[0, 2, 0, 0] == pytest.approx((255 / 255 - mean[2]) / std[2], abs=1e-4)
-        # region B is pure red (BGR) -> after BGR->RGB, R is 255, G and B are 0
+        # region B is pure red: R is 255, G and B are 0
         assert blob[1, 0, 0, 0] == pytest.approx((255 / 255 - mean[0]) / std[0], abs=1e-4)
         assert blob[1, 2, 0, 0] == pytest.approx((0 / 255 - mean[2]) / std[2], abs=1e-4)
 
     def test_recognizer_clamps_out_of_bounds_boxes(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
 
@@ -2366,7 +2401,7 @@ class TestPetRecognition:
     def test_recognizer_skips_degenerate_box_but_recognizes_valid_sibling(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         # only the valid sibling box is ever sent to the model -> one embedding row
         recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
@@ -2394,7 +2429,7 @@ class TestPetRecognition:
     def test_recognizer_skips_fully_out_of_bounds_box(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
 
         image = np.zeros((50, 50, 3), dtype=np.uint8)
@@ -2411,7 +2446,7 @@ class TestPetRecognition:
     def test_recognizer_uses_area_interpolation_downscaling_and_linear_upscaling(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         recognizer.session.run.return_value = [np.random.rand(2, 512).astype(np.float32)]
 
@@ -2438,9 +2473,9 @@ class TestPetRecognition:
         mocker.patch.object(settings, "max_batch_size", MaxBatchSize(pet_recognition=1))
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        assert recognizer.batch_size == 1
+        assert recognizer.shape_policy.dims == (Shape(batch=1),)
 
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session(batches=(1,))
         recognizer._input_name = "input"
 
         call_sizes: list[int] = []
@@ -2469,7 +2504,7 @@ class TestPetRecognition:
     def test_recognizer_raises_on_embedding_count_mismatch(self, mocker: MockerFixture) -> None:
         mocker.patch.object(PetRecognizer, "load")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
         recognizer._input_name = "input"
         # two pets are sent to the model, but the session only returns one embedding row
         recognizer.session.run.return_value = [np.random.rand(1, 512).astype(np.float32)]
@@ -2487,8 +2522,9 @@ class TestPetRecognition:
         assert get_model_class("rfdetr-nano", ModelType.DETECTION, ModelTask.PET_DETECTION) is PetDetector
 
     def test_download_uses_open_noodle_org(self, mocker: MockerFixture) -> None:
-        snapshot_download = mocker.patch("immich_ml.models.pet_recognition.recognition.snapshot_download")
+        snapshot_download = mocker.patch("immich_ml.models.gallery_hosted.snapshot_download")
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
+        mocker.patch.object(PetRecognizer, "cached", new_callable=mock.PropertyMock, side_effect=[False, True])
 
         recognizer.download()
 
@@ -2519,7 +2555,7 @@ class TestPetPipeline:
         recognizer = PetRecognizer("pet-recognition-base", cache_dir="test_cache")
         recognizer.loaded = True
         recognizer._input_name = "input"
-        recognizer.session = mock.Mock()
+        recognizer.session = _graph_session()
 
         def fake_run(_output_names: Any, feed: dict[str, NDArray[np.float32]]) -> list[NDArray[np.float32]]:
             blob = feed[recognizer._input_name]
@@ -2528,16 +2564,16 @@ class TestPetPipeline:
 
         recognizer.session.run.side_effect = fake_run
 
-        async def fake_get(model_name: str, model_type: ModelType, model_task: ModelTask, **kwargs: Any) -> Any:
+        def fake_get(model_name: str, model_type: ModelType, model_task: ModelTask, **kwargs: Any) -> Any:
             return detector if model_type == ModelType.DETECTION else recognizer
 
         mocker.patch.object(ml_main.model_cache, "get", side_effect=fake_get)
 
-        # region A (dog crop): BGR pure blue; region B (cat crop): BGR pure red
+        # region A (dog crop): pure blue; region B (cat crop): pure red
         image = np.zeros((100, 100, 3), dtype=np.uint8)
-        image[0:50, 0:50] = (255, 0, 0)
-        image[50:100, 50:100] = (0, 0, 255)
-        pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        image[0:50, 0:50] = (0, 0, 255)
+        image[50:100, 50:100] = (255, 0, 0)
+        pil_image = Image.fromarray(image)
 
         without_deps: list[dict[str, Any]] = [
             {"name": "yolo11n", "task": ModelTask.PET_DETECTION, "type": ModelType.DETECTION, "options": {}}
@@ -2567,8 +2603,8 @@ class TestPetPipeline:
             channel_values = [(c / 255.0 - _MEAN[i]) / _STD[i] for i, c in enumerate(rgb)]
             return float(np.mean(channel_values))
 
-        dog_expected = expected_mean((0, 0, 255))  # region A after BGR->RGB
-        cat_expected = expected_mean((255, 0, 0))  # region B after BGR->RGB
+        dog_expected = expected_mean((0, 0, 255))  # region A
+        cat_expected = expected_mean((255, 0, 0))  # region B
 
         dog_embedding = orjson.loads(dog_result["embedding"])
         cat_embedding = orjson.loads(cat_result["embedding"])
@@ -2968,10 +3004,6 @@ def test_ping_endpoint(deployed_app: TestClient) -> None:
     assert response.text == "pong"
 
 
-@pytest.mark.skipif(
-    not settings.test_full,
-    reason="More time-consuming since it deploys the app and loads models.",
-)
 class TestPrometheusMetrics:
     def test_metrics_endpoint_returns_prometheus_text(self, deployed_app: TestClient) -> None:
         from immich_ml.metrics import reset_metrics_for_tests
@@ -3078,8 +3110,10 @@ print(metrics.render().decode())
         mock_model = mock.Mock(spec=InferenceModel)
         mock_model.model_task = ModelTask.SEARCH
         mock_model.model_type = ModelType.VISUAL
-        cache = SimpleNamespace(_cache={"model": mock_model})
-        monkeypatch.setattr("immich_ml.main.model_cache", SimpleNamespace(cache=cache))
+        # a real ModelCache, so a rename of the attribute the refresh reads fails here rather than on /metrics
+        cache = ModelCache()
+        cache._models[("ViT-B-32__openai", ModelType.VISUAL, ModelTask.SEARCH)] = mock_model
+        monkeypatch.setattr("immich_ml.main.model_cache", cache)
 
         refresh_model_cache_metrics()
         rendered = metrics.render().decode()
@@ -3106,6 +3140,10 @@ print(metrics.render().decode())
         assert 'immich_ml_model_load_duration_ms_count{status="success",task="clip",type="visual"} 1.0' in metrics
 
 
+@pytest.mark.skipif(
+    not settings.test_full,
+    reason="More time-consuming since it deploys the app and loads models.",
+)
 class TestPredictionEndpoints:
     def test_clip_image_endpoint(
         self, asset: Callable[[str], bytes], responses: dict[str, Any], deployed_app: TestClient
