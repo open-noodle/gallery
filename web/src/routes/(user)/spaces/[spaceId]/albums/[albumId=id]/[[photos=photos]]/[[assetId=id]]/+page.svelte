@@ -153,8 +153,6 @@
     ),
   );
   const canManage = $derived(isSpaceEditor || isAlbumEditor);
-  // Album title/description editing is owner-gated, mirroring the regular album page's `isOwned`.
-  const isOwned = $derived(album.albumUsers[0]?.user.id === authManager.user.id);
 
   // Match the regular album flow: an abandoned empty + unnamed album (created here and left without a
   // title or any photos) is cleaned up on navigate-away. Deleting it also drops the shared_space_album
@@ -744,13 +742,14 @@
             onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
           >
             <!-- Editable album header (Timeline leading content — always rendered, incl. for an empty
-                 album so it can be named). Owner-gated, mirroring the regular album page. Unlike that
+                 album so it can be named). Album-editor-gated (owner or album editor), mirroring the regular
+                 album page and the server's Permission.AlbumUpdate; a Space role alone does not grant it. Unlike that
                  page, the header + period control already sit above, so it needs almost no top padding. -->
             <section class="pt-2">
               <AlbumTitle
                 id={album.id}
                 albumName={album.albumName}
-                {isOwned}
+                isEditor={isAlbumEditor}
                 onUpdate={(albumName) => (album = { ...album, albumName })}
               />
               {#if album.assetCount > 0}
@@ -758,7 +757,7 @@
               {/if}
               <AlbumDescription
                 id={album.id}
-                {isOwned}
+                isEditor={isAlbumEditor}
                 bind:description={() => album.description, (description) => (album = { ...album, description })}
               />
             </section>

@@ -213,7 +213,8 @@ describe('utils', () => {
         type: MemoryType.Birthday,
         memoryAt,
         data: { year: 1990, personName: 'Alex', ...data },
-      } as MemoryResponseDto);
+        // Gallery: `data` is an open record in the fork's SDK, which does not overlap a partial literal
+      } as unknown as MemoryResponseDto);
 
     it('should name the person whose birthday it is', () => {
       expect(birthday({ year: 1990 })).toBe("Alex's birthday");
