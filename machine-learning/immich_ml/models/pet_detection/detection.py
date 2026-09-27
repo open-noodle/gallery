@@ -6,12 +6,9 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
-from immich_ml.config import clean_name
-from immich_ml.models.base import InferenceModel
-from immich_ml.models.transforms import decode_pil
+from immich_ml.models.gallery_hosted import GalleryHostedModel
+from immich_ml.models.transforms import decode_pil, widen
 from immich_ml.schemas import BoundingBox, ModelFormat, ModelSession, ModelTask, ModelType, PetDetectionOutput
-
-_HF_ORG = "open-noodle"
 
 # The animals a household photo library actually contains, in RF-DETR's 91-class
 # COCO id space. bear/zebra/giraffe/elephant are deliberately absent: their only
@@ -44,7 +41,7 @@ _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 _DEFAULT_INPUT_SIZE = 384
 
 
-class PetDetector(InferenceModel):
+class PetDetector(GalleryHostedModel):
     depends = []
     identity = (ModelType.DETECTION, ModelTask.PET_DETECTION)
 
@@ -57,33 +54,18 @@ class PetDetector(InferenceModel):
     def model_path(self) -> Path:
         # Support both conventions:
         # 1. Standard: detection/model.onnx (matches base class)
-        # 2. Legacy: <model_name>.onnx at cache root
+        # 2. Legacy: <model_name>.onnx at cache root — an ONNX-only layout, so never for RKNN/ARMNN
         standard = super().model_path
-        if standard.is_file():
+        if standard.is_file() or self.model_format != ModelFormat.ONNX:
             return standard
         alt = self.cache_dir / f"{self.model_name}.onnx"
         if alt.is_file():
             return alt
         return standard
 
-    def _download(self) -> None:
-        from huggingface_hub import snapshot_download
-
-        ignored_patterns: dict[ModelFormat, list[str]] = {
-            ModelFormat.ONNX: ["*.armnn", "*.rknn"],
-            ModelFormat.ARMNN: ["*.rknn"],
-            ModelFormat.RKNN: ["*.armnn"],
-        }
-        snapshot_download(
-            f"{_HF_ORG}/{clean_name(self.model_name)}",
-            cache_dir=self.cache_dir,
-            local_dir=self.cache_dir,
-            ignore_patterns=ignored_patterns.get(self.model_format, []),
-        )
-
     def _load(self) -> ModelSession:
-        session = self._make_session(self.model_path)
-        model_input = session.get_inputs()[0]
+        session = super()._load()
+        model_input = session.for_shape(self.shape_policy.dims[0]).get_inputs()[0]
         if model_input.name is None:
             raise ValueError("Model input name is None")
         self._input_name: str = model_input.name
@@ -93,18 +75,19 @@ class PetDetector(InferenceModel):
             self._input_size = shape[2]
         return session
 
-    def _predict(self, inputs: Image.Image | bytes, **model_kwargs: Any) -> PetDetectionOutput:
-        # main.py:201 already decodes the upload to a PIL image, so in production
+    def _predict(self, inputs: Image.Image | bytes, minScore: float | None = None) -> PetDetectionOutput:
+        # main.py already decodes the upload to a PIL image, so in production
         # this receives an Image.Image. decode_pil passes one straight through.
-        # `min_score` is applied in `_postprocess` and is kept current by `configure`, which
-        # `InferenceModel.predict` calls before forwarding the same kwargs down to `_predict`.
+        # `minScore` arrives with every request (`InferenceModel.predict` forwards the request options), so an admin
+        # change applies on the next job. The instance is cached across requests: never read it from construction.
         image = decode_pil(inputs)
         orig_w, orig_h = image.size
 
         blob = self._preprocess(image)
-        outputs = self.session.run(None, {self._input_name: blob})
+        graph = self.session.for_shape(self.shape_policy.dims[0])
+        outputs = [widen(output) for output in graph.run(None, {self._input_name: blob})]
 
-        return self._postprocess(outputs, orig_w, orig_h)
+        return self._postprocess(outputs, orig_w, orig_h, self.min_score if minScore is None else minScore)
 
     def _preprocess(self, image: Image.Image) -> NDArray[np.float32]:
         # decode_pil only converts mode on the bytes path — handed an Image.Image
@@ -121,7 +104,9 @@ class PetDetector(InferenceModel):
         blob = np.transpose(blob, (2, 0, 1))  # HWC -> CHW
         return np.expand_dims(blob, axis=0).astype(np.float32)
 
-    def _postprocess(self, outputs: list[NDArray[np.float32]], orig_w: int, orig_h: int) -> PetDetectionOutput:
+    def _postprocess(
+        self, outputs: list[NDArray[np.float32]], orig_w: int, orig_h: int, min_score: float
+    ) -> PetDetectionOutput:
         boxes_raw, logits = self._resolve_outputs(outputs)
         boxes_cxcywh = boxes_raw[0]
         # RF-DETR emits pre-sigmoid logits over the 91-class COCO space.
@@ -134,7 +119,7 @@ class PetDetector(InferenceModel):
         confidences = animal_scores[np.arange(len(best)), best]
         class_ids = _ANIMAL_IDS[best]
 
-        keep = (confidences >= self.min_score) & np.isin(class_ids, _PET_IDS)
+        keep = (confidences >= min_score) & np.isin(class_ids, _PET_IDS)
         boxes_cxcywh = boxes_cxcywh[keep]
         confidences = confidences[keep]
         class_ids = class_ids[keep]
@@ -183,6 +168,3 @@ class PetDetector(InferenceModel):
         if outputs[0].shape[-1] == 4:
             return outputs[0], outputs[1]
         return outputs[1], outputs[0]
-
-    def configure(self, **kwargs: Any) -> None:
-        self.min_score = kwargs.pop("minScore", self.min_score)
