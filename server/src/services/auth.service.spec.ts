@@ -1228,8 +1228,12 @@ describe(AuthService.name, () => {
 
         // The thumbnail pipeline writes the resized image to the local profile folder
         // before the S3 upload reads it back with createReadStream.
-        expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
+        expect(mocks.media.decodeImage).toHaveBeenCalledWith(
           expect.any(Buffer),
+          expect.objectContaining({ processInvalidImages: false }),
+        );
+        expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
+          expect.anything(),
           expect.any(Object),
           `/data/profile/${user.id}/${fileId}.webp`,
         );

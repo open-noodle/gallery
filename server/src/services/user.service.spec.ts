@@ -351,7 +351,12 @@ describe(UserService.name, () => {
       await sut.createProfileImage(factory.auth({ user }), file);
 
       expect(mocks.media.extractFrame).not.toHaveBeenCalled();
-      expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(file.path, expect.any(Object), expect.any(String));
+      expect(mocks.media.decodeImage).toHaveBeenCalledWith(file.path, expect.any(Object));
+      expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Object),
+        expect.any(String),
+      );
     });
 
     describe('with S3 write backend', () => {

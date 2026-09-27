@@ -509,7 +509,7 @@ export class BaseService {
     const outputPath = join(tempDir, 'thumbnail.jpeg');
 
     try {
-      const { data: decodedImage, info } = await this.mediaRepository.decodeImage(source.localPath, {
+      const decoded = await this.mediaRepository.decodeImage(source.localPath, {
         colorspace: image.colorspace,
         processInvalidImages: process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true',
       });
@@ -517,7 +517,6 @@ export class BaseService {
       const thumbnailOptions: GenerateThumbnailOptions = {
         colorspace: image.colorspace,
         format: ImageFormat.Jpeg,
-        raw: info,
         quality: image.thumbnail.quality,
         progressive: false,
         processInvalidImages: false,
@@ -528,7 +527,7 @@ export class BaseService {
             parameters: this.getFaceThumbnailCrop(
               {
                 old: { width: face.imageWidth, height: face.imageHeight },
-                new: { width: info.width, height: info.height },
+                new: { width: decoded.info.width, height: decoded.info.height },
               },
               {
                 x1: face.boundingBoxX1,
@@ -541,7 +540,7 @@ export class BaseService {
         ],
       };
 
-      await this.mediaRepository.generateThumbnail(decodedImage, thumbnailOptions, outputPath);
+      await this.mediaRepository.generateThumbnail(decoded, thumbnailOptions, outputPath);
     } catch (error) {
       await rm(tempDir, { recursive: true, force: true });
       throw error;
