@@ -77,7 +77,7 @@ describe('TagsFilter', () => {
     expect(queryByTestId('tags-item-t4')).toBeNull();
   });
 
-  it('should show all search results without truncation', async () => {
+  it('should show every search match when they fit on one page', async () => {
     const tags = makeTags(15);
     const { getByTestId, queryByTestId } = render(TagsFilter, {
       props: { tags, selectedIds: [], onSelectionChange: () => {} },
@@ -136,6 +136,80 @@ describe('TagsFilter', () => {
     await fireEvent.click(getByTestId('tags-show-more'));
 
     expect(queryByTestId('tags-item-t15')).toBeTruthy();
+  });
+
+  // #1125: a one-letter search used to render every match at once. Each row mounts a tooltip and
+  // measures its own layout, so a few thousand rows froze iOS Safari for ~15s. Results now page in.
+  describe('paging (#1125)', () => {
+    const rows = (queryAllByTestId: (id: RegExp) => HTMLElement[]) => queryAllByTestId(/^tags-item-/).length;
+
+    it('P1: renders only the first page of search matches', async () => {
+      const tags = makeTags(120);
+      const { getByTestId, queryAllByTestId } = render(TagsFilter, {
+        props: { tags, selectedIds: [], onSelectionChange: () => {} },
+      });
+
+      await fireEvent.input(getByTestId('tags-search-input'), { target: { value: 'Tag' } });
+
+      expect(rows(queryAllByTestId)).toBe(50);
+      expect(getByTestId('tags-show-more').textContent).toContain('Show 50 more');
+    });
+
+    it('P2: pages through search matches and stops at the last one', async () => {
+      const tags = makeTags(120);
+      const { getByTestId, queryByTestId, queryAllByTestId } = render(TagsFilter, {
+        props: { tags, selectedIds: [], onSelectionChange: () => {} },
+      });
+      await fireEvent.input(getByTestId('tags-search-input'), { target: { value: 'Tag' } });
+
+      await fireEvent.click(getByTestId('tags-show-more'));
+      expect(rows(queryAllByTestId)).toBe(100);
+      expect(getByTestId('tags-show-more').textContent).toContain('Show 20 more');
+
+      await fireEvent.click(getByTestId('tags-show-more'));
+      expect(rows(queryAllByTestId)).toBe(120);
+      expect(queryByTestId('tags-show-more')).toBeNull();
+    });
+
+    it('P3: "Show more" without a search reveals one page, not every remaining tag', async () => {
+      const tags = makeTags(100);
+      const { getByTestId, queryAllByTestId } = render(TagsFilter, {
+        props: { tags, selectedIds: [], onSelectionChange: () => {} },
+      });
+      expect(getByTestId('tags-show-more').textContent).toContain('Show 50 more');
+
+      await fireEvent.click(getByTestId('tags-show-more'));
+
+      expect(rows(queryAllByTestId)).toBe(60);
+      expect(getByTestId('tags-show-more').textContent).toContain('Show 40 more');
+    });
+
+    it('P4: keeps a selected match visible when it falls beyond the first page', async () => {
+      const tags = makeTags(120);
+      const { getByTestId, queryAllByTestId } = render(TagsFilter, {
+        props: { tags, selectedIds: ['t110'], onSelectionChange: () => {} },
+      });
+
+      await fireEvent.input(getByTestId('tags-search-input'), { target: { value: 'Tag' } });
+
+      expect(getByTestId('tags-item-t110').getAttribute('aria-pressed')).toBe('true');
+      expect(rows(queryAllByTestId)).toBe(50);
+    });
+
+    it('P5: a new search starts again from the first page', async () => {
+      const tags = makeTags(120);
+      const { getByTestId, queryAllByTestId } = render(TagsFilter, {
+        props: { tags, selectedIds: [], onSelectionChange: () => {} },
+      });
+      await fireEvent.input(getByTestId('tags-search-input'), { target: { value: 'Tag' } });
+      await fireEvent.click(getByTestId('tags-show-more'));
+      expect(rows(queryAllByTestId)).toBe(100);
+
+      // Still matches all 120 (search is case-insensitive), so only the reset can bring it back to 50.
+      await fireEvent.input(getByTestId('tags-search-input'), { target: { value: 'tag' } });
+
+      expect(rows(queryAllByTestId)).toBe(50);
+    });
   });
 
   it('should not show "Show more" when list fits within initial count', () => {
