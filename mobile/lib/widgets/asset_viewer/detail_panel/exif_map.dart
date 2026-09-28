@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/domain/models/exif.model.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
+import 'package:immich_mobile/utils/geo_uri.dart';
 import 'package:immich_mobile/widgets/map/map_thumbnail.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -39,11 +40,7 @@ class ExifMap extends StatelessWidget {
       const zoomLevel = 16;
 
       if (Platform.isAndroid) {
-        final Uri uri = Uri(
-          scheme: 'geo',
-          host: '$latitude,$longitude',
-          queryParameters: {'z': '$zoomLevel', 'q': '$latitude,$longitude'},
-        );
+        final Uri uri = buildAndroidGeoUri(latitude, longitude, zoom: zoomLevel);
         if (await canLaunchUrl(uri)) {
           return uri;
         }
