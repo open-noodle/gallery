@@ -605,6 +605,10 @@ export class AssetService extends BaseService {
     // handler in SharedSpaceService receives this data and recounts/cleans up after the delete.
     const affectedSpacePersons = await this.sharedSpaceRepository.getSpacePersonsForAsset(id);
 
+    // Gallery-fork: derived image presets. The rows cascade with the asset, so read the paths first or
+    // the cached variants become orphan files.
+    const derivedFilePaths = await this.assetRepository.getDerivedFilePaths(id);
+
     // The delete cascades into asset_face, which makes Postgres lock shared_space_person rows to
     // null out representativeFaceId. Those locks are taken in face order, so they can cycle against
     // a concurrent space-people recount. Re-drive the victim rather than lose the deletion (#864).
@@ -648,6 +652,7 @@ export class AssetService extends BaseService {
       assetFiles.editedPreviewFile?.path,
       assetFiles.editedThumbnailFile?.path,
       assetFiles.encodedVideoFile?.path,
+      ...derivedFilePaths,
     ];
 
     if (deleteOnDisk && !asset.isOffline) {

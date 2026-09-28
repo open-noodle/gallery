@@ -140,6 +140,17 @@ export type AdminConfigGeneratedFullsizeImageDto = {
     /** Quality */
     quality: number;
 };
+export type AdminConfigImagePresetDto = {
+    /** Aspect ratio as W:H, e.g. "16:9" or "1:1". The output height is derived from it. */
+    aspectRatio: string;
+    format?: ImageFormat;
+    /** Where to crop from when the source aspect differs: center, or sharp attention/entropy */
+    position?: ImagePresetPosition;
+    /** Quality */
+    quality?: number;
+    /** Output widths (px) a client may request for this preset */
+    widths: number[];
+};
 export type AdminConfigGeneratedImageDto = {
     format: ImageFormat;
     /** Progressive */
@@ -154,6 +165,10 @@ export type AdminConfigImageDto = {
     /** Extract embedded */
     extractEmbedded: boolean;
     fullsize: AdminConfigGeneratedFullsizeImageDto;
+    /** Derived image presets, keyed by name. Empty unless an admin adds one. */
+    presets?: {
+        [key: string]: AdminConfigImagePresetDto;
+    };
     preview: AdminConfigGeneratedImageDto;
     thumbnail: AdminConfigGeneratedImageDto;
 };
@@ -6449,12 +6464,14 @@ export function downloadAsset({ download, edited, id, key, slug }: {
 /**
  * View asset thumbnail
  */
-export function viewAsset({ edited, id, key, size, slug }: {
+export function viewAsset({ edited, id, key, preset, size, slug, width }: {
     edited?: boolean;
     id: string;
     key?: string;
+    preset?: string;
     size?: AssetMediaSize;
     slug?: string;
+    width?: number;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchBlob<{
         status: 200;
@@ -6462,8 +6479,10 @@ export function viewAsset({ edited, id, key, size, slug }: {
     }>(`/assets/${encodeURIComponent(id)}/thumbnail${QS.query(QS.explode({
         edited,
         key,
+        preset,
         size,
-        slug
+        slug,
+        width
     }))}`, {
         ...opts
     }));
@@ -10857,6 +10876,11 @@ export enum ImageFormat {
     Jpeg = "jpeg",
     Webp = "webp"
 }
+export enum ImagePresetPosition {
+    Center = "center",
+    Attention = "attention",
+    Entropy = "entropy"
+}
 export enum LogLevel {
     Verbose = "verbose",
     Debug = "debug",
@@ -11323,6 +11347,7 @@ export enum JobName {
     HlsSessionCleanup = "HlsSessionCleanup",
     MemoryCleanup = "MemoryCleanup",
     MemoryGenerate = "MemoryGenerate",
+    AssetDerivedFileCleanup = "AssetDerivedFileCleanup",
     NotificationsCleanup = "NotificationsCleanup",
     NotifyUserSignup = "NotifyUserSignup",
     NotifyAlbumInvite = "NotifyAlbumInvite",

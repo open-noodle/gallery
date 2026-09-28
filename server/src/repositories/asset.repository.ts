@@ -33,6 +33,7 @@ import {
 } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
+import { AssetDerivedFileTable } from 'src/schema/tables/asset-derived-file.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetFileTable } from 'src/schema/tables/asset-file.table.js';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table.js';
@@ -2056,6 +2057,107 @@ export class AssetRepository {
       .deleteFrom('asset_file')
       .where('id', '=', anyUuid(files.map((file) => file.id)))
       .execute();
+  }
+
+  // Gallery-fork: derived image presets (image.presets). The rows below index the on-demand cache;
+  // they are written by the serve path, not the thumbnail job. See
+  // specs/2026-09-22-derived-image-presets-design.md.
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getForDerivedImage(id: string) {
+    return this.db
+      .selectFrom('asset')
+      .where('asset.id', '=', id)
+      .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+      .select([
+        'asset.id',
+        'asset.ownerId',
+        'asset.type',
+        'asset.originalPath',
+        'asset.originalFileName',
+        'asset_exif.exifImageWidth',
+        'asset_exif.exifImageHeight',
+        'asset_exif.orientation',
+      ])
+      .select(withFiles)
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [{ assetId: DummyValue.UUID, preset: DummyValue.STRING, width: 1600, isEdited: false }] })
+  getDerivedFile(key: Pick<Selectable<AssetDerivedFileTable>, 'assetId' | 'preset' | 'width' | 'isEdited'>) {
+    return this.db
+      .selectFrom('asset_derived_file')
+      .select(['path', 'height'])
+      .where('assetId', '=', asUuid(key.assetId))
+      .where('preset', '=', key.preset)
+      .where('width', '=', key.width)
+      .where('isEdited', '=', key.isEdited)
+      .executeTakeFirst();
+  }
+
+  async upsertDerivedFile(
+    file: Pick<Insertable<AssetDerivedFileTable>, 'assetId' | 'preset' | 'width' | 'height' | 'isEdited' | 'path'>,
+  ): Promise<void> {
+    await this.db
+      .insertInto('asset_derived_file')
+      .values(file)
+      .onConflict((oc) =>
+        oc.columns(['assetId', 'preset', 'width', 'isEdited']).doUpdateSet((eb) => ({
+          path: eb.ref('excluded.path'),
+          height: eb.ref('excluded.height'),
+        })),
+      )
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getDerivedFilePaths(assetId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('asset_derived_file')
+      .select('path')
+      .where('assetId', '=', asUuid(assetId))
+      .execute();
+    return rows.map((row) => row.path);
+  }
+
+  /** Drops every cached variant of an asset and returns the paths so the caller can queue the file deletes. */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async deleteDerivedFilesForAsset(assetId: string): Promise<string[]> {
+    const rows = await this.db
+      .deleteFrom('asset_derived_file')
+      .where('assetId', '=', asUuid(assetId))
+      .returning('path')
+      .execute();
+    return rows.map((row) => row.path);
+  }
+
+  /**
+   * Drops cached variants whose (preset, width) is no longer configured, one batch at a time so a large
+   * cache cannot hold a lock for long. Returns the paths removed in this batch; an empty result means done.
+   */
+  async deleteStaleDerivedFiles(valid: { preset: string; width: number }[], limit = 1000): Promise<string[]> {
+    const rows = await this.db
+      .deleteFrom('asset_derived_file')
+      .where('id', 'in', (eb) =>
+        eb
+          .selectFrom('asset_derived_file as stale')
+          .select('stale.id')
+          .$if(valid.length > 0, (qb) =>
+            qb.where((eb) =>
+              eb.not(
+                eb.or(
+                  valid.map(({ preset, width }) =>
+                    eb.and([eb('stale.preset', '=', preset), eb('stale.width', '=', width)]),
+                  ),
+                ),
+              ),
+            ),
+          )
+          .limit(limit),
+      )
+      .returning('path')
+      .execute();
+    return rows.map((row) => row.path);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.STRING], [DummyValue.STRING]] })

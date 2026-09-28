@@ -470,6 +470,30 @@ describe(MediaService.name, () => {
       expect(mocks.asset.update).not.toHaveBeenCalledWith();
     });
 
+    it('should drop cached derived images once new thumbnails exist (Gallery-fork presets)', async () => {
+      const asset = AssetFactory.from().exif().build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.asset.deleteDerivedFilesForAsset.mockResolvedValue(['/data/thumbs/aa/bb/x_landscape_1600.webp']);
+
+      await sut.handleGenerateThumbnails({ id: asset.id });
+
+      expect(mocks.asset.deleteDerivedFilesForAsset).toHaveBeenCalledWith(asset.id);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FileDelete,
+        data: { files: ['/data/thumbs/aa/bb/x_landscape_1600.webp'] },
+      });
+    });
+
+    it('should not queue a file delete when no derived images were cached', async () => {
+      const asset = AssetFactory.from().exif().build();
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.asset.deleteDerivedFilesForAsset.mockResolvedValue([]);
+
+      await sut.handleGenerateThumbnails({ id: asset.id });
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.FileDelete }));
+    });
+
     it('should delete previous preview if different path', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Preview }).exif().build();
       mocks.systemMetadata.get.mockResolvedValue({ image: { thumbnail: { format: ImageFormat.Webp } } });
@@ -5357,6 +5381,46 @@ describe(MediaService.name, () => {
 
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
+    });
+  });
+
+  // Gallery-fork: derived image presets. See specs/2026-09-22-derived-image-presets-design.md.
+  describe('handleDerivedFileCleanup', () => {
+    it('should remove every variant whose preset/width is no longer configured, batch by batch', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        image: { presets: { square: { aspectRatio: '1:1', widths: [1024, 320] } } },
+      });
+      mocks.asset.deleteStaleDerivedFiles
+        .mockResolvedValueOnce(['/data/thumbs/a_landscape_1600.webp', '/data/thumbs/b_landscape_1600.webp'])
+        .mockResolvedValueOnce(['/data/thumbs/c_square_768.webp'])
+        .mockResolvedValueOnce([]);
+
+      await expect(sut.handleDerivedFileCleanup()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.asset.deleteStaleDerivedFiles).toHaveBeenCalledTimes(3);
+      expect(mocks.asset.deleteStaleDerivedFiles).toHaveBeenCalledWith([
+        { preset: 'square', width: 1024 },
+        { preset: 'square', width: 320 },
+      ]);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(2);
+      expect(mocks.job.queue).toHaveBeenNthCalledWith(1, {
+        name: JobName.FileDelete,
+        data: { files: ['/data/thumbs/a_landscape_1600.webp', '/data/thumbs/b_landscape_1600.webp'] },
+      });
+      expect(mocks.job.queue).toHaveBeenNthCalledWith(2, {
+        name: JobName.FileDelete,
+        data: { files: ['/data/thumbs/c_square_768.webp'] },
+      });
+    });
+
+    it('should treat an empty preset map as "everything is stale"', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+      mocks.asset.deleteStaleDerivedFiles.mockResolvedValueOnce([]);
+
+      await sut.handleDerivedFileCleanup();
+
+      expect(mocks.asset.deleteStaleDerivedFiles).toHaveBeenCalledWith([]);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });
 });

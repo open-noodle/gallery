@@ -12,11 +12,20 @@ import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
-import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum.js';
+import {
+  AssetFileType,
+  AssetType,
+  AssetVisibility,
+  CacheControl,
+  ImageFormat,
+  ImagePresetPosition,
+  JobName,
+} from 'src/enum.js';
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
 import { StorageService } from 'src/services/storage.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
 import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { AssetFileFactory } from 'test/factories/asset-file.factory.js';
@@ -191,6 +200,19 @@ const _copiedAsset = Object.freeze({
   id: 'copied-asset',
   originalPath: 'copied-path',
 }) as MapAsset;
+
+// Gallery-fork: derived image presets — the row shape AssetRepository.getForDerivedImage returns.
+const forDerivedImage = (asset: ReturnType<typeof AssetFactory.create>, files = asset.files) => ({
+  id: asset.id,
+  ownerId: asset.ownerId,
+  type: asset.type,
+  originalPath: asset.originalPath,
+  originalFileName: asset.originalFileName,
+  exifImageWidth: 6000,
+  exifImageHeight: 4000,
+  orientation: null,
+  files,
+});
 
 describe(AssetMediaService.name, () => {
   let sut: AssetMediaService;
@@ -1215,6 +1237,200 @@ describe(AssetMediaService.name, () => {
           fileName: `${asset.id}_preview.jpg`,
         }),
       );
+    });
+  });
+
+  // Gallery-fork: derived image presets (?preset=&width=). See specs/2026-09-22-derived-image-presets-design.md.
+  describe('viewThumbnail with a derived image preset', () => {
+    const presets = {
+      landscape: { aspectRatio: '16:9', widths: [1600, 320] },
+      square: { aspectRatio: '1:1', widths: [1024], position: ImagePresetPosition.Attention, format: ImageFormat.Jpeg },
+    };
+    const previewPath = '/data/thumbs/admin/aa/bb/asset_preview.jpeg';
+
+    beforeEach(() => {
+      clearConfigCache();
+      mocks.systemMetadata.get.mockResolvedValue({ image: { presets } });
+    });
+
+    it('should reject an unknown preset before touching the asset', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['id']));
+
+      await expect(sut.viewThumbnail(authStub.admin, 'id', { preset: 'portrait', width: 1600 })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mocks.asset.getForDerivedImage).not.toHaveBeenCalled();
+      expect(mocks.media.generateDerivedImage).not.toHaveBeenCalled();
+    });
+
+    it('should reject a width that is not configured for the preset', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['id']));
+
+      await expect(sut.viewThumbnail(authStub.admin, 'id', { preset: 'landscape', width: 1601 })).rejects.toThrow(
+        'Width 1601 is not configured for preset "landscape"',
+      );
+      expect(mocks.media.generateDerivedImage).not.toHaveBeenCalled();
+    });
+
+    it('should reject every preset request when none are configured (upstream behaviour)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['id']));
+
+      await expect(sut.viewThumbnail(authStub.admin, 'id', { preset: 'landscape', width: 1600 })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should serve a cached variant without rendering', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: previewPath }).build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue(forDerivedImage(asset));
+      mocks.asset.getDerivedFile.mockResolvedValue({
+        path: `/data/thumbs/admin/aa/bb/${asset.id}_landscape_1600.webp`,
+        height: 900,
+      });
+
+      await expect(sut.viewThumbnail(authStub.admin, asset.id, { preset: 'landscape', width: 1600 })).resolves.toEqual(
+        new ImmichFileResponse({
+          path: `/data/thumbs/admin/aa/bb/${asset.id}_landscape_1600.webp`,
+          cacheControl: CacheControl.PrivateWithCache,
+          contentType: 'image/webp',
+          fileName: `IMG_${asset.id}_landscape_1600.webp`,
+        }),
+      );
+      expect(mocks.asset.getDerivedFile).toHaveBeenCalledWith({
+        assetId: asset.id,
+        preset: 'landscape',
+        width: 1600,
+        isEdited: false,
+      });
+      expect(mocks.media.generateDerivedImage).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertDerivedFile).not.toHaveBeenCalled();
+    });
+
+    it('should render, atomically move into place, index and serve on a cache miss', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: previewPath }).build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue(forDerivedImage(asset));
+      mocks.asset.getDerivedFile.mockResolvedValue(undefined);
+
+      const response = await sut.viewThumbnail(authStub.admin, asset.id, { preset: 'landscape', width: 1600 });
+
+      expect(mocks.media.generateDerivedImage).toHaveBeenCalledOnce();
+      const [source, options, tempPath] = mocks.media.generateDerivedImage.mock.calls[0];
+      expect(source).toBe(previewPath);
+      expect(options).toEqual({
+        width: 1600,
+        height: 900,
+        position: ImagePresetPosition.Center,
+        format: 'webp',
+        quality: 80,
+        colorspace: 'p3',
+        processInvalidImages: false,
+        orientation: undefined,
+      });
+      expect(tempPath).toMatch(/_landscape_1600\.webp\.tmp-[0-9a-f-]{36}$/);
+
+      const finalPath = expect.stringMatching(new RegExp(String.raw`/${asset.id}_landscape_1600\.webp$`));
+      expect(mocks.storage.rename).toHaveBeenCalledWith(tempPath, finalPath);
+      expect(mocks.asset.upsertDerivedFile).toHaveBeenCalledWith({
+        assetId: asset.id,
+        preset: 'landscape',
+        width: 1600,
+        height: 900,
+        isEdited: false,
+        path: finalPath,
+      });
+      expect(response).toEqual(
+        expect.objectContaining({
+          path: finalPath,
+          contentType: 'image/webp',
+          fileName: `IMG_${asset.id}_landscape_1600.webp`,
+        }),
+      );
+    });
+
+    it('should honour the preset position and format, and the edited flag', async () => {
+      const asset = AssetFactory.from()
+        .file({ type: AssetFileType.Preview, path: previewPath })
+        .file({ type: AssetFileType.Preview, path: previewPath.replace('.jpeg', '_edited.jpeg'), isEdited: true })
+        .build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue(forDerivedImage(asset));
+      mocks.asset.getDerivedFile.mockResolvedValue(undefined);
+
+      await sut.viewThumbnail(authStub.admin, asset.id, { preset: 'square', width: 1024, edited: true });
+
+      const [source, options] = mocks.media.generateDerivedImage.mock.calls[0];
+      expect(source).toBe(previewPath.replace('.jpeg', '_edited.jpeg'));
+      expect(options).toEqual(
+        expect.objectContaining({ width: 1024, height: 1024, position: ImagePresetPosition.Attention, format: 'jpeg' }),
+      );
+      expect(mocks.asset.upsertDerivedFile).toHaveBeenCalledWith(
+        expect.objectContaining({ isEdited: true, path: expect.stringMatching(/_square_1024_edited\.jpeg$/) }),
+      );
+    });
+
+    it('should pass the EXIF orientation only when rendering from the original', async () => {
+      // Portrait original (rotated 6): the 1440 preview is only 1440 wide, so 1600 needs the original.
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: previewPath }).build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue({ ...forDerivedImage(asset), orientation: '6' });
+      mocks.asset.getDerivedFile.mockResolvedValue(undefined);
+
+      await sut.viewThumbnail(authStub.admin, asset.id, { preset: 'landscape', width: 1600 });
+
+      const [source, options] = mocks.media.generateDerivedImage.mock.calls[0];
+      expect(source).toBe(asset.originalPath);
+      expect(options).toEqual(expect.objectContaining({ orientation: '6' }));
+    });
+
+    it('should clean up the temp file and not index anything when rendering fails', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: previewPath }).build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue(forDerivedImage(asset));
+      mocks.asset.getDerivedFile.mockResolvedValue(undefined);
+      mocks.media.generateDerivedImage.mockRejectedValue(new Error('vips: corrupt'));
+
+      await expect(sut.viewThumbnail(authStub.admin, asset.id, { preset: 'landscape', width: 320 })).rejects.toThrow(
+        'vips: corrupt',
+      );
+
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp-[0-9a-f-]{36}$/));
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      expect(mocks.asset.upsertDerivedFile).not.toHaveBeenCalled();
+    });
+
+    it('should 404 when the asset has no generated files yet and the original cannot be decoded', async () => {
+      const asset = AssetFactory.from({
+        originalFileName: 'IMG_1.CR2',
+        originalPath: '/data/library/IMG_1.CR2',
+      }).build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue(forDerivedImage(asset, []));
+      mocks.asset.getDerivedFile.mockResolvedValue(undefined);
+
+      await expect(sut.viewThumbnail(authStub.admin, asset.id, { preset: 'landscape', width: 320 })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mocks.media.generateDerivedImage).not.toHaveBeenCalled();
+    });
+
+    it('should hide the original file name behind a shared link that does not expose EXIF', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Preview, path: previewPath }).build();
+      const auth = AuthFactory.from().sharedLink({ showExif: false }).build();
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForDerivedImage.mockResolvedValue(forDerivedImage(asset));
+      mocks.asset.getDerivedFile.mockResolvedValue({
+        path: `/data/thumbs/${asset.id}_landscape_320.webp`,
+        height: 180,
+      });
+
+      const response = await sut.viewThumbnail(auth, asset.id, { preset: 'landscape', width: 320 });
+
+      expect(response).toEqual(expect.objectContaining({ fileName: `${asset.id}_landscape_320.webp` }));
+      // shared links always see the edited variant, as the plain endpoint does
+      expect(mocks.asset.getDerivedFile).toHaveBeenCalledWith(expect.objectContaining({ isEdited: true }));
     });
   });
 

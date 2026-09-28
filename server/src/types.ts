@@ -21,6 +21,7 @@ import {
   H264Profile,
   HevcProfile,
   ImageFormat,
+  ImagePresetPosition,
   IntegrityReport,
   JobName,
   MemoryType,
@@ -56,6 +57,17 @@ export type ImageOptions = {
   progressive?: boolean;
 };
 
+// Gallery-fork: a derived image preset is an aspect ratio plus the widths a client may ask for.
+// Height is derived from the ratio, so a preset yields exact dimensions regardless of the
+// source photo's own aspect. See specs/2026-09-22-derived-image-presets-design.md.
+export type ImagePresetOptions = {
+  aspectRatio: string;
+  widths: number[];
+  position: ImagePresetPosition;
+  format: ImageFormat;
+  quality: number;
+};
+
 export type RawImageInfo = {
   width: number;
   height: number;
@@ -75,6 +87,13 @@ export interface DecodeToBufferOptions extends DecodeImageOptions {
 }
 
 export type GenerateThumbnailOptions = Pick<ImageOptions, 'format' | 'quality' | 'progressive'> & DecodeToBufferOptions;
+// Gallery-fork: exact-dimension cover crop, unlike GenerateThumbnailOptions which scales by shortest edge.
+export type GenerateDerivedImageOptions = Pick<ImageOptions, 'format' | 'quality'> &
+  Omit<DecodeToBufferOptions, 'size'> & {
+    width: number;
+    height: number;
+    position: ImagePresetPosition;
+  };
 export type GenerateThumbhashOptions = DecodeImageOptions;
 
 export interface VideoStreamInfo {
@@ -531,6 +550,9 @@ export type JobItem =
   // Memories
   | { name: JobName.MemoryCleanup; data?: IBaseJob }
   | { name: JobName.MemoryGenerate; data?: IBaseJob }
+
+  // Derived image presets (Gallery-fork)
+  | { name: JobName.AssetDerivedFileCleanup; data?: IBaseJob }
 
   // Filesystem
   | { name: JobName.FileDelete; data: IDeleteFilesJob }

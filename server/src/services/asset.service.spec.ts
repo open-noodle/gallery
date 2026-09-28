@@ -1675,6 +1675,23 @@ describe(AssetService.name, () => {
       expect(mocks.asset.remove).toHaveBeenCalledWith(getForAssetDeletion(asset));
     });
 
+    it('should also remove cached derived images, reading their paths before the cascade (Gallery-fork presets)', async () => {
+      const asset = AssetFactory.from().file({ type: AssetFileType.Thumbnail }).build();
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(getForAssetDeletion(asset));
+      mocks.asset.getDerivedFilePaths.mockResolvedValue(['/data/thumbs/aa/bb/x_landscape_1600.webp']);
+
+      await sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: false });
+
+      expect(mocks.asset.getDerivedFilePaths).toHaveBeenCalledWith(asset.id);
+      expect(mocks.asset.getDerivedFilePaths.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.asset.remove.mock.invocationCallOrder[0],
+      );
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.FileDelete,
+        data: { files: [asset.files[0].path, '/data/thumbs/aa/bb/x_landscape_1600.webp'] },
+      });
+    });
+
     it('should delete the entire stack if deleted asset was the primary asset and the stack would only contain one asset afterwards', async () => {
       const asset = AssetFactory.from()
         .stack({}, (builder) => builder.asset())

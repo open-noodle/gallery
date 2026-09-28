@@ -59,6 +59,35 @@ Use embedded previews in RAW photos as the input to image processing when availa
 The default resolution for Large thumbnails can be lowered from 1440p (default) to 1080p or 720p to save storage space.
 :::
 
+### Derived Image Presets
+
+Thumbnails and previews keep each photo's own aspect ratio. When you need exact dimensions instead — a 1600×900 blog hero, a 1024×1024 card, a responsive `srcset` of both — define a **preset**: an aspect ratio plus the widths a client may ask for. Gallery derives the height, crops the photo to fit, and renders the variant the first time it is requested. The result is cached on disk (or in your S3 bucket) and served from the cache afterwards.
+
+Nothing is generated up front. A library with 50,000 photos and two presets does not gain 450,000 files; it gains one file per variant that a page actually uses.
+
+**Request a variant**
+
+```
+GET /api/assets/{id}/thumbnail?preset={name}&width={px}
+```
+
+`width` must be one of the widths listed on the preset; any other value is rejected with `400`, so the cache can only ever hold what you configured. The usual thumbnail rules apply: the same permissions, API keys and shared links work, and `edited=true` returns the variant cut from the edited photo.
+
+**Per preset**
+
+- **Aspect ratio** — `width:height`, e.g. `16:9` or `1:1`. Height is `width × H / W`, rounded to an even number.
+- **Widths** — the sizes you will request, e.g. `1600, 1280, 960, 640, 320`.
+- **Crop position** — what to keep when the photo's aspect differs: the centre, or the region libvips judges most detailed (_attention_) or most varied (_entropy_).
+- **Format** and **Quality** — WebP at 80 by default.
+
+**Housekeeping**
+
+Cached variants are removed when the asset is deleted, when its thumbnails are regenerated (a new edit, a changed preview resolution), and — for presets or widths you have since removed — by the nightly database cleanup. Removing a preset therefore also reclaims its disk space overnight.
+
+:::note
+The variant is cut from the preview when the preview is large enough to cover it without upscaling, otherwise from the full-size or original file. A 1600-wide 16:9 hero from a 3:2 photo comes from the 1440p preview; a 1600-wide hero from a portrait photo needs the original.
+:::
+
 ## Job Settings
 
 Using these settings, you can determine the amount of work that will run concurrently for each task in microservices. Some tasks can be set to higher values on computers with powerful hardware and storage with good I/O capabilities.

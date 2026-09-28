@@ -13,7 +13,6 @@ import type {
   VideoInterfaces,
   VideoStreamInfo,
 } from 'src/types.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFile } from 'src/database.js';
@@ -42,9 +41,9 @@ import {
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { getAssetFile, getDimensions } from 'src/utils/asset.util.js';
 import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor.js';
+import { listConfiguredPresetVariants } from 'src/utils/image-preset.js';
 import { BaseConfig, ThumbnailConfig } from 'src/utils/media.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, clamp } from 'src/utils/misc.js';
@@ -73,26 +72,6 @@ export class MediaService extends BaseService {
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap() {
     this.videoInterfaces = await this.storageCore.getVideoInterfaces();
-  }
-
-  /**
-   * After generating a file locally, uploads it to S3 if the write backend is S3.
-   * Returns the key to store in the DB.
-   */
-  private async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
-    const writeBackend = StorageService.getWriteBackend();
-    if (!writeBackend || writeBackend instanceof DiskStorageBackend) {
-      // Disk mode: the file was already written to the final path
-      return localPath;
-    }
-    // S3 mode: upload the locally-generated file
-    const stream = this.storageRepository.createPlainReadStream(localPath);
-    await writeBackend.put(relativeKey, stream, { contentType });
-    // Clean up local temp file
-    await this.storageRepository.unlink(localPath).catch(() => {
-      /* ignore */
-    });
-    return relativeKey;
   }
 
   /**
@@ -447,6 +426,7 @@ export class MediaService extends BaseService {
       }
 
       await this.syncFiles(asset.files, generated.files);
+      await this.invalidateDerivedImages(asset.id);
       const thumbhash = editedGenerated?.thumbhash || generated.thumbhash;
 
       if (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbhash) !== 0) {
@@ -1036,6 +1016,39 @@ export class MediaService extends BaseService {
     const { width, height } = await this.mediaRepository.getImageMetadata(extractedPathOrBuffer);
     const extractedSize = Math.min(width, height);
     return extractedSize >= targetSize;
+  }
+
+  // Gallery-fork: derived image presets. Cached variants were cut from the previous preview/original, so
+  // a regenerated thumbnail set (new edit, new preview size, re-extracted RAW) makes every one of them
+  // stale. Drop the index rows and queue the files; the next request re-renders.
+  private async invalidateDerivedImages(assetId: string) {
+    const paths = await this.assetRepository.deleteDerivedFilesForAsset(assetId);
+    if (paths.length > 0) {
+      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: paths } });
+    }
+  }
+
+  // Gallery-fork: derived image presets. Nightly: anything cached under a (preset, width) an admin has
+  // since removed is dead weight — nothing can request it, since the serve path validates against config.
+  @OnJob({ name: JobName.AssetDerivedFileCleanup, queue: QueueName.BackgroundTask })
+  async handleDerivedFileCleanup(): Promise<JobStatus> {
+    const config = await this.getConfig({ withCache: false });
+    const valid = listConfiguredPresetVariants(config.image.presets);
+
+    let removed = 0;
+    for (;;) {
+      const paths = await this.assetRepository.deleteStaleDerivedFiles(valid);
+      if (paths.length === 0) {
+        break;
+      }
+      removed += paths.length;
+      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: paths } });
+    }
+
+    if (removed > 0) {
+      this.logger.log(`Removed ${removed} derived image(s) no longer covered by image.presets`);
+    }
+    return JobStatus.Success;
   }
 
   private async syncFiles(
