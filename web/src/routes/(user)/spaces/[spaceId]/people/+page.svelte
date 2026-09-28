@@ -21,6 +21,7 @@
   import { clearQueryParam } from '$lib/utils/navigation';
   import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
   import { sortPeople } from '$lib/utils/people-utils';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/utils/space-person-name-merge';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getSpacePeople,
@@ -412,10 +413,50 @@
     }
   }
 
+  const mergeIntoExistingPerson = async (
+    existingPerson: SharedSpacePersonResponseDto,
+    person: SharedSpacePersonResponseDto,
+  ) => {
+    const committed = await confirmAndMergeSpacePerson({
+      spaceId: space.id,
+      sourceId: person.id,
+      targetId: existingPerson.id,
+    });
+    if (committed) {
+      await refreshPeople();
+    }
+    return committed;
+  };
+
+  const searchNameSuggestions = async (name: string) => {
+    try {
+      return await getSpacePeople({ id: space.id, name, named: true, limit: 6 });
+    } catch (error) {
+      handleError(error, $t('errors.cant_search_people'));
+      return [];
+    }
+  };
+
+  const onSuggestionSelect = async (suggestion: SharedSpacePersonResponseDto, person: SharedSpacePersonResponseDto) => {
+    try {
+      await mergeIntoExistingPerson(suggestion, person);
+    } catch (error) {
+      handleError(error, $t('cannot_merge_people'));
+    }
+  };
+
   const onNameSubmit = async (name: string, person: SharedSpacePersonResponseDto) => {
     try {
       if (name === person.name) {
         return;
+      }
+      // Typing a name the space already has is almost always the same identity, so offer the merge
+      // first and only rename when it is declined (#1100).
+      if (name.trim()) {
+        const existingPerson = await findSpacePersonNamed(space.id, name, person.id);
+        if (existingPerson && (await mergeIntoExistingPerson(existingPerson, person))) {
+          return;
+        }
       }
       const updatedPerson = await updateSpacePerson({
         id: space.id,
@@ -595,6 +636,8 @@
         canEditNames={isEditor}
         canShowActions={isEditor}
         {onNameSubmit}
+        {searchNameSuggestions}
+        {onSuggestionSelect}
       >
         {#snippet actions(person)}
           <ButtonContextMenu

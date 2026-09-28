@@ -48,6 +48,7 @@
   import { lang, locale } from '$lib/stores/preferences.store';
   import { websocketEvents } from '$lib/stores/websocket';
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import {
     createCrossOwnerMergeHandlers,
     runMergeWithCrossOwnerConfirmation,
@@ -378,7 +379,7 @@
       return;
     }
 
-    const result = await searchPerson({ name: personName, withHidden: true });
+    const result = await searchPerson({ name: personName, withHidden: true, withSharedSpaces: true });
 
     const normalizedPersonName = normalizeSearchString(personName);
     const existingPerson = result.find(
@@ -762,7 +763,7 @@
                         <ImageThumbnail
                           circle
                           shadow
-                          url={getPeopleThumbnailUrl(person)}
+                          url={getGlobalPersonThumbnailUrl(person)}
                           altText={person.name}
                           widthStyle="2rem"
                           heightStyle="2rem"
