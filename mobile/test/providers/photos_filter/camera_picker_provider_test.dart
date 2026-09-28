@@ -10,6 +10,8 @@ FilterSuggestionsResponseDto _sugg(List<String> cameraMakes) => FilterSuggestion
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   cameraMakes: cameraMakes,
 );
 

@@ -224,6 +224,15 @@ describe('buildRecentlyAddedTimelineOptions', () => {
     expect(toOnly).not.toHaveProperty('takenAfter');
   });
 
+  it('forwards locationPresence (inherited from buildPhotosTimelineOptions)', () => {
+    const options = buildRecentlyAddedTimelineOptions(
+      { ...createFilterState(), locationPresence: 'noGps' },
+      MY_USER_ID,
+    );
+
+    expect(options.locationPresence).toBe('noGps');
+  });
+
   it('holds both invariants under a multi-filter combination', () => {
     const options = buildRecentlyAddedTimelineOptions(
       {
@@ -395,6 +404,12 @@ describe('buildRecentlyAddedSuggestionRequest', () => {
       lensModel: 'RF24-105mm F4 L IS USM',
       ownerId: 'owner-1',
     });
+  });
+
+  it('forwards locationPresence to the suggestion request', () => {
+    const request = buildRecentlyAddedSuggestionRequest({ ...createFilterState(), locationPresence: 'noGps' });
+
+    expect(request.locationPresence).toBe('noGps');
   });
 
   it('never sends the album filter or the free-text filters to the suggestion endpoint', () => {

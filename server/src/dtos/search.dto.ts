@@ -24,6 +24,38 @@ const DEPRECATED_FLAT_FIELD = {
   deprecated: true,
 };
 
+const LOCATION_PRESENCE_SIBLINGS = ['city', 'state', 'country'] as const;
+
+/**
+ * Fork (#868): `locationPresence` is a MEMBER of the location filter group, never an extra
+ * narrowing on top of one, so it is mutually exclusive with city/state/country.
+ *
+ * Written as a `superRefine` rather than the `IsNotSiblingOf` pipe used for the suggestion DTOs
+ * because the result must stay a ZodObject: the search DTOs are extended and then wrapped by
+ * upstream's `withShapeExclusivity`, and a ZodPipe has neither `.extend()` nor a `.shape`.
+ * Declared here, above the first call site, because these are `const`s — a helper defined beside
+ * `withShapeExclusivity` further down would be in its TDZ when `LargeAssetSearchSchema` evaluates.
+ */
+const withLocationPresenceExclusivity = <T extends z.ZodObject<z.ZodRawShape>>(schema: T) =>
+  schema.superRefine((dto, ctx) => {
+    const values = dto as Record<string, unknown>;
+    if (values.locationPresence === undefined) {
+      return;
+    }
+
+    for (const sibling of LOCATION_PRESENCE_SIBLINGS) {
+      if (values[sibling] === undefined) {
+        continue;
+      }
+
+      ctx.addIssue({
+        code: 'custom',
+        path: ['locationPresence'],
+        message: `locationPresence cannot exist alongside ${LOCATION_PRESENCE_SIBLINGS.join(' or ')}`,
+      });
+    }
+  });
+
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const ScopedPersonTokenSchema = z
   .string()
@@ -49,6 +81,15 @@ const BaseSearchSchema = z.object({
   city: z.string().nullable().optional().describe('Filter by city name').meta(DEPRECATED_FLAT_FIELD),
   state: z.string().nullable().optional().describe('Filter by state/province name').meta(DEPRECATED_FLAT_FIELD),
   country: z.string().nullable().optional().describe('Filter by country name').meta(DEPRECATED_FLAT_FIELD),
+  // Fork field. Deliberately NOT marked DEPRECATED_FLAT_FIELD: that meta advertises a structured
+  // V3 replacement, and this facet has none — `withShapeExclusivity` would then reject it
+  // alongside `filter`, which is not the intent.
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   make: z.string().nullable().optional().describe('Filter by camera make').meta(DEPRECATED_FLAT_FIELD),
   model: z.string().nullable().optional().describe('Filter by camera model').meta(DEPRECATED_FLAT_FIELD),
   lensModel: z.string().nullable().optional().describe('Filter by lens model').meta(DEPRECATED_FLAT_FIELD),
@@ -91,10 +132,12 @@ const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
   size: z.int().min(1).max(1000).default(250).describe('Number of results to return'),
 });
 
-const LargeAssetSearchSchema = BaseSearchWithResultsSchema.extend({
-  minFileSize: z.coerce.number().int().min(0).optional().describe('Minimum file size in bytes'),
-  size: z.coerce.number().int().min(1).max(1000).default(250).describe('Number of results to return'),
-}).meta({ id: 'LargeAssetSearchDto' });
+const LargeAssetSearchSchema = withLocationPresenceExclusivity(
+  BaseSearchWithResultsSchema.extend({
+    minFileSize: z.coerce.number().int().min(0).optional().describe('Minimum file size in bytes'),
+    size: z.coerce.number().int().min(1).max(1000).default(250).describe('Number of results to return'),
+  }),
+).meta({ id: 'LargeAssetSearchDto' });
 
 const SearchPlacesSchema = z
   .object({
@@ -221,6 +264,10 @@ const FilterSuggestionsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -242,6 +289,10 @@ const SmartSearchFacetsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
@@ -253,6 +304,12 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   country: z.string().optional().describe('Filter by country'),
   state: z.string().optional().describe('Filter by state/province'),
   city: z.string().optional().describe('Filter by city'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
@@ -278,6 +335,7 @@ const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
   IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['spaceId']),
 )
   .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'locationPresence', ['city', 'state', 'country']))
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
 export function mapPlaces(place: Place): PlacesResponseDto {
@@ -598,87 +656,98 @@ const RandomSearchBaseSchema = BaseSearchWithResultsSchema.extend({
   filter: filterField,
 });
 
-const RandomSearchSchema = withShapeExclusivity(RandomSearchBaseSchema).meta({ id: 'RandomSearchDto' });
+const RandomSearchSchema = withLocationPresenceExclusivity(withShapeExclusivity(RandomSearchBaseSchema)).meta({
+  id: 'RandomSearchDto',
+});
 
-const MetadataSearchSchema = withShapeExclusivity(
-  RandomSearchBaseSchema.extend({
-    id: z.uuidv4().optional().describe('Filter by asset ID').meta(DEPRECATED_FLAT_FIELD),
-    description: boundedTextFilter(z.string().trim())
-      .optional()
-      .describe('Filter by description text')
-      .meta(DEPRECATED_FLAT_FIELD),
-    checksum: z.string().optional().describe('Filter by file checksum').meta(DEPRECATED_FLAT_FIELD),
-    originalFileName: boundedTextFilter(z.string().trim())
-      .optional()
-      .describe('Filter by original file name')
-      .meta(DEPRECATED_FLAT_FIELD),
-    originalPath: z.string().optional().describe('Filter by original file path').meta(DEPRECATED_FLAT_FIELD),
-    previewPath: z.string().optional().describe('Filter by preview file path').meta(DEPRECATED_FLAT_FIELD),
-    thumbnailPath: z.string().optional().describe('Filter by thumbnail file path').meta(DEPRECATED_FLAT_FIELD),
-    encodedVideoPath: z.string().optional().describe('Filter by encoded video file path').meta(DEPRECATED_FLAT_FIELD),
-    order: AssetOrderSchema.optional().describe('Sort order').meta(DEPRECATED_FLAT_FIELD),
-    page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
-    orderBy: SearchOrderSchema.optional().meta(ADDED_V3_2),
-    cursor: cursorField,
-  }),
+const MetadataSearchSchema = withLocationPresenceExclusivity(
+  withShapeExclusivity(
+    RandomSearchBaseSchema.extend({
+      id: z.uuidv4().optional().describe('Filter by asset ID').meta(DEPRECATED_FLAT_FIELD),
+      description: boundedTextFilter(z.string().trim())
+        .optional()
+        .describe('Filter by description text')
+        .meta(DEPRECATED_FLAT_FIELD),
+      checksum: z.string().optional().describe('Filter by file checksum').meta(DEPRECATED_FLAT_FIELD),
+      originalFileName: boundedTextFilter(z.string().trim())
+        .optional()
+        .describe('Filter by original file name')
+        .meta(DEPRECATED_FLAT_FIELD),
+      originalPath: z.string().optional().describe('Filter by original file path').meta(DEPRECATED_FLAT_FIELD),
+      previewPath: z.string().optional().describe('Filter by preview file path').meta(DEPRECATED_FLAT_FIELD),
+      thumbnailPath: z.string().optional().describe('Filter by thumbnail file path').meta(DEPRECATED_FLAT_FIELD),
+      encodedVideoPath: z.string().optional().describe('Filter by encoded video file path').meta(DEPRECATED_FLAT_FIELD),
+      order: AssetOrderSchema.optional().describe('Sort order').meta(DEPRECATED_FLAT_FIELD),
+      page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
+      orderBy: SearchOrderSchema.optional().meta(ADDED_V3_2),
+      cursor: cursorField,
+    }),
+  ),
 ).meta({ id: 'MetadataSearchDto' });
 
-const StatisticsSearchSchema = withShapeExclusivity(
-  BaseSearchSchema.extend({
-    description: boundedTextFilter(z.string().trim())
-      .optional()
-      .describe('Filter by description text')
-      .meta(DEPRECATED_FLAT_FIELD),
-    filter: filterField,
-  }),
+const StatisticsSearchSchema = withLocationPresenceExclusivity(
+  withShapeExclusivity(
+    BaseSearchSchema.extend({
+      description: boundedTextFilter(z.string().trim())
+        .optional()
+        .describe('Filter by description text')
+        .meta(DEPRECATED_FLAT_FIELD),
+      filter: filterField,
+    }),
+  ),
 ).meta({ id: 'StatisticsSearchDto' });
 
-const SmartSearchSchema = withShapeExclusivity(
-  BaseSearchWithResultsSchema.extend({
-    size: z.int().min(1).max(1000).default(100).describe('Number of results to return'),
-    query: z.string().trim().optional().describe('Natural language search query'),
-    queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
-    language: z.string().optional().describe('Search language code'),
-    page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
-    // Fork fields. Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3
-    // replacement, and neither of these has one (`order` here means relevance-vs-date on smart
-    // search; `withSharedSpaces` has no V3 equivalent at all).
-    order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
-    // POST body, so a real boolean — stringToBool is for the query-string suggestion DTOs.
-    withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-    filter: filterField,
-  }),
+const SmartSearchSchema = withLocationPresenceExclusivity(
+  withShapeExclusivity(
+    BaseSearchWithResultsSchema.extend({
+      size: z.int().min(1).max(1000).default(100).describe('Number of results to return'),
+      query: z.string().trim().optional().describe('Natural language search query'),
+      queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
+      language: z.string().optional().describe('Search language code'),
+      page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
+      // Fork fields. Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3
+      // replacement, and neither of these has one (`order` here means relevance-vs-date on smart
+      // search; `withSharedSpaces` has no V3 equivalent at all).
+      order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
+      // POST body, so a real boolean — stringToBool is for the query-string suggestion DTOs.
+      withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+      filter: filterField,
+    }),
+  ),
 ).meta({ id: 'SmartSearchDto' });
 
-const SmartSearchFacetsSchema = BaseSearchSchema.pick({
-  type: true,
-  isFavorite: true,
-  isNotInAlbum: true,
-  isInAlbum: true,
-  takenBefore: true,
-  takenAfter: true,
-  city: true,
-  country: true,
-  make: true,
-  model: true,
-  personIds: true,
-  tagIds: true,
-  rating: true,
-  // An album detail page runs its page-aware search scoped to its own album, so the facets that
-  // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
-  // here does not merely lose a filter: zod strips the field, so the facets would silently describe
-  // the whole library beside a result grid showing one album.
-  albumIds: true,
-  spaceId: true,
-  spacePersonIds: true,
-})
-  .extend({
+const SmartSearchFacetsSchema = withLocationPresenceExclusivity(
+  BaseSearchSchema.pick({
+    type: true,
+    isFavorite: true,
+    isNotInAlbum: true,
+    isInAlbum: true,
+    takenBefore: true,
+    takenAfter: true,
+    city: true,
+    country: true,
+    // `state` is deliberately NOT picked here (see the un-picked keys above), so only
+    // `city`/`country` can ever collide with `locationPresence` on this endpoint.
+    locationPresence: true,
+    make: true,
+    model: true,
+    personIds: true,
+    tagIds: true,
+    rating: true,
+    // An album detail page runs its page-aware search scoped to its own album, so the facets that
+    // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
+    // here does not merely lose a filter: zod strips the field, so the facets would silently
+    // describe the whole library beside a result grid showing one album.
+    albumIds: true,
+    spaceId: true,
+    spacePersonIds: true,
+  }).extend({
     query: z.string().trim().optional().describe('Natural language search query'),
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-  })
-  .meta({ id: 'SmartSearchFacetsDto' });
+  }),
+).meta({ id: 'SmartSearchFacetsDto' });
 
 // Declared last: every schema these wrap must exist at class-evaluation time, and the fork's
 // suggestion/facet schemas are interleaved with upstream's V3 block further down.
