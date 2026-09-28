@@ -2792,7 +2792,7 @@
   "reset_sqlite_confirmation": "Bist du sicher, dass du die SQLite-Datenbank zurücksetzen willst? Es werden alle Einstellungen zurückgesetzt und du wirst abgemeldet.",
   "reset_sqlite_confirmation_note": "Warnung: Du musst nach dem Zurücksetzten die App neu starten.",
   "reset_sqlite_done": "Die Anwendungsdaten wurden gelöscht. Bitte starte Immich neu um dich erneut anzumelden.",
-  "reset_sqlite_error_hint": "Etwas ist schiefgegangen, setze die Datenbank über den folgenden Button zurück",
+  "reset_sqlite_error_hint": "Etwas ist schief gelaufen, setze die lokale Datenbank mit der Schaltfläche unten zurück",
   "reset_sqlite_success": "SQLite Datenbank erfolgreich zurückgesetzt",
   "reset_to_default": "Auf Standard zurücksetzen",
   "resolution": "Auflösung",

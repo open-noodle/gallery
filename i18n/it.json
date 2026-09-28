@@ -2792,7 +2792,7 @@
   "reset_sqlite_confirmation": "Sei sicuro di voler cancellare i dati dell'app? Questa azione rimuoverà tutte le impostazioni e verrai disconnesso.",
   "reset_sqlite_confirmation_note": "Nota: dovrai riavviare l'app dopo la pulizia.",
   "reset_sqlite_done": "I dati dell'app sono stati cancellati. Si prega di riavviare Immich ed accedere nuovamente.",
-  "reset_sqlite_error_hint": "Qualcosa è andato storto, reimposta il database locale tramite il bottone qui sotto",
+  "reset_sqlite_error_hint": "Qualcosa è andato storto, resetta il database locale con il pulsante qui sotto",
   "reset_sqlite_success": "Database SQLite reimpostato correttamente",
   "reset_to_default": "Ripristina i valori predefiniti",
   "resolution": "Risoluzione",

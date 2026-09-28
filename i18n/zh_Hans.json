@@ -2783,7 +2783,7 @@
   "reset_sqlite_confirmation": "您确定要清除所有数据吗？这会清除所有设置和登出您的账户。",
   "reset_sqlite_confirmation_note": "注意：清除数据后，您需要重新启动程序。",
   "reset_sqlite_done": "数据已清除。请重启 Immich 并重新登录。",
-  "reset_sqlite_error_hint": "出错了，使用下方按钮重置本地数据库",
+  "reset_sqlite_error_hint": "出错了，请使用下方按钮重置本地数据库",
   "reset_sqlite_success": "已成功重置 SQLite 数据库",
   "reset_to_default": "恢复默认值",
   "resolution": "分辨率",
