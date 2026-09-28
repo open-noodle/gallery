@@ -16,9 +16,10 @@
   let { tags, selectedIds, selectedNames, onSelectionChange }: Props = $props();
 
   let searchQuery = $state('');
-  let showAll = $state(false);
+  let extraPages = $state(0);
 
   const INITIAL_SHOW_COUNT = 10;
+  const PAGE_SIZE = 50;
 
   // Cache tag names so orphaned tags can display their name even after removal from results
   const tagNameCache = new SvelteMap<string, string>();
@@ -34,7 +35,7 @@
     const currentLength = tags.length;
     if (previousTagsLength > 0 && currentLength !== previousTagsLength) {
       searchQuery = '';
-      showAll = false;
+      extraPages = 0;
     }
     previousTagsLength = currentLength;
   });
@@ -51,31 +52,36 @@
   );
 
   /**
-   * When searching, show all results (no truncation); otherwise respect INITIAL_SHOW_COUNT — but
-   * never truncate away a tag that is actually SELECTED.
+   * The list is always truncated — to INITIAL_SHOW_COUNT, or to a first page of search matches — and
+   * "Show more" adds one PAGE_SIZE at a time. Never render every match at once: each row mounts a
+   * tooltip and measures its own layout, and a one-letter search in a library with thousands of tags
+   * froze iOS Safari for ~15s doing exactly that (#1125).
    *
-   * A library with thousands of tags will essentially never have the active one in the first ten, so
-   * a tag filter applied from anywhere other than this list (a contextual filter clicked in the
-   * asset viewer, a shared link, typed search) left the panel looking as though nothing was
-   * selected. Selected tags are hoisted rather than scrolled to: it needs no measurement, survives a
-   * re-fetch, and puts them alongside the orphaned tags already pinned above instead of splitting
-   * the selection across two places.
+   * Truncation never hides a tag that is actually SELECTED. A library with thousands of tags will
+   * essentially never have the active one in the first ten, so a tag filter applied from anywhere
+   * other than this list (a contextual filter clicked in the asset viewer, a shared link, typed
+   * search) left the panel looking as though nothing was selected. Selected tags are hoisted rather
+   * than scrolled to: it needs no measurement, survives a re-fetch, and puts them alongside the
+   * orphaned tags already pinned above instead of splitting the selection across two places.
    */
+  let visibleLimit = $derived((searchQuery.trim() ? PAGE_SIZE : INITIAL_SHOW_COUNT) + extraPages * PAGE_SIZE);
+
   let visibleTags = $derived.by(() => {
-    if (searchQuery.trim() || showAll) {
+    if (filteredTags.length <= visibleLimit) {
       return filteredTags;
     }
 
     const selected = filteredTags.filter((tag) => selectedIds.includes(tag.id));
     if (selected.length === 0) {
-      return filteredTags.slice(0, INITIAL_SHOW_COUNT);
+      return filteredTags.slice(0, visibleLimit);
     }
 
     const rest = filteredTags.filter((tag) => !selectedIds.includes(tag.id));
-    return [...selected, ...rest].slice(0, Math.max(INITIAL_SHOW_COUNT, selected.length));
+    return [...selected, ...rest].slice(0, Math.max(visibleLimit, selected.length));
   });
 
   let remainingCount = $derived(Math.max(0, filteredTags.length - visibleTags.length));
+  let nextPageCount = $derived(Math.min(PAGE_SIZE, remainingCount));
 
   function toggleTag(id: string) {
     const isSelected = selectedIds.includes(id);
@@ -102,7 +108,7 @@
         placeholder={$t('search_tags')}
         bind:value={searchQuery}
         oninput={() => {
-          showAll = false;
+          extraPages = 0;
         }}
         data-testid="tags-search-input"
       />
@@ -126,14 +132,14 @@
     {/each}
 
     <!-- Show more link -->
-    {#if !showAll && remainingCount > 0 && !searchQuery.trim()}
+    {#if remainingCount > 0}
       <button
         type="button"
         class="py-1 text-xs font-medium text-immich-primary dark:text-immich-dark-primary"
-        onclick={() => (showAll = true)}
+        onclick={() => extraPages++}
         data-testid="tags-show-more"
       >
-        {$t('filter_show_more', { values: { count: remainingCount } })}
+        {$t('filter_show_more', { values: { count: nextPageCount } })}
       </button>
     {/if}
   {/if}
