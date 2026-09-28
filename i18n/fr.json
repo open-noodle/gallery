@@ -2805,7 +2805,7 @@
   "reset_sqlite_confirmation": "Êtes-vous certain de vouloir supprimer les données de l'application ? Cela va supprimer tous les paramètres et vous déconnecter.",
   "reset_sqlite_confirmation_note": "Remarque : vous devrez redémarrer l'application après cette suppression.",
   "reset_sqlite_done": "Les données de l'application ont été supprimées. Veuillez redémarrer Immich et vous reconnecter.",
-  "reset_sqlite_error_hint": "Une erreur s'est produite, veuillez réinitialiser la base de données locale via le bouton ci-dessous",
+  "reset_sqlite_error_hint": "Une erreur est survenue, réinitialisez la base de données locale avec le bouton ci-dessous",
   "reset_sqlite_success": "La base de données SQLite à été réinitialisé avec succès",
   "reset_to_default": "Rétablir les valeurs par défaut",
   "resolution": "Résolution",

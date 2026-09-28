@@ -2798,7 +2798,7 @@
   "reset_sqlite_confirmation": "Weet je zeker dat je de app-gegevens wilt wissen? Hiermee worden alle instellingen verwijderd en word je uitgelogd.",
   "reset_sqlite_confirmation_note": "Let op: je moet de app opnieuw opstarten nadat je deze hebt gewist.",
   "reset_sqlite_done": "App data is gewist. Start Immich opnieuw op en log opnieuw in.",
-  "reset_sqlite_error_hint": "Er ging iets fout, herstel de lokale database met onderstaande knop",
+  "reset_sqlite_error_hint": "Er is iets misgegaan, reset de lokale database met de knop hieronder",
   "reset_sqlite_success": "De SQLite database is succesvol gereset",
   "reset_to_default": "Resetten naar standaard",
   "resolution": "Resolutie",
