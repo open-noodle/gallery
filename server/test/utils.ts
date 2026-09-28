@@ -30,6 +30,7 @@ import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
+import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -253,6 +254,7 @@ export type ServiceOverrides = {
   assetJob: AssetJobRepository;
   clusterGroup: ClusterGroupRepository;
   classification: ClassificationRepository;
+  cleanup: CleanupRepository;
   config: ConfigRepository;
   cron: CronRepository;
   crypto: CryptoRepository;
@@ -355,6 +357,8 @@ export const getMocks = () => {
     app: automock(AppRepository, { strict: false }),
     // eslint-disable-next-line no-sparse-arrays
     classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    cleanup: automock(CleanupRepository, { args: [, loggerMock], strict: false }),
     config: newConfigRepositoryMock(),
     database: databaseMock,
     downloadRepository: automock(DownloadRepository, { strict: false }),
@@ -439,6 +443,7 @@ export const newTestService = <T extends BaseService>(
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),
     overrides.config || (mocks.config as As<ConfigRepository> as ConfigRepository),
     overrides.classification || (mocks.classification as As<ClassificationRepository>),
+    overrides.cleanup || (mocks.cleanup as As<CleanupRepository>),
     overrides.cron || (mocks.cron as As<CronRepository>),
     overrides.crypto || (mocks.crypto as As<CryptoRepository>),
     overrides.database || (mocks.database as As<DatabaseRepository>),

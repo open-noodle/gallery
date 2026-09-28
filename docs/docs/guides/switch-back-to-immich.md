@@ -11,6 +11,7 @@ This guide walks through switching a Gallery instance back to upstream [Immich](
 - Pet detection results, and every individual pet you named through pet recognition
 - Asset duplicate checksums
 - Library sync state
+- Library Cleanup progress: keep decisions, reviewed dates and quality-analysis scores
 
 Assets you uploaded through Gallery are preserved, as long as they exist in Immich-native tables (which is the normal case for every file uploaded via the web or mobile app).
 
@@ -115,8 +116,8 @@ Watch the server log. A successful boot ends with the usual Immich startup banne
 
 Here is what the cleanup script changes:
 
-- It drops the Gallery-only tables `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log` and `asset_duplicate_checksum`.
-- It drops the Gallery-added columns `person.type`, `person.species`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt` and `library.createId`.
+- It drops the Gallery-only tables `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`, `cleanup_decision`, `cleanup_day_review` and `asset_quality`.
+- It drops the Gallery-added columns `person.type`, `person.species`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt`, `asset_job_status.qualityAnalyzedAt` and `library.createId`.
 - It drops the Gallery-only functions and triggers that reference the dropped tables.
 - It strips the `classification` key out of the `system-config` row in `system_metadata`.
 - It deletes fork migration rows from `kysely_migrations` and `migration_overrides`, so upstream Immich's migrator does not see them as unknown migrations.
