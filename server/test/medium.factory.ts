@@ -65,6 +65,7 @@ import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.re
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
 import { SyncRepository } from 'src/repositories/sync.repository.js';
@@ -650,6 +651,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case SharedLinkAssetRepository:
     case SharedSpaceRepository:
     case StackRepository:
+    case StorageMigrationRepository:
     case SyncRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:

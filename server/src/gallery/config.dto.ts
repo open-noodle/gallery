@@ -78,6 +78,29 @@ export const GalleryMemoriesSchema = z
   })
   .meta({ id: 'AdminConfigMemoriesDto' });
 
+// Gallery-fork: per-file-type storage routing. `Auto` follows IMMICH_STORAGE_BACKEND.
+export enum StorageRouting {
+  Auto = 'auto',
+  Disk = 'disk',
+  S3 = 's3',
+}
+
+const StorageRoutingSchema = z.enum(StorageRouting).describe('Storage routing').meta({ id: 'StorageRouting' });
+
+export const GalleryStorageSchema = z
+  .object({
+    routing: z
+      .object({
+        originals: StorageRoutingSchema.describe('Where newly written original files and sidecars are stored'),
+        thumbnails: StorageRoutingSchema.describe(
+          'Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored',
+        ),
+        encodedVideo: StorageRoutingSchema.describe('Where newly written transcoded videos are stored'),
+      })
+      .meta({ id: 'AdminConfigStorageRoutingDto' }),
+  })
+  .meta({ id: 'AdminConfigStorageDto' });
+
 // Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
 export const GalleryStorageUsageSchema = z
   .object({
@@ -178,6 +201,15 @@ export const galleryTopLevelDefaults = {
     personThrowbackDormancyMonths: 6,
   },
   classification: { enabled: true, categories: [] },
+  // Gallery-fork: defaults to `auto` everywhere, so behaviour matches IMMICH_STORAGE_BACKEND
+  // exactly and no existing install changes on upgrade.
+  storage: {
+    routing: {
+      originals: StorageRouting.Auto,
+      thumbnails: StorageRouting.Auto,
+      encodedVideo: StorageRouting.Auto,
+    },
+  },
   // Gallery-fork: defaults to false, so out of the box storage usage matches upstream Immich
   // and counts original files only.
   storageUsage: { includeDerivatives: false },

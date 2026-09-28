@@ -210,16 +210,20 @@ Additional machine learning parameters can be tuned from the admin UI.
 
 ## S3 Storage
 
-| Variable                         | Description                                                                                                                   |   Default   | Containers | Workers            |
-| :------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- | :---------: | :--------- | :----------------- |
-| `IMMICH_STORAGE_BACKEND`         | Storage backend for new uploads (`disk` or `s3`)                                                                              |   `disk`    | server     | api, microservices |
-| `IMMICH_S3_BUCKET`               | S3 bucket name                                                                                                                |             | server     | api, microservices |
-| `IMMICH_S3_REGION`               | AWS region or S3-compatible provider region                                                                                   | `us-east-1` | server     | api, microservices |
-| `IMMICH_S3_ENDPOINT`             | Custom endpoint URL for S3-compatible services                                                                                |             | server     | api, microservices |
-| `IMMICH_S3_ACCESS_KEY_ID`        | Access key ID (falls back to IAM role if omitted)                                                                             |             | server     | api, microservices |
-| `IMMICH_S3_SECRET_ACCESS_KEY`    | Secret access key (falls back to IAM role if omitted)                                                                         |             | server     | api, microservices |
-| `IMMICH_S3_PRESIGNED_URL_EXPIRY` | Presigned URL expiration time in seconds                                                                                      |   `3600`    | server     | api, microservices |
-| `IMMICH_S3_SERVE_MODE`           | How to serve S3 assets: use `redirect` for normal deployments; `proxy` is the fallback when browsers cannot reach S3 directly | `redirect`  | server     | api, microservices |
+| Variable                         | Description                                                                                                                                                                      |   Default   | Containers | Workers            |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------: | :--------- | :----------------- |
+| `IMMICH_STORAGE_BACKEND`         | Fallback storage backend (`disk` or `s3`) for any file kind whose [storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored) is left at its default, `auto` |   `disk`    | server     | api, microservices |
+| `IMMICH_S3_BUCKET`               | S3 bucket name                                                                                                                                                                   |             | server     | api, microservices |
+| `IMMICH_S3_REGION`               | AWS region or S3-compatible provider region                                                                                                                                      | `us-east-1` | server     | api, microservices |
+| `IMMICH_S3_ENDPOINT`             | Custom endpoint URL for S3-compatible services                                                                                                                                   |             | server     | api, microservices |
+| `IMMICH_S3_ACCESS_KEY_ID`        | Access key ID (falls back to IAM role if omitted)                                                                                                                                |             | server     | api, microservices |
+| `IMMICH_S3_SECRET_ACCESS_KEY`    | Secret access key (falls back to IAM role if omitted)                                                                                                                            |             | server     | api, microservices |
+| `IMMICH_S3_PRESIGNED_URL_EXPIRY` | Presigned URL expiration time in seconds                                                                                                                                         |   `3600`    | server     | api, microservices |
+| `IMMICH_S3_SERVE_MODE`           | How to serve S3 assets: use `redirect` for normal deployments; `proxy` is the fallback when browsers cannot reach S3 directly                                                    | `redirect`  | server     | api, microservices |
+
+:::info
+`IMMICH_STORAGE_BACKEND` is only the **fallback**: the backend used by any file kind (originals, thumbnails, encoded video) whose per-file-type [storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored) is left at its default, `auto`. Pinning a knob to Disk or S3 in **Administration > System Settings > Storage routing** overrides this variable for that kind, regardless of what it's set to.
+:::
 
 :::info
 If you use `IMMICH_S3_SERVE_MODE=redirect`, configure bucket CORS for your Gallery origins before switching an existing deployment over. Without that, redirected media can display but canvas-based workflows such as editing, face crops, and copy-to-clipboard can fail. For the required CORS policy and rollout steps, see the [S3-Compatible Storage](/features/s3-storage) guide.
