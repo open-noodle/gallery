@@ -1,9 +1,18 @@
 import { Kysely } from 'kysely';
 import { Stats } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { copyFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum.js';
+import { fileURLToPath } from 'node:url';
+import {
+  AssetType,
+  AssetVisibility,
+  JobName,
+  JobStatus,
+  SharedSpaceRole,
+  SourceType,
+  UserMetadataKey,
+} from 'src/enum.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -12,6 +21,7 @@ import { EventRepository } from 'src/repositories/event.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MediaRepository } from 'src/repositories/media.repository.js';
 import { MetadataRepository } from 'src/repositories/metadata.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
@@ -24,6 +34,7 @@ import { MetadataService } from 'src/services/metadata.service.js';
 import { PersonService } from 'src/services/person.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
+import { videoInfoStub } from 'test/fixtures/media.stub.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB, newRandomImage } from 'test/utils.js';
@@ -217,6 +228,70 @@ const createTestFile = async (exifData: Record<string, any>) => {
   return { filePath };
 };
 
+const setupWithMedia = () => {
+  const { sut, ctx } = newMediumService(MetadataService, {
+    database: defaultDatabase,
+    real: [
+      AssetRepository,
+      AssetJobRepository,
+      ConfigRepository,
+      MetadataRepository,
+      SystemMetadataRepository,
+      TagRepository,
+    ],
+    mock: [EventRepository, StorageRepository, LoggingRepository, MediaRepository],
+  });
+  ctx.getMock(EventRepository).emit.mockResolvedValue();
+  ctx.getMock(StorageRepository).stat.mockResolvedValue({
+    size: 123_456,
+    mtime: new Date(654_321),
+    mtimeMs: 654_321,
+    birthtimeMs: 654_322,
+  } as Stats);
+  ctx.getMock(MediaRepository).probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+  ctx.getMock(MediaRepository).probePackets.mockResolvedValue({
+    totalDuration: 0,
+    packetCount: 0,
+    outputFrames: 0,
+    keyframePts: [],
+    keyframeAccDuration: [],
+    keyframeOwnDuration: [],
+  });
+  return { sut, ctx };
+};
+
+const createTestVideo = async (exifData: Record<string, any>) => {
+  const { ctx } = setup();
+  const filePath = join(tmpdir(), 'test-1147.mp4');
+  await copyFile(fileURLToPath(new URL('../../../fixtures/videos/short.mp4', import.meta.url)), filePath);
+  await ctx.get(MetadataRepository).writeTags(filePath, exifData);
+  return { filePath };
+};
+
+const extractDates = async (
+  ctx: ReturnType<typeof setupWithMedia>['ctx'],
+  sut: MetadataService,
+  asset: { originalPath: string; type?: AssetType; fileCreatedAt?: Date },
+) => {
+  const { user } = await ctx.newUser();
+  const { asset: created } = await ctx.newAsset({ ...asset, ownerId: user.id });
+  await ctx.newExif({ assetId: created.id, description: '' });
+
+  await sut.handleMetadataExtraction({ id: created.id });
+
+  const exif = await ctx.database
+    .selectFrom('asset_exif')
+    .select(['dateTimeOriginal', 'timeZone'])
+    .where('assetId', '=', created.id)
+    .executeTakeFirstOrThrow();
+  const { localDateTime } = await ctx.database
+    .selectFrom('asset')
+    .select('localDateTime')
+    .where('id', '=', created.id)
+    .executeTakeFirstOrThrow();
+  return { ...exif, localDateTime };
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -286,6 +361,91 @@ describe(MetadataService.name, () => {
       await expect(ctx.get(AssetRepository).getById(asset.id)).resolves.toEqual(
         expect.objectContaining({ localDateTime: new Date(expected.localDateTime) }),
       );
+    });
+
+    // Issue #1147: a file that carries no zone is shown in the server's TZ, as
+    // documented, not in UTC. Runs the real exiftool so the tags it returns for
+    // these files (no date at all; a QuickTime date it only assumed was UTC)
+    // are the ones the service sees.
+    describe('server TZ fallback', () => {
+      it('should show a file with no date in its metadata in the server time zone', async () => {
+        vi.stubEnv('TZ', 'America/Port_of_Spain');
+        const { sut, ctx } = setupWithMedia();
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        ctx.getMock(StorageRepository).stat.mockResolvedValue({
+          size: 123_456,
+          mtime: instant,
+          mtimeMs: instant.valueOf(),
+          birthtimeMs: instant.valueOf(),
+        } as Stats);
+        const { filePath } = await createTestFile({});
+
+        await expect(extractDates(ctx, sut, { originalPath: filePath, fileCreatedAt: instant })).resolves.toEqual({
+          dateTimeOriginal: instant,
+          timeZone: 'America/Port_of_Spain',
+          localDateTime: new Date('2026-09-24T21:07:27.000Z'),
+        });
+      });
+
+      it('should show a video with no zone in its metadata in the server time zone', async () => {
+        vi.stubEnv('TZ', 'America/Port_of_Spain');
+        const { sut, ctx } = setupWithMedia();
+        const { filePath } = await createTestVideo({ CreateDate: '2026:09:24 20:57:57' });
+
+        await expect(extractDates(ctx, sut, { originalPath: filePath, type: AssetType.Video })).resolves.toEqual({
+          dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+          timeZone: 'America/Port_of_Spain',
+          localDateTime: new Date('2026-09-24T16:57:57.000Z'),
+        });
+      });
+
+      it('should keep a video whose date says +00:00 explicitly in UTC', async () => {
+        // e.g. an iPhone video recorded in Lisbon: exiftool still reports
+        // tzSource 'defaultVideosToUTC', but this UTC came from the file.
+        vi.stubEnv('TZ', 'America/Port_of_Spain');
+        const { sut, ctx } = setupWithMedia();
+        const { filePath } = await createTestVideo({ 'Keys:CreationDate': '2026:09:24 20:57:57+00:00' });
+
+        await expect(extractDates(ctx, sut, { originalPath: filePath, type: AssetType.Video })).resolves.toEqual({
+          dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+          timeZone: 'UTC',
+          localDateTime: new Date('2026-09-24T20:57:57.000Z'),
+        });
+      });
+
+      it('should show a video with no date at all in the server time zone', async () => {
+        vi.stubEnv('TZ', 'America/Port_of_Spain');
+        const { sut, ctx } = setupWithMedia();
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        ctx.getMock(StorageRepository).stat.mockResolvedValue({
+          size: 123_456,
+          mtime: instant,
+          mtimeMs: instant.valueOf(),
+          birthtimeMs: instant.valueOf(),
+        } as Stats);
+        // the fixture's QuickTime dates are all 0000:00:00 00:00:00
+        const { filePath } = await createTestVideo({});
+
+        await expect(
+          extractDates(ctx, sut, { originalPath: filePath, type: AssetType.Video, fileCreatedAt: instant }),
+        ).resolves.toEqual({
+          dateTimeOriginal: instant,
+          timeZone: 'America/Port_of_Spain',
+          localDateTime: new Date('2026-09-24T21:07:27.000Z'),
+        });
+      });
+
+      it('should keep a video with no zone in its metadata in UTC when the server runs in UTC', async () => {
+        vi.stubEnv('TZ', 'UTC');
+        const { sut, ctx } = setupWithMedia();
+        const { filePath } = await createTestVideo({ CreateDate: '2026:09:24 20:57:57' });
+
+        await expect(extractDates(ctx, sut, { originalPath: filePath, type: AssetType.Video })).resolves.toEqual({
+          dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+          timeZone: 'UTC',
+          localDateTime: new Date('2026-09-24T20:57:57.000Z'),
+        });
+      });
     });
 
     it('should handle dates far in the future', async () => {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ContainerDirectoryItem, ExifDateTime, Tags } from 'exiftool-vendored';
+import { ContainerDirectoryItem, ExifDateTime, Tags, defaultVideosToUTC } from 'exiftool-vendored';
 import { Insertable } from 'kysely';
 import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration, FixedOffsetZone } from 'luxon';
@@ -34,7 +34,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { getAssetFiles } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
-import { mergeTimeZone } from 'src/utils/date.js';
+import { getServerTimeZone, mergeTimeZone } from 'src/utils/date.js';
 import { parseDurationToSeconds } from 'src/utils/duration.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, isFaceImportEnabled } from 'src/utils/misc.js';
@@ -677,7 +677,7 @@ export class MetadataService extends BaseService {
         //
         // this is especially important in the case of UTC+0 where exiftool-vendored does not return tz/zone fields
         // and as such the tags aren't overwritten when returning all tags.
-        for (const tag of ['zone', 'tz', 'tzSource'] as const) {
+        for (const tag of ['zone', 'tz', 'tzSource', 'zoneSource'] as const) {
           delete mediaTags[tag];
         }
       }
@@ -1160,16 +1160,27 @@ export class MetadataService extends BaseService {
 
     // timezone
     let timeZone = exifTags.zone ?? null;
-    if (timeZone === null && (dateTime?.rawValue?.endsWith('Z') || dateTime?.rawValue?.endsWith('+00:00'))) {
+    const hasExplicitUtcOffset = dateTime?.rawValue?.endsWith('Z') || dateTime?.rawValue?.endsWith('+00:00');
+    if (timeZone === null && hasExplicitUtcOffset) {
       // exiftool-vendored returns "no timezone" information even though "+00:00" might be set explicitly
       // https://github.com/photostructure/exiftool-vendored.js/issues/203
       timeZone = 'UTC+0';
     }
 
+    // exiftool assumed UTC only to parse a zone-less QuickTime timestamp: the
+    // instant is right but the zone is unknown, so use the server's TZ as
+    // documented. Issue #1147. exiftool reports the same source when the date
+    // says +00:00 or Z outright (e.g. an iPhone video recorded in Lisbon);
+    // that UTC came from the file, so keep it.
+    // exiftool-vendored's types deprecate tzSource for zoneSource, but 35.x only sets tzSource.
+    const zoneSource = exifTags.zoneSource ?? exifTags.tzSource;
+    const serverTimeZone = getServerTimeZone();
+    if (zoneSource === defaultVideosToUTC && !hasExplicitUtcOffset && serverTimeZone) {
+      timeZone = serverTimeZone;
+    }
+
     if (timeZone) {
-      this.logger.verbose(
-        `Found timezone ${timeZone} via ${exifTags.zoneSource} for asset ${asset.id}: ${asset.originalPath}`,
-      );
+      this.logger.verbose(`Found timezone ${timeZone} via ${zoneSource} for asset ${asset.id}: ${asset.originalPath}`);
     } else {
       this.logger.debug(`No timezone information found for asset ${asset.id}: ${asset.originalPath}`);
     }
@@ -1214,7 +1225,11 @@ export class MetadataService extends BaseService {
       this.logger.debug(
         `No exif date time found, falling back on ${earliestDate.toISO()}, earliest of file creation and modification for asset ${asset.id}: ${asset.originalPath}`,
       );
-      dateTimeOriginal = localDateTime = earliestDate;
+      // The file carries no date, so keep its local time in whatever zone we
+      // know, falling back to the server's TZ as documented. Issue #1147.
+      timeZone ??= serverTimeZone;
+      dateTimeOriginal = earliestDate.setZone(timeZone ?? 'UTC');
+      localDateTime = dateTimeOriginal.setZone('UTC', { keepLocalTime: true });
     }
 
     this.logger.verbose(`Found local date time ${localDateTime.toISO()} for asset ${asset.id}: ${asset.originalPath}`);

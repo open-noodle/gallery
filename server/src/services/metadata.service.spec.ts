@@ -75,6 +75,15 @@ const emptyPackets = {
   keyframeOwnDuration: [],
 };
 
+// Shape exiftool-vendored returns for a QuickTime video with no zone
+// (verified against a real file): the UTC zone is an assumption, not data.
+const videoAssumedUtc = (exifDate: string): Partial<ImmichTags> => ({
+  CreateDate: ExifDateTime.fromEXIF(exifDate, 'UTC'),
+  zone: 'UTC',
+  tz: 'UTC',
+  tzSource: 'defaultVideosToUTC',
+});
+
 describe(MetadataService.name, () => {
   let sut: MetadataService;
   let mocks: ServiceMocks;
@@ -83,6 +92,15 @@ describe(MetadataService.name, () => {
     mocks.metadata.readTags.mockReset();
     mocks.metadata.readTags.mockResolvedValueOnce(exifData ?? {});
     mocks.metadata.readTags.mockResolvedValueOnce(sidecarData ?? {});
+  };
+
+  const mockFileTimes = (date: Date) => {
+    mocks.storage.stat.mockResolvedValue({
+      size: 123_456,
+      mtime: date,
+      mtimeMs: date.valueOf(),
+      birthtimeMs: date.valueOf(),
+    } as Stats);
   };
 
   beforeEach(() => {
@@ -94,7 +112,9 @@ describe(MetadataService.name, () => {
     mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
     mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
 
-    delete process.env.TZ;
+    // Restore the zone test/vitest.config.mjs sets. Deleting TZ instead would
+    // leak the developer machine's zone into tests that fall back to it.
+    process.env.TZ = 'UTC';
   });
 
   const expectNoGlobalFaceIdentityRootJobs = () => {
@@ -414,6 +434,281 @@ describe(MetadataService.name, () => {
           localDateTime: new Date('2026-05-18T16:51:00.000Z'),
         }),
       );
+    });
+
+    // Issue #1147: when the file carries no zone, fall back to the server's TZ
+    // (as documented) instead of showing the time in UTC.
+    describe('server TZ fallback', () => {
+      it('should show a file with no exif date in the server time zone', async () => {
+        // WhatsApp image received at 21:07 local time in UTC-4
+        process.env.TZ = 'America/Port_of_Spain';
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        const asset = AssetFactory.create({ fileCreatedAt: instant });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mockFileTimes(instant);
+        mockReadTags();
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({ dateTimeOriginal: instant, timeZone: 'America/Port_of_Spain' }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fileCreatedAt: instant,
+            localDateTime: new Date('2026-09-24T21:07:27.000Z'),
+          }),
+        );
+      });
+
+      it('should keep a file with no exif date in UTC with no time zone when the server runs in UTC', async () => {
+        process.env.TZ = 'Etc/UTC';
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        const asset = AssetFactory.create({ fileCreatedAt: instant });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mockFileTimes(instant);
+        mockReadTags();
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({ dateTimeOriginal: instant, timeZone: null }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ fileCreatedAt: instant, localDateTime: instant }),
+        );
+      });
+
+      it('should prefer a zone from the metadata over the server time zone when there is no exif date', async () => {
+        process.env.TZ = 'America/Port_of_Spain';
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        const asset = AssetFactory.create({ fileCreatedAt: instant });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mockFileTimes(instant);
+        mockReadTags({ zone: 'UTC+2' });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({ dateTimeOriginal: instant, timeZone: 'UTC+2' }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-09-25T03:07:27.000Z') }),
+        );
+      });
+
+      it('should show a video exiftool assumed to be UTC in the server time zone', async () => {
+        // Android camera video recorded at 16:57 local time in UTC-4, location off
+        process.env.TZ = 'America/Port_of_Spain';
+        const asset = AssetFactory.create({ type: AssetType.Video });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+        mockReadTags(videoAssumedUtc('2026:09:24 20:57:57'));
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({
+              dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+              timeZone: 'America/Port_of_Spain',
+            }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fileCreatedAt: new Date('2026-09-24T20:57:57.000Z'),
+            localDateTime: new Date('2026-09-24T16:57:57.000Z'),
+          }),
+        );
+      });
+
+      it('should keep a video exiftool assumed to be UTC in UTC when the server runs in UTC', async () => {
+        const asset = AssetFactory.create({ type: AssetType.Video });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+        mockReadTags(videoAssumedUtc('2026:09:24 20:57:57'));
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({
+              dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+              timeZone: 'UTC',
+            }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-09-24T20:57:57.000Z') }),
+        );
+      });
+
+      // exiftool reports tzSource 'defaultVideosToUTC' even when the date it
+      // read says +00:00 or Z outright (verified against a real file), e.g. an
+      // iPhone video recorded in Lisbon. That UTC is data, not an assumption.
+      it.each(['+00:00', 'Z'])('should keep a video whose date says %s explicitly in UTC', async (offset) => {
+        process.env.TZ = 'America/Port_of_Spain';
+        const asset = AssetFactory.create({ type: AssetType.Video });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+        mockReadTags({
+          ...videoAssumedUtc('2026:09:24 20:57:57'),
+          CreationDate: ExifDateTime.fromISO(`2026-09-24T20:57:57${offset}`),
+        });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({
+              dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+              timeZone: 'UTC',
+            }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-09-24T20:57:57.000Z') }),
+        );
+      });
+
+      it('should show a video with no date at all in the server time zone', async () => {
+        process.env.TZ = 'America/Port_of_Spain';
+        const instant = new Date('2026-09-25T01:07:27.000Z');
+        const asset = AssetFactory.create({ type: AssetType.Video, fileCreatedAt: instant });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+        mockFileTimes(instant);
+        mockReadTags({ zone: 'UTC', tz: 'UTC', tzSource: 'defaultVideosToUTC' });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({ dateTimeOriginal: instant, timeZone: 'America/Port_of_Spain' }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-09-24T21:07:27.000Z') }),
+        );
+      });
+
+      // exiftool-vendored's types mark tzSource deprecated in favour of
+      // zoneSource, but 35.x only sets tzSource at runtime. Accept either.
+      it('should show a video exiftool assumed to be UTC in the server time zone when it reports zoneSource', async () => {
+        process.env.TZ = 'America/Port_of_Spain';
+        const asset = AssetFactory.create({ type: AssetType.Video });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+        const { tzSource, ...tags } = videoAssumedUtc('2026:09:24 20:57:57');
+        mockReadTags({ ...tags, zoneSource: tzSource });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({ timeZone: 'America/Port_of_Spain' }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-09-24T16:57:57.000Z') }),
+        );
+      });
+
+      // A sidecar date replaces the video's dates, and the zone exiftool
+      // assumed for them goes too; it must not be applied to the sidecar date.
+      it.each(['tzSource', 'zoneSource'])(
+        'should not apply the server time zone to a zone-less sidecar date on a video (%s)',
+        async (sourceTag) => {
+          process.env.TZ = 'America/Port_of_Spain';
+          const asset = AssetFactory.from({
+            type: AssetType.Video,
+            fileCreatedAt: new Date('2026-09-24T16:57:57.000Z'),
+          })
+            .file({ type: AssetFileType.Sidecar })
+            .build();
+          mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+          mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+          mockReadTags(
+            {
+              CreateDate: ExifDateTime.fromEXIF('2026:09:24 20:57:57', 'UTC'),
+              zone: 'UTC',
+              tz: 'UTC',
+              [sourceTag]: 'defaultVideosToUTC',
+            },
+            { DateTimeOriginal: '2026:09:24 16:57:57' },
+          );
+
+          await sut.handleMetadataExtraction({ id: asset.id });
+
+          expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+            expect.objectContaining({
+              exif: expect.objectContaining({
+                dateTimeOriginal: new Date('2026-09-24T16:57:57.000Z'),
+                timeZone: null,
+              }),
+            }),
+          );
+          expect(mocks.asset.update).toHaveBeenCalledWith(
+            expect.objectContaining({ localDateTime: new Date('2026-09-24T16:57:57.000Z') }),
+          );
+        },
+      );
+
+      it('should keep a video zone that came from the metadata, not the UTC assumption', async () => {
+        process.env.TZ = 'America/Port_of_Spain';
+        const asset = AssetFactory.create({ type: AssetType.Video });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
+        mockReadTags({
+          CreateDate: ExifDateTime.fromISO('2026-09-24T22:57:57+02:00'),
+          zone: 'UTC+2',
+          tz: 'UTC+2',
+          tzSource: 'GPSLatitude/GPSLongitude',
+        });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({
+              dateTimeOriginal: new Date('2026-09-24T20:57:57.000Z'),
+              timeZone: 'UTC+2',
+            }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-09-24T22:57:57.000Z') }),
+        );
+      });
+
+      it('should not apply the server time zone to a photo whose exif time has no offset', async () => {
+        // The #607 path: zone-less wall-clock EXIF stays UTC when it can't be derived.
+        process.env.TZ = 'America/Port_of_Spain';
+        const asset = AssetFactory.create({ fileCreatedAt: new Date('2026-05-18T16:51:00.000Z') });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+        mockReadTags({ DateTimeOriginal: '2026:05:18 16:51:00' });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+          expect.objectContaining({
+            exif: expect.objectContaining({
+              dateTimeOriginal: new Date('2026-05-18T16:51:00.000Z'),
+              timeZone: null,
+            }),
+          }),
+        );
+        expect(mocks.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ localDateTime: new Date('2026-05-18T16:51:00.000Z') }),
+        );
+      });
     });
 
     it('should handle lists of numbers', async () => {
