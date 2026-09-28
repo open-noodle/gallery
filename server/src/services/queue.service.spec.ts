@@ -359,6 +359,7 @@ describe(QueueService.name, () => {
         { name: JobName.MemoryCleanup },
         { name: JobName.SessionCleanup },
         { name: JobName.HlsSessionCleanup },
+        { name: JobName.UploadSessionCleanup },
         { name: JobName.AuditTableCleanup },
         { name: JobName.SharedSpaceAlbumGrantReconcileSweep },
         { name: JobName.MemoryGenerate },

@@ -54,6 +54,8 @@ const ADMIN_ROUTES = new Set([
 /** Routes a shared link (`?key=`) is allowed to reach, i.e. `@Authenticated({ sharedLink: true })` */
 const SHARED_LINK_ROUTES = new Set([
   'DELETE assets/:id/video/stream/:sessionId',
+  // fork-only: the resumable upload session, same auth as 'POST assets' below (AssetUpload + sharedLink)
+  'DELETE assets/upload-session/:id',
   'GET albums/:id',
   'GET albums/:id/map-markers',
   'GET assets/:id',
@@ -68,7 +70,10 @@ const SHARED_LINK_ROUTES = new Set([
   // fork-only: same auth as its upstream siblings above (AssetRead + sharedLink)
   'GET timeline/bucket-covers',
   'GET timeline/buckets',
+  'HEAD assets/upload-session/:id',
+  'PATCH assets/upload-session/:id',
   'POST assets',
+  'POST assets/upload-session',
   'POST download/archive',
   'POST download/info',
   'POST search/metadata',

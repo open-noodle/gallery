@@ -101,9 +101,10 @@ Make sure to [set your reverse proxy](/administration/reverse-proxy/) to allow l
 Also, check the disk space of your reverse proxy.
 In some cases, proxies cache requests to disk before passing them on, and if disk space runs out, the request fails.
 
-If you are using Cloudflare Tunnel, please know that they set a maximum filesize of 100 MB that cannot be changed.
-At times, files larger than this may work, potentially up to 1 GB. However, the official limit is 100 MB.
-If you are having issues, we recommend switching to a different network deployment.
+If you are using Cloudflare Tunnel, please know that they set a maximum request body size of 100 MB that cannot be changed.
+This is no longer a ceiling on the size of the asset you can upload — Gallery uses [chunked/resumable upload](/features/chunked-upload) for files larger than 32 MiB, so a large photo or video is sent as a sequence of 32 MiB chunks, each well under Cloudflare's 100 MB limit, rather than as one request for the whole file. The 100 MB limit only matters if it is smaller than a single chunk, which it is not.
+Note that upload resumption is within the same browser tab or app session only: if the upload is interrupted by closing the tab or app, that file restarts from the beginning on the next attempt rather than picking up where it left off.
+If you are still having issues, we recommend switching to a different network deployment.
 
 ### Why are some photos stored in the file system with the wrong date?
 
