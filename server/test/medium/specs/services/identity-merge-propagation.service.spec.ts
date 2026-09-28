@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -20,7 +21,7 @@ let defaultDatabase: Kysely<DB>;
 const setup = (db: Kysely<DB> = defaultDatabase) => {
   const { ctx } = newMediumService(BaseService, {
     database: db,
-    real: [DatabaseRepository, FaceIdentityRepository, PersonRepository, SharedSpaceRepository],
+    real: [DatabaseRepository, FaceIdentityRepository, FamilyRepository, PersonRepository, SharedSpaceRepository],
     mock: [JobRepository, LoggingRepository],
   });
   const jobRepository = ctx.getMock(JobRepository);
@@ -29,6 +30,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
+    familyRepository: ctx.get(FamilyRepository),
     jobRepository,
     logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),

@@ -120,6 +120,10 @@ DROP TABLE IF EXISTS "shared_space_person" CASCADE;
 DROP TABLE IF EXISTS "shared_space_face_match_backfill_target" CASCADE;
 DROP TABLE IF EXISTS "shared_space_library_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_asset_audit" CASCADE;
+DROP TABLE IF EXISTS "family_access" CASCADE;
+DROP TABLE IF EXISTS "family_union_child" CASCADE;
+DROP TABLE IF EXISTS "family_union_partner" CASCADE;
+DROP TABLE IF EXISTS "family_union" CASCADE;
 DROP TABLE IF EXISTS "face_person_verdict" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
@@ -505,6 +509,7 @@ DELETE FROM "kysely_migrations"
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  '1795000000000-AddFamilyRelationships',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts

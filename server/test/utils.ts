@@ -44,6 +44,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -305,6 +306,7 @@ export type ServiceOverrides = {
   view: ViewRepository;
   websocket: WebsocketRepository;
   workflow: WorkflowRepository;
+  family: FamilyRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -410,6 +412,8 @@ export const getMocks = () => {
     // eslint-disable-next-line no-sparse-arrays
     websocket: automock(WebsocketRepository, { args: [, loggerMock], strict: false }),
     workflow: automock(WorkflowRepository, { strict: true }),
+    // eslint-disable-next-line no-sparse-arrays
+    family: automock(FamilyRepository, { args: [, loggerMock], strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -489,6 +493,7 @@ export const newTestService = <T extends BaseService>(
     overrides.view || (mocks.view as As<ViewRepository>),
     overrides.websocket || (mocks.websocket as As<WebsocketRepository>),
     overrides.workflow || (mocks.workflow as As<WorkflowRepository>),
+    overrides.family || (mocks.family as As<FamilyRepository>),
   );
 
   return {
