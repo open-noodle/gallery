@@ -26065,6 +26065,36 @@
         ],
         "type": "object"
       },
+      "AdjustParameters": {
+        "properties": {
+          "contrast": {
+            "description": "Contrast adjustment, -100 to 100",
+            "format": "double",
+            "maximum": 100,
+            "minimum": -100,
+            "type": "number"
+          },
+          "exposure": {
+            "description": "Exposure adjustment, -100 to 100",
+            "format": "double",
+            "maximum": 100,
+            "minimum": -100,
+            "type": "number"
+          },
+          "invert": {
+            "description": "Invert colors (for scanned film negatives)",
+            "type": "boolean"
+          },
+          "saturation": {
+            "description": "Saturation adjustment, -100 to 100",
+            "format": "double",
+            "maximum": 100,
+            "minimum": -100,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "AdminConfigBackupsDto": {
         "properties": {
           "database": {
@@ -28249,7 +28279,8 @@
           "crop",
           "rotate",
           "mirror",
-          "trim"
+          "trim",
+          "adjust"
         ],
         "type": "string"
       },
@@ -28271,9 +28302,12 @@
               },
               {
                 "$ref": "#/components/schemas/TrimParameters"
+              },
+              {
+                "$ref": "#/components/schemas/AdjustParameters"
               }
             ],
-            "description": "List of edit actions to apply (crop, rotate, mirror, or trim)"
+            "description": "List of edit actions to apply (crop, rotate, mirror, trim, or adjust)"
           }
         },
         "required": [
@@ -28306,9 +28340,12 @@
               },
               {
                 "$ref": "#/components/schemas/TrimParameters"
+              },
+              {
+                "$ref": "#/components/schemas/AdjustParameters"
               }
             ],
-            "description": "List of edit actions to apply (crop, rotate, mirror, or trim)"
+            "description": "List of edit actions to apply (crop, rotate, mirror, trim, or adjust)"
           }
         },
         "required": [
