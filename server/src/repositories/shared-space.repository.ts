@@ -4817,6 +4817,10 @@ export class SharedSpaceRepository {
     return map;
   }
 
+  // With no space context the caller is on a personal surface (/photos), which only resolves
+  // `space-person:` tokens from spaces shown on the viewer's timeline. When the asset is in several of
+  // the viewer's spaces, prefer one of those, so the Info panel's person chip filters by a person
+  // /photos can honour (#1115). The id tie-break keeps the pick stable.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async findSpaceForAssetAndUser(assetId: string, userId: string) {
     return this.db
@@ -4827,7 +4831,7 @@ export class SharedSpaceRepository {
           .innerJoin('asset', (join) =>
             join.onRef('asset.id', '=', 'shared_space_asset.assetId').on('asset.deletedAt', 'is', null),
           )
-          .select('shared_space_asset.spaceId')
+          .select(['shared_space_asset.spaceId', 'shared_space_member.showInTimeline'])
           .where('shared_space_asset.assetId', '=', assetId)
           .where('shared_space_member.userId', '=', userId)
           .union(
@@ -4841,12 +4845,14 @@ export class SharedSpaceRepository {
                   .on('asset.deletedAt', 'is', null)
                   .on('asset.isOffline', '=', false),
               )
-              .select('shared_space_library.spaceId')
+              .select(['shared_space_library.spaceId', 'shared_space_member.showInTimeline'])
               .where('shared_space_member.userId', '=', userId),
           )
           .as('combined'),
       )
       .select('combined.spaceId')
+      .orderBy('combined.showInTimeline', 'desc')
+      .orderBy('combined.spaceId', 'asc')
       .limit(1)
       .executeTakeFirst();
   }

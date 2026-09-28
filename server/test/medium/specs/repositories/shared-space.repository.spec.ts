@@ -5,7 +5,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService } from 'test/medium.factory.js';
-import { newEmbedding } from 'test/small.factory.js';
+import { newEmbedding, newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
@@ -5865,6 +5865,196 @@ describe('getPersonAssetIds — visibility scoping', () => {
         expect(ids).toContain(underscore.id);
         expect(ids).not.toContain(dash.id);
       });
+    });
+  });
+
+  // #1115: AssetService.get resolves an asset with no space context through this lookup, and the Info
+  // panel's person chip then filters /photos by the resolved space's `space-person:` token. /photos
+  // only honours tokens from spaces the viewer shows on their timeline, so the pick must prefer those.
+  // A space reaches an asset through two arms here (a direct shared_space_asset row or a linked
+  // library); every case runs through both.
+  describe('findSpaceForAssetAndUser', () => {
+    type Arm = 'direct' | 'library';
+
+    // Ascending ids, so a case can decide which space sorts first independently of insertion order.
+    const sortedIds = (count: number) => Array.from({ length: count }, () => newUuid()).sort();
+
+    const setupAsset = async (assetOverrides: { isOffline?: boolean } = {}) => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, libraryId: library.id, ...assetOverrides });
+
+      const addSpace = async (input: {
+        id: string;
+        arms: Arm[];
+        viewerTimeline?: boolean;
+        ownerTimeline?: boolean;
+        viewerIsMember?: boolean;
+      }) => {
+        const { space } = await ctx.newSharedSpace({ id: input.id, createdById: owner.id });
+        await ctx.newSharedSpaceMember({
+          spaceId: space.id,
+          userId: owner.id,
+          role: SharedSpaceRole.Owner,
+          showInTimeline: input.ownerTimeline ?? true,
+        });
+        if (input.viewerIsMember ?? true) {
+          await ctx.newSharedSpaceMember({
+            spaceId: space.id,
+            userId: viewer.id,
+            role: SharedSpaceRole.Viewer,
+            showInTimeline: input.viewerTimeline ?? true,
+          });
+        }
+        if (input.arms.includes('direct')) {
+          await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+        }
+        if (input.arms.includes('library')) {
+          await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+        }
+        return space;
+      };
+
+      return { ctx, sut, owner, viewer, asset, addSpace };
+    };
+
+    it('returns undefined when the asset is in no space', async () => {
+      const { sut, viewer, asset } = await setupAsset();
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toBeUndefined();
+    });
+
+    it.each<Arm>(['direct', 'library'])(
+      'returns undefined when the viewer is not a member of the space holding the asset (%s)',
+      async (arm) => {
+        const { sut, viewer, asset, addSpace } = await setupAsset();
+        await addSpace({ id: newUuid(), arms: [arm], viewerIsMember: false });
+
+        await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toBeUndefined();
+      },
+    );
+
+    it.each<Arm>(['direct', 'library'])(
+      'still resolves a sole space the viewer hides from their timeline (%s)',
+      async (arm) => {
+        const { sut, viewer, asset, addSpace } = await setupAsset();
+        const space = await addSpace({ id: newUuid(), arms: [arm], viewerTimeline: false });
+
+        // The preference is an ordering, not a filter: space people must still resolve for the asset.
+        await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: space.id });
+      },
+    );
+
+    const armPairs: Array<{ hiddenArm: Arm; timelineArm: Arm }> = [
+      { hiddenArm: 'direct', timelineArm: 'direct' },
+      { hiddenArm: 'library', timelineArm: 'library' },
+      { hiddenArm: 'direct', timelineArm: 'library' },
+      { hiddenArm: 'library', timelineArm: 'direct' },
+    ];
+
+    it.each(
+      armPairs.flatMap((pair) => [
+        { ...pair, hiddenIdIsLower: true },
+        { ...pair, hiddenIdIsLower: false },
+      ]),
+    )(
+      'prefers the timeline-enabled space (hidden via $hiddenArm, timeline via $timelineArm, hidden id lower: $hiddenIdIsLower)',
+      async ({ hiddenArm, timelineArm, hiddenIdIsLower }) => {
+        const { sut, viewer, asset, addSpace } = await setupAsset();
+        const [lowerId, higherId] = sortedIds(2);
+
+        await addSpace({ id: hiddenIdIsLower ? lowerId : higherId, arms: [hiddenArm], viewerTimeline: false });
+        const timelineSpace = await addSpace({ id: hiddenIdIsLower ? higherId : lowerId, arms: [timelineArm] });
+
+        await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({
+          spaceId: timelineSpace.id,
+        });
+      },
+    );
+
+    it.each([
+      { label: 'all timeline-enabled', viewerTimeline: true },
+      { label: 'all hidden from the timeline', viewerTimeline: false },
+    ])('breaks a tie on the lowest space id, whatever the insertion order ($label)', async ({ viewerTimeline }) => {
+      const { sut, viewer, asset, addSpace } = await setupAsset();
+      const [lowestId, middleId, highestId] = sortedIds(3);
+
+      // Inserted highest-first, across both arms, so neither insertion order nor arm can explain the pick.
+      await addSpace({ id: highestId, arms: ['direct'], viewerTimeline });
+      await addSpace({ id: middleId, arms: ['library'], viewerTimeline });
+      await addSpace({ id: lowestId, arms: ['direct'], viewerTimeline });
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: lowestId });
+      }
+    });
+
+    it('prefers the timeline-enabled space among several hidden ones', async () => {
+      const { sut, viewer, asset, addSpace } = await setupAsset();
+      const [firstId, secondId, thirdId, fourthId] = sortedIds(4);
+
+      await addSpace({ id: firstId, arms: ['direct'], viewerTimeline: false });
+      await addSpace({ id: secondId, arms: ['library'], viewerTimeline: false });
+      await addSpace({ id: fourthId, arms: ['direct'], viewerTimeline: false });
+      const timelineSpace = await addSpace({ id: thirdId, arms: ['library'] });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: timelineSpace.id });
+    });
+
+    it('orders by the requesting member’s own timeline flag, not another member’s', async () => {
+      const { sut, owner, viewer, asset, addSpace } = await setupAsset();
+      const [lowerId, higherId] = sortedIds(2);
+
+      // Opposite preferences: the viewer hides the lower space, the owner hides the higher one.
+      await addSpace({ id: lowerId, arms: ['direct'], viewerTimeline: false, ownerTimeline: true });
+      await addSpace({ id: higherId, arms: ['library'], viewerTimeline: true, ownerTimeline: false });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: higherId });
+      await expect(sut.findSpaceForAssetAndUser(asset.id, owner.id)).resolves.toEqual({ spaceId: lowerId });
+    });
+
+    it('does not pick a timeline-enabled space the viewer is not a member of', async () => {
+      const { sut, viewer, asset, addSpace } = await setupAsset();
+      const [lowerId, higherId] = sortedIds(2);
+
+      // The owner shows the lower space on their timeline, but the viewer has no row in it at all.
+      await addSpace({ id: lowerId, arms: ['direct'], viewerIsMember: false });
+      const memberSpace = await addSpace({ id: higherId, arms: ['library'], viewerTimeline: false });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: memberSpace.id });
+    });
+
+    it('counts a space reaching the asset through both arms once, with its own timeline flag', async () => {
+      const { sut, viewer, asset, addSpace } = await setupAsset();
+      const [lowerId, higherId] = sortedIds(2);
+
+      await addSpace({ id: lowerId, arms: ['direct', 'library'], viewerTimeline: false });
+      const timelineSpace = await addSpace({ id: higherId, arms: ['direct', 'library'] });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: timelineSpace.id });
+    });
+
+    it('ignores a library link for an offline asset, even when that space is timeline-enabled', async () => {
+      const { sut, viewer, asset, addSpace } = await setupAsset({ isOffline: true });
+      const [lowerId, higherId] = sortedIds(2);
+
+      await addSpace({ id: lowerId, arms: ['library'] });
+      const directSpace = await addSpace({ id: higherId, arms: ['direct'], viewerTimeline: false });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: directSpace.id });
+    });
+
+    it('returns undefined for a trashed asset through either arm', async () => {
+      const { ctx, sut, viewer, asset, addSpace } = await setupAsset();
+      const [lowerId, higherId] = sortedIds(2);
+      await addSpace({ id: lowerId, arms: ['direct'] });
+      await addSpace({ id: higherId, arms: ['library'] });
+
+      await ctx.softDeleteAsset(asset.id);
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toBeUndefined();
     });
   });
 });
