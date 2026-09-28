@@ -204,7 +204,7 @@
       isInAlbum: nextFilters.isInAlbum === true ? true : undefined,
       takenAfter: context?.takenAfter,
       takenBefore: context?.takenBefore,
-      ...(nextFilters.isFavorite === undefined && { withSharedSpaces: true }),
+      withSharedSpaces: true,
     });
     const mappedPeople = response.people.map((p) => ({
       id: getPhotosPersonFilterId(p),
@@ -237,7 +237,7 @@
       return undefined;
     }
 
-    const withSharedSpaces = nextFilters.isFavorite === undefined;
+    const withSharedSpaces = true;
     const key = buildSmartSearchFacetKey({ query, filters: nextFilters, withSharedSpaces, language: $lang });
     if (smartFacets && smartFacetKey === key) {
       return smartFacets;
@@ -289,14 +289,14 @@
         $type: SearchSuggestionType.City,
         country,
         ...context,
-        ...(context?.isFavorite === undefined && { withSharedSpaces: true }),
+        withSharedSpaces: true,
       }),
     cameraModels: (make, context) =>
       getSearchSuggestions({
         $type: SearchSuggestionType.CameraModel,
         make,
         ...context,
-        ...(context?.isFavorite === undefined && { withSharedSpaces: true }),
+        withSharedSpaces: true,
       }),
   };
 
@@ -341,7 +341,7 @@
           smartSearchFacetsDto: buildSmartSearchFacetsParams({
             query,
             filters: { ...filters, country },
-            withSharedSpaces: filters.isFavorite === undefined,
+            withSharedSpaces: true,
             language: $lang,
           }),
         });
@@ -359,7 +359,7 @@
           smartSearchFacetsDto: buildSmartSearchFacetsParams({
             query,
             filters: { ...filters, make },
-            withSharedSpaces: filters.isFavorite === undefined,
+            withSharedSpaces: true,
             language: $lang,
           }),
         });
@@ -382,7 +382,7 @@
     const terms: SearchTerms = { ...filterStateToSearchTerms(filters), visibility: AssetVisibility.Timeline };
     if (query) {
       terms.query = query;
-    } else if (filters.isFavorite === undefined) {
+    } else {
       terms.withSharedSpaces = true;
     }
     void modalManager.show(SearchAddAllToCollectionModal, {
@@ -668,7 +668,7 @@
           {filters}
           language={$lang}
           isShared={false}
-          withSharedSpaces={filters.isFavorite === undefined}
+          withSharedSpaces={true}
           total={smartFacetTotal}
         />
       {:else}
@@ -704,11 +704,21 @@
               </div>
             {/if}
             {#snippet empty()}
-              <EmptyPlaceholder
-                text={$t('no_assets_message')}
-                onClick={() => openFileUploadDialog()}
-                class="mx-auto mt-10"
-              />
+              <!--
+                #763: an empty FILTERED timeline is not an empty library. Saying "click to upload
+                your first photo" to someone who just clicked a camera value on a photo they were
+                looking at denies the photo exists, and hides the one thing that would fix it —
+                clearing the filter. The upload call to action belongs to the unfiltered empty only.
+              -->
+              {#if hasActiveFilters}
+                <EmptyPlaceholder text={$t('no_results')} class="mx-auto mt-10" />
+              {:else}
+                <EmptyPlaceholder
+                  text={$t('no_assets_message')}
+                  onClick={() => openFileUploadDialog()}
+                  class="mx-auto mt-10"
+                />
+              {/if}
             {/snippet}
           </Timeline>
         {/key}
@@ -735,9 +745,9 @@
     {/if}
     <ActionButton action={Actions.AddToAlbum} />
 
-    {#if assetMultiSelectManager.isAllUserOwned}
-      <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleFavorite} />
+    <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleFavorite} />
 
+    {#if assetMultiSelectManager.isAllUserOwned}
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
         {#if !showSearchResults && (assetMultiSelectManager.assets.length > 1 || isAssetStackSelected)}
