@@ -39,6 +39,7 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
@@ -261,6 +262,7 @@ export type ServiceOverrides = {
   duplicateRepository: DuplicateRepository;
   email: EmailRepository;
   event: EventRepository;
+  faceDissolve: FaceDissolveRepository;
   faceIdentity: FaceIdentityRepository;
   faceRepair: FaceRepairRepository;
   faceRepairScan: FaceRepairScanRepository;
@@ -362,6 +364,7 @@ export const getMocks = () => {
     email: automock(EmailRepository, { args: [loggerMock] }),
     // eslint-disable-next-line no-sparse-arrays
     event: automock(EventRepository, { args: [, , loggerMock], strict: false }),
+    faceDissolve: automock(FaceDissolveRepository, { strict: false }),
     faceIdentity: automock(FaceIdentityRepository, { strict: false }),
     faceRepair: automock(FaceRepairRepository, { strict: false }),
     faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
@@ -446,6 +449,7 @@ export const newTestService = <T extends BaseService>(
     overrides.duplicateRepository || (mocks.duplicateRepository as As<DuplicateRepository>),
     overrides.email || (mocks.email as As<EmailRepository>),
     overrides.event || (mocks.event as As<EventRepository>),
+    overrides.faceDissolve || (mocks.faceDissolve as As<FaceDissolveRepository>),
     overrides.faceIdentity || (mocks.faceIdentity as As<FaceIdentityRepository>),
     overrides.faceRepair || (mocks.faceRepair as As<FaceRepairRepository>),
     overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
