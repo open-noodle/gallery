@@ -82,6 +82,11 @@ describe('UserSidebar', () => {
   beforeEach(() => {
     mocks.authManager.preferences.memories.enabled = true;
     mocks.authManager.preferences.memories.sidebarWeb = true;
+    // The mocks object is shared across the whole file, so anything a test flips has to be put
+    // back here or it leaks into every test after it.
+    mocks.authManager.preferences.people.enabled = false;
+    mocks.authManager.preferences.people.sidebarWeb = false;
+    mocks.featureFlagsManager.value.map = false;
     mockPage.url = new URL('https://gallery.test/photos');
     sidebarMocks.sidebarModeStore.layout = 'expanded';
     sidebarMocks.sidebarModeStore.hoverExpanded = false;
@@ -116,6 +121,45 @@ describe('UserSidebar', () => {
       render(UserSidebar);
 
       expect(spacesLink()).toHaveAttribute('data-active', 'false');
+    });
+  });
+
+  // PhotoGuesser is a top-level destination, not a Library shelf: it browses the library by place
+  // and date the way Map and People do, so it belongs in that run of rows rather than under the
+  // Library heading. $t() returns the raw key in this environment, hence the lowercase names.
+  describe('PhotoGuesser', () => {
+    const photoGuesserLink = () => screen.getByRole('link', { name: /^photoguesser$/i });
+
+    it('links to the PhotoGuesser landing page', () => {
+      render(UserSidebar);
+
+      expect(photoGuesserLink()).toHaveAttribute('href', '/photoguesser');
+    });
+
+    it('sits between Map and People', () => {
+      mocks.featureFlagsManager.value.map = true;
+      mocks.authManager.preferences.people.enabled = true;
+      mocks.authManager.preferences.people.sidebarWeb = true;
+      // Memories moved into this same run of top-level rows, between PhotoGuesser and People.
+      // Switch it off so the map -> photoguesser -> people run is contiguous and the adjacency
+      // assertions below still mean something.
+      mocks.authManager.preferences.memories.sidebarWeb = false;
+
+      render(UserSidebar);
+
+      const titles = screen.getAllByRole('link').map((link) => link.textContent);
+      expect(titles.indexOf('photoguesser')).toBe(titles.indexOf('map') + 1);
+      expect(titles.indexOf('people')).toBe(titles.indexOf('photoguesser') + 1);
+    });
+
+    // PhotoGuesser needs no reverse-geocoding and works from capture dates alone, so an instance
+    // with the map feature switched off must still reach it.
+    it('is not gated on the map feature flag', () => {
+      mocks.featureFlagsManager.value.map = false;
+
+      render(UserSidebar);
+
+      expect(photoGuesserLink()).toBeInTheDocument();
     });
   });
 

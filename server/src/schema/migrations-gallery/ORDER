@@ -65,3 +65,7 @@
 1793100000000-AddSharedSpaceAlbumFolderTable
 1793200000000-SharedSpaceAlbumFolderAuditTable
 1793300000000-ClearPreOptionMFaceRepairScans
+1797000000000-AddPhotoGuessingGame
+1797100000000-AddDailyGameChallenge
+1797200000000-AddSpaceDailyChallengeEnabled
+1797300000000-AddSoloGameChallenge

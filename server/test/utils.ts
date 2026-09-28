@@ -44,6 +44,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -266,6 +267,7 @@ export type ServiceOverrides = {
   faceRepairScan: FaceRepairScanRepository;
   faceRepairDecline: FaceRepairDeclineRepository;
   facePersonVerdict: FacePersonVerdictRepository;
+  game: GameRepository;
   integrityReport: IntegrityRepository;
   job: JobRepository;
   library: LibraryRepository;
@@ -367,6 +369,7 @@ export const getMocks = () => {
     faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
     faceRepairDecline: automock(FaceRepairDeclineRepository, { strict: false }),
     facePersonVerdict: automock(FacePersonVerdictRepository, { strict: false }),
+    game: automock(GameRepository, { strict: false }),
     integrityReport: automock(IntegrityRepository, { strict: false }),
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
@@ -451,6 +454,7 @@ export const newTestService = <T extends BaseService>(
     overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
     overrides.faceRepairDecline || (mocks.faceRepairDecline as As<FaceRepairDeclineRepository>),
     overrides.facePersonVerdict || (mocks.facePersonVerdict as As<FacePersonVerdictRepository>),
+    overrides.game || (mocks.game as As<GameRepository>),
     overrides.integrityReport || (mocks.integrityReport as As<IntegrityRepository>),
     overrides.job || (mocks.job as As<JobRepository>),
     overrides.library || (mocks.library as As<LibraryRepository>),
