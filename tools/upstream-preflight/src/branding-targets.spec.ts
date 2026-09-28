@@ -58,7 +58,7 @@ describe('branding target paths', () => {
     });
   }
 
-  // M8 — the branch is rebased onto upstream Immich v3.2.2, so
+  // M8 — the branch is rebased onto upstream Immich v3.2.4, so
   // `branding/config.json` upstream.version is bumped to match. The
   // gallery-revert-to-immich-validation workflow boots the Gallery image
   // against `ghcr.io/immich-app/immich-server:v${upstream.version}`, so this
@@ -70,10 +70,12 @@ describe('branding target paths', () => {
   // bump REMOVED eight entries. This 3.2.0→3.2.2 bump removes none: **v3.2.2 ships
   // byte-identical migrations to v3.2.0** (97 files, `git trees` diff empty), so
   // neither direction of the coverage detector changes. Verified both ways before
-  // bumping; do not assume that of the next bump.
+  // bumping; do not assume that of the next bump. The 3.2.2→3.2.4 bump likewise
+  // removes none: v3.2.3 and v3.2.4 carry no `server/src/schema/` change at all
+  // (one mobile fix and a base-image bump, both backported onto `main`).
   //
   // Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.2.2 (base is immich v3.2.2)', () => {
-    expect(CONFIG.upstream.version).toBe('3.2.2');
+  it('M8: config.json upstream.version is 3.2.4 (base is immich v3.2.4)', () => {
+    expect(CONFIG.upstream.version).toBe('3.2.4');
   });
 });
