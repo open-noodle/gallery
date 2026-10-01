@@ -433,6 +433,27 @@ UPDATE "user" SET "oauthId" = '' WHERE "oauthId" IS NULL;
 ALTER TABLE "user" ALTER COLUMN "oauthId" SET DEFAULT '';
 ALTER TABLE "user" ALTER COLUMN "oauthId" SET NOT NULL;
 
+-- immich-30199 (1790587508209-RenameGeoNamesCountries) rewrote stored country names to their
+-- GeoNames forms. Data-only, with no `down()` (the old names came from a removed dependency); the
+-- new names are plain strings v3.2.4 reads fine. Nothing to reverse — only its kysely_migrations row.
+
+-- immich-31620 (1790616293884-PersonSharing) added person sharing, which Gallery keeps dormant
+-- (specs/2026-10-01-upstream-person-sharing-dormant-design.md). Mirrors its down(), idempotent so it
+-- is also safe against the tagged :main image where none of this exists. Dropping the table drops its
+-- own two triggers; person_delete_shares lives on "person" and goes first.
+DROP TRIGGER IF EXISTS "person_delete_shares" ON "person";
+DROP TABLE IF EXISTS "person_user";
+DROP FUNCTION IF EXISTS person_user_after_insert();
+DROP FUNCTION IF EXISTS person_delete_shares();
+DROP TYPE IF EXISTS "person_user_role_enum";
+DELETE FROM "migration_overrides" WHERE "name" IN (
+  'function_person_user_after_insert',
+  'function_person_delete_shares',
+  'trigger_person_delete_shares',
+  'trigger_person_user_after_insert',
+  'trigger_person_user_updatedAt'
+);
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -545,9 +566,11 @@ DELETE FROM "kysely_migrations"
 -- Post-tag upstream migrations pulled in by rebase, paired with the schema
 -- rollbacks in step 7. Keep timestamp-sorted.
 --
--- `upstream.version` is 3.2.2; this branch sits ahead of that tag and carries one
--- upstream migration the tagged release lacks. Its schema rollback is in step 7.
-   '1789419229196-ConvertUserOAuthIdEmptyStringToNull'
+-- `upstream.version` is 3.2.4; this branch sits ahead of that tag and carries upstream
+-- migrations the tagged release lacks. Their schema rollbacks are in step 7.
+   '1789419229196-ConvertUserOAuthIdEmptyStringToNull',
+   '1790587508209-RenameGeoNamesCountries',
+   '1790616293884-PersonSharing'
  );
 
 -- -----------------------------------------------------------------------------

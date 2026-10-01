@@ -23,6 +23,30 @@ const FORK_DELETED_PATHS: { path: string; why: string }[] = [
     path: 'packages/scripts',
     why: "upstream's release-version tooling, dropped in bc06e84a1f4; the fork releases via its own gallery-release-* workflows",
   },
+  {
+    path: 'web/src/lib/services/person-user.service.ts',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
+    path: 'web/src/lib/modals/PeopleFilterModal.svelte',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
+    path: 'web/src/lib/modals/PeopleFilterUserPicker.svelte',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
+    path: 'web/src/lib/modals/PersonEditAccessModal.svelte',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
+    path: 'web/src/lib/modals/PersonEditModal.svelte',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
+    path: 'server/test/medium/specs/repositories/person-user.repository.spec.ts',
+    why: "upstream's person-sharing repository tests; sharing cannot run under Option M — pinned instead by person-sharing-dormant.spec.ts",
+  },
 ];
 
 const REPO_ROOT = path.resolve(process.cwd(), '../..');
