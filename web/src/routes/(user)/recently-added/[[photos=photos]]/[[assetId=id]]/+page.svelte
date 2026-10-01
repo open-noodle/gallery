@@ -31,6 +31,7 @@
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import { AssetAction } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
   import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
