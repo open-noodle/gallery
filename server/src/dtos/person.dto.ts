@@ -150,6 +150,15 @@ const PersonUserRoleSchema = z
   .describe('Levels of access for managing people resources on behalf of another user.')
   .meta({ id: 'PersonUserRole' });
 
+export enum PeopleUsersUpsertType {
+  Everyone = 'everyone',
+}
+
+const PeopleUsersUpsertTypeSchema = z
+  .enum(PeopleUsersUpsertType)
+  .describe('Which people to update when personIds is omitted')
+  .meta({ id: 'PeopleUsersUpsertType' });
+
 const PersonOtherResponseSchema = z
   .object({
     sharedById: z.uuid(),
