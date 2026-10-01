@@ -83,9 +83,9 @@ describe('/gallery/map/markers', () => {
   });
 
   it('country filter narrows the result to matching assets', async () => {
-    // The thompson-springs fixture has country = 'United States of America'.
+    // The thompson-springs fixture reverse-geocodes to 'United States' (GeoNames names since immich-30199).
     const matching = await request(app)
-      .get('/gallery/map/markers?country=United%20States%20of%20America')
+      .get('/gallery/map/markers?country=United%20States')
       .set(asBearerAuth(user.accessToken));
     expect(matching.status).toBe(200);
     expect((matching.body as Array<{ id: string }>).map((m) => m.id)).toContain(assetWithGps.id);
