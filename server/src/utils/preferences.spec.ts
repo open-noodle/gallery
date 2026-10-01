@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AssetOrder, UserMetadataKey } from 'src/enum.js';
+import { AssetOrder, PersonUpdateStrategy, UserMetadataKey } from 'src/enum.js';
 import { UserMetadataItem, UserPreferences } from 'src/types.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
@@ -35,6 +35,7 @@ const getDefaultPreferences = (): UserPreferences => ({
     enabled: true,
     sidebarWeb: false,
     minimumFaces: 3,
+    updateStrategy: PersonUpdateStrategy.Everyone,
   },
   sharedLinks: {
     enabled: true,
