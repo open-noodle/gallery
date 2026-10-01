@@ -1089,8 +1089,8 @@ describe(AssetService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-2']));
       mocks.asset.getByIds.mockResolvedValue([
-        { id: 'asset-1', visibility: AssetVisibility.Timeline } as any,
-        { id: 'asset-2', visibility: AssetVisibility.Timeline } as any,
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+        AssetFactory.create({ id: 'asset-2', visibility: AssetVisibility.Timeline }),
       ]);
 
       await expect(
@@ -1278,7 +1278,9 @@ describe(AssetService.name, () => {
       'should purge direct space assets from member devices when visibility is %s',
       async (visibility) => {
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-        mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Timeline } as any]);
+        mocks.asset.getByIds.mockResolvedValue([
+          AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+        ]);
 
         await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility });
 
@@ -1291,7 +1293,9 @@ describe(AssetService.name, () => {
       'should re-add direct space assets to member devices when visibility is %s',
       async (visibility) => {
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-        mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Hidden } as any]);
+        mocks.asset.getByIds.mockResolvedValue([
+          AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Hidden }),
+        ]);
 
         await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility });
 
@@ -1304,7 +1308,9 @@ describe(AssetService.name, () => {
       'L4: should re-deliver library-asset EXIF to member devices when visibility is %s (restore)',
       async (visibility) => {
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-        mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Hidden } as any]);
+        mocks.asset.getByIds.mockResolvedValue([
+          AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Hidden }),
+        ]);
 
         await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility });
 
@@ -1326,7 +1332,9 @@ describe(AssetService.name, () => {
     // Slice 1: album-path purge/restore dispatch assertions.
     it('should purge album-linked space assets when visibility is Hidden', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Timeline } as any]);
+      mocks.asset.getByIds.mockResolvedValue([
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+      ]);
 
       await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility: AssetVisibility.Hidden });
 
@@ -1336,7 +1344,9 @@ describe(AssetService.name, () => {
 
     it('should NOT purge album-linked assets when visibility is Locked (removeAssetsFromAll covers it)', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Timeline } as any]);
+      mocks.asset.getByIds.mockResolvedValue([
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+      ]);
 
       await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility: AssetVisibility.Locked });
 
@@ -1348,7 +1358,9 @@ describe(AssetService.name, () => {
       'should re-add album-linked space assets to member devices when visibility is %s',
       async (visibility) => {
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-        mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Hidden } as any]);
+        mocks.asset.getByIds.mockResolvedValue([
+          AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Hidden }),
+        ]);
 
         await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility });
 
@@ -1371,7 +1383,9 @@ describe(AssetService.name, () => {
       'should purge library-linked space assets when visibility is %s',
       async (visibility) => {
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-        mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Timeline } as any]);
+        mocks.asset.getByIds.mockResolvedValue([
+          AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+        ]);
 
         await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility });
 
@@ -1437,7 +1451,9 @@ describe(AssetService.name, () => {
       // Gating purgeIds on "prior was shareable" would silently no-op here and leave the member's
       // device holding stale bytes forever. M3 makes the purge unconditional on a non-shareable next.
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Hidden } as any]);
+      mocks.asset.getByIds.mockResolvedValue([
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Hidden }),
+      ]);
       await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility: AssetVisibility.Hidden });
       expect(mocks.sharedSpace.emitDirectAssetVisibilityPurge).toHaveBeenCalledWith(['asset-1']);
       expect(mocks.sharedSpace.emitAlbumAssetVisibilityPurge).toHaveBeenCalledWith(['asset-1']);
@@ -1446,7 +1462,9 @@ describe(AssetService.name, () => {
 
     it('does NOT purge or restore on a Timeline→Archive move (both shareable, correctness-8)', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Timeline } as any]);
+      mocks.asset.getByIds.mockResolvedValue([
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+      ]);
       await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility: AssetVisibility.Archive });
       expect(mocks.sharedSpace.emitDirectAssetVisibilityPurge).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.emitDirectAssetVisibilityRestore).not.toHaveBeenCalled();
@@ -1457,8 +1475,8 @@ describe(AssetService.name, () => {
       // asset-1 crosses Timeline→Hidden; asset-2 was already Hidden (simulates a retry after a failed
       // emit on a prior request that committed the write but never delivered the purge).
       mocks.asset.getByIds.mockResolvedValue([
-        { id: 'asset-1', visibility: AssetVisibility.Timeline } as any,
-        { id: 'asset-2', visibility: AssetVisibility.Hidden } as any,
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Timeline }),
+        AssetFactory.create({ id: 'asset-2', visibility: AssetVisibility.Hidden }),
       ]);
       await sut.updateAll(authStub.admin, {
         ids: ['asset-1', 'asset-2'],
@@ -1472,7 +1490,9 @@ describe(AssetService.name, () => {
 
     it('re-locking an already-Locked asset still strips it from albums (M-1 retry-convergence)', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.asset.getByIds.mockResolvedValue([{ id: 'asset-1', visibility: AssetVisibility.Locked } as any]);
+      mocks.asset.getByIds.mockResolvedValue([
+        AssetFactory.create({ id: 'asset-1', visibility: AssetVisibility.Locked }),
+      ]);
       await sut.updateAll(authStub.admin, { ids: ['asset-1'], visibility: AssetVisibility.Locked });
       // M-1: the album strip is now UNCONDITIONAL on Locked (no prior!==Locked "lock-once" gate). A crash
       // between the visibility UPDATE and the strip left the album_asset rows with no tombstone, and the old
