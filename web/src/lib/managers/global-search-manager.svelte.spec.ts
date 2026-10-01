@@ -6082,6 +6082,9 @@ describe('prefix scoping — bare suggestions (tags/albums/spaces)', () => {
 });
 
 const mockPerson = (id: string, name: string, updatedAt?: string): PersonResponseDto => ({
+  otherPeople: [],
+  sharedBy: [],
+  sharedWith: [],
   id,
   name,
   birthDate: null,

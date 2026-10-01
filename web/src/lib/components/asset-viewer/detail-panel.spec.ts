@@ -161,6 +161,9 @@ describe('DetailPanel', () => {
     zoomImageToBase64Mock.mockResolvedValue('data:image/jpeg;base64,current-face');
 
     const person: PersonResponseDto = {
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
       id: 'global-person-1',
       name: 'Alice',
       thumbnailPath: '/ignored.jpg',
@@ -227,6 +230,9 @@ describe('DetailPanel', () => {
       .mockResolvedValueOnce('data:image/jpeg;base64,second-face');
 
     const alice: PersonResponseDto = {
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
       id: 'global-person-1',
       name: 'Alice',
       thumbnailPath: '/ignored-1.jpg',
@@ -237,6 +243,9 @@ describe('DetailPanel', () => {
       spacePersonId: 'space-person-1',
     };
     const bob: PersonResponseDto = {
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
       id: 'global-person-2',
       name: 'Bob',
       thumbnailPath: '/ignored-2.jpg',
@@ -314,6 +323,9 @@ describe('DetailPanel', () => {
   // attribute because it is locale-formatted by luxon rather than translated.
   it('renders the age for a person whose birthday arrives on the faces payload', async () => {
     const person: PersonResponseDto = {
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
       id: 'global-person-1',
       name: 'Karolin',
       thumbnailPath: '/person.jpg',
@@ -346,6 +358,9 @@ describe('DetailPanel', () => {
 
   it('renders no age for a person without a birthday', async () => {
     const person: PersonResponseDto = {
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
       id: 'global-person-1',
       name: 'Karolin',
       thumbnailPath: '/person.jpg',
@@ -378,6 +393,9 @@ describe('DetailPanel', () => {
 
   it('renders no age when the birthday is after the photo was taken', async () => {
     const person: PersonResponseDto = {
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
       id: 'global-person-1',
       name: 'Karolin',
       thumbnailPath: '/person.jpg',
