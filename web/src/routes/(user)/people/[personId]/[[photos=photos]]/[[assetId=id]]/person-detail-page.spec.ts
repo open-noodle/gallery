@@ -149,6 +149,9 @@ vi.mock('$lib/modals/PersonSuggestionReviewModal.svelte', async () => {
 
 function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
   return {
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
     id: 'person-1',
     name: 'Alice',
     birthDate: null,

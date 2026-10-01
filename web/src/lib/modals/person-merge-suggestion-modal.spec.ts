@@ -32,6 +32,9 @@ afterEach(async () => {
 
 function person(overrides: Partial<PersonResponseDto> = {}): PersonResponseDto {
   return {
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
     id: 'person-1',
     name: 'Person',
     birthDate: null,
