@@ -5,6 +5,7 @@ import type { ImageDimensions, MaybeDehydrated } from 'src/types.js';
 import { AssetFace, Person, User } from 'src/database.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { BulkIdsSchema } from 'src/dtos/asset-ids.response.dto.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AssetEditActionItem } from 'src/dtos/editing.dto.js';
 import { UserResponseSchema, mapUser } from 'src/dtos/user.dto.js';
 import { SharingDirectionSchema, SourceTypeSchema } from 'src/enum.js';
@@ -539,6 +540,7 @@ function mapFacesWithoutPerson(
  */
 export function mapFaces(
   face: AssetFace,
+  auth: AuthDto,
   edits?: AssetEditActionItem[],
   assetDimensions?: ImageDimensions,
 ): AssetFaceResponseDto {
