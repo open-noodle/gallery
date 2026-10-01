@@ -61,7 +61,9 @@ from immich_ml.schemas import (
     ModelSource,
     ModelTask,
     ModelType,
+    PetDetectionOptions,
     PetDetectionOutput,
+    PetRecognitionOptions,
     Shape,
     TextDetectionOptions,
     TextRecognitionOptions,
@@ -1895,9 +1897,9 @@ class TestPetDetection:
         return [dets, logits]
 
     @staticmethod
-    def _detector(mocker: MockerFixture, min_score: float = 0.3, input_size: int = 384) -> PetDetector:
+    def _detector(mocker: MockerFixture, input_size: int = 384) -> PetDetector:
         mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("rfdetr-nano", min_score=min_score, cache_dir="test_cache")
+        detector = PetDetector("rfdetr-nano", cache_dir="test_cache")
         session = _graph_session()
         model_input = mock.Mock()
         model_input.name = "input"
@@ -1916,7 +1918,7 @@ class TestPetDetection:
         detector.session.run.return_value = self._make_rfdetr_output([])
 
         red = Image.new("RGB", (64, 48), (255, 0, 0))
-        detector.predict(red)
+        detector.predict(red, options=PetDetectionOptions())
 
         blob = detector.session.run.call_args[0][1]["input"]
         # After ImageNet normalisation the red channel is the largest of the three.
@@ -1928,7 +1930,7 @@ class TestPetDetection:
         for size in (384, 512):
             detector = self._detector(mocker, input_size=size)
             detector.session.run.return_value = self._make_rfdetr_output([])
-            detector.predict(Image.new("RGB", (100, 200), (10, 20, 30)))
+            detector.predict(Image.new("RGB", (100, 200), (10, 20, 30)), options=PetDetectionOptions())
             blob = detector.session.run.call_args[0][1]["input"]
             assert blob.shape == (1, 3, size, size)
 
@@ -1958,7 +1960,7 @@ class TestPetDetection:
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([])
 
-        detector.predict(Image.new("RGB", (32, 32), (255, 255, 255)))
+        detector.predict(Image.new("RGB", (32, 32), (255, 255, 255)), options=PetDetectionOptions())
 
         blob = detector.session.run.call_args[0][1]["input"]
         expected = [(1.0 - 0.485) / 0.229, (1.0 - 0.456) / 0.224, (1.0 - 0.406) / 0.225]
@@ -1969,7 +1971,7 @@ class TestPetDetection:
         """Spec #4."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([])
-        detector.predict(Image.new("RGB", (64, 48), (128, 128, 128)))
+        detector.predict(Image.new("RGB", (64, 48), (128, 128, 128)), options=PetDetectionOptions())
         blob = detector.session.run.call_args[0][1]["input"]
         assert blob.dtype == np.float32
         assert blob.shape == (1, 3, 384, 384)
@@ -1979,7 +1981,7 @@ class TestPetDetection:
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([])
 
-        detector.predict(Image.new("RGB", (200, 100), (255, 255, 255)))
+        detector.predict(Image.new("RGB", (200, 100), (255, 255, 255)), options=PetDetectionOptions())
 
         blob = detector.session.run.call_args[0][1]["input"]
         padded = (114 / 255.0 - 0.485) / 0.229
@@ -1991,7 +1993,7 @@ class TestPetDetection:
         detector.session.run.return_value = self._make_rfdetr_output([])
 
         for mode in ("L", "P"):
-            detector.predict(Image.new(mode, (32, 32)))
+            detector.predict(Image.new(mode, (32, 32)), options=PetDetectionOptions())
             blob = detector.session.run.call_args[0][1]["input"]
             assert blob.shape == (1, 3, 384, 384)
 
@@ -1999,14 +2001,14 @@ class TestPetDetection:
 
     def test_applies_sigmoid_to_logits(self, mocker: MockerFixture) -> None:
         """Spec #7. A raw logit of 0 is probability 0.5."""
-        detector = self._detector(mocker, min_score=0.4)
+        detector = self._detector(mocker)
         dets = np.zeros((1, 300, 4), dtype=np.float32)
         logits = np.full((1, 300, 91), -30.0, dtype=np.float32)
         dets[0, 0] = (0.5, 0.5, 0.2, 0.2)
         logits[0, 0, 18] = 0.0
         detector.session.run.return_value = [dets, logits]
 
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions(min_score=0.4))
 
         assert len(results) == 1
         assert results[0]["score"] == pytest.approx(0.5, abs=1e-4)
@@ -2017,7 +2019,7 @@ class TestPetDetection:
         for class_id, label in expected.items():
             detector = self._detector(mocker)
             detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.9)])
-            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
             assert len(results) == 1
             assert results[0]["label"] == label
 
@@ -2026,7 +2028,7 @@ class TestPetDetection:
         for class_id in (16, 19, 20, 21):
             detector = self._detector(mocker)
             detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.99)])
-            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
             assert results == []
 
     def test_non_pet_animal_is_dropped_not_relabelled(self, mocker: MockerFixture) -> None:
@@ -2043,7 +2045,7 @@ class TestPetDetection:
         logits[0, 0, 18] = float(np.log(0.40 / 0.60))  # dog
         detector.session.run.return_value = [dets, logits]
 
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
 
         assert results == []
 
@@ -2052,7 +2054,7 @@ class TestPetDetection:
         for class_id in (22, 23, 24, 25):
             detector = self._detector(mocker)
             detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.99)])
-            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
             assert results == []
 
     def test_excludes_non_animal_classes(self, mocker: MockerFixture) -> None:
@@ -2060,7 +2062,7 @@ class TestPetDetection:
         for class_id in (1, 3):
             detector = self._detector(mocker)
             detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, class_id, 0.99)])
-            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+            results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
             assert results == []
 
     def test_score_is_max_over_domestic_subspace(self, mocker: MockerFixture) -> None:
@@ -2073,7 +2075,7 @@ class TestPetDetection:
         logits[0, 0, 18] = float(np.log(0.60 / 0.40))  # dog
         detector.session.run.return_value = [dets, logits]
 
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
 
         assert len(results) == 1
         assert results[0]["label"] == "dog"
@@ -2084,7 +2086,7 @@ class TestPetDetection:
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.4, 0.2, 18, 0.9)])
 
-        results = detector.predict(Image.new("RGB", (200, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (200, 100), (0, 0, 0)), options=PetDetectionOptions())
 
         box = results[0]["boundingBox"]
         assert box == {"x1": 60, "y1": 40, "x2": 140, "y2": 60}
@@ -2095,7 +2097,7 @@ class TestPetDetection:
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.1, 0.1, 0.6, 0.6, 18, 0.9)])
 
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
 
         box = results[0]["boundingBox"]
         assert box["x1"] == 0
@@ -2105,12 +2107,17 @@ class TestPetDetection:
 
     def test_honours_min_score(self, mocker: MockerFixture) -> None:
         """Spec #14. Just below is dropped, just above is kept."""
-        detector = self._detector(mocker, min_score=0.5)
+        detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 18, 0.49)])
-        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
+        assert (
+            detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions(min_score=0.5)) == []
+        )
 
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 18, 0.51)])
-        assert len(detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))) == 1
+        assert (
+            len(detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions(min_score=0.5)))
+            == 1
+        )
 
     def test_resolves_outputs_by_shape_not_order(self, mocker: MockerFixture) -> None:
         """Spec #15. Export order is not guaranteed; identify by trailing dimension."""
@@ -2118,7 +2125,7 @@ class TestPetDetection:
         dets, logits = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 17, 0.9)])
         detector.session.run.return_value = [logits, dets]  # swapped
 
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
 
         assert len(results) == 1
         assert results[0]["label"] == "cat"
@@ -2133,7 +2140,7 @@ class TestPetDetection:
             ]
         )
 
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
 
         assert len(results) == 2
         assert {r["label"] for r in results} == {"dog", "cat"}
@@ -2142,7 +2149,7 @@ class TestPetDetection:
         """Spec #17. Empty is a list, not an error."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([])
-        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
+        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions()) == []
 
     # ---- edge cases (spec #18-#25) ----
 
@@ -2150,20 +2157,20 @@ class TestPetDetection:
         """Spec #18. Zero width/height."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.0, 0.0, 18, 0.9)])
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
         assert isinstance(results, list)
 
     def test_box_fully_outside_is_dropped(self, mocker: MockerFixture) -> None:
         """Spec #19. Clipping leaves zero area, so it must not be emitted."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(1.8, 1.8, 0.2, 0.2, 18, 0.9)])
-        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0))) == []
+        assert detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions()) == []
 
     def test_extreme_aspect_ratio(self, mocker: MockerFixture) -> None:
         """Spec #20."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.1, 0.5, 18, 0.9)])
-        results = detector.predict(Image.new("RGB", (4000, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (4000, 100), (0, 0, 0)), options=PetDetectionOptions())
         box = results[0]["boundingBox"]
         assert box["x1"] == 1800 and box["x2"] == 2200
         assert box["y1"] == 25 and box["y2"] == 75
@@ -2172,34 +2179,35 @@ class TestPetDetection:
         """Spec #21."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.5, 0.5, 18, 0.9)])
-        results = detector.predict(Image.new("RGB", (10, 10), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (10, 10), (0, 0, 0)), options=PetDetectionOptions())
         assert isinstance(results, list)
 
     def test_all_queries_above_threshold(self, mocker: MockerFixture) -> None:
         """Spec #22. The 300-query maximum."""
         detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.1, 0.1, 18, 0.9)] * 300)
-        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)))
+        results = detector.predict(Image.new("RGB", (100, 100), (0, 0, 0)), options=PetDetectionOptions())
         assert len(results) == 300
 
     def test_min_score_follows_each_request(self, mocker: MockerFixture) -> None:
         """Spec #23. The model cache hands every request the instance the first one built, so a threshold the
         admin changes afterwards must come from the request itself, never from construction."""
-        detector = self._detector(mocker, min_score=0.6)
+        detector = self._detector(mocker)
         detector.session.run.return_value = self._make_rfdetr_output([(0.5, 0.5, 0.2, 0.2, 18, 0.5)])
 
-        assert detector.predict(Image.new("RGB", (100, 100))) == []
-        assert len(detector.predict(Image.new("RGB", (100, 100)), minScore=0.3)) == 1
+        assert detector.predict(Image.new("RGB", (100, 100)), options=PetDetectionOptions(min_score=0.6)) == []
+        assert len(detector.predict(Image.new("RGB", (100, 100)), options=PetDetectionOptions(min_score=0.3))) == 1
 
-    def test_min_score_from_kwargs(self, mocker: MockerFixture) -> None:
-        """Spec #23, constructor form."""
-        mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("rfdetr-nano", minScore=0.8, cache_dir="test_cache")
-        assert detector.min_score == 0.8
+    def test_min_score_from_request(self) -> None:
+        """Spec #23, wire form: the server sends `minScore`, which must reach the detector as its options."""
+        request = {"pet-detection": {"detection": {"modelName": "rfdetr-nano", "options": {"minScore": 0.8}}}}
+        (entry,) = ml_main.PIPELINE_REQUEST.validate_json(orjson.dumps(request)).entries()
+        assert entry.model is PetDetector
+        assert entry.options == PetDetectionOptions(min_score=0.8)
 
     def test_detector_clamps_boxes_to_image_bounds(self, mocker: MockerFixture) -> None:
         """RF-DETR emits normalised centre/size; a query straddling the edge must not escape it."""
-        detector = self._detector(mocker, min_score=0.5)
+        detector = self._detector(mocker)
         # Boxes wider than the frame and centred on the edges: unclamped these produce negative
         # corners and corners past (600, 800).
         detector.session.run.return_value = self._make_rfdetr_output(
@@ -2209,7 +2217,7 @@ class TestPetDetection:
             ]
         )
 
-        results = detector.predict(Image.new("RGB", (600, 800)))
+        results = detector.predict(Image.new("RGB", (600, 800)), options=PetDetectionOptions(min_score=0.5))
 
         assert len(results) == 2
         for detection in results:
@@ -2281,7 +2289,7 @@ class TestPetRecognition:
         recognizer.session.run.return_value = [np.random.rand(2, 512).astype(np.float32)]
         pets = self._pets()
 
-        results = recognizer.predict(pil_image, pets)
+        results = recognizer.predict(pil_image, pets, options=PetRecognitionOptions())
 
         assert isinstance(results, list)
         assert len(results) == 2
@@ -2301,7 +2309,7 @@ class TestPetRecognition:
         recognizer.session = _graph_session()
         recognizer._input_name = "input"
 
-        results = recognizer.predict(pil_image, [])
+        results = recognizer.predict(pil_image, [], options=PetRecognitionOptions())
 
         assert results == []
         recognizer.session.run.assert_not_called()
@@ -2319,7 +2327,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.9, "label": "dog"},
         ]
 
-        recognizer.predict(image, pets)
+        recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         call_kwargs = recognizer.session.run.call_args[0][1]
         blob = call_kwargs[recognizer._input_name]
@@ -2351,7 +2359,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 50, "y1": 50, "x2": 100, "y2": 100}, "score": 0.8, "label": "cat"},
         ]
 
-        recognizer.predict(image, pets)
+        recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         blob = recognizer.session.run.call_args[0][1][recognizer._input_name]
         assert blob.shape == (2, 3, 224, 224)
@@ -2386,7 +2394,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": -20, "y1": -10, "x2": 1000, "y2": 1000}, "score": 0.9, "label": "dog"},
         ]
 
-        results = recognizer.predict(image, pets)
+        results = recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         assert mock_resize.call_count == 1
         assert mock_resize.call_args_list[0].args[0].shape == (50, 50, 3)
@@ -2411,7 +2419,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.8, "label": "dog"},
         ]
 
-        results = recognizer.predict(image, pets)
+        results = recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         assert len(results) == 2
         degenerate_result, valid_result = results
@@ -2436,7 +2444,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 1000, "y1": 1000, "x2": 1010, "y2": 1010}, "score": 0.9, "label": "dog"},
         ]
 
-        results = recognizer.predict(image, pets)
+        results = recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         assert len(results) == 1
         assert "embedding" not in results[0]
@@ -2462,7 +2470,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 400, "y1": 400, "x2": 500, "y2": 500}, "score": 0.8, "label": "cat"},
         ]
 
-        recognizer.predict(image, pets)
+        recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         assert mock_resize.call_count == 2
         assert mock_resize.call_args_list[0].kwargs["interpolation"] == cv2.INTER_AREA
@@ -2494,7 +2502,7 @@ class TestPetRecognition:
             {"boundingBox": {"x1": 20, "y1": 20, "x2": 30, "y2": 30}, "score": 0.7, "label": "bird"},
         ]
 
-        results = recognizer.predict(image, pets)
+        results = recognizer.predict(image, pets, options=PetRecognitionOptions())
 
         assert recognizer.session.run.call_count == 3
         assert call_sizes == [1, 1, 1]
@@ -2512,13 +2520,23 @@ class TestPetRecognition:
         pets = self._pets()
 
         with pytest.raises(ValueError):
-            recognizer.predict(image, pets)
+            recognizer.predict(image, pets, options=PetRecognitionOptions())
 
-    def test_get_model_class_resolves_pet_recognition(self) -> None:
-        assert get_model_class("pet-recognition-base", ModelType.RECOGNITION, ModelTask.PET_DETECTION) is PetRecognizer
+    def test_pipeline_resolves_pet_recognition(self) -> None:
+        request = {"pet-detection": {"recognition": {"modelName": "pet-recognition-base"}}}
+        (entry,) = ml_main.PIPELINE_REQUEST.validate_json(orjson.dumps(request)).entries()
+        assert entry.model is PetRecognizer
 
-    def test_pet_detector_still_resolves(self) -> None:
-        assert get_model_class("rfdetr-nano", ModelType.DETECTION, ModelTask.PET_DETECTION) is PetDetector
+    def test_pipeline_resolves_pet_detector(self) -> None:
+        request = {"pet-detection": {"detection": {"modelName": "rfdetr-nano"}}}
+        (entry,) = ml_main.PIPELINE_REQUEST.validate_json(orjson.dumps(request)).entries()
+        assert entry.model is PetDetector
+
+    def test_pipeline_rejects_a_model_from_another_source(self) -> None:
+        request = {"pet-detection": {"detection": {"modelName": "buffalo_l"}}}
+        with pytest.raises(HTTPException) as e:
+            ml_main.get_entries(orjson.dumps(request).decode())
+        assert e.value.status_code == 422
 
     def test_download_uses_open_noodle_org(self, mocker: MockerFixture) -> None:
         snapshot_download = mocker.patch("immich_ml.models.gallery_hosted.snapshot_download")
@@ -2543,7 +2561,7 @@ class TestPetPipeline:
         fake embedding (mean pixel value, computed independently of the production zip) survives
         end-to-end through run_inference. A reversed zip inside PetRecognizer._predict would swap the
         two embeddings between labels and fail this test."""
-        detector = PetDetector("yolo11n", cache_dir="test_cache")
+        detector = PetDetector("rfdetr-nano", cache_dir="test_cache")
         detector.loaded = True
         detected_pets: PetDetectionOutput = [
             {"boundingBox": {"x1": 0, "y1": 0, "x2": 50, "y2": 50}, "score": 0.9, "label": "dog"},
@@ -2563,8 +2581,8 @@ class TestPetPipeline:
 
         recognizer.session.run.side_effect = fake_run
 
-        def fake_get(model_name: str, model_type: ModelType, model_task: ModelTask, **kwargs: Any) -> Any:
-            return detector if model_type == ModelType.DETECTION else recognizer
+        def fake_get(entry: InferenceEntry[Any], ttl: int | None = None) -> Any:
+            return detector if entry.model is PetDetector else recognizer
 
         mocker.patch.object(ml_main.model_cache, "get", side_effect=fake_get)
 
@@ -2574,19 +2592,15 @@ class TestPetPipeline:
         image[50:100, 50:100] = (255, 0, 0)
         pil_image = Image.fromarray(image)
 
-        without_deps: list[dict[str, Any]] = [
-            {"name": "yolo11n", "task": ModelTask.PET_DETECTION, "type": ModelType.DETECTION, "options": {}}
-        ]
-        with_deps: list[dict[str, Any]] = [
-            {
-                "name": "pet-recognition-base",
-                "task": ModelTask.PET_DETECTION,
-                "type": ModelType.RECOGNITION,
-                "options": {},
+        request = {
+            "pet-detection": {
+                "detection": {"modelName": "rfdetr-nano"},
+                "recognition": {"modelName": "pet-recognition-base"},
             }
-        ]
+        }
+        entries = list(ml_main.PIPELINE_REQUEST.validate_json(orjson.dumps(request)).entries())
 
-        response = await ml_main.run_inference(pil_image, (without_deps, with_deps))  # type: ignore[arg-type]
+        response = await ml_main.run_inference(pil_image, entries)
 
         pet_detection_result = response["pet-detection"]
         assert len(pet_detection_result) == 2
