@@ -23,18 +23,24 @@ import {
   DetachScopedPersonDto,
   MergePersonDto,
   MergeScopedPeopleDto,
+  PeopleDeleteDto,
   PeopleFaceStatisticsResponseDto,
   PeopleResponseDto,
   PeopleStatisticsResponseDto,
   PeopleUpdateDto,
   PeopleUsersUpsertDto,
   PersonCreateDto,
+  PersonDeleteDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
   PersonResponseDto,
   PersonSearchDto,
   PersonStatisticsResponseDto,
   PersonUpdateDto,
+  PersonUsersCreateDto,
+  PersonUsersDeleteDto,
+  PersonUsersResponseDto,
+  PersonUsersSearchDto,
   RepresentativeFaceUpdateDto,
 } from 'src/dtos/person.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
@@ -196,6 +202,39 @@ export class PersonController {
     return this.service.updateRepresentativeFace(auth, id, dto);
   }
 
+  @Get('users')
+  @Authenticated({ permission: Permission.PersonRead })
+  @Endpoint({
+    summary: 'Get people access',
+    description: 'Retrieve a list of users and the people to which they have been given access',
+    history: new HistoryBuilder().added('v3.3').stable('v3.3'),
+  })
+  getUsersForPeople(@Auth() auth: AuthDto, @Query() dto: PersonUsersSearchDto): Promise<PersonUsersResponseDto> {
+    return this.service.getUsersForPeople(auth, dto);
+  }
+
+  @Put('users')
+  @Authenticated({ permission: Permission.PersonUpdate })
+  @Endpoint({
+    summary: 'Give users access to people',
+    description: 'Give users access to people',
+    history: new HistoryBuilder().added('v3.3').stable('v3.3'),
+  })
+  addUsersToPeople(@Auth() auth: AuthDto, @Body() dto: PersonUsersCreateDto): Promise<void> {
+    return this.service.addUsersToPeople(auth, dto);
+  }
+
+  @Delete('users')
+  @Authenticated({ permission: Permission.PersonDelete })
+  @Endpoint({
+    summary: 'Remove users from people',
+    description: 'Remove user access to people',
+    history: new HistoryBuilder().added('v3.3').stable('v3.3'),
+  })
+  removeUsersFromPeople(@Auth() auth: AuthDto, @Body() dto: PersonUsersDeleteDto): Promise<void> {
+    return this.service.removeUsersFromPeople(auth, dto);
+  }
+
   @Get(':id')
   @Authenticated({ permission: Permission.PersonRead })
   @Endpoint({
@@ -323,38 +362,5 @@ export class PersonController {
     @Body() dto: MergePersonDto,
   ): Promise<BulkIdResponseDto[]> {
     return this.service.mergePerson(auth, id, dto);
-  }
-
-  @Get('users')
-  @Authenticated({ permission: Permission.PersonRead })
-  @Endpoint({
-    summary: 'Get people access',
-    description: 'Retrieve a list of users and the people to which they have been given access',
-    history: new HistoryBuilder().added('v3.3').stable('v3.3'),
-  })
-  getUsersForPeople(@Auth() auth: AuthDto, @Query() dto: PersonUsersSearchDto): Promise<PersonUsersResponseDto> {
-    return this.service.getUsersForPeople(auth, dto);
-  }
-
-  @Put('users')
-  @Authenticated({ permission: Permission.PersonUpdate })
-  @Endpoint({
-    summary: 'Upsert user access',
-    description: 'Give users access to people',
-    history: new HistoryBuilder().added('v3.3').stable('v3.3'),
-  })
-  upsertPeopleUsers(@Auth() auth: AuthDto, @Body() dto: PeopleUsersUpsertDto): Promise<void> {
-    return this.service.upsertPeopleUsers(auth, dto);
-  }
-
-  @Delete('users')
-  @Authenticated({ permission: Permission.PersonUpdate })
-  @Endpoint({
-    summary: 'Remove users from people',
-    description: 'Remove user access to people',
-    history: new HistoryBuilder().added('v3.3').stable('v3.3'),
-  })
-  removeUsersFromPeople(@Auth() auth: AuthDto, @Body() dto: PersonUsersDeleteDto): Promise<void> {
-    return this.service.removeUsersFromPeople(auth, dto);
   }
 }

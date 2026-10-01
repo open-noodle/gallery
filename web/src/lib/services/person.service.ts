@@ -14,19 +14,17 @@ import {
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
-  mdiAccountMultipleOutline,
+  mdiCalendarEditOutline,
   mdiEyeOffOutline,
   mdiEyeOutline,
   mdiFaceManProfile,
   mdiHeartMinusOutline,
   mdiHeartOutline,
-  mdiPencilOutline,
 } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
-import PersonEditAccessModal from '$lib/modals/PersonEditAccessModal.svelte';
-import PersonEditModal from '$lib/modals/PersonEditModal.svelte';
+import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
@@ -107,13 +105,7 @@ export const getPersonActions = (
     onAction: () => handleShowPerson(person),
   };
 
-  const Access: ActionItem = {
-    title: 'Manage access',
-    icon: mdiAccountMultipleOutline,
-    onAction: () => modalManager.show(PersonEditAccessModal, { person }),
-  };
-
-  return { Edit, Favorite, Unfavorite, HidePerson, ShowPerson, Access };
+  return { SetDateOfBirth, Favorite, Unfavorite, HidePerson, ShowPerson };
 };
 
 export const getPersonAssetActions = ($t: MessageFormatter, person: PersonResponseDto, asset: AssetResponseDto) => {

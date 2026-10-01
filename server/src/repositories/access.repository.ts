@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { type Kysely, type NotNull, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
+import { PersonUserRole } from 'src/dtos/person.dto.js';
 import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
 import {
@@ -885,6 +887,22 @@ class ClusterGroupRequestAccess {
 
 class PersonAccess {
   constructor(private db: Kysely<DB>) {}
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkOwnerAccess(userId: string, personGroupIds: Set<string>) {
+    if (personGroupIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('person')
+      .select('person.personGroupId')
+      .where('person.personGroupId', 'in', [...personGroupIds])
+      .where('person.ownerId', '=', userId)
+      .execute()
+      .then((persons) => new Set(persons.map((person) => person.personGroupId)));
+  }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET, [PersonUserRole.Admin]] })
   @ChunkedSet({ paramIndex: 1 })

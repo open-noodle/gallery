@@ -2,7 +2,6 @@ import { Kysely, sql } from 'kysely';
 import { AssetFileType, AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { PersonUserRepository } from 'src/repositories/person-user.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -19,31 +18,6 @@ const setup = (db?: Kysely<DB>) => {
     mock: [LoggingRepository],
   });
   return { ctx, sut: ctx.get(PersonRepository) };
-};
-
-const listFor = async (sut: PersonRepository, userId: string, options?: { withHidden: boolean }) => {
-  const { items } = await sut.getAllForUser({ take: 100, skip: 0 }, userId, options);
-  return items;
-};
-
-// a named person with at least one visible face clears the minimum-faces rule
-const newNamedPerson = async (ctx: MediumTestContext, ownerId: string, name: string) => {
-  const { result: person } = await ctx.newPerson({ ownerId, name });
-  const { asset } = await ctx.newAsset({ ownerId });
-  await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-  return person;
-};
-
-const otherPeopleOf = async (sut: PersonRepository, ctx: MediumTestContext, userId: string, groupId: string) => {
-  const listItems = await listFor(sut, userId);
-  const listed = listItems.find((item) => item.personGroupId === groupId);
-  const forUser = await sut.getForUser({ userId, personGroupId: groupId });
-  const byGroupId = await sut.getByGroupId({ ownerId: userId, personGroupId: groupId });
-  return {
-    getAllForUser: listed?.otherPeople,
-    getForUser: forUser?.otherPeople,
-    getByGroupId: byGroupId?.otherPeople,
-  };
 };
 
 beforeAll(async () => {
@@ -209,77 +183,6 @@ describe(PersonRepository.name, () => {
     });
   });
 
-  describe('otherPeople', () => {
-    it('should report the person shared with the user from every lookup', async () => {
-      const { ctx, sut } = setup();
-      const [{ user: owner }, { user: recipient }] = [await ctx.newUser(), await ctx.newUser()];
-      const person = await newNamedPerson(ctx, owner.id, 'Alice');
-
-      await ctx.get(PersonUserRepository).createAll([
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: recipient.id,
-          role: PersonUserRole.Write,
-        },
-      ]);
-
-      const expected = [{ sharedById: owner.id, role: PersonUserRole.Write, name: 'Alice', birthDate: null }];
-      const results = await otherPeopleOf(sut, ctx, recipient.id, person.personGroupId);
-
-      expect(results.getAllForUser).toEqual(expected);
-      expect(results.getForUser).toEqual(expected);
-      expect(results.getByGroupId).toEqual(expected);
-    });
-
-    it('should not report a share pointed at a different user', async () => {
-      const { ctx, sut } = setup();
-      const [{ user: owner }, { user: first }, { user: second }] = [
-        await ctx.newUser(),
-        await ctx.newUser(),
-        await ctx.newUser(),
-      ];
-      const person = await newNamedPerson(ctx, owner.id, 'Alice');
-
-      await ctx.get(PersonUserRepository).createAll([
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: first.id,
-          role: PersonUserRole.Read,
-        },
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: second.id,
-          role: PersonUserRole.Read,
-        },
-      ]);
-
-      const expected = [{ sharedById: owner.id, role: PersonUserRole.Read, name: 'Alice', birthDate: null }];
-      const results = await otherPeopleOf(sut, ctx, first.id, person.personGroupId);
-
-      expect(results.getAllForUser).toEqual(expected);
-      expect(results.getForUser).toEqual(expected);
-      expect(results.getByGroupId).toEqual(expected);
-    });
-
-    it('should be empty for a group the user was never shared into', async () => {
-      const { ctx, sut } = setup();
-      const [{ user: owner }, { user: other }] = [await ctx.newUser(), await ctx.newUser()];
-      const person = await newNamedPerson(ctx, owner.id, 'Alice');
-
-      await ctx.database
-        .insertInto('person')
-        .values({ ownerId: other.id, name: 'Alice', personGroupId: person.personGroupId })
-        .execute();
-
-      const results = await otherPeopleOf(sut, ctx, other.id, person.personGroupId);
-
-      expect(results.getForUser).toEqual([]);
-      expect(results.getByGroupId).toEqual([]);
-    });
-  });
   describe('deleteEmptyGroups', () => {
     it('should delete groups that no longer have any people', async () => {
       const { ctx, sut } = setup(await getKyselyDB());
