@@ -2,10 +2,10 @@ version: 1
 
 metadata:
   upstream_remote: upstream
-  upstream_branch: main
+  upstream_branch: release/v3.3
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: f0f2c2ef8f11f616c6bb46d7203f0e8ea997bab1
+  last_verified_fork_head: da5480ae42b77db9cae729f2447ec9b3079ba4a7
 
 coverage_ignore:
   - specs/**
@@ -362,6 +362,7 @@ features:
       - pnpm-workspace.yaml
       - readme_i18n/**
       - server/Dockerfile
+      - server/Dockerfile.dev
       - server/bin/immich-dev
       - server/helmet.json
       - server/mise.toml
