@@ -2194,6 +2194,10 @@ export class FaceIdentityRepository {
       numberOfAssets: Number(row.numberOfAssets ?? 0),
       type: row.type ?? 'person',
       species: row.species,
+      // Gallery: person sharing is dormant (specs/2026-10-01-upstream-person-sharing-dormant-design.md).
+      otherPeople: [],
+      sharedBy: [],
+      sharedWith: [],
     };
   }
 

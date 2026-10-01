@@ -82,19 +82,12 @@
     ActionButton,
     CommandPaletteDefaultProvider,
     ContextMenuButton,
-    IconButton,
     LoadingSpinner,
     modalManager,
     toastManager,
     type ActionItem,
   } from '@immich/ui';
-  import {
-    mdiAccountBoxOutline,
-    mdiAccountMultipleCheckOutline,
-    mdiArrowLeft,
-    mdiDotsVertical,
-    mdiPencilOutline,
-  } from '@mdi/js';
+  import { mdiAccountBoxOutline, mdiAccountMultipleCheckOutline, mdiArrowLeft, mdiDotsVertical } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';

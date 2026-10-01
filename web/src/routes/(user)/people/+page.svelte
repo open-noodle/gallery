@@ -266,33 +266,6 @@
     await goto(Route.viewPerson(detail, { previousRoute: Route.people(), action: 'merge' }));
   };
 
-  const hasFilter = $derived(Object.values(data.filter).some((value) => value !== undefined));
-
-  const handleFilter = async () => {
-    const filter = await modalManager.show(PeopleFilterModal, { filter: data.filter });
-    if (!filter) {
-      return;
-    }
-
-    const url = new URL($page.url);
-    for (const [key, value] of [
-      [QueryParameter.SHARED_BY_ID, filter.sharedById],
-      [QueryParameter.SHARED_WITH_ID, filter.sharedWithId],
-      [QueryParameter.IS_FAVORITE, filter.isFavorite],
-      [QueryParameter.IS_HIDDEN, filter.isHidden],
-    ] as const) {
-      if (value === undefined) {
-        url.searchParams.delete(key);
-      } else {
-        url.searchParams.set(key, String(value));
-      }
-    }
-
-    await goto(url, { keepFocus: true });
-    currentPage = 1;
-    nextPage = data.people.hasNextPage ? 2 : null;
-  };
-
   const onResetSearchBar = async () => {
     await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, $page.url);
   };
@@ -573,18 +546,8 @@
           variant="ghost"
           color="secondary">{$t('show_and_hide_people')}</Button
         >
-      {/if}
-      <ActionButton action={ManageAccess} />
-      <IconButton
-        shape="round"
-        color="secondary"
-        variant="ghost"
-        indicator={hasFilter ? 'primary' : undefined}
-        icon={mdiTune}
-        aria-label={$t('filters')}
-        onclick={handleFilter}
-      />
-    </div>
+      </div>
+    {/if}
   {/snippet}
 
   {#if countVisiblePeople > 0 && (!searchName || searchedPeopleLocal.length > 0)}

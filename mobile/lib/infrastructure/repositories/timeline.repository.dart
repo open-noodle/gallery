@@ -1092,12 +1092,6 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
             _db.assetFaceEntity.isVisible.equals(true) &
             _db.assetFaceEntity.deletedAt.isNull(),
       );
-    final albumAssetIds = _db.remoteAlbumAssetEntity.selectOnly()..addColumns([_db.remoteAlbumAssetEntity.assetId]);
-    return _db.remoteAssetEntity.id.isInQuery(faceAssetIds) &
-        (_db.remoteAssetEntity.ownerId.isIn(userIds) | _db.remoteAssetEntity.id.isInQuery(albumAssetIds)) &
-        _db.remoteAssetEntity.deletedAt.isNull() &
-        _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline);
-  }
 
     if (groupBy == GroupAssetsBy.none) {
       final query = _db.remoteAssetEntity.selectOnly()
@@ -1139,13 +1133,21 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
   }
 
   Future<List<BaseAsset>> _getPersonBucketAssets(
-    List<String> userIds,
+    String userId,
     String personId, {
     required int offset,
     required int count,
     GroupAssetsBy groupBy = GroupAssetsBy.day,
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) {
+    final idQuery = _db.assetFaceEntity.selectOnly()
+      ..addColumns([_db.assetFaceEntity.assetId])
+      ..where(
+        _db.assetFaceEntity.personId.equals(personId) &
+            _db.assetFaceEntity.isVisible.equals(true) &
+            _db.assetFaceEntity.deletedAt.isNull(),
+      );
+
     final query = _db.remoteAssetEntity.select()
       ..where(
         (row) =>

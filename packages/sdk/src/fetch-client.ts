@@ -1625,10 +1625,31 @@ export type ExifResponseDto = {
     /** Time zone */
     timeZone?: string | null;
 };
+export type PersonOtherResponseDto = {
+    birthDate: string | null;
+    name: string;
+    role: PersonUserRole;
+    sharedById: string;
+};
 export type ScopedPrimaryProfile = {
     id: string;
     spaceId?: string;
     "type": Type;
+};
+export type PeopleUserResponseDto = {
+    avatarColor: UserAvatarColor;
+    /** User email */
+    email: string;
+    /** User ID */
+    id: string;
+    /** User name */
+    name: string;
+    /** Profile change date */
+    profileChangedAt: string;
+    /** Profile image path */
+    profileImagePath: string;
+    /** Access role */
+    role: PersonUserRole;
 };
 export type PersonResponseDto = {
     /** Person date of birth */
@@ -1647,8 +1668,13 @@ export type PersonResponseDto = {
     name: string;
     /** Accessible asset count for this grouped person */
     numberOfAssets?: number;
+    otherPeople: PersonOtherResponseDto[];
     /** Accessible profile used for navigation */
     primaryProfile?: ScopedPrimaryProfile;
+    /** Users that gave the current user access to this person */
+    sharedBy: PeopleUserResponseDto[];
+    /** Users the current user gave access to this person */
+    sharedWith: PeopleUserResponseDto[];
     /** Space person ID when viewed through a shared space */
     spacePersonId?: string;
     /** Pet species (e.g. dog, cat) */
@@ -2488,6 +2514,39 @@ export type PeopleStatisticsResponseDto = {
     hidden: number;
     /** Total number of people */
     total: number;
+};
+export type PersonUsersDeleteDto = {
+    /** Person ID */
+    personId: string;
+    /** User ID of the user that gave access to the person */
+    sharedById?: string;
+    /** User ID of the user that was given access to the person */
+    sharedWithId: string;
+}[];
+export type PersonUsersResponseDto = {
+    /** Person ID */
+    personId: string;
+    /** Access role */
+    role: PersonUserRole;
+    /** The user that gave access to this person */
+    sharedBy: UserResponseDto;
+    /** User ID of the user that gave access to this person */
+    sharedById: string;
+    /** The user that was given access to this person */
+    sharedWith: UserResponseDto;
+    /** User ID of the user that was given access to this person */
+    sharedWithId: string;
+}[];
+export type PersonUsersCreateDto = {
+    /** Person IDs */
+    personIds: string[];
+    /** Role that should be applied */
+    role: PersonUserRole;
+    /** User IDs that should be given access to the person */
+    sharedWithIds: string[];
+};
+export type PersonDeleteDto = {
+    userId?: string;
 };
 export type PersonUpdateDto = {
     /** Person date of birth */
@@ -7595,7 +7654,7 @@ export function deletePeople({ peopleDeleteDto }: {
 /**
  * Get all people
  */
-export function getAllPeople({ closestAssetId, closestPersonId, page, size, $type, withHidden, withSharedSpaces }: {
+export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     isFavorite?: boolean;
@@ -7672,10 +7731,14 @@ export function detachScopedPerson({ detachScopedPersonDto }: {
 /**
  * Get people face statistics
  */
-export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, $type, withHidden, withSharedSpaces }: {
+export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
+    isFavorite?: boolean;
+    isHidden?: boolean;
     page?: number;
+    sharedById?: string;
+    sharedWithId?: string;
     size?: number;
     $type?: "person" | "pet";
     withHidden?: boolean;
@@ -7687,7 +7750,11 @@ export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page,
     }>(`/people/face-statistics${QS.query(QS.explode({
         closestAssetId,
         closestPersonId,
+        isFavorite,
+        isHidden,
         page,
+        sharedById,
+        sharedWithId,
         size,
         "type": $type,
         withHidden,
@@ -7726,10 +7793,14 @@ export function mergeScopedPeople({ mergeScopedPeopleDto }: {
 /**
  * Get people statistics
  */
-export function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, $type, withHidden, withSharedSpaces }: {
+export function getPeopleStatistics({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
+    isFavorite?: boolean;
+    isHidden?: boolean;
     page?: number;
+    sharedById?: string;
+    sharedWithId?: string;
     size?: number;
     $type?: "person" | "pet";
     withHidden?: boolean;
@@ -7741,7 +7812,11 @@ export function getPeopleStatistics({ closestAssetId, closestPersonId, page, siz
     }>(`/people/statistics${QS.query(QS.explode({
         closestAssetId,
         closestPersonId,
+        isFavorite,
+        isHidden,
         page,
+        sharedById,
+        sharedWithId,
         size,
         "type": $type,
         withHidden,
@@ -7749,6 +7824,53 @@ export function getPeopleStatistics({ closestAssetId, closestPersonId, page, siz
     }))}`, {
         ...opts
     }));
+}
+/**
+ * Remove users from people
+ */
+export function removeUsersFromPeople({ personUsersDeleteDto }: {
+    personUsersDeleteDto: PersonUsersDeleteDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/people/users", oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: personUsersDeleteDto
+    })));
+}
+/**
+ * Get people access
+ */
+export function getUsersForPeople({ direction, personId, role, sharedById, sharedWithId }: {
+    direction?: SharingDirection;
+    personId?: string;
+    role?: PersonUserRole;
+    sharedById?: string;
+    sharedWithId?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonUsersResponseDto;
+    }>(`/people/users${QS.query(QS.explode({
+        direction,
+        personId,
+        role,
+        sharedById,
+        sharedWithId
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Give users access to people
+ */
+export function addUsersToPeople({ personUsersCreateDto }: {
+    personUsersCreateDto: PersonUsersCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/people/users", oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: personUsersCreateDto
+    })));
 }
 /**
  * Delete person
@@ -11258,6 +11380,11 @@ export enum AssetJobName {
     RegenerateThumbnail = "regenerate-thumbnail",
     TranscodeVideo = "transcode-video"
 }
+export enum PersonUserRole {
+    Read = "read",
+    Write = "write",
+    Admin = "admin"
+}
 export enum Type {
     UserPerson = "user-person",
     SpacePerson = "space-person"
@@ -11358,8 +11485,9 @@ export enum Type2 {
     Person = "person",
     SpacePerson = "space-person"
 }
-export enum PeopleUsersUpsertType {
-    Everyone = "everyone"
+export enum SharingDirection {
+    SharedBy = "shared-by",
+    SharedWith = "shared-with"
 }
 export enum WorkflowType {
     AssetV1 = "AssetV1"

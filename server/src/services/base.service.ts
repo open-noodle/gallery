@@ -82,7 +82,14 @@ import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { FaceVerdictService } from 'src/services/face-verdict.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
-import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access.js';
+import {
+  AccessPersonRequest,
+  AccessRequest,
+  checkAccess,
+  checkPersonAccess,
+  requireAccess,
+  requirePersonAccess,
+} from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
 import {
   ContentDisposition,

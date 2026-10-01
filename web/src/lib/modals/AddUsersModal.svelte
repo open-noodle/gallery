@@ -2,13 +2,7 @@
   import { initInput } from '$lib/actions/focus';
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import { normalizeSearchString } from '$lib/utils/string-utils';
-  import {
-    getAllGroups,
-    searchUsers,
-    type AlbumResponseDto,
-    type UserGroupResponseDto,
-    type UserResponseDto,
-  } from '@immich/sdk';
+  import { getAllGroups, searchUsers, type UserGroupResponseDto, type UserResponseDto } from '@immich/sdk';
   import { FormModal, ListButton, Stack, Text } from '@immich/ui';
   import { sortBy } from 'lodash-es';
   import { onMount } from 'svelte';
@@ -36,7 +30,6 @@
 
   let users: UserResponseDto[] = $state([]);
   let groups: UserGroupResponseDto[] = $state([]);
-  const excludedUserIds = $derived(album.albumUsers.map(({ user: { id } }) => id));
   const filteredUsers = $derived(
     sortBy(
       users.filter(
@@ -114,7 +107,7 @@
   };
 
   onMount(async () => {
-    const [userList, groupList] = await Promise.all([searchUsers(), getAllGroups()]);
+    const [userList, groupList] = await Promise.all([loadUsers(), getAllGroups()]);
     users = userList;
     groups = groupList;
     loading = false;
