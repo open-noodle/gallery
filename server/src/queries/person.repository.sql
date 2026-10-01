@@ -1105,6 +1105,14 @@ from
       1
   ) as "dummy"
 
+-- PersonRepository.refreshPetFaces
+begin
+insert into
+  "asset_face" ("id", "assetId")
+values
+  ($1, $2)
+rollback
+
 -- PersonRepository.updateForWritableOwners
 update "person"
 set
@@ -1121,14 +1129,6 @@ where
       and "person_user"."sharedWithId" = $4
       and "person_user"."role" in ($5, $6)
   )
-
--- PersonRepository.refreshPetFaces
-begin
-insert into
-  "asset_face" ("id", "assetId")
-values
-  ($1, $2)
-rollback
 
 -- PersonRepository.getFacesByIds
 select
