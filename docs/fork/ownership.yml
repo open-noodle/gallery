@@ -542,6 +542,24 @@ ci_invariants:
       - server/src/services/search.service.ts
     exceptions: []
 
+  # immich-31620 (+ immich-31902/31930/31931/31960) added person sharing: `person_user`, a trigger that
+  # gives the recipient their own `person` row in the same group, and an access model keyed on
+  # (personGroupId, ownerId). Option M (`person_personGroupId_key`) forbids a second row per group and
+  # cluster groups are inert, so Gallery pulls the code but keeps it dormant
+  # (specs/2026-10-01-upstream-person-sharing-dormant-design.md). A rebase that resolves the person
+  # service or controller toward upstream re-enables it with no conflict and no type error.
+  - id: person-sharing-dormant
+    title: Upstream person sharing stays dormant; person access keeps Gallery's owner/Space model
+    forbidden_patterns:
+      - 'this.personUserRepository.'
+      - 'this.personRepository.updateForWritableOwners('
+      - 'this.requirePersonAccess('
+      - 'this.checkPersonAccess('
+    paths:
+      - server/src/services/person.service.ts
+      - server/src/controllers/person.controller.ts
+    exceptions: []
+
   # immich-30831 added a first-class MemoryType.Birthday generator. Gallery already ships a
   # birthday memory (BirthdayMemoryRule), so upstream's createBirthdayMemories is pulled but never
   # dispatched (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). A rebase that

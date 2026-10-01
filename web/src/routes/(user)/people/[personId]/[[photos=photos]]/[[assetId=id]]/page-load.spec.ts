@@ -11,6 +11,9 @@ vi.mock('$lib/utils/auth', () => ({ authenticate }));
 vi.mock('$lib/utils/i18n', () => ({ getFormatter }));
 
 const makePerson = (overrides: Partial<PersonResponseDto> = {}): PersonResponseDto => ({
+  otherPeople: [],
+  sharedBy: [],
+  sharedWith: [],
   id: 'person-1',
   name: 'Alice',
   birthDate: null,
