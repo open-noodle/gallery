@@ -23,6 +23,7 @@
   import SearchAddAllToCollectionModal from '#lib/modals/SearchAddAllToCollectionModal.svelte';
   import { PersonPageViewMode, QueryParameter, SessionStorageKey } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type {
