@@ -28,6 +28,7 @@ const { mockAfterNavigate, mockAssetMultiSelectManager, mockAuthManager, mockFol
 
 vi.mock('$app/navigation', () => ({
   afterNavigate: mockAfterNavigate,
+  beforeNavigate: vi.fn(),
   goto: vi.fn(),
   invalidateAll: vi.fn(),
 }));
