@@ -26,7 +26,7 @@ const SWAPPED_SET = [
   'lib/modals/SpaceAddMemberModal.svelte',
   'lib/modals/MapModal.svelte',
   'lib/modals/UserGroupModal.svelte',
-  'lib/modals/AlbumAddUsersModal.svelte',
+  'lib/modals/AddUsersModal.svelte',
   'lib/components/spaces/space-albums-list.svelte',
   'lib/components/spaces/space-search-results.svelte',
   'lib/components/faces-page/AssignFaceSidePanel.svelte',
