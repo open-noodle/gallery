@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { PersonController } from 'src/controllers/person.controller.js';
+import { PersonUserRole } from 'src/dtos/person.dto.js';
 import { PersonStatisticsResponseDto } from 'src/dtos/person.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonService } from 'src/services/person.service.js';
@@ -406,6 +407,23 @@ describe(PersonController.name, () => {
         throw new Error('Person statistics response schema should accept faces');
       }
       expect(result.data).toEqual({ assets: 7, faces: 10 });
+    });
+  });
+
+  describe('PUT /people/users', () => {
+    it('should reject duplicate personIds as well as duplicate userIds', async () => {
+      const userId = newUuid();
+      const personId = newUuid();
+      const { status, body } = await request(ctx.getHttpServer())
+        .put('/people/users')
+        .send({ personIds: [personId, personId], sharedWithIds: [userId, userId], role: PersonUserRole.Write });
+      expect(status).toBe(400);
+      expect(body.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ['personIds'], message: 'Items must be unique' }),
+          expect.objectContaining({ path: ['sharedWithIds'], message: 'Items must be unique' }),
+        ]),
+      );
     });
   });
 });
