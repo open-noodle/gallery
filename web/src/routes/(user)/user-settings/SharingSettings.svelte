@@ -6,11 +6,9 @@
   to own before #30739 merged the two.
 -->
 <script lang="ts">
-  import SettingAccordion from '$lib/components/shared-components/settings/SettingAccordion.svelte';
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import PartnerSelectionModal from '$lib/modals/PartnerSelectionModal.svelte';
-  import { getPeopleUserActions } from '$lib/services/person-user.service';
   import { handleError } from '$lib/utils/handle-error';
   import {
     createPartner,
@@ -198,6 +196,10 @@
           {/if}
         </div>
       </div>
-    </SettingAccordion>
+    {/each}
+  {/if}
+
+  <div class="mt-5 flex justify-end">
+    <Button shape="round" size="small" onclick={() => handleCreatePartners()}>{$t('add_partner')}</Button>
   </div>
 </section>

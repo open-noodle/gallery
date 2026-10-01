@@ -35,7 +35,6 @@ import {
   PersonSearchDto,
   PersonStatisticsResponseDto,
   PersonUpdateDto,
-  PersonUsersCreateDto,
   PersonUsersDeleteDto,
   PersonUsersResponseDto,
   PersonUsersSearchDto,
@@ -1708,7 +1707,7 @@ export class PersonService extends BaseService {
     return Promise.resolve([]);
   }
 
-  addUsersToPeople(_auth: AuthDto, _dto: PersonUsersCreateDto): Promise<void> {
+  upsertPeopleUsers(_auth: AuthDto, _dto: PeopleUsersUpsertDto): Promise<void> {
     throw personSharingUnsupported();
   }
 

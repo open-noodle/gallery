@@ -82,17 +82,6 @@
   // seed this from its response rather than leaving the header wrong until the first filter change.
   let listTotals = $state<{ total: number; hidden: number } | null>(data.peopleListTotals ?? null);
 
-  let clusterGroupUsers: UserResponseDto[] = $state([]);
-
-  onMount(async () => {
-    try {
-      const users = await getClusterGroupUsers({ id: authManager.user.clusterGroupId });
-      clusterGroupUsers = users.filter(({ id }) => id !== authManager.user.id);
-    } catch (error) {
-      handleError(error, $t('errors.something_went_wrong'));
-    }
-  });
-
   onMount(() => {
     const getSearchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
     if (getSearchedPeople) {
@@ -283,7 +272,6 @@
   };
 
   let people = $derived(data.people.people);
-  const { ManageAccess } = $derived(getPeopleUserActions($t, clusterGroupUsers, nextPage ? undefined : people));
 
   let visiblePeople = $derived(people.filter((people) => !people.isHidden));
   let overviewStatistics = $derived(data.peopleStatistics);

@@ -2537,13 +2537,14 @@ export type PersonUsersResponseDto = {
     /** User ID of the user that was given access to this person */
     sharedWithId: string;
 }[];
-export type PersonUsersCreateDto = {
-    /** Person IDs, defaults to every person owned by the user */
+export type PeopleUsersUpsertDto = {
+    /** Person IDs, required when type is omitted */
     personIds?: string[];
     /** Role that should be applied */
     role: PersonUserRole;
     /** User IDs that should be given access to the person */
     sharedWithIds: string[];
+    "type"?: PeopleUsersUpsertType;
 };
 export type PersonDeleteDto = {
     userId?: string;
@@ -7834,15 +7835,15 @@ export function getUsersForPeople({ direction, personId, role, sharedById, share
     }));
 }
 /**
- * Give users access to people
+ * Upsert user access
  */
-export function addUsersToPeople({ personUsersCreateDto }: {
-    personUsersCreateDto: PersonUsersCreateDto;
+export function upsertPeopleUsers({ peopleUsersUpsertDto }: {
+    peopleUsersUpsertDto: PeopleUsersUpsertDto;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText("/people/users", oazapfts.json({
         ...opts,
         method: "PUT",
-        body: personUsersCreateDto
+        body: peopleUsersUpsertDto
     })));
 }
 /**
@@ -11461,6 +11462,9 @@ export enum Type2 {
 export enum SharingDirection {
     SharedBy = "shared-by",
     SharedWith = "shared-with"
+}
+export enum PeopleUsersUpsertType {
+    Everyone = "everyone"
 }
 export enum WorkflowType {
     AssetV1 = "AssetV1"

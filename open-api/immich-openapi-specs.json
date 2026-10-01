@@ -11640,13 +11640,13 @@
       },
       "put": {
         "description": "Give users access to people",
-        "operationId": "addUsersToPeople",
+        "operationId": "upsertPeopleUsers",
         "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PersonUsersCreateDto"
+                "$ref": "#/components/schemas/PeopleUsersUpsertDto"
               }
             }
           },
@@ -11668,7 +11668,7 @@
             "api_key": []
           }
         ],
-        "summary": "Give users access to people",
+        "summary": "Upsert user access",
         "tags": [
           "People"
         ],
