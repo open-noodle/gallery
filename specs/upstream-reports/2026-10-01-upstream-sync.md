@@ -251,3 +251,22 @@ Implemented per the spec, across five commits (one per upstream person-sharing c
 5. Pull the three newer release-line commits next cycle.
 6. Fork `album-utils.isAlbumEditor(album, userId)` vs upstream's `album.service.isAlbumEditor(album)` — converge.
 7. Upstream's `isFavorite`/`isHidden` people filters are no-ops in Gallery (they live in the declined query).
+
+## Remote CI
+
+- **Branch**: `rebase/upstream-rolling-v3.3.0`
+
+| Workflow                            | Status | Commit        | Notes                                                                                                 |
+| ----------------------------------- | ------ | ------------- | ----------------------------------------------------------------------------------------------------- |
+| Test                                | GREEN  | `ec04543a926` | run 36910199798; Lint Web (runner cancel) and one e2e arm (`toomanyrequests` image pull) re-run green |
+| Docker                              | GREEN  | `73359898b71` |                                                                                                       |
+| Static Code Analysis                | GREEN  | `73359898b71` |                                                                                                       |
+| Gallery Build Mobile                | GREEN  | `73359898b71` |                                                                                                       |
+| Gallery Rebase Smoke                | GREEN  | `73359898b71` |                                                                                                       |
+| Storage Migration Tests / E2E       | GREEN  | `73359898b71` |                                                                                                       |
+| Gallery Revert-to-Immich Validation | GREEN  | `73359898b71` | PersonSharing reversal + three post-tag rows                                                          |
+| Gallery ML Smoke / Mobile Smoke     | GREEN  | `73359898b71` |                                                                                                       |
+
+Fixed from the first CI round on `73359898b71`: `person.repository.sql` block order (SQL Schema Checks), a `kmr` CTA
+branding override for a string immich-31376 introduced, and the e2e camera-make expectation (Gallery's test-assets pin
+holds a Samsung video that immich-29375 now labels `Samsung`). Changes after `73359898b71` touch only `Test`'s scope.
