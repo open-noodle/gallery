@@ -1,8 +1,10 @@
 import { AssetEditAction, getAssetInfo, type AssetEditActionItemDto, type AssetResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
+import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
+import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
 import {
   getAssetActions,
   getAssetBulkActions,
@@ -24,6 +26,7 @@ const { downloadUrlMock } = vitest.hoisted(() => ({
 vitest.mock('@immich/ui', () => ({
   toastManager: {
     primary: vitest.fn(),
+    warning: vitest.fn(),
   },
   modalManager: { show: vitest.fn() },
 }));
@@ -348,5 +351,37 @@ describe('add to album/space entry points', () => {
         restrictToSpaceId: undefined,
       });
     });
+  });
+});
+
+// #853: the bulk share action (immich-31976 turned it into an ActionItem) must send only the owned
+// subset — the server rejects the whole request if it names one asset the caller does not own.
+describe('bulk CreateSharedLink action', () => {
+  const selection = assetMultiSelectManager as unknown as { ownedAssets?: { id: string }[] };
+
+  beforeEach(() => {
+    vitest.mocked(modalManager.show).mockClear();
+    vitest.mocked(toastManager.warning).mockClear();
+    authManager.setPreferences(preferencesFactory.build());
+    authManager.setUser(userAdminFactory.build({ id: 'me' }));
+  });
+  afterEach(() => {
+    authManager.reset();
+    delete selection.ownedAssets;
+  });
+
+  it('shares only the owned assets and reports how many were left out', async () => {
+    selection.ownedAssets = [{ id: 'x1' }];
+    const action = getAssetBulkActions(((k: string) => k) as never).CreateSharedLink;
+    await action.onAction({ action, event: new Event('click') });
+    expect(modalManager.show).toHaveBeenCalledWith(SharedLinkCreateModal, { assetIds: ['x1'], excludedCount: 1 });
+  });
+
+  it('warns instead of opening the modal when nothing in the selection is owned', async () => {
+    selection.ownedAssets = [];
+    const action = getAssetBulkActions(((k: string) => k) as never).CreateSharedLink;
+    await action.onAction({ action, event: new Event('click') });
+    expect(modalManager.show).not.toHaveBeenCalled();
+    expect(toastManager.warning).toHaveBeenCalledWith('shared_link_nothing_owned_to_share');
   });
 });
