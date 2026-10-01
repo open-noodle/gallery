@@ -2,7 +2,7 @@ import { Selectable } from 'kysely';
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import type { ImageDimensions, MaybeDehydrated } from 'src/types.js';
-import { AssetFace, Person, PersonUser, User } from 'src/database.js';
+import { AssetFace, Person, User } from 'src/database.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { BulkIdsSchema } from 'src/dtos/asset-ids.response.dto.js';
 import { AssetEditActionItem } from 'src/dtos/editing.dto.js';
@@ -138,6 +138,30 @@ export const ScopedPrimaryProfileSchema = z
   })
   .meta({ id: 'ScopedPrimaryProfile' });
 
+export enum PersonUserRole {
+  Read = 'read',
+  Write = 'write',
+  Admin = 'admin',
+}
+
+const PersonUserRoleSchema = z
+  .enum(PersonUserRole)
+  .describe('Levels of access for managing people resources on behalf of another user.')
+  .meta({ id: 'PersonUserRole' });
+
+const PersonOtherResponseSchema = z
+  .object({
+    sharedById: z.uuid(),
+    name: z.string(),
+    birthDate: z.string().nullable(),
+    role: PersonUserRoleSchema,
+  })
+  .meta({ id: 'PersonOtherResponseDto' });
+
+const PeopleUserResponseSchema = UserResponseSchema.extend({
+  role: PersonUserRoleSchema.describe('Access role'),
+}).meta({ id: 'PeopleUserResponseDto' });
+
 export const PersonResponseSchema = z
   .object({
     id: z.uuidv4().describe('Person ID'),
@@ -169,6 +193,9 @@ export const PersonResponseSchema = z
     type: z.string().default('person').describe('Entity type (person or pet)'),
     species: z.string().nullable().optional().describe('Pet species (e.g. dog, cat)'),
     spacePersonId: z.string().optional().describe('Space person ID when viewed through a shared space'),
+    otherPeople: z.array(PersonOtherResponseSchema),
+    sharedBy: z.array(PeopleUserResponseSchema).describe('Users that gave the current user access to this person'),
+    sharedWith: z.array(PeopleUserResponseSchema).describe('Users the current user gave access to this person'),
   })
   .meta({ id: 'PersonResponseDto' });
 
@@ -441,11 +468,7 @@ const PeopleResponseSchema = z
   .describe('People response');
 export class PeopleResponseDto extends createZodDto(PeopleResponseSchema) {}
 
-type OptionalKeys = 'otherPeople' | 'sharedBy' | 'sharedWith';
-
-export function mapPerson(
-  person: MaybeDehydrated<Omit<Person, OptionalKeys> & Partial<Pick<Person, OptionalKeys>>>,
-): PersonResponseDto {
+export function mapPerson(person: MaybeDehydrated<Person>): PersonResponseDto {
   return {
     id: person.personGroupId,
     name: person.name,
@@ -457,13 +480,12 @@ export function mapPerson(
     updatedAt: asDateTimeString(person.updatedAt),
     type: person.type,
     species: person.species,
+    // Gallery: person sharing is dormant (specs/2026-10-01-upstream-person-sharing-dormant-design.md).
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
   };
 }
-
-const mapPeopleUser = (user: MaybeDehydrated<PersonUser>): PeopleUserResponseDto => ({
-  ...mapUser(user),
-  role: user.role,
-});
 
 type PersonUserShare = {
   personId: string;
