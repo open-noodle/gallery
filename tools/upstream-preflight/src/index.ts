@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import micromatch from 'micromatch';
@@ -494,14 +495,28 @@ program
     process.exitCode = results.every((result) => result.ok) ? 0 : 1;
   });
 
+function upstreamRefFromManifest() {
+  const topLevel = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  }).trim();
+  const manifest = loadManifest(path.join(topLevel, defaultManifestPath));
+  return `${manifest.metadata.upstream_remote}/${manifest.metadata.upstream_branch}`;
+}
+
 program
   .command('commit-autolink-check')
-  .option('--range <range>', 'commit range to scan', 'upstream/main..HEAD')
+  .option(
+    '--range <range>',
+    "commit range to scan (default: the manifest's upstream ref..HEAD)",
+  )
   .option(
     '--fork-pr-ceiling <n>',
     'highest PR number that belongs to this repo; above it, #N resolves upstream',
   )
-  .action((options: { range: string; forkPrCeiling?: string }) => {
+  .action((options: { range?: string; forkPrCeiling?: string }) => {
+    // The rolling branch may track a release branch rather than main; scanning from main would
+    // then count upstream's own release-line cherry-picks as fork commits.
+    const range = options.range ?? `${upstreamRefFromManifest()}..HEAD`;
     const ceiling = options.forkPrCeiling
       ? Number(options.forkPrCeiling)
       : undefined;
@@ -510,7 +525,7 @@ program
         `--fork-pr-ceiling must be an integer, got ${options.forkPrCeiling}`,
       );
     }
-    const result = runCommitAutolinkAudit(options.range, repoRoot(), ceiling);
+    const result = runCommitAutolinkAudit(range, repoRoot(), ceiling);
     console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
     for (const detail of result.details) console.log(`- ${detail}`);
     process.exitCode = result.ok ? 0 : 1;
