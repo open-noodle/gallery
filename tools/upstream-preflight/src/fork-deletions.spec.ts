@@ -44,6 +44,14 @@ const FORK_DELETED_PATHS: { path: string; why: string }[] = [
     why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
   },
   {
+    path: 'web/src/lib/modals/PeopleSelectionModal.svelte',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
+    path: 'web/src/lib/modals/PersonBulkShareModal.svelte',
+    why: "upstream's person-sharing UI (immich-31620), dormant in Gallery — specs/2026-10-01-upstream-person-sharing-dormant-design.md",
+  },
+  {
     path: 'server/test/medium/specs/repositories/person-user.repository.spec.ts',
     why: "upstream's person-sharing repository tests; sharing cannot run under Option M — pinned instead by person-sharing-dormant.spec.ts",
   },

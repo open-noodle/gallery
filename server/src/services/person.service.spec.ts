@@ -6937,7 +6937,7 @@ describe(PersonService.name, () => {
     it('refuses to share people', () => {
       const auth = AuthFactory.create();
       expect(() =>
-        sut.addUsersToPeople(auth, { personIds: [newUuid()], sharedWithIds: [newUuid()], role: PersonUserRole.Read }),
+        sut.upsertPeopleUsers(auth, { personIds: [newUuid()], sharedWithIds: [newUuid()], role: PersonUserRole.Read }),
       ).toThrow(BadRequestException);
       expect(mocks.personUser.createAll).not.toHaveBeenCalled();
     });

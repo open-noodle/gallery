@@ -37,7 +37,6 @@ import {
   PersonSearchDto,
   PersonStatisticsResponseDto,
   PersonUpdateDto,
-  PersonUsersCreateDto,
   PersonUsersDeleteDto,
   PersonUsersResponseDto,
   PersonUsersSearchDto,
@@ -216,12 +215,12 @@ export class PersonController {
   @Put('users')
   @Authenticated({ permission: Permission.PersonUpdate })
   @Endpoint({
-    summary: 'Give users access to people',
+    summary: 'Upsert user access',
     description: 'Give users access to people',
     history: new HistoryBuilder().added('v3.3').stable('v3.3'),
   })
-  addUsersToPeople(@Auth() auth: AuthDto, @Body() dto: PersonUsersCreateDto): Promise<void> {
-    return this.service.addUsersToPeople(auth, dto);
+  upsertPeopleUsers(@Auth() auth: AuthDto, @Body() dto: PeopleUsersUpsertDto): Promise<void> {
+    return this.service.upsertPeopleUsers(auth, dto);
   }
 
   @Delete('users')
