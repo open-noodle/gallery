@@ -103,10 +103,24 @@ export const getAssetBulkActions = (
     onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds, restrictToSpaceId }),
   };
 
+  // Gallery (#853): `Permission.AssetShare` is owner ∪ partner only and rejects the ENTIRE request if it
+  // names one asset the caller does not own, so share the owned subset and surface what was left out.
+  // `ownedAssets` falls back to the full selection when unauthenticated, so gate on that too. Space
+  // surfaces keep the fork's CreateSharedLinkAction, which shares the whole selection against the space.
   const CreateSharedLink: ActionItem = {
     title: $t('share'),
     icon: mdiShareVariantOutline,
-    onAction: () => modalManager.show(SharedLinkCreateModal, { assetIds }),
+    onAction: async () => {
+      const ownedAssetIds = authManager.authenticated ? assetMultiSelectManager.ownedAssets.map(({ id }) => id) : [];
+      if (ownedAssetIds.length === 0) {
+        toastManager.warning($t('shared_link_nothing_owned_to_share'));
+        return;
+      }
+      await modalManager.show(SharedLinkCreateModal, {
+        assetIds: ownedAssetIds,
+        excludedCount: assetIds.length - ownedAssetIds.length,
+      });
+    },
   };
 
   const RemoveFromAlbum: ActionItem = {
