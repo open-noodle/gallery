@@ -10,7 +10,7 @@ import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.se
 import type { JobItem, JobOf } from 'src/types.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { Chunked, OnEvent, OnJob } from 'src/decorators.js';
-import { BulkIdErrorReason, BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto.js';
+import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
   AssetFaceCreateDto,
@@ -21,22 +21,27 @@ import {
   FaceDto,
   MergePersonDto,
   MergeScopedPeopleDto,
+  PeopleDeleteDto,
   PeopleFaceStatisticsResponseDto,
   PeopleResponseDto,
   PeopleStatisticsResponseDto,
   PeopleUpdateDto,
   PeopleUsersUpsertDto,
   PersonCreateDto,
+  PersonDeleteDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
   PersonResponseDto,
   PersonSearchDto,
   PersonStatisticsResponseDto,
   PersonUpdateDto,
+  PersonUsersCreateDto,
+  PersonUsersDeleteDto,
+  PersonUsersResponseDto,
+  PersonUsersSearchDto,
   RepresentativeFaceUpdateDto,
   mapFaces,
   mapPerson,
-  mapPersonUsers,
 } from 'src/dtos/person.dto.js';
 import {
   AssetVisibility,
@@ -65,6 +70,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { getDimensions } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
+import { isHttpException } from 'src/utils/logger.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, findOrFail, isFaceSuggestionEnabled, isFacialRecognitionEnabled } from 'src/utils/misc.js';
@@ -92,6 +98,23 @@ const PEOPLE_BACKFILL_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
  * maintenance, or a manual run) starts a fresh chain.
  */
 export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
+
+/**
+ * Gallery: upstream's person sharing (immich-31620) is pulled but dormant. Its model needs several `person` rows per
+ * person group, which Option M's `person_personGroupId_key` forbids, and it shares only inside a cluster group, which
+ * Gallery keeps inert. See specs/2026-10-01-upstream-person-sharing-dormant-design.md.
+ */
+export const personSharingUnsupported = () => new BadRequestException('Person sharing is not available in Gallery');
+
+/**
+ * Upstream lets `userId` address another owner's row of the same person through a `person_user` grant. Gallery's
+ * person access is owner-only, so an override naming anyone else would bypass it: refuse it.
+ */
+const assertOwnRecord = (auth: AuthDto, userId: string | undefined) => {
+  if (userId !== undefined && userId !== auth.user.id) {
+    throw personSharingUnsupported();
+  }
+};
 
 @Injectable()
 export class PersonService extends BaseService {
@@ -309,16 +332,11 @@ export class PersonService extends BaseService {
   }
 
   async reassignFaces(auth: AuthDto, personGroupId: string, dto: AssetFaceUpdateDto): Promise<PersonResponseDto[]> {
-    const ids = dto.data.map((item) => ({ personGroupId: item.personId, ownerId: item.userId ?? auth.user.id }));
-
-    await this.requirePersonAccess({
-      auth,
-      permission: Permission.PersonUpdate,
-      ids: [{ personGroupId, ownerId: auth.user.id }, ...ids],
-    });
-
+    for (const item of dto.data) {
+      assertOwnRecord(auth, item.userId);
+    }
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personGroupId] });
     const person = await this.findOrFail(auth, personGroupId);
-
     const result: PersonResponseDto[] = [];
     const changeFeaturePhoto = new Map<string, PersonId>();
     for (const data of dto.data) {
@@ -362,11 +380,7 @@ export class PersonService extends BaseService {
   }
 
   async reassignFacesById(auth: AuthDto, personGroupId: string, dto: FaceDto): Promise<PersonResponseDto> {
-    await this.requirePersonAccess({
-      auth,
-      permission: Permission.PersonUpdate,
-      ids: [{ personGroupId, ownerId: auth.user.id }],
-    });
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personGroupId] });
     await this.requireAccess({ auth, permission: Permission.PersonCreate, ids: [dto.id] });
     const face = await this.personRepository.getFaceById(dto.id, { viewingUserId: auth.user.id });
     const person = await this.findOrFail(auth, personGroupId);
@@ -658,13 +672,13 @@ export class PersonService extends BaseService {
   }
 
   async update(auth: AuthDto, personGroupId: string, dto: PersonUpdateDto): Promise<PersonResponseDto> {
+    assertOwnRecord(auth, dto.userId);
     await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personGroupId] });
     const prior = await this.personRepository.getByGroupIdOnly(personGroupId);
 
-    if (!userIdOverride && hasSharedProperties) {
-      await this.personRepository.updateForWritableOwners({ userId: auth.user.id, personGroupId }, { name, birthDate });
-    }
-
+    const { ownerId } = await this.findOrFail(auth, personGroupId);
+    const { name, birthDate, isHidden, featureFaceAssetId: assetId, isFavorite, color } = dto;
+    // TODO: set by faceId directly
     let faceId: string | undefined;
 
     if (assetId) {
@@ -712,7 +726,7 @@ export class PersonService extends BaseService {
     return mapPerson(person);
   }
 
-  delete(auth: AuthDto, id: string, dto: PersonDeleteDto): Promise<void> {
+  delete(auth: AuthDto, id: string, dto: PersonDeleteDto = {}): Promise<void> {
     return this.deleteAll(auth, { ids: [id], ...dto });
   }
 
@@ -739,7 +753,8 @@ export class PersonService extends BaseService {
     return results;
   }
 
-  async deleteAll(auth: AuthDto, { ids }: BulkIdsDto): Promise<void> {
+  async deleteAll(auth: AuthDto, { ids, userId }: PeopleDeleteDto): Promise<void> {
+    assertOwnRecord(auth, userId);
     await this.requireAccess({ auth, permission: Permission.PersonDelete, ids });
     await this.removeAllPersonGroups(ids, auth.user.id);
     if (ids.length > 0) {
@@ -1616,11 +1631,7 @@ export class PersonService extends BaseService {
   async createFace(auth: AuthDto, dto: AssetFaceCreateDto): Promise<void> {
     await Promise.all([
       this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [dto.assetId] }),
-      this.requirePersonAccess({
-        auth,
-        permission: Permission.PersonRead,
-        ids: [{ personGroupId: dto.personId, ownerId: auth.user.id }],
-      }),
+      this.requireAccess({ auth, permission: Permission.PersonRead, ids: [dto.personId] }),
     ]);
 
     const [asset, person] = await Promise.all([
@@ -1648,6 +1659,7 @@ export class PersonService extends BaseService {
       const scaleFactor = asset.width / dto.imageWidth;
       topLeft = { x: topLeft.x * scaleFactor, y: topLeft.y * scaleFactor };
       bottomRight = { x: bottomRight.x * scaleFactor, y: bottomRight.y * scaleFactor };
+
       const [invertedTopLeft, invertedBottomRight] = transformPoints(
         [topLeft, bottomRight],
         edits,
@@ -1696,65 +1708,16 @@ export class PersonService extends BaseService {
     await this.faceIdentityRepository.unlinkFaces([id]);
   }
 
-  async getUsersForPeople(auth: AuthDto, dto: PersonUsersSearchDto): Promise<PersonUsersResponseDto> {
-    const sharedUsers = await this.personUserRepository.searchPeopleUsers(auth.user.id, dto);
-
-    return mapPersonUsers(sharedUsers);
+  getUsersForPeople(_auth: AuthDto, _dto: PersonUsersSearchDto): Promise<PersonUsersResponseDto> {
+    return Promise.resolve([]);
   }
 
-  async upsertPeopleUsers(auth: AuthDto, dto: PeopleUsersUpsertDto) {
-    if (dto.sharedWithIds.includes(auth.user.id)) {
-      throw new BadRequestException('Cannot share a person with yourself');
-    }
-
-    if (dto.personIds) {
-      await this.requirePersonAccess({
-        auth,
-        permission: Permission.PersonUpdate,
-        ids: dto.personIds.map((item) => ({ personGroupId: item, ownerId: auth.user.id })),
-      });
-    }
-
-    const user = await findOrFail(() => this.userRepository.get(auth.user.id, {}), 'User');
-    const clusterGroupUsers = await this.clusterGroupRepository.getUsers({
-      clusterGroupId: user.clusterGroupId,
-      userId: user.id,
-    });
-    const clusterGroupUserIds = new Set(clusterGroupUsers.map(({ id }) => id));
-
-    for (const sharedWithId of dto.sharedWithIds) {
-      if (!clusterGroupUserIds.has(sharedWithId)) {
-        throw new BadRequestException('All users must be in the same cluster group');
-      }
-    }
-
-    const sharedById = auth.user.id;
-
-    if (dto.personIds) {
-      const items: Insertable<PersonUserTable>[] = [];
-      for (const sharedWithId of dto.sharedWithIds) {
-        for (const personGroupId of dto.personIds) {
-          items.push({ personGroupId, sharedById, sharedWithId, role: dto.role });
-        }
-      }
-
-      await this.personUserRepository.createAll(items);
-    } else {
-      await this.personUserRepository.createAllForOwner({
-        ownerId: sharedById,
-        sharedWithIds: dto.sharedWithIds,
-        role: dto.role,
-      });
-    }
+  addUsersToPeople(_auth: AuthDto, _dto: PersonUsersCreateDto): Promise<void> {
+    throw personSharingUnsupported();
   }
 
-  async removeUsersFromPeople(auth: AuthDto, dto: PersonUsersDeleteDto) {
-    await this.requirePersonAccess({
-      auth,
-      permission: Permission.PersonUpdate,
-      ids: dto.map((item) => ({ personGroupId: item.personId, ownerId: item.sharedById ?? auth.user.id })),
-    });
-    await this.personUserRepository.deleteAll(auth.user.id, dto);
+  removeUsersFromPeople(_auth: AuthDto, _dto: PersonUsersDeleteDto): Promise<void> {
+    throw personSharingUnsupported();
   }
 
   private vacuum(...tables: (keyof DB)[]): Promise<unknown> {
