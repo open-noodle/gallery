@@ -566,6 +566,15 @@ where
       "user"."id" = $2
   )
 
+-- AccessRepository.person.checkOwnerAccess
+select
+  "person"."personGroupId"
+from
+  "person"
+where
+  "person"."personGroupId" in ($1)
+  and "person"."ownerId" = $2
+
 -- AccessRepository.person.checkAccess
 select
   "personGroupId",
