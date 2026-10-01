@@ -110,7 +110,8 @@ ci-invariants-check:
 
 .PHONY: commit-autolink-check
 # `pnpm run <script> -- --range X` swallows the argument and reports a false OK, so invoke the CLI
-# directly. Override the range with: make commit-autolink-check RANGE=upstream/main..some-branch
+# directly. The default range starts at the ownership manifest's upstream ref; override it with:
+# make commit-autolink-check RANGE=<upstream-ref>..some-branch
 #
 # Resolve this repo's highest PR number at run time: anything above it is not ours, so `#N` resolves
 # to the upstream repo. Freezing this as a constant makes the check flag our OWN new PRs (it did —
