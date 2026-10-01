@@ -20,6 +20,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
+import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetService } from 'src/services/asset.service.js';
 import { newMediumService } from 'test/medium.factory.js';
@@ -30,7 +31,7 @@ let defaultDatabase: Kysely<DB>;
 
 // eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
-  return newMediumService(AssetService, {
+  const result = newMediumService(AssetService, {
     database: db || defaultDatabase,
     real: [
       AssetRepository,
@@ -44,8 +45,19 @@ const setup = (db?: Kysely<DB>) => {
       StackRepository,
       UserRepository,
     ],
-    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository, MapRepository],
+    mock: [
+      EventRepository,
+      LoggingRepository,
+      JobRepository,
+      StorageRepository,
+      OcrRepository,
+      MapRepository,
+      WebsocketRepository,
+    ],
   });
+  // immich-31777 pushes on_asset_update when updateAll writes no metadata (a visibility-only change).
+  result.ctx.getMock(WebsocketRepository).clientSend.mockReturnValue();
+  return result;
 };
 
 beforeAll(async () => {
