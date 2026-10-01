@@ -1,7 +1,6 @@
 import request from 'supertest';
 import { PersonController } from 'src/controllers/person.controller.js';
-import { PersonUserRole } from 'src/dtos/person.dto.js';
-import { PersonStatisticsResponseDto } from 'src/dtos/person.dto.js';
+import { PersonStatisticsResponseDto, PersonUserRole } from 'src/dtos/person.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonService } from 'src/services/person.service.js';
 import { errorDto } from 'test/medium/responses.js';

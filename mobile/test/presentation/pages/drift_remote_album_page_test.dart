@@ -21,13 +21,16 @@ import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/server_info/server_version.model.dart';
 import 'package:immich_mobile/presentation/pages/remote_album.page.dart';
 import 'package:immich_mobile/presentation/widgets/remote_album/album_option.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
+import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
@@ -35,6 +38,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart';
 
+import '../../riverpod_mocks.dart';
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
@@ -43,6 +47,8 @@ class _MockTimelineFactory extends Mock implements TimelineFactory {}
 class _MockRemoteAlbumService extends Mock implements RemoteAlbumService {}
 
 class _MockUserService extends Mock implements UserService {}
+
+class _MockServerInfoService extends Mock implements ServerInfoService {}
 
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto user) {
@@ -188,6 +194,13 @@ void main() {
                 noCurrentUser ? _NullCurrentUserNotifier(userService) : _StubCurrentUserNotifier(userService, user),
           ),
           timelineUsersProvider.overrideWith((_) => Stream<List<String>>.value([user.id])),
+          // immich-31959 gates editor editing on the server's albumEditorUpdate capability.
+          serverInfoProvider.overrideWith(
+            (ref) => StubServerInfoNotifier(
+              _MockServerInfoService(),
+              version: const ServerVersion(major: 3, minor: 3, patch: 0),
+            ),
+          ),
         ],
         child: EasyLocalization(
           supportedLocales: const [Locale('en')],
