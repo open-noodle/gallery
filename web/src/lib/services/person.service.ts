@@ -1,4 +1,3 @@
-import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import PersonEditBirthDateModal from '#lib/modals/PersonEditBirthDateModal.svelte';
 import { handleError } from '#lib/utils/handle-error.ts';
@@ -255,8 +254,6 @@ export const handleUpdatePersonBirthDate = async (person: PersonResponseDto, bir
   } catch (error) {
     handleError(error, $t('errors.unable_to_save_date_of_birth'));
   }
-
-  return response;
 };
 
 const handleSetFeaturedPhoto = async (person: PersonResponseDto, featureFaceAssetId: string) => {

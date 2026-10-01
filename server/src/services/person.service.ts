@@ -680,7 +680,6 @@ export class PersonService extends BaseService {
     const { name, birthDate, isHidden, featureFaceAssetId: assetId, isFavorite, color } = dto;
     // TODO: set by faceId directly
     let faceId: string | undefined;
-
     if (assetId) {
       await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [assetId] });
       const face = await this.personRepository.getForFeatureFaceUpdate({ personGroupId, assetId });
@@ -692,7 +691,7 @@ export class PersonService extends BaseService {
     }
 
     const person = await this.personRepository.update({
-      ownerId: targetOwnerId,
+      ownerId,
       personGroupId,
       faceAssetId: faceId,
       name,
@@ -703,10 +702,7 @@ export class PersonService extends BaseService {
     });
 
     if (assetId) {
-      await this.jobRepository.queue({
-        name: JobName.PersonGenerateThumbnail,
-        data: { ownerId: targetOwnerId, personGroupId },
-      });
+      await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
     }
 
     if (person.identityId && (name !== undefined || birthDate !== undefined)) {

@@ -1409,19 +1409,7 @@ describe(PersonService.name, () => {
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set(['person-1']));
     });
 
-    it('should throw an error when personal properties are updated for another user', async () => {
-      const auth = AuthFactory.create();
-      const person = PersonFactory.create();
-
-      await expect(
-        sut.update(auth, person.personGroupId, { userId: person.ownerId, name: 'Person 1', isFavorite: true }),
-      ).rejects.toThrow('Only name and birthDate can be updated for other users');
-      expect(mocks.access.person.checkAccess).not.toHaveBeenCalled();
-      expect(mocks.person.update).not.toHaveBeenCalled();
-      expect(mocks.person.updateForWritableOwners).not.toHaveBeenCalled();
-    });
-
-    it("should update a person's name for every user with write access", async () => {
+    it("should update a person's name", async () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create({ name: 'Person 1' });
 
@@ -1433,14 +1421,8 @@ describe(PersonService.name, () => {
         expect.objectContaining({ id: person.personGroupId, name: 'Person 1' }),
       );
 
-      expect(mocks.person.updateForWritableOwners).toHaveBeenCalledWith(
-        { userId: auth.user.id, personGroupId: person.personGroupId },
-        {
-          name: 'Person 1',
-        },
-      );
       expect(mocks.person.update).toHaveBeenCalledWith({
-        ownerId: auth.user.id,
+        ownerId: person.ownerId,
         personGroupId: person.personGroupId,
         name: 'Person 1',
       });
@@ -1473,29 +1455,6 @@ describe(PersonService.name, () => {
       mocks.person.update.mockResolvedValue(person);
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
-      await expect(
-        sut.update(auth, person.personGroupId, { name: 'Person 1', isFavorite: true, userId: auth.user.id }),
-      ).resolves.toEqual(expect.objectContaining({ id: person.personGroupId, name: 'Person 1' }));
-
-      expect(mocks.person.update).toHaveBeenCalledWith({
-        ownerId: auth.user.id,
-        personGroupId: person.personGroupId,
-        name: 'Person 1',
-        isFavorite: true,
-      });
-      expect(mocks.person.updateForWritableOwners).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkAccess).toHaveBeenCalledWith(auth.user.id, new Set(ids), PERSON_WRITE_ROLES);
-    });
-
-    it("should update a person's date of birth for every user with write access", async () => {
-      const auth = AuthFactory.create();
-      const person = PersonFactory.create({ ownerId: auth.user.id, birthDate: new Date('1976-06-30') });
-
-      mocks.access.person.checkAccess.mockResolvedValue(
-        new Set([{ personGroupId: person.personGroupId, ownerId: auth.user.id }]),
-      );
-      mocks.person.update.mockResolvedValue(person);
-
       await expect(sut.update(auth, person.personGroupId, { birthDate: '1976-06-30' })).resolves.toEqual({
         otherPeople: [],
         sharedBy: [],
@@ -1511,14 +1470,8 @@ describe(PersonService.name, () => {
         species: null,
         updatedAt: expect.any(String),
       });
-      expect(mocks.person.updateForWritableOwners).toHaveBeenCalledWith(
-        { userId: auth.user.id, personGroupId: person.personGroupId },
-        {
-          birthDate: '1976-06-30',
-        },
-      );
       expect(mocks.person.update).toHaveBeenCalledWith({
-        ownerId: auth.user.id,
+        ownerId: person.ownerId,
         personGroupId: person.personGroupId,
         birthDate: '1976-06-30',
       });
@@ -1565,38 +1518,6 @@ describe(PersonService.name, () => {
         isFavorite: true,
       });
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
-    });
-
-    it('should update shared and personal properties together', async () => {
-      const auth = AuthFactory.create();
-      const person = PersonFactory.create({ ownerId: auth.user.id, name: 'Person 1', isFavorite: true });
-
-      mocks.access.person.checkAccess.mockResolvedValue(
-        new Set([{ personGroupId: person.personGroupId, ownerId: auth.user.id }]),
-      );
-      mocks.person.update.mockResolvedValue(person);
-
-      await expect(sut.update(auth, person.personGroupId, { name: 'Person 1', isFavorite: true })).resolves.toEqual(
-        expect.objectContaining({ name: 'Person 1', isFavorite: true }),
-      );
-
-      expect(mocks.person.updateForWritableOwners).toHaveBeenCalledWith(
-        { userId: auth.user.id, personGroupId: person.personGroupId },
-        {
-          name: 'Person 1',
-        },
-      );
-      expect(mocks.person.update).toHaveBeenCalledWith({
-        ownerId: auth.user.id,
-        personGroupId: person.personGroupId,
-        name: 'Person 1',
-        isFavorite: true,
-      });
-      expect(mocks.access.person.checkAccess).toHaveBeenCalledWith(
-        auth.user.id,
-        new Set([{ personGroupId: person.personGroupId, ownerId: auth.user.id }]),
-        PERSON_WRITE_ROLES,
-      );
     });
 
     it("should update a person's thumbnailPath", async () => {
