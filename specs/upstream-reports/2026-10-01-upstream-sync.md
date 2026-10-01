@@ -5,12 +5,15 @@
 - **Branch**: `rebase/upstream-rolling-v3.3.0` (continued; pre-cycle backup `backup/rolling-pre-2026-10-01` = `83704cfeaab`)
 - **Upstream source changed**: the rolling branch now tracks **`upstream/release/v3.3`**, not `upstream/main`
   (`docs/fork/ownership.yml` `upstream_branch`). Only changes that ship in the v3.3.0 release candidates are pulled.
-- **Upstream commits pulled**: 15 (batches 40–48), `6b978d0c0d3` → `0f179b9914f`
-- **Quarantined**: everything from immich-31620 (`c12d5e6d35f`, "feat: people management") onward — 34 commits
-  incl. `v3.3.0-rc.0`/`rc.1` — pending a product decision (see below)
+- **Upstream commits pulled**: 49 (batches 40–74), `6b978d0c0d3` → **`3af49d9b4fa`** = the `release/v3.3` tip,
+  through `v3.3.0-rc.0` and `v3.3.0-rc.1`. Three later release-line commits (`112c5e190f7`, `882da7cab8b`,
+  `843051f0f5b`) landed during the cycle and are left for the next one.
+- **Person sharing (immich-31620 + 31902/31930/31931/31960)**: first quarantined, then pulled **dormant** after a
+  product decision (`specs/2026-10-01-upstream-person-sharing-dormant-design.md`).
 - **Fork synced**: #1151 (Immich v3.2.3/v3.2.4 backport, hand-resolved), #1145
-- **Risk level**: MEDIUM (one silent-break port in ML; one product quarantine)
-- **Recommendation**: PROCEED with the 15; brainstorm person sharing before advancing past the boundary
+- **Risk level**: MEDIUM-HIGH (one silent-break ML port; the person-sharing dormancy port; several zero-conflict
+  fork-test breaks fixed)
+- **Recommendation**: PROCEED — full local gates green; SQL docs and the base-image check rely on CI (no local Docker)
 
 ## Why `release/v3.3`
 
@@ -35,8 +38,10 @@ conflicts arise.
 | `b20bc5ed822` | auto-sync name changes to connected users (immich-31931)        | people names, user preferences           | builds on the above                                                                                                                                                                                                     |
 | `f32a891d407` | bulk person management (immich-31960)                           | people                                   | builds on the above                                                                                                                                                                                                     |
 
-`upstreamTargetHead` is set to `0f179b9914f`, the commit immediately before immich-31620. Pierre chose to brainstorm the
-direction before pulling it. Most of what rc.0/rc.1 add over the cursor sits behind this decision.
+The batch was first held at `0f179b9914f`. After brainstorming, Pierre chose a **dormant pull** (approach A): take the
+schema and code, refuse the sharing routes and `userId` overrides, keep Gallery's person access/read/merge paths, guard
+with an invariant. Upstream's model needs several `person` rows per group, which Option M's `person_personGroupId_key`
+forbids, and it shares only inside a cluster group, which Gallery keeps inert.
 
 ## Incoming Upstream Changes (pulled)
 
@@ -174,3 +179,75 @@ Upstream's typed ML pipeline was propagated to the fork's pet models in this cyc
    fork callers and drop the helper.
 4. upstream `...Object.values(Actions)` adds all album actions to the command palette; check for duplicates with the
    fork's cmdk album commands (#384).
+
+## Batches 49–74 (second half of the cycle)
+
+### Person sharing, dormant
+
+Implemented per the spec, across five commits (one per upstream person-sharing commit):
+
+- `PersonService`/`PersonRepository` return to Gallery's versions; access keeps `checkOwnerAccess` beside upstream's
+  inert `checkAccess`. Upstream hunks that merged **cleanly** but would have broken Space members were reverted:
+  `createFace`/`reassignFaces` switching to `requirePersonAccess` (owner-row model), `getAllForUser` rebuilt on
+  `person_group`, `update()` writing to `targetOwnerId`.
+- `GET /people/users` → `[]`; `PUT|DELETE /people/users` → 400 (`personSharingUnsupported`), declared before `:id`.
+  `userId` overrides naming anyone else → 400 (security: the owner-only check would otherwise be bypassed).
+- Adopted: DTOs (`PeopleUsersUpsertDto`, `otherPeople/sharedBy/sharedWith` always `[]`), `SharingDirection`,
+  `uniqueIds`, the `people.updateStrategy` preference (stored, no effect), the `PUT /people/users` validation test.
+- Deleted and registered in `fork-deletions.spec.ts`: upstream's share/access/filter/edit/bulk modals,
+  `person-user.service.ts`, the medium `person-user.repository.spec.ts`.
+- Guards: invariant `person-sharing-dormant`; unit tests for every refusal/guard (proven red); medium spec
+  `person-sharing-dormant.spec.ts` pinning the Option M collision and the delete trigger.
+- `revert-to-immich.sql`: idempotent `PersonSharing` reversal; rows for `1790587508209-RenameGeoNamesCountries`,
+  `1790616293884-PersonSharing`, `1790693088454-AddPersonUserTableSharedBySharedWithConstraint`.
+
+### Other resolutions
+
+| Batch | Upstream                                  | Resolution                                                                                                                                                                                                                                    |
+| ----- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 50    | library watcher ignore patterns           | medium DI lists unioned (fork's `SharedSpaceRepository` + upstream's mocks)                                                                                                                                                                   |
+| 52    | email template (immich-31859)             | converged on upstream's ESM import of the preset — the fork had made the same fix; kept the fork's `.d.ts`, so upstream's `@ts-expect-error` is dropped                                                                                       |
+| 53    | Samsung video make/model                  | applied upstream's fallback chain to the fork's re-indented `ensureLocalFile` body (transformer, every stop)                                                                                                                                  |
+| 54    | sync OAuth claims (immich-29013)          | imports unioned; fork's S3 profile-picture branch verified present in `auth`/`user` services                                                                                                                                                  |
+| 56    | translations                              | i18n key-union, fork-changed keys win                                                                                                                                                                                                         |
+| 57/70 | rc.0 / rc.1 version bumps                 | fork mobile versions kept (`1.0.0+1`, iOS `3.0.0`/`240`)                                                                                                                                                                                      |
+| 58    | cull offscreen thumbnails on shared links | upstream's `max-h-screen` + fork's `enableGrouping`                                                                                                                                                                                           |
+| 59    | release-workflow fix                      | `draft-release.yml` stays deleted (`git rm`)                                                                                                                                                                                                  |
+| 63    | typescript-projects + birthdate tz        | lockfile conflicts → HEAD; `packages/scripts` stays deleted                                                                                                                                                                                   |
+| 68    | mobile album editors (immich-31959)       | upstream's `FutureBuilder` app bar + `canEdit` gate merged with the fork's grouping header, `showEditAlbum` (#990) and Space link item (transformer proven byte-identical to upstream); converges with #990                                   |
+| 72    | library exclusion docs                    | took upstream's new sentence (no upstream name to rebrand)                                                                                                                                                                                    |
+| 73    | tag/shared-link actions (immich-31976)    | 12 pages converted by a transformer; `CreateSharedLinkAction.svelte` kept (Space surfaces, #1018); the bulk `CreateSharedLink` action now shares the owned subset (#853), tested red-first; `SelectionToolbar` uses the upstream `Tag` action |
+
+### Zero-conflict breaks fixed at the tip
+
+- **ML** — CI's mypy covers `test_main.py`; immich-31856 typed `session` as `ModelSession`: 33 casts, new cache key,
+  gunicorn patch by path.
+- **Medium** — immich-31777's `on_asset_update` push needs `WebsocketRepository` in the fork's visibility specs.
+- **e2e** — GeoNames country names (`United States`).
+- **Web** — `folders-page.spec` needs `beforeNavigate` (immich-31946); `branded-spinner` set follows the
+  `AddUsersModal` rename.
+- **Mobile** — album page test needs a `serverInfoProvider` override (immich-31959); store-disclosure policy:
+  upstream's new ms/yue_Hant translations of two location keys omit "Noodle Gallery" → dropped (fall back to English).
+- **Tooling** — `commit-autolink-check` now scans from the manifest's upstream ref; scanning from `upstream/main`
+  counted upstream's own release-line cherry-picks as fork commits.
+- **Lockfile** — regenerated once at the tip: canonical, frozen install passes, no injected workspace entries.
+
+### Local verification at the tip (`83e15cfb795`)
+
+| Check                                                                                                                 | Result                                                                   |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| server tsc / lint / prettier / unit                                                                                   | 0 errors / clean / clean / 6484 passed                                   |
+| web tsc / svelte-check / unit                                                                                         | 0 / 630 files 0 errors / 6414 passed                                     |
+| e2e tsc, prettier (server/web/e2e/i18n/.github)                                                                       | clean                                                                    |
+| ML ruff / mypy (CI scope) / pytest                                                                                    | clean / clean / 235 passed                                               |
+| mobile analyze / format / flutter test                                                                                | clean / clean / 4016 (all pass after fixes)                              |
+| preflight vitest                                                                                                      | 301 passed                                                               |
+| audits 40–74, invariants (incl. person-sharing-dormant), fork patches, ownership, autolink, revert coverage, branding | all OK                                                                   |
+| SQL docs                                                                                                              | hand-reconciled (no Docker) — CI SQL Schema Checks is the authority      |
+| base-image bump (`v202609291109`) Shape H check                                                                       | **not run** (no Docker) — `docker.yml` + ML/mobile smoke cover the build |
+
+### Follow-ups (added)
+
+5. Pull the three newer release-line commits next cycle.
+6. Fork `album-utils.isAlbumEditor(album, userId)` vs upstream's `album.service.isAlbumEditor(album)` — converge.
+7. Upstream's `isFavorite`/`isHidden` people filters are no-ops in Gallery (they live in the declined query).
