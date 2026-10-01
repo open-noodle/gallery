@@ -360,3 +360,5 @@ export const IsGreaterThanProperty = (_property: string): PropertyDecorator => {
 export const IsGreaterThanOrEqualTo = (_property: string): PropertyDecorator => {
   return applyDecorators();
 };
+
+export const uniqueIds = z.array(z.uuid()).refine((ids) => ids.length === new Set(ids).size, 'Items must be unique');

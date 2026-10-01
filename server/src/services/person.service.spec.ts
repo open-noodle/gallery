@@ -1942,7 +1942,7 @@ describe(PersonService.name, () => {
       mocks.person.getFaces.mockResolvedValue([getForAssetFace(face)]);
       mocks.asset.getForFaces.mockResolvedValue({ edits: [], ...asset.exifInfo });
       await expect(sut.getFacesById(auth, { id: face.assetId })).resolves.toStrictEqual([
-        mapFaces(getForAssetFace(face)),
+        mapFaces(getForAssetFace(face), auth),
       ]);
     });
 
@@ -6866,10 +6866,11 @@ describe(PersonService.name, () => {
   describe('mapFace', () => {
     it('should map a face', () => {
       const user = UserFactory.create();
+      const auth = AuthFactory.create({ id: user.id });
       const person = PersonFactory.create({ ownerId: user.id });
       const face = AssetFaceFactory.from().person(person).build();
 
-      expect(mapFaces(getForAssetFace(face))).toEqual({
+      expect(mapFaces(getForAssetFace(face), auth)).toEqual({
         boundingBoxX1: 100,
         boundingBoxX2: 200,
         boundingBoxY1: 100,
@@ -6883,7 +6884,7 @@ describe(PersonService.name, () => {
     });
 
     it('should not map person if person is null', () => {
-      expect(mapFaces(getForAssetFace(AssetFaceFactory.create())).person).toBeNull();
+      expect(mapFaces(getForAssetFace(AssetFaceFactory.create()), AuthFactory.create()).person).toBeNull();
     });
 
     // #796 POLICY REVERSAL (was 'should not map person if person does not match auth user id').
