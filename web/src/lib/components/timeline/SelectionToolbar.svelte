@@ -5,6 +5,7 @@
   import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '$lib/components/timeline/actions/ChangeLocationAction.svelte';
+  import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
   import CreateSharedLink from '$lib/components/timeline/actions/CreateSharedLinkAction.svelte';
   import DeleteAssets from '$lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
@@ -14,7 +15,6 @@
   import RotateAction from '$lib/components/timeline/actions/RotateAction.svelte';
   import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '$lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import TagAction from '$lib/components/timeline/actions/TagAction.svelte';
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -229,7 +229,7 @@
         {/if}
       {/if}
       {#if caps.canTag}
-        <TagAction menuItem />
+        <ActionMenuItem action={Actions.Tag} />
       {/if}
       {#if caps.canRemoveFromAlbum && album}
         <RemoveFromAlbum menuItem bind:album={localAlbum} {onRemove} />
