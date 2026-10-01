@@ -440,7 +440,9 @@ ALTER TABLE "user" ALTER COLUMN "oauthId" SET NOT NULL;
 -- immich-31620 (1790616293884-PersonSharing) added person sharing, which Gallery keeps dormant
 -- (specs/2026-10-01-upstream-person-sharing-dormant-design.md). Mirrors its down(), idempotent so it
 -- is also safe against the tagged :main image where none of this exists. Dropping the table drops its
--- own two triggers; person_delete_shares lives on "person" and goes first.
+-- own two triggers; person_delete_shares lives on "person" and goes first. immich-31902's
+-- 1790693088454-AddPersonUserTableSharedBySharedWithConstraint only adds a check on person_user, so
+-- dropping the table reverses it too.
 DROP TRIGGER IF EXISTS "person_delete_shares" ON "person";
 DROP TABLE IF EXISTS "person_user";
 DROP FUNCTION IF EXISTS person_user_after_insert();
@@ -570,7 +572,8 @@ DELETE FROM "kysely_migrations"
 -- migrations the tagged release lacks. Their schema rollbacks are in step 7.
    '1789419229196-ConvertUserOAuthIdEmptyStringToNull',
    '1790587508209-RenameGeoNamesCountries',
-   '1790616293884-PersonSharing'
+   '1790616293884-PersonSharing',
+   '1790693088454-AddPersonUserTableSharedBySharedWithConstraint'
  );
 
 -- -----------------------------------------------------------------------------
