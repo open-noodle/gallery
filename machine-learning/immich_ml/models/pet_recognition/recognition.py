@@ -11,9 +11,11 @@ from immich_ml.models.transforms import decode_pil, serialize_np_array, widen
 from immich_ml.schemas import (
     BoundingBox,
     ModelSession,
+    ModelSource,
     ModelTask,
     ModelType,
     PetDetectionOutput,
+    PetRecognitionOptions,
     PetRecognitionOutput,
     Shape,
 )
@@ -28,9 +30,10 @@ _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 _MIN_CROP_SIDE = 2
 
 
-class PetRecognizer(GalleryHostedModel):
+class PetRecognizer(GalleryHostedModel[PetRecognitionOptions]):
     depends = [(ModelType.DETECTION, ModelTask.PET_DETECTION)]
     identity = (ModelType.RECOGNITION, ModelTask.PET_DETECTION)
+    sources = (ModelSource.PET_RECOGNITION,)
 
     def __init__(self, model_name: str, **model_kwargs: Any) -> None:
         super().__init__(model_name, **model_kwargs)
@@ -47,7 +50,10 @@ class PetRecognizer(GalleryHostedModel):
         return session
 
     def _predict(
-        self, inputs: NDArray[np.uint8] | bytes | Image.Image, pets: PetDetectionOutput
+        self,
+        inputs: NDArray[np.uint8] | bytes | Image.Image,
+        pets: PetDetectionOutput,
+        options: PetRecognitionOptions,
     ) -> PetRecognitionOutput:
         if not pets:
             return []

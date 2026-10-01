@@ -8,7 +8,16 @@ from PIL import Image
 
 from immich_ml.models.gallery_hosted import GalleryHostedModel
 from immich_ml.models.transforms import decode_pil, widen
-from immich_ml.schemas import BoundingBox, ModelFormat, ModelSession, ModelTask, ModelType, PetDetectionOutput
+from immich_ml.schemas import (
+    BoundingBox,
+    ModelFormat,
+    ModelSession,
+    ModelSource,
+    ModelTask,
+    ModelType,
+    PetDetectionOptions,
+    PetDetectionOutput,
+)
 
 # The animals a household photo library actually contains, in RF-DETR's 91-class
 # COCO id space. bear/zebra/giraffe/elephant are deliberately absent: their only
@@ -41,12 +50,12 @@ _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 _DEFAULT_INPUT_SIZE = 384
 
 
-class PetDetector(GalleryHostedModel):
+class PetDetector(GalleryHostedModel[PetDetectionOptions]):
     depends = []
     identity = (ModelType.DETECTION, ModelTask.PET_DETECTION)
+    sources = (ModelSource.RFDETR,)
 
-    def __init__(self, model_name: str, min_score: float = 0.3, **model_kwargs: Any) -> None:
-        self.min_score = model_kwargs.pop("minScore", min_score)
+    def __init__(self, model_name: str, **model_kwargs: Any) -> None:
         self._input_size = _DEFAULT_INPUT_SIZE
         super().__init__(model_name, **model_kwargs)
 
@@ -75,11 +84,11 @@ class PetDetector(GalleryHostedModel):
             self._input_size = shape[2]
         return session
 
-    def _predict(self, inputs: Image.Image | bytes, minScore: float | None = None) -> PetDetectionOutput:
+    def _predict(self, inputs: Image.Image | bytes, options: PetDetectionOptions) -> PetDetectionOutput:
         # main.py already decodes the upload to a PIL image, so in production
         # this receives an Image.Image. decode_pil passes one straight through.
-        # `minScore` arrives with every request (`InferenceModel.predict` forwards the request options), so an admin
-        # change applies on the next job. The instance is cached across requests: never read it from construction.
+        # `minScore` arrives with every request as `options`, so an admin change applies on the next job. The instance
+        # is cached across requests: never read it from construction.
         image = decode_pil(inputs)
         orig_w, orig_h = image.size
 
@@ -87,7 +96,7 @@ class PetDetector(GalleryHostedModel):
         graph = self.session.for_shape(self.shape_policy.dims[0])
         outputs = [widen(output) for output in graph.run(None, {self._input_name: blob})]
 
-        return self._postprocess(outputs, orig_w, orig_h, self.min_score if minScore is None else minScore)
+        return self._postprocess(outputs, orig_w, orig_h, options.min_score)
 
     def _preprocess(self, image: Image.Image) -> NDArray[np.float32]:
         # decode_pil only converts mode on the bytes path — handed an Image.Image

@@ -181,4 +181,14 @@ class TextRecognitionOptions(Options):
     min_score: Annotated[float, Field(alias="minScore")] = 0.9
 
 
+@dataclass(frozen=True)
+class PetDetectionOptions(Options):
+    min_score: Annotated[float, Field(alias="minScore")] = 0.3
+
+
+@dataclass(frozen=True)
+class PetRecognitionOptions(Options):
+    pass
+
+
 InferenceResponse = dict[str, Any]
