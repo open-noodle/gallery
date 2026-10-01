@@ -218,7 +218,19 @@
        * the person he's editing
        *
        */
-      await handleUpdatePersonName({ id: personToBeMergedInto.id, name: newName }, { notify: true });
+      try {
+        await updatePerson({ id: personToBeMergedInto.id, personUpdateDto: { name: newName } });
+
+        for (const person of people) {
+          if (person.id === personToBeMergedInto.id) {
+            person.name = newName;
+            break;
+          }
+        }
+        toastManager.primary($t('change_name_successfully'));
+      } catch (error) {
+        handleError(error, $t('errors.unable_to_save_name'));
+      }
     }
   };
 
