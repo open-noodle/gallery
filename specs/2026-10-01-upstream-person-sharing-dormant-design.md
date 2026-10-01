@@ -49,7 +49,7 @@ The `PersonSharing` migration, the `ceea` check-constraint migration, `person_us
 They are inert because nothing can insert into `person_user` (below). Keeping them keeps later upstream migrations
 and schema diffs aligned.
 
-Both migrations post-date `branding/config.json` `upstream.version` (3.2.4), so `scripts/revert-to-immich.sql` gains
+The migrations are `1790616293884-PersonSharing` and `1790693088454-AddPersonUserTableSharedBySharedWithConstraint`. Both post-date `branding/config.json` `upstream.version` (3.2.4), so `scripts/revert-to-immich.sql` gains
 idempotent reversal (drop triggers/functions/table/enum `IF EXISTS`) and `kysely_migrations` entries, per skill §7i.
 
 ### API — refuse or stay empty
@@ -59,11 +59,15 @@ idempotent reversal (drop triggers/functions/table/enum `IF EXISTS`) and `kysely
 | `PUT /people/users`, `DELETE /people/users` | 400 `Person sharing is not available in Gallery` (a shared `personSharingUnsupported()` helper, mirroring `newShapeUnsupported()`) |
 | `GET /people/users` | `[]` |
 | `createAllForOwner` | no caller reachable |
-| `userId` on person update/delete, face reassignment, people delete | 400 unless equal to `auth.user.id` |
+| `userId` on person update/delete, face reassignment, people delete | 400 unless equal to `auth.user.id`. **Security-relevant**: upstream authorizes an override through a `person_user` grant; under the fork's owner-only check an unvalidated override would write another owner's row |
 | `PersonResponseDto.otherPeople/sharedBy/sharedWith` | always `[]` |
 | `PersonSearchDto.sharedById/sharedWithId` | accepted, no-op |
-| `PersonSearchDto.isFavorite/isHidden` | **real** — kept as upstream features |
+| `PersonSearchDto.isFavorite/isHidden` | accepted, no-op — upstream implements them inside its `person_group`-based `getAllForUser`, which Gallery declines (follow-up) |
 | `people.updateStrategy` preference | stored, no effect (sync only reaches owners via `person_user`) |
+
+**Route order.** Upstream declares the `users` routes after `:id`, so `:id`'s UUID validation shadows them. Gallery
+declares literal routes before `:id` (as it already does for `statistics`, `face-statistics`, `same-person`,
+`detach-profile`), which keeps the refusal reachable and testable.
 
 ### Code paths — the fork's wins where upstream replaced it
 
@@ -105,9 +109,14 @@ idempotent reversal (drop triggers/functions/table/enum `IF EXISTS`) and `kysely
 1. Advance `upstreamTargetHead` to the `release/v3.3` tip and pull the 34 quarantined commits in their planned batches
    (49–74). Batch 49 (immich-31620) carries most of the hand resolution; batches 60/64/65/69 apply the same rules.
 2. Implement the guards in the same cycle, in a fork commit after batch 49 so later batches replay against them.
-3. Regenerate OpenAPI (TS + Dart) and SQL query docs; run the full local gate set and the full CI suite.
-4. Record the resolution recipe as a standing divergence in the `rebase-upstream-report` skill.
+3. The new required `PersonResponseDto` arrays break fork code that builds the DTO by hand — fix in the batch-49
+   resolution: the fork's server mappers (space-person / identity → `PersonResponseDto`), `web/src/test-data/factories/person-factory.ts`
+   and the web specs constructing it, and the mobile tests constructing `PersonResponseDto(...)`
+   (`person_api_repository_test`, `people_service_test`, `shared_space_api_repository_test`,
+   `api_repository_lazy_resolution_test`). `tsc`/`svelte-check`/`dart analyze` all catch these.
+4. Regenerate OpenAPI (TS + Dart) and SQL query docs; run the full local gate set and the full CI suite.
+5. Record the resolution recipe as a standing divergence in the `rebase-upstream-report` skill.
 
 ## Non-goals
 
-Per-user person favorites (#763 remains open), any change to Shared Spaces people, adopting cluster groups.
+Per-user person favorites (#763 remains open), porting upstream's `isFavorite`/`isHidden` people filters onto the fork's people query, any change to Shared Spaces people, adopting cluster groups.
