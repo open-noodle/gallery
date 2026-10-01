@@ -1,7 +1,7 @@
 import { get, isEqual, set } from 'lodash-es';
 import type { DeepPartial, UserMetadataItem, UserPreferences } from 'src/types.js';
 import { UserPreferencesUpdateDto } from 'src/dtos/user-preferences.dto.js';
-import { AssetOrder, UserMetadataKey } from 'src/enum.js';
+import { AssetOrder, PersonUpdateStrategy, UserMetadataKey } from 'src/enum.js';
 import { buildDefaultMemoryTypeMap } from 'src/services/memory-rules/memory-type.metadata.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getKeysDeep } from 'src/utils/misc.js';
