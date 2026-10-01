@@ -12,11 +12,15 @@ from .models.facial_recognition.detection import FaceDetector
 from .models.facial_recognition.recognition import FaceRecognizer
 from .models.ocr.detection import TextDetector
 from .models.ocr.recognition import TextRecognizer
+from .models.pet_detection import PetDetector
+from .models.pet_recognition import PetRecognizer
 from .schemas import (
     FaceDetectionOptions,
     FaceRecognitionOptions,
     ModelSource,
     Options,
+    PetDetectionOptions,
+    PetRecognitionOptions,
     TextDetectionOptions,
     TextRecognitionOptions,
     TextualOptions,
@@ -61,6 +65,14 @@ class Ocr:
     recognition: Slot[TextRecognitionOptions] | None = None
 
 
+# Gallery: pet detection (RF-DETR) and recognition, published in Gallery's own model org.
+@with_config(STRICT)
+@dataclass(frozen=True)
+class PetDetection:
+    detection: Slot[PetDetectionOptions] | None = None
+    recognition: Slot[PetRecognitionOptions] | None = None
+
+
 @with_config(STRICT)
 @dataclass(frozen=True)
 class PipelineRequest:
@@ -69,6 +81,7 @@ class PipelineRequest:
         default_factory=FacialRecognition
     )
     ocr: Ocr = field(default_factory=Ocr)
+    pet_detection: Annotated[PetDetection, Field(alias="pet-detection")] = field(default_factory=PetDetection)
 
     def entries(self) -> Iterator[InferenceEntry[Any]]:
         if (visual := self.clip.visual) is not None:
@@ -83,3 +96,7 @@ class PipelineRequest:
             yield boxes.entry(TextDetector)
         if (reading := self.ocr.recognition) is not None:
             yield reading.entry(TextRecognizer)
+        if (pets := self.pet_detection.detection) is not None:
+            yield pets.entry(PetDetector)
+        if (pet_embedding := self.pet_detection.recognition) is not None:
+            yield pet_embedding.entry(PetRecognizer)

@@ -6,11 +6,12 @@ from huggingface_hub import snapshot_download
 
 from immich_ml.config import log, settings
 from immich_ml.models.base import _IGNORED_PATTERNS, InferenceModel
+from immich_ml.schemas import Options
 
 GALLERY_HF_ORG = "open-noodle"
 
 
-class GalleryHostedModel(InferenceModel):
+class GalleryHostedModel[O: Options](InferenceModel[O]):
     """A Gallery-only model, published in Gallery's Hugging Face org rather than upstream's.
 
     Upstream's `download()` fetches `{settings.model_organization}/{name}` at `settings.model_revision`, and keeps each
