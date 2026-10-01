@@ -671,6 +671,9 @@ describe('/search', () => {
         'NIKON CORPORATION',
         'PENTAX Corporation',
         'samsung',
+        // Gallery's test-assets pin includes a Samsung video with no Make tag; immich-29375 now
+        // derives 'Samsung' from its SamsungModel tag.
+        'Samsung',
         'SONY',
         null,
       ]);
@@ -688,6 +691,9 @@ describe('/search', () => {
         'NIKON CORPORATION',
         'PENTAX Corporation',
         'samsung',
+        // Gallery's test-assets pin includes a Samsung video with no Make tag; immich-29375 now
+        // derives 'Samsung' from its SamsungModel tag.
+        'Samsung',
         'SONY',
       ]);
       expect(status).toBe(200);
