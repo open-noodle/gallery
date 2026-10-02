@@ -179,4 +179,26 @@ mobile gates were run as the tasks' underlying commands with the 3.47.2 binary f
 
 ## Remote CI Verification
 
-REMOTE_PLACEHOLDER
+- **Branch**: `rebase/upstream-rolling-v3.3.0`
+- **Commit validated**: `19a3768321b` (this report's CI section was added afterwards; no code change)
+
+| Workflow                              | Status | Run           | Notes                                                                                                                                                          |
+| ------------------------------------- | ------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test.yml`                            | GREEN  | `37064079693` | 22/22 on attempt 2 — attempt 1 lost Medium (postgres image pull), E2E arm (GHCR `toomanyrequests`) and Lint Web (runner killed, exit 137) before any assertion |
+| `docker.yml`                          | GREEN  | `37064519974` | OpenVINO onnxruntime source build fits `ubuntu-latest`: 44.5 min                                                                                               |
+| `static_analysis.yml`                 | GREEN  | `37064115511` |                                                                                                                                                                |
+| `gallery-build-mobile.yml`            | GREEN  | `37064156200` |                                                                                                                                                                |
+| `gallery-mobile-smoke.yml`            | GREEN  | `37064198259` |                                                                                                                                                                |
+| `gallery-rebase-smoke.yml`            | GREEN  | `37064594005` |                                                                                                                                                                |
+| `storage-migration-tests.yml`         | GREEN  | `37064664234` |                                                                                                                                                                |
+| `gallery-revert-to-immich-validation` | GREEN  | `37064740101` |                                                                                                                                                                |
+| `gallery-ml-smoke.yml`                | GREEN  | `37064813967` |                                                                                                                                                                |
+| `storage-migration-e2e.yml`           | GREEN  | `37064889043` |                                                                                                                                                                |
+
+SQL Schema Checks (inside `test.yml`) green, so the hand-checked `shared.link.repository.sql` matches generation.
+The base-image bump is covered by `docker.yml`'s server build, which installs `binaryen` in the plugins stage.
+
+The OpenVINO build now takes ~45 min of the fork's release runs (`gallery-release-server-only.yml`,
+`gallery-prerelease-server.yml` build it on the same runner class). Not a blocker; worth knowing when timing a release.
+
+**Landing**: not applicable — `v3.3.0` is still at RC. The branch stays off `main`.
