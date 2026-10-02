@@ -485,6 +485,14 @@ ci_invariants:
     paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
     exceptions:
       - .github/workflows/merge-translations.yml
+  # Upstream builds some ML variants on its own self-hosted `pokedex-*` runners (immich-32020 put
+  # OpenVINO on `pokedex-large` when it moved to an onnxruntime source build). The fork has no such
+  # runners, so a merged mapping leaves that matrix job queued forever with zero conflict.
+  - id: no-upstream-self-hosted-runners
+    title: Workflows do not target upstream's self-hosted runners
+    forbidden_patterns: [pokedex-]
+    paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
+    exceptions: []
   - id: gallery-release-image-names
     title: Gallery release workflows publish Gallery images
     forbidden_patterns:
