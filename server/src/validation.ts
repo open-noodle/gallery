@@ -280,10 +280,10 @@ export function emptyStringToNull<T extends z.ZodType>(schema: T) {
 }
 
 /**
- * Zod transform that sanitises a string as a filename (strips path separators,
- * drops dots). Apply via `.pipe(sanitizeFilename)` on a string schema.
+ * Zod transform that sanitises a string as a filename (strips path separators and
+ * reserved names). Apply via `.pipe(sanitizeFilename)` on a string schema.
  */
-export const sanitizeFilename = z.string().transform((value) => sanitize(value.replaceAll('.', '')));
+export const sanitizeFilename = z.string().transform((value) => sanitize(value));
 
 /*
  * Fork-only decorator stubs.
