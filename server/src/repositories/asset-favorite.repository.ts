@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { Chunked, DummyValue, GenerateSql } from 'src/decorators.js';
 import { DB } from 'src/schema/index.js';
@@ -22,11 +22,15 @@ export class AssetFavoriteRepository {
       return;
     }
 
-    await this.db
-      .insertInto('asset_favorite')
-      .values(assetIds.map((assetId) => ({ userId, assetId })))
-      .onConflict((oc) => oc.doNothing())
-      .execute();
+    await this.db.transaction().execute(async (tx) => {
+      const changed = await tx
+        .insertInto('asset_favorite')
+        .values(assetIds.map((assetId) => ({ userId, assetId })))
+        .onConflict((oc) => oc.doNothing())
+        .returning('assetId')
+        .execute();
+      await this.touchOwnedAssets(tx, userId, changed);
+    });
   }
 
   // (E9) Unfavoriting a never-favorited asset must be a no-op, not an error.
@@ -37,7 +41,37 @@ export class AssetFavoriteRepository {
       return;
     }
 
-    await this.db.deleteFrom('asset_favorite').where('userId', '=', userId).where('assetId', 'in', assetIds).execute();
+    await this.db.transaction().execute(async (tx) => {
+      const changed = await tx
+        .deleteFrom('asset_favorite')
+        .where('userId', '=', userId)
+        .where('assetId', 'in', assetIds)
+        .returning('assetId')
+        .execute();
+      await this.touchOwnedAssets(tx, userId, changed);
+    });
+  }
+
+  // Legacy-client compatibility: an app that predates AssetFavoritesV1 only learns a favorite
+  // change through the asset streams, i.e. through asset.updateId. Before #763 an owner's favorite
+  // was a column write that bumped it, so bump it again — but ONLY for assets the caller owns and
+  // whose favorite actually changed. That is exactly the pre-#763 re-sync footprint; a non-owner's
+  // favorite never touches the asset, so it still cannot amplify into other users' re-syncs.
+  private async touchOwnedAssets(tx: Kysely<DB>, userId: string, changed: { assetId: string }[]) {
+    if (changed.length === 0) {
+      return;
+    }
+
+    await tx
+      .updateTable('asset')
+      .set({ updatedAt: sql`clock_timestamp()` })
+      .where('ownerId', '=', userId)
+      .where(
+        'id',
+        'in',
+        changed.map(({ assetId }) => assetId),
+      )
+      .execute();
   }
 
   // (E21) Duplicate-merge: a per-user UNION of every source asset's favorite rows onto the

@@ -6,9 +6,9 @@ import { SyncTestContext } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
-// #763 slice 6 (design doc §4.3): asset_favorite is its own synced entity, because a favorite
-// write must never bump asset.updateId — that would amplify a personal write into a cross-user
-// re-sync of the underlying asset. Modeled directly on sync-asset-edit.spec.ts / AssetEditSync:
+// #763 slice 6 (design doc §4.3): asset_favorite is its own synced entity, because a non-owner's
+// favorite write must never bump asset.updateId — that would amplify a personal write into a
+// cross-user re-sync of the underlying asset. Modeled directly on sync-asset-edit.spec.ts / AssetEditSync:
 // flat caller-scoped table, getUpserts + getDeletes, no backfill loop.
 
 let defaultDatabase: Kysely<DB>;
@@ -190,12 +190,17 @@ describe(SyncRequestType.AssetFavoritesV1, () => {
   });
 });
 
-// §4.3: a favorite write must not amplify onto the AssetsV2 stream — if it bumped
+// §4.3: a NON-OWNER's favorite write must not amplify onto the AssetsV2 stream — if it bumped
 // asset.updateId, every device that already has the asset would re-sync it just because
-// someone (possibly a different user entirely) favorited it.
-describe('§4.3 no cross-stream amplification', () => {
-  it('does not re-emit the asset on AssetsV2 when only its favorite changes', async () => {
+// someone else favorited it. An OWNER's favorite does bump it, exactly as the pre-#763 column
+// write did, so apps that predate AssetFavoritesV1 still propagate it to the owner's other devices.
+const getUpdateId = (ctx: SyncTestContext, assetId: string) =>
+  ctx.database.selectFrom('asset').select('updateId').where('id', '=', assetId).executeTakeFirstOrThrow();
+
+describe('§4.3 cross-stream amplification', () => {
+  it('does not re-emit the asset on AssetsV2 when a non-owner favorites it', async () => {
     const { auth, user, ctx } = await setup();
+    const { user: other } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const favoriteRepo = ctx.get(AssetFavoriteRepository);
 
@@ -203,21 +208,54 @@ describe('§4.3 no cross-stream amplification', () => {
     await ctx.syncAckAll(auth, assetsResponse);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.AssetsV2]);
 
-    const before = await ctx.database
-      .selectFrom('asset')
-      .select('updateId')
-      .where('id', '=', asset.id)
-      .executeTakeFirstOrThrow();
+    const before = await getUpdateId(ctx, asset.id);
+    await favoriteRepo.addAll(other.id, [asset.id]);
+    await favoriteRepo.removeAll(other.id, [asset.id]);
+    const after = await getUpdateId(ctx, asset.id);
+
+    expect(after.updateId).toBe(before.updateId);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.AssetsV2]);
+  });
+
+  it('re-emits the asset on AssetsV2 with the new state when the owner favorites or unfavorites it', async () => {
+    const { auth, user, ctx } = await setup();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const favoriteRepo = ctx.get(AssetFavoriteRepository);
+
+    await ctx.syncAckAll(auth, await ctx.syncStream(auth, [SyncRequestType.AssetsV2]));
 
     await favoriteRepo.addAll(user.id, [asset.id]);
+    const favorited = await ctx.syncStream(auth, [SyncRequestType.AssetsV2]);
+    expect(favorited).toEqual([
+      expect.objectContaining({
+        type: SyncEntityType.AssetV2,
+        data: expect.objectContaining({ id: asset.id, isFavorite: true }),
+      }),
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+    await ctx.syncAckAll(auth, favorited);
 
-    const after = await ctx.database
-      .selectFrom('asset')
-      .select('updateId')
-      .where('id', '=', asset.id)
-      .executeTakeFirstOrThrow();
+    await favoriteRepo.removeAll(user.id, [asset.id]);
+    const unfavorited = await ctx.syncStream(auth, [SyncRequestType.AssetsV2]);
+    expect(unfavorited).toEqual([
+      expect.objectContaining({
+        type: SyncEntityType.AssetV2,
+        data: expect.objectContaining({ id: asset.id, isFavorite: false }),
+      }),
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+  });
+
+  it('does not bump the asset when the favorite state did not change', async () => {
+    const { user, ctx } = await setup();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const favoriteRepo = ctx.get(AssetFavoriteRepository);
+
+    await favoriteRepo.addAll(user.id, [asset.id]);
+    const before = await getUpdateId(ctx, asset.id);
+    await favoriteRepo.addAll(user.id, [asset.id]);
+    const after = await getUpdateId(ctx, asset.id);
+
     expect(after.updateId).toBe(before.updateId);
-
-    await ctx.assertSyncIsComplete(auth, [SyncRequestType.AssetsV2]);
   });
 });
