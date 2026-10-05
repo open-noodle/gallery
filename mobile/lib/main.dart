@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/camera_bubble_picker_main.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/data/store.dart';
@@ -75,6 +76,15 @@ void main() async {
   } catch (error, stack) {
     runApp(BootstrapErrorWidget(error: error.toString(), stack: stack.toString()));
   }
+}
+
+/// Second Flutter entrypoint, run by `CameraBubblePickerActivity` in its own engine.
+///
+/// Declared here rather than beside its implementation because AOT only compiles libraries that
+/// something references; an entrypoint in an orphan file never makes it into the binary.
+@pragma('vm:entry-point')
+void cameraBubblePickerMain() {
+  unawaited(runCameraBubblePicker());
 }
 
 Future<void> initApp() async {
