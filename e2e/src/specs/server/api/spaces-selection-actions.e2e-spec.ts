@@ -26,9 +26,11 @@
  *    that space (#734 spec §2.3; access.repository.ts's `owner_member` EXISTS clause). The only
  *    restriction is a dedicated guard for `visibility`/`livePhotoVideoId` (asset.service.ts:214-224,
  *    "rbac-3"), whose own comment says explicitly: "other metadata (description/rating/…) stays
- *    editor-allowed." `isFavorite` is not part of that guard either (asset.service.ts:298-329).
- *    So for spaceAssetId (owned by spaceOwner, direct-add to the space): spaceOwner AND spaceEditor
- *    both succeed; spaceViewer (role below Editor) and spaceNonMember (no membership) are rejected.
+ *    editor-allowed." That guard also covers `isFavorite` and `duplicateId` since 2026-10-05:
+ *    `isFavorite` is still one column on `asset`, so an editor's heart would flip the owner's own.
+ *    So for spaceAssetId (owned by spaceOwner, direct-add to the space): a metadata update succeeds
+ *    for spaceOwner AND spaceEditor, a favorite only for spaceOwner (the editor gets 403 from the
+ *    guard); spaceViewer (role below Editor) and spaceNonMember (no membership) are rejected.
  *    (spaceOwner satisfies the owner-membership condition trivially here — `createSpace` auto-adds
  *    its creator as an Owner member, so spaceAssetId's owner is always a space member in this
  *    fixture; see access-space-edit.repository.spec.ts for the case where the owner is NOT a
@@ -129,11 +131,11 @@ describe('Server/API RBAC matrix — selection-toolbar consistency (Slice 1)', (
 
   // ─────────────────────────────────────────────────────────────────────────
   // 4. Favorite — PUT /assets bulk update, isFavorite (Permission.AssetUpdate)
-  //    See file-level correction #1: editor succeeds too, not just the owner.
+  //    See file-level correction #1: the editor passes AssetUpdate, but isFavorite is owner-only.
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('Favorite — PUT /assets (bulk, isFavorite)', () => {
-    it('Given spaceAssetId, When each actor bulk-favorites it, Then owner AND editor succeed (AssetUpdate = isOwner ∪ checkSpaceEditAccess; isFavorite is not visibility-restricted) and viewer/non-member are rejected', async () => {
+    it('Given spaceAssetId, When each actor bulk-favorites it, Then only the owner succeeds: the editor passes AssetUpdate but isFavorite is owner-only (403), and viewer/non-member fail AssetUpdate (400)', async () => {
       await forEachActor(
         [ctx.spaceOwner, ctx.spaceEditor, ctx.spaceViewer, ctx.spaceNonMember],
         (actor) =>
@@ -141,14 +143,14 @@ describe('Server/API RBAC matrix — selection-toolbar consistency (Slice 1)', (
             .put('/assets')
             .set(authHeaders(actor))
             .send({ ids: [ctx.spaceAssetId], isFavorite: true }),
-        { spaceOwner: 204, spaceEditor: 204, spaceViewer: 400, spaceNonMember: 400 },
+        { spaceOwner: 204, spaceEditor: 403, spaceViewer: 400, spaceNonMember: 400 },
       );
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────────
   // 5. Metadata update — PUT /assets bulk update, description (Permission.AssetUpdate)
-  //    Same gate as Favorite; a non-visibility field so the rbac-3 owner-only guard never fires.
+  //    AssetUpdate gate; a metadata field, so the rbac-3 owner-only guard never fires.
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('Metadata update — PUT /assets (bulk, description)', () => {
