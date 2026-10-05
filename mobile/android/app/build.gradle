@@ -116,6 +116,7 @@ dependencies {
   implementation libs.compose.ui
   implementation libs.compose.ui.tooling
   implementation libs.compose.material3
+  implementation libs.dynamicanimation
   implementation libs.lifecycle.runtime.ktx
   implementation libs.material
 }

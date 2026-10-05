@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/asset/asset_metadata.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart' hide AssetVisibility;
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart';
+import 'package:immich_mobile/domain/services/camera_bubble.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/network_capability_extensions.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
@@ -20,7 +21,9 @@ import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
@@ -46,6 +49,10 @@ final foregroundUploadServiceProvider = Provider((ref) {
     ref.watch(connectivityApiProvider),
     ref.watch(assetMediaRepositoryProvider),
     ref.watch(assetServiceProvider),
+    // Read on use, not watched: watching would pull the API layer into every widget that shows
+    // backup state, for a feature that is off by default.
+    () => ref.read(sharedSpaceApiRepositoryProvider),
+    () => ref.read(albumApiRepositoryProvider),
   );
 });
 
@@ -61,8 +68,12 @@ class ForegroundUploadService {
     this._backupRepository,
     this._connectivityApi,
     this._assetMediaRepository,
-    this._assetService,
-  );
+    this._assetService, [
+    // Optional so existing constructions (the unit tests) keep working; the Camera
+    // Bubble simply files nothing when they are absent.
+    this._sharedSpaceApiRepository,
+    this._albumApiRepository,
+  ]);
 
   final UploadRepository _uploadRepository;
   final StorageRepository _storageRepository;
@@ -70,6 +81,8 @@ class ForegroundUploadService {
   final ConnectivityApi _connectivityApi;
   final AssetMediaRepository _assetMediaRepository;
   final AssetService _assetService;
+  final SharedSpaceApiRepository Function()? _sharedSpaceApiRepository;
+  final AlbumApiRepository Function()? _albumApiRepository;
   final Logger _logger = Logger('ForegroundUploadService');
 
   bool shouldAbortUpload = false;
@@ -390,6 +403,7 @@ class ForegroundUploadService {
 
       if (result.isSuccess && result.remoteAssetId != null) {
         await _handleUploadSuccess(asset, result.remoteAssetId!, callbacks);
+        await _addToCameraBubbleTargets(asset, result.remoteAssetId!);
       } else if (result.isCancelled) {
         shouldAbortUpload = true;
       } else if (result.errorMessage != null) {
@@ -425,6 +439,38 @@ class ForegroundUploadService {
       await _assetService.stackEditedUpload(asset.localId!, remoteId, asset.checksum);
     } catch (error) {
       _logger.warning("Failed to stack the upload of ${asset.localId}: $error");
+    }
+  }
+
+  /// Camera Bubble: add a freshly uploaded photo to whatever was selected when it was taken.
+  ///
+  /// Attribution is by the asset's own capture time, not the current selection — an upload can
+  /// finish long after the session that produced it ended.
+  ///
+  /// Failures are logged, per target: the upload itself succeeded, a missing album or a revoked
+  /// space must not cost the other targets the photo, and throwing would abort the backup run.
+  Future<void> _addToCameraBubbleTargets(LocalAsset asset, String remoteAssetId) async {
+    final spaceApi = _sharedSpaceApiRepository;
+    final albumApi = _albumApiRepository;
+    if (spaceApi == null || albumApi == null) {
+      return;
+    }
+
+    for (final target in CameraBubbleSessions.targetsForCaptureTime(asset.createdAt)) {
+      try {
+        switch (target.kind) {
+          case CameraBubbleTargetKind.space:
+            await spaceApi().addAssets(target.id, [remoteAssetId]);
+          case CameraBubbleTargetKind.album:
+            await albumApi().addAssets(target.id, [remoteAssetId]);
+        }
+      } catch (error, stackTrace) {
+        _logger.warning(
+          () => 'Camera Bubble: could not add $remoteAssetId to ${target.kind.name} ${target.id}',
+          error,
+          stackTrace,
+        );
+      }
     }
   }
 

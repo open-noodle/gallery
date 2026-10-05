@@ -15,6 +15,7 @@ import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:immich_mobile/utils/hooks/app_settings_update_hook.dart';
+import 'package:immich_mobile/widgets/settings/camera_bubble_settings.dart';
 import 'package:immich_mobile/widgets/settings/custom_proxy_headers_settings/custom_proxy_headers_settings.dart';
 import 'package:immich_mobile/widgets/settings/ssl_client_cert_settings.dart';
 import 'package:immich_ui/immich_ui.dart';
@@ -71,6 +72,9 @@ class AdvancedSettings extends HookConsumerWidget {
         title: context.t.advanced_settings_troubleshooting_title,
         subtitle: context.t.advanced_settings_troubleshooting_subtitle,
       ),
+      // Here rather than under Backup: it needs a special permission and draws over other apps,
+      // which is not something to surface on a first-run settings page.
+      if (Platform.isAndroid) const CameraBubbleSettings(),
       if (isManageMediaSupported.value)
         Column(
           children: [
