@@ -163,4 +163,23 @@ describe('DetailPanel people refresh propagates to the asset viewer', () => {
     expect(getAssetInfoMock).toHaveBeenCalledWith({ id: 'asset-1', spaceId: 'space-1' });
     expect(eventManagerMock.emit).toHaveBeenCalledWith('AssetUpdate', refreshed);
   });
+
+  // The space panel applies each action as it happens, so the refresh after one action must leave
+  // it open for the next. Closing it here meant reopening the panel once per face named.
+  it('keeps the space panel open after a face edit refreshes the people row', async () => {
+    const asset = assetFactory.build({
+      id: 'asset-1',
+      ownerId: 'someone-else',
+      canEdit: true,
+      type: AssetTypeEnum.Image,
+    });
+    getAssetInfoMock.mockResolvedValue({ ...asset, people: [] });
+
+    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+
+    await fireEvent.click(screen.getByTestId('trigger-refresh'));
+
+    await vi.waitFor(() => expect(eventManagerMock.emit).toHaveBeenCalledWith('AssetUpdate', expect.anything()));
+    expect(assetViewerManagerMock.closeEditFacesPanel).not.toHaveBeenCalled();
+  });
 });

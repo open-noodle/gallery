@@ -203,6 +203,18 @@
     assetViewerManager.closeEditFacesPanel();
   };
 
+  // The space panel applies each action (name, detach, delete a box) as it happens, so it refreshes
+  // the People row after every one and stays open for the next -- unlike the owner panel, which
+  // batches its changes and refreshes once on "Done". The panel does not await this, so a failed
+  // refresh is reported here rather than left as an unhandled rejection.
+  const handleSpacePeopleChanged = async () => {
+    try {
+      await refreshAssetPeople(asset.id, effectiveSpaceId);
+    } catch (error) {
+      handleError(error, $t('errors.failed_to_load_people'));
+    }
+  };
+
   const getAssetFolderHref = (asset: AssetResponseDto) => {
     // Remove the last part of the path to get the parent path
     return Route.folders({ path: getParentPath(asset.originalPath) });
@@ -575,7 +587,7 @@
       assetId={asset.id}
       assetType={asset.type}
       onClose={() => assetViewerManager.closeEditFacesPanel()}
-      onRefresh={handleRefreshPeople}
+      onRefresh={() => void handleSpacePeopleChanged()}
     />
   {:else}
     <PersonSidePanel
