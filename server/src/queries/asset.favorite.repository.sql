@@ -19,7 +19,7 @@ where
   and "assetId" in ($2)
 returning
   "assetId"
-rollback
+commit
 
 -- AssetFavoriteRepository.mergeOnto
 insert into
