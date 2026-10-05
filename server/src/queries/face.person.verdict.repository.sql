@@ -595,13 +595,22 @@ where
 select
   "asset_face"."personGroupId" as "personGroupId",
   "person"."identityId" as "identityId",
-  "asset"."ownerId" as "assetOwnerId"
+  "asset"."ownerId" as "assetOwnerId",
+  exists (
+    select
+      "shared_space_member"."userId"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."spaceId" = $1
+      and "shared_space_member"."userId" = "asset"."ownerId"
+  ) as "ownerIsSpaceMember"
 from
   "asset_face"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
   left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
 where
-  "asset_face"."id" = $1
+  "asset_face"."id" = $2
 
 -- FacePersonVerdictRepository.lockFaceForAssignment
 select

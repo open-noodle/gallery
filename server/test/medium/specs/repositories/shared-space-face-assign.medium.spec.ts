@@ -7,14 +7,15 @@
  * OWNER marked hidden.
  *
  * Deliberately NOT the #992 rule: there is no owner-is-member clause here (F-6). An editor
- * may name Carol's face even though Carol never joined the space, because nothing of
- * Carol's is written — only the space's own taxonomy.
+ * may name Carol's face even though Carol never joined the space. Since §6.3.1 was revised,
+ * owner membership instead decides how far the edit reaches: only a member's own library is
+ * written, so for Carol the edit stays in the space's own taxonomy (see the §3 block below).
  *
  * Discipline: every deny row below is mutation-proved non-vacuous. Each uses a fixture that
  * a GRANT row in the same block also uses, so a deny can only be explained by the specific
  * property under test.
  */
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { AuthDto } from 'src/dtos/auth.dto.js';
@@ -332,6 +333,107 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
 
     const resolved = await faceIdentityRepo.getResolvedPersonByIdentityId(bob.id, bobIdentity.id);
     expect(resolved?.name).toBe('Dad');
+  });
+});
+
+// §3 / F-6: the propagation above is for space members only. Carol's photo reaches the space
+// through a linked album and she never joined it, so an editor naming her face must leave her own
+// library exactly as it was: same person, same tag, same identity, and no new person rows.
+const newCarolFixture = async () => {
+  const { sut, ctx } = newMediumService(SharedSpaceService, {
+    database: defaultDatabase,
+    real: [
+      FacePersonVerdictRepository,
+      SharedSpaceRepository,
+      FaceIdentityRepository,
+      DatabaseRepository,
+      PersonRepository,
+    ],
+    mock: [LoggingRepository],
+  });
+  const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+  const { anna, space } = await newSpaceWithEditorAndMember(ctx);
+  const { user: carol } = await ctx.newUser();
+  const { assetId } = await reachPathBuilders.album(ctx, { spaceId: space.id, ownerId: carol.id });
+
+  const { result: carolPerson } = await ctx.newPerson({ ownerId: carol.id, name: 'Dad' });
+  const carolIdentity = await faceIdentityRepo.ensurePersonIdentity(carolPerson.personGroupId);
+  const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId: carolPerson.personGroupId });
+  await faceIdentityRepo.linkFace({ assetFaceId: faceId, identityId: carolIdentity.id, source: 'owner-person' });
+
+  const auth = { user: { id: anna.id } } as AuthDto;
+  return { sut, ctx, auth, carol, space, faceId, carolPerson, carolIdentity };
+};
+
+const carolPersonCount = (ownerId: string) =>
+  defaultDatabase
+    .selectFrom('person')
+    .select((eb) => eb.fn.countAll<number>().as('count'))
+    .where('ownerId', '=', ownerId)
+    .executeTakeFirstOrThrow()
+    .then(({ count }) => Number(count));
+
+describe('an owner outside the space keeps their library untouched (§3, F-6)', () => {
+  it('attaches in the space only, leaving the face tag, identity and person rows alone', async () => {
+    const { sut, ctx, auth, carol, space, faceId, carolPerson, carolIdentity } = await newCarolFixture();
+    const spacePerson = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'Uncle Tom' });
+
+    await expect(sut.attachFaceToSpacePerson(auth, space.id, spacePerson.id, faceId)).resolves.toBe(true);
+
+    // The space shows the face under Anna's person...
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(projectionRows).toEqual([{ personId: spacePerson.id, assetFaceId: faceId }]);
+
+    // ...and nothing of Carol's moved.
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(face.personGroupId).toBe(carolPerson.personGroupId);
+    const identityLink = await defaultDatabase
+      .selectFrom('face_identity_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(identityLink.identityId).toBe(carolIdentity.id);
+    await expect(carolPersonCount(carol.id)).resolves.toBe(1);
+  });
+
+  it('creating a person from her face adds nothing to her library', async () => {
+    const { sut, auth, carol, space, faceId, carolPerson } = await newCarolFixture();
+
+    await sut.createSpacePerson(auth, space.id, { name: 'Grandpa', assetFaceId: faceId });
+
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(face.personGroupId).toBe(carolPerson.personGroupId);
+    await expect(carolPersonCount(carol.id)).resolves.toBe(1);
+  });
+
+  it('detaching keeps her own tag, even when the identities match', async () => {
+    const { sut, ctx, auth, space, faceId, carolPerson, carolIdentity } = await newCarolFixture();
+    // A space person on Carol's OWN identity: the case where a member's tag would be cleared.
+    const spacePerson = await ctx
+      .get(SharedSpaceRepository)
+      .createOrGetPersonForIdentity({ spaceId: space.id, identityId: carolIdentity.id, name: 'Dad' });
+    await ctx.get(SharedSpaceRepository).addPersonFaces([{ personId: spacePerson.id, assetFaceId: faceId }]);
+
+    await expect(sut.detachFaceFromSpacePerson(auth, space.id, spacePerson.id, faceId)).resolves.toBe(true);
+
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(face.personGroupId).toBe(carolPerson.personGroupId);
   });
 });
 
@@ -1084,6 +1186,36 @@ describe('createSpaceAssetFace', () => {
       .where('assetFaceId', '=', result.id)
       .execute();
     expect(projectionRows).toEqual([{ personId: person.id, assetFaceId: result.id }]);
+  });
+
+  // §3: a drawn box is a new face row on the owner's own asset, so unlike naming an existing face
+  // (F-6) it needs the owner to be a space member. Carol's album-path photo is refused.
+  it('refuses to draw a box on a photo whose owner is not a space member (§3)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const { anna, space } = await newSpaceWithEditorAndMember(ctx);
+    const { user: carol } = await ctx.newUser();
+    const { assetId } = await reachPathBuilders.album(ctx, { spaceId: space.id, ownerId: carol.id });
+    const person = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    await expect(
+      sut.createSpaceAssetFace(auth, space.id, assetId, {
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 100,
+        imageWidth: 1000,
+        imageHeight: 1000,
+        spacePersonId: person.id,
+      }),
+    ).rejects.toThrow(ForbiddenException);
+
+    const rows = await defaultDatabase.selectFrom('asset_face').selectAll().where('assetId', '=', assetId).execute();
+    expect(rows).toEqual([]);
   });
 
   // F-17: the asset carries edits (so the transform must run) but has no exif dimensions to invert

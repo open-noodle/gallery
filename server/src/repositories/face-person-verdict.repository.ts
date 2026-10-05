@@ -965,23 +965,43 @@ export class FacePersonVerdictRepository {
    * attribution rule keys off. Piggybacking it here avoids a second round-trip in the same
    * attach/detach transaction that already calls this method.
    *
+   * Also carries `ownerIsSpaceMember` — whether the asset owner is a member of `spaceId`. Only
+   * then may a space edit propagate into the owner's own people layer (§3, §6.3.1): an owner who
+   * never joined the space, e.g. one reached through a linked album, keeps their library untouched
+   * and the edit stays in the space's projection. Same owner-is-member rule as #992's
+   * `checkSpaceEditAccess`.
+   *
    * Never throws for a missing face: callers reach this only after `isFaceAssignableInSpace`
    * has already confirmed the face exists, but a null-safe read here costs nothing and avoids a
    * second implicit contract on call order.
    */
-  @GenerateSql({ params: [DummyValue.UUID] })
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async getFaceOwnerLink(
+    spaceId: string,
     assetFaceId: string,
     db: Kysely<DB> | Transaction<DB> = this.db,
-  ): Promise<{ personGroupId: string | null; identityId: string | null; assetOwnerId: string } | undefined> {
+  ): Promise<
+    | { personGroupId: string | null; identityId: string | null; assetOwnerId: string; ownerIsSpaceMember: boolean }
+    | undefined
+  > {
     return db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .leftJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select([
+      .select((eb) => [
         'asset_face.personGroupId as personGroupId',
         'person.identityId as identityId',
         'asset.ownerId as assetOwnerId',
+        eb
+          .exists(
+            eb
+              .selectFrom('shared_space_member')
+              .select('shared_space_member.userId')
+              .where('shared_space_member.spaceId', '=', spaceId)
+              .whereRef('shared_space_member.userId', '=', 'asset.ownerId'),
+          )
+          .$castTo<boolean>()
+          .as('ownerIsSpaceMember'),
       ])
       .where('asset_face.id', '=', assetFaceId)
       .executeTakeFirst();

@@ -2058,8 +2058,12 @@ export class SharedSpaceService extends BaseService {
     // keep `asset_face.personGroupId` untouched -- see the section for why the insulated model was
     // dropped. The owner may have never named this human, in which case a person row is created for
     // them (an editor naming a face can therefore add a person to the owner's People page).
-    const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
-    if (ownerLink) {
+    //
+    // §3: only when the owner is a member of this space. An owner reached through a linked album
+    // never joined it, so the space has no say over their library and the edit stays in the
+    // projection above -- the insulated model, which `writeIdentity: false` completes for row 3.
+    const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(person.spaceId, assetFaceId, trx);
+    if (ownerLink?.ownerIsSpaceMember) {
       const ownerPerson = await this.personRepository.getOrCreateOwnerPersonForIdentity(
         {
           ownerId: ownerLink.assetOwnerId,
@@ -2108,15 +2112,30 @@ export class SharedSpaceService extends BaseService {
       // person's identity differs from (or is absent, and so can never equal) the target space
       // person's own identity, the attach is still granted but must NOT rewrite the face's global
       // identity — see linkFaceToSpacePerson's doc comment for why the projection alone suffices.
-      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(spaceId, assetFaceId, trx);
       // §6.3.1 (revised): row 3 -- "the owner already named this face as someone else" -- no longer
-      // skips the identity write. Propagating only `asset_face.personId` while pinning the identity
-      // would leave the owner's OWN two layers disagreeing about one face: the person row would say
-      // "Uncle Tom" while `face_identity_face` still said "Dad", and applyResolvedPersonMetadata
-      // resolves the owner's names and birthdays through the identity. That split is precisely what
-      // the original §6.3.1 existed to prevent, so the editor's edit now moves both layers together.
-      // The negative-verdict write that row 3 needed goes with it: linkFaceToSpacePerson's
-      // clearNegativeForTarget is the correct verdict once the identity actually matches.
+      // skips the identity write when the owner is a space member. Propagating only
+      // `asset_face.personId` while pinning the identity would leave the owner's OWN two layers
+      // disagreeing about one face: the person row would say "Uncle Tom" while `face_identity_face`
+      // still said "Dad", and applyResolvedPersonMetadata resolves the owner's names and birthdays
+      // through the identity. That split is precisely what the original §6.3.1 existed to prevent, so
+      // the editor's edit moves both layers together.
+      //
+      // §3: an owner who is NOT a space member keeps the original insulated row 3 -- the owner layer
+      // is not propagated (see linkFaceToSpacePerson), so the identity they name the face by must not
+      // be re-pointed either. The negative verdict stops the suggestion pipeline re-offering the face.
+      const writeIdentity =
+        !!ownerLink?.ownerIsSpaceMember ||
+        !ownerLink?.personGroupId ||
+        (ownerLink.identityId !== null && ownerLink.identityId === person.identityId);
+      if (!writeIdentity) {
+        await this.facePersonVerdictRepository.markRejectedForSpacePerson(
+          person.id,
+          assetFaceId,
+          { identityId: ownerLink!.identityId, source: 'suggestion', actorId: auth.user.id },
+          trx,
+        );
+      }
 
       // F-13 (spec §6.3): reassign — attaching a face already held by a DIFFERENT space person in
       // this same space moves it. Remove every current holder's projection row (a plain re-attach
@@ -2141,7 +2160,7 @@ export class SharedSpaceService extends BaseService {
         }
       }
 
-      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity: true });
+      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity });
 
       // §6.7 (F-24/F-26): attribute the attach in the space's activity feed, unless the actor
       // owns the asset -- an owner naming their own photos should not flood their own feed,
@@ -2192,7 +2211,7 @@ export class SharedSpaceService extends BaseService {
       // §6.7: read before the face's projection row is removed below, for the asset owner id it
       // carries. Since §6.3.1 was revised the personGroupId/identityId half is used too -- see the
       // owner-layer clear at the end of this transaction.
-      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(spaceId, assetFaceId, trx);
 
       await this.facePersonVerdictRepository.markRejectedForSpacePerson(
         person.id,
@@ -2210,7 +2229,13 @@ export class SharedSpaceService extends BaseService {
       // The identity comparison is the guard: it clears the tag ONLY when the owner's person is the
       // same human as the space person being detached. An editor detaching "Uncle Tom" must never
       // null out the owner's unrelated "Dad" tag on that face, so a mismatch is left alone.
-      if (ownerLink?.personGroupId && person.identityId && ownerLink.identityId === person.identityId) {
+      // §3: and never for an owner outside the space -- their tag is theirs, not the space's.
+      if (
+        ownerLink?.ownerIsSpaceMember &&
+        ownerLink.personGroupId &&
+        person.identityId &&
+        ownerLink.identityId === person.identityId
+      ) {
         await this.personRepository.setFaceOwnerPerson(
           { assetFaceId, personGroupId: null, expectedPersonGroupId: ownerLink.personGroupId },
           trx,
@@ -2398,6 +2423,14 @@ export class SharedSpaceService extends BaseService {
     const asset = await this.assetRepository.getById(assetId, { edits: true, exifInfo: true });
     if (!asset) {
       throw new NotFoundException('Asset not found');
+    }
+
+    // §3: a drawn box is a new `asset_face` row on the OWNER's asset, which shows up in their own
+    // face data. That is a write to the owner's library, so it needs the #992 rule: the owner must
+    // be a member of this space. Naming an existing face on a non-member's asset stays allowed
+    // (F-6) because that write stays in the space's projection.
+    if (asset.ownerId !== auth.user.id && !(await this.sharedSpaceRepository.getMember(spaceId, asset.ownerId))) {
+      throw new ForbiddenException('Faces can only be drawn on photos from members of this space');
     }
 
     const { topLeft, bottomRight, imageWidth, imageHeight } = convertFaceBoxToOriginalImageSpace(dto, asset);
