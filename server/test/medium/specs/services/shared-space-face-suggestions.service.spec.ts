@@ -157,6 +157,10 @@ describe('SharedSpaceService space face suggestions', () => {
   it('confirm creates a missing space identity, links the candidate face, and propagates to the owner without changing asset ownership (edges 26 and 31)', async () => {
     const { ctx, sut } = setup();
     const fx = await createSuggestionFixture(ctx);
+    // Propagation into the owner's layer needs the asset owner to be a member of the space (spec §3,
+    // revised 2026-10-05). The fixture adds the asset without its owner joining, which is the
+    // non-member case, so join them here for the propagating one.
+    await ctx.newSharedSpaceMember({ spaceId: fx.space.id, userId: fx.assetOwner.id, role: SharedSpaceRole.Viewer });
 
     await sut.confirmSpacePersonFaceSuggestion(authFor(fx.reviewer), fx.space.id, fx.spacePerson.id, fx.assetFace.id);
 
