@@ -61,6 +61,7 @@ import {
 } from 'src/utils/asset.util.js';
 import { isDeadlockError, retryOnDeadlock, updateLockedColumns } from 'src/utils/database.js';
 import { asDateTimeString, extractTimeZone } from 'src/utils/date.js';
+import { favoriteViewerId } from 'src/utils/favorite.js';
 import { batched, findOrFail } from 'src/utils/misc.js';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 import { transformOcrBoundingBox } from 'src/utils/transform.js';
@@ -88,12 +89,9 @@ export class AssetService extends BaseService {
   async get(auth: AuthDto, id: string, spaceId?: string): Promise<AssetResponseDto | SanitizedAssetResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [id] });
 
-    // #763: auth.user.id is the CALLER for the isFavoriteForUser overlay. For a shared-link
-    // session this is the link owner's own id (validateSharedLinkKey/Slug set `user: sharedLink.user`),
-    // so a metadata-enabled link visitor sees the OWNER's favorite flag here — unchanged from this
-    // endpoint's pre-#763 behavior (the old ownership check compared auth.user.id === entity.ownerId,
-    // which was also true in that case). This is distinct from mapSharedLink (shared-link.dto.ts),
-    // which has no auth object at all and must never project.
+    // #763: the isFavoriteForUser overlay is resolved for the CALLER. A shared-link session has no
+    // caller of its own — auth.user is the link OWNER — so favoriteViewerId returns undefined there
+    // and the response reports false rather than the owner's private favorites.
     const asset = await this.assetRepository.getById(
       id,
       {
@@ -104,7 +102,7 @@ export class AssetService extends BaseService {
         edits: true,
         tags: true,
       },
-      auth.user.id,
+      favoriteViewerId(auth),
     );
 
     if (!asset) {

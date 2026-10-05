@@ -1897,7 +1897,11 @@ export class AssetRepository {
             // which Kysely's ExpressionBuilder generics don't consider assignable to the plain
             // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects, even though the
             // 'asset_favorite' table it queries is unaffected by the extra CTE in scope. Safe cast.
-            favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, auth.user.id).as('isFavorite'),
+            // A shared-link session's auth.user is the link OWNER, not a viewer: never project their
+            // private favorites to an anonymous visitor (#763).
+            auth.sharedLink
+              ? sql<boolean>`false`.as('isFavorite')
+              : favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, auth.user.id).as('isFavorite'),
             sql`asset.type = 'IMAGE'`.as('isImage'),
             sql`asset."deletedAt" is not null`.as('isTrashed'),
             'asset.livePhotoVideoId',

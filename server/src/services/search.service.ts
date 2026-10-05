@@ -33,6 +33,7 @@ import { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
 import { getMyPartnerIds } from 'src/utils/asset.util.js';
+import { favoriteViewerId, rejectSharedLinkFavoriteFilter } from 'src/utils/favorite.js';
 import { isSmartSearchEnabled } from 'src/utils/misc.js';
 import { decodeSearchCursor, encodeSearchCursor } from 'src/utils/search-cursor.js';
 import { applyLockedVisibilityPolicy, collectFilterIds } from 'src/utils/search-filter.js';
@@ -231,6 +232,8 @@ export class SearchService extends BaseService {
       userIds = await this.getUserIdsToSearch(auth, dto.visibility);
     }
 
+    rejectSharedLinkFavoriteFilter(auth, dto.isFavorite);
+
     const page = dto.page ?? 1;
     const size = dto.size;
     const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
@@ -245,7 +248,7 @@ export class SearchService extends BaseService {
         visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
         userIds,
         viewingUserId: auth.user.id,
-        authUserId: auth.user.id,
+        authUserId: favoriteViewerId(auth),
         orderDirection: dto.order ?? AssetOrder.Desc,
       },
     );

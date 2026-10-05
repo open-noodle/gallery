@@ -13,6 +13,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';
 import { getMyPartnerIds } from 'src/utils/asset.util.js';
+import { rejectSharedLinkFavoriteFilter } from 'src/utils/favorite.js';
 import { timelineHiddenScopeIsEmpty } from 'src/utils/shared-space-album-scope.js';
 import { normalizeTimeBucketForBucketSize } from 'src/utils/timeline-bucket.js';
 
@@ -253,6 +254,7 @@ export class TimelineService extends BaseService {
     if (auth.sharedLink && !auth.sharedLink.showExif) {
       dto.withCoordinates = false;
     }
+    rejectSharedLinkFavoriteFilter(auth, dto.isFavorite);
     if (dto.withPartners) {
       const isRequestedLocked = dto.visibility === AssetVisibility.Locked;
       const isRequestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;

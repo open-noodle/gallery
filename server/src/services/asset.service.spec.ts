@@ -142,6 +142,17 @@ describe(AssetService.name, () => {
       );
     });
 
+    // #763: a shared-link session's auth.user is the link owner — their favorites must not leak.
+    it('does not project the link owner favorite for a shared link session (#763)', async () => {
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+
+      await sut.get(authStub.adminSharedLink, asset.id);
+
+      expect(mocks.asset.getById).toHaveBeenCalledWith(asset.id, expect.anything(), undefined);
+    });
+
     it('should strip metadata for shared link if exif is disabled', async () => {
       const asset = AssetFactory.from().exif({ description: 'foo' }).build();
       mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));

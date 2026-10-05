@@ -428,6 +428,18 @@ describe(TimelineService.name, () => {
       mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
     });
 
+    // #763: auth.user is the link owner, so a favorite filter would list THEIR favorites.
+    it.each([true, false])('rejects isFavorite=%s for a shared link session (#763)', async (isFavorite) => {
+      await expect(sut.getTimeBuckets(sharedLinkAuth(spaceId), { albumId, isFavorite })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(
+        sut.getTimeBucket(sharedLinkAuth(spaceId), { albumId, isFavorite, timeBucket: '2024-01-01' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.asset.getTimeBuckets).not.toHaveBeenCalled();
+      expect(mocks.asset.getTimeBucket).not.toHaveBeenCalled();
+    });
+
     it('resolves the contributed arm from the space the link was made from', async () => {
       mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([spaceId]);
       mocks.asset.getTimeBuckets.mockResolvedValue([]);

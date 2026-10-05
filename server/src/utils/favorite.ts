@@ -13,7 +13,9 @@
 // aliased or the correlation target is a CTE column not present in the static `DB` schema (e.g.
 // `getTimeBucket`'s `.with('asset', ...)` / `.with('cte', ...)` chain) — `sql.ref` interpolates it
 // as a raw identifier instead of being resolved against the schema at compile time.
+import { BadRequestException } from '@nestjs/common';
 import { AliasableExpression, ExpressionBuilder, SqlBool, sql } from 'kysely';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
 
@@ -82,3 +84,19 @@ export function favoriteExistsForOwner(
       .whereRef('asset_favorite.userId', '=', sql.ref(ownerIdRef)),
   );
 }
+
+/**
+ * The user whose favorites a response should reflect, or undefined when there is none. A
+ * shared-link session's `auth.user` is the link OWNER (validateSharedLinkKey/Slug), not the
+ * anonymous visitor — projecting their overlay would show a visitor which of the album's
+ * photos (including other contributors' photos) the owner favorited. Undefined makes every
+ * `$if(!!authUserId, …)` projection skip, so mapAsset reports false.
+ */
+export const favoriteViewerId = (auth: AuthDto): string | undefined => (auth.sharedLink ? undefined : auth.user.id);
+
+/** Filtering by favorite state would leak the link owner's favorites just like projecting it. */
+export const rejectSharedLinkFavoriteFilter = (auth: AuthDto, isFavorite: boolean | undefined | null) => {
+  if (auth.sharedLink && isFavorite !== undefined && isFavorite !== null) {
+    throw new BadRequestException('Shared link sessions cannot filter by favorite');
+  }
+};

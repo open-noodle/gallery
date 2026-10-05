@@ -208,6 +208,15 @@ entirely, so it would not surface in a naive slice-6 test.
    watermarks and an `asset_favorite_audit` tombstone table for the delete stream, exactly
    mirroring `album_space_asset` + `album_space_asset_audit`.
 
+**Revised during the 2026-10 review — owner writes also bump `asset.updateId`.** Apps that predate
+`AssetFavoritesV1` only see favorite changes through the asset streams. Before #763 an owner's
+favorite was a column write that bumped the watermark, so those apps propagated it to the owner's
+other devices; option 2 alone silently broke that. `AssetFavoriteRepository.addAll`/`removeAll`
+therefore bump `asset.updatedAt` (and so `updateId`) for rows whose favorite state actually changed
+**and** whose owner is the writer. That is exactly the pre-#763 re-sync footprint, so option 1's
+objection — a viewer's personal write re-syncing the owner's asset to every space member — still
+holds and still does not happen: a non-owner's favorite never touches the asset row.
+
 **Consequences.** `asset_favorite_audit` is created in **slice 0**, alongside the main table and
 its delete trigger — never later, because slice 3 is irreversible. Slice 6 consumes these streams
 rather than introducing them. Both tables need DROP lines, step-8 migration entries and step-9
@@ -303,6 +312,13 @@ canonical endpoint, an anonymous visitor holding a share link would create `asse
 **attributed to the link's owner** — an unauthenticated write in a real user's name.
 
 The endpoint must reject any request where `auth.sharedLink` is set, and E6 must assert it.
+
+**Nor may they read the owner's favorites.** The same `auth.user` identity means every read path
+that resolves the overlay "for the caller" would resolve it for the link **owner** — showing an
+anonymous visitor which of the album's photos (other contributors' included) the owner favorited.
+Reads that accept shared links (asset detail, timeline buckets, metadata search) therefore project
+no favorite for a shared-link session (`favoriteViewerId`), and reject an `isFavorite` filter
+(`rejectSharedLinkFavoriteFilter`) — see `server/src/utils/favorite.ts`.
 
 ### 5.2 Losing access
 

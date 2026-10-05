@@ -1573,6 +1573,29 @@ describe(SearchService.name, () => {
   });
 
   describe('searchMetadata', () => {
+    // #763: auth.user is the link owner — neither project nor filter by their favorites.
+    it('does not resolve favorites for a shared link session (#763)', async () => {
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set(['album-1']));
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await sut.searchMetadata(authStub.adminSharedLink, { albumIds: ['album-1'], size: 250 });
+
+      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ authUserId: undefined }),
+      );
+    });
+
+    it('rejects a favorite filter for a shared link session (#763)', async () => {
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set(['album-1']));
+
+      await expect(
+        sut.searchMetadata(authStub.adminSharedLink, { albumIds: ['album-1'], isFavorite: true, size: 250 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.search.searchMetadata).not.toHaveBeenCalled();
+    });
+
     it('should search metadata with default pagination', async () => {
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
