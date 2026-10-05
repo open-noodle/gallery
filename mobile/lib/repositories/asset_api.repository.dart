@@ -7,20 +7,24 @@ import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/option.dart';
-import 'package:immich_mobile/utils/semver.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:openapi/api.dart' as api show AssetVisibility;
 import 'package:openapi/api.dart' hide AssetVisibility;
 
 final assetApiRepositoryProvider = Provider(
-  (ref) => AssetApiRepository(ref.watch(apiServiceProvider), () => ref.read(serverInfoProvider).serverVersion),
+  (ref) => AssetApiRepository(
+    ref.watch(apiServiceProvider),
+    () => ref.read(serverInfoProvider).serverFeatures.syncRequestTypes,
+  ),
 );
 
 class AssetApiRepository extends ApiRepository {
   final ApiService _apiService;
-  final SemVer Function() _getServerVersion;
+  // The sync request types the server declares (`GET /server/features`), or null when it
+  // declares none / they are not known yet. See [updateFavorite].
+  final Set<String>? Function() _getSupportedSyncTypes;
 
-  AssetApiRepository(this._apiService, this._getServerVersion);
+  AssetApiRepository(this._apiService, this._getSupportedSyncTypes);
 
   AssetsApi get _api => _apiService.assetsApi;
   StacksApi get _stacksApi => _apiService.stacksApi;
@@ -87,7 +91,7 @@ class AssetApiRepository extends ApiRepository {
   // #763: DO NOT pass `isFavorite` here. This posts an AssetBulkUpdateDto to the OWNER-ONLY
   // `PUT /assets`, but favorites are now a per-user overlay (`asset_favorite`) that a read-only
   // space Viewer may set on another member's asset — use `updateFavorite` below, which routes to
-  // `PUT /assets/favorites` (and handles the pre-5.2.0 server fallback). The parameter survives
+  // `PUT /assets/favorites` (and falls back for servers without that endpoint). The parameter survives
   // only because it is the upstream Immich shape; nothing passes it, and
   // test/policy/favorite_overlay_policy_test.dart fails if anything starts to.
   Future<void> update(
@@ -110,26 +114,29 @@ class AssetApiRepository extends ApiRepository {
   }
 
   // #763: favorites are per-user (not owner-gated), so they route through the dedicated
-  // /assets/favorites endpoint rather than the owner-only bulk-update endpoint — but that
-  // endpoint doesn't exist on fork servers <= 5.2.0 (mobile and server release independently, so
-  // a newer app can talk to an older server). There, the request falls through to `PUT
-  // /assets/:id` (id = "favorites") and 400s on UUID validation, breaking favoriting entirely,
-  // owned assets included. Gate on the SAME boundary the sync stream uses for the equivalent
-  // problem (sync_api.repository.dart): a fork server > 5.2.0 gets the canonical per-user
-  // endpoint; anything <= 5.2.0 falls back to the legacy bulk-update endpoint below, which the
-  // server still honours via a deprecated `isFavorite` alias that internally calls the same
-  // per-user write path for assets the caller owns (server asset.service.ts
-  // update/updateAll) — restoring pre-#763 owned-asset favoriting. A viewer favoriting someone
-  // else's asset on an old server gets the old 403 (that alias requires Permission.AssetUpdate,
-  // stricter than the canonical endpoint's AssetRead): an accepted degraded mode, since per-user
-  // favorites didn't exist on that server anyway. Remove this fallback once the minimum
-  // supported fork server version is > 5.2.0.
+  // /assets/favorites endpoint rather than the owner-only bulk-update endpoint — but no RELEASED
+  // fork server has that endpoint (mobile and server release independently, so a newer app can
+  // talk to an older server). There, the request falls through to `PUT /assets/:id` (id =
+  // "favorites") and 400s on UUID validation, breaking favoriting entirely, owned assets
+  // included. The reported version cannot gate this (PR RC images stamp the bare upstream base
+  // version), so gate on the server's own capability declaration instead: the endpoint and the
+  // `AssetFavoritesV1` sync request type ship together, and `GET /server/features` →
+  // `syncRequestTypes` declares every request type the server accepts. Declared → the canonical
+  // per-user endpoint. Anything else — not declared, a server that predates capability
+  // signalling (null), or features not loaded yet / failed to load (null) — falls back to the
+  // legacy bulk-update endpoint below, which every server honours via a deprecated `isFavorite`
+  // alias that writes the per-user favorite for assets the caller owns (server asset.service.ts
+  // update/updateAll). A viewer favoriting someone else's asset on such a server gets a 403 (that
+  // alias requires Permission.AssetUpdate, stricter than the canonical endpoint's AssetRead): an
+  // accepted degraded mode, since per-user favorites don't exist on that server anyway. The
+  // declaration is read from the cached server features (serverInfoProvider), not fetched per tap.
   //
   // Upstream's action migration deleted the `updateLocation`/`updateDateTime`/`updateFavorite`
   // trio in favour of the consolidated `update` above; only this one is kept, because `update`
   // posts an AssetBulkUpdateDto to the OWNER-ONLY `PUT /assets`.
   Future<void> updateFavorite(List<String> ids, bool isFavorite) async {
-    if (_getServerVersion() > const SemVer(major: 5, minor: 2, patch: 0)) {
+    final supportedSyncTypes = _getSupportedSyncTypes();
+    if (supportedSyncTypes != null && supportedSyncTypes.contains(SyncRequestType.assetFavoritesV1.toJson())) {
       await _api.updateAssetFavorites(AssetFavoriteUpdateDto(ids: ids, isFavorite: isFavorite));
       return;
     }

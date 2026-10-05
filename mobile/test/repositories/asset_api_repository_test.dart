@@ -2,15 +2,15 @@
 // PUT /assets/favorites endpoint (AssetFavoriteUpdateDto), not the owner-only bulk-update
 // endpoint (AssetBulkUpdateDto) other asset fields (visibility, location, dateTime) still use.
 //
-// That canonical endpoint doesn't exist on fork servers <= 5.2.0 (mobile and server release
-// independently), so the write path is gated the same way the sync stream gates the per-user
-// favorites sync type: strictly-after-5.2.0 gets the canonical endpoint, everything else falls
-// back to the legacy bulk-update endpoint (see asset_api.repository.dart `updateFavorite` for
-// the full rationale).
+// No released fork server has that canonical endpoint (mobile and server release independently),
+// so the write path is gated on the server's capability declaration (`GET /server/features` →
+// `syncRequestTypes`): the endpoint ships together with the `AssetFavoritesV1` sync request type,
+// so a declaration containing it gets the canonical endpoint, and everything else — not declared,
+// or no declaration at all (pre-5.7.0 server, features not loaded) — falls back to the legacy
+// bulk-update endpoint (see asset_api.repository.dart `updateFavorite` for the full rationale).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
-import 'package:immich_mobile/utils/semver.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
@@ -22,8 +22,8 @@ void main() {
   late MockAssetsApi mockApi;
   late MockApiService mockApiService;
 
-  AssetApiRepository buildRepository(SemVer serverVersion) {
-    return AssetApiRepository(mockApiService, () => serverVersion);
+  AssetApiRepository buildRepository(Set<String>? supportedSyncTypes) {
+    return AssetApiRepository(mockApiService, () => supportedSyncTypes);
   }
 
   setUpAll(() {
@@ -37,8 +37,8 @@ void main() {
     when(() => mockApiService.assetsApi).thenReturn(mockApi);
   });
 
-  group('updateFavorite — new server (> 5.2.0)', () {
-    const newServer = SemVer(major: 5, minor: 3, patch: 0);
+  group('updateFavorite — server declares AssetFavoritesV1', () {
+    final newServer = {'AssetsV1', 'SharedSpaceAlbumFoldersV1', api.SyncRequestType.assetFavoritesV1.toJson()};
 
     test('calls updateAssetFavorites (PUT /assets/favorites), not the bulk-update endpoint', () async {
       final repository = buildRepository(newServer);
@@ -66,8 +66,8 @@ void main() {
     });
   });
 
-  group('updateFavorite — old server (<= 5.2.0)', () {
-    const oldServer = SemVer(major: 5, minor: 2, patch: 0);
+  group('updateFavorite — server declares capabilities but not AssetFavoritesV1 (released 5.7.x)', () {
+    const oldServer = {'AssetsV1', 'SharedSpaceAlbumFoldersV1'};
 
     test('falls back to updateAssets (PUT /assets), not the canonical endpoint', () async {
       final repository = buildRepository(oldServer);
@@ -92,13 +92,27 @@ void main() {
       expect(dto.isFavorite.value, isFalse);
     });
 
-    test('an older/unknown server (e.g. 5.0.0) also falls back to updateAssets', () async {
-      final repository = buildRepository(const SemVer(major: 5, minor: 0, patch: 0));
+    test('an empty declaration also falls back to updateAssets', () async {
+      final repository = buildRepository(const {});
       when(() => mockApi.updateAssets(any())).thenAnswer((_) async {});
 
       await repository.updateFavorite(['asset-1'], true);
 
       verify(() => mockApi.updateAssets(any())).called(1);
+      verifyNever(() => mockApi.updateAssetFavorites(any()));
+    });
+  });
+
+  group('updateFavorite — no declaration (pre-5.7.0 server, or features not loaded yet)', () {
+    test('null declaration falls back to updateAssets (PUT /assets), not the canonical endpoint', () async {
+      final repository = buildRepository(null);
+      when(() => mockApi.updateAssets(any())).thenAnswer((_) async {});
+
+      await repository.updateFavorite(['asset-1', 'asset-2'], true);
+
+      final dto = verify(() => mockApi.updateAssets(captureAny())).captured.single as api.AssetBulkUpdateDto;
+      expect(dto.ids, ['asset-1', 'asset-2']);
+      expect(dto.isFavorite.value, isTrue);
       verifyNever(() => mockApi.updateAssetFavorites(any()));
     });
   });

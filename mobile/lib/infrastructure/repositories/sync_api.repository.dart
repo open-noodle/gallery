@@ -45,9 +45,10 @@ class SyncApiRepository {
   /// list, never `_legacySpaceAlbumSyncTypes`.
   static const _spaceAlbumSyncTypes = [..._legacySpaceAlbumSyncTypes, SyncRequestType.sharedSpaceAlbumFoldersV1];
 
-  /// The #763 per-user favorites request type. Same one-place rule as
-  /// [_spaceAlbumSyncTypes] so the capability filter and the version-gate fallback
-  /// can never drift apart.
+  /// The #763 per-user favorites request type. Introduced after M14 capability signalling
+  /// shipped, so — like SharedSpaceAlbumFoldersV1 in [_spaceAlbumSyncTypes] — it is only ever
+  /// requested behind an explicit server declaration (`supportedSyncTypes`), never on a
+  /// version-gate fallback.
   static const _assetFavoriteSyncTypes = [SyncRequestType.assetFavoritesV1];
 
   Future<void> streamChanges(
@@ -155,15 +156,15 @@ class SyncApiRepository {
             ...(_spaceAlbumSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson())))
           else if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0))
             ..._legacySpaceAlbumSyncTypes,
-          // #763 per-user favorites stream. Routed through the same M14 capability declaration as
-          // the space-album types above, falling back to a fork-version gate on servers that
-          // predate capability signalling. An unknown enum value 400s the WHOLE /sync/stream
-          // request, so this gate is the only protection. Membership is tested with `toJson()`,
-          // matching the space-album filter above — the generated enum has no `.value`.
+          // #763 per-user favorites stream. AssetFavoritesV1 was introduced AFTER capability
+          // signalling shipped (v5.7.0), so — exactly like SharedSpaceAlbumFoldersV1 above — it
+          // is sent ONLY behind an explicit server declaration, never on a version fallback: no
+          // pre-declaration server (fork 5.2.1–5.6.x) can accept it, and an unknown enum value
+          // 400s the WHOLE /sync/stream request. A null declaration therefore sends nothing here.
+          // Membership is tested with `toJson()`, matching the space-album filter above — the
+          // generated enum has no `.value`.
           if (supportedSyncTypes != null)
-            ...(_assetFavoriteSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson())))
-          else if (serverVersion > const SemVer(major: 5, minor: 2, patch: 0))
-            ..._assetFavoriteSyncTypes,
+            ...(_assetFavoriteSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson()))),
         ],
       ).toJson(),
     );

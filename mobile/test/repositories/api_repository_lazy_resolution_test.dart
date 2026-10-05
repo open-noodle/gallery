@@ -20,7 +20,6 @@ import 'package:immich_mobile/repositories/folder_api.repository.dart';
 import 'package:immich_mobile/repositories/partner_api.repository.dart';
 import 'package:immich_mobile/repositories/sessions_api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
-import 'package:immich_mobile/utils/semver.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
@@ -178,7 +177,7 @@ void main() {
     final oldApi = _MockAssetsApi();
     final newApi = _MockAssetsApi();
     when(() => apiService.assetsApi).thenReturn(oldApi);
-    final repo = AssetApiRepository(apiService, () => const SemVer(major: 5, minor: 3, patch: 0));
+    final repo = AssetApiRepository(apiService, () => null);
 
     when(() => apiService.assetsApi).thenReturn(newApi);
     when(() => newApi.updateAsset(any(), any())).thenAnswer((_) => Future.error(Exception('stop')));

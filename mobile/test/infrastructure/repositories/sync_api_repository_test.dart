@@ -347,52 +347,39 @@ void main() {
     });
   });
 
-  group('#763: AssetFavoritesV1 request-type version gate', () {
-    test('v5.2.0 (at the boundary): EXCLUDES AssetFavoritesV1', () async {
-      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 0));
-      expect(types, isNot(contains('AssetFavoritesV1')));
+  group('#763: AssetFavoritesV1 is requested ONLY behind a server declaration', () {
+    // AssetFavoritesV1 post-dates capability signalling (v5.7.0), so like SharedSpaceAlbumFoldersV1
+    // it has no version-gate fallback: a server without a declaration (fork 5.2.1–5.6.x) does not
+    // know the type, and an unknown request type 400s the WHOLE /sync/stream request.
+    test('no declaration: EXCLUDES AssetFavoritesV1 at every version', () async {
+      for (final version in [
+        const SemVer(major: 3, minor: 0, patch: 1),
+        const SemVer(major: 5, minor: 2, patch: 0),
+        const SemVer(major: 5, minor: 2, patch: 1),
+        const SemVer(major: 5, minor: 6, patch: 3),
+        const SemVer(major: 5, minor: 7, patch: 1),
+        const SemVer(major: 6, minor: 0, patch: 0),
+      ]) {
+        final types = await capturedRequestTypes(version);
+        expect(types, isNot(contains('AssetFavoritesV1')), reason: 'no declaration must never send it at $version');
+        clearInteractions(mockHttpClient);
+      }
     });
 
-    test('below the boundary (v5.1.9): EXCLUDES AssetFavoritesV1', () async {
-      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 1, patch: 9));
-      expect(types, isNot(contains('AssetFavoritesV1')));
-    });
-
-    test('old upstream-numbered fork server (3.0.1): EXCLUDES AssetFavoritesV1 (fail-safe to old)', () async {
-      final types = await capturedRequestTypes(const SemVer(major: 3, minor: 0, patch: 1));
-      expect(types, isNot(contains('AssetFavoritesV1')));
-    });
-
-    test('v5.2.1 (first possible post-release): INCLUDES AssetFavoritesV1', () async {
-      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 1));
-      expect(types, contains('AssetFavoritesV1'));
-    });
-
-    test('feature release-candidate v5.2.1-rc.0: INCLUDES AssetFavoritesV1 (RC validation)', () async {
-      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 1, prerelease: 0));
-      expect(types, contains('AssetFavoritesV1'));
-    });
-
-    test('far-future v6.0.0: INCLUDES AssetFavoritesV1', () async {
-      final types = await capturedRequestTypes(const SemVer(major: 6, minor: 0, patch: 0));
-      expect(types, contains('AssetFavoritesV1'));
-    });
-  });
-
-  group('#763: server-declared sync capabilities override the AssetFavoritesV1 version gate', () {
-    test('a declaring server INCLUDES AssetFavoritesV1 even when its version reads at/below the gate', () async {
-      // Same RC/unbranded-dev-server lie as the album types: the declaration must win.
-      for (final version in [const SemVer(major: 5, minor: 2, patch: 0), const SemVer(major: 3, minor: 0, patch: 3)]) {
+    test('a declaring server INCLUDES AssetFavoritesV1 regardless of its reported version', () async {
+      // RC images stamp the bare upstream base version, unbranded dev servers the upstream
+      // version: the declaration must win.
+      for (final version in [const SemVer(major: 3, minor: 2, patch: 2), const SemVer(major: 5, minor: 7, patch: 1)]) {
         final types = await capturedRequestTypes(version, supportedSyncTypes: {'AssetFavoritesV1', 'AssetsV1'});
         expect(types, contains('AssetFavoritesV1'), reason: 'declared capability must open the gate at $version');
         clearInteractions(mockHttpClient);
       }
     });
 
-    test('a declaring server WITHOUT AssetFavoritesV1 EXCLUDES it even far above the version gate', () async {
+    test('a declaring server WITHOUT AssetFavoritesV1 (released 5.7.x) EXCLUDES it', () async {
       final types = await capturedRequestTypes(
         const SemVer(major: 6, minor: 0, patch: 0),
-        supportedSyncTypes: {'AssetsV1'},
+        supportedSyncTypes: {'AssetsV1', 'SharedSpaceAlbumFoldersV1'},
       );
       expect(types, isNot(contains('AssetFavoritesV1')), reason: 'the declaration is authoritative in both directions');
     });

@@ -17,8 +17,8 @@
 //
 //   1. The CHOKE POINT. Every possible route to owner-only favoriting has to construct an
 //      `AssetBulkUpdateDto` carrying `isFavorite`. Only two such sites may exist: the dead
-//      consolidated `update`, and the deliberate `updateFavorite` fallback for fork servers
-//      <= 5.2.0 that predate `PUT /assets/favorites` (see the comment at that call site).
+//      consolidated `update`, and the deliberate `updateFavorite` fallback for servers that do
+//      not declare `AssetFavoritesV1` and so lack `PUT /assets/favorites` (see that call site).
 //   2. The CALLER inventory. No `.update(...)` call may pass `isFavorite:` beyond the two internal
 //      forwards inside `AssetService.update`'s own body. Weaker than (1) — it only sees
 //      receiver-qualified calls, so a bare in-class `update(...)` would slip past it — but it names
@@ -231,7 +231,7 @@ void main() {
       'endpoint PUT /assets. Since #763 favorites are a per-user overlay (asset_favorite) that a '
       "read-only space Viewer may set on another member's asset, so the write must go through "
       'PUT /assets/favorites — call AssetApiRepository.updateFavorite (which already handles the '
-      'pre-5.2.0 server fallback) instead of adding another bulk-update site.';
+      'fallback for servers without that endpoint) instead of adding another bulk-update site.';
 
   const callerRemedy =
       'Something now passes isFavorite into the consolidated update path (AssetService.update -> '
@@ -243,7 +243,7 @@ void main() {
 
   test('only the two sanctioned sites send isFavorite to the owner-only bulk endpoint (#763)', () {
     // AssetApiRepository.update  — the dead consolidated path (no caller passes isFavorite).
-    // AssetApiRepository.updateFavorite — deliberate fallback for fork servers <= 5.2.0.
+    // AssetApiRepository.updateFavorite — deliberate fallback for servers not declaring AssetFavoritesV1.
     const expected = <String>[
       'lib/repositories/asset_api.repository.dart -> update() -> AssetBulkUpdateDto',
       'lib/repositories/asset_api.repository.dart -> updateFavorite() -> AssetBulkUpdateDto',
