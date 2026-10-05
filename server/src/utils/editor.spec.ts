@@ -73,6 +73,7 @@ const createFace = (params: Partial<AssetFace> = {}): AssetFace => ({
   ownerId: 'owner-id',
   assetVisibility: AssetVisibility.Timeline,
   assetDeletedAt: null,
+  createdBy: null,
   ...params,
 });
 

@@ -1926,6 +1926,7 @@ rollback
 begin
 select
   "id",
+  "spaceId",
   "identityId",
   "type",
   "representativeFaceId"
@@ -1955,6 +1956,14 @@ set
   "confidence" = $7
 returning
   *
+
+-- FaceIdentityRepository.getIdentityIdForFace
+select
+  "identityId"
+from
+  "face_identity_face"
+where
+  "assetFaceId" = $1
 
 -- FaceIdentityRepository.getManualLinkedFaceIds
 select

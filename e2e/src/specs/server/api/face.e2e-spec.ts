@@ -59,9 +59,9 @@ describe('/faces', () => {
 
   describe('POST /faces', () => {
     it('access matrix on the asset side', async () => {
-      // Posting a face requires READ access to BOTH the asset and the person
-      // (person.service.ts:641-642 — Permission.AssetRead + Permission.PersonRead, not
-      // write). Use ownerAssetId (owned by spaceOwner) + ownerPerson (also spaceOwner).
+      // Posting a face requires UPDATE access to the asset and READ access to the person
+      // (person.service.ts createFace — Permission.AssetUpdate + Permission.PersonRead).
+      // Use ownerAssetId (owned by spaceOwner) + ownerPerson (also spaceOwner).
       // Owner can; anon is 401; spaceNonMember is 400 (Immich's bulk-access pattern
       // returns 400 not 403 — the same taxonomic split T03 pinned for timeline endpoints).
       await forEachActor(

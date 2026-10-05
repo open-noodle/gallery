@@ -1,5 +1,28 @@
-import type { AssetResponseDto } from '@immich/sdk';
-import { canCopyImageToClipboard, getAssetFilename, getFilenameExtension } from './asset-utils';
+import { AssetVisibility, updateAsset, type AssetResponseDto } from '@immich/sdk';
+import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
+import {
+  canCopyImageToClipboard,
+  getAssetFilename,
+  getEditableAssetsWithWarning,
+  getFilenameExtension,
+  toggleArchive,
+} from './asset-utils';
+
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@immich/sdk')>();
+  return {
+    ...actual,
+    updateAsset: vi.fn(),
+  };
+});
+
+vi.mock('@immich/ui', async (orig) => {
+  const actual = await orig<typeof import('@immich/ui')>();
+  return {
+    ...actual,
+    toastManager: { primary: vi.fn(), danger: vi.fn(), warning: vi.fn(), success: vi.fn(), info: vi.fn() },
+  };
+});
 
 describe('get file extension from filename', () => {
   it('returns the extension without including the dot', () => {
@@ -61,5 +84,60 @@ describe('copy image to clipboard', () => {
   // This test is dubious, as it totally on the environment where the test is run which is mocked.
   it('should allow copy image to clipboard', () => {
     expect(canCopyImageToClipboard()).toEqual(true);
+  });
+});
+
+describe('toggleArchive', () => {
+  beforeEach(() => {
+    vi.mocked(updateAsset).mockReset();
+  });
+
+  it('updates both isArchived and visibility when archiving', async () => {
+    vi.mocked(updateAsset).mockResolvedValue({
+      isArchived: true,
+      visibility: AssetVisibility.Archive,
+    } as AssetResponseDto);
+
+    const asset = { id: '1', isArchived: false, visibility: AssetVisibility.Timeline } as AssetResponseDto;
+    await toggleArchive(asset);
+
+    expect(asset.isArchived).toBe(true);
+    // regression: visibility must be refreshed so the timeline correctly excludes the archived asset
+    expect(asset.visibility).toBe(AssetVisibility.Archive);
+  });
+
+  it('updates both isArchived and visibility when unarchiving', async () => {
+    vi.mocked(updateAsset).mockResolvedValue({
+      isArchived: false,
+      visibility: AssetVisibility.Timeline,
+    } as AssetResponseDto);
+
+    const asset = { id: '1', isArchived: true, visibility: AssetVisibility.Archive } as AssetResponseDto;
+    await toggleArchive(asset);
+
+    expect(asset.isArchived).toBe(false);
+    expect(asset.visibility).toBe(AssetVisibility.Timeline);
+  });
+});
+
+describe('getEditableAssetsWithWarning (#734)', () => {
+  const asset = (id: string): TimelineAsset => ({ id }) as unknown as TimelineAsset;
+
+  it('returns the ids that are in editableAssetIds and warns of nothing when all are editable', async () => {
+    const { toastManager } = await import('@immich/ui');
+
+    const ids = getEditableAssetsWithWarning([asset('a'), asset('b')], ['a', 'b']);
+
+    expect(ids).toEqual(['a', 'b']);
+    expect(toastManager.warning).not.toHaveBeenCalled();
+  });
+
+  it('drops non-editable assets and reports the skipped count via a warning toast', async () => {
+    const { toastManager } = await import('@immich/ui');
+
+    const ids = getEditableAssetsWithWarning([asset('a'), asset('b'), asset('c')], ['a']);
+
+    expect(ids).toEqual(['a']);
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
   });
 });
