@@ -343,6 +343,17 @@ identity.
 > still bounded to assets actually shared into the space; an editor cannot reach anything else.
 > Since 2026-10-05 it is also bounded to owners who are members of the space. A non-member owner
 > keeps the insulated model below (§3).
+>
+> **Same human, no duplicate (2026-10-05).** The owner layer is matched by identity
+> (`getOrCreateOwnerPersonForIdentity`). A space person created by name alone has no identity
+> until its first face, so attaching Bob's "Dad" face to a space person also called "Dad" used to
+> mint a new identity and give Bob a second "Dad". Now, when the space person has no identity yet
+> and its name matches the owner person on the face (trimmed, case-insensitive), it adopts that
+> person's identity instead, and the face stays on Bob's existing "Dad". A different name is still
+> a correction (F-36), and adoption is skipped when another space person in the space already holds
+> the identity, since `(spaceId, identityId)` is unique. Out of scope: a space person that already
+> has its *own* identity under the same name still creates a second owner person, because joining
+> the two would mean merging identities.
 > F-36 now asserts the propagation rather than the insulation.
 
 **Superseded decision (kept for context): the attach is allowed — an editor may override the owner's

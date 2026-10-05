@@ -7769,6 +7769,7 @@ describe(SharedSpaceService.name, () => {
       // factory.auth()'s random actor, so the §6.7 attribution write below fires by default too.
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: null,
         identityId: null,
         assetOwnerId: 'default-asset-owner',
@@ -7838,7 +7839,9 @@ describe(SharedSpaceService.name, () => {
       );
 
       expect(mocks.facePersonVerdict.isFaceAssignableInSpace).toHaveBeenCalledWith('space-1', 'face-1');
-      expect(mocks.faceIdentity.ensureSpacePersonIdentity).toHaveBeenCalledWith('space-person-1', mocks.database);
+      expect(mocks.faceIdentity.ensureSpacePersonIdentity).toHaveBeenCalledWith('space-person-1', mocks.database, {
+        adoptIdentityId: null,
+      });
       expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith(
         { assetFaceId: 'face-1', identityId: 'space-identity-1', source: 'manual' },
         mocks.database,
@@ -7858,6 +7861,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: null,
         identityId: null,
         assetOwnerId: 'default-asset-owner',
@@ -7898,6 +7902,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: 'owner-person-1',
         identityId: 'shared-identity',
         assetOwnerId: 'default-asset-owner',
@@ -7930,6 +7935,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: 'owner-person-1',
         identityId: 'owner-identity',
         assetOwnerId: 'default-asset-owner',
@@ -7962,6 +7968,35 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
+    // §6.3.1: an identity-less space person named like the owner's person on this face is the same
+    // human, so it adopts that person's identity and the owner keeps one "Dad" rather than gaining a
+    // second. A different name is a correction (F-36) and must not adopt; nor may a non-member's.
+    it.each([
+      { case: 'same name (case and spacing ignored)', spaceName: ' dad ', member: true, adopt: 'owner-identity' },
+      { case: 'a different name (a correction)', spaceName: 'Uncle Tom', member: true, adopt: null },
+      { case: 'same name, owner not a space member', spaceName: 'Dad', member: false, adopt: null },
+    ])('adopts the owner identity only for $case', async ({ spaceName, member, adopt }) => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1', name: spaceName, identityId: null }),
+      );
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        ownerIsSpaceMember: member,
+        ownerPersonName: 'Dad',
+        personGroupId: 'owner-person-1',
+        identityId: 'owner-identity',
+        assetOwnerId: 'default-asset-owner',
+      });
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1');
+
+      expect(mocks.faceIdentity.ensureSpacePersonIdentity).toHaveBeenCalledWith('space-person-1', mocks.database, {
+        adoptIdentityId: adopt,
+      });
+    });
+
     // §3: the owner-layer propagation above needs the asset owner to be a space member. Carol reached
     // the space only through a linked album, so Anna's edit stays in the space projection: Carol's
     // "Dad" keeps its identity and its face, and the space person records a negative verdict instead.
@@ -7973,6 +8008,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: false,
+        ownerPersonName: null,
         personGroupId: 'carol-person-1',
         identityId: 'carol-identity',
         assetOwnerId: 'carol',
@@ -8007,6 +8043,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: false,
+        ownerPersonName: null,
         personGroupId: null,
         identityId: null,
         assetOwnerId: 'carol',
@@ -8063,6 +8100,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: null,
         identityId: null,
         assetOwnerId: 'bob',
@@ -8095,6 +8133,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: null,
         identityId: null,
         assetOwnerId: 'bob',
@@ -8115,6 +8154,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: null,
         identityId: null,
         assetOwnerId: 'bob',
@@ -8134,6 +8174,7 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: 'owner-person-1',
         identityId: 'identity-1',
         assetOwnerId: 'bob',
@@ -8160,6 +8201,7 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: true,
+        ownerPersonName: null,
         personGroupId: 'owner-person-1',
         identityId: 'a-different-identity',
         assetOwnerId: 'bob',
@@ -8181,6 +8223,7 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         ownerIsSpaceMember: false,
+        ownerPersonName: null,
         personGroupId: 'carol-person-1',
         identityId: 'identity-1',
         assetOwnerId: 'carol',

@@ -595,6 +595,7 @@ where
 select
   "asset_face"."personGroupId" as "personGroupId",
   "person"."identityId" as "identityId",
+  "person"."name" as "ownerPersonName",
   "asset"."ownerId" as "assetOwnerId",
   exists (
     select

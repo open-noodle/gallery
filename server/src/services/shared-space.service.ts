@@ -111,6 +111,13 @@ const NAME_SOURCE_PRECEDENCE: Record<string, number> = {
 };
 const getNameSourcePrecedence = (nameSource: string) => NAME_SOURCE_PRECEDENCE[nameSource] ?? 0;
 
+// §6.3.1: an owner person and an identity-less space person with the same non-empty name are taken
+// to be the same human. Case and surrounding whitespace are not meaningful in a person's name.
+const isSamePersonName = (ownerPersonName: string | null | undefined, spacePersonName: string) => {
+  const owner = ownerPersonName?.trim().toLocaleLowerCase();
+  return !!owner && owner === spacePersonName.trim().toLocaleLowerCase();
+};
+
 /**
  * Upper bound on chained {@link SharedSpaceService.handleSharedSpacePersonDedup} passes for one
  * space. Each job runs a single pass and re-queues the next; this caps the chain so a pathological
@@ -2026,10 +2033,25 @@ export class SharedSpaceService extends BaseService {
     assetFaceId: string,
     { writeIdentity }: { writeIdentity: boolean },
   ): Promise<void> {
+    // §3: read first -- whether the owner is a space member, and which of the owner's people already
+    // holds this face, decide both the identity below and the owner-layer write at the end.
+    const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(person.spaceId, assetFaceId, trx);
+
     // §6.3.1 (revised): the identity is now resolved on BOTH paths, not just the writeIdentity one.
     // Propagating the edit to the owner's `asset_face.personId` needs an identity to bridge the space
     // person onto a person the owner owns, so a space person that has never carried one gets it here.
-    const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
+    //
+    // A space person with no identity yet, carrying the same name as the owner's person on this face,
+    // is the same human: it adopts that person's identity, so the owner keeps one "Dad" instead of
+    // gaining a second one beside it. A different name is a correction (F-36) and gets a fresh
+    // identity as before. ensureSpacePersonIdentity ignores the hint once the person has an identity.
+    const adoptIdentityId =
+      ownerLink?.ownerIsSpaceMember && isSamePersonName(ownerLink.ownerPersonName, person.name)
+        ? ownerLink.identityId
+        : null;
+    const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx, {
+      adoptIdentityId,
+    });
 
     if (writeIdentity) {
       await this.faceIdentityRepository.replaceFaceIdentity(
@@ -2062,7 +2084,6 @@ export class SharedSpaceService extends BaseService {
     // §3: only when the owner is a member of this space. An owner reached through a linked album
     // never joined it, so the space has no say over their library and the edit stays in the
     // projection above -- the insulated model, which `writeIdentity: false` completes for row 3.
-    const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(person.spaceId, assetFaceId, trx);
     if (ownerLink?.ownerIsSpaceMember) {
       const ownerPerson = await this.personRepository.getOrCreateOwnerPersonForIdentity(
         {

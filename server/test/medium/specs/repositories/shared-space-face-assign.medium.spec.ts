@@ -437,6 +437,75 @@ describe('an owner outside the space keeps their library untouched (§3, F-6)', 
   });
 });
 
+// §6.3.1: a space person with no identity yet, named like the owner's person on the face, is the
+// same human. It adopts the owner's identity, so the owner keeps a single "Dad" instead of gaining a
+// second one beside it.
+const newBobDadFixture = async () => {
+  const { sut, ctx } = newMediumService(SharedSpaceService, {
+    database: defaultDatabase,
+    real: [
+      FacePersonVerdictRepository,
+      SharedSpaceRepository,
+      FaceIdentityRepository,
+      DatabaseRepository,
+      PersonRepository,
+    ],
+    mock: [LoggingRepository],
+  });
+  const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+  const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+  const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+  const { result: bobPerson } = await ctx.newPerson({ ownerId: bob.id, name: 'Dad' });
+  const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.personGroupId);
+  const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId: bobPerson.personGroupId });
+  await faceIdentityRepo.linkFace({ assetFaceId: faceId, identityId: bobIdentity.id, source: 'owner-person' });
+  const auth = { user: { id: anna.id } } as AuthDto;
+  return { sut, ctx, auth, bob, space, faceId, bobPerson, bobIdentity };
+};
+
+describe('an identity-less space person named like the owner person reuses it (§6.3.1)', () => {
+  it('keeps the face on the owner person and gives the space person its identity', async () => {
+    const { sut, ctx, auth, bob, space, faceId, bobPerson, bobIdentity } = await newBobDadFixture();
+    const spacePerson = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'dad' });
+
+    await expect(sut.attachFaceToSpacePerson(auth, space.id, spacePerson.id, faceId)).resolves.toBe(true);
+
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(face.personGroupId).toBe(bobPerson.personGroupId);
+    const bobPeople = await defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute();
+    expect(bobPeople).toHaveLength(1);
+    const updated = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('id', '=', spacePerson.id)
+      .executeTakeFirstOrThrow();
+    expect(updated.identityId).toBe(bobIdentity.id);
+  });
+
+  // (spaceId, identityId) is unique: when another space person here already holds the owner's
+  // identity, adoption is skipped and the space person gets a fresh identity, as before.
+  it('falls back to a fresh identity when another space person already holds it', async () => {
+    const { sut, ctx, auth, space, faceId, bobIdentity } = await newBobDadFixture();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    await spaceRepo.createOrGetPersonForIdentity({ spaceId: space.id, identityId: bobIdentity.id, name: 'Father' });
+    const spacePerson = await spaceRepo.createPerson({ spaceId: space.id, name: 'Dad' });
+
+    await expect(sut.attachFaceToSpacePerson(auth, space.id, spacePerson.id, faceId)).resolves.toBe(true);
+
+    const updated = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('id', '=', spacePerson.id)
+      .executeTakeFirstOrThrow();
+    expect(updated.identityId).not.toBeNull();
+    expect(updated.identityId).not.toBe(bobIdentity.id);
+  });
+});
+
 // F-37: two editors attach the SAME face to two DIFFERENT space people at the same time. Needs two real
 // Postgres transactions actually racing -- a mocked repository cannot express the interleaving this pins.
 describe('concurrent attach to the same face (F-37)', () => {

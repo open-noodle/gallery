@@ -2331,15 +2331,25 @@ export class FaceIdentityRepository {
     }
   }
 
+  /**
+   * The space person's identity, minting one if it has none.
+   *
+   * `adoptIdentityId`: when the space person has no identity yet, take this existing one instead of
+   * minting a new one. The caller passes it when the space person is the same human as an existing
+   * owner person (§6.3.1), so the owner layer reuses that person rather than gaining a duplicate.
+   * Skipped when another space person in the same space already holds the identity, because
+   * `(spaceId, identityId)` is unique; the person then gets a fresh identity as before.
+   */
   @GenerateSql({ params: [DummyValue.UUID] })
   async ensureSpacePersonIdentity(
     spacePersonId: string,
     db: Kysely<DB> | Transaction<DB> = this.db,
+    { adoptIdentityId }: { adoptIdentityId?: string | null } = {},
   ): Promise<FaceIdentity> {
     const ensure = async (runner: Kysely<DB> | Transaction<DB>) => {
       const person = await runner
         .selectFrom('shared_space_person')
-        .select(['id', 'identityId', 'type', 'representativeFaceId'])
+        .select(['id', 'spaceId', 'identityId', 'type', 'representativeFaceId'])
         .where('id', '=', spacePersonId)
         .executeTakeFirstOrThrow();
 
@@ -2349,6 +2359,33 @@ export class FaceIdentityRepository {
           .selectAll()
           .where('id', '=', person.identityId)
           .executeTakeFirstOrThrow();
+      }
+
+      if (adoptIdentityId) {
+        const adopted = await runner
+          .updateTable('shared_space_person')
+          .set({ identityId: adoptIdentityId })
+          .where('id', '=', person.id)
+          .where('identityId', 'is', null)
+          .where((eb) =>
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_person as holder')
+                  .select('holder.id')
+                  .where('holder.spaceId', '=', person.spaceId)
+                  .where('holder.identityId', '=', adoptIdentityId),
+              ),
+            ),
+          )
+          .executeTakeFirst();
+        if (Number(adopted.numUpdatedRows) > 0) {
+          return runner
+            .selectFrom('face_identity')
+            .selectAll()
+            .where('id', '=', adoptIdentityId)
+            .executeTakeFirstOrThrow();
+        }
       }
 
       const identity = await runner

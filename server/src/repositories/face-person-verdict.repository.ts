@@ -965,6 +965,9 @@ export class FacePersonVerdictRepository {
    * attribution rule keys off. Piggybacking it here avoids a second round-trip in the same
    * attach/detach transaction that already calls this method.
    *
+   * `ownerPersonName` is that owner person's name, which `linkFaceToSpacePerson` compares against
+   * an identity-less space person's name to decide whether they are the same human (§6.3.1).
+   *
    * Also carries `ownerIsSpaceMember` — whether the asset owner is a member of `spaceId`. Only
    * then may a space edit propagate into the owner's own people layer (§3, §6.3.1): an owner who
    * never joined the space, e.g. one reached through a linked album, keeps their library untouched
@@ -981,7 +984,13 @@ export class FacePersonVerdictRepository {
     assetFaceId: string,
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<
-    | { personGroupId: string | null; identityId: string | null; assetOwnerId: string; ownerIsSpaceMember: boolean }
+    | {
+        personGroupId: string | null;
+        identityId: string | null;
+        ownerPersonName: string | null;
+        assetOwnerId: string;
+        ownerIsSpaceMember: boolean;
+      }
     | undefined
   > {
     return db
@@ -991,6 +1000,7 @@ export class FacePersonVerdictRepository {
       .select((eb) => [
         'asset_face.personGroupId as personGroupId',
         'person.identityId as identityId',
+        'person.name as ownerPersonName',
         'asset.ownerId as assetOwnerId',
         eb
           .exists(

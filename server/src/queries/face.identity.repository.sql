@@ -1926,6 +1926,7 @@ rollback
 begin
 select
   "id",
+  "spaceId",
   "identityId",
   "type",
   "representativeFaceId"
