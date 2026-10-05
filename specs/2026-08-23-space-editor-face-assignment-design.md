@@ -99,6 +99,28 @@ though Carol never joined, exactly as the ML pipeline already does for her today
 assignable here (F-6) while her asset is not editable under #992 (S-4). Both are correct; they answer
 different questions.
 
+> **REVISED 2026-10-05 — owner membership decides how far an edit reaches.** The paragraph above
+> stopped being true when §6.3.1 was revised on 2026-08-25: attach, create-from-face and draw now write
+> into the asset owner's own layer (`asset_face.personGroupId`, a new owner `person`, the face
+> identity), and detach clears the owner's tag. Combined with F-6, that let an editor of S create
+> people in the library of an owner who never joined S, e.g. Carol reached through a linked album.
+>
+> The rule now has two tiers:
+>
+> - **Owner is a member of S** (the #992 rule: a `shared_space_member` row): the revised §6.3.1
+>   applies in full. The edit propagates into the owner's layer.
+> - **Owner is not a member of S:** naming an existing face is still granted (F-6), but the edit
+>   stays in S's projection. This is the original insulated model. The owner's `asset_face.personId`
+>   and person rows are never written. Their face identity is re-pointed only for §6.3.1 rows 1–2
+>   (the face is unnamed, or its owner person already carries the same identity). For row 3 the
+>   identity is left alone and a negative verdict is written. Detach removes only the projection.
+>   Drawing a box (§6.5) is refused with 403, because the new `asset_face` row lands in the owner's
+>   own face data.
+>
+> `getFaceOwnerLink(spaceId, assetFaceId)` returns `ownerIsSpaceMember` for this. Pinned by the
+> "an owner outside the space keeps their library untouched" medium block and the matching unit
+> cases.
+
 ---
 
 ## 4. Scope
@@ -319,6 +341,8 @@ identity.
 > Consequence: the privacy guarantee in the paragraph below no longer holds — an editor CAN alter
 > face tags on the owner's own copy of a photo shared into the space. That is intended. Scope is
 > still bounded to assets actually shared into the space; an editor cannot reach anything else.
+> Since 2026-10-05 it is also bounded to owners who are members of the space. A non-member owner
+> keeps the insulated model below (§3).
 > F-36 now asserts the propagation rather than the insulation.
 
 **Superseded decision (kept for context): the attach is allowed — an editor may override the owner's
@@ -379,7 +403,8 @@ member's asset, so an editor drawing on a rotated preview is a _likely_ path, no
 (F-16). Reject with 400 when dimensions are unavailable, same as the owner path.
 
 The created `asset_face` gets `personId = NULL` (never the owner's person) and is attached to the
-space person through §6.3's helper.
+space person through §6.3's helper. Refused with 403 when the asset owner is not a member of the space (§3, revised
+2026-10-05).
 
 ### 6.6 Editor-drawn boxes are deletable by the editor
 
@@ -770,7 +795,9 @@ browser. Cite the path, not a SHA — #992's branch is rebased routinely and any
    detected faces stay owner-only. Fork migration required.
 2. **§6.3.1 — faces the owner already named.** An editor **may** override, and the override is
    space-local: the space projection is written, the identity link is not. Bob's own library and his
-   resolved names and ages are untouched (F-36, F-40).
+   resolved names and ages are untouched (F-36, F-40). _Superseded 2026-08-25 for owners who are space
+   members (the override propagates, §6.3.1 revised). It still holds for owners who are not (§3,
+   revised 2026-10-05)._
 
 3. **§5.2 — where the affordance appears.** Asset-scoped, not route-scoped: it shows wherever a photo
    is reachable through a space the viewer edits, including the main timeline. The first draft said
@@ -796,3 +823,27 @@ browser.
   worth a cap if group shots prove pathological.
 - Bulk face assignment across a selection.
 - #992's known gap: tag add/remove are still unattributed. Unrelated, but the same feed.
+
+### Known limitations (review of 2026-10-05, deliberately deferred)
+
+- **Face affordances can appear in a space where the viewer is only a Viewer.** `canEditSpacePeople`
+  (`web/src/lib/utils/asset-editability.ts`) combines `asset.canEdit`, which is true when *any* space
+  grants the edit, with `effectiveSpaceId`, which is the route's space or the server's
+  `resolvedSpaceId`. `findSpaceForAssetAndUser` picks that space with no role filter and no ordering
+  (`LIMIT 1`). So an Editor of B who is a Viewer of A, with the same photo in both, can be offered the
+  People-row controls against A. The server then refuses (`requireRole(Editor)`), so nothing is written,
+  but the panel shows an error. The same unordered lookup also decides which space a #992 cross-owner
+  edit is logged to, so an `asset_edit` row can land in a space the owner is not in. Fix for both:
+  resolve the space with the same three arms as `checkSpaceEditAccess` (Editor/Owner role, owner is a
+  member), and gate the web on the role in that space.
+- **Only `createSpacePerson` retries on deadlock.** Attach, detach, `createSpaceAssetFace` and
+  `deleteSpaceAssetFace` lock the previous holders' person rows (recount) and then the target's
+  (`addPersonFaces`) separately. Two editors moving faces between the same two people in opposite
+  directions at once can deadlock, and the loser returns a 500. Fix: wrap all four transactions in
+  `retryOnDeadlock`. A failed transaction rolls back, so re-running the whole thing is safe.
+- **A face can get stuck after an attach onto a person the owner hid.** `getOrCreateOwnerPersonForIdentity`
+  does not filter `isHidden`, so the attach can move the face onto a hidden owner person. After that,
+  `getAssetFacesForSpace` stops listing it and `isFaceAssignableInSpace` refuses detach and reassign
+  ("Face not found"). Owner members only, since the owner layer is not written for non-members (§3).
+  Fix: skip the owner-layer write when the resolved person is hidden, or exempt faces the space itself
+  holds from the hidden exclusion.
