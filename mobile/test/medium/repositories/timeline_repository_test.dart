@@ -3,6 +3,7 @@
 // matcher (live-photos group merged in from main), so drift's must yield.
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_hidden.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_link.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/stack.drift.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
@@ -547,10 +548,9 @@ void main() {
     });
   });
 
-  // #763: favorite() dropped the ownerId-only filter in favor of the same viewer-visibility
-  // join/predicate the map favorite filter uses — a viewer's Favorites page must surface
-  // favorites on assets they can see via a shared space (direct, library, or album), not just
-  // assets they own.
+  // #763: favorite() dropped the ownerId-only filter and mirrors the server/web /favorites scope —
+  // own assets, timeline-enabled partners' assets, and assets in EVERY space the viewer is a
+  // member of (direct, library, or album), ignoring the member's showInTimeline hide.
   group('favorite() viewer visibility (#763)', () {
     Future<int> bucketTotal(TimelineQuery q) async {
       final buckets = await q.bucketSource().first;
@@ -593,13 +593,111 @@ void main() {
       expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 1);
     });
 
-    test('a favorited asset shared directly with showInTimeline=false stays hidden', () async {
+    test('a favorited asset in a space the viewer hid from their timeline is still visible', () async {
+      // Server "Favorites ignores the timeline hide": the favorites scope spans every member space
+      // (getAllMemberSpaceIds), not just the showInTimeline ones.
       final viewer = await ctx.newUser();
       final owner = await ctx.newUser();
       final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
       final space = await ctx.newSharedSpace(createdById: owner.id);
       await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: false);
       await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: asset.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {asset.id});
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 1);
+    });
+
+    test('a favorited asset in a hidden space reached via a library or album is still visible', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final library = await ctx.newLibrary(ownerId: owner.id);
+      final viaLibrary = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true, libraryId: library.id);
+      final viaAlbum = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: false);
+      await ctx.insertSharedSpaceLibrary(spaceId: space.id, libraryId: library.id);
+      // The shared link flag governs the space's own Photos tab, not a personal surface.
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: false);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: viaAlbum.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {viaLibrary.id, viaAlbum.id});
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 2);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 2);
+    });
+
+    test("a favorited asset only in a space album the viewer personally hid is excluded", () async {
+      // Mirrors the server album arm's 'personal' gate (shared_space_album_hidden for the viewer).
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      final album = await ctx.newSharedSpaceAlbum();
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+      await ctx.db
+          .into(ctx.db.sharedSpaceAlbumHiddenEntity)
+          .insert(
+            SharedSpaceAlbumHiddenEntityCompanion.insert(spaceId: space.id, albumId: album.id, userId: viewer.id),
+          );
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets, isEmpty);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 0);
+    });
+
+    test('a favorited asset in a space the viewer is NOT a member of is excluded', () async {
+      final viewer = await ctx.newUser();
+      final owner = await ctx.newUser();
+      final other = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, isFavorite: true);
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: other.id, showInTimeline: true);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: asset.id);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets, isEmpty);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 0);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 0);
+    });
+
+    test("a timeline-enabled partner's favorited asset is visible", () async {
+      final viewer = await ctx.newUser();
+      final partner = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: partner.id, isFavorite: true);
+      await ctx.newRemoteAsset(ownerId: partner.id);
+      await ctx.newPartner(sharedById: partner.id, sharedWithId: viewer.id, inTimeline: true);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets.map((a) => (a as RemoteAsset).id).toSet(), {asset.id});
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 1);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.day)), 1);
+    });
+
+    test("a partner's ARCHIVED favorited asset is excluded (server withPartners needs Timeline)", () async {
+      final viewer = await ctx.newUser();
+      final partner = await ctx.newUser();
+      await ctx.newRemoteAsset(ownerId: partner.id, isFavorite: true, visibility: AssetVisibility.archive);
+      await ctx.newPartner(sharedById: partner.id, sharedWithId: viewer.id, inTimeline: true);
+
+      final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
+      expect(assets, isEmpty);
+      expect(await bucketTotal(sut.favorite(viewer.id, GroupAssetsBy.none)), 0);
+    });
+
+    test('partner scope is directional and needs inTimeline (getMyPartnerIds timelineEnabled)', () async {
+      final viewer = await ctx.newUser();
+      final notInTimeline = await ctx.newUser();
+      final sharedWithThem = await ctx.newUser();
+      await ctx.newRemoteAsset(ownerId: notInTimeline.id, isFavorite: true);
+      await ctx.newRemoteAsset(ownerId: sharedWithThem.id, isFavorite: true);
+      await ctx.newPartner(sharedById: notInTimeline.id, sharedWithId: viewer.id, inTimeline: false);
+      // Wrong direction: the VIEWER shares with this user, not the other way round.
+      await ctx.newPartner(sharedById: viewer.id, sharedWithId: sharedWithThem.id, inTimeline: true);
 
       final assets = await sut.favorite(viewer.id, GroupAssetsBy.none).assetSource(0, 100);
       expect(assets, isEmpty);

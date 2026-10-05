@@ -816,12 +816,21 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     sortBy: SortAssetsBy.uploaded,
   );
 
-  // #763: favorites are per-viewer, not per-owner — a shared-space viewer's favorite flag on
-  // someone else's asset must still surface on their Favorites page. This drops the old
-  // row.ownerId.equals(userId) scoping and instead mirrors the map favorite filter's
-  // viewer-visibility join/predicate (own + space/album/library-shared), diverging intentionally
-  // from the previous owner-only semantics. Can't reuse `_remoteQueryBuilder` here since it has
-  // no join support, so this mirrors `_watchMapBucket`/`_getMapBucketAssets` instead.
+  // #763: favorites are per-viewer, not per-owner — a viewer's favorite flag on someone else's
+  // asset must still surface on their Favorites page. Mirrors the server/web /favorites scope
+  // (timeline.service.ts getTimeBuckets with isFavorite=true, withPartners, withSharedSpaces):
+  //   * own assets (Timeline + Archive, the page's pre-#763 owner scope);
+  //   * timeline-enabled partners' assets (partner.inTimeline, the same set getMyPartnerIds
+  //     {timelineEnabled: true} resolves) — Timeline visibility only, since the server rejects
+  //     withPartners without an explicit visibility so a partner's ARCHIVED assets never leak;
+  //   * assets reachable through EVERY space the viewer is a member of, ignoring the member's
+  //     showInTimeline: a favorite placed inside a space the viewer hid from their timeline is
+  //     still theirs (server getAllMemberSpaceIds, "Favorites ignores the timeline hide"). The
+  //     album arm keeps the server's 'personal' gate — the viewer's own
+  //     shared_space_album_hidden row — not the shared link showInTimeline flag.
+  // Can't reuse `_remoteQueryBuilder` (no join support) or the viewer_visibility helpers (they
+  // apply the timeline hide), so the scope lives in [_favoriteScopeJoins] (bucket .watch(), real
+  // joins for reactivity) and [_favoriteScopePredicate] (asset list .get()), kept in lockstep.
   TimelineQuery favorite(
     String userId,
     GroupAssetsBy groupBy, {
@@ -833,28 +842,163 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     origin: TimelineOrigin.favorite,
   );
 
+  /// LEFT OUTER JOINs + WHERE term for the Favorites scope (see [favorite]). Real joins rather than
+  /// isInQuery so Drift's readsFrom tracks every table and the bucket stream stays reactive.
+  ({List<Join> joins, Expression<bool> inScope}) _favoriteScopeJoins(String userId) {
+    final rae = _db.remoteAssetEntity;
+    final assetMember = _db.alias(_db.sharedSpaceMemberEntity, 'fav_ssm_asset');
+    final libraryMember = _db.alias(_db.sharedSpaceMemberEntity, 'fav_ssm_lib');
+    final albumMember = _db.alias(_db.sharedSpaceMemberEntity, 'fav_ssm_album');
+
+    final joins = <Join>[
+      leftOuterJoin(
+        _db.partnerEntity,
+        _db.partnerEntity.sharedById.equalsExp(rae.ownerId) &
+            _db.partnerEntity.sharedWithId.equals(userId) &
+            _db.partnerEntity.inTimeline.equals(true),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        _db.sharedSpaceAssetEntity,
+        _db.sharedSpaceAssetEntity.assetId.equalsExp(rae.id),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        assetMember,
+        assetMember.spaceId.equalsExp(_db.sharedSpaceAssetEntity.spaceId) & assetMember.userId.equals(userId),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        _db.sharedSpaceLibraryEntity,
+        _db.sharedSpaceLibraryEntity.libraryId.equalsExp(rae.libraryId),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        libraryMember,
+        libraryMember.spaceId.equalsExp(_db.sharedSpaceLibraryEntity.spaceId) & libraryMember.userId.equals(userId),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        _db.sharedSpaceAlbumAssetEntity,
+        _db.sharedSpaceAlbumAssetEntity.assetId.equalsExp(rae.id),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        _db.sharedSpaceAlbumLinkEntity,
+        _db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(_db.sharedSpaceAlbumAssetEntity.albumId),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        albumMember,
+        albumMember.spaceId.equalsExp(_db.sharedSpaceAlbumLinkEntity.spaceId) & albumMember.userId.equals(userId),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        _db.sharedSpaceAlbumHiddenEntity,
+        _db.sharedSpaceAlbumHiddenEntity.spaceId.equalsExp(_db.sharedSpaceAlbumLinkEntity.spaceId) &
+            _db.sharedSpaceAlbumHiddenEntity.albumId.equalsExp(_db.sharedSpaceAlbumLinkEntity.albumId) &
+            _db.sharedSpaceAlbumHiddenEntity.userId.equals(userId),
+        useColumns: false,
+      ),
+    ];
+
+    final inScope =
+        rae.ownerId.equals(userId) |
+        (_db.partnerEntity.sharedById.isNotNull() & rae.visibility.equalsValue(AssetVisibility.timeline)) |
+        assetMember.userId.isNotNull() |
+        libraryMember.userId.isNotNull() |
+        (albumMember.userId.isNotNull() & _db.sharedSpaceAlbumHiddenEntity.albumId.isNull());
+
+    return (joins: joins, inScope: inScope);
+  }
+
+  /// The [_favoriteScopeJoins] scope as isInQuery subqueries, for one-shot .get() asset lists
+  /// (no reactivity concern; isInQuery naturally deduplicates).
+  Expression<bool> _favoriteScopePredicate(String userId) {
+    final rae = _db.remoteAssetEntity;
+
+    final ownedByPartner =
+        rae.ownerId.isInQuery(
+          _db.partnerEntity.selectOnly()
+            ..addColumns([_db.partnerEntity.sharedById])
+            ..where(_db.partnerEntity.sharedWithId.equals(userId) & _db.partnerEntity.inTimeline.equals(true)),
+        ) &
+        rae.visibility.equalsValue(AssetVisibility.timeline);
+
+    final inSpaceAsset = rae.id.isInQuery(
+      _db.sharedSpaceAssetEntity.selectOnly()
+        ..addColumns([_db.sharedSpaceAssetEntity.assetId])
+        ..join([
+          innerJoin(
+            _db.sharedSpaceMemberEntity,
+            _db.sharedSpaceMemberEntity.spaceId.equalsExp(_db.sharedSpaceAssetEntity.spaceId) &
+                _db.sharedSpaceMemberEntity.userId.equals(userId),
+            useColumns: false,
+          ),
+        ]),
+    );
+
+    final inSpaceLibrary = rae.libraryId.isInQuery(
+      _db.sharedSpaceLibraryEntity.selectOnly()
+        ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
+        ..join([
+          innerJoin(
+            _db.sharedSpaceMemberEntity,
+            _db.sharedSpaceMemberEntity.spaceId.equalsExp(_db.sharedSpaceLibraryEntity.spaceId) &
+                _db.sharedSpaceMemberEntity.userId.equals(userId),
+            useColumns: false,
+          ),
+        ]),
+    );
+
+    final inSpaceAlbum = rae.id.isInQuery(
+      _db.sharedSpaceAlbumAssetEntity.selectOnly()
+        ..addColumns([_db.sharedSpaceAlbumAssetEntity.assetId])
+        ..join([
+          innerJoin(
+            _db.sharedSpaceAlbumLinkEntity,
+            _db.sharedSpaceAlbumLinkEntity.albumId.equalsExp(_db.sharedSpaceAlbumAssetEntity.albumId),
+            useColumns: false,
+          ),
+          innerJoin(
+            _db.sharedSpaceMemberEntity,
+            _db.sharedSpaceMemberEntity.spaceId.equalsExp(_db.sharedSpaceAlbumLinkEntity.spaceId) &
+                _db.sharedSpaceMemberEntity.userId.equals(userId),
+            useColumns: false,
+          ),
+          leftOuterJoin(
+            _db.sharedSpaceAlbumHiddenEntity,
+            _db.sharedSpaceAlbumHiddenEntity.spaceId.equalsExp(_db.sharedSpaceAlbumLinkEntity.spaceId) &
+                _db.sharedSpaceAlbumHiddenEntity.albumId.equalsExp(_db.sharedSpaceAlbumLinkEntity.albumId) &
+                _db.sharedSpaceAlbumHiddenEntity.userId.equals(userId),
+            useColumns: false,
+          ),
+        ])
+        ..where(_db.sharedSpaceAlbumHiddenEntity.albumId.isNull()),
+    );
+
+    return rae.ownerId.equals(userId) | ownedByPartner | inSpaceAsset | inSpaceLibrary | inSpaceAlbum;
+  }
+
   Stream<List<Bucket>> _watchFavoriteBucket(
     String userId, {
     GroupAssetsBy groupBy = GroupAssetsBy.day,
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) {
-    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, userId);
+    final scope = _favoriteScopeJoins(userId);
     final visible =
         _db.remoteAssetEntity.deletedAt.isNull() &
         _db.remoteAssetEntity.isFavorite.equals(true) &
         (_db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) |
             _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.archive)) &
         _remoteWithinTemporalScope(_db.remoteAssetEntity, temporalScope) &
-        (_db.remoteAssetEntity.ownerId.equals(userId) |
-            viz.assetMember.userId.isNotNull() |
-            viz.libraryMember.userId.isNotNull() |
-            viz.albumMember.userId.isNotNull());
+        scope.inScope;
 
     if (groupBy == GroupAssetsBy.none) {
       final countExp = _db.remoteAssetEntity.id.count(distinct: true);
       final query = _db.remoteAssetEntity.selectOnly()
         ..addColumns([countExp])
-        ..join(viz.joins)
+        ..join(scope.joins)
         ..where(visible);
 
       return query.map((row) => row.read(countExp) ?? 0).map(_generateBuckets).watchSingle();
@@ -865,7 +1009,7 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
 
     final query = _db.remoteAssetEntity.selectOnly()
       ..addColumns([assetCountExp, dateExp])
-      ..join(viz.joins)
+      ..join(scope.joins)
       ..where(visible)
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
@@ -883,7 +1027,7 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     required int count,
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) {
-    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, [userId], userId);
+    final scopePredicate = _favoriteScopePredicate(userId);
 
     final query = _db.remoteAssetEntity.select()
       ..where(
@@ -893,7 +1037,7 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
             (row.visibility.equalsValue(AssetVisibility.timeline) |
                 row.visibility.equalsValue(AssetVisibility.archive)) &
             _remoteWithinTemporalScope(row, temporalScope) &
-            visibilityPredicate,
+            scopePredicate,
       )
       ..orderBy([(row) => OrderingTerm.desc(row.createdAt)])
       ..limit(count, offset: offset);
