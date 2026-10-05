@@ -17,6 +17,7 @@
   import { getStackActions } from '$lib/services/stack.service';
   import { getSharedLink, withoutIcons } from '$lib/utils';
   import type { OnUndoDelete } from '$lib/utils/actions';
+  import { canEditAsset } from '$lib/utils/asset-editability';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
   import {
     AssetTypeEnum,
@@ -65,6 +66,11 @@
 
   const isOwner = $derived(authManager.authenticated && asset.ownerId === authManager.user.id);
   const isLocked = $derived(asset.visibility === AssetVisibility.Locked);
+  // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
+  // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`).
+  const isEditable = $derived(
+    canEditAsset(asset, { userId: authManager.authenticated ? authManager.user.id : undefined }),
+  );
 
   const { Cast } = $derived(getGlobalActions($t));
 
@@ -183,7 +189,7 @@
 
         <ActionMenuItem action={PlayOriginalVideo} />
 
-        {#if isOwner}
+        {#if isEditable}
           <hr />
           <ActionMenuItem action={Actions.RefreshFacesJob} />
           <ActionMenuItem action={Actions.RefreshMetadataJob} />

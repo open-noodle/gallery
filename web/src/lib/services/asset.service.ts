@@ -65,6 +65,8 @@ import { SlideshowState, slideshowStore } from '$lib/stores/slideshow.store';
 import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { getAssetMediaUrl, getSharedLink, sleep } from '$lib/utils';
 import { downloadUrl } from '$lib/utils';
+import { canEditAsset } from '$lib/utils/asset-editability';
+import { getEditableAssetsWithWarning } from '$lib/utils/asset-utils';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 
@@ -73,6 +75,7 @@ export const getAssetBulkActions = (
   {
     restrictToSpaceId,
     album,
+    editableSelectedAssetIds,
   }: {
     /**
      * Set when the selection contains assets the user does not own: the add-to-collection
@@ -85,6 +88,12 @@ export const getAssetBulkActions = (
      * into this bag so the fork's restrictToSpaceId and it can coexist. Gates RemoveFromAlbum.
      */
     album?: AlbumResponseDto;
+    /**
+     * #734: which of the current selection the caller may edit (resolved by `SelectionToolbar`
+     * via `POST /assets/editable`). When set, Tag sends only these and reports the skipped count;
+     * omitted on every other surface, which keeps upstream's all-owned behaviour.
+     */
+    editableSelectedAssetIds?: string[];
   } = {},
 ) => {
   const assetIds = assetMultiSelectManager.assets.map((asset) => asset.id);
@@ -134,9 +143,21 @@ export const getAssetBulkActions = (
   const Tag: ActionItem = {
     title: $t('tag'),
     icon: mdiTagMultipleOutline,
-    $if: () => authManager.preferences.tags.enabled && assetMultiSelectManager.isAllUserOwned,
+    $if: () =>
+      authManager.preferences.tags.enabled &&
+      (assetMultiSelectManager.isAllUserOwned || (editableSelectedAssetIds?.length ?? 0) > 0),
     onAction: async () => {
-      if (await modalManager.show(AssetTagModal, { assetIds })) {
+      // #734: a space Owner/Editor may tag a member's assets. Send only the editable subset and
+      // report what was skipped; a selection that resolves to nothing editable never opens the
+      // modal, which would otherwise "succeed" with an empty id list.
+      const ids =
+        editableSelectedAssetIds === undefined
+          ? assetIds
+          : getEditableAssetsWithWarning(assetMultiSelectManager.assets, editableSelectedAssetIds);
+      if (ids.length === 0) {
+        return;
+      }
+      if (await modalManager.show(AssetTagModal, { assetIds: ids })) {
         assetMultiSelectManager.clear();
       }
     },
@@ -293,10 +314,15 @@ export const getAssetActions = (
     shortcuts: [{ key: 'f' }],
   };
 
+  // Server-authoritative on a single-asset read (`asset.canEdit`); falls back to ownership when
+  // the field was never resolved (e.g. bulk/list surfaces). See `canEditAsset` (#734).
+  const isEditable = () => canEditAsset(asset, { userId: authUser?.id });
+
   const Rate: ActionItem = {
     title: $t('rate_asset'),
     description: $t('rate_asset_description'),
-    $if: () => isOwner && authManager.preferences.ratings.enabled,
+    // #734: ratings are a metadata edit, open to a space Owner/Editor of a member's asset.
+    $if: () => isEditable() && authManager.preferences.ratings.enabled,
     onAction: ({ event }) => handleRate(asset, event instanceof KeyboardEvent ? Number(event.key) : NaN),
     shortcuts: [0, 1, 2, 3, 4, 5].map((key) => ({ key: String(key) })),
   };
@@ -364,7 +390,7 @@ export const getAssetActions = (
 
   const canEditImage = () =>
     !sharedLink &&
-    isOwner &&
+    isEditable() &&
     asset.type === AssetTypeEnum.Image &&
     !asset.livePhotoVideoId &&
     asset.exifInfo?.projectionType !== ProjectionType.EQUIRECTANGULAR &&
@@ -373,7 +399,7 @@ export const getAssetActions = (
     !asset.originalPath.toLowerCase().endsWith('.svg');
 
   const canEditVideo = () => {
-    if (sharedLink || !isOwner || asset.type !== AssetTypeEnum.Video || asset.livePhotoVideoId) {
+    if (sharedLink || !isEditable() || asset.type !== AssetTypeEnum.Video || asset.livePhotoVideoId) {
       return false;
     }
     // Duration must be known and >= 2 seconds

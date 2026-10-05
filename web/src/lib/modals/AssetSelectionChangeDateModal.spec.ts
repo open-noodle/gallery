@@ -43,6 +43,7 @@ describe('DateSelectionModal component', () => {
       initialDate,
       initialTimeZone,
       assets: [],
+      editableAssetIds: [],
 
       onClose,
     });
@@ -52,7 +53,7 @@ describe('DateSelectionModal component', () => {
 
   test('calls onConfirm with correct date on confirm', async () => {
     render(AssetSelectionChangeDateModal, {
-      props: { initialDate, initialTimeZone, assets: [], onClose },
+      props: { initialDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
     });
 
     await fireEvent.click(getConfirmButton());
@@ -67,7 +68,7 @@ describe('DateSelectionModal component', () => {
 
   test('calls onCancel on cancel', async () => {
     render(AssetSelectionChangeDateModal, {
-      props: { initialDate, initialTimeZone, assets: [], onClose },
+      props: { initialDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
     });
 
     await fireEvent.click(getCancelButton());
@@ -77,7 +78,7 @@ describe('DateSelectionModal component', () => {
 
   test('does not fall back to UTC when datetime-local value has no seconds', async () => {
     render(AssetSelectionChangeDateModal, {
-      props: { initialDate, initialTimeZone, assets: [], onClose },
+      props: { initialDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
     });
 
     await fireEvent.input(getDateInput(), { target: { value: '2024-01-01T00:00' } });
@@ -91,7 +92,7 @@ describe('DateSelectionModal component', () => {
 
   test('does not fall back to UTC when datetime-local value has no milliseconds', async () => {
     render(AssetSelectionChangeDateModal, {
-      props: { initialDate, initialTimeZone, assets: [], onClose },
+      props: { initialDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
     });
 
     await fireEvent.input(getDateInput(), { target: { value: '2024-01-01T00:00:00' } });
@@ -111,6 +112,7 @@ describe('DateSelectionModal component', () => {
         initialDate: dstDate,
         initialTimeZone,
         assets: [],
+        editableAssetIds: [],
         onClose,
       });
 
@@ -119,7 +121,7 @@ describe('DateSelectionModal component', () => {
 
     test('calls onConfirm with correct date on confirm', async () => {
       render(AssetSelectionChangeDateModal, {
-        props: { initialDate: dstDate, initialTimeZone, assets: [], onClose },
+        props: { initialDate: dstDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
       });
 
       await fireEvent.click(getConfirmButton());
@@ -135,7 +137,7 @@ describe('DateSelectionModal component', () => {
 
   test('calls onConfirm with correct offset in relative mode', async () => {
     render(AssetSelectionChangeDateModal, {
-      props: { initialDate, initialTimeZone, assets: [], onClose },
+      props: { initialDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
     });
 
     await fireEvent.click(getRelativeInputToggle());
@@ -166,7 +168,7 @@ describe('DateSelectionModal component', () => {
   test('calls onConfirm with correct timeZone in relative mode', async () => {
     const user = userEvent.setup();
     render(AssetSelectionChangeDateModal, {
-      props: { initialDate, initialTimeZone, assets: [], onClose },
+      props: { initialDate, initialTimeZone, assets: [], editableAssetIds: [], onClose },
     });
 
     await user.click(getRelativeInputToggle());

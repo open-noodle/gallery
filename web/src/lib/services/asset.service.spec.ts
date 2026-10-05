@@ -4,6 +4,7 @@ import { vitest } from 'vitest';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
+import AssetTagModal from '$lib/modals/AssetTagModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
 import {
   getAssetActions,
@@ -383,5 +384,48 @@ describe('bulk CreateSharedLink action', () => {
     await action.onAction({ action, event: new Event('click') });
     expect(modalManager.show).not.toHaveBeenCalled();
     expect(toastManager.warning).toHaveBeenCalledWith('shared_link_nothing_owned_to_share');
+  });
+});
+
+// #734: SelectionToolbar resolves which of a mixed selection a space Owner/Editor may edit and hands
+// it to the bulk Tag action (immich-31976 turned TagAction.svelte into this ActionItem).
+describe('bulk Tag action', () => {
+  const selection = assetMultiSelectManager as unknown as { isAllUserOwned?: boolean };
+  const tagAction = (options?: { editableSelectedAssetIds?: string[] }) =>
+    getAssetBulkActions(((k: string) => k) as never, options).Tag;
+
+  beforeEach(() => {
+    vitest.mocked(modalManager.show).mockClear();
+    vitest.mocked(toastManager.warning).mockClear();
+    authManager.setPreferences(preferencesFactory.build({ tags: { enabled: true, sidebarWeb: false } }));
+    authManager.setUser(userAdminFactory.build({ id: 'me' }));
+    selection.isAllUserOwned = false;
+  });
+  afterEach(() => {
+    authManager.reset();
+    delete selection.isAllUserOwned;
+  });
+
+  it('never opens the tag modal when a mixed selection resolves to nothing editable', async () => {
+    const action = tagAction({ editableSelectedAssetIds: [] });
+    expect(action.$if?.()).toBe(false);
+    await action.onAction({ action, event: new Event('click') });
+    expect(modalManager.show).not.toHaveBeenCalled();
+  });
+
+  it('sends only the editable subset when the selection is mixed', async () => {
+    const action = tagAction({ editableSelectedAssetIds: ['x1'] });
+    expect(action.$if?.()).toBe(true);
+    await action.onAction({ action, event: new Event('click') });
+    expect(modalManager.show).toHaveBeenCalledWith(AssetTagModal, { assetIds: ['x1'] });
+    expect(toastManager.warning).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the all-owned behaviour on surfaces that do not resolve editability', async () => {
+    selection.isAllUserOwned = true;
+    const action = tagAction();
+    expect(action.$if?.()).toBe(true);
+    await action.onAction({ action, event: new Event('click') });
+    expect(modalManager.show).toHaveBeenCalledWith(AssetTagModal, { assetIds: ['x1', 'x2'] });
   });
 });

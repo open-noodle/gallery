@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { isUndefined, omitBy } from 'lodash-es';
+import { chunk, isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import { isAbsolute } from 'node:path';
 import type { ShallowDehydrateObject } from 'kysely';
@@ -15,6 +15,8 @@ import {
   AssetBulkDeleteDto,
   AssetBulkUpdateDto,
   AssetCopyDto,
+  AssetEditableDto,
+  AssetEditableResponseDto,
   AssetJobName,
   AssetJobsDto,
   AssetMetadataBulkDeleteDto,
@@ -43,6 +45,7 @@ import {
   JobStatus,
   Permission,
   QueueName,
+  SharedSpaceActivityType,
 } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -60,6 +63,15 @@ import { asDateTimeString, extractTimeZone } from 'src/utils/date.js';
 import { batched, findOrFail } from 'src/utils/misc.js';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 import { transformOcrBoundingBox } from 'src/utils/transform.js';
+
+// Bounds how many cross-owner ids logCrossOwnerEdit will resolve a space for, per bulk edit —
+// it does NOT bound how many assets a user may edit. A bulk edit can carry an id list large
+// enough that resolving a space (a two-subquery UNION join) for every cross-owner id would fan
+// one request out into tens of thousands of heavy queries; logCrossOwnerEdit is best-effort
+// activity-feed attribution whose failure is already swallowed, so it is the one place in this
+// feature safe to degrade under a huge selection. Never apply this constant to AssetBulkUpdateDto
+// or to POST /assets/editable — both must answer for the user's whole selection.
+const MAX_ATTRIBUTION_ASSETS = 500;
 
 @Injectable()
 export class AssetService extends BaseService {
@@ -111,6 +123,14 @@ export class AssetService extends BaseService {
         spaceId,
         new Set([id]),
       );
+      // The response must carry the space it was resolved in whether the caller named the space or
+      // the server inferred it (the `else` branch below sets the same field). Without this, a client
+      // that re-reads WITH `spaceId` gets an asset whose `resolvedSpaceId` is suddenly absent, and
+      // any affordance gated on an effective space id -- `canEditSpacePeople`, which falls back to
+      // `resolvedSpaceId` when the route carries no space -- silently switches itself off. That is
+      // exactly what made the People-row edit controls vanish after a face edit on /photos/:id.
+      data.resolvedSpaceId = spaceId;
+
       if (hasSpaceAccess.size === 0 || !data.people) {
         data.people = [];
       } else {
@@ -148,7 +168,21 @@ export class AssetService extends BaseService {
       }
     }
 
+    // #734: resolve editability once, here, where the space context already is. Never in
+    // mapAsset — it has no AuthDto and feeds list endpoints, where this would be N+1.
+    if (!auth.sharedLink) {
+      const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+      data.canEdit = editable.has(id);
+    }
+
     return data;
+  }
+
+  async getEditable(auth: AuthDto, dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
+    // Deliberately a bare access check, not a second implementation of the rule: this IS
+    // the same call the write will make, so the answer cannot drift from enforcement.
+    const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
+    return { editableAssetIds: [...editable] };
   }
 
   private async applyResolvedPersonMetadata(
@@ -216,10 +250,15 @@ export class AssetService extends BaseService {
     // (fleet-wide tombstone) or re-link their motion video. Reject if either is set on an asset the caller does
     // not own; other metadata (description/rating/…) stays editor-allowed. Runs BEFORE the livePhotoVideoId
     // link/unlink side-effects and the visibility transition helper below.
-    if (dto.visibility !== undefined || dto.livePhotoVideoId !== undefined) {
+    //
+    // isFavorite too: it is still one column on `asset`, so an editor's heart would flip the OWNER's own
+    // favorite. It stops mattering once favorites are per-user (#819), which moves them off this endpoint.
+    if (dto.visibility !== undefined || dto.livePhotoVideoId !== undefined || dto.isFavorite !== undefined) {
       const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: [id] });
       if (!ownedIds.has(id)) {
-        throw new ForbiddenException('Visibility and live-photo linkage can only be changed on assets you own');
+        throw new ForbiddenException(
+          'Visibility, favorite and live-photo linkage can only be changed on assets you own',
+        );
       }
     }
 
@@ -272,6 +311,17 @@ export class AssetService extends BaseService {
       this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
     }
 
+    // #734: after the write succeeds — a rejected write must log nothing. Skipped entirely when
+    // visibility is set: the rbac-3 guard above already required the caller to OWN this id to get
+    // here, but checkOwnerAccess filters on hasElevatedPermission — a Locked row (this write may
+    // have just produced) reads back as not-owned for an API-key session, so logCrossOwnerEdit
+    // would misclassify the owner's own lock as a cross-owner edit. A visibility write can never
+    // legitimately be cross-owner (the guard above is total for it), so skip rather than rely on
+    // logCrossOwnerEdit's own owner check to get this right post-write.
+    if (dto.visibility === undefined) {
+      await this.logCrossOwnerEdit(auth, [id]);
+    }
+
     return this.get(auth, id) as Promise<AssetResponseDto>;
   }
 
@@ -317,16 +367,22 @@ export class AssetService extends BaseService {
 
     // rbac-3: `visibility` is destructive — flipping an asset to Locked/Hidden strips it from the owner's
     // albums (removeAssetsFromAll) and #757-tombstones it off every member device. AssetUpdate grants a space
-    // EDITOR that power over OTHER members' direct+library assets (checkSpaceEditAccess), which would let an
-    // editor wipe another member's asset fleet-wide. Restrict visibility to OWNED ids: reject the whole request
+    // EDITOR that power over OTHER members' direct+library+album assets (checkSpaceEditAccess), which would let
+    // an editor wipe another member's asset fleet-wide. Restrict visibility to OWNED ids: reject the whole request
     // if visibility is set on any id the caller does not own. This guard MUST run before the write and the
     // applyVisibilityTransitionSideEffects cascade below, or the destructive side-effects fire before the guard.
     // AssetDelete == the pure owner arm (checkOwnerAccess, same hasElevatedPermission as the AssetUpdate gate's
     // isOwner sub-check); a library-backed asset owned by another user is correctly NOT returned as owned.
-    if (visibility !== undefined) {
+    //
+    // isFavorite and duplicateId take the same guard. isFavorite is still one shared column (see update()),
+    // and duplicateId is the owner's own duplicate clean-up: an editor must not pull a member's asset into or
+    // out of a duplicate group. Neither is part of the space-editor grant.
+    if (visibility !== undefined || isFavorite !== undefined || duplicateId !== undefined) {
       const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids });
       if (ownedIds.size !== new Set(ids).size) {
-        throw new ForbiddenException('Visibility can only be changed on assets you own');
+        throw new ForbiddenException(
+          'Visibility, favorite and duplicate grouping can only be changed on assets you own',
+        );
       }
     }
 
@@ -393,6 +449,15 @@ export class AssetService extends BaseService {
       for (const asset of assets) {
         this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
       }
+    }
+
+    // #734: after the write succeeds — a rejected write must log nothing. Skipped entirely when
+    // visibility is set: see the matching comment in update() — the ownership guard above already
+    // requires the caller to own every id when visibility is set, so a visibility write can never
+    // legitimately be cross-owner, and logCrossOwnerEdit's own owner check would misclassify a
+    // just-Locked asset (checkOwnerAccess reads it back as not-owned for a non-elevated session).
+    if (visibility === undefined) {
+      await this.logCrossOwnerEdit(auth, ids);
     }
   }
 
@@ -804,6 +869,72 @@ export class AssetService extends BaseService {
     return findOrFail(() => this.assetRepository.getById(id), 'Asset');
   }
 
+  /**
+   * #734: record an edit made by someone who is not the asset owner, so the owner can see
+   * what changed and who changed it. Owner self-edits — nearly all editing — log nothing,
+   * which is what keeps this low-volume.
+   *
+   * Grouped by resolved space, one row per space: a bulk edit can span several spaces, and
+   * attributing all of it to whichever space resolved first would be wrong. Assets that
+   * resolve to no space contribute no row.
+   *
+   * Never throws. Attribution is secondary to the edit that triggered it.
+   */
+  private async logCrossOwnerEdit(auth: AuthDto, assetIds: string[]): Promise<void> {
+    // assetIds arrives here via a zod-validated DTO, so it's already guaranteed to be a real
+    // array — this check is defence in depth at the helper boundary, not a suspicion that the
+    // DTO lies. It also matters for static analysis: it's what makes the chunking below
+    // provably bounded rather than relying on a `.length` that isn't necessarily an array's own.
+    if (!Array.isArray(assetIds)) {
+      return;
+    }
+
+    try {
+      // Which of these does the caller own? AssetDelete is the pure owner arm — the same
+      // trick rbac-3 uses at :220-223. Deliberately NOT a getByIds fetch: findSpaceForAssetAndUser
+      // takes an asset id, so the owner id itself is never needed, and a bulk edit should not pay
+      // for a full asset read just to decide whether to write an activity row.
+      const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: assetIds });
+      const crossOwnerIds = assetIds.filter((id) => !ownedIds.has(id));
+      if (crossOwnerIds.length === 0) {
+        return;
+      }
+
+      // findSpaceForAssetAndUser is a UNION of two three-join subqueries; a large cross-owner bulk
+      // edit is this feature's headline case, so resolving one id at a time, sequentially, would add
+      // a serial-latency term proportional to the batch size. Chunk into bounded-concurrency batches
+      // instead of firing all of them at once (connection-pool safety) or one at a time (latency).
+      const truncated = crossOwnerIds.length > MAX_ATTRIBUTION_ASSETS;
+      const sampledIds = crossOwnerIds.slice(0, MAX_ATTRIBUTION_ASSETS);
+      const bySpace = new Map<string, string[]>();
+      for (const batch of chunk(sampledIds, 10)) {
+        const spaces = await Promise.all(
+          batch.map((assetId) => this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)),
+        );
+        for (const [index, space] of spaces.entries()) {
+          if (!space) {
+            continue;
+          }
+          const assetId = batch[index];
+          const ids = bySpace.get(space.spaceId) ?? [];
+          ids.push(assetId);
+          bySpace.set(space.spaceId, ids);
+        }
+      }
+
+      for (const [spaceId, ids] of bySpace) {
+        await this.sharedSpaceRepository.logActivity({
+          spaceId,
+          userId: auth.user.id,
+          type: SharedSpaceActivityType.AssetEdit,
+          data: { count: ids.length, assetIds: ids.slice(0, 4), ...(truncated && { truncated: true }) },
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to log cross-owner edit activity: ${error}`);
+    }
+  }
+
   private async updateExif(dto: {
     id: string;
     description?: string;
@@ -987,6 +1118,9 @@ export class AssetService extends BaseService {
     const newEdits = await this.assetEditRepository.replaceAll(id, edits);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
+    // #734: after the write succeeds — a rejected write must log nothing.
+    await this.logCrossOwnerEdit(auth, [id]);
+
     return {
       assetId: id,
       edits: newEdits,
@@ -1014,5 +1148,8 @@ export class AssetService extends BaseService {
 
     await this.assetEditRepository.replaceAll(id, []);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+
+    // #734: after the write succeeds — a rejected write must log nothing.
+    await this.logCrossOwnerEdit(auth, [id]);
   }
 }
