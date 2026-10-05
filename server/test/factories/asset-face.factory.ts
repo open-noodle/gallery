@@ -22,6 +22,7 @@ export class AssetFaceFactory {
       boundingBoxX2: 200,
       boundingBoxY1: 100,
       boundingBoxY2: 200,
+      createdBy: null,
       deletedAt: null,
       id: newUuid(),
       imageHeight: 500,

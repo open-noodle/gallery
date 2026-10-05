@@ -57,6 +57,38 @@ beforeAll(async () => {
 // as a lock is outstanding and cleared by the deferred reset, so a spec that never opens a modal
 // pays nothing. The iteration cap keeps a spec that sets that style for its own reasons from
 // stalling the file.
+//
+// bits-ui's dismissable layer (popovers, menus) has the same shape with a longer fuse: its
+// "interact outside" handler is debounced by 500ms, so a spec whose last test clicks while a layer
+// is open can finish with that timer pending, and it then fails on `Element` instead of `document`.
+// Nothing in the DOM shows it is pending, so this one cannot be drained by waiting on a signal.
+// Instead every timeout set during the file is tracked, and whatever is still pending once the
+// drain above has run is cancelled: every test has finished by then, so no assertion can depend on
+// it.
+const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
+const nativeSetTimeout = setTimeout;
+const nativeClearTimeout = clearTimeout;
+const trackedSetTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+  if (typeof handler !== 'function') {
+    return nativeSetTimeout(handler, timeout, ...args);
+  }
+  const id = nativeSetTimeout(() => {
+    pendingTimeouts.delete(id);
+    handler(...args);
+  }, timeout);
+  pendingTimeouts.add(id);
+  return id;
+}) as typeof setTimeout;
+const trackedClearTimeout = ((id?: Parameters<typeof clearTimeout>[0]) => {
+  pendingTimeouts.delete(id as ReturnType<typeof setTimeout>);
+  nativeClearTimeout(id);
+}) as typeof clearTimeout;
+// Defined rather than stubbed: specs call `vi.unstubAllGlobals()`, which would drop a stub.
+Object.defineProperties(globalThis, {
+  setTimeout: { value: trackedSetTimeout, writable: true, configurable: true },
+  clearTimeout: { value: trackedClearTimeout, writable: true, configurable: true },
+});
+
 afterAll(async () => {
   if (typeof document === 'undefined') {
     return;
@@ -75,6 +107,11 @@ afterAll(async () => {
   if (layers && layers.size > 0) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
+
+  for (const id of pendingTimeouts) {
+    nativeClearTimeout(id);
+  }
+  pendingTimeouts.clear();
 });
 
 Object.defineProperty(globalThis, 'matchMedia', {

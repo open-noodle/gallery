@@ -118,6 +118,23 @@ export const setupTimelineMockApiRoutes = async (
     await route.fallback();
   });
 
+  // #734: SelectionToolbar resolves editability via POST /assets/editable for any selection
+  // that isn't entirely owned by the current user. Every mock timeline here has a single
+  // ownerId, so that branch never fires today — but the glob mocks above only special-case
+  // GET/DELETE on `/api/assets*` and fall back to the real network otherwise, which would hang
+  // this suite the moment a spec exercises a mixed-ownership selection. Mock it defensively.
+  await context.route('**/api/assets/editable', async (route, request) => {
+    if (request.method() === 'POST') {
+      const { assetIds } = request.postDataJSON() as { assetIds: string[] };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: { editableAssetIds: assetIds },
+      });
+    }
+    await route.fallback();
+  });
+
   await context.route('**/api/assets/*/ocr', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json', json: [] });
   });
