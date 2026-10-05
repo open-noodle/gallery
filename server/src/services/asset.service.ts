@@ -250,10 +250,15 @@ export class AssetService extends BaseService {
     // (fleet-wide tombstone) or re-link their motion video. Reject if either is set on an asset the caller does
     // not own; other metadata (description/rating/…) stays editor-allowed. Runs BEFORE the livePhotoVideoId
     // link/unlink side-effects and the visibility transition helper below.
-    if (dto.visibility !== undefined || dto.livePhotoVideoId !== undefined) {
+    //
+    // isFavorite too: it is still one column on `asset`, so an editor's heart would flip the OWNER's own
+    // favorite. It stops mattering once favorites are per-user (#819), which moves them off this endpoint.
+    if (dto.visibility !== undefined || dto.livePhotoVideoId !== undefined || dto.isFavorite !== undefined) {
       const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: [id] });
       if (!ownedIds.has(id)) {
-        throw new ForbiddenException('Visibility and live-photo linkage can only be changed on assets you own');
+        throw new ForbiddenException(
+          'Visibility, favorite and live-photo linkage can only be changed on assets you own',
+        );
       }
     }
 
@@ -364,10 +369,16 @@ export class AssetService extends BaseService {
     // applyVisibilityTransitionSideEffects cascade below, or the destructive side-effects fire before the guard.
     // AssetDelete == the pure owner arm (checkOwnerAccess, same hasElevatedPermission as the AssetUpdate gate's
     // isOwner sub-check); a library-backed asset owned by another user is correctly NOT returned as owned.
-    if (visibility !== undefined) {
+    //
+    // isFavorite and duplicateId take the same guard. isFavorite is still one shared column (see update()),
+    // and duplicateId is the owner's own duplicate clean-up: an editor must not pull a member's asset into or
+    // out of a duplicate group. Neither is part of the space-editor grant.
+    if (visibility !== undefined || isFavorite !== undefined || duplicateId !== undefined) {
       const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids });
       if (ownedIds.size !== new Set(ids).size) {
-        throw new ForbiddenException('Visibility can only be changed on assets you own');
+        throw new ForbiddenException(
+          'Visibility, favorite and duplicate grouping can only be changed on assets you own',
+        );
       }
     }
 

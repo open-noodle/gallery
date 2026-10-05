@@ -1052,6 +1052,19 @@ describe(AssetService.name, () => {
       expect(mocks.asset.update).not.toHaveBeenCalled();
     });
 
+    it('rejects a single-PUT favorite change on a non-owned (space-edit) asset (rbac-3)', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+
+      await expect(sut.update(auth, asset.id, { isFavorite: true })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+
     it('allows changing visibility on an asset the caller owns even as a space editor (rbac-3)', async () => {
       const asset = AssetFactory.create({ visibility: AssetVisibility.Timeline });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
@@ -1122,15 +1135,41 @@ describe(AssetService.name, () => {
       expect(mocks.sharedSpace.emitLibraryAssetVisibilityPurge).not.toHaveBeenCalled();
     });
 
-    it('allows a space editor to change a NON-visibility field on a non-owned asset (existing policy) (rbac-3)', async () => {
+    it('allows a space editor to change a metadata field on a non-owned asset (existing policy) (rbac-3)', async () => {
       const auth = AuthFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-2']));
 
-      await sut.updateAll(auth, { ids: ['asset-2'], isFavorite: true });
+      await sut.updateAll(auth, { ids: ['asset-2'], rating: 3 });
 
-      // No visibility → owner-split guard never runs → editor keeps their metadata-edit capability.
-      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-2'], { isFavorite: true });
+      // No owner-only field → the owner-split guard never runs → editor keeps their metadata-edit capability.
+      expect(mocks.asset.updateAllExif).toHaveBeenCalledWith(['asset-2'], { rating: 3 });
+    });
+
+    // isFavorite is still one shared column, so an editor's heart would flip the owner's own favorite;
+    // duplicateId is the owner's duplicate clean-up. Neither is part of the space-editor grant.
+    it.each([
+      { field: 'isFavorite', dto: { isFavorite: true } },
+      { field: 'duplicateId', dto: { duplicateId: null } },
+    ])('rejects a bulk $field change that includes a non-owned (space-edit) asset (rbac-3)', async ({ dto }) => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-2']));
+
+      await expect(sut.updateAll(auth, { ids: ['asset-1', 'asset-2'], ...dto })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
+    });
+
+    it('allows a bulk favorite change on assets the caller owns (rbac-3)', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1', 'asset-2']));
+
+      await sut.updateAll(auth, { ids: ['asset-1', 'asset-2'], isFavorite: true });
+
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-1', 'asset-2'], { isFavorite: true });
     });
 
     it('should not update Assets table if no relevant fields are provided', async () => {
