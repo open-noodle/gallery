@@ -701,9 +701,15 @@ describe('rbac-3: visibility writes are restricted to owned assets', () => {
     expect(status).toBe(204);
   });
 
-  it('editor CAN still set a non-visibility field on the victim asset (existing policy) → 204', async () => {
-    const { status } = await bulkUpdateAssets(editor.accessToken, { ids: [victimAsset.id], isFavorite: true });
+  it('editor CAN still set a metadata field on the victim asset (existing policy) → 204', async () => {
+    const { status } = await bulkUpdateAssets(editor.accessToken, { ids: [victimAsset.id], description: 'edited' });
     expect(status).toBe(204);
+  });
+
+  // isFavorite is still one column on asset, so an editor's heart would flip the owner's favorite.
+  it('editor CANNOT favorite the victim asset → 403', async () => {
+    const { status } = await bulkUpdateAssets(editor.accessToken, { ids: [victimAsset.id], isFavorite: true });
+    expect(status).toBe(403);
   });
 });
 

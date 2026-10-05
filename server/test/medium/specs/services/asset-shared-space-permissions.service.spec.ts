@@ -78,6 +78,12 @@ describe(AssetService.name, () => {
         // Add asset to space
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
+        // #734 spec §2.3: checkSpaceEditAccess requires the asset's owner to also be a member of
+        // the space granting the caller their role — see the EDITOR test below for the full
+        // rationale. Without this row the denial would come from the owner-is-member EXISTS, not
+        // from the role gate this test is meant to cover.
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+
         // Add viewer member to space
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: 'viewer' });
 
@@ -98,6 +104,13 @@ describe(AssetService.name, () => {
         // Add asset to space
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
+        // #734 spec §2.3: checkSpaceEditAccess requires the asset's owner to also be a member of
+        // the space granting the caller their role — an editor may act on a fellow MEMBER's
+        // asset, not on any asset merely reachable through the space. Without this row the owner
+        // isn't a member, so this test would assert the pre-#734 behaviour instead of the
+        // scenario it's meant to cover.
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+
         // Add editor member to space
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: editor.id, role: 'editor' });
 
@@ -117,6 +130,11 @@ describe(AssetService.name, () => {
 
         // Add asset to space
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+        // #734 spec §2.3: checkSpaceEditAccess requires the asset's owner to also be a member of
+        // the space granting the caller their role — see the EDITOR test above for the full
+        // rationale.
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
 
         // Add admin member to space
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: admin.id, role: 'owner' });

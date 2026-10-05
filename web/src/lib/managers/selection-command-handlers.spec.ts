@@ -82,6 +82,7 @@ const makeSelection = (overrides: Partial<SelectionCommandContext> = {}): Select
     isAllFavorite: assets.every((asset) => asset.isFavorite),
     isAllArchived: assets.every((asset) => asset.visibility === AssetVisibility.Archive),
     isAllTrashed: assets.every((asset) => asset.isTrashed),
+    editableSelectedAssetIds: assets.map((asset) => asset.id),
     clearSelection: vi.fn(),
     onFavorite: vi.fn(),
     onArchive: vi.fn(),
