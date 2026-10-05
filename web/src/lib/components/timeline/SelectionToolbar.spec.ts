@@ -1,8 +1,12 @@
-import type { AlbumResponseDto, AssetVisibility as AssetVisibilityType } from '@immich/sdk';
-import { AlbumUserRole, AssetVisibility } from '@immich/sdk';
+import type {
+  AlbumResponseDto,
+  AssetVisibility as AssetVisibilityType,
+  SharedSpaceMemberResponseDto,
+} from '@immich/sdk';
+import { AlbumUserRole, AssetVisibility, getEditableAssets } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
@@ -10,13 +14,21 @@ import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import type { TimelineDateTime } from '$lib/utils/timeline-util';
 import SelectionToolbar from './SelectionToolbar.svelte';
 
+// #734: SelectionToolbar resolves `editableSelectedAssetIds` itself via `POST /assets/editable`
+// (`resolveEditableAssetIds`) whenever the selection isn't all-owned — mock the SDK call so
+// tests control the response instead of hitting the network.
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@immich/sdk')>();
+  return { ...actual, getEditableAssets: vi.fn() };
+});
+
 // Mirrors the (unexported) Props interface declared inside SelectionToolbar.svelte —
 // just enough shape for this spec file's own type-checking of test fixtures.
 interface ToolbarTestProps {
   timelineManager: TimelineManager;
   assetInteraction: AssetMultiSelectManager;
   album?: AlbumResponseDto;
-  space?: { id: string; canWrite: boolean };
+  space?: { id: string; canWrite: boolean; members?: SharedSpaceMemberResponseDto[] };
   downloadFilename?: string;
   onRemove?: (assetIds: string[]) => void;
   onSetCover?: () => void;
@@ -139,6 +151,7 @@ function renderToolbar(props: ToolbarTestProps) {
 beforeEach(() => {
   mockUser.current = { id: 'me', isAdmin: false };
   mockPreferences.current = { tags: { enabled: true } };
+  vi.mocked(getEditableAssets).mockReset();
 });
 
 describe('SelectionToolbar', () => {
@@ -301,5 +314,127 @@ describe('SelectionToolbar', () => {
 
     expect(screen.queryByLabelText('menu')).not.toBeInTheDocument();
     expect(container.querySelector('#control-bar')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #734: canEditMetadata resolves to the editable subset (POST /assets/editable), and
+// Archive/SetVisibility split out into canSetVisibility (still owner-only).
+// ---------------------------------------------------------------------------
+
+describe('SelectionToolbar — #734 editable-subset resolution', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('an all-owned selection shows Rotate and Archive immediately, without ever calling POST /assets/editable', async () => {
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: true,
+        assets: [makeAsset({ id: 'mine', ownerId: 'me' })],
+      }),
+      space: { id: 'space-1', canWrite: true },
+    });
+
+    expect(screen.getByRole('menuitem', { name: 'rotate_right' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'to_archive' })).toBeInTheDocument();
+
+    // Advance well past the 250ms debounce window used for a non-all-owned selection: if the
+    // resolution effect took that path instead of the synchronous one, this is where it would
+    // fire. Asserting immediately after render (with no timer advance) would pass either way.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(getEditableAssets).not.toHaveBeenCalled();
+  });
+
+  it('a mixed selection hides Rotate until the resolved subset is non-empty, then shows it — Archive never appears', async () => {
+    vi.mocked(getEditableAssets).mockResolvedValue({ editableAssetIds: ['mine', 'theirs'] });
+
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'mine', ownerId: 'me' }), makeAsset({ id: 'theirs', ownerId: 'other' })],
+      }),
+      space: { id: 'space-1', canWrite: true },
+    });
+
+    // Pending: editableSelectedAssetIds hasn't resolved yet, so canEditMetadata (hasEditable) is
+    // false — the action must not pop in before the request lands (W-11).
+    expect(screen.queryByRole('menuitem', { name: 'rotate_right' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'to_archive' })).not.toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(getEditableAssets).toHaveBeenCalledWith({ assetEditableDto: { assetIds: ['mine', 'theirs'] } });
+    expect(screen.getByRole('menuitem', { name: 'rotate_right' })).toBeInTheDocument();
+    // Still absent: canSetVisibility stays isAllUserOwned-only regardless of what resolves.
+    expect(screen.queryByRole('menuitem', { name: 'to_archive' })).not.toBeInTheDocument();
+  });
+
+  it('W-14: discards a stale response that resolves after the selection has already changed', async () => {
+    let resolveStaleRequest: ((value: { editableAssetIds: string[] }) => void) | undefined;
+    const staleRequest = new Promise<{ editableAssetIds: string[] }>((resolve) => {
+      resolveStaleRequest = resolve;
+    });
+    vi.mocked(getEditableAssets).mockReturnValueOnce(staleRequest as ReturnType<typeof getEditableAssets>);
+    vi.mocked(getEditableAssets).mockResolvedValueOnce({ editableAssetIds: [] });
+
+    const { rerender } = renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'a', ownerId: 'other' }), makeAsset({ id: 'b', ownerId: 'other' })],
+      }),
+      space: { id: 'space-1', canWrite: true },
+    });
+
+    // Fires the first (stale-to-be) debounced request; it stays unresolved.
+    await vi.advanceTimersByTimeAsync(250);
+
+    // The selection changes before that request settles.
+    await rerender({
+      component: SelectionToolbar,
+      componentProps: {
+        timelineManager: fakeTimelineManager,
+        assetInteraction: makeAssetInteraction({
+          isAllUserOwned: false,
+          assets: [makeAsset({ id: 'b', ownerId: 'other' })],
+        }),
+        space: { id: 'space-1', canWrite: true },
+      },
+    });
+
+    // Fires the second (fresh) debounced request, which resolves to nothing editable.
+    await vi.advanceTimersByTimeAsync(250);
+    expect(screen.queryByRole('menuitem', { name: 'rotate_right' })).not.toBeInTheDocument();
+
+    // The stale first request now settles, claiming both original assets are editable. If it
+    // were applied on top of the fresh (empty) answer, Rotate would incorrectly reappear.
+    resolveStaleRequest?.({ editableAssetIds: ['a', 'b'] });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(screen.queryByRole('menuitem', { name: 'rotate_right' })).not.toBeInTheDocument();
+  });
+
+  it('a mixed selection that resolves to nothing editable never shows Rotate', async () => {
+    vi.mocked(getEditableAssets).mockResolvedValue({ editableAssetIds: [] });
+
+    renderToolbar({
+      timelineManager: fakeTimelineManager,
+      assetInteraction: makeAssetInteraction({
+        isAllUserOwned: false,
+        assets: [makeAsset({ id: 'theirs', ownerId: 'other' })],
+      }),
+      space: { id: 'space-1', canWrite: false },
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(screen.queryByRole('menuitem', { name: 'rotate_right' })).not.toBeInTheDocument();
   });
 });

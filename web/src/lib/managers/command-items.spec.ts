@@ -169,6 +169,7 @@ describe('selection-context commands', () => {
     isAllFavorite: false,
     isAllArchived: false,
     isAllTrashed: false,
+    editableSelectedAssetIds: ['asset-1'],
     clearSelection: vi.fn(),
     onFavorite: vi.fn(),
     onArchive: vi.fn(),
