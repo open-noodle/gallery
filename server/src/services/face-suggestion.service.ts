@@ -8,6 +8,7 @@ import { PersonId } from 'src/repositories/person.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { JobItem, type JobOf } from 'src/types.js';
 import { asDateTimeString } from 'src/utils/date.js';
+import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
 import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
 import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope.js';
 
@@ -23,9 +24,9 @@ const PERSON_SUGGESTION_NUM_RESULTS = 100;
  * output is byte-identical to before the move (verified by the zero-diff gate in the slice 13 commit).
  *
  * `person.service.ts` keeps only the genuine in-place hooks this engine needs from upstream code
- * paths it cannot own outright: verdict clearing in `reassignFaces`/`reassignFacesById`, the re-scan
- * queue in `update()`, the backfill-completion queue in `handleFaceIdentityBackfill`, and the
- * bootstrap sweep (`queueInitialFaceSuggestionSweep`, `onConfigValidate`, `onConfigUpdate`).
+ * paths it cannot own outright: the re-scan queue in `update()`, the backfill-completion queue in
+ * `handleFaceIdentityBackfill`, and the bootstrap sweep (`queueInitialFaceSuggestionSweep`,
+ * `onConfigValidate`, `onConfigUpdate`).
  */
 @Injectable()
 export class FaceSuggestionService extends BaseService {
@@ -100,13 +101,8 @@ export class FaceSuggestionService extends BaseService {
     };
   }
 
-  // D14/Slice 9: claim -> reassign -> resolveAssignedFace -> identity-relink is one atomic unit — a crash or
-  // failure mid-chain must never leave the face reassigned without its manual identity link (a torn write),
-  // the same defect class executeRepair's per-route transaction (A1) already closes for the cleanup engine.
-  // Reads (access checks, person/face lookups) happen BEFORE the transaction opens; only the writes are
-  // wrapped. This intentionally does NOT delegate to reassignFacesById (the public method, used autocommit
-  // by its OTHER callers, e.g. the face-editor reassign endpoint) — confirm gets its own trx-wrapped write
-  // chain so that method's signature/behaviour for those callers is untouched.
+  // D14/Slice 9: the claim and the assignment are one atomic unit, so a failure mid-chain rolls the claim back
+  // too. Reads (access checks, person/face lookups) happen BEFORE the transaction opens.
   //
   // Slice 3 (S3.9): the feature gate runs FIRST, before the access checks, matching the space twin
   // (confirmSpacePersonFaceSuggestion) — a disabled feature is a cheap no-op rather than paying for an
@@ -150,25 +146,9 @@ export class FaceSuggestionService extends BaseService {
         return claimed;
       }
 
-      await this.personRepository.reassignFace(face.id, personId, trx);
-      // Drains every OTHER target's still-pending row for this now-assigned face (edge 12).
-      await this.facePersonVerdictRepository.resolveAssignedFace(face.id, trx);
-      // Inlined (rather than the private replaceFaceIdentity wrapper) so every write here threads the SAME
-      // trx explicitly.
-      const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId, trx);
-      await this.faceIdentityRepository.replaceFaceIdentity(
-        { assetFaceId: face.id, identityId: identity.id, source: 'manual' },
-        trx,
-      );
-      // Slice 8 (F15): confirming this suggestion states a fact ("this face IS this person") that
-      // contradicts any durable rejected/ignored row for this SAME target. In practice claimPending's own
-      // eligibility gate (a few lines up) already refuses the claim whenever such a row exists — it applies
-      // the identical personId/identityId match to decide the row is even pending — so this call is
-      // defense-in-depth against that gate ever being relaxed independently, not something a fresh confirm
-      // can currently observe deleting a row. Scoped to this target only — see clearNegativeForTarget.
-      await this.facePersonVerdictRepository.clearNegativeForTarget(
-        { personGroupId: personId, identityId: identity.id },
-        [face.id],
+      // Also drains every OTHER target's still-pending row for this now-assigned face (edge 12).
+      await this.faceAssignmentService.assignFaces(
+        { personGroupId: personId, faceIds: [face.id], strength: 'manual' },
         trx,
       );
       return claimed;
@@ -178,7 +158,7 @@ export class FaceSuggestionService extends BaseService {
     }
 
     // Feature-photo refresh is display-only (a job enqueue + a non-identity person column), so it stays
-    // OUTSIDE the transaction — mirrors reassignFacesById's own placement of this step.
+    // OUTSIDE the transaction, as in reassignFacesById.
     if (person.faceAssetId === null) {
       await this.createNewFeaturePhoto([person]);
     }
@@ -248,7 +228,7 @@ export class FaceSuggestionService extends BaseService {
     const suggestionMaxDistance = suggestions.maxDistance;
 
     const person = await this.personRepository.getByGroupIdOnly(id);
-    if (!person || person.name === '' || person.isHidden || person.type !== 'person') {
+    if (!person || !isSuggestionScanTarget(person)) {
       return JobStatus.Skipped;
     }
 
@@ -281,15 +261,12 @@ export class FaceSuggestionService extends BaseService {
     // D3: exclude candidates a human has already settled — a manually-linked face (owner-agnostic), or a
     // face a human has already said "not this person/identity" about, in ANY scope that shares the target's
     // identity. The candidate set is bounded to this scan's own results (never an unscoped read).
-    const candidateFaceIds = bestByFace.keys().toArray();
-    const { manualLinkedFaceIds, negativeFaceTargets } =
-      await this.faceVerdictService.getFaceSettlementInputs(candidateFaceIds);
-    const targetTokens = new Set([`person:${id}`, ...(person.identityId ? [`identity:${person.identityId}`] : [])]);
-    for (const faceId of candidateFaceIds) {
-      const negatives = negativeFaceTargets.get(faceId);
-      if (manualLinkedFaceIds.has(faceId) || (negatives && !negatives.isDisjointFrom(targetTokens))) {
-        bestByFace.delete(faceId);
-      }
+    const settled = await this.faceAssignmentService.getSettledFaceIds(bestByFace.keys().toArray(), {
+      personGroupId: id,
+      identityId: person.identityId,
+    });
+    for (const faceId of settled) {
+      bestByFace.delete(faceId);
     }
 
     const rows = [...bestByFace].map(([assetFaceId, distance]) => ({ personGroupId: id, assetFaceId, distance }));
@@ -328,7 +305,7 @@ export class FaceSuggestionService extends BaseService {
     const suggestionMaxDistance = suggestions.maxDistance;
 
     const person = await this.sharedSpaceRepository.getPersonById(id);
-    if (!person || person.name.trim() === '' || person.isHidden || person.type !== 'person') {
+    if (!person || !isSuggestionScanTarget(person)) {
       return JobStatus.Skipped;
     }
 
@@ -378,18 +355,12 @@ export class FaceSuggestionService extends BaseService {
 
     // D3: same exclusion as the personal scan — a manually-linked face (owner-agnostic), or a face a human
     // has already said "not this person/identity" about, in ANY scope that shares the target's identity.
-    const candidateFaceIds = bestByFace.keys().toArray();
-    const { manualLinkedFaceIds, negativeFaceTargets } =
-      await this.faceVerdictService.getFaceSettlementInputs(candidateFaceIds);
-    const targetTokens = new Set([
-      `space-person:${id}`,
-      ...(person.identityId ? [`identity:${person.identityId}`] : []),
-    ]);
-    for (const faceId of candidateFaceIds) {
-      const negatives = negativeFaceTargets.get(faceId);
-      if (manualLinkedFaceIds.has(faceId) || (negatives && !negatives.isDisjointFrom(targetTokens))) {
-        bestByFace.delete(faceId);
-      }
+    const settled = await this.faceAssignmentService.getSettledFaceIds(bestByFace.keys().toArray(), {
+      spacePersonId: id,
+      identityId: person.identityId,
+    });
+    for (const faceId of settled) {
+      bestByFace.delete(faceId);
     }
 
     const rows = [...bestByFace].map(([assetFaceId, distance]) => ({
