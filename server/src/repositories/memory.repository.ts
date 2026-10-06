@@ -74,7 +74,8 @@ export class MemoryRepository implements IBulkAsset {
    * `for` window (the memory lane) still carries its own `showAt <= for` bound on both paths.
    */
   private baseSearchBuilder(dto: MemorySearchDto, { hideUnshownByDefault }: { hideUnshownByDefault: boolean }) {
-    const visibleAt = dto.for ?? DateTime.now().toJSDate();
+    // immich-32166: showAt holds a calendar date as UTC midnight, so "now" is the wall clock read as UTC.
+    const visibleAt = dto.for ?? asLocalTime(DateTime.now());
     const hideUnshown = dto.isUpcoming === undefined && (hideUnshownByDefault || dto.for !== undefined);
 
     return this.db
