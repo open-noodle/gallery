@@ -28,6 +28,8 @@ class MemoryData {
 
   int? get year => raw['year'] is int ? raw['year'] as int : (raw['year'] as num?)?.toInt();
 
+  String? get personName => raw['personName'] as String?;
+
   String? get ruleId => raw['ruleId'] as String?;
 
   String? get title => raw['title'] as String?;
