@@ -423,6 +423,10 @@ END $$;
 DROP INDEX IF EXISTS "idx_asset_exif_description_trigram";
 DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_description_trigram';
 
+-- 1797000000000-AddAssetLocalDateTimeIndex added a fork-only plain btree on
+-- asset."localDateTime" for the filter panel's taken range.
+DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
+
 -- 1783628194057-DisablePostgresJit set jit=off on the application role. Restore
 -- the PostgreSQL default so the reverted database carries no Gallery-specific
 -- planner tuning.
@@ -586,6 +590,7 @@ DELETE FROM "kysely_migrations"
   '1794000000000-AddAssetFavoriteTables',
   '1794100000000-DropAssetIsFavoriteColumn',
   '1796000000000-AddAssetFaceCreatedBy',
+  '1797000000000-AddAssetLocalDateTimeIndex',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
