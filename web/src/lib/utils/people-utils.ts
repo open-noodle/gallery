@@ -105,12 +105,6 @@ export const getPersonFaceThumbnailUrl = (personId: string, faceId: string, upda
 export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string, faceId: string, updatedAt?: string) =>
   createUrl(`/shared-spaces/${spaceId}/people/${personId}/faces/${faceId}/thumbnail`, { updatedAt });
 
-// Slice 8, Task 2 -- the space-person equivalent of getPeopleThumbnailUrl, for rendering a space
-// person as a face-assignment PICKER candidate (SpacePersonSidePanel / SpaceFaceEditor), where only
-// the id/updatedAt pair is on hand rather than a full PersonResponseDto.
-export const getSpacePersonThumbnailUrl = (spaceId: string, personId: string, updatedAt?: string) =>
-  createUrl(`/shared-spaces/${spaceId}/people/${personId}/thumbnail`, { updatedAt });
-
 /**
  * Order face-picker candidates so the people who have a name come first.
  *
