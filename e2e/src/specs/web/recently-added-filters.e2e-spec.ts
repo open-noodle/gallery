@@ -387,8 +387,9 @@ test.describe('Recently Added text search', () => {
   // outgoing DTO when the caller passes a truthy `withSharedSpaces`; when falsy, the key is
   // omitted entirely (not sent as `false`). Recently Added always passes `withSharedSpaces={false}`
   // (own + partner scope only — see the route-level spec's "does not send shared-space scope to
-  // SmartSearchResults"), while /photos passes `withSharedSpaces={filters.isFavorite === undefined}`,
-  // i.e. `true` by default. So the same query, run on both pages, must produce two different
+  // SmartSearchResults"), while /photos passes `withSharedSpaces={true}` unconditionally (since
+  // #763 made favorites per-user, a Favorites filter no longer narrows the scope there).
+  // So the same query, run on both pages, must produce two different
   // request bodies — that difference *is* the own+partner-vs-shared-spaces scope invariant, and
   // it's fully deterministic (it never touches embeddings or matching).
   test('text search stays within own + partner scope', async ({ context, page }) => {

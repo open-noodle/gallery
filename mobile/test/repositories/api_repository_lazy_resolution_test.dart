@@ -177,7 +177,7 @@ void main() {
     final oldApi = _MockAssetsApi();
     final newApi = _MockAssetsApi();
     when(() => apiService.assetsApi).thenReturn(oldApi);
-    final repo = AssetApiRepository(apiService);
+    final repo = AssetApiRepository(apiService, () => null);
 
     when(() => apiService.assetsApi).thenReturn(newApi);
     when(() => newApi.updateAsset(any(), any())).thenAnswer((_) => Future.error(Exception('stop')));

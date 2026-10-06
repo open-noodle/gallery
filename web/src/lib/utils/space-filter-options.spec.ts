@@ -1,7 +1,7 @@
 import { AssetOrder } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
+import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
 import { buildSpaceTimelineOptions } from '$lib/utils/space-filter-options';
 
 describe('space vs album timeline options — stack collapse (#751)', () => {
@@ -16,5 +16,14 @@ describe('space vs album timeline options — stack collapse (#751)', () => {
     const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, createFilterState());
 
     expect(options.withStacked).toBeUndefined();
+  });
+});
+
+describe('album asset picker options — favorites compose with cross-user scopes (#763 slice 4)', () => {
+  it('an active favorite filter no longer suppresses partner scope', () => {
+    const options = buildAlbumAssetPickerOptions('album-1', { ...createFilterState(), isFavorite: true });
+
+    expect(options.isFavorite).toBe(true);
+    expect(options.withPartners).toBe(true);
   });
 });

@@ -175,10 +175,38 @@ describe('buildContextualFilterUrl', () => {
 
   // E3 — fallback
   it('E3: falls back to /photos from a non-filterable surface', () => {
-    const url = buildContextualFilterUrl(u('/favorites/a1'), { make: 'Apple' });
+    const url = buildContextualFilterUrl(u('/search/photos/a1'), { make: 'Apple' });
 
     expect(url).toContain('/photos');
     expect(url).toContain('make=Apple');
+    // A surface with no scope of its own carries nothing but the patch.
+    expect(url).not.toContain('favorite=');
+  });
+
+  // #763 — /favorites has no filter panel, so it is not a filter TARGET (E3 above), but it is still
+  // an implicit filter: everything on it is there because I favourited it. Dropping that on the way
+  // to /photos silently rewrites "this camera, among my favourites" into "this camera, anywhere in
+  // my timeline" — and for the favourite that only /favorites can reach (one placed inside a Space
+  // I have hidden from my timeline, which the isFavorite carve-out in timeline.service.ts exists to
+  // keep reachable) the widened query matches NOTHING. The report was a camera filter that returned
+  // 0 results for a photo the user was looking at.
+  it('#763: carries the Favorites scope over when filtering from /favorites', () => {
+    const url = buildContextualFilterUrl(u('/favorites/photos/a1'), { make: 'Canon', model: 'Canon EOS R6' });
+
+    expect(url).toContain('/photos');
+    expect(url).toContain('favorite=true');
+    expect(url).toContain('make=Canon');
+    expect(url).toContain('model=Canon+EOS+R6');
+  });
+
+  // The counterpart: "search everywhere" means everywhere. It is the one affordance whose whole
+  // point is leaving the current scope behind, so it must NOT pick the favorites seed up.
+  it('#763: does not carry the Favorites scope into a global "search everywhere" filter', () => {
+    const url = buildContextualFilterUrl(u('/favorites/photos/a1'), { make: 'Canon' }, { global: true });
+
+    expect(url).toContain('/photos');
+    expect(url).toContain('make=Canon');
+    expect(url).not.toContain('favorite=');
   });
 
   it('keeps the map on the map, preserving its spaceId', () => {
@@ -282,10 +310,20 @@ describe('applyContextualFilter', () => {
   // E3 — a non-filterable surface (resolveFilterTarget returns null) must not throw; it falls back
   // to /photos.
   it('does not throw from a non-filterable surface, falling back to /photos', () => {
-    mockPage.reset('https://g.test/favorites/asset-1');
+    mockPage.reset('https://g.test/search/asset-1');
 
     expect(() => applyContextualFilter({ make: 'Apple' })).not.toThrow();
     expect(gotoMock).toHaveBeenCalledWith('/photos?make=Apple');
+  });
+
+  // #763 — the wiring for the seed, end to end: this is what the camera row's own button does when
+  // the asset viewer is open on /favorites.
+  it('#763: navigates to the favorites-scoped /photos URL from /favorites', () => {
+    mockPage.reset('https://g.test/favorites/photos/asset-1');
+
+    applyContextualFilter({ make: 'Canon' });
+
+    expect(gotoMock).toHaveBeenCalledWith('/photos?make=Canon&favorite=true');
   });
 });
 
