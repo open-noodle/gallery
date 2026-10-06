@@ -860,6 +860,28 @@ where
 order by
   "memory_asset"."updateId" asc
 
+-- SyncRepository.memoryToAsset.getUpsertsForTypes
+select
+  "memoriesId" as "memoryId",
+  "assetId" as "assetId",
+  "updateId"
+from
+  "memory_asset" as "memory_asset"
+where
+  "memory_asset"."updateId" < $1
+  and "memory_asset"."updateId" > $2
+  and "memoriesId" in (
+    select
+      "id"
+    from
+      "memory"
+    where
+      "ownerId" = $3
+      and "type" in ($4, $5)
+  )
+order by
+  "memory_asset"."updateId" asc
+
 -- SyncRepository.partner.getCreatedAfter
 select
   "sharedById",
