@@ -2776,7 +2776,7 @@
   "reset_sqlite_confirmation": "確定要重設所有資料嗎？你的所有設定將被重設，且你會被登出。",
   "reset_sqlite_confirmation_note": "注意：你需要在清除資料後重新開啟 App。",
   "reset_sqlite_done": "資料已清除。請重啟 Immich 及重新登入。",
-  "reset_sqlite_error_hint": "發生錯誤，請使用下方按鈕重設本機資料庫",
+  "reset_sqlite_error_hint": "出現錯誤了，請使用下面的按鈕重置本地資料庫",
   "reset_sqlite_success": "已成功重設 SQLite 資料庫",
   "reset_to_default": "重設為預設值",
   "resolution": "解析度",
