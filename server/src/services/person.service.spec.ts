@@ -217,6 +217,12 @@ describe(PersonService.name, () => {
     return identityMergePropagation;
   };
 
+  const useFaceAssignment = () => {
+    const faceAssignment = { assignFaces: vi.fn().mockResolvedValue([]) };
+    (sut as unknown as { faceAssignmentService: typeof faceAssignment }).faceAssignmentService = faceAssignment;
+    return faceAssignment;
+  };
+
   // `mocks.systemMetadata.get` is one mock shared by every key, so a bare `mockResolvedValue` would answer the
   // one-shot suggestion-sweep marker AND the system config with the same object. These two helpers key on the
   // metadata key so a test can pin one without disturbing the other.
@@ -1740,33 +1746,30 @@ describe(PersonService.name, () => {
       ]);
     });
 
-    it('should replace identity links for reassigned faces', async () => {
-      const face = AssetFaceFactory.create();
+    it('assigns every reassigned face in one manual face-assignment call', async () => {
+      const faceAssignment = useFaceAssignment();
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
+      const [face1, face2] = [AssetFaceFactory.create(), AssetFaceFactory.create()];
 
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
-      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.access.person.checkFaceOwnerAccess
+        .mockResolvedValueOnce(new Set([face1.id]))
+        .mockResolvedValueOnce(new Set([face2.id]));
+      mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face1), getForAssetFace(face2)]);
 
       await sut.reassignFaces(auth, person.personGroupId, {
-        data: [{ personId: person.personGroupId, assetId: face.assetId }],
+        data: [{ personId: person.personGroupId, assetId: face1.assetId }],
       });
 
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(person.personGroupId);
-      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
-        assetFaceId: face.id,
-        identityId: 'identity-1',
-        source: 'manual',
+      // One call means one transaction: a failure part-way leaves no face moved without its identity link.
+      expect(faceAssignment.assignFaces).toHaveBeenCalledTimes(1);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [face1.id, face2.id],
+        strength: 'manual',
       });
-      // S11 (slice 11d): the owner just stated a fact that contradicts any durable rejected/ignored row for
-      // this same target — clear it, scoped to this person's identity only.
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personGroupId: person.personGroupId, identityId: 'identity-1' },
-        [face.id],
-      );
     });
 
     // immich-31580 (shipped upstream in v3.2.2). `PersonCreate` on a face id is owner-only
@@ -1777,6 +1780,7 @@ describe(PersonService.name, () => {
     // an identity link and a negative-verdict clear per face, so it left strictly more half-done than
     // upstream's. Denied faces must be skipped, and the accessible ones must still go through.
     it('should skip a face on an asset the caller does not own and reassign the rest', async () => {
+      const faceAssignment = useFaceAssignment();
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
       const ownedFace = AssetFaceFactory.create();
@@ -1802,23 +1806,12 @@ describe(PersonService.name, () => {
         }),
       ).resolves.toBeDefined();
 
-      expect(mocks.person.reassignFace).toHaveBeenCalledTimes(1);
-      expect(mocks.person.reassignFace).toHaveBeenCalledWith(ownedFace.id, person.personGroupId);
-
-      // the fork-only per-face writes must not fire for the skipped face either
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledTimes(1);
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(ownedFace.id);
-      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledTimes(1);
-      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
-        assetFaceId: ownedFace.id,
-        identityId: 'identity-1',
-        source: 'manual',
+      expect(faceAssignment.assignFaces).toHaveBeenCalledTimes(1);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [ownedFace.id],
+        strength: 'manual',
       });
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledTimes(1);
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personGroupId: person.personGroupId, identityId: 'identity-1' },
-        [ownedFace.id],
-      );
     });
   });
 
@@ -2168,29 +2161,24 @@ describe(PersonService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith();
     });
 
-    it('should replace identity links when reassigning a face by id', async () => {
+    it('assigns the face in one manual face-assignment call', async () => {
+      const faceAssignment = useFaceAssignment();
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
 
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
-      mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       await sut.reassignFacesById(AuthFactory.create(), person.personGroupId, { id: face.id });
 
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(person.personGroupId);
-      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
-        assetFaceId: face.id,
-        identityId: 'identity-1',
-        source: 'manual',
+      expect(faceAssignment.assignFaces).toHaveBeenCalledTimes(1);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [face.id],
+        strength: 'manual',
       });
-      // S11 (slice 11d): same clearing as reassignFaces — scoped to this person's identity only.
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personGroupId: person.personGroupId, identityId: 'identity-1' },
-        [face.id],
-      );
     });
 
     it('should fail if user has not the correct permissions on the asset', async () => {
@@ -6354,26 +6342,6 @@ describe(PersonService.name, () => {
     });
   });
 
-  describe('reassignFaces', () => {
-    it('resolves pending suggestions for the face when bulk-reassigned (edge 11, manual branch)', async () => {
-      const face = AssetFaceFactory.create();
-      const auth = AuthFactory.create();
-      const person = PersonFactory.create();
-
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
-      mocks.person.reassignFace.mockResolvedValue(1);
-
-      await sut.reassignFaces(auth, person.personGroupId, {
-        data: [{ personId: person.personGroupId, assetId: face.assetId }],
-      });
-
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id);
-    });
-  });
-
   describe('reassignFacesById', () => {
     it('should trigger new feature photo for person with null faceAssetId', async () => {
       const face = AssetFaceFactory.create();
@@ -6411,20 +6379,6 @@ describe(PersonService.name, () => {
       await sut.reassignFacesById(AuthFactory.create(), newPerson.personGroupId, { id: face.id });
 
       expect(mocks.person.getRandomFace).toHaveBeenCalledWith(face.person!.personGroupId);
-    });
-
-    it('resolves pending suggestions for the face when it is reassigned by id (edge 11, manual branch)', async () => {
-      const face = AssetFaceFactory.create();
-      const person = PersonFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
-      mocks.person.reassignFace.mockResolvedValue(1);
-      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-
-      await sut.reassignFacesById(AuthFactory.create(), person.personGroupId, { id: face.id });
-
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id);
     });
   });
 
@@ -6675,6 +6629,7 @@ describe(PersonService.name, () => {
 
   describe('createFace', () => {
     it('should create a face for an asset', async () => {
+      const faceAssignment = useFaceAssignment();
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
       const asset = AssetFactory.from().exif().build();
@@ -6683,6 +6638,7 @@ describe(PersonService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.asset.getById.mockResolvedValue(asset as any);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.createAssetFace.mockResolvedValue('new-face');
 
       await sut.createFace(auth, {
         assetId: asset.id,
@@ -6702,6 +6658,13 @@ describe(PersonService.name, () => {
           sourceType: SourceType.Manual,
         }),
       );
+      // The new face already sits on the person: it is linked in place, as a human placement.
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: ['new-face'],
+        strength: 'manual',
+        from: person.personGroupId,
+      });
     });
 
     it('should throw NotFoundException if asset is not found', async () => {
@@ -6990,21 +6953,26 @@ describe(PersonService.name, () => {
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFacesByIds.mockResolvedValue([face] as any);
-      mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
       mocks.person.update.mockResolvedValue(person);
+      // #1156 routes face placement through FaceAssignmentService.assignFaces.
+      const faceAssignment = useFaceAssignment();
 
       await expect(
         sut.reassignFaces(auth, person.personGroupId, {
           data: [{ personId: person.personGroupId, assetId: face.assetId, userId: newUuid() }],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(faceAssignment.assignFaces).not.toHaveBeenCalled();
 
       await sut.reassignFaces(auth, person.personGroupId, {
         data: [{ personId: person.personGroupId, assetId: face.assetId, userId: auth.user.id }],
       });
-      expect(mocks.person.reassignFace).toHaveBeenCalled();
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [face.id],
+        strength: 'manual',
+      });
     });
 
     it('allows a userId naming the caller', async () => {

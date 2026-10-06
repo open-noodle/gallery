@@ -86,7 +86,7 @@ import { WebAuthnRepository } from 'src/repositories/webauthn.repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
-import { FaceVerdictService } from 'src/services/face-verdict.service.js';
+import { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
 import {
   AccessPersonRequest,
@@ -189,7 +189,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
 export class BaseService {
   protected storageCore: StorageCore;
   protected identityMergePropagationService: IdentityMergePropagationService;
-  protected faceVerdictService: FaceVerdictService;
+  protected faceAssignmentService: FaceAssignmentService;
 
   constructor(
     protected logger: LoggingRepository,
@@ -281,11 +281,13 @@ export class BaseService {
       personRepository,
       sharedSpaceRepository,
     });
-    this.faceVerdictService = new FaceVerdictService({
+    this.faceAssignmentService = new FaceAssignmentService({
+      databaseRepository,
       faceIdentityRepository,
       facePersonVerdictRepository,
       faceRepairDeclineRepository,
-      logger: this.logger,
+      faceRepairRepository,
+      personRepository,
     });
   }
 

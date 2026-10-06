@@ -68,6 +68,7 @@ import {
 import { BaseService } from 'src/services/base.service.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
+import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { isHttpException } from 'src/utils/logger.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
@@ -337,6 +338,7 @@ export class PersonService extends BaseService {
     const person = await this.findOrFail(auth, personGroupId);
     const result: PersonResponseDto[] = [];
     const changeFeaturePhoto = new Map<string, PersonId>();
+    const faceIds: string[] = [];
     for (const data of dto.data) {
       const faces = await this.personRepository.getFacesByIds(
         [{ personGroupId: data.personId, assetId: data.assetId }],
@@ -357,20 +359,12 @@ export class PersonService extends BaseService {
           changeFeaturePhoto.set(personKey(face.person), face.person);
         }
 
-        await this.personRepository.reassignFace(face.id, person.personGroupId);
-        await this.facePersonVerdictRepository.resolveAssignedFace(face.id);
-        const identityId = await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
-        // Slice 8 (F15): the owner just stated a fact ("this face IS this person") that contradicts any
-        // durable rejected/ignored row for this SAME target — the newer human decision wins. Scoped to
-        // `personId` only: a negative recorded against a DIFFERENT person for this face must survive.
-        await this.facePersonVerdictRepository.clearNegativeForTarget(
-          { personGroupId: person.personGroupId, identityId },
-          [face.id],
-        );
+        faceIds.push(face.id);
       }
 
       result.push(mapPerson(person));
     }
+    await this.faceAssignmentService.assignFaces({ personGroupId: person.personGroupId, faceIds, strength: 'manual' });
     if (changeFeaturePhoto.size > 0) {
       await this.createNewFeaturePhoto(changeFeaturePhoto.values().toArray());
     }
@@ -383,14 +377,11 @@ export class PersonService extends BaseService {
     const face = await this.personRepository.getFaceById(dto.id, { viewingUserId: auth.user.id });
     const person = await this.findOrFail(auth, personGroupId);
 
-    await this.personRepository.reassignFace(face.id, person.personGroupId);
-    await this.facePersonVerdictRepository.resolveAssignedFace(face.id);
-    const identityId = await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
-    // Slice 8 (F15): same clearing as reassignFaces above — scoped to `personId`, so a negative recorded
-    // against a DIFFERENT person for this face survives.
-    await this.facePersonVerdictRepository.clearNegativeForTarget({ personGroupId: person.personGroupId, identityId }, [
-      face.id,
-    ]);
+    await this.faceAssignmentService.assignFaces({
+      personGroupId: person.personGroupId,
+      faceIds: [face.id],
+      strength: 'manual',
+    });
     if (person.faceAssetId === null) {
       await this.createNewFeaturePhoto([person]);
     }
@@ -712,7 +703,7 @@ export class PersonService extends BaseService {
 
     const { machineLearning } = await this.getConfig({ withCache: true });
     const featureEnabled = isFaceSuggestionEnabled(machineLearning);
-    const nowScannable = person.name !== '' && !person.isHidden && person.type === 'person';
+    const nowScannable = isSuggestionScanTarget(person);
     if (featureEnabled && nowScannable && prior && prior.name !== person.name) {
       await this.jobRepository.queue({ name: JobName.PersonSuggestionScan, data: { id: personGroupId } });
     }
@@ -1653,7 +1644,12 @@ export class PersonService extends BaseService {
       boundingBoxY2: Math.round(bottomRight.y),
       sourceType: SourceType.Manual,
     });
-    await this.replaceFaceIdentity(dto.personId, faceId, 'manual');
+    await this.faceAssignmentService.assignFaces({
+      personGroupId: person.personGroupId,
+      faceIds: [faceId],
+      strength: 'manual',
+      from: person.personGroupId,
+    });
 
     if (!person.faceAssetId) {
       await this.createNewFeaturePhoto([person]);

@@ -87,6 +87,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { retryOnDeadlock } from 'src/utils/database.js';
 import { asDateString, asDateTimeString } from 'src/utils/date.js';
+import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
@@ -2078,7 +2079,7 @@ export class SharedSpaceService extends BaseService {
         trx,
       );
     }
-    await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
+    await this.facePersonVerdictRepository.drainPendingForFaces([assetFaceId], trx);
     // D3: write the space projection so getAssignedFaceIdsForSpace excludes this face from the same space's
     // next scan, for every space person — not just this one. addPersonFaces is onConflict().doNothing(), so
     // this is idempotent if a concurrent face-match backfill already wrote the same row.
@@ -2846,7 +2847,7 @@ export class SharedSpaceService extends BaseService {
         isHidden: dto.isHidden ?? person.isHidden,
         type: person.type,
       };
-      if (this.isNamedVisibleSpacePerson(candidate) && dto.name.trim() !== person.name.trim()) {
+      if (isSuggestionScanTarget(candidate) && dto.name.trim() !== person.name.trim()) {
         const suggestionsEnabled = await this.areSpacePersonSuggestionsEnabled({ withCache: false });
         if (suggestionsEnabled && (await this.isSpaceFaceRecognitionEnabled(spaceId))) {
           await this.jobRepository.queue({ name: JobName.SpacePersonSuggestionScan, data: { id: personId } });
@@ -3125,12 +3126,6 @@ export class SharedSpaceService extends BaseService {
     });
   }
 
-  private async resolveMovedSpacePersonFaces(faceIds: Array<{ assetFaceId: string }>): Promise<void> {
-    for (const { assetFaceId } of faceIds) {
-      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId);
-    }
-  }
-
   async mergeSpacePeople(
     auth: AuthDto,
     spaceId: string,
@@ -3184,7 +3179,7 @@ export class SharedSpaceService extends BaseService {
       createCrossOwnerMergeAuthorizer(() => Promise.resolve(server), dto),
     );
 
-    await this.resolveMovedSpacePersonFaces(movedFaceIds);
+    await this.facePersonVerdictRepository.drainPendingForFaces(movedFaceIds.map(({ assetFaceId }) => assetFaceId));
     await this.sharedSpaceRepository.logActivity({
       spaceId,
       userId: auth.user.id,
@@ -3827,7 +3822,7 @@ export class SharedSpaceService extends BaseService {
       // Reassign faces and migrate aliases
       const movedFaceIds = await this.sharedSpaceRepository.getFaceIdsForPerson(source.id);
       await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
-      await this.resolveMovedSpacePersonFaces(movedFaceIds);
+      await this.facePersonVerdictRepository.drainPendingForFaces(movedFaceIds.map(({ assetFaceId }) => assetFaceId));
       await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
 
       const candidateIdentityIds = [target.identityId, source.identityId].filter(
@@ -4466,16 +4461,12 @@ export class SharedSpaceService extends BaseService {
       return {
         didInherit: true,
         ...(nameChanged &&
-          this.isNamedVisibleSpacePerson({ ...person, name: nextName }) && {
+          isSuggestionScanTarget({ ...person, name: nextName }) && {
             suggestionScanCandidate: { ...person, name: nextName },
           }),
       };
     }
     return { didInherit: false };
-  }
-
-  private isNamedVisibleSpacePerson(person: Pick<SharedSpacePerson, 'name' | 'isHidden' | 'type'>): boolean {
-    return person.name.trim().length > 0 && !person.isHidden && person.type === 'person';
   }
 
   private async areSpacePersonSuggestionsEnabled({ withCache }: { withCache: boolean }): Promise<boolean> {
@@ -4509,7 +4500,7 @@ export class SharedSpaceService extends BaseService {
     const spaceEnabledCache = new Map<string, boolean>();
     const jobs: Array<{ name: JobName.SpacePersonSuggestionScan; data: { id: string } }> = [];
     for (const candidate of candidates) {
-      if (queuedIds.has(candidate.id) || !this.isNamedVisibleSpacePerson(candidate)) {
+      if (queuedIds.has(candidate.id) || !isSuggestionScanTarget(candidate)) {
         continue;
       }
 
