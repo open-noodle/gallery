@@ -160,6 +160,12 @@ const ServerFeaturesSchema = z
       .describe(
         'Sync stream request types this server accepts. Absent on servers that predate capability signalling; clients fall back to version-based gating.',
       ),
+    localTakenRange: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end.',
+      ),
   })
   .meta({ id: 'ServerFeaturesDto' });
 

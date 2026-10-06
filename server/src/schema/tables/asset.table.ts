@@ -58,6 +58,8 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
   name: 'asset_localDateTime_month_idx',
   expression: `date_trunc('MONTH'::text, ("localDateTime" AT TIME ZONE 'UTC'::text)) AT TIME ZONE 'UTC'::text`,
 })
+// Gallery-fork: backs the filter panel's taken range (src/utils/asset-filter.ts).
+@Index({ name: 'asset_localDateTime_range_idx', columns: ['localDateTime'] })
 @Index({ columns: ['originalPath', 'libraryId'] })
 @Index({ columns: ['id', 'stackId'] })
 @Index({

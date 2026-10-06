@@ -9,8 +9,12 @@ import 'package:openapi/api.dart' hide SearchFilter;
 
 class SearchApiRepository extends ApiRepository {
   final ApiService _apiService;
+  // Whether the server reads taken ranges as wall-clock time (`GET /server/features` →
+  // `localTakenRange`); false when it does not declare it or the features are not known yet.
+  final bool Function() _localTakenRange;
 
-  SearchApiRepository(this._apiService);
+  SearchApiRepository(this._apiService, {bool Function()? localTakenRange})
+    : _localTakenRange = localTakenRange ?? (() => false);
 
   SearchApi get _api => _apiService.searchApi;
 
@@ -41,10 +45,12 @@ class SearchApiRepository extends ApiRepository {
         city: filter.location.city == null ? const Optional.absent() : Optional.present(filter.location.city),
         make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make),
         model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model),
-        takenAfter: filter.date.takenAfter == null ? const Optional.absent() : Optional.present(filter.date.takenAfter),
+        takenAfter: filter.date.takenAfter == null
+            ? const Optional.absent()
+            : Optional.present(filter.date.takenAfterParam(localTakenRange: _localTakenRange())),
         takenBefore: filter.date.takenBefore == null
             ? const Optional.absent()
-            : Optional.present(filter.date.takenBefore),
+            : Optional.present(filter.date.takenBeforeParam(localTakenRange: _localTakenRange())),
         visibility: Optional.present(filter.display.isArchive ? AssetVisibility.archive : AssetVisibility.timeline),
         rating: filter.rating.rating.toOptional(),
         isFavorite: filter.display.isFavorite ? const Optional.present(true) : const Optional.absent(),
@@ -76,10 +82,12 @@ class SearchApiRepository extends ApiRepository {
       city: filter.location.city == null ? const Optional.absent() : Optional.present(filter.location.city),
       make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make),
       model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model),
-      takenAfter: filter.date.takenAfter == null ? const Optional.absent() : Optional.present(filter.date.takenAfter),
+      takenAfter: filter.date.takenAfter == null
+          ? const Optional.absent()
+          : Optional.present(filter.date.takenAfterParam(localTakenRange: _localTakenRange())),
       takenBefore: filter.date.takenBefore == null
           ? const Optional.absent()
-          : Optional.present(filter.date.takenBefore),
+          : Optional.present(filter.date.takenBeforeParam(localTakenRange: _localTakenRange())),
       visibility: Optional.present(filter.display.isArchive ? AssetVisibility.archive : AssetVisibility.timeline),
       rating: filter.rating.rating.toOptional(),
       isFavorite: filter.display.isFavorite ? const Optional.present(true) : const Optional.absent(),

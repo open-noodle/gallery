@@ -3028,9 +3028,9 @@ export type MetadataSearchDto = {
     state?: string | null;
     /** Filter by tag IDs */
     tagIds?: string[] | null;
-    /** Filter by taken date (after) */
+    /** Filter by taken date: on or after this local date and time (inclusive) */
     takenAfter?: string;
-    /** Filter by taken date (before) */
+    /** Filter by taken date: before this local date and time (exclusive) */
     takenBefore?: string;
     /** Filter by thumbnail file path */
     thumbnailPath?: string;
@@ -3152,9 +3152,9 @@ export type RandomSearchDto = {
     state?: string | null;
     /** Filter by tag IDs */
     tagIds?: string[] | null;
-    /** Filter by taken date (after) */
+    /** Filter by taken date: on or after this local date and time (inclusive) */
     takenAfter?: string;
-    /** Filter by taken date (before) */
+    /** Filter by taken date: before this local date and time (exclusive) */
     takenBefore?: string;
     /** Filter by trash date (after) */
     trashedAfter?: string;
@@ -3237,9 +3237,9 @@ export type SmartSearchDto = {
     state?: string | null;
     /** Filter by tag IDs */
     tagIds?: string[] | null;
-    /** Filter by taken date (after) */
+    /** Filter by taken date: on or after this local date and time (inclusive) */
     takenAfter?: string;
-    /** Filter by taken date (before) */
+    /** Filter by taken date: before this local date and time (exclusive) */
     takenBefore?: string;
     /** Filter by trash date (after) */
     trashedAfter?: string;
@@ -3291,9 +3291,9 @@ export type SmartSearchFacetsDto = {
     spacePersonIds?: string[];
     /** Filter by tag IDs */
     tagIds?: string[] | null;
-    /** Filter by taken date (after) */
+    /** Filter by taken date: on or after this local date and time (inclusive) */
     takenAfter?: string;
-    /** Filter by taken date (before) */
+    /** Filter by taken date: before this local date and time (exclusive) */
     takenBefore?: string;
     "type"?: AssetTypeEnum;
     /** Include shared spaces the user is a member of */
@@ -3399,9 +3399,9 @@ export type StatisticsSearchDto = {
     state?: string | null;
     /** Filter by tag IDs */
     tagIds?: string[] | null;
-    /** Filter by taken date (after) */
+    /** Filter by taken date: on or after this local date and time (inclusive) */
     takenAfter?: string;
-    /** Filter by taken date (before) */
+    /** Filter by taken date: before this local date and time (exclusive) */
     takenBefore?: string;
     /** Filter by trash date (after) */
     trashedAfter?: string;
@@ -3543,6 +3543,8 @@ export type ServerFeaturesDto = {
     facialRecognition: boolean;
     /** Whether face import is enabled */
     importFaces: boolean;
+    /** Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end. */
+    localTakenRange?: boolean;
     /** Whether map feature is enabled */
     map: boolean;
     /** Whether OAuth is enabled */

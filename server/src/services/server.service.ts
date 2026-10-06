@@ -148,6 +148,10 @@ export class ServerService extends BaseService {
       // type outside this enum, so clients must know the accepted set before asking. Version
       // numbers can't carry this (RC builds report the bare base version).
       syncRequestTypes: Object.values(SyncRequestType),
+      // Capability signal for mobile date filters: this server reads takenAfter/takenBefore as a
+      // wall-clock range (src/utils/asset-filter.ts). A client sends that shape only when this is set,
+      // and keeps sending device-local instants to an older server that compares fileCreatedAt.
+      localTakenRange: true,
     };
   }
 

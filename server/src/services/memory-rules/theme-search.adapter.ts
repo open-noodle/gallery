@@ -7,10 +7,10 @@ import { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/the
 import { isSmartSearchEnabled } from 'src/utils/misc.js';
 
 /**
- * `searchAssetBuilder` filters `takenAfter`/`takenBefore` against `asset.fileCreatedAt`
- * (`src/utils/database.ts:725-726`), not `localDateTime`, which every memory rule buckets by.
- * Widening the search window by this many days on each side ensures no in-year asset is missed
- * by that skew; the calling rule then filters the results to the exact year by `localDateTime`.
+ * `searchSmart` now filters `takenAfter`/`takenBefore` on `localDateTime` (src/utils/asset-filter.ts),
+ * the column every memory rule buckets by, so this margin is no longer needed to catch skewed
+ * assets. It is kept because removing it changes which top-N results a themed memory sees; the
+ * calling rule still filters the results to the exact year by `localDateTime`.
  */
 export const SEARCH_WINDOW_MARGIN_DAYS = 2;
 const SEARCH_WINDOW_MARGIN_MS = SEARCH_WINDOW_MARGIN_DAYS * 24 * 60 * 60 * 1000;

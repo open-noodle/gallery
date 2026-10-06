@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/asset_type_mapper.dart';
+import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:openapi/api.dart' hide SearchFilter;
 
 final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<FilterSuggestionsResponseDto, SearchFilter>((
@@ -15,6 +16,7 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
   filter,
 ) async {
   final api = ref.watch(apiServiceProvider).searchApi;
+  final localTakenRange = ref.watch(serverLocalTakenRangeProvider);
   final response = await api.getFilterSuggestions(
     city: filter.location.city,
     country: filter.location.country,
@@ -28,8 +30,8 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
     personIds: filter.people.isEmpty ? null : filter.people.map((p) => p.id).toList(),
     rating: filter.rating.rating.unwrapOrNull,
     tagIds: filter.tagIds,
-    takenAfter: filter.date.takenAfter,
-    takenBefore: filter.date.takenBefore,
+    takenAfter: filter.date.takenAfterParam(localTakenRange: localTakenRange),
+    takenBefore: filter.date.takenBeforeParam(localTakenRange: localTakenRange),
     // A non-owner viewer owns none of the shared-space assets they see, so an owner-scoped
     // facet query comes up empty. Request shared-space content so the facets populate,
     // mirroring the web filter page (map-filter-config.ts `withSharedSpaces: true`). The

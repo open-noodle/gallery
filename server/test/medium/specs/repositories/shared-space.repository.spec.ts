@@ -149,7 +149,7 @@ const createSpaceIdentityPerson = async (
 const seedAlbumPerson = async (
   ctx: ReturnType<typeof setup>['ctx'],
   sut: SharedSpaceRepository,
-  opts: { fileCreatedAt?: Date; representative?: boolean } = {},
+  opts: { localDateTime?: Date; representative?: boolean } = {},
 ) => {
   const { user } = await ctx.newUser();
   const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
@@ -158,7 +158,7 @@ const seedAlbumPerson = async (
   const { asset } = await ctx.newAsset({
     ownerId: user.id,
     visibility: AssetVisibility.Timeline,
-    ...(opts.fileCreatedAt && { fileCreatedAt: opts.fileCreatedAt }),
+    ...(opts.localDateTime && { localDateTime: opts.localDateTime }),
   });
   await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
   await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
@@ -2250,12 +2250,12 @@ describe(SharedSpaceRepository.name, () => {
       const { asset: targetAsset } = await ctx.newAsset({
         ownerId: user.id,
         visibility: AssetVisibility.Timeline,
-        fileCreatedAt: new Date('2024-02-15T00:00:00.000Z'),
+        localDateTime: new Date('2024-02-15T00:00:00.000Z'),
       });
       const { asset: otherSpaceAsset } = await ctx.newAsset({
         ownerId: user.id,
         visibility: AssetVisibility.Timeline,
-        fileCreatedAt: new Date('2024-03-15T00:00:00.000Z'),
+        localDateTime: new Date('2024-03-15T00:00:00.000Z'),
       });
       await ctx.newSharedSpaceAsset({ spaceId: targetSpace.id, assetId: targetAsset.id });
       await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: otherSpaceAsset.id });
@@ -2736,11 +2736,11 @@ describe(SharedSpaceRepository.name, () => {
         const { space } = await ctx.newSharedSpace({ createdById: user.id });
         const { asset: inRangeAsset } = await ctx.newAsset({
           ownerId: user.id,
-          fileCreatedAt: new Date('2024-02-15T00:00:00.000Z'),
+          localDateTime: new Date('2024-02-15T00:00:00.000Z'),
         });
         const { asset: outOfRangeAsset } = await ctx.newAsset({
           ownerId: user.id,
-          fileCreatedAt: new Date('2024-05-15T00:00:00.000Z'),
+          localDateTime: new Date('2024-05-15T00:00:00.000Z'),
         });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: inRangeAsset.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: outOfRangeAsset.id });
@@ -4316,12 +4316,12 @@ describe(SharedSpaceRepository.name, () => {
       const { asset } = await ctx.newAsset({
         ownerId: user.id,
         visibility: AssetVisibility.Timeline,
-        fileCreatedAt: new Date('2024-02-15T00:00:00.000Z'),
+        localDateTime: new Date('2024-02-15T00:00:00.000Z'),
       });
       const { asset: otherAsset } = await ctx.newAsset({
         ownerId: user.id,
         visibility: AssetVisibility.Timeline,
-        fileCreatedAt: new Date('2024-03-15T00:00:00.000Z'),
+        localDateTime: new Date('2024-03-15T00:00:00.000Z'),
       });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
       await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: otherAsset.id });
@@ -4963,14 +4963,14 @@ describe(SharedSpaceRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.database
         .insertInto('asset_exif')
-        .values({ assetId: asset.id, latitude: 11, longitude: 11, rating: 5 })
+        .values({ assetId: asset.id, latitude: 11, longitude: 11, rating: 3 })
         .execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
       const matching = await sut.getFilteredMapMarkers({
         userIds: [member.id],
         timelineSpaceIds: [space.id],
-        rating: 5,
+        rating: 3,
         visibility: AssetVisibility.Timeline,
       });
       expect(matching.find((r) => r.id === asset.id)).toBeDefined();
@@ -4978,7 +4978,7 @@ describe(SharedSpaceRepository.name, () => {
       const nonMatching = await sut.getFilteredMapMarkers({
         userIds: [member.id],
         timelineSpaceIds: [space.id],
-        rating: 1,
+        rating: 4,
         visibility: AssetVisibility.Timeline,
       });
       expect(nonMatching.find((r) => r.id === asset.id)).toBeUndefined();
@@ -5364,7 +5364,7 @@ describe(SharedSpaceRepository.name, () => {
     it('countPersonsBySpaceId includes album faces in detectedFaceCount and date-filtered totals', async () => {
       const { ctx, sut } = setup();
       const takenAt = new Date('2024-06-15T12:00:00.000Z');
-      const { space, person } = await seedAlbumPerson(ctx, sut, { fileCreatedAt: takenAt });
+      const { space, person } = await seedAlbumPerson(ctx, sut, { localDateTime: takenAt });
 
       const base = await sut.countPersonsBySpaceId(space.id, {});
       expect(base.total).toBeGreaterThanOrEqual(1);
@@ -5396,7 +5396,7 @@ describe(SharedSpaceRepository.name, () => {
     it('getPersonsBySpaceId lists an album-only person, honoring date filters', async () => {
       const { ctx, sut } = setup();
       const takenAt = new Date('2024-06-15T12:00:00.000Z');
-      const { space, person } = await seedAlbumPerson(ctx, sut, { fileCreatedAt: takenAt });
+      const { space, person } = await seedAlbumPerson(ctx, sut, { localDateTime: takenAt });
 
       const all = await sut.getPersonsBySpaceId(space.id, {});
       expect(all.map((p) => p.id)).toContain(person.id);
@@ -5477,7 +5477,7 @@ describe(SharedSpaceRepository.name, () => {
     it('hides an album-only person when the linked album is soft-deleted', async () => {
       const { ctx, sut } = setup();
       const takenAt = new Date('2024-06-15T12:00:00.000Z');
-      const { space, person, album } = await seedAlbumPerson(ctx, sut, { fileCreatedAt: takenAt });
+      const { space, person, album } = await seedAlbumPerson(ctx, sut, { localDateTime: takenAt });
 
       await ctx.softDeleteAlbum(album.id);
 

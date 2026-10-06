@@ -240,12 +240,13 @@ describe(AssetRepository.name, () => {
       ]);
     });
 
-    it('keeps takenAfter and takenBefore inclusive for bucket counts', async () => {
+    it('applies takenAfter inclusively and takenBefore exclusively to bucket counts', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
 
       await createTimelineAsset(ctx, user.id, new Date('2024-01-10T00:00:00.000Z'));
       await createTimelineAsset(ctx, user.id, new Date('2024-01-20T00:00:00.000Z'));
+      // Just past the bound: excluded like the asset exactly on it.
       await createTimelineAsset(ctx, user.id, new Date('2024-01-20T00:00:01.000Z'));
 
       await expect(
@@ -260,7 +261,7 @@ describe(AssetRepository.name, () => {
           },
           factory.auth({ user: { id: user.id } }),
         ),
-      ).resolves.toEqual([expect.objectContaining({ count: 2 })]);
+      ).resolves.toEqual([expect.objectContaining({ count: 1 })]);
 
       const result = await sut.getTimeBuckets(
         {
@@ -272,10 +273,7 @@ describe(AssetRepository.name, () => {
         },
         factory.auth({ user: { id: user.id } }),
       );
-      expect(result).toEqual([
-        expect.objectContaining({ timeBucket: '2024-01-20', count: 1 }),
-        expect.objectContaining({ timeBucket: '2024-01-10', count: 1 }),
-      ]);
+      expect(result).toEqual([expect.objectContaining({ timeBucket: '2024-01-10', count: 1 })]);
       expect(result[0]).not.toHaveProperty('representativeAssetId');
       expect(result[0]).not.toHaveProperty('representativeThumbhash');
       expect(result[0]).not.toHaveProperty('representativeRatio');
