@@ -79,8 +79,14 @@ const TimeBucketQueryBaseSchema = z
     ocr: boundedTextFilter().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
     rating: z.coerce.number().int().min(1).max(5).optional().describe('Minimum star rating (>=)'),
     type: AssetTypeSchema.optional().describe('Filter by asset type (IMAGE or VIDEO)'),
-    takenAfter: z.string().optional().describe('Only include assets taken on or after this date (ISO 8601)'),
-    takenBefore: z.string().optional().describe('Only include assets taken on or before this date (ISO 8601)'),
+    takenAfter: z
+      .string()
+      .optional()
+      .describe('Only include assets taken on or after this local date and time (ISO 8601, inclusive)'),
+    takenBefore: z
+      .string()
+      .optional()
+      .describe('Only include assets taken before this local date and time (ISO 8601, exclusive)'),
     order: AssetOrderSchema.optional().describe(
       'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
     ),

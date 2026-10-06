@@ -158,6 +158,7 @@ describe(ServerService.name, () => {
         realtimeTranscoding: false,
         peopleStatistics: false,
         syncRequestTypes: Object.values(SyncRequestType),
+        localTakenRange: true,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });

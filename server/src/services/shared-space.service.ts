@@ -1670,9 +1670,6 @@ export class SharedSpaceService extends BaseService {
       make: dto.make,
       model: dto.model,
       rating: dto.rating,
-      // `rating` is documented as a MINIMUM. Without this flag searchAssetBuilder falls to its
-      // `=` branch, so markers matched exact ratings while every other surface matched `>=`.
-      ratingIsMinimum: dto.rating === undefined ? undefined : true,
       description: dto.description,
       originalFileName: dto.originalFileName,
       ocr: dto.ocr,
