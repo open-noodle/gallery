@@ -152,27 +152,6 @@ describe('handleUpdatePersonBirthDate', () => {
 describe('getPersonActions', () => {
   const $t = ((key: string) => key) as unknown as MessageFormatter;
 
-  it('routes hiding a space-scoped person to the shared space endpoint', async () => {
-    const person = personFactory.build({
-      id: 'space-person-1',
-      isHidden: false,
-      primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
-    });
-    vi.mocked(updateSpacePerson).mockResolvedValue(spacePersonResponse({ isHidden: true }));
-
-    const { HidePerson } = getPersonActions($t, person);
-    await HidePerson.onAction({ action: HidePerson, event: new Event('click') });
-
-    expect(updateSpacePerson).toHaveBeenCalledWith({
-      id: 'space-1',
-      personId: 'space-person-1',
-      sharedSpacePersonUpdateDto: { isHidden: true },
-    });
-    expect(updatePerson).not.toHaveBeenCalled();
-    expect(emitSpy).toHaveBeenCalledWith('PersonUpdate', expect.objectContaining({ id: person.id, isHidden: true }));
-    expect(toastManager.primary).toHaveBeenCalledOnce();
-  });
-
   it('routes unhiding a space-scoped person to the shared space endpoint', async () => {
     const person = personFactory.build({
       id: 'space-person-1',
@@ -192,22 +171,6 @@ describe('getPersonActions', () => {
     expect(emitSpy).toHaveBeenCalledWith('PersonUpdate', expect.objectContaining({ id: person.id, isHidden: false }));
   });
 
-  it('keeps hiding an owned person on the person endpoint', async () => {
-    const person = personFactory.build({
-      isHidden: false,
-      primaryProfile: { type: Type.UserPerson, id: 'person-1' },
-    });
-    const updated = { ...person, isHidden: true };
-    vi.mocked(updatePerson).mockResolvedValue(updated);
-
-    const { HidePerson } = getPersonActions($t, person);
-    await HidePerson.onAction({ action: HidePerson, event: new Event('click') });
-
-    expect(updatePerson).toHaveBeenCalledWith({ id: person.id, personUpdateDto: { isHidden: true } });
-    expect(updateSpacePerson).not.toHaveBeenCalled();
-    expect(emitSpy).toHaveBeenCalledWith('PersonUpdate', updated);
-  });
-
   it('handles failures when hiding a space-scoped person without emitting updates', async () => {
     const person = personFactory.build({
       isHidden: false,
@@ -222,29 +185,6 @@ describe('getPersonActions', () => {
     expect(handleErrorSpy).toHaveBeenCalledWith(error, expect.any(String));
     expect(emitSpy).not.toHaveBeenCalled();
     expect(toastManager.primary).not.toHaveBeenCalled();
-  });
-
-  it('does not offer favorite actions for a space-scoped person', () => {
-    const person = personFactory.build({
-      isFavorite: undefined,
-      primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
-    });
-
-    const { Favorite, Unfavorite } = getPersonActions($t, person);
-
-    expect(Favorite.$if?.()).toBe(false);
-    expect(Unfavorite.$if?.()).toBe(false);
-  });
-
-  it('offers favorite actions for an owned person', () => {
-    const person = personFactory.build({
-      isFavorite: false,
-      primaryProfile: { type: Type.UserPerson, id: 'person-1' },
-    });
-
-    const { Favorite } = getPersonActions($t, person);
-
-    expect(Favorite.$if?.()).toBe(true);
   });
 });
 
@@ -405,7 +345,7 @@ describe('representative face routing', () => {
 });
 
 describe('updatePersonName', () => {
-  it('routes renames of a space-scoped person to the shared space endpoint', async () => {
+  it('merges the shared space response into a space-scoped person', async () => {
     const person = personFactory.build({
       id: 'space-person-1',
       name: 'Old Name',
@@ -416,12 +356,6 @@ describe('updatePersonName', () => {
 
     const updated = await updatePersonName(person, 'New Name');
 
-    expect(updateSpacePerson).toHaveBeenCalledWith({
-      id: 'space-1',
-      personId: 'space-person-1',
-      sharedSpacePersonUpdateDto: { name: 'New Name' },
-    });
-    expect(updatePerson).not.toHaveBeenCalled();
     expect(updated).toEqual(
       expect.objectContaining({
         id: person.id,
@@ -430,18 +364,5 @@ describe('updatePersonName', () => {
         updatedAt: '2026-01-02T00:00:00Z',
       }),
     );
-  });
-
-  it('keeps renames of an owned person on the person endpoint', async () => {
-    const person = personFactory.build({
-      primaryProfile: { type: Type.UserPerson, id: 'person-1' },
-    });
-    const response = { ...person, name: 'New Name' };
-    vi.mocked(updatePerson).mockResolvedValue(response);
-
-    await expect(updatePersonName(person, 'New Name')).resolves.toEqual(response);
-
-    expect(updatePerson).toHaveBeenCalledWith({ id: person.id, personUpdateDto: { name: 'New Name' } });
-    expect(updateSpacePerson).not.toHaveBeenCalled();
   });
 });

@@ -11,7 +11,6 @@ import {
   type FilterPanelConfig,
   type FilterState,
 } from '$lib/components/filter-panel/filter-panel';
-import { createUrl } from '$lib/utils';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>, spaceId?: string) {
@@ -22,9 +21,7 @@ function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions
     people: response.people.map((p: FilterSuggestionsPersonDto) => ({
       id: spaceId ? p.id : getPhotosPersonFilterId(p),
       name: p.name,
-      thumbnailUrl: spaceId
-        ? createUrl(`/shared-spaces/${spaceId}/people/${p.primaryProfile?.id ?? p.id}/thumbnail`)
-        : getPhotosPersonFilterThumbnailUrl(p),
+      thumbnailUrl: getPhotosPersonFilterThumbnailUrl(p, spaceId),
     })),
     ratings: response.ratings,
     mediaTypes: response.mediaTypes,
