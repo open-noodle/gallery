@@ -47,7 +47,8 @@
   } from '#lib/services/person.service.ts';
   import { lang, locale } from '#lib/stores/preferences.store.ts';
   import { websocketEvents } from '#lib/stores/websocket.ts';
-  import { createUrl, getPeopleThumbnailUrl } from '#lib/utils.ts';
+  import { getPeopleThumbnailUrl } from '#lib/utils.ts';
+  import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import {
     createCrossOwnerMergeHandlers,
     runMergeWithCrossOwnerConfirmation,
@@ -158,13 +159,7 @@
   let suggestionContainer: HTMLElement | undefined = $state();
 
   function getScopedThumbnailUrl(person: PersonResponseDto, updatedAt?: string): string {
-    const profile = person.primaryProfile;
-    if (profile?.type === 'space-person' && profile.spaceId) {
-      return createUrl(`/shared-spaces/${profile.spaceId}/people/${profile.id}/thumbnail`, {
-        updatedAt: updatedAt ?? person.updatedAt,
-      });
-    }
-    return getPeopleThumbnailUrl(person, updatedAt);
+    return getGlobalPersonThumbnailUrl(person, { updatedAt });
   }
 
   onMount(() => {
