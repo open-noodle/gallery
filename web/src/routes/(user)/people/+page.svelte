@@ -41,10 +41,7 @@
     mdiAccountMultipleCheckOutline,
     mdiAccountOff,
     mdiDotsVertical,
-    mdiEyeOffOutline,
     mdiEyeOutline,
-    mdiHeartMinusOutline,
-    mdiHeartOutline,
     mdiAccountGroupOutline,
     mdiAccountMultipleOutline,
     mdiPaw,
@@ -220,46 +217,6 @@
       } catch (error) {
         handleError(error, $t('errors.unable_to_save_name'));
       }
-    }
-  };
-
-  const handleHidePerson = async (detail: PersonResponseDto) => {
-    try {
-      const updatedPerson = await updatePerson({
-        id: detail.id,
-        personUpdateDto: { isHidden: true },
-      });
-
-      people = people.map((person: PersonResponseDto) => {
-        if (person.id === updatedPerson.id) {
-          return updatedPerson;
-        }
-        return person;
-      });
-
-      toastManager.primary($t('changed_visibility_successfully'));
-    } catch (error) {
-      handleError(error, $t('errors.unable_to_hide_person'));
-    }
-  };
-
-  const handleToggleFavorite = async (detail: PersonResponseDto) => {
-    try {
-      const updatedPerson = await updatePerson({
-        id: detail.id,
-        personUpdateDto: { isFavorite: !detail.isFavorite },
-      });
-
-      people = people.map((person: PersonResponseDto) => {
-        if (person.id === updatedPerson.id) {
-          return updatedPerson;
-        }
-        return person;
-      });
-
-      toastManager.primary(updatedPerson.isFavorite ? $t('added_to_favorites') : $t('removed_from_favorites'));
-    } catch (error) {
-      handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: detail.isFavorite } }));
     }
   };
 
@@ -571,18 +528,15 @@
           icon={mdiDotsVertical}
           title={$t('show_person_options')}
         >
-          <MenuOption onClick={() => handleHidePerson(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
+          <ActionMenuItem action={Actions.HidePerson} />
           <ActionMenuItem action={Actions.SetDateOfBirth} />
           <MenuOption
             onClick={() => handleMergePeople(person)}
             icon={mdiAccountMultipleCheckOutline}
             text={$t('merge_people')}
           />
-          <MenuOption
-            onClick={() => handleToggleFavorite(person)}
-            icon={person.isFavorite ? mdiHeartMinusOutline : mdiHeartOutline}
-            text={person.isFavorite ? $t('unfavorite') : $t('to_favorite')}
-          />
+          <ActionMenuItem action={Actions.Favorite} />
+          <ActionMenuItem action={Actions.Unfavorite} />
         </ButtonContextMenu>
       {/snippet}
     </PeopleManagementGrid>

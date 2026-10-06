@@ -1,8 +1,8 @@
 import { AssetOrder, AssetTypeEnum, AssetVisibility, type FilterSuggestionsPersonDto } from '@immich/sdk';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { applyTextFilters, buildFilterContext } from '$lib/components/filter-panel/filter-panel';
-import { createUrl } from '$lib/utils';
 import { handleRemoveFilter } from '$lib/utils/filter-remove';
+import { getGlobalPersonThumbnailUrl, getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
 
 export type PhotosPersonFilterReference = {
   id: string;
@@ -107,19 +107,14 @@ export function buildPhotosTimelineOptions(filters: FilterState, userId: string)
 
 export function getPhotosPersonFilterThumbnailUrl(
   person: Pick<FilterSuggestionsPersonDto, 'id' | 'primaryProfile'>,
+  spaceId?: string,
 ): string {
-  const profile = person.primaryProfile;
-
-  if (profile?.type === 'space-person' && profile.spaceId) {
-    return createUrl(`/shared-spaces/${profile.spaceId}/people/${profile.id}/thumbnail`);
+  // Inside a space, suggestion rows are that space's people, keyed by their own id.
+  if (spaceId) {
+    return getSpacePersonThumbnailUrl({ spaceId, id: person.id });
   }
 
-  if (profile?.type === 'user-person') {
-    return createUrl(`/people/${profile.id}/thumbnail`);
-  }
-
-  const userPersonId = person.id.startsWith('person:') ? person.id.slice('person:'.length) : person.id;
-  return createUrl(`/people/${userPersonId}/thumbnail`);
+  return getGlobalPersonThumbnailUrl({ id: person.id.replace(/^person:/, ''), primaryProfile: person.primaryProfile });
 }
 
 export function getPhotosPersonFilterId(person: PhotosPersonFilterReference): string {

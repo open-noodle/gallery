@@ -3,7 +3,6 @@ import {
   getPersonFaces,
   getSpacePersonFaces,
   SharedSpaceRole,
-  Type,
   updatePerson,
   updateRepresentativeFace,
   updateSpacePerson,
@@ -24,18 +23,10 @@ import {
 import type { MessageFormatter } from 'svelte-i18n';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
+import { getSpaceProfile } from '$lib/utils/global-person-route';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
-
-// Members of a shared space see space-scoped people whose IDs do not exist in the person table;
-// writes for those must go to the shared space endpoint instead of person.update.
-const getSpaceProfile = (person: PersonResponseDto) => {
-  const profile = person.primaryProfile;
-  return profile?.type === Type.SpacePerson && profile.spaceId
-    ? { id: profile.id, spaceId: profile.spaceId }
-    : undefined;
-};
 
 // Resolved per space and cached for the session; the server enforces the role on every
 // write, so membership lookup failures fail open instead of hiding working actions.

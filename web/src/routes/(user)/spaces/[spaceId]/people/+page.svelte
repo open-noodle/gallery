@@ -15,8 +15,9 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
   import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
-  import { createUrl, handlePromiseError } from '$lib/utils';
+  import { handlePromiseError } from '$lib/utils';
   import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
+  import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
   import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
@@ -194,15 +195,11 @@
     }
   });
 
-  const getThumbUrl = (person: SharedSpacePersonResponseDto): string => {
-    return createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt });
-  };
-
   const toManagedPerson = (person: SharedSpacePersonResponseDto): ManagedPerson => ({
     id: person.id,
     displayName: person.name || '',
     canonicalName: person.name,
-    thumbnailUrl: getThumbUrl(person),
+    thumbnailUrl: getSpacePersonThumbnailUrl(person),
     href: `/spaces/${space.id}/people/${person.id}`,
     isHidden: person.isHidden,
     type: person.type,
@@ -644,7 +641,7 @@
     <PeopleMergeSelector
       person={mergingPerson}
       getDisplayName={getMergeDisplayName}
-      getThumbnailUrl={getThumbUrl}
+      getThumbnailUrl={(candidate) => getSpacePersonThumbnailUrl(candidate)}
       loadPeople={loadMergePeople}
       {mergePeople}
       onBack={() => (mergingPerson = undefined)}

@@ -4,7 +4,6 @@ import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildPhotosTimelineOptions,
   getPhotosPersonFilterId,
-  getPhotosPersonFilterThumbnailUrl,
   handlePhotosRemoveFilter,
 } from '$lib/utils/photos-filter-options';
 
@@ -435,26 +434,6 @@ describe('handlePhotosRemoveFilter', () => {
       selectedYear: undefined,
       selectedMonth: undefined,
     });
-  });
-});
-
-describe('getPhotosPersonFilterThumbnailUrl', () => {
-  it('uses the shared-space thumbnail for space-primary scoped people', () => {
-    expect(
-      getPhotosPersonFilterThumbnailUrl({
-        id: 'space-person:space-person-1',
-        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
-      }),
-    ).toBe('/api/shared-spaces/space-1/people/space-person-1/thumbnail');
-  });
-
-  it('uses the user person thumbnail for user-primary scoped people', () => {
-    expect(
-      getPhotosPersonFilterThumbnailUrl({
-        id: 'person:person-1',
-        primaryProfile: { type: Type.UserPerson, id: 'person-1' },
-      }),
-    ).toBe('/api/people/person-1/thumbnail');
   });
 });
 
