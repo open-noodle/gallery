@@ -133,6 +133,9 @@ export function mapSharedLink(
     type: sharedLink.type,
     createdAt: sharedLink.createdAt,
     expiresAt: sharedLink.expiresAt,
+    // #763: deliberately NOT projecting isFavoriteForUser — there is no auth object at all for an
+    // anonymous shared-link visitor, so `false` is correct (and is what mapAsset's fail-safe
+    // `?? false` already yields for a row with the field unset).
     assets: assets.map((asset) => {
       const mapped = mapAsset(asset, { auth: options.auth });
       if (options.redactAssetOwners) {

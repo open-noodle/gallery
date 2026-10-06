@@ -67,7 +67,7 @@ Note: PR #243 adds `findSpaceForAssetAndUser` which auto-resolves space context 
 | **Download**            | Yes     | Yes    | Yes    | Yes        |
 | **Download original**   | Yes     | Yes    | Yes    | Yes        |
 | **Share**               | Yes     | No\*   | No\*   | No\*       |
-| **Favorite/unfavorite** | Yes     | No     | No     | No         |
+| **Favorite/unfavorite** | Yes     | Yes    | Yes    | No         |
 | **Edit (crop/rotate)**  | Yes     | No     | No     | No         |
 | **Add to album**        | Yes     | Yes    | Yes    | Yes        |
 | **Slideshow**           | Yes     | Yes    | Yes    | Yes        |
@@ -175,5 +175,5 @@ Note: PR #243 adds `findSpaceForAssetAndUser` which auto-resolves space context 
 1. **Tag editing for space members** — `TagAsset` permission is owner-only. Space editors cannot add/remove tags on space assets. Requires extending the tag permission model.
 2. **Photos page people filter** — Uses `getAllPeople()` which returns only the user's own people. Space people not included. Needs cross-space person dedup logic.
 3. **`$preferences.tags.enabled`** — Space members must enable tags in their personal settings to see them. No automatic bypass for space context.
-4. **Nav bar actions for editors** — Several actions (favorite, archive, edit/crop/rotate, rating) are gated by `isOwner` in the frontend even though space editors have `AssetUpdate` permission on the server. The Share button is visible to all but fails server-side for non-owners.
+4. **Nav bar actions for editors** — Several actions (archive, edit/crop/rotate, rating) are gated by `isOwner` in the frontend even though space editors have `AssetUpdate` permission on the server. (Favorite was removed from this list by #763: it is now a per-user `asset_favorite` overlay, available to every member who can read the asset.) The Share button is visible to all but fails server-side for non-owners.
 5. **No shared links from space context** — Space members cannot create shared links for space assets. Only the asset owner and partners can share via `AssetShare`.

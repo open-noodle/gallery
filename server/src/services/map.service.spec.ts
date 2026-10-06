@@ -153,19 +153,21 @@ describe(MapService.name, () => {
       );
     });
 
-    it('should not resolve space IDs when isFavorite=true', async () => {
+    it('resolves space IDs even when isFavorite=true (#763 slice 4)', async () => {
       const auth = AuthFactory.create();
+      const spaceId = '00000000-0000-4000-8000-000000000004';
       mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.map.getMapMarkers.mockResolvedValue([]);
 
       await sut.getMapMarkers(auth, { withSharedSpaces: true, isFavorite: true });
 
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
       expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
         auth.user.id,
         [auth.user.id],
         expect.anything(),
-        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+        expect.objectContaining({ timelineSpaceIds: [spaceId], isFavorite: true }),
       );
     });
 
