@@ -8,11 +8,11 @@
   } from '$lib/stores/preferences.store';
   import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import { pinnedSpaceIds } from '$lib/stores/space-view.store';
-  import { userInteraction } from '$lib/stores/user.svelte';
+  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { splitPinnedSpaces } from '$lib/utils/space-utils';
   import { handleError } from '$lib/utils/handle-error';
-  import { getAllSpaces, getSharedSpaceAlbums } from '@immich/sdk';
+  import { getSharedSpaceAlbums } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiChevronRight, mdiDotsHorizontal } from '@mdi/js';
   import { SvelteSet } from 'svelte/reactivity';
@@ -81,19 +81,13 @@
     }
   });
 
-  const refreshSpaces = async () => {
-    try {
-      allSpaces = await getAllSpaces();
-      userInteraction.recentSpaces = allSpaces;
-    } catch (error) {
-      handleError(error, $t('failed_to_load_spaces'));
-    }
-  };
-
+  // Shares the People pages' fetch of the spaces list. The last list stays on screen while a
+  // cache reset refetches it.
   $effect(() => {
-    if (!userInteraction.recentSpaces) {
-      void refreshSpaces();
+    if (userInteraction.recentSpaces) {
+      allSpaces = userInteraction.recentSpaces;
     }
+    loadSpaces();
   });
 
   // These rows stay rendered in the rail so it keeps the sidebar's vertical rhythm; collapsed

@@ -5,7 +5,6 @@ import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
 import {
-  getMembers,
   getPersonFaces,
   getSpacePersonFaces,
   SharedSpaceRole,
@@ -16,6 +15,7 @@ import {
   type AssetResponseDto,
   type PersonFacePageResponseDto,
   type PersonResponseDto,
+  type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
@@ -28,28 +28,17 @@ import {
 } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 
-// Resolved per space and cached for the session; the server enforces the role on every
-// write, so membership lookup failures fail open instead of hiding working actions.
-const spaceEditableCache = new Map<string, Promise<boolean>>();
-
-const resolveSpaceEditable = async (spaceId: string, userId: string): Promise<boolean> => {
-  try {
-    const members = await getMembers({ id: spaceId });
-    const role = members.find((member) => member.userId === userId)?.role;
-    return role === SharedSpaceRole.Owner || role === SharedSpaceRole.Editor;
-  } catch {
+// The role is the viewer's own row in the spaces list (`getAllSpaces` embeds `members`, see
+// loadSpaces). The server enforces the role on every write, so this fails open: while the list is
+// unknown (loading or failed), or when it lacks the space (joined since it was cached), the actions
+// stay offered rather than hidden from an editor.
+export const isSpaceEditor = (spaces: SharedSpaceResponseDto[] | undefined, spaceId: string, userId: string) => {
+  const space = spaces?.find(({ id }) => id === spaceId);
+  if (!space) {
     return true;
   }
-};
-
-export const isSpaceEditor = (spaceId: string, userId: string): Promise<boolean> => {
-  const key = `${spaceId}:${userId}`;
-  let cached = spaceEditableCache.get(key);
-  if (!cached) {
-    cached = resolveSpaceEditable(spaceId, userId);
-    spaceEditableCache.set(key, cached);
-  }
-  return cached;
+  const role = space.members?.find((member) => member.userId === userId)?.role;
+  return role === SharedSpaceRole.Owner || role === SharedSpaceRole.Editor;
 };
 
 export const getPersonActions = (

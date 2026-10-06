@@ -20,6 +20,7 @@ import { eventManager } from '$lib/managers/event-manager.svelte';
 import * as handleErrorModule from '$lib/utils/handle-error';
 import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
 import { personFactory } from '@test-data/factories/person-factory';
+import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import {
   getPersonActions,
   getPersonFacesPage,
@@ -199,38 +200,33 @@ describe('isSpaceEditor', () => {
     showInTimeline: true,
   });
 
-  it('returns true for editors and owners', async () => {
-    vi.mocked(getMembers).mockResolvedValue([member('user-1', SharedSpaceRole.Editor)]);
-    await expect(isSpaceEditor('editor-space', 'user-1')).resolves.toBe(true);
+  const spaces = [
+    sharedSpaceFactory.build({ id: 'editor-space', members: [member('user-1', SharedSpaceRole.Editor)] }),
+    sharedSpaceFactory.build({ id: 'owner-space', members: [member('user-1', SharedSpaceRole.Owner)] }),
+    sharedSpaceFactory.build({
+      id: 'viewer-space',
+      members: [member('someone-else', SharedSpaceRole.Owner), member('user-1', SharedSpaceRole.Viewer)],
+    }),
+  ];
 
-    vi.mocked(getMembers).mockResolvedValue([member('user-1', SharedSpaceRole.Owner)]);
-    await expect(isSpaceEditor('owner-space', 'user-1')).resolves.toBe(true);
+  it('returns true for editors and owners', () => {
+    expect(isSpaceEditor(spaces, 'editor-space', 'user-1')).toBe(true);
+    expect(isSpaceEditor(spaces, 'owner-space', 'user-1')).toBe(true);
   });
 
-  it('returns false for viewers', async () => {
-    vi.mocked(getMembers).mockResolvedValue([
-      member('someone-else', SharedSpaceRole.Owner),
-      member('user-1', SharedSpaceRole.Viewer),
-    ]);
-
-    await expect(isSpaceEditor('viewer-space', 'user-1')).resolves.toBe(false);
-
-    expect(getMembers).toHaveBeenCalledWith({ id: 'viewer-space' });
+  it('returns false for viewers', () => {
+    expect(isSpaceEditor(spaces, 'viewer-space', 'user-1')).toBe(false);
   });
 
-  it('fails open when the membership cannot be loaded', async () => {
-    vi.mocked(getMembers).mockRejectedValue(new Error('network'));
-
-    await expect(isSpaceEditor('unreachable-space', 'user-1')).resolves.toBe(true);
+  it('fails open while the spaces list is unknown or lacks the space', () => {
+    expect(isSpaceEditor(undefined, 'viewer-space', 'user-1')).toBe(true);
+    expect(isSpaceEditor(spaces, 'unknown-space', 'user-1')).toBe(true);
   });
 
-  it('caches the result per space', async () => {
-    vi.mocked(getMembers).mockResolvedValue([member('user-1', SharedSpaceRole.Viewer)]);
+  it('reads the role from the spaces list without fetching members', () => {
+    isSpaceEditor(spaces, 'editor-space', 'user-1');
 
-    await expect(isSpaceEditor('cached-space', 'user-1')).resolves.toBe(false);
-    await expect(isSpaceEditor('cached-space', 'user-1')).resolves.toBe(false);
-
-    expect(getMembers).toHaveBeenCalledTimes(1);
+    expect(getMembers).not.toHaveBeenCalled();
   });
 });
 
