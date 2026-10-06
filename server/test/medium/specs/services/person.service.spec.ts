@@ -2230,7 +2230,7 @@ describe(PersonService.name, () => {
     });
   });
 
-  // D14/Slice 9: confirm's claim -> reassign -> resolveAssignedFace -> identity-relink chain must be one
+  // D14/Slice 9: confirm's claim -> reassign -> drain -> identity-relink chain must be one
   // atomic unit. Before this slice each write autocommitted separately, so a crash/failure between the
   // reassign and the relink left the face pointed at the new person WITHOUT a manual identity link (a torn
   // write) and the claimed pending row gone for good — the exact defect class executeRepair's per-route
@@ -2281,7 +2281,7 @@ describe(PersonService.name, () => {
       expect(seeded.status).toBe('pending');
 
       // The LAST write in the chain fails.
-      vi.spyOn(faceIdentityRepo, 'replaceFaceIdentity').mockRejectedValueOnce(new Error('relink failed'));
+      vi.spyOn(faceIdentityRepo, 'replaceFaceIdentities').mockRejectedValueOnce(new Error('relink failed'));
 
       await expect(faceSuggestion.confirmFaceSuggestion(auth, p.personGroupId, face.id)).rejects.toThrow(
         'relink failed',

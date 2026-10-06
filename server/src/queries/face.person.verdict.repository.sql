@@ -14,12 +14,6 @@ set
 where
   "face_person_verdict"."status" = $4
 
--- FacePersonVerdictRepository.resolveAssignedFace
-delete from "face_person_verdict"
-where
-  "assetFaceId" = $1
-  and "status" = $2
-
 -- FacePersonVerdictRepository.drainPendingForFaces
 delete from "face_person_verdict"
 where
@@ -351,7 +345,7 @@ from
   "person"
 where
   "person"."personGroupId" = $1
-  and "person"."name" != $2
+  and BTRIM("person"."name") <> $2
   and "person"."isHidden" = $3
   and "person"."type" = $4
 

@@ -15,7 +15,6 @@ const plan = (toRepair: { assetFaceId: string; currentPersonId: string; suspecte
 function arrangeSameOwnerMove(mocks: ServiceMocks) {
   mocks.person.getByGroupIdOnly.mockImplementation((id: string) => Promise.resolve({ id, ownerId: 'u1' } as any));
   mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
-  mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 }
 
 // S11 (slice 11e): `p1` and `q` resolve to DIFFERENT owners, so the C6 guard must fire and skip the route.
@@ -26,18 +25,21 @@ function arrangeDifferentOwnerMove(mocks: ServiceMocks) {
     Promise.resolve({ id, ownerId: id === 'p1' ? 'u1' : 'u2' } as any),
   );
   mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
-  mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 }
 
 describe(FaceRepairService.name, () => {
   let sut: FaceRepairService;
   let mocks: ServiceMocks;
+  // Each route is one call into the face-assignment module, which owns the transaction and the write order
+  // (covered against a real database in test/medium/specs/services/face-assignment.service.spec.ts).
+  let assignFaces: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(FaceRepairService));
-
-    // executeRepair wraps each route's writes in a transaction — run the callback with a stub trx.
-    mocks.database.transaction.mockImplementation((cb: any) => cb({}));
+    assignFaces = vi.fn().mockResolvedValue([]);
+    (sut as unknown as { faceAssignmentService: { assignFaces: typeof assignFaces } }).faceAssignmentService = {
+      assignFaces,
+    };
   });
 
   describe('executeRepair', () => {
@@ -45,9 +47,8 @@ describe(FaceRepairService.name, () => {
       // executeRepair now also compares the source and destination owners (C6): both p1 and q share owner u1,
       // so the cross-owner guard never fires and the move proceeds.
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1', 'f2']);
+      assignFaces.mockResolvedValue(['f1', 'f2']);
       mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
-      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 
       const r = await sut.executeRepair(
         plan([
@@ -56,27 +57,18 @@ describe(FaceRepairService.name, () => {
         ]),
       );
 
-      // Called inside a transaction — the 4th/2nd arg is the trx handle.
-      expect(mocks.faceRepair.reattributeFaces).toHaveBeenCalledWith('p1', 'q', ['f1', 'f2'], expect.anything());
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        {
-          assetFaceIds: ['f1', 'f2'],
-          identityId: 'identQ',
-          source: 'manual',
-        },
-        expect.anything(),
-      );
+      expect(assignFaces).toHaveBeenCalledTimes(1);
+      expect(assignFaces).toHaveBeenCalledWith({
+        personGroupId: 'q',
+        faceIds: ['f1', 'f2'],
+        strength: 'manual',
+        from: 'p1',
+        movableOnly: true,
+      });
       // Never re-queues facial recognition — that is what re-clustered faces back to the wrong person.
       // (queueAll is only used for thumbnail regen, and only when a representative face was repointed.)
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
       expect(r).toEqual({ moved: 2, skipped: 0, movedFaceIds: ['f1', 'f2'] });
-      // S11 (slice 11d): the move just stated a fact that contradicts any durable rejected/ignored row for
-      // this SAME destination — clear it, scoped to `to`'s identity only.
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personGroupId: 'q', identityId: 'identQ' },
-        ['f1', 'f2'],
-        expect.anything(),
-      );
     });
 
     it('skips faces whose suspected owner no longer exists (deleted/merged since the scan)', async () => {
@@ -84,7 +76,7 @@ describe(FaceRepairService.name, () => {
 
       const r = await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'gone' }]));
 
-      expect(mocks.faceRepair.reattributeFaces).not.toHaveBeenCalled();
+      expect(assignFaces).not.toHaveBeenCalled();
       expect(r).toEqual({ moved: 0, skipped: 1, movedFaceIds: [] });
     });
 
@@ -92,9 +84,8 @@ describe(FaceRepairService.name, () => {
       // executeRepair now also compares the source and destination owners (C6): both p1 and q share owner u1,
       // so the cross-owner guard never fires and the move proceeds.
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
+      assignFaces.mockResolvedValue(['f1']);
       mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
-      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));
 
@@ -106,9 +97,8 @@ describe(FaceRepairService.name, () => {
       // executeRepair now also compares the source and destination owners (C6): both p1 and q share owner u1,
       // so the cross-owner guard never fires and the move proceeds.
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
+      assignFaces.mockResolvedValue(['f1']);
       mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([{ ownerId: 'u1', personGroupId: 'p1' }]);
-      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));
 
@@ -124,13 +114,11 @@ describe(FaceRepairService.name, () => {
     // person to the SAME owner, so the comparison is always true and the guard trivially never fires.
     it('skips a route whose destination resolves to a DIFFERENT owner than the source, writing nothing', async () => {
       arrangeDifferentOwnerMove(mocks);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
+      assignFaces.mockResolvedValue(['f1']);
 
       const r = await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));
 
-      expect(mocks.faceRepair.reattributeFaces).not.toHaveBeenCalled();
-      expect(mocks.faceIdentity.replaceFaceIdentities).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).not.toHaveBeenCalled();
+      expect(assignFaces).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
       expect(r).toEqual({ moved: 0, skipped: 1, movedFaceIds: [] });
     });
@@ -147,67 +135,50 @@ describe(FaceRepairService.name, () => {
     // THEN the identity link is `manual`, so no future scan can question the face again.
     it('writes a manual link for a locked move', async () => {
       arrangeSameOwnerMove(mocks);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
 
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q', lock: true }]));
 
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        { assetFaceIds: ['f1'], identityId: 'identQ', source: 'manual' },
-        expect.anything(),
-      );
+      expect(assignFaces).toHaveBeenCalledWith(expect.objectContaining({ faceIds: ['f1'], strength: 'manual' }));
     });
 
     // GIVEN a plain move, which the DTO documents as "undurable unless the caller opts in"
     // WHEN the move is written
-    // THEN the identity link is re-pointed but NOT manual, so the face stays reviewable.
+    // THEN it is an ordinary (owner-person) placement, so the face stays reviewable.
     it('writes an owner-person link for an unlocked move', async () => {
       arrangeSameOwnerMove(mocks);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
 
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q', lock: false }]));
 
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        { assetFaceIds: ['f1'], identityId: 'identQ', source: 'owner-person' },
-        expect.anything(),
-      );
+      expect(assignFaces).toHaveBeenCalledWith(expect.objectContaining({ faceIds: ['f1'], strength: 'owner-person' }));
     });
 
-    // An unlocked move must still RE-POINT the identity. Skipping the relink would leave the face on the
-    // destination while still carrying the source person's identity — the torn state FaceIdentityBackfill
-    // resolves back to the source, silently reverting the move.
-    it('still re-points the identity to the destination on an unlocked move', async () => {
+    // A route whose suspected owner is the current person re-affirms in place, but only over the faces a move
+    // would take: a hand-drawn face on an unlocked route must not have its manual link downgraded.
+    it('keeps the move filter on a route that stays on the same person', async () => {
       arrangeSameOwnerMove(mocks);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
 
-      await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q', lock: false }]));
+      await sut.executeRepair(
+        plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'p1', lock: false }]),
+      );
 
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith('q', expect.anything());
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        expect.objectContaining({ identityId: 'identQ' }),
-        expect.anything(),
+      expect(assignFaces).toHaveBeenCalledWith(
+        expect.objectContaining({ personGroupId: 'p1', from: 'p1', movableOnly: true, strength: 'owner-person' }),
       );
     });
 
     // The scan's own auto-repair path builds FlaggedFace without a lock field and has always been durable.
     it('defaults an omitted lock flag to durable', async () => {
       arrangeSameOwnerMove(mocks);
-      mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
 
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));
 
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        expect.objectContaining({ source: 'manual' }),
-        expect.anything(),
-      );
+      expect(assignFaces).toHaveBeenCalledWith(expect.objectContaining({ strength: 'manual' }));
     });
 
     // Routes are keyed by (from, to). Without the lock in the key, a mixed batch collapses into one write
     // and one bucket silently inherits the other's durability.
     it('does not collapse locked and unlocked faces on the same route into one write', async () => {
       arrangeSameOwnerMove(mocks);
-      mocks.faceRepair.reattributeFaces.mockImplementation((_from: string, _to: string, ids: string[]) =>
-        Promise.resolve(ids),
-      );
 
       await sut.executeRepair(
         plan([
@@ -216,14 +187,20 @@ describe(FaceRepairService.name, () => {
         ]),
       );
 
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        { assetFaceIds: ['f1'], identityId: 'identQ', source: 'manual' },
-        expect.anything(),
-      );
-      expect(mocks.faceIdentity.replaceFaceIdentities).toHaveBeenCalledWith(
-        { assetFaceIds: ['f2'], identityId: 'identQ', source: 'owner-person' },
-        expect.anything(),
-      );
+      expect(assignFaces).toHaveBeenCalledWith({
+        personGroupId: 'q',
+        faceIds: ['f1'],
+        strength: 'manual',
+        from: 'p1',
+        movableOnly: true,
+      });
+      expect(assignFaces).toHaveBeenCalledWith({
+        personGroupId: 'q',
+        faceIds: ['f2'],
+        strength: 'owner-person',
+        from: 'p1',
+        movableOnly: true,
+      });
     });
   });
 });

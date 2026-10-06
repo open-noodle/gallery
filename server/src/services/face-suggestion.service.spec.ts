@@ -62,7 +62,7 @@ describe(FaceSuggestionService.name, () => {
       expect(mocks.facePersonVerdict.upsertPending).not.toHaveBeenCalled();
     });
 
-    it('skips an unnamed / hidden / pet / missing person (edge 5, 7, 16)', async () => {
+    it('skips an unnamed / whitespace-named / hidden / pet / missing person (edge 5, 7, 16)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
 
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(void 0);
@@ -72,6 +72,16 @@ describe(FaceSuggestionService.name, () => {
         id: 'p',
         ownerId: 'u',
         name: '',
+        isHidden: false,
+        type: 'person',
+      } as any);
+      await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
+
+      // Same rule as the space scan: whitespace is not a name.
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce({
+        id: 'p',
+        ownerId: 'u',
+        name: ' '.repeat(3),
         isHidden: false,
         type: 'person',
       } as any);
@@ -95,6 +105,7 @@ describe(FaceSuggestionService.name, () => {
       } as any);
       await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
 
+      expect(mocks.person.getAssignedFaceEmbeddings).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.upsertPending).not.toHaveBeenCalled();
     });
 
@@ -699,7 +710,7 @@ describe(FaceSuggestionService.name, () => {
         BadRequestException,
       );
       expect(mocks.facePersonVerdict.claimPending).not.toHaveBeenCalled();
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
     // S11 (slice 11a): confirm applies the identical owner-BOTH gate reject/ignore apply — owning the person
@@ -722,17 +733,18 @@ describe(FaceSuggestionService.name, () => {
         sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.facePersonVerdict.claimPending).not.toHaveBeenCalled();
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
-    it('flips the row to confirmed then delegates to reassignFacesById (assign + manual identity + feature photo)', async () => {
+    it('claims the row and assigns the face in the same transaction, then refreshes the feature photo', async () => {
+      const faceAssignment = { assignFaces: vi.fn().mockResolvedValue([]) };
+      (sut as unknown as { faceAssignmentService: typeof faceAssignment }).faceAssignmentService = faceAssignment;
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
       person.faceAssetId = null; // no feature photo yet — triggers createNewFeaturePhoto
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
-      mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getByGroupId.mockResolvedValue(person);
       mocks.person.getRandomFace.mockResolvedValue(face); // drives createNewFeaturePhoto
@@ -743,8 +755,8 @@ describe(FaceSuggestionService.name, () => {
       // (204, no-op) side of the same signal.
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id)).resolves.toBe(true);
 
-      // Slice 9: every write in the chain now runs inside `databaseRepository.transaction`, so each call
-      // carries a trailing trx arg — the test/utils.ts L318 passthrough default makes `trx === mocks.database`.
+      // Both writes run inside `databaseRepository.transaction`, so each call carries a trailing trx arg — the
+      // test/utils.ts passthrough default makes `trx === mocks.database`.
       // Slice 3 (S3.9): claimPending now also takes the eligibility band, read from the same config lookup.
       expect(mocks.facePersonVerdict.claimPending).toHaveBeenCalledWith(
         person.personGroupId,
@@ -752,24 +764,13 @@ describe(FaceSuggestionService.name, () => {
         { maxDistance: 0.5, suggestionMaxDistance: 0.8 },
         mocks.database,
       );
-      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.personGroupId, mocks.database);
-      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith(
-        {
-          assetFaceId: face.id,
-          identityId: 'identity-1',
-          source: 'manual',
-        },
+      expect(faceAssignment.assignFaces).toHaveBeenCalledTimes(1);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith(
+        { personGroupId: person.personGroupId, faceIds: [face.id], strength: 'manual' },
         mocks.database,
       );
       expect(mocks.person.update).toHaveBeenCalledWith(
         expect.objectContaining({ personGroupId: person.personGroupId, faceAssetId: face.id }),
-      );
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id, mocks.database);
-      // S11 (slice 11d): defense-in-depth clear, scoped to this target's identity, inside the same trx.
-      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personGroupId: person.personGroupId, identityId: 'identity-1' },
-        [face.id],
-        mocks.database,
       );
     });
 
@@ -788,7 +789,7 @@ describe(FaceSuggestionService.name, () => {
 
       // S11.7: no-op (already resolved) -> false, the signal the controller maps to 204.
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id)).resolves.toBe(false);
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
     it('a CASCADE-deleted person or face → 400 (owner-only precedence, edges 9, 10)', async () => {
@@ -916,7 +917,7 @@ describe(FaceSuggestionService.name, () => {
         actorId: authUser.user.id,
       });
       expect(mocks.facePersonVerdict.markIgnored).not.toHaveBeenCalled();
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
@@ -934,7 +935,7 @@ describe(FaceSuggestionService.name, () => {
         actorId: authUser.user.id,
       });
       expect(mocks.facePersonVerdict.markRejected).not.toHaveBeenCalled();
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
@@ -960,7 +961,7 @@ describe(FaceSuggestionService.name, () => {
         source: 'suggestion',
         actorId: authUser.user.id,
       });
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
 
@@ -978,7 +979,7 @@ describe(FaceSuggestionService.name, () => {
         actorId: authUser.user.id,
       });
       expect(mocks.facePersonVerdict.markIgnored).not.toHaveBeenCalled();
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
     });
   });
