@@ -16,19 +16,14 @@ export class MapService extends BaseService {
 
     const albumIds = options.withSharedAlbums ? await this.albumRepository.getAllIds(auth.user.id) : [];
 
+    const { timelineSpaceIds } = await this.resolveViewerScope(auth, 'map', options);
     const searchOptions: MapMarkerSearchOptions = {
       isArchived: options.isArchived,
       isFavorite: options.isFavorite,
       fileCreatedBefore: options.fileCreatedBefore,
       fileCreatedAfter: options.fileCreatedAfter,
+      timelineSpaceIds,
     };
-
-    if (options.withSharedSpaces || options.withSharedAlbums) {
-      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-      if (spaceRows.length > 0) {
-        searchOptions.timelineSpaceIds = spaceRows.map((row) => row.spaceId);
-      }
-    }
 
     return this.mapRepository.getMapMarkers(auth.user.id, userIds, albumIds, searchOptions);
   }
