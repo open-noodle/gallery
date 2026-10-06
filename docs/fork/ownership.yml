@@ -444,7 +444,10 @@ features:
         - server/src/schema/migrations-gallery/1793100000000-AddSharedSpaceAlbumFolderTable.ts
         - server/src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable.ts
         - server/src/schema/migrations-gallery/1793300000000-ClearPreOptionMFaceRepairScans.ts
+        - server/src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables.ts
+        - server/src/schema/migrations-gallery/1794100000000-DropAssetIsFavoriteColumn.ts
         - server/src/schema/migrations-gallery/1796000000000-AddAssetFaceCreatedBy.ts
+        - server/src/schema/migrations-gallery/1797000000000-AddAssetLocalDateTimeIndex.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
