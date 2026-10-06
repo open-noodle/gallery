@@ -12009,7 +12009,8 @@ export enum WorkflowResult {
     Error = "error"
 }
 export enum MemoryTypeV1 {
-    OnThisDay = "on_this_day"
+    OnThisDay = "on_this_day",
+    Rule = "rule"
 }
 export enum ReleaseType {
     Major = "major",
