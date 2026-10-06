@@ -5,34 +5,34 @@ sidebar_position: 87
 # Qnap [Community]
 
 ::: note
-This is a community contribution and not officially supported by the Immich team, but included here for convenience.
+This is a community contribution and not officially supported by the Gallery team, but included here for convenience.
 
 Community support should be directed to Qnap-specific support platforms.
 :::
 
-Immich can easily be installed on a Qnap NAS using [Container Station](https://www.qnap.com/en/how-to/tutorial/article/container-station-quick-start-guide) within QTS. Container Station comes already installed on QTS, check [Container Station docs](https://www.qnap.com/en/how-to/tutorial/article/how-to-use-container-station-3) for detailed information on using Container Station.
+Gallery can easily be installed on a Qnap NAS using [Container Station](https://www.qnap.com/en/how-to/tutorial/article/container-station-quick-start-guide) within QTS. Container Station comes already installed on QTS, check [Container Station docs](https://www.qnap.com/en/how-to/tutorial/article/how-to-use-container-station-3) for detailed information on using Container Station.
 
-## Step 1 - Qnap configuration checklist for running Immich
+## Step 1 - Qnap configuration checklist for running Gallery
 
 - The default admin user must be enabled to run containers.
   - To enable, open Control Panel, Privilege, Users to verify admin status is Enabled.
   - If not, login with another administrator user and uncheck the Disable this account checkbox in the Edit Account Profile window.
 
-### Optional - Store Immich Data Outside Containers Folder
+### Optional - Store Gallery Data Outside Containers Folder
 
-- To store Immich data outside the default Containers folder, providing easier direct access to the files or sharing by other services.
+- To store Gallery data outside the default Containers folder, providing easier direct access to the files or sharing by other services.
 - Enable Advanced Folder Permissions.
   - Open Control Panel, Privilege, Shared Folders, Advanced Permissions tab, check Enable Advanced Folder Permissions and click Apply button.
-- Recomended: Setup Immich data folder in Multimedia Shared Folder
+- Recomended: Setup Gallery data folder in Multimedia Shared Folder
   - In Control Panel, Privilege, Shared Folders, click Multimedia Edit Shared Folder Permissions button
   - Add admin user with read/write (RW) access to the folder
   - Click Apply changes to files and subfolders checkbox
   - Click Apply button
-  - Open File Station, Multimedia folder, and add Immich folder
+  - Open File Station, Multimedia folder, and add Gallery folder
 
 ### Optional - Access existing photo files with External Libraries
 
-- To allow Immich to access existing folders with photos on the Qnap storage, they must be accessable to the admin user and added as volume bindings in the docker compose.
+- To allow Gallery to access existing folders with photos on the Qnap storage, they must be accessable to the admin user and added as volume bindings in the docker compose.
 - Enable Advanced Folder Permissions.
   - Open Control Panel, Privilege, Shared Folders, Advanced Permissions tab, check Enable Advanced Folder Permissions and click Apply button.
 - Add admin account permissions for existing folders.
@@ -50,7 +50,7 @@ If the welcome screen keeps appearing when opening Container Station restart the
 
 ## Step 3 - Download docker compose files
 
-Download [`docker-compose.yml`](https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml) and [`example.env`](https://github.com/immich-app/immich/releases/latest/download/example.env) to your computer.
+Download [`docker-compose.yml`](https://github.com/open-noodle/gallery/releases/latest/download/docker-compose.yml) and [`example.env`](https://github.com/open-noodle/gallery/releases/latest/download/example.env) to your computer.
 
 ## Step 4 - Populate the docker compose file with .env and custom values
 
@@ -65,18 +65,18 @@ Open the docker-compose and .env files in text editors on your computer.
 - Recommended: Keep default value for postgres password or the immich_server container will error during startup.
 - Recommended: Uncomment the DB_STORAGE_TYPE: 'HDD' line in the database: section if your NAS uses hard-drives, not SSDs.
 
-- ### Optional: Store Immich Data Outside Containers Folder
+- ### Optional: Store Gallery Data Outside Containers Folder
   - In general, it's best practice to have Container Station applications store files under the `./Container` directory. Folders will automatically be created by Container Station.
-  - Storing Immich-server data outside the Container folder allows easier navigation and sharing of files uploaded to Immich because the `./Container` directory has restrictive permission.
+  - Storing Gallery server data outside the Container folder allows easier navigation and sharing of files uploaded to Gallery because the `./Container` directory has restrictive permission.
   - In services, immich-server yml, set volumes binding values for immich-server to access folder.
   - Comment out existing line:
     ```
       #- ${UPLOAD_LOCATION}:/data
     ```
-  - Set external source for Immich default /data folder.
+  - Set external source for Gallery default /data folder.
     ```
     - type: bind
-      source: /share/Multimedia/Immich
+      source: /share/Multimedia/Gallery
       target: /data
     ```
 - ### Optional: Access existing photo files with External Libraries
@@ -108,11 +108,11 @@ Use the Upload > Local QNAP Device buttons to open the docker compose file in ./
 
 Click the Validate button to check for any syntax errors. A green checkmark should appear. Warnings will popup if any issues are found and you will not be able to create the application.
 
-Modifying Advanced Settings is not required, but can be used to limit the Resources. Keep Default Web URL Port disabled, the docker yml file sets the outside port and Container Station crates the required networking rules for accessing Immich.
+Modifying Advanced Settings is not required, but can be used to limit the Resources. Keep Default Web URL Port disabled, the docker yml file sets the outside port and Container Station crates the required networking rules for accessing Gallery.
 
 Click the Create button.
 
-Once your containers are successfully running, navigate to the "**Containers**" section of Container Station, click on the "**immich-server**" container. In the Container Details section is the Port Forwarding value, click the copy button and paste the url into a new browser tab to open the Immich Web app.
+Once your containers are successfully running, navigate to the "**Containers**" section of Container Station, click on the "**immich-server**" container. In the Container Details section is the Port Forwarding value, click the copy button and paste the url into a new browser tab to open the Gallery Web app.
 
 If the website doesn't open in a web browser, open the immich_server page and open the Logs tab. Any application errors will be output into the terminal.
 
@@ -130,18 +130,18 @@ From the examples above '/multimediaphotos' and '/userpictures' are valid to ent
 
 Click Add button.
 
-## Updating Immich
+## Updating Gallery
 
-To update Immich it is recommended to use the Container Station, Applications, Recreate process.
+To update Gallery it is recommended to use the Container Station, Applications, Recreate process.
 
 This brings up the docker compose text in the Recreate Application window.
 Edit the docker compose text to update versions or just click Update button.
 
 The latest version of the image major version will be downloaded.
 
-The postgres database will be cleared by this operation, the Immich data and backups will be preserved and used to restore the app.
+The postgres database will be cleared by this operation, the Gallery data and backups will be preserved and used to restore the app.
 
-When the Immich website comes back online, it displays options for Getting Started and Restore From Backup. Click Restore From Backup.
+When the Gallery website comes back online, it displays options for Getting Started and Restore From Backup. Click Restore From Backup.
 
 Manually refresh the browser if it doesn't automatically refresh the page.
 
