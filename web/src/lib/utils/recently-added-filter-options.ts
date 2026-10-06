@@ -19,8 +19,9 @@ export function shouldShowRecentlyAddedCount(count: number, hasActiveFilters: bo
  *
  * Reuses Photos' predicate mapping, then applies the two invariants that define this view:
  *  1. never surface shared-space assets — `withSharedSpaces` is stripped in every case, so the
- *     view stays own + partner (and own-only under a Favorites filter, which Photos treats as
- *     a personal flag);
+ *     view stays own + partner. That includes under a Favorites filter: since #763 favorites are
+ *     per-user (an `asset_favorite` overlay rather than the owner's flag on the asset), so the
+ *     viewer's favorites on partner assets are theirs and stay in scope;
  *  2. always order and day-group by *added* date.
  *
  * Note the date filter still filters *taken* date (there is no created-at range predicate);

@@ -361,5 +361,21 @@ describe(ViewRepository.name, () => {
 
       expect(result.map((a) => a.id)).toContain(asset.id);
     });
+
+    // #763 slice 1b Task 2, E1 — mapAsset feeds isFavorite from `isFavoriteForUser` exclusively;
+    // the folder-contents query must project the per-user overlay, not the asset owner's flag.
+    it('E1 — a space member sees their own favorite here, independent of the owner (#763)', async () => {
+      const { ctx, sut } = setup();
+      const path = '/archive/contents/favorite-e1';
+      const { owner, member, asset } = await seedDirectSpaceAsset(ctx, SharedSpaceRole.Viewer, `${path}/IMG.jpg`);
+
+      await ctx.database.insertInto('asset_favorite').values({ userId: member.id, assetId: asset.id }).execute();
+
+      const asMember = await sut.getAssetsByOriginalPath(member.id, path);
+      expect(asMember).toEqual([expect.objectContaining({ id: asset.id, isFavoriteForUser: true })]);
+
+      const asOwner = await sut.getAssetsByOriginalPath(owner.id, path);
+      expect(asOwner).toEqual([expect.objectContaining({ id: asset.id, isFavoriteForUser: false })]);
+    });
   });
 });

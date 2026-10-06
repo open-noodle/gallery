@@ -162,6 +162,14 @@ where
   "userId" = $1
   and "showInTimeline" = $2
 
+-- SharedSpaceRepository.getAllMemberSpaceIds
+select
+  "spaceId"
+from
+  "shared_space_member"
+where
+  "userId" = $1
+
 -- SharedSpaceRepository.getHiddenAlbumIdsForUser
 select
   "albumId"

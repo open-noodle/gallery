@@ -9,8 +9,12 @@ import 'package:immich_mobile/utils/error_handler.dart';
 
 typedef _State = ({bool shouldFavorite, List<String> assetIds});
 
+// #763: no ownership gate — favoriting is a per-user overlay write available to anyone who can see
+// the asset, so every remote asset in the selection is a candidate (NOT ownedAssetsActionProvider,
+// unlike every other action here). E32: the direction must also derive from the SAME set the action
+// mutates, which this provider is.
 final _stateProvider = Provider.family.autoDispose<_State?, ActionSource>((ref, source) {
-  final assets = ref.watch(ownedAssetsActionProvider(source));
+  final assets = ref.watch(assetsActionProvider(source)).remote();
   if (assets.isEmpty) {
     return null;
   }
@@ -18,7 +22,7 @@ final _stateProvider = Provider.family.autoDispose<_State?, ActionSource>((ref, 
   final shouldFavorite = assets.favorite(isFavorite: false).isNotEmpty;
   final assetIds = assets.favorite(isFavorite: !shouldFavorite).map((asset) => asset.id).toList(growable: false);
   return (shouldFavorite: shouldFavorite, assetIds: assetIds);
-}, dependencies: [ownedAssetsActionProvider]);
+}, dependencies: [assetsActionProvider]);
 
 class FavoriteAction extends AssetActionBuilder {
   const FavoriteAction({required super.source});
@@ -52,7 +56,8 @@ class FavoriteAction extends AssetActionBuilder {
     final clearSelection = ref.read(clearSelectionProvider(source));
 
     try {
-      await assetService.update(assetIds, isFavorite: .some(shouldFavorite));
+      // #763: the per-user overlay route (PUT /assets/favorites), NOT the owner-only bulk update.
+      await assetService.updateFavorite(assetIds, shouldFavorite);
       toastService.success(message);
       clearSelection();
     } catch (error, stack) {

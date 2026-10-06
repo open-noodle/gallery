@@ -706,10 +706,18 @@ describe('rbac-3: visibility writes are restricted to owned assets', () => {
     expect(status).toBe(204);
   });
 
-  // isFavorite is still one column on asset, so an editor's heart would flip the owner's favorite.
-  it('editor CANNOT favorite the victim asset → 403', async () => {
+  // #763: favorites are a per-user overlay (asset_favorite), so the editor's bulk isFavorite write
+  // succeeds but must create ONLY the editor's own row and leave the victim's (owner's) favorite
+  // state completely untouched.
+  it("editor bulk-favoriting the victim's asset creates only the EDITOR'S OWN favorite row, leaving the victim's state untouched (#763 per-user favorites)", async () => {
     const { status } = await bulkUpdateAssets(editor.accessToken, { ids: [victimAsset.id], isFavorite: true });
-    expect(status).toBe(403);
+    expect(status).toBe(204);
+
+    const editorView = await utils.getAssetInfo(editor.accessToken, victimAsset.id);
+    expect(editorView.isFavorite).toBe(true);
+
+    const victimView = await utils.getAssetInfo(victim.accessToken, victimAsset.id);
+    expect(victimView.isFavorite).toBe(false);
   });
 });
 
