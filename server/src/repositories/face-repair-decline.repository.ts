@@ -63,7 +63,7 @@ export class FaceRepairDeclineRepository {
   // `face_person_verdict` layer so BOTH face features can see them; this table now records only the
   // console-local "stop showing me this whole cluster" fingerprint, which is a UI queue concern rather than
   // a fact about a face. Scoped to the persons in play — never an unscoped read.
-  // H6: chunked at 1000, matching removeClusterMutes below. face-verdict.service.ts calls this for every
+  // H6: chunked at 1000, matching removeClusterMutes below. face-assignment.service.ts calls this for every
   // suspected owner in a scan; minFaces is admin-settable, so a full-library scan can pass every flagged
   // face's suspected-owner person id — one id is one bind parameter, so an unchunked IN-list breaks at
   // Postgres's 65 535-parameter ceiling.
