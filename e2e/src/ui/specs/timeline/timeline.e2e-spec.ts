@@ -614,11 +614,8 @@ test.describe('Timeline', () => {
       const assetToFavorite = assets[0];
       changes.assetArchivals.push(assetToFavorite.id);
       await pageUtils.openArchivePage(page);
-      const favorite = pageRoutePromise(page, '**/api/assets', async (route, request) => {
+      const favorite = pageRoutePromise(page, '**/api/assets/favorites', async (route, request) => {
         const requestJson = request.postDataJSON();
-        if (requestJson.isFavorite === undefined) {
-          return await route.continue();
-        }
         const isFavorite = requestJson.isFavorite;
         if (isFavorite) {
           changes.assetFavorites.push(...requestJson.ids);
@@ -639,11 +636,8 @@ test.describe('Timeline', () => {
       await thumbnailUtils.expectThumbnailIsFavorite(page, assetToFavorite.id);
       await thumbnailUtils.withAssetId(page, assetToFavorite.id).hover();
       await thumbnailUtils.selectButton(page, assetToFavorite.id).click();
-      const unFavoriteRequest = pageRoutePromise(page, '**/api/assets', async (route, request) => {
+      const unFavoriteRequest = pageRoutePromise(page, '**/api/assets/favorites', async (route, request) => {
         const requestJson = request.postDataJSON();
-        if (requestJson.isFavorite === undefined) {
-          return await route.continue();
-        }
         changes.assetFavorites = changes.assetFavorites.filter((id) => !requestJson.ids.includes(id));
         await route.fulfill({
           status: 204,
@@ -713,11 +707,8 @@ test.describe('Timeline', () => {
 
       await thumbnailUtils.withAssetId(page, assetToFavorite.id).hover();
       await thumbnailUtils.selectButton(page, assetToFavorite.id).click();
-      const favorite = pageRoutePromise(page, '**/api/assets', async (route, request) => {
+      const favorite = pageRoutePromise(page, '**/api/assets/favorites', async (route, request) => {
         const requestJson = request.postDataJSON();
-        if (requestJson.isFavorite === undefined) {
-          return await route.continue();
-        }
         const isFavorite = requestJson.isFavorite;
         if (isFavorite) {
           changes.assetFavorites.push(...requestJson.ids);
@@ -737,11 +728,8 @@ test.describe('Timeline', () => {
       await thumbnailUtils.expectInViewport(page, assetToFavorite.id);
       await thumbnailUtils.withAssetId(page, assetToFavorite.id).hover();
       await thumbnailUtils.selectButton(page, assetToFavorite.id).click();
-      const unFavoriteRequest = pageRoutePromise(page, '**/api/assets', async (route, request) => {
+      const unFavoriteRequest = pageRoutePromise(page, '**/api/assets/favorites', async (route, request) => {
         const requestJson = request.postDataJSON();
-        if (requestJson.isFavorite === undefined) {
-          return await route.continue();
-        }
         changes.assetFavorites = changes.assetFavorites.filter((id) => !requestJson.ids.includes(id));
         await route.fulfill({
           status: 204,
@@ -807,11 +795,8 @@ test.describe('Timeline', () => {
 
       await thumbnailUtils.withAssetId(page, assetToFavorite.id).hover();
       await thumbnailUtils.selectButton(page, assetToFavorite.id).click();
-      const favorite = pageRoutePromise(page, '**/api/assets', async (route, request) => {
+      const favorite = pageRoutePromise(page, '**/api/assets/favorites', async (route, request) => {
         const requestJson = request.postDataJSON();
-        if (requestJson.isFavorite === undefined) {
-          return await route.continue();
-        }
         const isFavorite = requestJson.isFavorite;
         if (isFavorite) {
           changes.assetFavorites.push(...requestJson.ids);
@@ -834,11 +819,8 @@ test.describe('Timeline', () => {
       await thumbnailUtils.expectInViewport(page, assetToFavorite.id);
       await thumbnailUtils.withAssetId(page, assetToFavorite.id).hover();
       await thumbnailUtils.selectButton(page, assetToFavorite.id).click();
-      const unFavoriteRequest = pageRoutePromise(page, '**/api/assets', async (route, request) => {
+      const unFavoriteRequest = pageRoutePromise(page, '**/api/assets/favorites', async (route, request) => {
         const requestJson = request.postDataJSON();
-        if (requestJson.isFavorite === undefined) {
-          return await route.continue();
-        }
         changes.assetFavorites = changes.assetFavorites.filter((id) => !requestJson.ids.includes(id));
         await route.fulfill({
           status: 204,

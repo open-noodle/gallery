@@ -59,7 +59,6 @@ export class AssetFactory {
       fileCreatedAt: new Date(now++),
       fileModifiedAt: new Date(now++),
       isExternal: false,
-      isFavorite: false,
       isOffline: false,
       libraryId: null,
       livePhotoVideoId: null,

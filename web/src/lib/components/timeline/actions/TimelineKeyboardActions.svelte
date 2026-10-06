@@ -63,7 +63,7 @@
   };
 
   const toggleFavoriteSelected = async () => {
-    const allAssets = assetInteraction.ownedAssets;
+    const allAssets = assetInteraction.assets;
     const isFavorite = allAssets.some((a) => !a.isFavorite);
     const assetsToUpdate = allAssets.filter((asset) => asset.isFavorite !== isFavorite);
     await toggleFavoriteAssets(assetsToUpdate, isFavorite);

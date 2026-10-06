@@ -1,4 +1,10 @@
-import { AssetVisibility, deleteAssets as deleteBulk, restoreAssets, updateAssets } from '@immich/sdk';
+import {
+  AssetVisibility,
+  deleteAssets as deleteBulk,
+  restoreAssets,
+  updateAssetFavorites,
+  updateAssets,
+} from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
@@ -37,9 +43,7 @@ export const canAddSelectedToSpace = (ctx: CommandContext) => {
 
 export const canFavoriteSelected = (ctx: CommandContext) => {
   const selection = getSelection(ctx);
-  return (
-    selection !== null && selection.isAllUserOwned && selection.onFavorite !== undefined && !selection.isAllFavorite
-  );
+  return selection !== null && selection.onFavorite !== undefined && !selection.isAllFavorite;
 };
 
 export const canArchiveSelected = (ctx: CommandContext) => {
@@ -87,11 +91,12 @@ export async function handleAddSelectedToCurrentSpace(ctx?: CommandContext) {
 
 export async function handleFavoriteSelected(ctx?: CommandContext) {
   const selection = getSelection(ctx);
-  if (!selection || !selection.isAllUserOwned || !selection.onFavorite) {
+  if (!selection || !selection.onFavorite) {
     return;
   }
 
-  const assets = selection.ownedAssets.filter((asset) => !asset.isFavorite);
+  // #763: favorites are per-user — the whole selection is favoritable, not just owned assets.
+  const assets = selection.assets.filter((asset) => !asset.isFavorite);
   const ids = assets.map((asset) => asset.id);
   if (ids.length === 0) {
     return;
@@ -99,7 +104,7 @@ export async function handleFavoriteSelected(ctx?: CommandContext) {
 
   const $t = get(t);
   try {
-    await updateAssets({ assetBulkUpdateDto: { ids, isFavorite: true } });
+    await updateAssetFavorites({ assetFavoriteUpdateDto: { ids, isFavorite: true } });
     for (const asset of assets) {
       asset.isFavorite = true;
     }
