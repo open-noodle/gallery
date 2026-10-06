@@ -1,6 +1,6 @@
-import { HttpException } from '@nestjs/common';
+import { HttpException, NotFoundException } from '@nestjs/common';
 import express from 'express';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { get } from 'node:http';
 import { Readable } from 'node:stream';
 import request from 'supertest';
@@ -12,7 +12,7 @@ import {
   ImmichFileResponse,
   ImmichRedirectResponse,
   ImmichStreamResponse,
-  S3_STREAM_IDLE_TIMEOUT_MS,
+  getResponseSignal,
   sendFile,
 } from 'src/utils/file.js';
 
@@ -56,6 +56,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should send redirect response with 302', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       redirect: vi.fn(),
@@ -231,6 +232,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should set cache-control for redirect with None', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       redirect: vi.fn(),
@@ -255,6 +257,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should reject redirect with javascript: protocol', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       redirect: vi.fn(),
@@ -279,6 +282,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should reject redirect with invalid URL', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       redirect: vi.fn(),
@@ -303,6 +307,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should send file response for ImmichFileResponse', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -328,6 +333,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should send file response with fileName for ImmichFileResponse', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -353,6 +359,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should send file response with attachment disposition', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -379,6 +386,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should set expiry-safe cache-control for redirect responses', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       redirect: vi.fn(),
@@ -403,6 +411,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should reject file path with traversal segments', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -428,6 +437,7 @@ describe('sendFile with ImmichMediaResponse', () => {
 
   it('should pass root option to sendFile to prevent path traversal', async () => {
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -457,6 +467,7 @@ describe('sendFile with ImmichMediaResponse', () => {
   it('should handle non-http errors by logging and calling next', async () => {
     const error = new Error('Something went wrong');
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -472,6 +483,7 @@ describe('sendFile with ImmichMediaResponse', () => {
   it('should not log HttpException errors', async () => {
     const error = new HttpException('Not Found', 404);
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -488,6 +500,7 @@ describe('sendFile with ImmichMediaResponse', () => {
     const error = new Error('Connection aborted');
     (error as any).code = 'ECONNABORTED';
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: false,
@@ -499,9 +512,39 @@ describe('sendFile with ImmichMediaResponse', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('should stay silent about a backend read aborted because the client left', async () => {
+    const res = Object.assign(new EventEmitter(), { headersSent: false }) as any;
+    const next = vi.fn();
+
+    await sendFile(
+      res,
+      next,
+      () => {
+        res.emit('close'); // the client leaves while the handler is still reading
+        return Promise.reject(new DOMException('This operation was aborted', 'AbortError'));
+      },
+      mockLogger,
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLogger.error).not.toHaveBeenCalled();
+  });
+
+  it('should still report an AbortError while the response is open', async () => {
+    const res = Object.assign(new EventEmitter(), { headersSent: false }) as any;
+    const next = vi.fn();
+    const error = new DOMException('Request aborted', 'AbortError');
+
+    await sendFile(res, next, () => Promise.reject(error), mockLogger);
+
+    expect(mockLogger.error).toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(NotFoundException));
+  });
+
   it('should silently return if headers are already sent', async () => {
     const error = new Error('Something went wrong');
     const res = {
+      once: vi.fn(),
       set: vi.fn(),
       header: vi.fn(),
       headersSent: true,
@@ -511,112 +554,6 @@ describe('sendFile with ImmichMediaResponse', () => {
     await sendFile(res, next, () => Promise.reject(error), mockLogger);
 
     expect(next).not.toHaveBeenCalled();
-  });
-});
-
-describe('S3 stream idle timeout', () => {
-  const TIMEOUT = S3_STREAM_IDLE_TIMEOUT_MS;
-  let mockLogger: LoggingRepository;
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-    mockLogger = { debug: vi.fn(), error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  // starts a proxied stream response the way sendFile does, with `pipe` stubbed out so the
-  // stream stays quiet and only the idle timer acts on it
-  const startProxyStream = async () => {
-    const stream = new Readable({ read() {} });
-    const destroy = vi.spyOn(stream, 'destroy');
-    const res = {
-      set: vi.fn(),
-      header: vi.fn(),
-      headersSent: false,
-      status: vi.fn().mockReturnThis(),
-      once: vi.fn(),
-    } as any;
-    stream.pipe = vi.fn() as any;
-
-    await sendFile(
-      res,
-      vi.fn(),
-      () =>
-        new ImmichStreamResponse({
-          stream,
-          contentType: 'video/mp4',
-          cacheControl: CacheControl.PrivateWithCache,
-        }),
-      mockLogger,
-    );
-
-    return { stream, destroy, res };
-  };
-
-  it('should destroy the stream after a full idle window with no data', async () => {
-    const { destroy } = await startProxyStream();
-
-    vi.advanceTimersByTime(TIMEOUT - 1);
-    expect(destroy).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(1);
-    expect(destroy).toHaveBeenCalledWith(expect.objectContaining({ message: 'S3 stream idle timeout' }));
-  });
-
-  it('should not destroy the stream while data keeps arriving', async () => {
-    const { stream, destroy } = await startProxyStream();
-
-    // span more than two full windows — a timer that never reset would have fired long ago
-    for (let elapsed = 0; elapsed < TIMEOUT * 2.5; elapsed += TIMEOUT / 4) {
-      vi.advanceTimersByTime(TIMEOUT / 4);
-      stream.emit('data', Buffer.from('x'));
-    }
-
-    expect(destroy).not.toHaveBeenCalled();
-  });
-
-  it('should destroy the stream one full window after the last chunk, not after the first', async () => {
-    const { stream, destroy } = await startProxyStream();
-
-    vi.advanceTimersByTime(TIMEOUT * 0.9);
-    stream.emit('data', Buffer.from('x'));
-
-    // the timer armed at the start fires in here, but the stream has only been idle for a
-    // tenth of a window, so it has to re-arm for the remainder instead of destroying
-    vi.advanceTimersByTime(TIMEOUT * 0.9);
-    expect(destroy).not.toHaveBeenCalled();
-
-    // now a full window has passed since that last chunk
-    vi.advanceTimersByTime(TIMEOUT * 0.1);
-    expect(destroy).toHaveBeenCalledWith(expect.objectContaining({ message: 'S3 stream idle timeout' }));
-  });
-
-  it('should clear the idle timer when the stream ends normally', async () => {
-    const { stream, destroy } = await startProxyStream();
-
-    stream.emit('end');
-    vi.advanceTimersByTime(TIMEOUT * 2);
-
-    expect(destroy).not.toHaveBeenCalled();
-  });
-
-  it('should clear the idle timer when the downstream response closes', async () => {
-    const { destroy, res } = await startProxyStream();
-
-    vi.advanceTimersByTime(TIMEOUT / 2);
-
-    const closeHandler = res.once.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
-    closeHandler();
-
-    // `res.once('close')` destroys with no argument — pre-existing behavior
-    expect(destroy).toHaveBeenCalledWith();
-
-    // the idle timer was cleared, so nothing destroys it a second time
-    vi.advanceTimersByTime(TIMEOUT * 2);
-    expect(destroy).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -663,7 +600,8 @@ describe('sendFile with a client that disconnects before the stream is ready', (
     expect(streamDestroy).toHaveBeenCalledWith();
     expect(res.set).not.toHaveBeenCalled();
     expect(res.header).not.toHaveBeenCalled();
-    expect(res.once).not.toHaveBeenCalled();
+    // only sendFile's own response-closed signal, registered before the handler ran
+    expect(res.once).toHaveBeenCalledTimes(1);
   });
 
   it('destroys the stream immediately when BOTH destroyed and writableEnded are already true', async () => {
@@ -905,6 +843,60 @@ describe('sendFile stream responses over real HTTP', () => {
     resolveHandler();
 
     await vi.waitFor(() => expect(sourceDestroy).toHaveBeenCalledWith());
+    server.close();
+  });
+
+  it('should destroy the source stream when sending fails before it is piped', async () => {
+    // a header that cannot be set (here an invalid Content-Type) throws after the stream exists
+    // but before `pipe`; the error response still closes the response, which is what destroys it
+    const source: Readable = new Readable({ read() {} });
+    const app = appServing(
+      () =>
+        new ImmichStreamResponse({
+          stream: source,
+          contentType: 'video/mp4\n',
+          cacheControl: CacheControl.PrivateWithCache,
+        }),
+    );
+
+    const response = await request(app).get('/media');
+
+    expect(response.status).toBe(404);
+    await vi.waitFor(() => expect(source.destroyed).toBe(true));
+  });
+
+  it('should give the handler a signal that aborts when the response closes', async () => {
+    const { promise: handlerSignal, resolve: captureSignal } = Promise.withResolvers<AbortSignal | undefined>();
+    const { promise: handlerGate, resolve: resolveHandler } = Promise.withResolvers<void>();
+    const app = express();
+    app.get('/media', (_req, res, next) => {
+      void sendFile(
+        res,
+        next,
+        async () => {
+          captureSignal(getResponseSignal());
+          await handlerGate;
+          return new ImmichStreamResponse({
+            stream: Readable.from([object]),
+            contentType: 'video/mp4',
+            cacheControl: CacheControl.PrivateWithCache,
+          });
+        },
+        mockLogger,
+      );
+    });
+    const server = app.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const clientRequest = get(`http://127.0.0.1:${port}/media`);
+    clientRequest.once('error', () => {}); // destroy() below causes an expected client-side ECONNRESET
+    const signal = await handlerSignal;
+    expect(signal?.aborted).toBe(false);
+
+    clientRequest.destroy();
+    await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+    resolveHandler();
     server.close();
   });
 });
