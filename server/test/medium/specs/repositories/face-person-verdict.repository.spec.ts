@@ -197,6 +197,8 @@ describe('FacePersonVerdictRepository', () => {
     let personPId: string;
     // U: unnamed person — excluded by read gate
     let unnamedPersonId: string;
+    // W: whitespace-only name — excluded by read gate (whitespace is not a name)
+    let blankPersonId: string;
     // H: hidden person — excluded by read gate
     let hiddenPersonId: string;
     // X: pet person — excluded by read gate
@@ -233,6 +235,14 @@ describe('FacePersonVerdictRepository', () => {
       });
       unnamedPersonId = personU.personGroupId;
 
+      const { person: personW } = await ctx.newPerson({
+        ownerId: user.id,
+        name: ' '.repeat(3),
+        isHidden: false,
+        type: 'person',
+      });
+      blankPersonId = personW.personGroupId;
+
       const { person: personH } = await ctx.newPerson({
         ownerId: user.id,
         name: 'Hidden Hannah',
@@ -259,6 +269,7 @@ describe('FacePersonVerdictRepository', () => {
       const { assetFace: f5 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       // Asset faces for gate-excluded persons
       const { assetFace: fU } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: fW } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const { assetFace: fH } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const { assetFace: fX } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
@@ -297,6 +308,7 @@ describe('FacePersonVerdictRepository', () => {
 
       // Read-gate persons each get one in-band pending suggestion
       await sut.upsertPending([{ personGroupId: unnamedPersonId, assetFaceId: fU.id, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: blankPersonId, assetFaceId: fW.id, distance: 0.65 }]);
       await sut.upsertPending([{ personGroupId: hiddenPersonId, assetFaceId: fH.id, distance: 0.65 }]);
       await sut.upsertPending([{ personGroupId: petPersonId, assetFaceId: fX.id, distance: 0.65 }]);
     });
@@ -353,6 +365,12 @@ describe('FacePersonVerdictRepository', () => {
     it('returns empty for an unnamed person (read gate)', async () => {
       const { sut } = setup();
       const res = await sut.getPendingForPerson(unnamedPersonId, opts);
+      expect(res).toEqual({ total: 0, items: [] });
+    });
+
+    it('returns empty for a whitespace-named person (read gate)', async () => {
+      const { sut } = setup();
+      const res = await sut.getPendingForPerson(blankPersonId, opts);
       expect(res).toEqual({ total: 0, items: [] });
     });
 
@@ -630,7 +648,7 @@ describe('FacePersonVerdictRepository', () => {
   });
 
   // S3.10 (pin): the refactor's safety net. This mirrors PersonService#confirmFaceSuggestion's write chain
-  // (claim -> reassign -> resolveAssignedFace -> identity-relink) directly against the repositories, so it
+  // (claim -> reassign -> drain -> identity-relink) directly against the repositories, so it
   // exercises exactly what the Slice 3 eligibility refactor touches without pulling in the service's access
   // checks. Written and run FIRST, against the pre-refactor `claimPending`, to prove the happy path is green
   // before anything changes; kept green throughout the refactor.
@@ -655,7 +673,7 @@ describe('FacePersonVerdictRepository', () => {
       const faceIdentityRepository = ctx.get(FaceIdentityRepository);
 
       await personRepository.reassignFace(assetFace.id, person.personGroupId);
-      await sut.resolveAssignedFace(assetFace.id);
+      await sut.drainPendingForFaces([assetFace.id]);
       const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: assetFace.id,
@@ -1167,7 +1185,7 @@ describe('FacePersonVerdictRepository', () => {
     });
   });
 
-  describe('resolveAssignedFace', () => {
+  describe('drainPendingForFaces across persons and engines', () => {
     let faceXId: string;
 
     beforeAll(async () => {
@@ -1213,7 +1231,7 @@ describe('FacePersonVerdictRepository', () => {
       await sut.markRejected(p5.personGroupId, faceXId, { source: 'cleanup' });
 
       // Now resolve: deletes pending rows for faceX, leaves every negative verdict alone
-      await sut.resolveAssignedFace(faceXId);
+      await sut.drainPendingForFaces([faceXId]);
     });
 
     it('deletes all pending rows for that face across all persons', async () => {
@@ -1260,9 +1278,9 @@ describe('FacePersonVerdictRepository', () => {
         { personGroupId: p2Id, assetFaceId, distance: 0.65 },
       ]);
 
-      // Confirm flow order: claimPending BEFORE resolveAssignedFace
+      // Confirm flow order: claimPending BEFORE drainPendingForFaces
       expect(await sut.claimPending(p1Id, assetFaceId, { maxDistance: 0.5, suggestionMaxDistance: 0.8 })).toBe(1);
-      await sut.resolveAssignedFace(assetFaceId); // pending-only delete across ALL persons
+      await sut.drainPendingForFaces([assetFaceId]); // pending-only delete across ALL persons
 
       // No row survives for the confirming person: the positive verdict lives in the face's manual
       // identity link, not here.
@@ -2055,7 +2073,7 @@ describe('FacePersonVerdictRepository', () => {
       });
     });
 
-    it('resolveAssignedFace deletes pending personal and space-person rows for the same face', async () => {
+    it('drainPendingForFaces deletes pending personal and space-person rows for the same face', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Personal' });
@@ -2073,7 +2091,7 @@ describe('FacePersonVerdictRepository', () => {
       await sut.upsertPendingForSpacePerson([
         { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
       ]);
-      await sut.resolveAssignedFace(assetFace.id);
+      await sut.drainPendingForFaces([assetFace.id]);
 
       const pending = await defaultDatabase
         .selectFrom('face_person_verdict')
@@ -2179,7 +2197,7 @@ describe('FacePersonVerdictRepository', () => {
     });
   });
 
-  // H6: face-verdict.service.ts calls this for every flagged face in a scan, unchunked. minFaces is
+  // H6: face-assignment.service.ts calls this for every flagged face in a scan, unchunked. minFaces is
   // admin-settable, so a full-library scan can pass every flagged face in the instance — far larger than
   // Postgres's 65 535 bind-parameter ceiling (one id is one bind parameter). Mirrors the removeVerdicts
   // (F20) / clearNegativeForTarget (F15) chunking tests below.
