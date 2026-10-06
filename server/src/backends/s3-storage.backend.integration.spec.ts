@@ -28,7 +28,11 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
   const bucket = 'test-bucket';
 
   beforeAll(async () => {
-    container = await new GenericContainer('minio/minio')
+    // MinIO withdrew its own images on 2026-09-24; same pinned Chainguard build as
+    // e2e/docker-compose.storage-migration.yml
+    container = await new GenericContainer(
+      'cgr.dev/chainguard/minio:latest@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1',
+    )
       .withExposedPorts(9000)
       .withEnvironment({ MINIO_ROOT_USER: 'minioadmin', MINIO_ROOT_PASSWORD: 'minioadmin' })
       .withCommand(['server', '/data'])
@@ -176,6 +180,40 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
       }
       expect(Buffer.concat(chunks).toString()).toBe('proxy content');
     }
+  });
+
+  it('should read a whole object into a buffer', async () => {
+    await backend.put('test/read-all.txt', Buffer.from('whole object'));
+    await expect(backend.readAll('test/read-all.txt')).resolves.toEqual(Buffer.from('whole object'));
+  });
+
+  it('should free a proxy read slot when the response it serves closes unread', async () => {
+    const endpoint = `http://${container.getHost()}:${container.getMappedPort(9000)}`;
+    const proxyBackend = new S3StorageBackend({
+      bucket,
+      region: 'us-east-1',
+      endpoint,
+      accessKeyId: 'minioadmin',
+      secretAccessKey: 'minioadmin',
+      presignedUrlExpiry: 3600,
+      serveMode: 'proxy',
+      proxyReadConcurrency: 1,
+    });
+    const options = { contentType: 'text/plain', cacheControl: CacheControl.PrivateWithCache };
+    await backend.put('test/abandoned.txt', Buffer.from('abandoned'));
+
+    const response = new AbortController();
+    const first = await proxyBackend.getServeStrategy('test/abandoned.txt', { ...options, signal: response.signal });
+    response.abort();
+
+    // with one slot, this read only starts once the abandoned one gave its slot back
+    const second = await proxyBackend.getServeStrategy('test/abandoned.txt', options);
+    expect(first.type === 'stream' && first.stream.destroyed).toBe(true);
+    if (second.type !== 'stream') {
+      throw new Error('expected a stream');
+    }
+    const chunks = await second.stream.toArray();
+    expect(chunks.join('')).toBe('abandoned');
   });
 
   describe('range requests in proxy mode', () => {
