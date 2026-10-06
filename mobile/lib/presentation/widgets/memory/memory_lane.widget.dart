@@ -10,7 +10,6 @@ import 'package:immich_mobile/presentation/widgets/memory/memory_title.widget.da
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/utils/memory_card_text.dart';
 
 class MemoryLane extends ConsumerWidget {
   const MemoryLane({super.key});

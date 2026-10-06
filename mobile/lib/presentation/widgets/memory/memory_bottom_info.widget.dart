@@ -9,13 +9,6 @@ import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_destinatio
 import 'package:immich_mobile/routing/router.dart';
 import 'package:intl/intl.dart';
 
-/// The asset shown on [page] of [memory], clamped to the memory's bounds.
-///
-/// `currentAssetPage` in the memory page belongs to the ACTIVE memory, so an
-/// inactive page in the vertical PageView can ask for an index this memory does
-/// not have.
-RemoteAsset memoryAssetForPage(Memory memory, int page) => memory.assets[page.clamp(0, memory.assets.length - 1)];
-
 class MemoryBottomInfo extends ConsumerWidget {
   final Memory memory;
   final RemoteAsset asset;
