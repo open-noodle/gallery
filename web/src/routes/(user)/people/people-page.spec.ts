@@ -7,6 +7,7 @@ import {
   type PeopleStatisticsResponseDto,
   type PersonResponseDto,
   type SharedSpacePersonResponseDto,
+  type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -19,8 +20,10 @@ import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/peopl
 import { PEOPLE_PAGE_SIZE } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+import { userInteraction } from '$lib/stores/user.svelte';
 import { personFactory } from '@test-data/factories/person-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import PeoplePage from './+page.svelte';
 
@@ -94,6 +97,28 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
     type: 'person',
     ...overrides,
   };
+}
+
+// The viewer's role in a space comes from the spaces list (getAllSpaces embeds members).
+function makeSpace(spaceId: string, role: SharedSpaceRole): SharedSpaceResponseDto {
+  return sharedSpaceFactory.build({
+    id: spaceId,
+    members: [
+      {
+        userId: 'current-user-id',
+        role,
+        email: 'me@test.dev',
+        name: 'Me',
+        joinedAt: '2026-01-01T00:00:00.000Z',
+        sharePersonMetadata: true,
+        showInTimeline: true,
+      },
+    ],
+  });
+}
+
+function mockSpaceRole(spaceId: string, role: SharedSpaceRole) {
+  sdkMock.getAllSpaces.mockResolvedValue([makeSpace(spaceId, role)]);
 }
 
 function makeFaceStatistics(overrides: Partial<PeopleFaceStatisticsResponseDto> = {}): PeopleFaceStatisticsResponseDto {
@@ -183,6 +208,7 @@ function renderPaginatedPage() {
 describe('Global people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    userInteraction.recentSpaces = undefined;
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
     clearPeopleFaceStatisticsInfoCache();
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
@@ -658,9 +684,10 @@ describe('Global people page', () => {
       primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
     });
     sdkMock.updateSpacePerson.mockResolvedValue(makeSpacePerson({ name: 'Shared Alicia' }));
+    mockSpaceRole('space-1', SharedSpaceRole.Editor);
     renderPage([person]);
 
-    const input = screen.getByDisplayValue('Shared Alice');
+    const input = await screen.findByDisplayValue('Shared Alice');
     const user = userEvent.setup();
 
     await user.click(input);
@@ -679,17 +706,7 @@ describe('Global people page', () => {
   });
 
   it('blocks inline renames for space-primary rows when the user is a viewer', async () => {
-    sdkMock.getMembers.mockResolvedValue([
-      {
-        userId: 'current-user-id',
-        role: SharedSpaceRole.Viewer,
-        email: 'me@test.dev',
-        name: 'Me',
-        joinedAt: '2026-01-01T00:00:00.000Z',
-        sharePersonMetadata: true,
-        showInTimeline: true,
-      },
-    ]);
+    mockSpaceRole('viewer-space-grid', SharedSpaceRole.Viewer);
     renderPage([
       makePerson({
         id: 'space-person-2',
@@ -699,12 +716,36 @@ describe('Global people page', () => {
       }),
     ]);
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-grid' }));
+    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
+    expect(screen.queryByDisplayValue('Shared Alice')).toBeNull();
+    expect(screen.getByText('Shared Alice')).toBeInTheDocument();
+    expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce();
+    expect(sdkMock.getMembers).not.toHaveBeenCalled();
+  });
+
+  it('keeps space-primary names editable until the spaces list says the viewer cannot edit', async () => {
+    let resolveSpaces!: (spaces: SharedSpaceResponseDto[]) => void;
+    sdkMock.getAllSpaces.mockReturnValue(new Promise((resolve) => (resolveSpaces = resolve)));
+    renderPage([
+      makePerson({
+        id: 'space-person-1',
+        name: 'Shared Alice',
+        isFavorite: undefined,
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-1' },
+      }),
+    ]);
+
+    await waitFor(() => expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce());
+    expect(await screen.findByDisplayValue('Shared Alice')).toBeInTheDocument();
+
+    resolveSpaces([makeSpace('space-1', SharedSpaceRole.Viewer)]);
+
     await waitFor(() => expect(screen.queryByDisplayValue('Shared Alice')).toBeNull());
     expect(screen.getByText('Shared Alice')).toBeInTheDocument();
   });
 
   it('keeps personal actions off shared-space-only rows', async () => {
+    mockSpaceRole('space-1', SharedSpaceRole.Editor);
     const { baseElement } = renderPage([
       makePerson({
         id: 'space-person-1',
@@ -716,7 +757,7 @@ describe('Global people page', () => {
 
     await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
 
-    expect(screen.getByDisplayValue('Shared Alice')).toHaveAttribute('placeholder', 'add_a_name');
+    expect(await screen.findByDisplayValue('Shared Alice')).toHaveAttribute('placeholder', 'add_a_name');
     expect(screen.queryByLabelText('show_person_options')).not.toBeInTheDocument();
     expect(screen.queryByText('to_favorite')).not.toBeInTheDocument();
     expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
