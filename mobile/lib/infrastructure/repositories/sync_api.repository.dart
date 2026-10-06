@@ -68,10 +68,19 @@ class SyncApiRepository {
 
     final request = http.AbortableRequest('POST', Uri.parse(endpoint), abortTrigger: abortSignal);
     request.headers.addAll(headers);
+
+    // Gallery: upstream gates its 3.3-era request types (AuthUsersV2, MemoriesV2,
+    // MemoryToAssetsV2, AssetFacesV3) on serverVersion >= 3.3.0. A Gallery server reports its own
+    // version (5.x), which clears that gate on every release, including the 5.7.x line that does
+    // not know these types, and an unknown request type 400s the WHOLE /sync/stream request. Like
+    // the fork's own post-signalling types below, they are requested only when the server declares
+    // them; with no declaration the client stays on the earlier version of each stream.
+    bool declares(SyncRequestType type) => supportedSyncTypes?.contains(type.toJson()) ?? false;
+
     request.body = jsonEncode(
       SyncStreamDto(
         types: [
-          serverVersion.supports(.syncAuthUsersV2) ? SyncRequestType.authUsersV2 : SyncRequestType.authUsersV1,
+          declares(SyncRequestType.authUsersV2) ? SyncRequestType.authUsersV2 : SyncRequestType.authUsersV1,
           SyncRequestType.usersV1,
           serverVersion.supports(.syncV2) ? SyncRequestType.assetsV2 : SyncRequestType.assetsV1,
           SyncRequestType.assetExifsV1,
@@ -85,13 +94,15 @@ class SyncApiRepository {
           serverVersion.supports(.syncV2) ? SyncRequestType.albumAssetsV2 : SyncRequestType.albumAssetsV1,
           SyncRequestType.albumAssetExifsV1,
           SyncRequestType.albumToAssetsV1,
-          serverVersion.supports(.syncMemoriesV2) ? SyncRequestType.memoriesV2 : SyncRequestType.memoriesV1,
-          serverVersion.supports(.syncMemoriesV2) ? SyncRequestType.memoryToAssetsV2 : SyncRequestType.memoryToAssetsV1,
+          declares(SyncRequestType.memoriesV2) ? SyncRequestType.memoriesV2 : SyncRequestType.memoriesV1,
+          declares(SyncRequestType.memoryToAssetsV2)
+              ? SyncRequestType.memoryToAssetsV2
+              : SyncRequestType.memoryToAssetsV1,
           SyncRequestType.stacksV1,
           SyncRequestType.partnerStacksV1,
           SyncRequestType.userMetadataV1,
           SyncRequestType.peopleV1,
-          serverVersion.supports(.syncAssetFacesV3)
+          declares(SyncRequestType.assetFacesV3)
               ? SyncRequestType.assetFacesV3
               : serverVersion.supports(.syncAssetFacesV2)
               ? SyncRequestType.assetFacesV2

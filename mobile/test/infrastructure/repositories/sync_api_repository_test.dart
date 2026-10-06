@@ -385,6 +385,56 @@ void main() {
     });
   });
 
+  group("upstream's 3.3-era request types are requested ONLY behind a server declaration", () {
+    // Upstream gates these on serverVersion >= 3.3.0, but a Gallery server reports its own 5.x
+    // version, which clears that gate even on the released 5.7.x line that does not know the types,
+    // and one unknown request type 400s the WHOLE /sync/stream request.
+    const upgraded = {'AuthUsersV2': 'AuthUsersV1', 'MemoriesV2': 'MemoriesV1', 'MemoryToAssetsV2': 'MemoryToAssetsV1'};
+
+    test('no declaration: stays on the earlier version of every stream, at every version', () async {
+      for (final version in [
+        const SemVer(major: 3, minor: 3, patch: 0),
+        const SemVer(major: 5, minor: 7, patch: 1),
+        const SemVer(major: 6, minor: 0, patch: 0),
+      ]) {
+        final types = await capturedRequestTypes(version);
+        for (final MapEntry(key: newer, value: older) in upgraded.entries) {
+          expect(types, isNot(contains(newer)), reason: 'no declaration must never send $newer at $version');
+          expect(types, contains(older), reason: 'no declaration must fall back to $older at $version');
+        }
+        expect(
+          types,
+          isNot(contains('AssetFacesV3')),
+          reason: 'no declaration must never send AssetFacesV3 at $version',
+        );
+        clearInteractions(mockHttpClient);
+      }
+    });
+
+    test('a released 5.7.x server that does not declare them gets the earlier versions', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 5, minor: 7, patch: 1),
+        supportedSyncTypes: {'AuthUsersV1', 'MemoriesV1', 'MemoryToAssetsV1', 'AssetFacesV2', 'AssetsV1'},
+      );
+      expect(types, containsAll(['AuthUsersV1', 'MemoriesV1', 'MemoryToAssetsV1', 'AssetFacesV2']));
+      for (final newer in ['AuthUsersV2', 'MemoriesV2', 'MemoryToAssetsV2', 'AssetFacesV3']) {
+        expect(types, isNot(contains(newer)), reason: 'the 5.7.x line does not know $newer');
+      }
+    });
+
+    test('a declaring server gets the newer versions regardless of its reported version', () async {
+      for (final version in [const SemVer(major: 3, minor: 3, patch: 0), const SemVer(major: 5, minor: 8, patch: 0)]) {
+        final types = await capturedRequestTypes(
+          version,
+          supportedSyncTypes: {'AuthUsersV2', 'MemoriesV2', 'MemoryToAssetsV2', 'AssetFacesV3', 'AssetsV1'},
+        );
+        expect(types, containsAll(['AuthUsersV2', 'MemoriesV2', 'MemoryToAssetsV2', 'AssetFacesV3']));
+        expect(types, isNot(contains('MemoriesV1')), reason: 'one version of each stream at $version');
+        clearInteractions(mockHttpClient);
+      }
+    });
+  });
+
   test('streamChanges stops processing stream when abort is called', () async {
     int onDataCallCount = 0;
     bool abortWasCalledInCallback = false;
