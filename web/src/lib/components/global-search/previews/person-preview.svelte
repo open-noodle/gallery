@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { createUrl, getAssetMediaUrl, getPeopleThumbnailUrl } from '$lib/utils';
-  import { getGlobalPersonHref } from '$lib/utils/global-person-route';
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { AssetMediaSize, searchAssets, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { t } from 'svelte-i18n';
@@ -15,13 +15,7 @@
   let loaded = $state(false);
   let generation = 0;
 
-  const thumbUrl = $derived(
-    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
-      ? createUrl(`/shared-spaces/${person.primaryProfile.spaceId}/people/${person.primaryProfile.id}/thumbnail`, {
-          updatedAt: person.updatedAt,
-        })
-      : getPeopleThumbnailUrl({ ...person, id: person.primaryProfile?.id ?? person.id }),
-  );
+  const thumbUrl = $derived(getGlobalPersonThumbnailUrl(person));
   let failed = $state(false);
   // Reset failure when the person changes (preview is re-used as the user
   // arrows through the People section).

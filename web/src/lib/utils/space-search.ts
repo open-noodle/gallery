@@ -6,7 +6,6 @@ import {
   type SmartSearchFacetsResponseDto,
 } from '@immich/sdk';
 import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { createUrl } from '$lib/utils';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
 export const SEARCH_FILTER_DEBOUNCE_MS = 250;
@@ -198,9 +197,7 @@ export function mapSmartSearchFacetsToFilterSuggestions(
     people: facets.people.map((person) => ({
       id: options.spaceId ? person.id : getPhotosPersonFilterId(person),
       name: person.name,
-      thumbnailUrl: options.spaceId
-        ? createUrl(`/shared-spaces/${options.spaceId}/people/${person.id}/thumbnail`)
-        : getPhotosPersonFilterThumbnailUrl(person),
+      thumbnailUrl: getPhotosPersonFilterThumbnailUrl(person, options.spaceId),
     })),
     ratings: facets.ratings,
     mediaTypes: facets.mediaTypes,
