@@ -33846,7 +33846,8 @@
       },
       "MemoryTypeV1": {
         "enum": [
-          "on_this_day"
+          "on_this_day",
+          "rule"
         ],
         "type": "string"
       },
