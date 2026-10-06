@@ -561,8 +561,8 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
 
-      // SP1 has faces on assets with fileCreatedAt in 2024
-      const { asset: asset2024 } = await ctx.newAsset({ ownerId: user.id, fileCreatedAt: new Date('2024-06-15') });
+      // SP1 has faces on assets taken (localDateTime) in 2024
+      const { asset: asset2024 } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date('2024-06-15') });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset2024.id });
       const face2024 = await createFaceWithEmbedding(ctx, { assetId: asset2024.id });
       const sp1 = await sut.createPerson({
@@ -573,8 +573,8 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       });
       await sut.addPersonFaces([{ personId: sp1.id, assetFaceId: face2024 }]);
 
-      // SP2 has faces on assets with fileCreatedAt in 2026
-      const { asset: asset2026 } = await ctx.newAsset({ ownerId: user.id, fileCreatedAt: new Date('2026-06-15') });
+      // SP2 has faces on assets taken (localDateTime) in 2026
+      const { asset: asset2026 } = await ctx.newAsset({ ownerId: user.id, localDateTime: new Date('2026-06-15') });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset2026.id });
       const face2026 = await createFaceWithEmbedding(ctx, { assetId: asset2026.id });
       const sp2 = await sut.createPerson({

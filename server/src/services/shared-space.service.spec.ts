@@ -13300,31 +13300,6 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
-    // The DTO documents `rating` as "Minimum star rating" and every other surface sets
-    // ratingIsMinimum. Without it searchAssetBuilder falls to the `=` branch, so map markers
-    // silently did exact-rating matching while the map timeline did >=.
-    it('should request minimum-rating matching so markers agree with every other surface', async () => {
-      const auth = factory.auth();
-      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
-
-      await sut.getFilteredMapMarkers(auth, { rating: 4 });
-
-      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
-        expect.objectContaining({ rating: 4, ratingIsMinimum: true }),
-      );
-    });
-
-    it('should not request minimum-rating matching when no rating filter is set', async () => {
-      const auth = factory.auth();
-      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
-
-      await sut.getFilteredMapMarkers(auth, {});
-
-      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
-        expect.objectContaining({ rating: undefined, ratingIsMinimum: undefined }),
-      );
-    });
-
     it('should pass city and country to repository', async () => {
       const auth = factory.auth();
       mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);

@@ -18,6 +18,9 @@ abstract class ServerFeatures with _$ServerFeatures {
     // predates capability signalling (fork < 5.7.0), or features not loaded yet — and must stay
     // distinct from an empty set, which would read as "declares nothing".
     Set<String>? syncRequestTypes,
+    // Fork capability signal: the server reads takenAfter/takenBefore as a wall-clock range with an
+    // exclusive end (`GET /server/features` → `localTakenRange`). False on servers that predate it.
+    @Default(false) bool localTakenRange,
   }) = _ServerFeatures;
 
   factory ServerFeatures.fromDto(ServerFeaturesDto dto) => ServerFeatures(
@@ -28,5 +31,6 @@ abstract class ServerFeatures with _$ServerFeatures {
     ocr: dto.ocr,
     smartSearch: dto.smartSearch,
     syncRequestTypes: dto.syncRequestTypes.orElse(null)?.toSet(),
+    localTakenRange: dto.localTakenRange.orElse(null) ?? false,
   );
 }

@@ -103,6 +103,12 @@ final serverInfoProvider = StateNotifierProvider<ServerInfoNotifier, ServerInfo>
   return ServerInfoNotifier(ref.read(serverInfoServiceProvider));
 });
 
+/// Whether the server reads takenAfter/takenBefore as a wall-clock range (`GET /server/features` →
+/// `localTakenRange`). False until the features load and on servers that predate it.
+final serverLocalTakenRangeProvider = Provider<bool>(
+  (ref) => ref.watch(serverInfoProvider.select((info) => info.serverFeatures.localTakenRange)),
+);
+
 final versionWarningPresentProvider = Provider.family<bool, UserDto?>((ref, user) {
   final serverInfo = ref.watch(serverInfoProvider);
   return switch (serverInfo.versionStatus) {

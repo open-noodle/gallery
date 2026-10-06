@@ -23,9 +23,11 @@ import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-pers
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table.js';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table.js';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table.js';
+import { assetFilterConditions, assetFilterKeys, withAssetFilter } from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database.js';
 import { reviewableAssetVisibility } from 'src/utils/face-review.js';
 import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
+import { without } from 'src/utils/filter-suggestions.js';
 import {
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
@@ -2288,7 +2290,12 @@ export class SharedSpaceRepository {
     params: [{ userIds: [DummyValue.UUID], visibility: AssetVisibility.Timeline }],
   })
   getFilteredMapMarkers(options: AssetSearchBuilderOptions) {
-    return searchAssetBuilderLegacy(this.db, options)
+    // The map answers the filter panel like the timeline does, so the panel's taken, place, camera
+    // and rating filters come from the shared asset filter; scope and the remaining filters (text,
+    // type, favourites, tags, people, albums) stay with upstream search. The filter's asset_exif
+    // EXISTS and the lat/long join below both probe asset_exif by primary key, which is cheap.
+    return searchAssetBuilderLegacy(this.db, without(options, ...assetFilterKeys))
+      .$call((qb) => withAssetFilter(qb, options))
       .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
       .where('asset_exif.latitude', 'is not', null)
       .where('asset_exif.longitude', 'is not', null)
@@ -2511,8 +2518,9 @@ export class SharedSpaceRepository {
                   ),
                 ]),
               )
-              .$if(!!options.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-              .$if(!!options.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options.takenBefore!)),
+              .$call((qb2) =>
+                withAssetFilter(qb2, { takenAfter: options.takenAfter, takenBefore: options.takenBefore }),
+              ),
           ),
         )
         .orderBy('shared_space_person.isHidden', 'asc')
@@ -2556,8 +2564,12 @@ export class SharedSpaceRepository {
     const namePattern = escapedName ? `%${escapedName}%` : undefined;
     const minimumFaceCount = options.minimumFaceCount;
     const visibilityFilter = sql`"asset"."visibility" IN (${sql.join(visibleSpaceAssetVisibilities)})`;
-    const takenAfterFilter = options.takenAfter ? sql`AND "asset"."fileCreatedAt" >= ${options.takenAfter}` : sql``;
-    const takenBeforeFilter = options.takenBefore ? sql`AND "asset"."fileCreatedAt" < ${options.takenBefore}` : sql``;
+    const takenFilter = sql.join(
+      assetFilterConditions({ takenAfter: options.takenAfter, takenBefore: options.takenBefore }).map(
+        (condition) => sql`AND ${condition}`,
+      ),
+      sql` `,
+    );
     const petPersonFilter = options.petsEnabled ? sql`` : sql`AND "shared_space_person"."type" != 'pet'`;
     // type filter, count-arm twin of getPersonsBySpaceId's $if(!!options.type, ...) / $if(options.type
     // === 'pet', ...) (shared-space.repository.ts ~2378-2391). Spliced into person_rows ONLY — never
@@ -2646,8 +2658,7 @@ export class SharedSpaceRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset"."isOffline" = false
           AND ${visibilityFilter}
-          ${takenAfterFilter}
-          ${takenBeforeFilter}
+          ${takenFilter}
         UNION
         SELECT "asset"."id" AS "assetId"
         FROM "shared_space_library"
@@ -2656,8 +2667,7 @@ export class SharedSpaceRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset"."isOffline" = false
           AND ${visibilityFilter}
-          ${takenAfterFilter}
-          ${takenBeforeFilter}
+          ${takenFilter}
         UNION
         SELECT "asset"."id" AS "assetId"
         FROM "shared_space_album"
@@ -2670,8 +2680,7 @@ export class SharedSpaceRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset"."isOffline" = false
           AND ${visibilityFilter}
-          ${takenAfterFilter}
-          ${takenBeforeFilter}
+          ${takenFilter}
       ),
       "person_rows" AS (
         SELECT
@@ -2735,8 +2744,12 @@ export class SharedSpaceRepository {
     const namePattern = escapedName ? `%${escapedName}%` : undefined;
     const minimumFaceCount = options.minimumFaceCount;
     const visibilityFilter = sql`"asset"."visibility" IN (${sql.join(visibleSpaceAssetVisibilities)})`;
-    const takenAfterFilter = options.takenAfter ? sql`AND "asset"."fileCreatedAt" >= ${options.takenAfter}` : sql``;
-    const takenBeforeFilter = options.takenBefore ? sql`AND "asset"."fileCreatedAt" < ${options.takenBefore}` : sql``;
+    const takenFilter = sql.join(
+      assetFilterConditions({ takenAfter: options.takenAfter, takenBefore: options.takenBefore }).map(
+        (condition) => sql`AND ${condition}`,
+      ),
+      sql` `,
+    );
     const petPersonFilter = options.petsEnabled ? sql`` : sql`AND "shared_space_person"."type" != 'pet'`;
     const namedPersonFilter = options.named ? sql`AND "shared_space_person"."name" != ''` : sql``;
     const namePersonFilter = namePattern
@@ -2767,8 +2780,7 @@ export class SharedSpaceRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset"."isOffline" = false
           AND ${visibilityFilter}
-          ${takenAfterFilter}
-          ${takenBeforeFilter}
+          ${takenFilter}
         UNION
         SELECT "asset"."id" AS "assetId"
         FROM "shared_space_library"
@@ -2777,8 +2789,7 @@ export class SharedSpaceRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset"."isOffline" = false
           AND ${visibilityFilter}
-          ${takenAfterFilter}
-          ${takenBeforeFilter}
+          ${takenFilter}
         UNION
         SELECT "asset"."id" AS "assetId"
         FROM "shared_space_album"
@@ -2791,8 +2802,7 @@ export class SharedSpaceRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset"."isOffline" = false
           AND ${visibilityFilter}
-          ${takenAfterFilter}
-          ${takenBeforeFilter}
+          ${takenFilter}
       ),
       "detected_faces" AS (
         SELECT DISTINCT "asset_face"."id" AS "assetFaceId"
