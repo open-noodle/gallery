@@ -22,11 +22,7 @@ describe(SearchService.name, () => {
   beforeEach(() => {
     ({ sut, mocks } = newTestService(SearchService));
     mocks.partner.getAll.mockResolvedValue([]);
-    // #763: the favourites facet resolves its own wider space scope. Default it to "no memberships"
-    // so the many tests that do not care about spaces keep their previous behaviour; the tests that
-    // do assert on it override this.
-    mocks.sharedSpace.getAllMemberSpaceIds.mockResolvedValue([]);
-    (mocks.faceIdentity as any).resolveScopedPersonTokens ??= vitest.fn();
+    vi.spyOn(sut, 'resolveViewerScope').mockResolvedValue({ visibility: 'not-locked' });
     (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions ??= vitest.fn();
     (mocks.faceIdentity as any).searchAccessiblePeople ??= vitest.fn();
     (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
@@ -112,7 +108,6 @@ describe(SearchService.name, () => {
       const asset = AssetFactory.from()
         .exif({ latitude: 42, longitude: 69, city: 'city', state: 'state', country: 'country' })
         .build();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.asset.getAssetIdByCity.mockResolvedValue({
         fieldName: 'exifInfo.city',
         items: [{ value: 'city', data: asset.id }],
@@ -135,47 +130,10 @@ describe(SearchService.name, () => {
       expect(result).toEqual(expectedResponse);
     });
 
-    // #867: the Explore "Places" strip was owner-scoped, so a space member saw no tile for a city
-    // that only exists on assets shared with them. Scope it like every other home surface: own
-    // assets plus the spaces the member kept in their timeline.
-    it('scopes explore cities to the viewer plus their timeline-enabled shared spaces', async () => {
-      const auth = AuthFactory.create();
-      const spaceId = newUuid();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
-      mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
-      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
-
-      await sut.getExploreData(auth);
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
-      expect(mocks.asset.getAssetIdByCity).toHaveBeenCalledWith(
-        auth.user.id,
-        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
-      );
-    });
-
-    it('leaves the city scope owner-only when the viewer has no timeline-enabled spaces', async () => {
-      const auth = AuthFactory.create();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
-      mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
-      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
-
-      await sut.getExploreData(auth);
-
-      expect(mocks.asset.getAssetIdByCity).toHaveBeenCalledWith(auth.user.id, {
-        maxFields: 12,
-        minAssetsPerField: 5,
-        timelineSpaceIds: undefined,
-      });
-    });
-
     // The "recently added" strip stays owner-scoped on purpose — it answers "what did *I* just
     // add", and /recently-added itself is an owner surface.
     it('leaves the recently-added strip owner-scoped', async () => {
       const auth = AuthFactory.create();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: newUuid() }]);
       mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
       mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
       mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
@@ -252,39 +210,6 @@ describe(SearchService.name, () => {
       expect(mocks.search.getCities).toHaveBeenCalledWith(
         [authStub.user1.user.id],
         expect.objectContaining({ country: 'Germany', personIds, rating: 4 }),
-      );
-    });
-
-    it('resolves scoped person tokens before global search suggestions', async () => {
-      const spaceId = newUuid();
-      const token = `space-person:${newUuid()}`;
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: ['00000000-0000-4000-8000-000000000010'],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: false,
-      });
-      mocks.search.getCities.mockResolvedValue(['Berlin']);
-
-      await sut.getSearchSuggestions(authStub.user1, {
-        includeNull: false,
-        type: SearchSuggestionType.CITY,
-        withSharedSpaces: true,
-        personIds: [token],
-      });
-
-      expect((mocks.faceIdentity as any).resolveScopedPersonTokens).toHaveBeenCalledWith({
-        userId: authStub.user1.user.id,
-        tokens: [token],
-        scope: { withSharedSpaces: true, timelineSpaceIds: [spaceId], spaceId: undefined },
-      });
-      expect(mocks.search.getCities).toHaveBeenCalledWith(
-        [authStub.user1.user.id],
-        expect.objectContaining({
-          identityIds: ['00000000-0000-4000-8000-000000000010'],
-          personIds: [],
-        }),
       );
     });
 
@@ -564,7 +489,6 @@ describe(SearchService.name, () => {
         const albumId = newUuid();
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
         mocks.search.getCountries.mockResolvedValue(['Germany']);
 
         const result = await sut.getSearchSuggestions(authStub.user1, {
@@ -578,23 +502,6 @@ describe(SearchService.name, () => {
         expect(mocks.search.getCountries).toHaveBeenCalledWith(
           [authStub.user1.user.id],
           expect.objectContaining({ albumId }),
-        );
-      });
-
-      it('checks album access and passes timelineSpaceIds to getSearchSuggestions', async () => {
-        const albumId = newUuid();
-        const spaceId = newUuid();
-        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
-        mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-        mocks.search.getCountries.mockResolvedValue(['Germany']);
-
-        await sut.getSearchSuggestions(authStub.user1, { type: SearchSuggestionType.COUNTRY, albumId });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-        expect(mocks.search.getCountries).toHaveBeenCalledWith(
-          [authStub.user1.user.id],
-          expect.objectContaining({ albumId, timelineSpaceIds: [spaceId] }),
         );
       });
 
@@ -679,78 +586,6 @@ describe(SearchService.name, () => {
             withSharedSpaces: true,
           }),
         ).rejects.toBeInstanceOf(BadRequestException);
-      });
-
-      it('should fetch timeline space IDs when withSharedSpaces is true', async () => {
-        const spaceId1 = newUuid();
-        const spaceId2 = newUuid();
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
-        mocks.search.getCountries.mockResolvedValue(['Germany', 'France']);
-
-        const result = await sut.getSearchSuggestions(authStub.user1, {
-          type: SearchSuggestionType.COUNTRY,
-          withSharedSpaces: true,
-        });
-
-        expect(result).toEqual(['Germany', 'France']);
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-        expect(mocks.search.getCountries).toHaveBeenCalledWith(
-          [authStub.user1.user.id],
-          expect.objectContaining({ timelineSpaceIds: [spaceId1, spaceId2] }),
-        );
-      });
-
-      it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-        mocks.search.getCountries.mockResolvedValue(['USA']);
-
-        const result = await sut.getSearchSuggestions(authStub.user1, {
-          type: SearchSuggestionType.COUNTRY,
-          withSharedSpaces: true,
-        });
-
-        expect(result).toEqual(['USA']);
-        expect(mocks.search.getCountries).toHaveBeenCalledWith(
-          [authStub.user1.user.id],
-          expect.objectContaining({ timelineSpaceIds: undefined }),
-        );
-      });
-
-      it('should preserve existing behavior when withSharedSpaces is absent', async () => {
-        mocks.search.getCountries.mockResolvedValue(['USA']);
-
-        await sut.getSearchSuggestions(authStub.user1, {
-          type: SearchSuggestionType.COUNTRY,
-        });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
-      });
-
-      it('should preserve existing behavior when withSharedSpaces is explicitly false', async () => {
-        mocks.search.getCountries.mockResolvedValue(['USA']);
-
-        await sut.getSearchSuggestions(authStub.user1, {
-          type: SearchSuggestionType.COUNTRY,
-          withSharedSpaces: false,
-        });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
-      });
-
-      it('should pass timelineSpaceIds through to camera make suggestions', async () => {
-        const spaceId1 = newUuid();
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }]);
-        mocks.search.getCameraMakes.mockResolvedValue(['Nikon']);
-
-        await sut.getSearchSuggestions(authStub.user1, {
-          type: SearchSuggestionType.CAMERA_MAKE,
-          withSharedSpaces: true,
-        });
-
-        expect(mocks.search.getCameraMakes).toHaveBeenCalledWith(
-          [authStub.user1.user.id],
-          expect.objectContaining({ timelineSpaceIds: [spaceId1] }),
-        );
       });
     });
   });
@@ -1041,7 +876,6 @@ describe(SearchService.name, () => {
         const albumId = newUuid();
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
         await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
@@ -1054,7 +888,6 @@ describe(SearchService.name, () => {
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
         // Mocked so the ONLY thing that can reject here is the access check. Without it the call
         // throws on an unstubbed repository method instead, and the assertion passes either way.
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
         await expect(
           sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] }),
@@ -1065,7 +898,6 @@ describe(SearchService.name, () => {
         const albumId = newUuid();
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
         await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
@@ -1088,7 +920,6 @@ describe(SearchService.name, () => {
         const albumId = newUuid();
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
         await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
@@ -1100,7 +931,6 @@ describe(SearchService.name, () => {
         const albumId = newUuid();
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
         mocks.search.getSmartSearchFacets.mockResolvedValue({ total: 0, timeBuckets: [], people: [] } as never);
 
         await sut.searchSmartFacets(authStub.user1, { query: 'test', albumIds: [albumId] });
@@ -1196,20 +1026,6 @@ describe(SearchService.name, () => {
         ).rejects.toThrow('Cannot use both spaceId and withSharedSpaces');
       });
 
-      it('should fetch timeline space IDs and pass them through when withSharedSpaces is true', async () => {
-        const spaceId1 = newUuid();
-        const spaceId2 = newUuid();
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
-
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: true });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({ timelineSpaceIds: [spaceId1, spaceId2] }),
-        );
-      });
-
       // #830: the reference asset for "Show similar photos" is often one the caller reaches only
       // through a Space, so the access check has to clear on space membership rather than
       // ownership, and the space scope has to survive onto the queryAssetId path.
@@ -1221,7 +1037,7 @@ describe(SearchService.name, () => {
         mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
         mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
         mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+        vi.mocked(sut.resolveViewerScope).mockResolvedValue({ timelineSpaceIds: [spaceId] });
 
         await sut.searchSmart(authStub.user1, { size: 100, queryAssetId: assetId, withSharedSpaces: true });
 
@@ -1230,39 +1046,6 @@ describe(SearchService.name, () => {
           expect.anything(),
           expect.objectContaining({ embedding: '[4, 5, 6]', timelineSpaceIds: [spaceId] }),
         );
-      });
-
-      it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: true });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({ timelineSpaceIds: undefined }),
-        );
-      });
-
-      it('should not call getSpaceIdsForTimeline when withSharedSpaces is absent', async () => {
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
-      });
-
-      it('should not call getSpaceIdsForTimeline when withSharedSpaces is explicitly false', async () => {
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: false });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
-      });
-
-      it('should not call getSpaceIdsForTimeline when spaceId is set', async () => {
-        const spaceId = newUuid();
-        mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
-
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
       });
 
       it('should still reject spacePersonIds without spaceId when withSharedSpaces is true', async () => {
@@ -1274,44 +1057,6 @@ describe(SearchService.name, () => {
             spacePersonIds: [newUuid()],
           }),
         ).rejects.toBeInstanceOf(BadRequestException);
-      });
-
-      it('resolves scoped person tokens before smart search', async () => {
-        const spaceId = newUuid();
-        const token = `space-person:${newUuid()}`;
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-        (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-          identityIds: ['00000000-0000-4000-8000-000000000030'],
-          legacyPersonIds: [],
-          legacySpacePersonIds: [],
-          hasInaccessibleToken: false,
-        });
-
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: true, personIds: [token] });
-
-        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({
-            identityIds: ['00000000-0000-4000-8000-000000000030'],
-            personIds: [],
-          }),
-        );
-      });
-
-      it('fetches timeline space IDs when albumIds are set for smart search', async () => {
-        const albumId = newUuid();
-        const spaceId = newUuid();
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-        // An albumIds scope is now AlbumRead-checked before anything else runs.
-        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
-
-        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
-
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
-        );
       });
     });
 
@@ -1521,36 +1266,6 @@ describe(SearchService.name, () => {
       ).rejects.toThrow('spacePersonIds requires spaceId');
     });
 
-    it('passes timeline shared spaces when withSharedSpaces is true', async () => {
-      const spaceId1 = newUuid();
-      const spaceId2 = newUuid();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
-
-      await sut.searchSmartFacets(authStub.user1, { query: 'test', withSharedSpaces: true });
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-      expect(mocks.search.getSmartSearchFacets).toHaveBeenCalledWith(
-        expect.objectContaining({ timelineSpaceIds: [spaceId1, spaceId2] }),
-      );
-    });
-
-    it('resolves inaccessible scoped tokens to an empty smart-facet result set', async () => {
-      const token = `space-person:${newUuid()}`;
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: [],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: true,
-      });
-
-      await sut.searchSmartFacets(authStub.user1, { query: 'test', withSharedSpaces: true, personIds: [token] });
-
-      expect(mocks.search.getSmartSearchFacets).toHaveBeenCalledWith(
-        expect.objectContaining({ forceEmptyResult: true }),
-      );
-    });
-
     it('does not pass orderDirection to the facets repository call', async () => {
       await sut.searchSmartFacets(authStub.user1, { query: 'test' });
 
@@ -1703,82 +1418,6 @@ describe(SearchService.name, () => {
       });
     });
 
-    it('passes timelineSpaceIds for album-scoped searchMetadata', async () => {
-      const albumId = newUuid();
-      const spaceId = newUuid();
-      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
-
-      await sut.searchMetadata(authStub.user1, { size: 250, albumIds: [albumId] });
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
-      );
-    });
-
-    // testq-4: the test above was rebased-in with checkOwnerAccess granting the actor OWNER access to
-    // the album (needed to satisfy #29352's requireAccess(AlbumRead) gate), which lost coverage of the
-    // space-MEMBER path (checkSharedAlbumAccess, not checkOwnerAccess) — the actor who most needs the
-    // person-filter guard below, since they don't own the album's assets. A member combining albumIds
-    // with personIds must not be able to bypass person-filter RBAC: resolveScopedPersonFilters routes
-    // every personIds token through faceIdentityRepository.resolveScopedPersonTokens whenever albumIds
-    // is set (isGlobalSharedScope), and an inaccessible token forces the whole search empty.
-    it('forces an empty result for a space-member actor who person-filters an album-scoped search with an inaccessible token', async () => {
-      const albumId = newUuid();
-      const spaceId = newUuid();
-      const personId = newUuid();
-      // Member access via the album's own share grant, NOT ownership.
-      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: [],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: true,
-      });
-
-      await sut.searchMetadata(authStub.user1, { size: 250, albumIds: [albumId], personIds: [personId] });
-
-      expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
-      expect((mocks.faceIdentity as any).resolveScopedPersonTokens).toHaveBeenCalledWith({
-        userId: authStub.user1.user.id,
-        tokens: [personId],
-        scope: { withSharedSpaces: true, timelineSpaceIds: [spaceId], spaceId: undefined },
-      });
-      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ forceEmptyResult: true }),
-      );
-    });
-
-    it('deduplicates resolved scoped person filters before repository search', async () => {
-      const token = `person:${newUuid()}`;
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: ['00000000-0000-4000-8000-000000000010', '00000000-0000-4000-8000-000000000010'],
-        legacyPersonIds: ['00000000-0000-4000-8000-000000000020', '00000000-0000-4000-8000-000000000020'],
-        legacySpacePersonIds: ['00000000-0000-4000-8000-000000000030', '00000000-0000-4000-8000-000000000030'],
-        hasInaccessibleToken: false,
-      });
-
-      await sut.searchMetadata(authStub.user1, { size: 250, withSharedSpaces: true, personIds: [token, token] });
-
-      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          identityIds: ['00000000-0000-4000-8000-000000000010'],
-          personIds: ['00000000-0000-4000-8000-000000000020'],
-          spacePersonIds: ['00000000-0000-4000-8000-000000000030'],
-        }),
-      );
-    });
-
     // ownerId is a narrowing contributor filter (searchAssetBuilder applies it as a standalone AND
     // on asset.ownerId). It must reach the repository as its own field and must NOT be merged into
     // userIds, which is the owner SCOPING predicate — merging it there would widen the result set
@@ -1806,19 +1445,6 @@ describe(SearchService.name, () => {
         expect.objectContaining({ userIds: [authStub.user1.user.id] }),
       );
       expect(result).toEqual({ images: 10, videos: 5, total: 15 });
-    });
-
-    it('passes timelineSpaceIds for album-scoped searchStatistics', async () => {
-      const albumId = newUuid();
-      const spaceId = newUuid();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.searchStatistics.mockResolvedValue({ total: 0 } as any);
-
-      await sut.searchStatistics(authStub.user1, { albumIds: [albumId] });
-
-      expect(mocks.search.searchStatistics).toHaveBeenCalledWith(
-        expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
-      );
     });
   });
 
@@ -1926,20 +1552,6 @@ describe(SearchService.name, () => {
         await expect(sut.searchRandom(authStub.user1, { size: 250, spaceId })).rejects.toThrow();
       });
     });
-
-    it('passes timelineSpaceIds for album-scoped searchRandom', async () => {
-      const albumId = newUuid();
-      const spaceId = newUuid();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.searchRandom.mockResolvedValue([]);
-
-      await sut.searchRandom(authStub.user1, { size: 250, albumIds: [albumId] });
-
-      expect(mocks.search.searchRandom).toHaveBeenCalledWith(
-        250,
-        expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
-      );
-    });
   });
 
   describe('searchLargeAssets', () => {
@@ -2004,20 +1616,6 @@ describe(SearchService.name, () => {
 
         await expect(sut.searchLargeAssets(authStub.user1, { size: 250, spaceId })).rejects.toThrow();
       });
-    });
-
-    it('passes timelineSpaceIds for album-scoped searchLargeAssets', async () => {
-      const albumId = newUuid();
-      const spaceId = newUuid();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.searchLargeAssets.mockResolvedValue([]);
-
-      await sut.searchLargeAssets(authStub.user1, { size: 250, albumIds: [albumId] });
-
-      expect(mocks.search.searchLargeAssets).toHaveBeenCalledWith(
-        250,
-        expect.objectContaining({ albumIds: [albumId], timelineSpaceIds: [spaceId] }),
-      );
     });
   });
 
@@ -2086,7 +1684,6 @@ describe(SearchService.name, () => {
   describe('getAssetsByCity', () => {
     it('should get assets by city', async () => {
       const asset = AssetFactory.from().build();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.search.getAssetsByCity.mockResolvedValue([asset as any]);
 
       const result = await sut.getAssetsByCity(authStub.user1);
@@ -2099,23 +1696,6 @@ describe(SearchService.name, () => {
         authStub.user1.user.id,
       );
       expect(result).toHaveLength(1);
-    });
-
-    // #867: /places is the "view all" of the same Explore strip, so it gets the same scope.
-    it('scopes the places page to the viewer plus their timeline-enabled shared spaces', async () => {
-      const spaceId = newUuid();
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.getAssetsByCity.mockResolvedValue([]);
-
-      await sut.getAssetsByCity(authStub.user1);
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-      // #763 threads the caller as a third argument so the row can project isFavoriteForUser.
-      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith(
-        [authStub.user1.user.id],
-        [spaceId],
-        authStub.user1.user.id,
-      );
     });
   });
 
@@ -2138,6 +1718,8 @@ describe(SearchService.name, () => {
     // would hide a filter that does have results. The other facets keep the timeline-visible scope —
     // widening those would pull a hidden space's cities/tags/people back into the panel.
     it('scopes the favourites probe to every membership while other facets stay timeline-visible (#763)', async () => {
+      // Through the real viewer scope: this is the service-level pin on the favourites facet's spaces.
+      vi.mocked(sut.resolveViewerScope).mockRestore();
       const auth = AuthFactory.create();
       const visibleSpaceId = newUuid();
       const hiddenSpaceId = newUuid();
@@ -2167,7 +1749,6 @@ describe(SearchService.name, () => {
     it('should return filter suggestions', async () => {
       const auth = AuthFactory.create();
       mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.search.getFilterSuggestions.mockResolvedValue({
         countries: ['Germany', 'France'],
         cameraMakes: ['Canon'],
@@ -2252,11 +1833,9 @@ describe(SearchService.name, () => {
 
     it('checks album access and passes albumId to getFilterSuggestions', async () => {
       const albumId = newUuid();
-      const spaceId = newUuid();
       const auth = AuthFactory.create();
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.search.getFilterSuggestions.mockResolvedValue({
         countries: ['Germany'],
         cameraMakes: ['Canon'],
@@ -2275,10 +1854,9 @@ describe(SearchService.name, () => {
       expect(result.countries).toEqual(['Germany']);
       expect(mocks.access.album.checkOwnerAccess).toHaveBeenCalled();
       expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
       expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
         [auth.user.id],
-        expect.objectContaining({ albumId, timelineSpaceIds: [spaceId] }),
+        expect.objectContaining({ albumId }),
       );
     });
 
@@ -2298,34 +1876,6 @@ describe(SearchService.name, () => {
       );
     });
 
-    it('validates album scoped space-person tokens using timeline-enabled shared-space scope', async () => {
-      const auth = AuthFactory.create();
-      const albumId = newUuid();
-      const spaceId = newUuid();
-      const token = `space-person:${newUuid()}`;
-      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: [],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: true,
-      });
-
-      await sut.getFilterSuggestions(auth, { albumId, personIds: [token] });
-
-      expect((mocks.faceIdentity as any).resolveScopedPersonTokens).toHaveBeenCalledWith({
-        userId: auth.user.id,
-        tokens: [token],
-        scope: { withSharedSpaces: true, timelineSpaceIds: [spaceId], spaceId: undefined },
-      });
-      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-        [auth.user.id],
-        expect.objectContaining({ forceEmptyResult: true }),
-      );
-    });
-
     it('should check space access when spaceId is set', async () => {
       const auth = AuthFactory.create();
       const spaceId = newUuid();
@@ -2336,130 +1886,6 @@ describe(SearchService.name, () => {
       await sut.getFilterSuggestions(auth, { spaceId });
 
       expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalled();
-    });
-
-    it('should resolve timelineSpaceIds when withSharedSpaces is set', async () => {
-      const auth = AuthFactory.create();
-      const spaceId = newUuid();
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
-
-      await sut.getFilterSuggestions(auth, { withSharedSpaces: true });
-
-      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-        [auth.user.id],
-        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
-      );
-    });
-
-    it('resolves scoped person tokens before global filter suggestions', async () => {
-      const auth = AuthFactory.create();
-      const spaceId = newUuid();
-      const token = `space-person:${newUuid()}`;
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: ['00000000-0000-4000-8000-000000000020'],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: false,
-      });
-      (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
-        people: [{ id: token, name: 'Alice' }],
-        hasUnnamedPeople: false,
-      });
-      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
-
-      await sut.getFilterSuggestions(auth, { withSharedSpaces: true, personIds: [token] });
-
-      expect((mocks.faceIdentity as any).resolveScopedPersonTokens).toHaveBeenCalledWith({
-        userId: auth.user.id,
-        tokens: [token],
-        scope: { withSharedSpaces: true, timelineSpaceIds: [spaceId], spaceId: undefined },
-      });
-      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-        [auth.user.id],
-        expect.objectContaining({
-          identityIds: ['00000000-0000-4000-8000-000000000020'],
-          personIds: [],
-        }),
-      );
-    });
-
-    it('keeps bare UUID person filters as legacy personal person ids', async () => {
-      const auth = AuthFactory.create();
-      const personId = newUuid();
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: [],
-        legacyPersonIds: [personId],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: false,
-      });
-      (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
-        people: [],
-        hasUnnamedPeople: false,
-      });
-      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
-
-      await sut.getFilterSuggestions(auth, { withSharedSpaces: true, personIds: [personId] });
-
-      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-        [auth.user.id],
-        expect.objectContaining({ personIds: [personId] }),
-      );
-    });
-
-    it('returns empty people-filtered results for inaccessible scoped tokens', async () => {
-      const auth = AuthFactory.create();
-      const token = `space-person:${newUuid()}`;
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: [],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: true,
-      });
-      (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
-        people: [],
-        hasUnnamedPeople: false,
-      });
-      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
-
-      await sut.getFilterSuggestions(auth, { withSharedSpaces: true, personIds: [token] });
-
-      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-        [auth.user.id],
-        expect.objectContaining({ forceEmptyResult: true }),
-      );
-    });
-
-    it('does not resolve another users private person token through a shared identity', async () => {
-      const auth = AuthFactory.create();
-      const token = `person:${newUuid()}`;
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      (mocks.faceIdentity as any).resolveScopedPersonTokens.mockResolvedValue({
-        identityIds: [],
-        legacyPersonIds: [],
-        legacySpacePersonIds: [],
-        hasInaccessibleToken: true,
-      });
-      (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
-        people: [],
-        hasUnnamedPeople: false,
-      });
-      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
-
-      await sut.getFilterSuggestions(auth, { withSharedSpaces: true, personIds: [token] });
-
-      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-        [auth.user.id],
-        expect.objectContaining({ forceEmptyResult: true }),
-      );
     });
 
     it('should pass all filter dimensions through to repository', async () => {
@@ -2537,6 +1963,133 @@ describe(SearchService.name, () => {
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ userIds: [authStub.user1.user.id, partnerId] }),
+      );
+    });
+  });
+
+  // What the viewer may see is resolved by src/utils/viewer-scope.ts (table-tested there); every
+  // search entry point asks for the `search` surface and hands the resolved scope to its query.
+  describe('viewer scope', () => {
+    const spaceId = newUuid();
+    const scope = {
+      timelineSpaceIds: [spaceId],
+      visibility: 'not-locked' as const,
+      personIds: ['legacy-person'],
+      identityIds: ['identity'],
+      spacePersonIds: ['space-person'],
+      forceEmptyResult: true,
+    };
+    const dto = { size: 10, withSharedSpaces: true, personIds: [`space-person:${newUuid()}`] };
+    const auth = authStub.user1;
+    const userIds = [auth.user.id];
+
+    beforeEach(() => {
+      vi.mocked(sut.resolveViewerScope).mockResolvedValue(scope);
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+      mocks.search.searchSmart.mockResolvedValue({ hasNextPage: false, items: [] });
+      mocks.search.getSmartSearchFacets.mockResolvedValue({ total: 0, people: [] } as never);
+      mocks.search.searchRandom.mockResolvedValue([]);
+      mocks.search.searchLargeAssets.mockResolvedValue([]);
+      mocks.search.getCameraMakes.mockResolvedValue([]);
+      mocks.search.getAccessibleTags.mockResolvedValue([]);
+      mocks.search.getAssetsByCity.mockResolvedValue([]);
+      mocks.machineLearning.encodeText.mockResolvedValue('[1, 2, 3]');
+      clearConfigCache();
+    });
+
+    it.each([
+      ['searchMetadata', () => sut.searchMetadata(auth, dto), () => mocks.search.searchMetadata, [expect.anything()]],
+      ['searchStatistics', () => sut.searchStatistics(auth, dto), () => mocks.search.searchStatistics, []],
+      ['searchRandom', () => sut.searchRandom(auth, dto), () => mocks.search.searchRandom, [dto.size]],
+      ['searchLargeAssets', () => sut.searchLargeAssets(auth, dto), () => mocks.search.searchLargeAssets, [dto.size]],
+      [
+        'searchSmart',
+        () => sut.searchSmart(auth, { ...dto, query: 'q' }),
+        () => mocks.search.searchSmart,
+        [expect.anything()],
+      ],
+      [
+        'searchSmartFacets',
+        () => sut.searchSmartFacets(auth, { ...dto, query: 'q' }),
+        () => mocks.search.getSmartSearchFacets,
+        [],
+      ],
+      [
+        'getSearchSuggestions',
+        () => sut.getSearchSuggestions(auth, { ...dto, type: SearchSuggestionType.CAMERA_MAKE }),
+        () => mocks.search.getCameraMakes,
+        [userIds],
+      ],
+      [
+        'getFilterSuggestions',
+        () => sut.getFilterSuggestions(auth, dto),
+        () => mocks.search.getFilterSuggestions,
+        [userIds],
+      ],
+    ] as const)('%s resolves the search scope and passes it whole', async (_, call, repository, leadingArgs) => {
+      await call();
+
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(auth, 'search', expect.objectContaining(dto));
+      expect(repository()).toHaveBeenCalledWith(...leadingArgs, expect.objectContaining(scope));
+    });
+
+    it('getTagSuggestions resolves the search scope', async () => {
+      await sut.getTagSuggestions(auth, { withSharedSpaces: true });
+
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(auth, 'search', { withSharedSpaces: true });
+      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith(
+        userIds,
+        expect.objectContaining({ timelineSpaceIds: [spaceId], visibility: 'not-locked' }),
+      );
+    });
+
+    it('scopes the Explore places strip and the places page to the viewer’s timeline spaces (#867)', async () => {
+      mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
+      mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
+      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
+
+      await sut.getExploreData(auth);
+      await sut.getAssetsByCity(auth);
+
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(auth, 'search', { withSharedSpaces: true });
+      expect(mocks.asset.getAssetIdByCity).toHaveBeenCalledWith(auth.user.id, {
+        maxFields: 12,
+        minAssetsPerField: 5,
+        timelineSpaceIds: [spaceId],
+      });
+      // #763 threads the caller as a third argument so the row can project isFavoriteForUser.
+      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith(userIds, [spaceId], auth.user.id);
+    });
+
+    // #763: a favourite-filtered search spans every space the caller belongs to; the call sites opt in.
+    it.each([
+      ['searchMetadata', () => sut.searchMetadata(auth, { ...dto, isFavorite: true })],
+      ['searchStatistics', () => sut.searchStatistics(auth, { ...dto, isFavorite: true })],
+      ['searchRandom', () => sut.searchRandom(auth, { ...dto, isFavorite: true })],
+      ['searchLargeAssets', () => sut.searchLargeAssets(auth, { ...dto, isFavorite: true })],
+      ['searchSmart', () => sut.searchSmart(auth, { ...dto, query: 'q', isFavorite: true })],
+    ] as const)('%s asks for every member space on a favourite-filtered search (#763)', async (_, call) => {
+      await call();
+
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(
+        auth,
+        'search',
+        expect.objectContaining({ favoriteScoped: true }),
+      );
+    });
+
+    it('keeps filter suggestions on the timeline spaces, with the member spaces for the favourites probe (#763)', async () => {
+      await sut.getFilterSuggestions(auth, { ...dto, isFavorite: true });
+
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(
+        auth,
+        'search',
+        expect.objectContaining({ withFavoriteSpaces: true }),
+      );
+      expect(sut.resolveViewerScope).not.toHaveBeenCalledWith(
+        auth,
+        'search',
+        expect.objectContaining({ favoriteScoped: true }),
       );
     });
   });
