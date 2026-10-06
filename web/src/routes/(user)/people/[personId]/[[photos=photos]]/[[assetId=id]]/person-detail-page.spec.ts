@@ -5,6 +5,7 @@ import {
   type PersonResponseDto,
   type PersonStatisticsResponseDto,
   type SharedSpaceMemberResponseDto,
+  type SharedSpaceResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
@@ -14,8 +15,10 @@ import type { Component } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { userInteraction } from '$lib/stores/user.svelte';
 import { isSuggestionSnoozed, snoozeSuggestions } from '$lib/utils/face-suggestion-snooze';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import PersonDetailPage from './+page.svelte';
 
@@ -178,6 +181,15 @@ function makeMember(userId: string, role: SharedSpaceRole): SharedSpaceMemberRes
   };
 }
 
+// The viewer's role in each space comes from the spaces list (getAllSpaces embeds members).
+function mockSpaceRoles(roles: Record<string, SharedSpaceRole>) {
+  sdkMock.getAllSpaces.mockResolvedValue(
+    Object.entries(roles).map(([id, role]) =>
+      sharedSpaceFactory.build({ id, members: [makeMember('current-user-id', role)] }),
+    ),
+  );
+}
+
 function makeSuggestion(overrides: Partial<PersonFaceSuggestionPageResponseDto['items'][number]> = {}) {
   return {
     assetFaceId: 'face-1',
@@ -220,6 +232,7 @@ function renderPage({
 describe('Person detail page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    userInteraction.recentSpaces = undefined;
     gotoMock.mockResolvedValue(undefined);
     invalidateAllMock.mockResolvedValue(undefined);
     mockAssetMultiSelectManager.selectionActive = false;
@@ -506,7 +519,7 @@ describe('Person detail page', () => {
   });
 
   it('hides space-person write actions when the current user is a space viewer', async () => {
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    mockSpaceRoles({ 'viewer-space-detail': SharedSpaceRole.Viewer });
     renderPage({
       person: makePerson({
         id: 'space-person-1',
@@ -514,14 +527,14 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-detail' }));
+    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
     await waitFor(() => expect(screen.queryByText('set_date_of_birth')).not.toBeInTheDocument());
     expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
     expect(screen.queryByText('select_representative_face')).not.toBeInTheDocument();
   });
 
   it('hides the merge option for a space-primary person the actor cannot edit', async () => {
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    mockSpaceRoles({ 'viewer-space-detail-merge-gate': SharedSpaceRole.Viewer });
     renderPage({
       person: makePerson({
         id: 'space-person-1',
@@ -529,12 +542,36 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-detail-merge-gate' }));
+    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
     expect(screen.queryByText('merge_people')).not.toBeInTheDocument();
   });
 
+  it('offers space-person write actions until the spaces list resolves, then hides them from a viewer', async () => {
+    let resolveSpaces!: (spaces: SharedSpaceResponseDto[]) => void;
+    sdkMock.getAllSpaces.mockReturnValue(new Promise((resolve) => (resolveSpaces = resolve)));
+    renderPage({
+      person: makePerson({
+        id: 'space-person-1',
+        primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'loading-space-detail' },
+      }),
+    });
+
+    await waitFor(() => expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce());
+    expect(await screen.findByText('set_date_of_birth')).toBeInTheDocument();
+
+    resolveSpaces([
+      sharedSpaceFactory.build({
+        id: 'loading-space-detail',
+        members: [makeMember('current-user-id', SharedSpaceRole.Viewer)],
+      }),
+    ]);
+
+    await waitFor(() => expect(screen.queryByText('set_date_of_birth')).not.toBeInTheDocument());
+    expect(sdkMock.getMembers).not.toHaveBeenCalled();
+  });
+
   it('keeps space-person write actions for space editors', async () => {
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    mockSpaceRoles({ 'editor-space-detail': SharedSpaceRole.Editor });
     renderPage({
       person: makePerson({
         id: 'space-person-1',
@@ -542,8 +579,7 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'editor-space-detail' }));
-    expect(screen.getByText('set_date_of_birth')).toBeInTheDocument();
+    expect(await screen.findByText('set_date_of_birth')).toBeInTheDocument();
     expect(screen.getByText('hide_person')).toBeInTheDocument();
     expect(screen.getByText('select_representative_face')).toBeInTheDocument();
   });
@@ -612,6 +648,7 @@ describe('Person detail page', () => {
 describe('face suggestions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    userInteraction.recentSpaces = undefined;
     gotoMock.mockResolvedValue(undefined);
     invalidateAllMock.mockResolvedValue(undefined);
     mockAssetMultiSelectManager.selectionActive = false;
@@ -625,7 +662,12 @@ describe('face suggestions', () => {
     sdkMock.confirmSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
     sdkMock.dismissSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
     sdkMock.ignoreSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    mockSpaceRoles({
+      'space-suggest-banner': SharedSpaceRole.Editor,
+      'space-suggest-thumbnail': SharedSpaceRole.Editor,
+      'space-suggest-modal': SharedSpaceRole.Editor,
+      'space-snooze-consistency': SharedSpaceRole.Editor,
+    });
   });
 
   it('renders the banner when the API returns suggestions for a named owned person', async () => {
@@ -701,15 +743,17 @@ describe('face suggestions', () => {
   // S12.2: client-side defence in depth, mirroring S12.1 on the space route. The server already returns
   // `{ total: 0 }` to non-editors (covered above), but that is enforced only by the read endpoint. This test
   // uses the SAME non-zero suggestion data for both halves, differing only in role, so it cannot pass on
-  // `total: 0` alone. Two distinct spaceIds are used because `isSpaceEditor` caches its result per
-  // `spaceId:userId` — reusing one space between the two renders would read the first render's cached answer.
+  // `total: 0` alone. One spaces list carries both roles, so each render reads its own space's role.
   it('gates the banner on canEditSpacePerson: a space viewer with pending suggestions renders none, an editor with the same data does', async () => {
     sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
       total: 3,
       items: [makeSuggestion({ assetFaceId: 'face-1' })],
     });
 
-    sdkMock.getMembers.mockResolvedValueOnce([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    mockSpaceRoles({
+      'space-suggest-gate-viewer': SharedSpaceRole.Viewer,
+      'space-suggest-gate-editor': SharedSpaceRole.Editor,
+    });
     const viewerRender = renderPage({
       person: makePerson({
         id: 'space-person-1',
@@ -717,11 +761,10 @@ describe('face suggestions', () => {
         primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-suggest-gate-viewer' },
       }),
     });
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'space-suggest-gate-viewer' }));
+    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
     await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
     viewerRender.unmount();
 
-    sdkMock.getMembers.mockResolvedValueOnce([makeMember('current-user-id', SharedSpaceRole.Editor)]);
     renderPage({
       person: makePerson({
         id: 'space-person-1',

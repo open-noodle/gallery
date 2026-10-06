@@ -16,16 +16,6 @@ void main() {
   late MockApiService mockApiService;
   late SharedSpaceApiRepository repository;
 
-  api.SharedSpaceMemberResponseDto member(String userId, api.SharedSpaceRole role) => api.SharedSpaceMemberResponseDto(
-    userId: userId,
-    name: userId,
-    email: '$userId@example.com',
-    role: role,
-    joinedAt: '2024-01-01T00:00:00Z',
-    sharePersonMetadata: true,
-    showInTimeline: true,
-  );
-
   api.SharedSpacePersonResponseDto spacePerson(
     String id, {
     String name = '',
@@ -234,43 +224,6 @@ void main() {
       expect(result.length, equals(2));
       expect(result[0].name, equals('Alice'));
       expect(result[1].role, equals(api.SharedSpaceRole.editor));
-    });
-  });
-
-  // Mirrors the web resolveSpaceEditable (person.service.ts): owner/editor may edit Space
-  // people; viewers may not; a membership-lookup failure fails open (the server enforces the
-  // role on every write, so hiding a working action would be worse than showing a rejected one).
-  group('isSpaceEditor', () {
-    test('returns true for an owner', () async {
-      when(() => mockApi.getMembers('space-1')).thenAnswer((_) async => [member('user-1', api.SharedSpaceRole.owner)]);
-
-      expect(await repository.isSpaceEditor('space-1', 'user-1'), isTrue);
-    });
-
-    test('returns true for an editor', () async {
-      when(() => mockApi.getMembers('space-1')).thenAnswer((_) async => [member('user-1', api.SharedSpaceRole.editor)]);
-
-      expect(await repository.isSpaceEditor('space-1', 'user-1'), isTrue);
-    });
-
-    test('returns false for a viewer', () async {
-      when(() => mockApi.getMembers('space-1')).thenAnswer((_) async => [member('user-1', api.SharedSpaceRole.viewer)]);
-
-      expect(await repository.isSpaceEditor('space-1', 'user-1'), isFalse);
-    });
-
-    test('returns false when the user is not a member', () async {
-      when(
-        () => mockApi.getMembers('space-1'),
-      ).thenAnswer((_) async => [member('someone-else', api.SharedSpaceRole.owner)]);
-
-      expect(await repository.isSpaceEditor('space-1', 'user-1'), isFalse);
-    });
-
-    test('fails open (true) when the membership lookup throws', () async {
-      when(() => mockApi.getMembers('space-1')).thenThrow(Exception('network down'));
-
-      expect(await repository.isSpaceEditor('space-1', 'user-1'), isTrue);
     });
   });
 
