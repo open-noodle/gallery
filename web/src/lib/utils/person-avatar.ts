@@ -1,5 +1,5 @@
 import type { PersonResponseDto } from '@immich/sdk';
-import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
+import { getGlobalPersonThumbnailUrl, getSpaceProfile } from '$lib/utils/global-person-route';
 
 /** Which of the three renderings the Info-panel People grid should use for one person. */
 export type PersonAvatar =
@@ -24,15 +24,8 @@ export type PersonAvatar =
 export const getRepresentativeThumbnailUrl = (
   person: PersonResponseDto,
   { isOwner, spaceId }: { isOwner: boolean; spaceId?: string },
-): string | undefined => {
-  if (spaceId && person.spacePersonId) {
-    return createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
-      updatedAt: person.updatedAt,
-    });
-  }
-
-  return isOwner ? getPeopleThumbnailUrl(person) : undefined;
-};
+): string | undefined =>
+  isOwner || getSpaceProfile(person, spaceId) ? getGlobalPersonThumbnailUrl(person, { spaceId }) : undefined;
 
 export const resolvePersonAvatar = ({
   person,

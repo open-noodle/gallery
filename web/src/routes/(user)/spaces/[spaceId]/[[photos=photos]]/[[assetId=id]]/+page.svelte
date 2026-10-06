@@ -34,8 +34,8 @@
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { lang } from '$lib/stores/preferences.store';
-  import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
+  import { getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
   import {
     buildSearchablePageUrl,
     getSearchablePageFilterState,
@@ -210,7 +210,7 @@
     const mappedPeople = response.people.map((p) => ({
       id: p.id,
       name: p.name,
-      thumbnailUrl: createUrl(`/shared-spaces/${space.id}/people/${p.id}/thumbnail`),
+      thumbnailUrl: getPhotosPersonFilterThumbnailUrl(p, space.id),
     }));
     for (const p of response.people) {
       personNames.set(p.id, p.name);
