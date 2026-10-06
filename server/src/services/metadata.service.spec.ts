@@ -3034,7 +3034,7 @@ describe(MetadataService.name, () => {
 
         await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
-        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.jpg.xmp');
+        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.jpg.xmp', { readable: true });
         expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
         expect(mocks.asset.upsertFile).toHaveBeenCalledWith({
           assetId: asset.id,
@@ -3054,27 +3054,13 @@ describe(MetadataService.name, () => {
 
         await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
-        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.jpg.xmp');
-        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.xmp');
+        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.jpg.xmp', { readable: true });
+        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.xmp', { readable: true });
         expect(mocks.asset.upsertFile).toHaveBeenCalledWith({
           assetId: asset.id,
           type: AssetFileType.Sidecar,
           path: 'upload/user1/ab/cd/IMG_123.xmp',
         });
-      });
-
-      it('should use checkFileExists for disk (absolute) paths', async () => {
-        const asset = forSidecarJob({
-          originalPath: '/path/to/IMG_123.jpg',
-          files: [],
-        });
-        mocks.assetJob.getForSidecarCheckJob.mockResolvedValue(asset);
-        mocks.storage.checkFileExists.mockResolvedValueOnce(true);
-
-        await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
-
-        expect(mocks.storage.checkFileExists).toHaveBeenCalled();
-        expect(mockBackend.exists).not.toHaveBeenCalled();
       });
     });
 

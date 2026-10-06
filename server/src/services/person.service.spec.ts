@@ -2,7 +2,6 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
 import { PersonUserRole, mapFaces, mapPerson } from 'src/dtos/person.dto.js';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto.js';
@@ -21,7 +20,6 @@ import {
 } from 'src/enum.js';
 import { FaceSearchResult } from 'src/repositories/search.repository.js';
 import { FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS, PersonService } from 'src/services/person.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
@@ -110,10 +108,6 @@ const onConfigUpdateTestConfig = (
 describe(PersonService.name, () => {
   let sut: PersonService;
   let mocks: ServiceMocks;
-
-  beforeAll(() => {
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
-  });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(PersonService));

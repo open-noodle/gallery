@@ -35,7 +35,7 @@ const setup = (db?: Kysely<DB>) => {
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
   // Initialize StorageService static backends for medium tests
-  (StorageService as any).diskBackend = new DiskStorageBackend('/tmp/immich-test');
+  (StorageService as any).diskBackend = new DiskStorageBackend('/tmp/immich-test', {} as StorageRepository);
 });
 
 describe(AssetService.name, () => {
