@@ -2443,7 +2443,7 @@ export class FaceIdentityRepository {
   // that a human placed a face on a person — written by every human reassignment, keyed by identity so it
   // survives merges, and replaced (never accumulated) by the next human reassignment. Both face engines
   // exclude these faces from their queues.
-  // H6: face-verdict.service.ts calls this for every flagged face in a scan. minFaces is admin-settable, so
+  // H6: face-assignment.service.ts calls this for every flagged face in a scan. minFaces is admin-settable, so
   // a full-library scan can pass every flagged face in the instance — chunked at 1000, matching every
   // sibling bulk face path in this file (replaceFaceIdentities, demoteManualFaceLinks): one id is one bind
   // parameter, so an unchunked IN-list breaks at Postgres's 65 535-parameter ceiling.
@@ -2471,7 +2471,7 @@ export class FaceIdentityRepository {
   // IDENTITY has to match a suspicion aimed at the person itself, which is what the identity token provides;
   // the person token remains so verdicts written before the person had an identity keep matching.
   //
-  // H6: chunked at 1000 for the same reason as getManualLinkedFaceIds above — face-verdict.service.ts calls
+  // H6: chunked at 1000 for the same reason as getManualLinkedFaceIds above — face-assignment.service.ts calls
   // this for every suspected owner in a scan, and minFaces is admin-settable.
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async getPersonVerdictTokens(personIds: string[]): Promise<Map<string, string[]>> {

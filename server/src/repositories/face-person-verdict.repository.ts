@@ -56,15 +56,6 @@ export class FacePersonVerdictRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async resolveAssignedFace(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
-    await db
-      .deleteFrom('face_person_verdict')
-      .where('assetFaceId', '=', assetFaceId)
-      .where('status', '=', 'pending')
-      .execute();
-  }
-
   // Bulk drain of pending queue rows for a set of faces. The cleanup console calls this after a resolve so a
   // moved/detached/confirmed face leaves no stale suggestion behind — leak 3: without it the never-reappear
   // guarantee was held only by the read path's `af.personGroupId IS NULL` filter, and would break the moment such
@@ -510,7 +501,7 @@ export class FacePersonVerdictRepository {
   // is the whole scoping point (S8.2).
   //
   // Deliberately does NOT touch `status='pending'` rows — a pending row is drained by
-  // resolveAssignedFace/drainPendingForFaces, not cleared here; this method's WHERE always includes
+  // drainPendingForFaces, not cleared here; this method's WHERE always includes
   // `status IN ('rejected','ignored')`.
   @GenerateSql({ params: [{ personGroupId: DummyValue.UUID }, [DummyValue.UUID]] })
   async clearNegativeForTarget(
@@ -611,7 +602,7 @@ export class FacePersonVerdictRepository {
     return removed;
   }
 
-  // H6: chunked at BULK_CHUNK_SIZE, matching every other bulk face path in this file. face-verdict.service.ts
+  // H6: chunked at BULK_CHUNK_SIZE, matching every other bulk face path in this file. face-assignment.service.ts
   // calls this for every flagged face in a scan; minFaces is admin-settable, so a full-library scan can pass
   // every flagged face in the instance — one id is one bind parameter, so an unchunked IN-list breaks at
   // Postgres's 65 535-parameter ceiling.
@@ -664,7 +655,7 @@ export class FacePersonVerdictRepository {
       .selectFrom('person')
       .select(['person.personGroupId', 'person.identityId'])
       .where('person.personGroupId', '=', personGroupId)
-      .where('person.name', '!=', '')
+      .where(sql`BTRIM("person"."name")`, '<>', '')
       .where('person.isHidden', '=', false)
       .where('person.type', '=', 'person')
       .executeTakeFirst();
@@ -673,7 +664,7 @@ export class FacePersonVerdictRepository {
     }
 
     // The count and items queries below are two separate round-trips with no wrapping transaction.
-    // A concurrent resolveAssignedFace between them can make total > items.length. This is an
+    // A concurrent drainPendingForFaces between them can make total > items.length. This is an
     // acceptable trade-off for a background review queue where stale counts cause no harm.
     // Slice 3: band + af/asset visibility gates + manual-link anti-join now come from the shared eligibility
     // predicate also used by claimPending — this must keep emitting the same SQL, apart from Slice 1's

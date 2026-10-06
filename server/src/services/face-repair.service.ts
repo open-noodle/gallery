@@ -132,16 +132,15 @@ export type { RepairReport } from 'src/services/face-repair.summary.js';
 
 @Injectable()
 export class FaceRepairService extends BaseService {
-  // Delegates to the shared FaceVerdictService (Slice 3 extraction) — the suggestion engine's scan handlers
-  // consult the SAME method via `this.faceVerdictService`, so a face a user confirmed or rejected is never
-  // re-proposed to an admin, and vice versa. See FaceVerdictService.buildVerdictMaps for the implementation.
+  // Delegates to the shared FaceAssignmentService, which the suggestion engine's scan handlers consult too
+  // (getSettledFaceIds), so a face a user confirmed or rejected is never re-proposed to an admin, and vice versa.
   private buildVerdictMaps(scope: {
     assetFaceIds: string[];
     personGroupIds: string[];
     suspectedOwnerIds: string[];
   }): Promise<VerdictMaps> {
     const { personGroupIds, ...rest } = scope;
-    return this.faceVerdictService.buildVerdictMaps({ ...rest, personIds: personGroupIds });
+    return this.faceAssignmentService.buildVerdictMaps({ ...rest, personIds: personGroupIds });
   }
 
   async buildRepairPlan(
@@ -298,35 +297,15 @@ export class FaceRepairService extends BaseService {
         continue;
       }
 
-      // Wrap the re-attribution and its identity relink in one transaction (A1). Without this a crash between
-      // the two writes leaves a face on `to` still carrying `from`'s identity, which a later FaceIdentityBackfill
-      // can resolve back to `from` and silently revert the approved move. One transaction makes the pair atomic.
-      // Slice 9 (D14): the pending-queue drain for these faces is IN the same transaction — a moved face that
-      // rolls back must not leave its suggestion queue row drained (and vice versa: a committed move must never
-      // leave a stale pending row behind for a face that just left `from`).
-      const movedIds = await this.databaseRepository.transaction(async (trx) => {
-        const ids = await this.faceRepairRepository.reattributeFaces(from, to, faceIds, trx);
-        if (ids.length > 0) {
-          const identity = await this.faceIdentityRepository.ensurePersonIdentity(to, trx);
-          await this.faceIdentityRepository.replaceFaceIdentities(
-            // B2: the relink always happens — leaving the face on `to` while it still carries `from`'s
-            // identity is the torn state FaceIdentityBackfill resolves back to `from`. Only the STRENGTH
-            // is conditional: `manual` is the durable lock, `owner-person` is an ordinary placement that a
-            // later scan may still question.
-            { assetFaceIds: ids, identityId: identity.id, source: lock ? 'manual' : 'owner-person' },
-            trx,
-          );
-          await this.facePersonVerdictRepository.drainPendingForFaces(ids, trx);
-          // Slice 8 (F15): the move just stated a fact ("these faces ARE this person") that contradicts any
-          // durable rejected/ignored row for this SAME destination (e.g. an earlier decline against `to`,
-          // now overridden by this move). Scoped to `to` only — see clearNegativeForTarget.
-          await this.facePersonVerdictRepository.clearNegativeForTarget(
-            { personGroupId: to, identityId: identity.id },
-            ids,
-            trx,
-          );
-        }
-        return ids;
+      // One atomic move (A1/D14): only faces still on `from` move. B2: the identity relink always happens; only
+      // its STRENGTH is conditional (`manual` is the durable lock, `owner-person` a placement a later scan may
+      // still question).
+      const movedIds = await this.faceAssignmentService.assignFaces({
+        personGroupId: to,
+        faceIds,
+        strength: lock ? 'manual' : 'owner-person',
+        from,
+        movableOnly: true,
       });
       skipped += faceIds.length - movedIds.length;
       if (movedIds.length === 0) {
@@ -1121,39 +1100,15 @@ export class FaceRepairService extends BaseService {
     // `personGroupId`; marking its identity link `source='manual'` records that a human confirmed it there, which
     // is exactly what stops every future scan from suspecting it toward any owner — the age-gap case. Same
     // record a move writes, so there is one notion of "settled", not two.
-    // Slice 9 (D14): the identity relink and its pending-queue drain are wrapped in one transaction — this
-    // bucket was previously unwrapped (a torn-pair gap of the same class A1/executeRepair already closes): a
-    // crash between the two writes could leave a face locked without its stale suggestion drained, or (were
-    // the write ORDER ever reversed) a drained face without its lock link. Same shape as executeRepair's
-    // per-route transaction and `detach` below.
+    // In place (`from` = the reviewed person): a face that raced away since the eligibility read above is not
+    // locked, drained or cleared (H5).
     let locked = moveLocked;
     if (lock.length > 0) {
-      const lockedIds = await this.databaseRepository.transaction(async (trx) => {
-        const identity = await this.faceIdentityRepository.ensurePersonIdentity(personGroupId, trx);
-        // H5: `requirePersonId` re-checks placement INSIDE this transaction. getEligibleFaceIdsForPerson
-        // ran outside it and calls itself advisory; without a write-time guard a concurrent reassign left
-        // the face on the other person while its identity was re-pointed here — the exact torn state the
-        // move and detach paths transact against.
-        const writtenIds = await this.faceIdentityRepository.replaceFaceIdentities(
-          {
-            assetFaceIds: lock,
-            identityId: identity.id,
-            source: 'manual',
-            requirePersonId: personGroupId,
-          },
-          trx,
-        );
-        // Scoped to what was actually written: a face that raced away must not have its queue drained or
-        // its negatives cleared for a lock that never happened.
-        await this.facePersonVerdictRepository.drainPendingForFaces(writtenIds, trx);
-        // Slice 8 (F15): the lock just re-affirmed a fact ("these faces ARE this reviewed person") that
-        // contradicts any durable rejected/ignored row for this SAME person — see clearNegativeForTarget.
-        await this.facePersonVerdictRepository.clearNegativeForTarget(
-          { personGroupId, identityId: identity.id },
-          writtenIds,
-          trx,
-        );
-        return writtenIds;
+      const lockedIds = await this.faceAssignmentService.assignFaces({
+        personGroupId,
+        faceIds: lock,
+        strength: 'manual',
+        from: personGroupId,
       });
       // Count rows actually written, not ids requested — a duplicate id or a raced face used to inflate this.
       locked += lockedIds.length;
