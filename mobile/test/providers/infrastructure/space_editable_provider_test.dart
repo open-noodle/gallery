@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
@@ -6,6 +8,9 @@ import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart';
+
+import '../../fixtures/shared_space.stub.dart';
 
 class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
@@ -23,34 +28,58 @@ CurrentUserProvider _fixedUser(UserDto? user) {
 
 UserDto _user(String id) => UserDto(id: id, email: 'u@example.com', name: 'U', profileChangedAt: DateTime(2024, 1, 1));
 
+// SharedSpaceStub.spaceWithMembers is 'space-3': user-1 owner (and creator), user-2 editor,
+// user-3 viewer.
 void main() {
-  test('resolves the editor role from the shared-space repository', () async {
-    final repo = MockSharedSpaceApiRepository();
-    when(() => repo.isSpaceEditor('space-1', 'u1')).thenAnswer((_) async => true);
+  late MockSharedSpaceApiRepository repo;
+
+  setUp(() {
+    repo = MockSharedSpaceApiRepository();
+    when(() => repo.getAll()).thenAnswer((_) async => [SharedSpaceStub.spaceWithMembers]);
+  });
+
+  ProviderContainer containerFor(UserDto? user) {
     final container = ProviderContainer(
       overrides: [
         sharedSpaceApiRepositoryProvider.overrideWithValue(repo),
-        currentUserProvider.overrideWith((ref) => _fixedUser(_user('u1'))),
+        currentUserProvider.overrideWith((ref) => _fixedUser(user)),
       ],
     );
     addTearDown(container.dispose);
+    return container;
+  }
 
-    expect(await container.read(driftSpaceEditableProvider('space-1').future), isTrue);
+  test('owners and editors may edit, read from the spaces list without fetching members', () async {
+    expect(await containerFor(_user('user-1')).read(driftSpaceEditableProvider('space-3').future), isTrue);
+    expect(await containerFor(_user('user-2')).read(driftSpaceEditableProvider('space-3').future), isTrue);
 
-    when(() => repo.isSpaceEditor('space-1', 'u1')).thenAnswer((_) async => false);
-    container.invalidate(driftSpaceEditableProvider);
-    expect(await container.read(driftSpaceEditableProvider('space-1').future), isFalse);
+    verifyNever(() => repo.getMembers(any()));
   });
 
-  test('defaults to editable when no user is resolved', () async {
-    final container = ProviderContainer(
-      overrides: [
-        sharedSpaceApiRepositoryProvider.overrideWithValue(MockSharedSpaceApiRepository()),
-        currentUserProvider.overrideWith((ref) => _fixedUser(null)),
-      ],
-    );
-    addTearDown(container.dispose);
+  test('viewers are read-only', () async {
+    expect(await containerFor(_user('user-3')).read(driftSpaceEditableProvider('space-3').future), isFalse);
+  });
 
-    expect(await container.read(driftSpaceEditableProvider('space-1').future), isTrue);
+  test('a space missing from the list, or no resolved user, fails open', () async {
+    expect(await containerFor(_user('user-3')).read(driftSpaceEditableProvider('space-unknown').future), isTrue);
+    expect(await containerFor(null).read(driftSpaceEditableProvider('space-3').future), isTrue);
+  });
+
+  test('a failed spaces list fails open instead of erroring', () async {
+    when(() => repo.getAll()).thenThrow(Exception('offline'));
+
+    expect(await containerFor(_user('user-3')).read(driftSpaceEditableProvider('space-3').future), isTrue);
+  });
+
+  test('has no value while the spaces list loads, then resolves a viewer to read-only', () async {
+    final spaces = Completer<List<SharedSpaceResponseDto>>();
+    when(() => repo.getAll()).thenAnswer((_) => spaces.future);
+    final container = containerFor(_user('user-3'));
+
+    // Callers read `.valueOrNull ?? true`, so the loading state keeps the edit affordances.
+    expect(container.read(driftSpaceEditableProvider('space-3')).valueOrNull, isNull);
+
+    spaces.complete([SharedSpaceStub.spaceWithMembers]);
+    expect(await container.read(driftSpaceEditableProvider('space-3').future), isFalse);
   });
 }
