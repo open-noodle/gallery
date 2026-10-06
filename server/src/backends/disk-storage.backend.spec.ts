@@ -6,6 +6,9 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { CacheControl } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { automock } from 'test/utils.js';
 
 describe('DiskStorageBackend', () => {
   let backend: DiskStorageBackend;
@@ -14,7 +17,11 @@ describe('DiskStorageBackend', () => {
   beforeEach(async () => {
     testDir = join(tmpdir(), `immich-disk-test-${Date.now()}`);
     await mkdir(testDir, { recursive: true });
-    backend = new DiskStorageBackend(testDir);
+    backend = new DiskStorageBackend(
+      testDir,
+      // eslint-disable-next-line no-sparse-arrays
+      new StorageRepository(automock(LoggingRepository, { args: [, { getEnv: () => ({}) }], strict: false })),
+    );
   });
 
   afterEach(async () => {
@@ -63,6 +70,31 @@ describe('DiskStorageBackend', () => {
 
     it('should return false for non-existing file', async () => {
       expect(await backend.exists('nope.txt')).toBe(false);
+    });
+
+    it.skipIf(process.getuid?.() === 0)('should only require readability when asked to', async () => {
+      await writeFile(join(testDir, 'locked.txt'), 'data', { mode: 0o000 });
+
+      expect(await backend.exists('locked.txt')).toBe(true);
+      expect(await backend.exists('locked.txt', { readable: true })).toBe(false);
+    });
+  });
+
+  describe('without a media location', () => {
+    it('should refuse a relative key instead of resolving it against the cwd', async () => {
+      const absoluteOnly = new DiskStorageBackend('', {} as StorageRepository);
+
+      await expect(absoluteOnly.deletePrefix('no-such-relative-prefix')).rejects.toThrow('cannot resolve relative key');
+      await expect(absoluteOnly.downloadToTemp('/data/file.jpg')).resolves.toMatchObject({
+        tempPath: '/data/file.jpg',
+      });
+    });
+  });
+
+  describe('readAll', () => {
+    it('should read the whole file into a buffer', async () => {
+      await writeFile(join(testDir, 'test.txt'), 'data');
+      await expect(backend.readAll('test.txt')).resolves.toEqual(Buffer.from('data'));
     });
   });
 

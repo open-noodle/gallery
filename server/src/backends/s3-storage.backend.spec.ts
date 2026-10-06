@@ -2,9 +2,9 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { Readable } from 'node:stream';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
+import { PassThrough, Readable, Writable } from 'node:stream';
+import { Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { S3StorageBackend, S3_STREAM_IDLE_TIMEOUT_MS } from 'src/backends/s3-storage.backend.js';
 import { CacheControl } from 'src/enum.js';
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 
@@ -52,6 +52,14 @@ vi.mock('@aws-sdk/lib-storage', () => ({
     return { done: vi.fn().mockResolvedValue({}) };
   }),
 }));
+
+const quietBody = () => new Readable({ read() {} });
+
+// a GetObject that only settles by being aborted, like a slow S3 response the client gives up on
+const abortableSend = (_command: unknown, { abortSignal }: { abortSignal: AbortSignal }) =>
+  new Promise<never>((_resolve, reject) => {
+    abortSignal.addEventListener('abort', () => reject(abortSignal.reason));
+  });
 
 describe('S3StorageBackend', () => {
   let backend: S3StorageBackend;
@@ -111,6 +119,14 @@ describe('S3StorageBackend', () => {
         chunks.push(Buffer.from(chunk));
       }
       expect(Buffer.concat(chunks).toString()).toBe('s3 content');
+    });
+  });
+
+  describe('readAll', () => {
+    it('should read every chunk of the object into one buffer', async () => {
+      mockSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('chunk-1-'), Buffer.from('chunk-2')]) });
+
+      await expect(backend.readAll('thumbs/user1/preview.webp')).resolves.toEqual(Buffer.from('chunk-1-chunk-2'));
     });
   });
 
@@ -250,110 +266,6 @@ describe('S3StorageBackend', () => {
 
       expect(proxyClient.send).toHaveBeenCalledTimes(2);
       await expect(second).resolves.toMatchObject({ type: 'stream' });
-    });
-
-    it('should release a proxy read slot when the stream ends', async () => {
-      const proxyBackend = new S3StorageBackend({
-        bucket: 'test-bucket',
-        region: 'us-east-1',
-        presignedUrlExpiry: 3600,
-        serveMode: 'proxy' as const,
-        proxyReadConcurrency: 1,
-      });
-      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-      proxyClient.send
-        .mockResolvedValueOnce({ Body: Readable.from([Buffer.from('first')]), ContentLength: 5 })
-        .mockResolvedValueOnce({ Body: Readable.from([Buffer.from('second')]), ContentLength: 6 });
-
-      const first = await proxyBackend.getServeStrategy('first.jpg', {
-        contentType: 'image/jpeg',
-        cacheControl: CacheControl.PrivateWithCache,
-      });
-      const secondPromise = proxyBackend.getServeStrategy('second.jpg', {
-        contentType: 'image/jpeg',
-        cacheControl: CacheControl.PrivateWithCache,
-      });
-      expect(proxyClient.send).toHaveBeenCalledTimes(1);
-      if (first.type === 'stream') {
-        for await (const _chunk of first.stream) {
-          // drain stream
-        }
-      }
-      const second = await secondPromise;
-
-      expect(second.type).toBe('stream');
-      expect(proxyClient.send).toHaveBeenCalledTimes(2);
-    });
-
-    it('should release a proxy read slot when stream creation fails', async () => {
-      const proxyBackend = new S3StorageBackend({
-        bucket: 'test-bucket',
-        region: 'us-east-1',
-        presignedUrlExpiry: 3600,
-        serveMode: 'proxy' as const,
-        proxyReadConcurrency: 1,
-      });
-      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-      proxyClient.send.mockRejectedValueOnce(new Error('denied')).mockResolvedValueOnce({
-        Body: Readable.from([Buffer.from('second')]),
-        ContentLength: 6,
-      });
-
-      await expect(
-        proxyBackend.getServeStrategy('first.jpg', {
-          contentType: 'image/jpeg',
-          cacheControl: CacheControl.PrivateWithCache,
-        }),
-      ).rejects.toThrow('denied');
-      const second = await proxyBackend.getServeStrategy('second.jpg', {
-        contentType: 'image/jpeg',
-        cacheControl: CacheControl.PrivateWithCache,
-      });
-
-      expect(second.type).toBe('stream');
-      expect(proxyClient.send).toHaveBeenCalledTimes(2);
-    });
-
-    it('should release a proxy read slot when the stream errors', async () => {
-      const proxyBackend = new S3StorageBackend({
-        bucket: 'test-bucket',
-        region: 'us-east-1',
-        presignedUrlExpiry: 3600,
-        serveMode: 'proxy' as const,
-        proxyReadConcurrency: 1,
-      });
-      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-      // self-reference instead of `this` (unicorn/no-this-outside-of-class)
-      const erroringStream: Readable = new Readable({
-        read() {
-          erroringStream.destroy(new Error('stream failed'));
-        },
-      });
-      proxyClient.send
-        .mockResolvedValueOnce({ Body: erroringStream, ContentLength: 5 })
-        .mockResolvedValueOnce({ Body: Readable.from([Buffer.from('second')]), ContentLength: 6 });
-
-      const first = await proxyBackend.getServeStrategy('first.jpg', {
-        contentType: 'image/jpeg',
-        cacheControl: CacheControl.PrivateWithCache,
-      });
-      const secondPromise = proxyBackend.getServeStrategy('second.jpg', {
-        contentType: 'image/jpeg',
-        cacheControl: CacheControl.PrivateWithCache,
-      });
-      if (first.type === 'stream') {
-        await expect(
-          (async () => {
-            for await (const _chunk of first.stream) {
-              // drain stream
-            }
-          })(),
-        ).rejects.toThrow('stream failed');
-      }
-      const second = await secondPromise;
-
-      expect(second.type).toBe('stream');
-      expect(proxyClient.send).toHaveBeenCalledTimes(2);
     });
 
     it('should pass the client Range header through to S3 and relay the partial response', async () => {
@@ -512,6 +424,224 @@ describe('S3StorageBackend', () => {
       expect(strategy.type).toBe('redirect');
       expect(mockSend).not.toHaveBeenCalled();
       expect(getSignedUrl).toHaveBeenCalled();
+    });
+  });
+
+  // The proxy read slot belongs to the stream getServeStrategy returns: whatever ends the read, the
+  // slot comes back without the HTTP layer doing more than destroying a stream it stops piping.
+  describe('proxy read slot', () => {
+    const options = { contentType: 'video/mp4', cacheControl: CacheControl.PrivateWithCache };
+    let proxyBackend: S3StorageBackend;
+    let send: Mock<(command: unknown, options: { abortSignal: AbortSignal }) => Promise<unknown>>;
+
+    const activeSlots = () => (proxyBackend as any).proxyReadLimiter.active as number;
+    const serve = async (signal?: AbortSignal) => {
+      const strategy = await proxyBackend.getServeStrategy('upload/user1/video.mp4', { ...options, signal });
+      if (strategy.type !== 'stream') {
+        throw new Error('expected a stream');
+      }
+      return strategy.stream;
+    };
+
+    beforeEach(() => {
+      proxyBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy',
+        proxyReadConcurrency: 1,
+      });
+      send = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value.send;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('is released when the stream is read to the end', async () => {
+      send.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('video')]) });
+
+      const stream = await serve();
+      expect(activeSlots()).toBe(1);
+      await expect(stream.toArray()).resolves.toEqual([Buffer.from('video')]);
+
+      await vi.waitFor(() => expect(activeSlots()).toBe(0));
+    });
+
+    it('is released when the S3 body fails mid-read', async () => {
+      const body = quietBody();
+      send.mockResolvedValueOnce({ Body: body });
+
+      const stream = await serve();
+      body.destroy(new Error('stream failed'));
+
+      await expect(stream.toArray()).rejects.toThrow('stream failed');
+      expect(activeSlots()).toBe(0);
+    });
+
+    it('is released when the consumer destroys the stream, and the S3 body goes with it', async () => {
+      const body = quietBody();
+      send.mockResolvedValueOnce({ Body: body });
+
+      const stream = await serve();
+      stream.destroy();
+
+      await vi.waitFor(() => expect(activeSlots()).toBe(0));
+      expect(body.destroyed).toBe(true);
+    });
+
+    it('is released when GetObject fails', async () => {
+      send.mockRejectedValueOnce(new Error('denied'));
+
+      await expect(serve()).rejects.toThrow('denied');
+      expect(activeSlots()).toBe(0);
+    });
+
+    it('is released, and GetObject aborted, when the client leaves before the stream exists', async () => {
+      send.mockImplementationOnce(abortableSend);
+      const response = new AbortController();
+
+      const pending = serve(response.signal);
+      await vi.waitFor(() => expect(send).toHaveBeenCalled());
+      response.abort();
+
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      expect(activeSlots()).toBe(0);
+    });
+
+    it('is never used by a read whose client left while it waited for a slot', async () => {
+      const first = quietBody();
+      send.mockResolvedValueOnce({ Body: first });
+      const firstStream = await serve();
+      const response = new AbortController();
+
+      const queued = serve(response.signal);
+      response.abort();
+      firstStream.destroy();
+
+      await expect(queued).rejects.toMatchObject({ name: 'AbortError' });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(activeSlots()).toBe(0);
+    });
+
+    it('is never queued for by a client that already left', async () => {
+      send.mockResolvedValueOnce({ Body: quietBody() });
+      const firstStream = await serve();
+      const response = new AbortController();
+      response.abort();
+
+      // the slot is held, so a queued read would hang here instead of rejecting
+      await expect(serve(response.signal)).rejects.toMatchObject({ name: 'AbortError' });
+      expect((proxyBackend as any).proxyReadLimiter.queue).toHaveLength(0);
+      firstStream.destroy();
+      await vi.waitFor(() => expect(activeSlots()).toBe(0));
+    });
+
+    it('never surfaces an idle destroy as an unhandled stream error while the stream is only piped', async () => {
+      // pipe() adds no 'error' listener to its source, and with no signal nothing else does: this
+      // holds only because the backend's own pipeline listens on the stream it returns
+      vi.useFakeTimers();
+      send.mockResolvedValueOnce({ Body: quietBody() });
+      const stream = await serve();
+      stream.pipe(new PassThrough());
+      const uncaught = vi.fn();
+      process.on('uncaughtException', uncaught);
+
+      try {
+        await vi.advanceTimersByTimeAsync(S3_STREAM_IDLE_TIMEOUT_MS);
+        vi.useRealTimers();
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(stream.errored?.message).toBe('S3 stream idle timeout');
+        expect(uncaught).not.toHaveBeenCalled();
+      } finally {
+        process.off('uncaughtException', uncaught);
+      }
+    });
+
+    it('never surfaces an idle destroy as an unhandled error once the S3 body has ended into a stalled consumer', async () => {
+      // the thumbnail endpoint resolves its stream before sendFile, so there is no signal; once the
+      // body has ended into the stream the backend's pipeline completes and drops its listeners,
+      // leaving the idle destroy as the stream's only exit while the client holds the socket open
+      vi.useFakeTimers();
+      send.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('a'), Buffer.from('b')]) });
+      const stream = await serve();
+      stream.pipe(new Writable({ highWaterMark: 1, write: () => {} }));
+      const uncaught = vi.fn();
+      process.on('uncaughtException', uncaught);
+
+      try {
+        await vi.advanceTimersByTimeAsync(S3_STREAM_IDLE_TIMEOUT_MS);
+        vi.useRealTimers();
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(stream.errored?.message).toBe('S3 stream idle timeout');
+        expect(uncaught).not.toHaveBeenCalled();
+        expect(activeSlots()).toBe(0);
+      } finally {
+        process.off('uncaughtException', uncaught);
+      }
+    });
+
+    it('is released when the client leaves after the stream exists but before anything reads it', async () => {
+      // e.g. sendFile throwing between getting the stream and piping it: the error response
+      // closes the response, which aborts its signal
+      const body = quietBody();
+      send.mockResolvedValueOnce({ Body: body });
+      const response = new AbortController();
+
+      const stream = await serve(response.signal);
+      response.abort();
+
+      await vi.waitFor(() => expect(activeSlots()).toBe(0));
+      expect(stream.destroyed).toBe(true);
+      expect(body.destroyed).toBe(true);
+    });
+
+    it('is released, and the S3 body destroyed, after a full idle window with no data', async () => {
+      vi.useFakeTimers();
+      const body = quietBody();
+      send.mockResolvedValueOnce({ Body: body });
+
+      const stream = await serve();
+      const destroy = vi.spyOn(stream, 'destroy');
+
+      await vi.advanceTimersByTimeAsync(S3_STREAM_IDLE_TIMEOUT_MS - 1);
+      expect(destroy).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(destroy).toHaveBeenCalledWith(expect.objectContaining({ message: 'S3 stream idle timeout' }));
+      expect(activeSlots()).toBe(0);
+      expect(body.destroyed).toBe(true);
+    });
+
+    it('measures idleness from the last chunk, not the first', async () => {
+      vi.useFakeTimers();
+      const body = quietBody();
+      send.mockResolvedValueOnce({ Body: body });
+
+      const stream = await serve();
+      stream.resume();
+
+      // keep data flowing across more than two windows: a timer that never reset would have fired
+      for (let elapsed = 0; elapsed < S3_STREAM_IDLE_TIMEOUT_MS * 2.5; elapsed += S3_STREAM_IDLE_TIMEOUT_MS / 4) {
+        await vi.advanceTimersByTimeAsync(S3_STREAM_IDLE_TIMEOUT_MS / 4);
+        body.push(Buffer.from('x'));
+      }
+      await vi.advanceTimersByTimeAsync(S3_STREAM_IDLE_TIMEOUT_MS - 1);
+      expect(stream.destroyed).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(stream.destroyed).toBe(true);
+      expect(activeSlots()).toBe(0);
+    });
+
+    it('clears its idle timer once the read ends', async () => {
+      vi.useFakeTimers();
+      send.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('video')]) });
+
+      const stream = await serve();
+      await stream.toArray();
+
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 
