@@ -264,3 +264,47 @@ receive it. The mobile enum order and its invariant stay for as long as any inst
 2. Space-aware birthdays: Space-shared photos (timeline-enabled Spaces) and Space people's
    birthdates — needs a decision between the two birthdate sources (see #808).
 3. Mobile title for `MemoryTypeEnum.birthday` (only relevant once a client can receive one).
+
+## 2026-10-06 — upstream's memory sync V2 and mobile birthday UI (v3.3.0)
+
+The v3.3.0 release line added two pieces on top of immich-30831. The maintainer's decision was
+**adopt upstream's V2 contract, under the fork's type policy**.
+
+**immich-32167, `MemoriesV2` / `MemoryToAssetsV2`.** Upstream's fix for older clients that cannot
+decode `birthday`: V1 is narrowed to `on_this_day` (for memories and, via a new `getUpsertsV1`, for
+their photo links), and V2 sends every type. The mobile app picks V2 when
+`serverVersion >= 3.3.0`. Taken as shipped, this would have caused three failures on Gallery:
+
+1. **No conflict, silent break.** `syncMemoryAssetsV1` merges cleanly onto the `on_this_day`-only
+   link query, so every installed Gallery app (which syncs V1 and receives rule memories through
+   #1013) would get its rule memories without photos.
+2. A Gallery server reports its own 5.x version, so a stock Immich app at 3.3 or later requests V2
+   from it. Upstream's V2 then sends that app `rule` rows it cannot decode, which aborts its whole
+   sync (the #999/#1013 failure again). V2 also sends `birthday`.
+3. A Gallery app gates V2 on the same version check, so against a released Gallery server (5.7.x,
+   which has no V2) it would request an unknown type, and the whole `/sync/stream` would 400. The
+   same applied to the 3.3-era `AuthUsersV2` and `AssetFacesV3`, already on the rolling branch.
+
+**Resolution.**
+
+- **Server.** One policy, `syncedMemoryTypes(isForkAwareClient)` in `sync.service.ts`: `on_this_day`
+  and `rule` for fork-aware clients, `on_this_day` alone otherwise, `birthday` never. It applies to
+  memories V1 and V2 and to their links V1 and V2. Links use the fork's
+  `MemoryToAssetSync.getUpsertsForTypes`, so a client never receives photos for a memory it was not
+  sent; this closes the "unfiltered `memory_asset` links" residual above. Upstream's
+  `getUpsertsV1` stays in place, unused. `MemoryTypeV1` declares `on_this_day | rule`, which is what
+  a Gallery server sends on V1. Every memory stream stays after the asset-bearing streams (#1033),
+  V2 included.
+- **Mobile.** `AuthUsersV2`, `MemoriesV2`, `MemoryToAssetsV2` and `AssetFacesV3` are requested
+  only when the server declares them (`GET /server/features` → `syncRequestTypes`), never on the
+  version check, which matches the fork's own post-signalling types. Without a declaration the
+  client stays on the earlier version of each stream.
+
+**immich-32165, mobile birthday memory UI.** All memory titles now go through upstream's
+`getMemoryTitle(Translations, Memory, {asset})` / `MemoryTitle`. The fork adds a `rule` branch that
+delegates to its per-rule builder (`memory_card_text.dart` `getRuleMemoryTitle`, #1045) and reads
+its nullable raw-map `MemoryData.year` safely; `MemoryData` gains upstream's `personName`. The local
+memory query now follows upstream and has **no type filter**. The previous
+`isInValues([onThisDay, rule])` existed because mobile could not title `birthday`, which is no
+longer true, and the server-side withholding above remains the guard. Follow-up 3 above is
+therefore done upstream's way.
