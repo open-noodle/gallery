@@ -102,6 +102,7 @@ import {
   getResponseSignal,
 } from 'src/utils/file.js';
 import { clamp } from 'src/utils/misc.js';
+import { ViewerScopeArgs, ViewerSurface, resolveViewerScope } from 'src/utils/viewer-scope.js';
 
 type FaceThumbnailBounds = {
   x1: number;
@@ -391,6 +392,12 @@ export class BaseService {
 
   checkPersonAccess(request: AccessPersonRequest) {
     return checkPersonAccess(this.accessRepository, request);
+  }
+
+  /** Fork: what this viewer may see on a surface — see src/utils/viewer-scope.ts. */
+  resolveViewerScope<S extends ViewerSurface>(...args: ViewerScopeArgs<S>) {
+    const { sharedSpaceRepository, faceIdentityRepository } = this;
+    return resolveViewerScope({ sharedSpaceRepository, faceIdentityRepository }, ...args);
   }
 
   async isSetupAvailable(): Promise<boolean> {
