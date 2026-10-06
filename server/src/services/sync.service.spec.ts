@@ -147,6 +147,9 @@ const makeSub = () => ({
   getUpsertsV2: vi.fn().mockReturnValue(makeStream([])),
   getDeletesV3: vi.fn().mockReturnValue(makeStream([])),
   getUpsertsV3: vi.fn().mockReturnValue(makeStream([])),
+  // memoryToAsset: upstream's on_this_day-only V1 links, and the fork's per-policy links.
+  getUpsertsV1: vi.fn().mockReturnValue(makeStream([])),
+  getUpsertsForTypes: vi.fn().mockReturnValue(makeStream([])),
   getBackfill: vi.fn().mockReturnValue(makeStream([])),
   getCreatedAfter: vi.fn().mockResolvedValue([]),
   getAlbumUsers: vi.fn().mockResolvedValue([{ userId: 'u1', role: AlbumUserRole.Owner }]),
@@ -204,6 +207,10 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
   return subs;
 };
 
+// A stock Immich client requests no gallery-fork-only sync type; a Gallery app always adds SharedSpacesV1.
+const stockClient = (...types: SyncRequestType[]) => types;
+const galleryClient = (...types: SyncRequestType[]) => [...types, SyncRequestType.SharedSpacesV1];
+
 describe(SyncService.name, () => {
   let sut: SyncService;
   let mocks: ServiceMocks;
@@ -217,6 +224,27 @@ describe(SyncService.name, () => {
     mocks.syncCheckpoint.deleteAll.mockResolvedValue(undefined as any);
     mocks.session.resetSyncProgress.mockResolvedValue(undefined as any);
   });
+
+  // Streams one memory of each type and returns the types the client was sent as `entityType`.
+  const streamMemories = async (types: SyncRequestType[], entityType: SyncEntityType) => {
+    const { writable, chunks } = makeWritable();
+    mocks.session.isPendingSyncReset.mockResolvedValue(false);
+    mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+    mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+    syncSubs.memory.getUpserts.mockReturnValue(
+      makeStream([
+        { updateId: newUuid(), id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+        { updateId: newUuid(), id: 'm2', ownerId: 'u1', type: MemoryType.Rule },
+        { updateId: newUuid(), id: 'm3', ownerId: 'u1', type: MemoryType.Birthday },
+      ]),
+    );
+
+    await sut.stream(authStub.user1, writable, { types });
+
+    return parseChunks(chunks)
+      .filter((m: any) => m.type === entityType)
+      .map((m: any) => m.data.type);
+  };
 
   it('should exist', () => {
     expect(sut).toBeDefined();
@@ -697,13 +725,61 @@ describe(SyncService.name, () => {
       mocks.syncCheckpoint.getAll.mockResolvedValue([]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.memoryToAsset.getDeletes.mockReturnValue(makeStream([{ id: deleteId, memoryId: 'm1', assetId: 'a1' }]));
-      syncSubs.memoryToAsset.getUpserts.mockReturnValue(makeStream([{ updateId, memoryId: 'm1', assetId: 'a1' }]));
+      syncSubs.memoryToAsset.getUpsertsForTypes.mockReturnValue(
+        makeStream([{ updateId, memoryId: 'm1', assetId: 'a1' }]),
+      );
 
       await sut.stream(authStub.user1, writable, { types: [SyncRequestType.MemoryToAssetsV1] });
 
       const messages = parseChunks(chunks);
       expect(messages.some((m: any) => m.type === SyncEntityType.MemoryToAssetDeleteV1)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.MemoryToAssetV1)).toBe(true);
+    });
+
+    // immich-32167 added MemoriesV2 / MemoryToAssetsV2 and narrowed V1 to on_this_day. A Gallery
+    // server applies one policy to both versions: a stock Immich app at 3.3+ requests V2 from a
+    // Gallery server (its 5.x version clears upstream's 3.3.0 gate) and cannot decode `rule`, and
+    // installed Gallery apps stay on V1 yet need their rule memories and those memories' photos.
+    describe('memory sync policy across MemoriesV1/V2 and MemoryToAssetsV1/V2', () => {
+      it('should send a stock client on_this_day only, on V1 and on V2', async () => {
+        await expect(streamMemories(stockClient(SyncRequestType.MemoriesV1), SyncEntityType.MemoryV1)).resolves.toEqual(
+          [MemoryType.OnThisDay],
+        );
+        await expect(streamMemories(stockClient(SyncRequestType.MemoriesV2), SyncEntityType.MemoryV2)).resolves.toEqual(
+          [MemoryType.OnThisDay],
+        );
+      });
+
+      it('should send a Gallery client on_this_day and rule, and never birthday, on V1 and on V2', async () => {
+        await expect(
+          streamMemories(galleryClient(SyncRequestType.MemoriesV1), SyncEntityType.MemoryV1),
+        ).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Rule]);
+        await expect(
+          streamMemories(galleryClient(SyncRequestType.MemoriesV2), SyncEntityType.MemoryV2),
+        ).resolves.toEqual([MemoryType.OnThisDay, MemoryType.Rule]);
+      });
+
+      it('should scope memory photo links to the memory types the client is sent', async () => {
+        for (const [types, expected] of [
+          [stockClient(SyncRequestType.MemoryToAssetsV1), [MemoryType.OnThisDay]],
+          [stockClient(SyncRequestType.MemoryToAssetsV2), [MemoryType.OnThisDay]],
+          [galleryClient(SyncRequestType.MemoryToAssetsV1), [MemoryType.OnThisDay, MemoryType.Rule]],
+          [galleryClient(SyncRequestType.MemoryToAssetsV2), [MemoryType.OnThisDay, MemoryType.Rule]],
+        ] as const) {
+          syncSubs.memoryToAsset.getUpsertsForTypes.mockClear();
+          const { writable } = makeWritable();
+          mocks.session.isPendingSyncReset.mockResolvedValue(false);
+          mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+          mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+
+          await sut.stream(authStub.user1, writable, { types: [...types] });
+
+          expect(syncSubs.memoryToAsset.getUpsertsForTypes).toHaveBeenCalledWith(expect.anything(), expected);
+        }
+        // upstream's on_this_day-only and unscoped link queries must not serve either version
+        expect(syncSubs.memoryToAsset.getUpsertsV1).not.toHaveBeenCalled();
+        expect(syncSubs.memoryToAsset.getUpserts).not.toHaveBeenCalled();
+      });
     });
 
     it('should handle StacksV1 sync type', async () => {
@@ -1318,17 +1394,23 @@ describe(SyncService.name, () => {
       SyncRequestType.SharedSpaceAlbumAssetsV1,
     ];
 
-    it('should stream every asset-bearing type before MemoryToAssetsV1', () => {
-      const linkIndex = SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV1);
-      expect(linkIndex).toBeGreaterThan(-1);
+    // immich-32167's V2 link stream writes the same `memory_asset_entity` rows.
+    for (const linkType of [SyncRequestType.MemoryToAssetsV1, SyncRequestType.MemoryToAssetsV2]) {
+      it(`should stream every asset-bearing type before ${linkType}`, () => {
+        const linkIndex = SYNC_TYPES_ORDER.indexOf(linkType);
+        expect(linkIndex).toBeGreaterThan(-1);
 
-      const streamedAfter = assetBearingTypes.filter((type) => SYNC_TYPES_ORDER.indexOf(type) > linkIndex);
-      expect(streamedAfter).toEqual([]);
-    });
+        const streamedAfter = assetBearingTypes.filter((type) => SYNC_TYPES_ORDER.indexOf(type) > linkIndex);
+        expect(streamedAfter).toEqual([]);
+      });
+    }
 
-    it('should stream MemoriesV1 before MemoryToAssetsV1', () => {
+    it('should stream each memory version before its links', () => {
       expect(SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoriesV1)).toBeLessThan(
         SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV1),
+      );
+      expect(SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoriesV2)).toBeLessThan(
+        SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV2),
       );
     });
 
