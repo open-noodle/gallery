@@ -127,17 +127,19 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.locator('[data-testid="detail-panel-filename"]')).toContainText('rebase-smoke.jpg');
   });
 
-  test('Test 5 — editor detail panel: edit controls hidden, file path revealable', async ({ context, page }) => {
+  test('Test 5 — editor detail panel: edit controls visible on a member asset, file path revealable', async ({
+    context,
+    page,
+  }) => {
     await utils.setAuthCookies(context, editor.accessToken);
     await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
     await expect(page.locator('#detail-panel')).toBeVisible();
-    // Since #778 (R3/R10) the whole row is no longer an "edit date" button: the date text became a
-    // contextual filter and the edit action moved onto its own pencil IconButton, gated behind
-    // `{#if isOwner}` in DetailPanelDate.svelte. For non-owners it is not rendered at all, so assert
-    // absence rather than the old empty-`title` proxy. Matches contextual-filters.e2e-spec.ts.
-    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);
+    // #734 (#992): a space Owner/Editor may edit an asset whose owner is a member of the same space.
+    // The owner added this asset directly and is the space's Owner, so the editor gets the date
+    // pencil (DetailPanelDate's gate is DetailPanel's `canEdit`). The viewer still does not (Test 6).
+    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toBeVisible();
     // Since #688 the "Show file location" toggle is gated on asset.originalPath (which the
     // server sends to space members), not on ownership — so editors can reveal the path too.
     await expect(page.getByLabel('Show file location')).toBeVisible();
@@ -149,8 +151,8 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
     await expect(page.locator('#detail-panel')).toBeVisible();
-    // Viewer has same UI gating as editor for these owner-only controls (see Test 5 for why this is
-    // an absence assertion since #778).
+    // A viewer may not edit even a member's asset (#734 widens editing to space Owner/Editor only),
+    // so the date pencil — its own IconButton since #778 — is not rendered at all.
     await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);
     // Since #688 the file-path toggle follows asset.originalPath, not ownership (see Test 5).
     await expect(page.getByLabel('Show file location')).toBeVisible();
