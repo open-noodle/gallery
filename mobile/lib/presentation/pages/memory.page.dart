@@ -13,7 +13,6 @@ import 'package:immich_mobile/presentation/widgets/memory/memory_bottom_info.wid
 import 'package:immich_mobile/presentation/widgets/memory/memory_card.widget.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
-import 'package:immich_mobile/utils/memory_card_text.dart';
 import 'package:immich_mobile/utils/system_ui.utils.dart';
 import 'package:immich_mobile/widgets/memories/memory_epilogue.dart';
 import 'package:immich_mobile/widgets/memories/memory_progress_indicator.dart';

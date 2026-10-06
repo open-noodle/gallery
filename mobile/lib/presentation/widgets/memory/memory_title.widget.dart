@@ -4,16 +4,23 @@ import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/extensions/datetime_extensions.dart';
 import 'package:immich_mobile/extensions/object_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/utils/memory_card_text.dart';
 import 'package:intl/intl.dart';
 
 /// [asset] adds the age at that asset to birthday titles
 String getMemoryTitle(Translations t, Memory memory, {RemoteAsset? asset, bool preferDate = false}) =>
     switch (memory.type) {
+      // Gallery: MemoryData is the fork's raw-map payload (#418), so `year` is nullable.
       MemoryTypeEnum.onThisDay =>
         preferDate
             ? DateFormat.yMMMMd(resolvedDateTimeLocale()).format(memory.memoryAt)
-            : t.years_ago(years: DateTime.now().year - memory.data.year),
+            : switch (memory.data.year) {
+                final year? => t.years_ago(years: DateTime.now().year - year),
+                null => t.memory,
+              },
       MemoryTypeEnum.birthday => _getBirthdayTitle(t, memory.data, asset),
+      // Gallery: rule memories (#418) title through the fork's per-rule builder (#1045).
+      MemoryTypeEnum.rule => getRuleMemoryTitle(memory),
     };
 
 String _getBirthdayTitle(Translations t, MemoryData data, RemoteAsset? asset) {
@@ -22,7 +29,8 @@ String _getBirthdayTitle(Translations t, MemoryData data, RemoteAsset? asset) {
     return t.unknown;
   }
 
-  final age = asset?.let((asset) => asset.createdAt.toLocal().year - data.year);
+  final birthYear = data.year;
+  final age = birthYear == null ? null : asset?.let((asset) => asset.createdAt.toLocal().year - birthYear);
   if (age == null || age < 1) {
     return t.birthday_memory_title(name: name);
   }
