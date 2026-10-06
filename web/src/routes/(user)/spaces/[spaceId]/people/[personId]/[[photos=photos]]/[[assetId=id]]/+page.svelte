@@ -19,12 +19,12 @@
   import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '$lib/route';
-  import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import {
     createCrossOwnerMergeHandlers,
     runMergeWithCrossOwnerConfirmation,
     runScopedMergeWithCrossOwnerConfirmation,
   } from '$lib/utils/cross-owner-merge';
+  import { getGlobalPersonThumbnailUrl, getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { locale } from '$lib/stores/preferences.store';
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
@@ -123,11 +123,7 @@
   );
   const getSpacePersonRoute = (personId: string) => Route.viewSpacePerson(space.id, personId, previousRouteParams);
   let thumbnailRefresh = $state<string | null>(null);
-  const thumbnailUrl = $derived(
-    createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, {
-      updatedAt: thumbnailRefresh ?? person.updatedAt,
-    }),
-  );
+  const thumbnailUrl = $derived(getSpacePersonThumbnailUrl(person, thumbnailRefresh ?? person.updatedAt));
   const suggestionPerson = $derived({ id: person.id, name: person.name } as PersonResponseDto);
   let suggestionTotal = $state(0);
   let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
@@ -273,10 +269,6 @@
     }
   };
 
-  const getThumbUrl = (person: SharedSpacePersonResponseDto): string => {
-    return createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt });
-  };
-
   const isSharedSpacePerson = (person: ScopedMergeCandidate): person is SharedSpacePersonResponseDto =>
     'assetCount' in person;
 
@@ -290,22 +282,8 @@
 
   const getMergeDisplayName = (person: ScopedMergeCandidate) => person.name || '';
 
-  const getMergeThumbnailUrl = (person: ScopedMergeCandidate): string => {
-    if (isSharedSpacePerson(person)) {
-      return createUrl(`/shared-spaces/${person.spaceId ?? space.id}/people/${person.id}/thumbnail`, {
-        updatedAt: person.updatedAt,
-      });
-    }
-
-    const profile = person.primaryProfile;
-    if (profile?.type === 'space-person' && profile.spaceId) {
-      return createUrl(`/shared-spaces/${profile.spaceId}/people/${profile.id}/thumbnail`, {
-        updatedAt: person.updatedAt,
-      });
-    }
-
-    return getPeopleThumbnailUrl(person);
-  };
+  const getMergeThumbnailUrl = (person: ScopedMergeCandidate): string =>
+    isSharedSpacePerson(person) ? getSpacePersonThumbnailUrl(person) : getGlobalPersonThumbnailUrl(person);
 
   const loadMergePeople = () => getSpacePeople({ id: space.id, limit: PAGE_SIZE });
 
@@ -770,7 +748,7 @@
                       <ImageThumbnail
                         circle
                         shadow
-                        url={getThumbUrl(suggestedPerson)}
+                        url={getSpacePersonThumbnailUrl(suggestedPerson)}
                         altText={suggestedPerson.name}
                         widthStyle="2rem"
                         heightStyle="2rem"

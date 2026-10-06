@@ -6,12 +6,8 @@
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
-  import {
-    appendUniqueById,
-    getSpacePersonThumbnailUrl,
-    orderPickerCandidates,
-    zoomImageToBase64,
-  } from '$lib/utils/people-utils';
+  import { appendUniqueById, orderPickerCandidates, zoomImageToBase64 } from '$lib/utils/people-utils';
+  import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import {
     attachSpacePersonFace,
@@ -194,7 +190,7 @@
         id: person.id,
         name: person.name,
         isHidden: person.isHidden,
-        thumbnailUrl: getSpacePersonThumbnailUrl(spaceId, person.id, person.updatedAt),
+        thumbnailUrl: getSpacePersonThumbnailUrl({ spaceId, id: person.id }, person.updatedAt),
       })),
     ),
   );
