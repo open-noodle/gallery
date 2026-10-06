@@ -1566,3 +1566,37 @@ describe('deleteSpaceAssetFace', () => {
     expect(projectionRows).toEqual([{ personId: person.id, assetFaceId: faceId }]);
   });
 });
+
+// SharedSpaceFaceMatch creates an UNNAMED space person for a face's identity whenever it runs after
+// the face exists. An editor who then types a name and taps "Create person" on that face reaches the
+// same row through createOrGetPersonForIdentity, and the name they typed used to be dropped (the
+// e2e "creates a brand-new space person" case, failing whenever the job beat the click).
+describe('create person on a face whose identity already has a space person', () => {
+  it('names the unnamed space person face-match created', async () => {
+    const { sut, ctx, auth, space, faceId, carolIdentity } = await newCarolFixture();
+    const blank = await ctx
+      .get(SharedSpaceRepository)
+      .createOrGetPersonForIdentity({ spaceId: space.id, identityId: carolIdentity.id, name: '' });
+
+    const created = await sut.createSpacePerson(auth, space.id, { name: 'Jessica', assetFaceId: faceId });
+
+    expect(created).toMatchObject({ id: blank.id, name: 'Jessica' });
+    const stored = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select('name')
+      .where('id', '=', blank.id)
+      .executeTakeFirstOrThrow();
+    expect(stored.name).toBe('Jessica');
+  });
+
+  it('never renames a space person someone already named', async () => {
+    const { sut, ctx, auth, space, faceId, carolIdentity } = await newCarolFixture();
+    const named = await ctx
+      .get(SharedSpaceRepository)
+      .createOrGetPersonForIdentity({ spaceId: space.id, identityId: carolIdentity.id, name: 'Uncle Tom' });
+
+    const created = await sut.createSpacePerson(auth, space.id, { name: 'Jessica', assetFaceId: faceId });
+
+    expect(created).toMatchObject({ id: named.id, name: 'Uncle Tom' });
+  });
+});
