@@ -713,14 +713,14 @@ export class SharedSpaceService extends BaseService {
     await this.requireMembership(auth, spaceId);
     const callerId = auth.user.id;
 
-    const before = await this.countOwnTimeline(callerId);
+    const before = await this.countOwnTimeline(auth);
     // Both reads run inside the SAME rolled-back transaction, so they observe one consistent
     // hypothetical state: `after` is the whole timeline, `retained` narrows it to this space.
     const { after, retained } = await this.sharedSpaceRepository.previewInRolledBackTransaction(
       (trx) => this.sharedSpaceRepository.updateMember(spaceId, callerId, { showInTimeline: false }, trx).then(),
       async (trx) => ({
-        after: await this.countOwnTimeline(callerId, trx),
-        retained: await this.countOwnTimeline(callerId, trx, spaceId),
+        after: await this.countOwnTimeline(auth, trx),
+        retained: await this.countOwnTimeline(auth, trx, spaceId),
       }),
     );
 
@@ -742,14 +742,14 @@ export class SharedSpaceService extends BaseService {
     await this.requireAlbumLinked(spaceId, albumId);
     const callerId = auth.user.id;
 
-    const before = await this.countOwnTimeline(callerId);
+    const before = await this.countOwnTimeline(auth);
     // Both reads run inside the SAME rolled-back transaction, so they observe one consistent
     // hypothetical state — mirrors getTimelineHidePreview above.
     const { after, retained } = await this.sharedSpaceRepository.previewInRolledBackTransaction(
       (trx) => this.sharedSpaceRepository.hideAlbumForUser(spaceId, albumId, callerId, trx),
       async (trx) => ({
-        after: await this.countOwnTimeline(callerId, trx),
-        retained: await this.countOwnTimeline(callerId, trx, undefined, { spaceId, albumId }),
+        after: await this.countOwnTimeline(auth, trx),
+        retained: await this.countOwnTimeline(auth, trx, undefined, { spaceId, albumId }),
       }),
     );
 
@@ -764,7 +764,7 @@ export class SharedSpaceService extends BaseService {
   // `retainedAssetCount` is measured: after the hypothetical hide, anything still counted here is a
   // photo of that space some OTHER visible path is keeping on the timeline (§3).
   private async countOwnTimeline(
-    callerId: string,
+    auth: AuthDto,
     db?: Kysely<DB> | Transaction<DB>,
     spaceId?: string,
     // #1041 follow-up: narrows the same count to ONE linked album, which is how the album preview's
@@ -773,18 +773,15 @@ export class SharedSpaceService extends BaseService {
     // the album.
     album?: { spaceId: string; albumId: string },
   ): Promise<number> {
-    const [hiddenScope, spaceRows] = await Promise.all([
-      this.sharedSpaceRepository.getTimelineHiddenScope(callerId, db),
-      this.sharedSpaceRepository.getSpaceIdsForTimeline(callerId, db),
-    ]);
-    const timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+    const callerId = auth.user.id;
+    const scope = await this.resolveViewerScope(auth, 'timeline', { userId: callerId, withSharedSpaces: true }, db);
     return this.assetRepository.getTimelineAssetCount(
       {
         userIds: [callerId],
         callerId,
-        hiddenScope,
-        timelineSpaceIds: timelineSpaceIds.length > 0 ? timelineSpaceIds : undefined,
-        visibleSpaceIds: timelineSpaceIds,
+        timelineSpaceIds: scope.timelineSpaceIds,
+        hiddenScope: scope.hiddenScope,
+        visibleSpaceIds: scope.visibleSpaceIds,
         spaceId,
         albumId: album?.albumId,
         albumSpaceIds: album ? [album.spaceId] : undefined,
@@ -1642,61 +1639,14 @@ export class SharedSpaceService extends BaseService {
       await this.requireAccess({ auth, permission: Permission.AlbumRead, ids: [dto.albumId] });
     }
 
-    // timelineSpaceIds has TWO independent consumers, and they do NOT want it under the same
-    // conditions. Conflating them has now produced the same silently-empty map twice (00a7fd6bac,
-    // and again below), so they are computed as two separate predicates.
-    //
-    // CONSUMER 1 — the space-scope WIDENING (searchAssetBuilder, database.ts:688). It only applies
-    // to the plain (non-album, non-space) query, where it widens the result to shared-space assets
-    // in the caller's timeline. It is skipped for a favorites query: `isFavorite` is the asset
-    // OWNER'S flag, so widening would pin other members' favourites on the caller's favourites map
-    // (timeline.service.ts:158-168 refuses the same combination outright rather than answer it).
-    //
-    // The album map matches the album grid on SCOPE: album ACCESS (AlbumRead, checked above) IS the
-    // boundary for an album query — same as the album grid (asset.repository.ts
-    // withTimeBucketAssetFilters, a plain album_asset join with no space scoping) and the pre-fork
-    // GET /albums/{id}/map-markers endpoint (map.repository.ts). Re-gating an album query by the
-    // caller's shared-space timeline visibility on top of that hid pins the grid shows — whenever a
-    // shared album asset also lived in a space the caller wasn't a member of, or had simply toggled
-    // out of their timeline (#656). (It matches the grid on VISIBILITY too — see the `visibility`
-    // option below.) On the album path timelineSpaceIds is therefore inert for the gate (albumAccessIsBoundary
-    // skips albumSharedSpaceScope, and with userIds unset the widening arm cannot fire either).
-    // #763: `isFavorite` used to be carved out here, because favourites lived on `asset.isFavorite`
-    // (the OWNER's flag) and widening to timeline spaces would have surfaced other members' assets
-    // under the caller's own favourite filter. The overlay makes the filter per-user — searchAssetBuilder
-    // resolves it from `asset_favorite` for `authUserId` — so a member's favourite inside a space is
-    // theirs, and the widening is correct rather than a leak.
-    const spaceScopeWidensToTimelineSpaces = !dto.spaceId && dto.withSharedSpaces === true;
-
-    // CONSUMER 2 — scoped person-token resolution. resolveScopedMapPersonFilters forwards
-    // timelineSpaceIds to faceIdentityRepository.resolveScopedPersonTokens to resolve
-    // `space-person:<id>` tokens: face-identity.repository.ts's spaceMatchesScope requires
-    // timelineSpaceIds.size > 0 whenever withSharedSpaces is truthy, or it treats the token as
-    // inaccessible -> hasInaccessibleToken -> forceEmptyResult -> ZERO pins. This consumer is
-    // conditioned on neither albumId nor isFavorite — a caller can combine
-    // ?withSharedSpaces=true&isFavorite=true&personIds=space-person:<id> (the /photos favourite chip
-    // and person chip are one-click co-reachable, and its map icon carries both), just as they can
-    // combine ?albumId=&withSharedSpaces=true&personIds=space-person:<id>. Narrowing this predicate
-    // to the widening one starves it and silently empties the map for a legitimate space member —
-    // that was the albumId bug fixed in 00a7fd6bac, and the isFavorite bug fixed here. So do NOT
-    // re-fold this back into the condition above.
-    const hasScopedPersonTokens = !dto.spaceId && !!dto.personIds?.some((token) => token.includes(':'));
-    const personScopeNeedsTimelineSpaceIds = dto.withSharedSpaces === true && hasScopedPersonTokens;
-
-    let timelineSpaceIds: string[] | undefined;
-    if (spaceScopeWidensToTimelineSpaces || personScopeNeedsTimelineSpaceIds) {
-      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-      if (spaceRows.length > 0) {
-        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
-      }
-    }
-
-    const scopedPersonFilters = await this.resolveScopedMapPersonFilters(auth, {
+    // Under a space scope the endpoint's person ids are that space's people. The album map matches the
+    // album grid on SCOPE: album ACCESS (checked above) is the boundary, so the viewer's timeline spaces
+    // never widen or re-gate it (#656) — see the `filtered-map` row in src/utils/viewer-scope.ts for
+    // when they widen the query and when they only resolve person tokens.
+    const scope = await this.resolveViewerScope(auth, 'filtered-map', {
+      ...dto,
       personIds: dto.spaceId ? undefined : dto.personIds,
       spacePersonIds: dto.spaceId ? dto.personIds : undefined,
-      withSharedSpaces: dto.withSharedSpaces,
-      timelineSpaceIds,
-      spaceId: dto.spaceId,
     });
 
     const markers = await this.sharedSpaceRepository.getFilteredMapMarkers({
@@ -1711,13 +1661,11 @@ export class SharedSpaceService extends BaseService {
       authUserId: auth.user.id,
       spaceId: dto.spaceId,
       albumAccessIsBoundary: !!dto.albumId,
-      // Consumer 1 only (see above): a favorites query resolved timelineSpaceIds purely to make its
-      // space-person tokens resolvable, and must NOT be widened by it — the query stays owner-scoped.
-      timelineSpaceIds: spaceScopeWidensToTimelineSpaces ? timelineSpaceIds : undefined,
-      personIds: scopedPersonFilters.personIds,
-      spacePersonIds: scopedPersonFilters.spacePersonIds,
-      identityIds: scopedPersonFilters.identityIds,
-      forceEmptyResult: scopedPersonFilters.forceEmptyResult,
+      timelineSpaceIds: scope.timelineSpaceIds,
+      personIds: scope.personIds,
+      spacePersonIds: scope.spacePersonIds,
+      identityIds: scope.identityIds,
+      forceEmptyResult: scope.forceEmptyResult,
       tagIds: dto.tagIds,
       make: dto.make,
       model: dto.model,
@@ -1765,44 +1713,6 @@ export class SharedSpaceService extends BaseService {
       state: marker.state ?? null,
       country: marker.country ?? null,
     }));
-  }
-
-  private async resolveScopedMapPersonFilters(
-    auth: AuthDto,
-    filters: {
-      personIds?: string[];
-      spacePersonIds?: string[];
-      identityIds?: string[];
-      forceEmptyResult?: boolean;
-      withSharedSpaces?: boolean;
-      timelineSpaceIds?: string[];
-      spaceId?: string;
-    },
-  ) {
-    const tokens = filters.personIds?.filter(Boolean) ?? [];
-    const hasScopedTokens = tokens.some((token) => token.includes(':'));
-
-    if (tokens.length === 0 || !hasScopedTokens) {
-      return filters;
-    }
-
-    const resolution = await this.faceIdentityRepository.resolveScopedPersonTokens({
-      userId: auth.user.id,
-      tokens,
-      scope: {
-        withSharedSpaces: filters.withSharedSpaces,
-        timelineSpaceIds: filters.timelineSpaceIds,
-        spaceId: filters.spaceId,
-      },
-    });
-
-    return {
-      ...filters,
-      personIds: resolution.legacyPersonIds,
-      identityIds: resolution.identityIds,
-      spacePersonIds: [...new Set([...(filters.spacePersonIds ?? []), ...resolution.legacySpacePersonIds])],
-      forceEmptyResult: filters.forceEmptyResult || resolution.hasInaccessibleToken,
-    };
   }
 
   async getSpacePeople(
