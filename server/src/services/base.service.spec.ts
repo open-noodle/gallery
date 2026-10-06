@@ -1,4 +1,8 @@
+import { EventEmitter } from 'node:events';
+import { CacheControl } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import { sendFile } from 'src/utils/file.js';
 import { newTestService } from 'test/utils.js';
 
 describe(BaseService.name, () => {
@@ -55,6 +59,27 @@ describe(BaseService.name, () => {
       vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
 
       await expect((sut as any).ensureLocalFile('upload/user/abc.jpg')).rejects.toThrow('S3 unavailable');
+    });
+  });
+
+  describe('serveFromBackend', () => {
+    it('hands the backend the signal of the response it is serving', async () => {
+      const backend = { getServeStrategy: vi.fn().mockResolvedValue({ type: 'redirect', url: 'https://s3/key' }) };
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+      const res = Object.assign(new EventEmitter(), { set: vi.fn(), redirect: vi.fn() }) as any;
+
+      await sendFile(
+        res,
+        vi.fn(),
+        () => (sut as any).serveFromBackend('upload/user/abc.mp4', 'video/mp4', CacheControl.None),
+        { debug: vi.fn(), error: vi.fn() } as unknown as LoggingRepository,
+      );
+
+      const { signal } = backend.getServeStrategy.mock.calls[0][1];
+      expect(signal.aborted).toBe(false);
+      res.emit('close');
+      expect(signal.aborted).toBe(true);
     });
   });
 });

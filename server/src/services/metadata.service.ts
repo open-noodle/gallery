@@ -4,7 +4,6 @@ import { Insertable } from 'kysely';
 import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration, FixedOffsetZone } from 'luxon';
 import { Stats } from 'node:fs';
-import { constants } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, parse } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
@@ -269,12 +268,8 @@ export class MetadataService extends BaseService {
 
     const { localPath: localOriginal, cleanup: cleanupOriginal } = await this.ensureLocalFile(asset.originalPath);
     try {
-      // Download sidecar to temp if it's an S3 path
       const { sidecarFile } = getAssetFiles(asset.files);
-      let localSidecar: { localPath: string; cleanup: () => Promise<void> } | undefined;
-      if (sidecarFile && !isAbsolute(sidecarFile.path)) {
-        localSidecar = await this.ensureLocalFile(sidecarFile.path);
-      }
+      const localSidecar = sidecarFile ? await this.ensureLocalFile(sidecarFile.path) : undefined;
 
       try {
         const [exifResult, stats] = await Promise.all([
@@ -484,14 +479,9 @@ export class MetadataService extends BaseService {
 
     let sidecarPath = null;
     for (const candidate of this.getSidecarCandidates(asset)) {
-      let exists: boolean;
-      if (isAbsolute(candidate)) {
-        exists = await this.storageRepository.checkFileExists(candidate, constants.R_OK);
-      } else {
-        const backend = StorageService.resolveBackendForKey(candidate);
-        exists = await backend.exists(candidate);
-      }
-      if (!exists) {
+      const backend = await this.backendFor(candidate);
+      const isExists = await backend.exists(candidate, { readable: true });
+      if (!isExists) {
         continue;
       }
 

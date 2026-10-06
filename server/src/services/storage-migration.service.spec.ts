@@ -1,10 +1,17 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import { Mock } from 'vitest';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
-import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
+import { ServiceMocks, automock, makeStream, newTestService } from 'test/utils.js';
 
 describe(StorageMigrationService.name, () => {
   let sut: StorageMigrationService;
@@ -22,7 +29,7 @@ describe(StorageMigrationService.name, () => {
   let mockS3Backend: {
     exists: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
-    put: ReturnType<typeof vi.fn>;
+    put: Mock<(key: string, source: Readable) => Promise<unknown>>;
     delete: ReturnType<typeof vi.fn>;
     getServeStrategy: ReturnType<typeof vi.fn>;
     downloadToTemp: ReturnType<typeof vi.fn>;
@@ -383,6 +390,34 @@ describe(StorageMigrationService.name, () => {
       expect(mockS3Backend.put).not.toHaveBeenCalled();
       expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
     });
+
+    it.skipIf(process.getuid?.() === 0)(
+      'should fail, not skip as missing, a disk source that exists but cannot be read',
+      async () => {
+        const mediaLocation = await mkdtemp(join(tmpdir(), 'gallery-migration-'));
+        const sourcePath = join(mediaLocation, 'file.jpg');
+        await writeFile(sourcePath, 'data', { mode: 0o000 });
+        vi.spyOn(StorageService, 'getDiskBackend').mockReturnValue(
+          new DiskStorageBackend(
+            mediaLocation,
+            // eslint-disable-next-line no-sparse-arrays
+            new StorageRepository(automock(LoggingRepository, { args: [, { getEnv: () => ({}) }], strict: false })),
+          ),
+        );
+        mockS3Backend.exists.mockResolvedValue(false);
+        // read the source like S3's Upload does, which is where the permission error surfaces
+        mockS3Backend.put.mockImplementation(async (_key: string, stream: Readable) => {
+          await stream.toArray();
+        });
+
+        try {
+          await expect(sut.handleMigration({ ...baseJob, sourcePath })).resolves.toBe(JobStatus.Failed);
+          expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
+        } finally {
+          await rm(mediaLocation, { recursive: true, force: true });
+        }
+      },
+    );
 
     it('should skip copy when target already exists (idempotency) but still update DB and log', async () => {
       mockDiskBackend.exists.mockResolvedValue(true);

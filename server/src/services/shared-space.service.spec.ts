@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
@@ -33,7 +32,6 @@ import {
   SharedSpaceService,
   sharedSpaceAlbumFolderDepthMessage,
 } from 'src/services/shared-space.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy.js';
 import { factory, newDate, newUuid } from 'test/small.factory.js';
@@ -324,10 +322,6 @@ type SpaceMergeAuthorizerFn = (plan: {
 describe(SharedSpaceService.name, () => {
   let sut: SharedSpaceService;
   let mocks: ServiceMocks;
-
-  beforeAll(() => {
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
-  });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(SharedSpaceService));

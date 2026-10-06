@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import sanitize from 'sanitize-filename';
 import type { ClassConstructor, GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE, SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFace, UserAdmin } from 'src/database.js';
@@ -13,7 +14,7 @@ import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
 import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
 import { computePhysicalUsage } from 'src/gallery/storage-usage.js';
-import { RangeNotSatisfiableError, ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
+import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -98,6 +99,7 @@ import {
   ImmichMediaResponse,
   ImmichRedirectResponse,
   ImmichStreamResponse,
+  getResponseSignal,
 } from 'src/utils/file.js';
 import { clamp } from 'src/utils/misc.js';
 
@@ -418,9 +420,7 @@ export class BaseService {
     disposition: ContentDisposition = 'inline',
     options: { range?: string; acceptsRanges?: boolean } = {},
   ): Promise<ImmichMediaResponse> {
-    // lazy import to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('./storage.service.js');
-    const backend = StorageService.resolveBackendForKey(filePath);
+    const backend = await this.backendFor(filePath);
     let strategy: ServeStrategy;
     try {
       strategy = await backend.getServeStrategy(filePath, {
@@ -429,6 +429,7 @@ export class BaseService {
         fileName,
         disposition,
         range: options.range,
+        signal: getResponseSignal(),
       });
     } catch (error) {
       if (error instanceof RangeNotSatisfiableError) {
@@ -481,12 +482,7 @@ export class BaseService {
    *          in a `finally` block.
    */
   protected async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
-    if (isAbsolute(filePath)) {
-      return { localPath: filePath, cleanup: async () => {} };
-    }
-    // lazy import to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('./storage.service.js');
-    const backend = StorageService.resolveBackendForKey(filePath);
+    const backend = await this.backendFor(filePath);
     const { tempPath, cleanup } = await backend.downloadToTemp(filePath);
     return { localPath: tempPath, cleanup };
   }
@@ -497,12 +493,23 @@ export class BaseService {
    * does NOT download the object, so it is safe to call inside a request handler.
    */
   protected async getProbeInput(filePath: string): Promise<string> {
-    if (isAbsolute(filePath)) {
-      return filePath;
+    const backend = await this.backendFor(filePath);
+    return backend.getReadableUrl(filePath);
+  }
+
+  /**
+   * The storage backend that owns `key`: disk for an absolute path, built over this service's
+   * StorageRepository so disk I/O goes where upstream code (and its specs) expect it; otherwise
+   * whatever StorageService resolves for a relative key.
+   */
+  protected async backendFor(key: string): Promise<StorageBackend> {
+    if (isAbsolute(key)) {
+      // the media location only resolves relative keys, and this backend is only given absolute ones
+      return new DiskStorageBackend('', this.storageRepository);
     }
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('./storage.service.js');
-    return StorageService.resolveBackendForKey(filePath).getReadableUrl(filePath);
+    return StorageService.resolveBackendForKey(key);
   }
 
   protected async getFaceThumbnailSource(assetId: string): Promise<string | null> {

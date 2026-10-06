@@ -477,14 +477,10 @@ export class NotificationService extends BaseService {
     const filePath = albumThumbnailFiles[0].path;
     const filename = `album-thumbnail${getFilenameExtension(filePath)}`;
 
+    // a disk thumbnail is attached by path for the mailer to read; an S3 key has no path to give it
     if (!isAbsolute(filePath)) {
-      const backend = StorageService.resolveBackendForKey(filePath);
-      const { stream } = await backend.get(filePath);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      return { filename, cid: 'album-thumbnail', content: Buffer.concat(chunks) };
+      const content = await StorageService.resolveBackendForKey(filePath).readAll(filePath);
+      return { filename, cid: 'album-thumbnail', content };
     }
 
     return { filename, cid: 'album-thumbnail', path: filePath };
