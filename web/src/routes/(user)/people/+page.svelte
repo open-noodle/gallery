@@ -19,6 +19,7 @@
   import { getPersonActions, isSpaceEditor, updatePersonName } from '$lib/services/person.service';
   import Dropdown from '$lib/elements/Dropdown.svelte';
   import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
   import { websocketEvents } from '$lib/stores/websocket';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { handlePromiseError } from '$lib/utils';
@@ -50,7 +51,6 @@
   } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import type { PageData } from './$types';
 
   interface Props {
@@ -334,26 +334,16 @@
   const isSpacePrimary = (person: PersonResponseDto) =>
     person.primaryProfile?.type === 'space-person' && !!person.primaryProfile.spaceId;
 
-  // Space-person renames need the editor role; resolve it once per space as people load
-  // and default to allowing edits until known (the server enforces the role regardless).
-  const requestedSpaceRoles = new SvelteSet<string>();
-  const editableSpaces = new SvelteMap<string, boolean>();
+  // Space-person renames need the owner/editor role, read from the spaces list; rows stay editable
+  // until it says otherwise (the server enforces the role regardless).
   $effect(() => {
-    for (const person of people) {
-      const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
-      if (!spaceId || requestedSpaceRoles.has(spaceId)) {
-        continue;
-      }
-
-      requestedSpaceRoles.add(spaceId);
-      void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
-        editableSpaces.set(spaceId, editable);
-      });
+    if (people.some((person) => isSpacePrimary(person))) {
+      loadSpaces();
     }
   });
   const canEditSpacePerson = (person: PersonResponseDto) => {
     const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
-    return !spaceId || (editableSpaces.get(spaceId) ?? true);
+    return !spaceId || isSpaceEditor(userInteraction.recentSpaces, spaceId, authManager.user.id);
   };
   const canEditName = (person: PersonResponseDto) =>
     isPersonalPrimary(person) || (isSpacePrimary(person) && canEditSpacePerson(person));

@@ -110,7 +110,7 @@ class _PersonName extends ConsumerWidget {
       FixedEditability(:final canEdit) => canEdit,
       PerPersonSpaceRole() => switch (person.spaceId) {
         null => true,
-        final spaceId => ref.watch(driftSpaceEditableProvider(spaceId)).value ?? true,
+        final spaceId => ref.watch(driftSpaceEditableProvider(spaceId)).valueOrNull ?? true,
       },
     };
 

@@ -45,6 +45,7 @@
     updatePersonRepresentativeFace,
   } from '$lib/services/person.service';
   import { lang, locale } from '$lib/stores/preferences.store';
+  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
   import { websocketEvents } from '$lib/stores/websocket';
   import { getPeopleThumbnailUrl } from '$lib/utils';
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
@@ -417,21 +418,19 @@
     await updateAssetCount();
   };
 
-  // Space-person writes need the editor role; default to offering the actions until the
-  // membership resolves (the server enforces the role on every write regardless).
-  let canEditSpacePerson = $state(true);
+  // Space-person writes need the owner/editor role, read from the spaces list; offered until it says
+  // otherwise (the server enforces the role on every write regardless).
+  const personSpaceId = $derived(
+    person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined,
+  );
   $effect(() => {
-    const profile = person.primaryProfile;
-    canEditSpacePerson = true;
-    if (profile?.type === 'space-person' && profile.spaceId) {
-      const spaceId = profile.spaceId;
-      void isSpaceEditor(spaceId, authManager.user.id).then((editable) => {
-        if (person.primaryProfile?.spaceId === spaceId) {
-          canEditSpacePerson = editable;
-        }
-      });
+    if (personSpaceId) {
+      loadSpaces();
     }
   });
+  const canEditSpacePerson = $derived(
+    !personSpaceId || isSpaceEditor(userInteraction.recentSpaces, personSpaceId, authManager.user.id),
+  );
 
   let suggestionTotal = $state(0);
   let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
