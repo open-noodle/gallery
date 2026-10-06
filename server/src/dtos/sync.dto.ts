@@ -309,7 +309,8 @@ const SyncMemoryV1Schema = z
     updatedAt: isoDatetimeToDate.describe('Updated at'),
     deletedAt: isoDatetimeToDate.nullable().describe('Deleted at'),
     ownerId: z.uuidv4().describe('Owner ID'),
-    type: MemoryTypeSchema.extract(['OnThisDay']).meta({ id: 'MemoryTypeV1' }),
+    // Gallery: V1 also carries rule memories to fork-aware clients (#1013); birthday stays withheld.
+    type: MemoryTypeSchema.extract(['OnThisDay', 'Rule']).meta({ id: 'MemoryTypeV1' }),
     data: z.record(z.string(), z.unknown()).describe('Data'),
     isSaved: z.boolean().describe('Is saved'),
     memoryAt: isoDatetimeToDate.describe('Memory at'),
