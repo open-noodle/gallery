@@ -2244,12 +2244,19 @@ export class SharedSpaceService extends BaseService {
         await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
 
         const existingIdentityId = await this.faceIdentityRepository.getIdentityIdForFace(assetFaceId, trx);
-        const created = existingIdentityId
+        let created = existingIdentityId
           ? await this.sharedSpaceRepository.createOrGetPersonForIdentity(
               { spaceId, identityId: existingIdentityId, name: dto.name ?? '' },
               trx,
             )
           : await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' }, trx);
+
+        // The identity's space person can already exist, unnamed: SharedSpaceFaceMatch creates one
+        // whenever it reaches this face first. The caller asked for a person with this name, so name
+        // that row rather than hand back a blank one. A person someone already named keeps its name.
+        if (dto.name?.trim() && !created.name.trim()) {
+          created = await this.sharedSpaceRepository.updatePerson(created.id, { name: dto.name }, trx);
+        }
 
         await this.linkFaceToSpacePerson(trx, created, assetFaceId, { writeIdentity: true });
         return created;
