@@ -1,5 +1,4 @@
 import 'package:easy_localization/easy_localization.dart' show StringTranslateExtension;
-import 'package:flutter/widgets.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/message_format.dart';
@@ -122,7 +121,7 @@ String? _buildTitle(String ruleId, Map<String, dynamic> context, Translate trans
 }
 
 /// The localized title for [memory]. Pure, so it can be tested without a widget tree; use
-/// [getMemoryTitle] from UI code.
+/// [getRuleMemoryTitle] from UI code.
 String buildMemoryTitle(Memory memory, {required Translate translate, required String locale, DateTime? now}) {
   final serverTitle = memory.data.title;
   if (serverTitle != null && serverTitle.isNotEmpty) {
@@ -152,20 +151,23 @@ String buildMemoryTitle(Memory memory, {required Translate translate, required S
 /// What the deleted `String.t()` extension did (immich-30672 removed it in favour of a typed
 /// accessor): look the key up, then run the result through ICU MessageFormat when there are args.
 /// The typed accessor cannot be used here because the key is chosen at runtime from the rule id.
-String _translate(BuildContext context, String key, {Map<String, Object>? args}) {
+String _translate(String key, {Map<String, Object>? args}) {
   try {
-    final message = key.tr(context: context);
+    final message = key.tr();
     return args == null ? message : MessageFormat(message, locale: Intl.defaultLocale ?? 'en').format(args);
   } catch (_) {
-    // Same fallback the deleted helper had: with no EasyLocalization ancestor (widget tests, an
+    // Same fallback the deleted helper had: with easy_localization not ready (widget tests, an
     // early frame) return the key rather than throwing out of a title getter.
     return key;
   }
 }
 
-String getMemoryTitle(BuildContext context, Memory memory) => buildMemoryTitle(
+/// The title upstream's `getMemoryTitle` switch (memory_title.widget.dart) uses for rule memories.
+/// Context-free, like the generated `StaticTranslations`: easy_localization's global instance
+/// serves the same locale the widget tree does, and upstream's switch only receives `Translations`.
+String getRuleMemoryTitle(Memory memory) => buildMemoryTitle(
   memory,
-  translate: (key, {args}) => _translate(context, key, args: args),
+  translate: _translate,
   // Same source easy_localization's own MessageFormat call uses, so dates and messages agree.
   locale: Intl.defaultLocale ?? 'en',
 );
