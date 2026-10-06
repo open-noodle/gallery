@@ -32,8 +32,12 @@ const FilteredMapMarkerSchema = z
     model: z.string().optional().describe('Camera model'),
     rating: z.coerce.number().min(1).max(5).optional().describe('Minimum star rating'),
     type: MapMediaTypeSchema.optional().describe('Filter by media type'),
-    takenAfter: isoDatetimeToDate.optional().describe('Filter assets taken after this date'),
-    takenBefore: isoDatetimeToDate.optional().describe('Filter assets taken before this date'),
+    takenAfter: isoDatetimeToDate
+      .optional()
+      .describe('Filter assets taken on or after this local date and time (inclusive)'),
+    takenBefore: isoDatetimeToDate
+      .optional()
+      .describe('Filter assets taken before this local date and time (exclusive)'),
     isFavorite: stringToBool.optional().describe('Filter by favorite status'),
     isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
     isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),

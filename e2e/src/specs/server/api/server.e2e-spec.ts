@@ -124,6 +124,8 @@ describe('/server', () => {
           'SharedSpaceAlbumAssetsV1',
           'SharedSpaceAlbumAssetExifsV1',
         ]),
+        // Mobile sends wall-clock taken ranges only to a server that declares it reads them that way.
+        localTakenRange: true,
       });
     });
   });

@@ -20,6 +20,7 @@ import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.j
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
+import { AssetFilter, searchAssetBuilderWithLocalTaken, withAssetFilter } from 'src/utils/asset-filter.js';
 import {
   anyUuid,
   asUuid,
@@ -272,6 +273,15 @@ type SmartFacetExclude =
   | 'favorites'
   | 'albums';
 
+const smartFacetFilterExcludes: Partial<Record<SmartFacetExclude, (keyof AssetFilter)[]>> = {
+  time: ['takenAfter', 'takenBefore'],
+  location: ['country', 'city'],
+  city: ['city'],
+  camera: ['make', 'model'],
+  cameraModel: ['model'],
+  rating: ['rating'],
+};
+
 export interface SmartSearchFacetsResult {
   total: number;
   timeBuckets: Array<{ timeBucket: string; count: number }>;
@@ -485,7 +495,7 @@ export class SearchRepository {
   )
   async searchMetadata(pagination: SearchPaginationOptions, options: AssetSearchOptions) {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
-    const items = await searchAssetBuilderLegacy(this.db, options)
+    const items = await searchAssetBuilderWithLocalTaken(this.db, options)
       .select(columns.searchAsset)
       // #763: project the per-user overlay onto the rows feeding mapAsset. Not folded into
       // searchAssetBuilderLegacy itself — searchStatistics also builds on it with an aggregate
@@ -493,7 +503,10 @@ export class SearchRepository {
       .$if(!!options.authUserId, (qb) =>
         qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
       )
-      .orderBy('asset.fileCreatedAt', orderDirection)
+      // Fork: sorted by local taken time (wall clock), the timeline's order and the column the taken
+      // range filters on (src/utils/asset-filter.ts). Deliberate: a date-filtered page then walks
+      // asset_localDateTime_range_idx; sorting by fileCreatedAt instead scans every newer asset.
+      .orderBy('asset.localDateTime', orderDirection)
       .orderBy('asset.id', orderDirection)
       .limit(pagination.size + 1)
       .offset((pagination.page - 1) * pagination.size)
@@ -515,7 +528,7 @@ export class SearchRepository {
     ],
   })
   searchStatistics(options: AssetSearchOptions) {
-    return searchAssetBuilderLegacy(this.db, options)
+    return searchAssetBuilderWithLocalTaken(this.db, options)
       .select((qb) => qb.fn.countAll<number>().as('total'))
       .executeTakeFirstOrThrow();
   }
@@ -536,7 +549,7 @@ export class SearchRepository {
   })
   async searchRandom(size: number, options: AssetSearchOptions) {
     return (
-      searchAssetBuilderLegacy(this.db, options)
+      searchAssetBuilderWithLocalTaken(this.db, options)
         .select(columns.searchAsset)
         // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
         .$if(!!options.authUserId, (qb) =>
@@ -565,7 +578,7 @@ export class SearchRepository {
   searchLargeAssets(size: number, options: LargeAssetSearchOptions) {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
     return (
-      searchAssetBuilderLegacy(this.db, options)
+      searchAssetBuilderWithLocalTaken(this.db, options)
         .select(columns.searchAsset)
         // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
         .$if(!!options.authUserId, (qb) =>
@@ -589,7 +602,7 @@ export class SearchRepository {
     const personIds = options.personIds?.filter(Boolean) ?? [];
     const identityIds = options.identityIds?.filter(Boolean) ?? [];
 
-    let baseQuery = searchAssetBuilderLegacy(kysely, {
+    let baseQuery = searchAssetBuilderWithLocalTaken(kysely, {
       ...without(options, 'personIds', 'personMatchAny', 'identityIds', 'forceEmptyResult'),
       ratingIsMinimum: true,
     })
@@ -813,12 +826,6 @@ export class SearchRepository {
     options: SmartSearchFacetsOptions,
     exclude?: SmartFacetExclude,
   ) {
-    const appliesCountry = exclude !== 'location' && options.country !== undefined;
-    const appliesCity = exclude !== 'location' && exclude !== 'city' && options.city !== undefined;
-    const appliesMake = exclude !== 'camera' && options.make !== undefined;
-    const appliesModel = exclude !== 'camera' && exclude !== 'cameraModel' && options.model !== undefined;
-    const appliesRating = exclude !== 'rating' && options.rating !== undefined;
-    const needsExifJoin = !!(appliesCountry || appliesCity || appliesMake || appliesModel || appliesRating);
     // #763: same caller resolution as getSmartFacetHasFavorites — `authUserId` and `callerId` are two
     // names for the viewer on this path, and `userIds[0]` is deliberately not consulted (it is not the
     // caller under an album scope). Only read when `isFavorite` is set, and the assertion holds for
@@ -834,12 +841,7 @@ export class SearchRepository {
         'in',
         kysely.selectFrom(sql<{ id: string }>`smart_search_facet_candidates`.as('candidates')).select('candidates.id'),
       )
-      .$if(exclude !== 'time' && !!options.takenAfter, (qb) =>
-        qb.where('asset.fileCreatedAt', '>=', options.takenAfter!),
-      )
-      .$if(exclude !== 'time' && !!options.takenBefore, (qb) =>
-        qb.where('asset.fileCreatedAt', '<=', options.takenBefore!),
-      )
+      .$call((qb) => withAssetFilter(qb, options, exclude && smartFacetFilterExcludes[exclude]))
       .$if(exclude !== 'media' && !!options.type, (qb) => qb.where('asset.type', '=', options.type!))
       .$if(exclude !== 'favorites' && options.isFavorite !== undefined, (qb) =>
         qb.where((eb) =>
@@ -853,21 +855,6 @@ export class SearchRepository {
       )
       .$if(exclude !== 'albums' && !!options.isInAlbum && !options.albumIds?.length, (qb) =>
         qb.where((eb) => eb.exists(eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
-      )
-      .$if(needsExifJoin, (qb) =>
-        qb
-          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-          .$if(appliesCountry, (qb) =>
-            qb.where('asset_exif.country', options.country === null ? 'is' : '=', options.country!),
-          )
-          .$if(appliesCity, (qb) => qb.where('asset_exif.city', options.city === null ? 'is' : '=', options.city!))
-          .$if(appliesMake, (qb) => qb.where('asset_exif.make', options.make === null ? 'is' : '=', options.make!))
-          .$if(appliesModel, (qb) => qb.where('asset_exif.model', options.model === null ? 'is' : '=', options.model!))
-          .$if(appliesRating, (qb) =>
-            options.rating === null
-              ? qb.where('asset_exif.rating', 'is', null)
-              : qb.where('asset_exif.rating', '>=', options.rating!),
-          ),
       )
       .$if(exclude !== 'people' && !!options.personIds?.length, (qb) => hasPeople(qb, options.personIds!))
       .$if(exclude !== 'people' && !!options.identityIds?.length, (qb) =>
@@ -1689,8 +1676,7 @@ export class SearchRepository {
           ]),
         ),
       )
-      .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
-      .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!))
+      .$call((qb) => withAssetFilter(qb, { takenAfter: options?.takenAfter, takenBefore: options?.takenBefore }))
       .orderBy('tag.value')
       .execute();
   }
@@ -1860,15 +1846,6 @@ export class SearchRepository {
   }
 
   private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
-    const needsExifJoin = !!(
-      options.country ||
-      options.state ||
-      options.city ||
-      options.make ||
-      options.model ||
-      options.lensModel ||
-      options.rating
-    );
     const visibility = options.visibility;
 
     return this.applySuggestionScope(
@@ -1895,19 +1872,7 @@ export class SearchRepository {
           eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
         ),
       )
-      .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-      .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
-      .$if(needsExifJoin, (qb) =>
-        qb
-          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-          .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
-          .$if(!!options.state, (qb) => qb.where('asset_exif.state', '=', options.state!))
-          .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
-          .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
-          .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
-          .$if(!!options.lensModel, (qb) => qb.where('asset_exif.lensModel', '=', options.lensModel!))
-          .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '>=', options.rating!)),
-      )
+      .$call((qb) => withAssetFilter(qb, options))
       .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
       .$if(!!options.personIds?.length && !!options.spaceId, (qb) => hasSpacePeople(qb, options.personIds!))
       .$if(!!options.personIds?.length && !options.spaceId, (qb) => hasPeople(qb, options.personIds!))

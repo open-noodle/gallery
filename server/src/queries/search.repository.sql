@@ -50,9 +50,8 @@ from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $2
-  and "asset_exif"."lensModel" = $3
-  and "asset"."ownerId" = any ($4::uuid[])
+  "asset_exif"."lensModel" = $2
+  and "asset"."ownerId" = any ($3::uuid[])
   and exists (
     select
       1 as "exists"
@@ -60,11 +59,12 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $5::uuid
+      and "asset_favorite"."userId" = $4::uuid
   )
   and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $5
 order by
-  "asset"."fileCreatedAt" desc,
+  "asset"."localDateTime" desc,
   "asset"."id" desc
 limit
   $6
@@ -176,7 +176,7 @@ where
   )
   and "asset"."deletedAt" is null
 order by
-  "asset"."fileCreatedAt" desc,
+  "asset"."localDateTime" desc,
   "asset"."id" desc
 limit
   $12
@@ -190,9 +190,8 @@ from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $1
-  and "asset_exif"."lensModel" = $2
-  and "asset"."ownerId" = any ($3::uuid[])
+  "asset_exif"."lensModel" = $1
+  and "asset"."ownerId" = any ($2::uuid[])
   and exists (
     select
       1 as "exists"
@@ -200,9 +199,10 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
+      and "asset_favorite"."userId" = $3::uuid
   )
   and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $4
 
 -- SearchRepository.searchRandom
 select
@@ -246,9 +246,8 @@ from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $2
-  and "asset_exif"."lensModel" = $3
-  and "asset"."ownerId" = any ($4::uuid[])
+  "asset_exif"."lensModel" = $2
+  and "asset"."ownerId" = any ($3::uuid[])
   and exists (
     select
       1 as "exists"
@@ -256,9 +255,10 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $5::uuid
+      and "asset_favorite"."userId" = $4::uuid
   )
   and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $5
 order by
   random()
 limit
@@ -307,9 +307,8 @@ from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."fileCreatedAt" >= $2
-  and "asset_exif"."lensModel" = $3
-  and "asset"."ownerId" = any ($4::uuid[])
+  "asset_exif"."lensModel" = $2
+  and "asset"."ownerId" = any ($3::uuid[])
   and exists (
     select
       1 as "exists"
@@ -317,9 +316,10 @@ where
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $5::uuid
+      and "asset_favorite"."userId" = $4::uuid
   )
   and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $5
   and "asset_exif"."fileSizeInByte" > $6
 order by
   "asset_exif"."fileSizeInByte" desc
@@ -417,8 +417,7 @@ from
           and "asset_face"."isVisible" is true
           and "shared_space_person_face"."personId" = $11::uuid
       )
-      and "asset"."fileCreatedAt" >= $12
-      and "asset_exif"."lensModel" = $13
+      and "asset_exif"."lensModel" = $12
       and exists (
         select
           1 as "exists"
@@ -426,9 +425,10 @@ from
           "asset_favorite"
         where
           "asset_favorite"."assetId" = "asset"."id"
-          and "asset_favorite"."userId" = $14::uuid
+          and "asset_favorite"."userId" = $13::uuid
       )
       and "asset"."deletedAt" is null
+      and "asset"."localDateTime" >= $14
       and (smart_search.embedding <=> $15) <= $16
     order by
       smart_search.embedding <=> $17
@@ -527,7 +527,6 @@ from
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -548,12 +547,21 @@ from
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."make" = $7
-      and "asset_exif"."rating" >= $8
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
+      and "asset"."type" = $8
   ) as "filtered"
 with
   "asset" as (
@@ -567,7 +575,6 @@ with
           "asset"."id"
         from
           "asset"
-          inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
           inner join (
             select
               "assetId"
@@ -588,10 +595,19 @@ with
             from
               smart_search_facet_candidates as "candidates"
           )
-          and "asset"."type" = $3
-          and "asset_exif"."country" = $4
-          and "asset_exif"."make" = $5
-          and "asset_exif"."rating" >= $6
+          and exists (
+            select
+            from
+              "asset_exif"
+            where
+              "asset_exif"."assetId" = "asset"."id"
+              and (
+                "asset_exif"."country" = $3
+                and "asset_exif"."make" = $4
+                and "asset_exif"."rating" >= $5
+              )
+          )
+          and "asset"."type" = $6
       )
   )
 select
@@ -613,7 +629,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -634,11 +649,20 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."make" = $6
-      and "asset_exif"."rating" >= $7
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."make" = $5
+            and "asset_exif"."rating" >= $6
+          )
+      )
+      and "asset"."type" = $7
   )
   and "country" is not null
   and "country" != $8
@@ -654,7 +678,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -675,12 +698,21 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."make" = $7
-      and "asset_exif"."rating" >= $8
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
+      and "asset"."type" = $8
   )
   and "city" is not null
   and "city" != $9
@@ -696,7 +728,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -717,11 +748,20 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."rating" >= $7
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."rating" >= $6
+          )
+      )
+      and "asset"."type" = $7
   )
   and "make" is not null
   and "make" != $8
@@ -737,7 +777,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -758,12 +797,21 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."make" = $7
-      and "asset_exif"."rating" >= $8
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
+      and "asset"."type" = $8
   )
   and "model" is not null
   and "model" != $9
@@ -781,7 +829,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
     where
       "asset"."id" in (
         select
@@ -789,12 +836,21 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $1
-      and "asset"."fileCreatedAt" <= $2
-      and "asset"."type" = $3
-      and "asset_exif"."country" = $4
-      and "asset_exif"."make" = $5
-      and "asset_exif"."rating" >= $6
+      and "asset"."localDateTime" >= $1
+      and "asset"."localDateTime" < $2
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $3
+            and "asset_exif"."make" = $4
+            and "asset_exif"."rating" >= $5
+          )
+      )
+      and "asset"."type" = $6
   )
 order by
   "tag"."value"
@@ -805,7 +861,6 @@ WITH
         "asset"."id"
       from
         "asset"
-        inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
         inner join (
           select
             "assetId"
@@ -826,12 +881,21 @@ WITH
           from
             smart_search_facet_candidates as "candidates"
         )
-        and "asset"."fileCreatedAt" >= $3
-        and "asset"."fileCreatedAt" <= $4
-        and "asset"."type" = $5
-        and "asset_exif"."country" = $6
-        and "asset_exif"."make" = $7
-        and "asset_exif"."rating" >= $8
+        and "asset"."localDateTime" >= $3
+        and "asset"."localDateTime" < $4
+        and exists (
+          select
+          from
+            "asset_exif"
+          where
+            "asset_exif"."assetId" = "asset"."id"
+            and (
+              "asset_exif"."country" = $5
+              and "asset_exif"."make" = $6
+              and "asset_exif"."rating" >= $7
+            )
+        )
+        and "asset"."type" = $8
     )
   ),
   identity_faces AS (
@@ -989,7 +1053,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -1010,11 +1073,20 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."make" = $7
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+          )
+      )
+      and "asset"."type" = $7
   )
   and "rating" is not null
   and "rating" > $8
@@ -1030,7 +1102,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -1051,11 +1122,20 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset_exif"."country" = $5
-      and "asset_exif"."make" = $6
-      and "asset_exif"."rating" >= $7
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
   )
 order by
   "type"
@@ -1069,7 +1149,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -1090,12 +1169,21 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."make" = $7
-      and "asset_exif"."rating" >= $8
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
+      and "asset"."type" = $8
   )
   and exists (
     select
@@ -1116,7 +1204,6 @@ where
       "asset"."id"
     from
       "asset"
-      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
       inner join (
         select
           "assetId"
@@ -1137,12 +1224,21 @@ where
         from
           smart_search_facet_candidates as "candidates"
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" <= $4
-      and "asset"."type" = $5
-      and "asset_exif"."country" = $6
-      and "asset_exif"."make" = $7
-      and "asset_exif"."rating" >= $8
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."country" = $5
+            and "asset_exif"."make" = $6
+            and "asset_exif"."rating" >= $7
+          )
+      )
+      and "asset"."type" = $8
   )
   and not exists (
     select
@@ -3444,7 +3540,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -3528,7 +3624,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -3614,7 +3710,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -3693,7 +3789,7 @@ WITH
             )
           )
         )
-        and "asset"."fileCreatedAt" >= $9
+        and "asset"."localDateTime" >= $9
     )
   ),
   identity_faces AS (
@@ -3908,7 +4004,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -3992,7 +4088,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -4074,7 +4170,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -4163,7 +4259,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
@@ -4252,7 +4348,7 @@ where
           )
         )
       )
-      and "asset"."fileCreatedAt" >= $9
+      and "asset"."localDateTime" >= $9
       and exists (
         select
         from
