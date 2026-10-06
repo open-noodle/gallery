@@ -1755,7 +1755,7 @@ void main() {
   // app must survive an older fork server too: park what it cannot write yet and replay
   // it once every asset stream has landed.
   group('SyncStreamRepository - memory to asset links', () {
-    SyncMemoryV1 makeMemory({String id = 'memory-1', String ownerId = 'user-1'}) => SyncMemoryV1(
+    SyncMemoryV2 makeMemory({String id = 'memory-1', String ownerId = 'user-1'}) => SyncMemoryV2(
       createdAt: DateTime(2026, 4, 23),
       data: const {'title': 'A memory'},
       deletedAt: null,
@@ -1772,7 +1772,7 @@ void main() {
 
     setUp(() async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateMemoriesV1([makeMemory()]);
+      await sut.updateMemoriesV2([makeMemory()]);
     });
 
     test('does not throw when the asset has not been streamed yet', () async {
@@ -1817,7 +1817,7 @@ void main() {
       await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-unknown', assetId: 'asset-1')]);
       expect(await db.memoryAssetEntity.select().get(), isEmpty);
 
-      await sut.updateMemoriesV1([makeMemory(id: 'memory-unknown')]);
+      await sut.updateMemoriesV2([makeMemory(id: 'memory-unknown')]);
       await sut.flushDeferredMemoryAssetsV1();
 
       expect((await db.memoryAssetEntity.select().get()).single.memoryId, 'memory-unknown');
@@ -1885,8 +1885,8 @@ void main() {
   test('stores rule memories from sync without requiring year data', () async {
     await sut.updateUsersV1([_createUser()]);
 
-    await sut.updateMemoriesV1([
-      SyncMemoryV1(
+    await sut.updateMemoriesV2([
+      SyncMemoryV2(
         createdAt: DateTime(2026, 4, 23),
         data: {'ruleId': 'birthday', 'title': 'Happy birthday, Alice', 'subtitle': 'Photos from different years'},
         deletedAt: null,
@@ -1912,8 +1912,8 @@ void main() {
   test('stores a birthday memory from sync as MemoryTypeEnum.birthday', () async {
     await sut.updateUsersV1([_createUser()]);
 
-    await sut.updateMemoriesV1([
-      SyncMemoryV1(
+    await sut.updateMemoriesV2([
+      SyncMemoryV2(
         createdAt: DateTime(2026, 4, 23),
         data: {'personId': 'person-1', 'personName': 'Alice', 'year': 1990},
         deletedAt: null,
