@@ -5,9 +5,9 @@
 - **Upstream ref**: `upstream/release/v3.3`, `d15972e7223` → `d1c1a65ed3b` (past `v3.3.0-rc.2`, no rc.3 tag yet)
 - **Upstream commits pulled**: 8 (batches 82–84 of the regenerated plan)
 - **Conflicts resolved**: 8 stops across the replay (6 in batch 83, 2 in batch 84), all inside a pre-declared file set
-- **Fork sync**: `da5480ae42b` → `f047d921872` (`origin/main` tip): #992, #819, #1156, #1159. Requested after the
-  upstream batches landed; see "Fork sync" below. `sync-fork-main` threw on #992 and on #1156, so all four were
-  finished by hand and `integratedForkHead` / `appendHistory` were reconciled manually.
+- **Fork sync**: `da5480ae42b` → `c7549b59e65` (`origin/main` tip): #992, #819, #1156, #1159, then — as they merged
+  during the session — #1160, #1157, #1161. See "Fork sync" below. `sync-fork-main` threw on #992, #1156, #1160 and
+  #1161, so every PR was finished by hand and `integratedForkHead` / `appendHistory` were reconciled manually.
 - **Risk level**: LOW (upstream) / MEDIUM (fork sync: two large features replayed onto rolling's vocabulary)
 - **Recommendation**: PROCEED (stays off `main`; v3.3.0 is still an RC)
 - **Backup**: local branch `backup/rolling-pre-2026-10-06` (`a40462cff98`); before the fork sync `backup/rolling-pre-forksync-2026-10-06`
@@ -111,12 +111,15 @@ None incoming. Server and mobile trees unchanged.
 
 ## Fork sync
 
-| Fork PR                                        | Rolling commit | Stops   | Notes                                                                                                                                 |
-| ---------------------------------------------- | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| #992 space editors edit members' assets (#734) | `a30ec455390`  | 7 files | hand-resolved, see below                                                                                                              |
-| #819 per-user favorites (#763)                 | `0586bf047b3`  | 8 files | hand-resolved, see below                                                                                                              |
-| #1156 one face-assignment module               | `ffb8e599064`  | 1 file  | `face-suggestion.service.ts`: took #1156's `getSettledFaceIds`; rolling's side differed from base only by `isDisjointFrom` (asserted) |
-| #1159 S3 backend owns its proxy read slot      | `87a9b2a57ef`  | 0       | clean; per-file numstat identical to `main`                                                                                           |
+| Fork PR                                        | Rolling commit | Stops   | Notes                                                                                                                                                                                                                                                        |
+| ---------------------------------------------- | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #992 space editors edit members' assets (#734) | `a30ec455390`  | 7 files | hand-resolved, see below                                                                                                                                                                                                                                     |
+| #819 per-user favorites (#763)                 | `0586bf047b3`  | 8 files | hand-resolved, see below                                                                                                                                                                                                                                     |
+| #1156 one face-assignment module               | `ffb8e599064`  | 1 file  | `face-suggestion.service.ts`: took #1156's `getSettledFaceIds`; rolling's side differed from base only by `isDisjointFrom` (asserted)                                                                                                                        |
+| #1159 S3 backend owns its proxy read slot      | `87a9b2a57ef`  | 0       | clean; per-file numstat identical to `main`                                                                                                                                                                                                                  |
+| #1160 one person-scope module (web)            | `a5e8ae08820`  | 1 file  | `person.service.spec.ts`: #1160 moved two tests into `global-person-route.spec.ts`; took the move and converted the moved test to rolling's `onAction({ action, event })`                                                                                    |
+| #1157 viewer scope in one module (server)      | `44ef957f85d`  | 1 file  | `base.service.ts`: union (rolling's dormant person-access helpers + `resolveViewerScope`). The other 14 files merged clean; each file's delta on rolling is byte-identical to #1157's own (sorted `+`/`-` audit), and `search-v3-not-dispatched` still holds |
+| #1161 viewer space role from the spaces list   | `d15c614b5cf`  | 2 files | people page: took #1161's `loadSpaces` form (rolling's side was base + an early-`continue` reflow); `people.provider.dart`: only #1161's `shared_space.provider` import is added (rolling had already dropped `user_metadata.provider.dart`, gone upstream)  |
 
 ### #992 on rolling
 
@@ -150,21 +153,35 @@ The rolling-only dormant-sharing pin `refuses to reassign faces onto another own
 which the new `FaceAssignmentService.assignFaces` path never calls. The guard itself (`assertOwnRecord`) is intact; the
 probe now asserts `assignFaces` is not called on the 400 and is called with the face on the caller's own request.
 
+### Round-2 CI findings, fixed
+
+- **Rebase Smoke** (`permission-matrix` Test 5): asserted the editor gets no date pencil on the space owner's photo —
+  pre-#734. Now asserts it is visible; the viewer negative (Test 6) stays. The same stale assertion is on `main`.
+- **Web e2e** (`spaces-editor-asset-viewer-affordances`): pinned `main`'s label "Add upload to stack"; upstream reworded
+  it to "Upload and {add to | create} stack". The owner positive failed and the three role negatives were vacuous —
+  now one regex covers both variants.
+- **Web e2e** (`space-face-picker`, "creates a brand-new space person"): failed 4/4 attempts in CI on `af00b7f0d43` —
+  the create returned a space person with a blank name (the spec's own documented NAME-LOSS shape:
+  `createOrGetPersonForIdentity` returned a pre-existing blank row). Not reproducible locally: 16/16 alone, and passing
+  in a full local web run on the later tip. Watched in round 3.
+
 ### Verification after the fork sync
 
-| Check                                                                         | Status | Notes                                                                                                         |
-| ----------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
-| server `pnpm build` / `pnpm check`                                            | PASS   | 70 Gallery migrations synced                                                                                  |
-| OpenAPI spec + TS SDK regenerated                                             | PASS   | byte-identical to the merged files                                                                            |
-| SQL: fresh DB `migrations:run`, `migrations:generate`, `mise //:sql`          | PASS   | no schema drift; 42 query files rewritten byte-identical (twice: after #819 and after #1159)                  |
-| server eslint + prettier (all touched files)                                  | PASS   | after the two unicorn fixes                                                                                   |
-| server unit                                                                   | PASS   | 6590 passed, two consecutive full runs                                                                        |
-| server medium (40 touched specs)                                              | PASS   | 1538 passed; one failure was a stale local plugin-core wasm (pre-immich-32027), green after `mise //:plugins` |
-| web tsc / svelte-check / eslint / unit                                        | PASS   | 643 files 0 problems; 6548 passed                                                                             |
-| e2e `pnpm check` + eslint + prettier                                          | PASS   |                                                                                                               |
-| mobile codegen + `dart analyze --fatal-infos` + format + `flutter test`       | PASS   | Flutter 3.47.2; 4057 passed                                                                                   |
-| revert-to-immich coverage + `IN`-list comma audit                             | PASS   |                                                                                                               |
-| invariants / fork patches / ownership / autolink / branding / preflight (301) | PASS   |                                                                                                               |
+| Check                                                                                                     | Status             | Notes                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| server `pnpm build` / `pnpm check`                                                                        | PASS               | 70 Gallery migrations synced                                                                                                                                             |
+| OpenAPI spec + TS SDK regenerated                                                                         | PASS               | byte-identical to the merged files                                                                                                                                       |
+| SQL: fresh DB `migrations:run`, `migrations:generate`, `mise //:sql`                                      | PASS               | no schema drift; 42 query files rewritten byte-identical (twice: after #819 and after #1159)                                                                             |
+| server eslint + prettier (all touched files)                                                              | PASS               | after the two unicorn fixes                                                                                                                                              |
+| server unit                                                                                               | PASS               | 6590 passed, two consecutive full runs                                                                                                                                   |
+| server medium (40 touched specs)                                                                          | PASS               | 1538 passed; one failure was a stale local plugin-core wasm (pre-immich-32027), green after `mise //:plugins`                                                            |
+| web tsc / svelte-check / eslint / unit                                                                    | PASS               | 643 files 0 problems; 6548 passed                                                                                                                                        |
+| e2e `pnpm check` + eslint + prettier                                                                      | PASS               |                                                                                                                                                                          |
+| mobile codegen + `dart analyze --fatal-infos` + format + `flutter test`                                   | PASS               | Flutter 3.47.2; 4057 passed                                                                                                                                              |
+| revert-to-immich coverage + `IN`-list comma audit                                                         | PASS               |                                                                                                                                                                          |
+| invariants / fork patches / ownership / autolink / branding / preflight (301)                             | PASS               |                                                                                                                                                                          |
+| after #1160/#1157/#1161: server tsc/lint/unit, web tsc/svelte-check/lint/unit, mobile analyze/format/test | PASS               | server 6601; web 6554 (4 global-search timer failures under load ~25 passed 525/525 twice in isolation); mobile 4055                                                     |
+| local full `--project=web` e2e on the final tree                                                          | 367 pass / 52 fail | every failure is a cmdk / global-search / search keyboard or visual-snapshot spec CI passes on Linux (macOS env); `space-face-picker` and the fixed affordance spec pass |
 
 Local server unit runs before the final two hit the known supertest socket family (`ECONNRESET` / `socket hang up`, a
 different untouched controller spec each run). A control on the pre-sync tree (`54d76b5c758`, CI-green) failed 2 of 3
