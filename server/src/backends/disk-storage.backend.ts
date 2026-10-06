@@ -1,17 +1,31 @@
-import { createReadStream, createWriteStream } from 'node:fs';
-import { access, mkdir, opendir, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { constants, createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, opendir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
 
+/**
+ * exists / readAll / delete go through StorageRepository: they replace direct StorageRepository
+ * calls in upstream code paths, which keeps those paths (and the specs that mock the repository)
+ * unchanged for disk files.
+ */
 export class DiskStorageBackend implements StorageBackend {
-  constructor(private mediaLocation: string) {}
+  constructor(
+    private mediaLocation: string,
+    private storageRepository: StorageRepository,
+  ) {}
 
   private resolvePath(key: string): string {
     // Absolute paths are legacy disk assets — return as-is
     if (isAbsolute(key)) {
       return key;
+    }
+    // an absolute-only backend (see BaseService.backendFor): a relative key would resolve against
+    // the cwd, and deletePrefix would then remove whatever it found there
+    if (!this.mediaLocation) {
+      throw new Error(`Disk backend without a media location cannot resolve relative key ${key}`);
     }
     return join(this.mediaLocation, key);
   }
@@ -37,17 +51,19 @@ export class DiskStorageBackend implements StorageBackend {
     };
   }
 
-  async exists(key: string): Promise<boolean> {
-    try {
-      await access(this.resolvePath(key));
-      return true;
-    } catch {
-      return false;
-    }
+  readAll(key: string): Promise<Buffer> {
+    return this.storageRepository.readFile(this.resolvePath(key));
   }
 
-  async delete(key: string): Promise<void> {
-    await unlink(this.resolvePath(key));
+  exists(key: string, options?: { readable?: boolean }): Promise<boolean> {
+    return this.storageRepository.checkFileExists(
+      this.resolvePath(key),
+      options?.readable ? constants.R_OK : constants.F_OK,
+    );
+  }
+
+  delete(key: string): Promise<void> {
+    return this.storageRepository.unlink(this.resolvePath(key));
   }
 
   async deletePrefix(prefix: string): Promise<void> {
