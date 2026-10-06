@@ -4,6 +4,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
+import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/utils/option.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' hide SearchFilter;
@@ -31,7 +32,13 @@ void main() {
     mockSearchApi = MockSearchApi();
     when(() => mockApiService.searchApi).thenReturn(mockSearchApi);
 
-    container = ProviderContainer(overrides: [apiServiceProvider.overrideWithValue(mockApiService)]);
+    container = ProviderContainer(
+      overrides: [
+        apiServiceProvider.overrideWithValue(mockApiService),
+        // A server that declares `localTakenRange`; the legacy shape is pinned separately below.
+        serverLocalTakenRangeProvider.overrideWithValue(true),
+      ],
+    );
     addTearDown(container.dispose);
   });
 
@@ -208,8 +215,9 @@ void main() {
         ),
       ).thenAnswer((_) async => emptySuggestions());
 
-      final after = DateTime.utc(2024, 1, 1);
-      final before = DateTime.utc(2024, 12, 31);
+      // What the month cell stores: device-local first day and last second of January.
+      final after = DateTime(2024, 1, 1);
+      final before = DateTime(2024, 1, 31, 23, 59, 59);
       final filter = SearchFilter.empty().copyWith(
         location: const SearchLocationFilter(city: 'Paris', country: 'France'),
         camera: const SearchCameraFilter(make: 'Canon', model: 'EOS R5'),
@@ -233,9 +241,62 @@ void main() {
           personIds: null,
           rating: 4,
           tagIds: ['tag-1', 'tag-2'],
+          // Sent as the wall-clock range web sends: UTC midnight start, exclusive UTC midnight end.
+          takenAfter: DateTime.utc(2024, 1, 1),
+          takenBefore: DateTime.utc(2024, 2, 1),
+          withSharedSpaces: true,
+        ),
+      ).called(1);
+    });
+
+    test('keeps device-local instants for a server without localTakenRange', () async {
+      final legacy = ProviderContainer(
+        overrides: [
+          apiServiceProvider.overrideWithValue(mockApiService),
+          serverLocalTakenRangeProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(legacy.dispose);
+      when(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          isNotInAlbum: any(named: 'isNotInAlbum'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+        ),
+      ).thenAnswer((_) async => emptySuggestions());
+      final after = DateTime(2024, 1, 1);
+      final before = DateTime(2024, 1, 31, 23, 59, 59);
+      final filter = SearchFilter.empty().copyWith(
+        date: SearchDateFilter(takenAfter: after, takenBefore: before),
+      );
+
+      await legacy.read(photosFilterSuggestionsProvider(filter).future);
+
+      verify(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          isNotInAlbum: any(named: 'isNotInAlbum'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          tagIds: any(named: 'tagIds'),
           takenAfter: after,
           takenBefore: before,
-          withSharedSpaces: true,
+          withSharedSpaces: any(named: 'withSharedSpaces'),
         ),
       ).called(1);
     });

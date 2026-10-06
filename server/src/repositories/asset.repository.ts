@@ -38,6 +38,7 @@ import { AssetFileTable } from 'src/schema/tables/asset-file.table.js';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table.js';
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { withAssetFilter } from 'src/utils/asset-filter.js';
 import {
   anyUuid,
   asUuid,
@@ -405,61 +406,29 @@ export function withTimeBucketAssetFilters<O>(
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
       .$if(!!options.isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
       .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
-      .$if(
-        !!options.bbox ||
-          !!options.city ||
-          !!options.country ||
-          !!options.state ||
-          !!options.make ||
-          !!options.model ||
-          !!options.lensModel ||
-          !!options.description ||
-          options.rating !== undefined,
-        (qb) => {
-          let q = qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId');
+      .$if(!!options.bbox || !!options.description, (qb) => {
+        let q = qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId');
 
-          if (options.bbox) {
-            const circle = getBoundingCircle(options.bbox);
-            q = q.where(
-              sql`earth_box(ll_to_earth_public(${circle.centerLatitude}, ${circle.centerLongitude}), ${circle.radius})`,
-              '@>',
-              sql`ll_to_earth_public(asset_exif.latitude, asset_exif.longitude)`,
-            ) as any;
-            q = withBoundingBox(q, options.bbox) as any;
-          }
+        if (options.bbox) {
+          const circle = getBoundingCircle(options.bbox);
+          q = q.where(
+            sql`earth_box(ll_to_earth_public(${circle.centerLatitude}, ${circle.centerLongitude}), ${circle.radius})`,
+            '@>',
+            sql`ll_to_earth_public(asset_exif.latitude, asset_exif.longitude)`,
+          ) as any;
+          q = withBoundingBox(q, options.bbox) as any;
+        }
 
-          if (options.city) {
-            q = q.where('asset_exif.city', '=', options.city) as any;
-          }
-          if (options.country) {
-            q = q.where('asset_exif.country', '=', options.country) as any;
-          }
-          if (options.make) {
-            q = q.where('asset_exif.make', '=', options.make) as any;
-          }
-          if (options.model) {
-            q = q.where('asset_exif.model', '=', options.model) as any;
-          }
-          if (options.lensModel) {
-            q = q.where('asset_exif.lensModel', '=', options.lensModel) as any;
-          }
-          if (options.state) {
-            q = q.where('asset_exif.state', '=', options.state) as any;
-          }
-          if (options.rating !== undefined) {
-            q = q.where('asset_exif.rating', '>=', options.rating) as any;
-          }
-          if (options.description) {
-            q = q.where(
-              sql`f_unaccent(asset_exif.description)`,
-              'ilike',
-              sql`'%' || f_unaccent(${escapeLikePattern(options.description)}) || '%' escape '\\'`,
-            ) as any;
-          }
+        if (options.description) {
+          q = q.where(
+            sql`f_unaccent(asset_exif.description)`,
+            'ilike',
+            sql`'%' || f_unaccent(${escapeLikePattern(options.description)}) || '%' escape '\\'`,
+          ) as any;
+        }
 
-          return q;
-        },
-      )
+        return q;
+      })
       .$if(options.visibility === undefined, withDefaultVisibility)
       .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
@@ -649,8 +618,7 @@ export function withTimeBucketAssetFilters<O>(
           .innerJoin('ocr_search', 'asset.id', 'ocr_search.assetId')
           .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
       )
-      .$if(!!options.takenAfter, (qb) => qb.where('asset.localDateTime', '>=', new Date(options.takenAfter!)))
-      .$if(!!options.takenBefore, (qb) => qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!)))
+      .$call((qb) => withAssetFilter(qb, options))
   );
 }
 

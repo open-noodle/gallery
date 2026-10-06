@@ -44,8 +44,14 @@ const BaseSearchSchema = z.object({
   updatedAfter: isoDatetimeToDate.optional().describe('Filter by update date (after)').meta(DEPRECATED_FLAT_FIELD),
   trashedBefore: isoDatetimeToDate.optional().describe('Filter by trash date (before)').meta(DEPRECATED_FLAT_FIELD),
   trashedAfter: isoDatetimeToDate.optional().describe('Filter by trash date (after)').meta(DEPRECATED_FLAT_FIELD),
-  takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)').meta(DEPRECATED_FLAT_FIELD),
-  takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)').meta(DEPRECATED_FLAT_FIELD),
+  takenBefore: isoDatetimeToDate
+    .optional()
+    .describe('Filter by taken date: before this local date and time (exclusive)')
+    .meta(DEPRECATED_FLAT_FIELD),
+  takenAfter: isoDatetimeToDate
+    .optional()
+    .describe('Filter by taken date: on or after this local date and time (inclusive)')
+    .meta(DEPRECATED_FLAT_FIELD),
   city: z.string().nullable().optional().describe('Filter by city name').meta(DEPRECATED_FLAT_FIELD),
   state: z.string().nullable().optional().describe('Filter by state/province name').meta(DEPRECATED_FLAT_FIELD),
   country: z.string().nullable().optional().describe('Filter by country name').meta(DEPRECATED_FLAT_FIELD),
@@ -160,8 +166,12 @@ const SearchSuggestionRequestBaseSchema = z.object({
   // ZodValidationPipe would silently strip it and the suggestion lists would not narrow.
   ownerId: z.uuidv4().optional().describe('Filter by asset owner (contributor)'),
   mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
-  takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
-  takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
+  takenAfter: isoDatetimeToDate
+    .optional()
+    .describe('Filter suggestions by taken date: on or after this local date and time (inclusive)'),
+  takenBefore: isoDatetimeToDate
+    .optional()
+    .describe('Filter suggestions by taken date: before this local date and time (exclusive)'),
   spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
   withSharedSpaces: stringToBool.optional().describe('Include suggestions from shared spaces the user is a member of'),
   includeNull: stringToBool
@@ -182,8 +192,12 @@ const TagSuggestionRequestSchema = z
     withSharedSpaces: stringToBool
       .optional()
       .describe('Include suggestions from shared spaces the user is a member of'),
-    takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
-    takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
+    takenAfter: isoDatetimeToDate
+      .optional()
+      .describe('Filter suggestions by taken date: on or after this local date and time (inclusive)'),
+    takenBefore: isoDatetimeToDate
+      .optional()
+      .describe('Filter suggestions by taken date: before this local date and time (exclusive)'),
   })
   .meta({ id: 'TagSuggestionRequestDto' });
 
@@ -267,8 +281,12 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   isFavorite: stringToBool.optional().describe('Filter by favorites'),
   isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
   isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
-  takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)'),
-  takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
+  takenAfter: isoDatetimeToDate
+    .optional()
+    .describe('Filter by taken date: on or after this local date and time (inclusive)'),
+  takenBefore: isoDatetimeToDate
+    .optional()
+    .describe('Filter by taken date: before this local date and time (exclusive)'),
   albumId: z.uuidv4().optional().describe('Scope to a specific album'),
   spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
   withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
