@@ -1,0 +1,117 @@
+# Upstream Sync Report — 2026-10-06
+
+## Summary
+
+- **Upstream ref**: `upstream/release/v3.3`, `d15972e7223` → `d1c1a65ed3b` (past `v3.3.0-rc.2`, no rc.3 tag yet)
+- **Upstream commits pulled**: 8 (batches 82–84 of the regenerated plan)
+- **Conflicts resolved**: 8 stops across the replay (6 in batch 83, 2 in batch 84), all inside a pre-declared file set
+- **Fork sync**: none. `origin/main` gained #992 and #819 since `da5480ae42b`; they are deliberately not part of
+  this cycle (scope: only what is on upstream's 3.3.0 RC line).
+- **Risk level**: LOW
+- **Recommendation**: PROCEED (stays off `main`; v3.3.0 is still an RC)
+- **Backup**: local branch `backup/rolling-pre-2026-10-06` (`a40462cff98`)
+
+## Incoming Upstream Changes
+
+| SHA           | Summary                                                        | Area       | Risk to Fork | Outcome                                                                   |
+| ------------- | -------------------------------------------------------------- | ---------- | ------------ | ------------------------------------------------------------------------- |
+| `34bec012325` | fix: stale memory cover (#32101)                               | web        | LOW          | Taken as-is (thumbhash cache key on the memories page)                    |
+| `17e4cfd96b8` | fix(web): no trash actions when trash is empty (#32104)        | web        | LOW          | Taken; trash page conflict resolved to fork version + upstream's one line |
+| `bf04a9fc35f` | fix: bounding box label clipping (#32107)                      | web        | LOW          | Taken as-is; block byte-identical to upstream's                           |
+| `983177d5700` | fix: strip workflow step ids from user-facing actions (#32106) | web        | LOW          | Taken as-is                                                               |
+| `81de979a35f` | fix: people page search (#32108)                               | server/web | MEDIUM       | **Declined fork-side** (see below)                                        |
+| `07b54cf9b4c` | fix(web): album reactivity (#32111)                            | web        | MEDIUM       | `TimelineManager` + `TimelineAssetViewer` taken; album page stays fork's  |
+| `06c397add1b` | docs: add QNAP install guide (#32105)                          | docs       | LOW          | Taken, then rebranded like the rest of the install guides (#167)          |
+| `d1c1a65ed3b` | fix: select hidden people (#32116)                             | web        | LOW          | Modify/delete on `PersonBulkShareModal.svelte` → kept deleted (`git rm`)  |
+
+### immich-32108 — declined (Pierre's call at Checkpoint 1)
+
+Upstream adds a `name` filter to `GET /people` (`f_unaccent(name) %> f_unaccent($name)` under a
+`pg_trgm.word_similarity_threshold` CTE) and rewrites its People page to search through it. Gallery's
+`getAllForUser` is its own query (person sharing stays dormant, `withFilters` is not on that path) and
+Gallery's People page already searches through `GET /search/person`. So:
+
+- `person.repository.ts`, `person.repository.sql`, `people/+page.svelte`, `people/+page.ts`, `fetch-client.ts`
+  were resolved to the replayed fork commit's version at every stop;
+- fork commit `fix(people): decline immich-32108's GET /people name filter` drops the residue that merged
+  cleanly (`PersonSearchDto.name`, the OpenAPI parameter, `PeopleFilter.name`). Leaving the DTO field alone
+  would have made the API accept a filter it never applies, i.e. answer with more people than asked for.
+
+End state: `server/`, `open-api/`, `packages/` trees are byte-identical to the pre-cycle tip.
+
+### immich-32111 — partial
+
+Upstream moves "remove assets from the open album's timeline" out of `TimelineAssetViewer` (which used to
+key on its `album` prop) into a `TimelineManager` `AlbumRemoveAssets` handler gated on `#options.albumId`.
+Checked against the Shape J pattern (a guard enumerating option names): the only surfaces that pass `album`
+to `<Timeline>` are `AlbumViewer` and the album page, and both build options with `albumId`. Space album
+pages pass no `album` prop and remove assets themselves (`timelineManager?.removeAssets` at three sites),
+so they lose nothing.
+
+The album-page half (`$derived(data.album)`, `refreshAlbum` → `invalidate('album:data')`,
+`onAssetsDelete`) was **not** ported. The fork's page already re-syncs `album` from `data.album` when the
+route changes, and its `handleRemoveAssets` also prunes the filter-panel search results, which upstream's
+manager handler cannot see. A double removal from the timeline (manager handler + fork handler) is
+idempotent.
+
+## Conflict Resolutions
+
+| Stop (replayed fork commit)                                     | File                               | Resolution                                                             | Risk |
+| --------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------- | ---- |
+| `feat: unify people management for spaces (#450)`               | `people/+page.svelte`              | replayed fork version (decline 32108)                                  | LOW  |
+| `feat: add global face identities across spaces (#495)`         | `people/+page.ts`                  | replayed fork version (decline 32108)                                  | LOW  |
+| `feat: scale face identity backfill … (#542)`                   | `person.repository.ts`             | replayed fork version (decline 32108)                                  | LOW  |
+| `feat: add timeline grouping display modes (#625)`              | `trash/…/+page.svelte`             | fork version + `getTrashActions($t, timelineManager?.assetCount ?? 0)` | LOW  |
+| `chore(rebase): regen OpenAPI clients … (batch 232)`            | `packages/sdk/src/fetch-client.ts` | replayed fork version (decline 32108)                                  | LOW  |
+| `chore(sql): regenerate person.repository.sql …`                | `person.repository.sql`            | replayed fork version (decline 32108)                                  | LOW  |
+| `feat: add album detail filter panel (#414)`                    | `albums/[albumId]/…/+page.svelte`  | replayed fork version (see 32111)                                      | LOW  |
+| `fix(rebase): keep person sharing dormant through immich-31960` | `PersonBulkShareModal.svelte`      | kept deleted (`git rm`)                                                | LOW  |
+
+A resolver script handled the stops. It refused any file outside the declared set, asserted a single anchor
+for the trash edit and no conflict markers before each `git add`, and checked for a stalled
+`rebase --continue`.
+
+## Whole-tree audit
+
+`git diff a40462cff98..HEAD --name-status` lists only: `docs/docs/install/qnap.md` (A) plus seven web files,
+each matching upstream's own delta (`PhotoViewer`, `TimelineAssetViewer`, `timeline-manager`,
+`trash.service`, trash page, memories page, workflow page). Tree identity against the last 10/10-green tip:
+only `web/` and `docs/` changed. The zero-byte files (`CODEOWNERS`, `docs/static/.nojekyll`,
+`docs/static/CNAME`) were already empty before this cycle.
+
+## Fork Feature Verification
+
+| Feature                    | Status | Notes                                                                  |
+| -------------------------- | ------ | ---------------------------------------------------------------------- |
+| Person sharing (dormant)   | OK     | Bulk share modal stays deleted; `GET /people` unchanged                |
+| People page / Space people | OK     | Fork page and repository untouched                                     |
+| Space albums               | OK     | Remove paths unaffected by the `albumId`-only manager guard            |
+| Album filter panel         | OK     | Fork album page kept; search-result pruning intact                     |
+| Branding                   | OK     | `qnap.md` rebranded (product name, download links, example data path)  |
+| Everything else            | OK     | `server/ mobile/ machine-learning/ e2e/ .github/ i18n/` byte-identical |
+
+## Database / Mobile Drift Migrations
+
+None incoming. Server and mobile trees unchanged.
+
+## Local CI Verification
+
+| Check                                                                          | Status | Notes                                                                                                |
+| ------------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------- |
+| `upstream-postrebase-audit` BATCH=82/83/84                                     | PASS   | 83's "Generated Artifact Review" flags files restored to the fork version (byte-identical to backup) |
+| `ci-invariants-check` / `fork-patches-check` / `fork-ownership-coverage-check` | PASS   |                                                                                                      |
+| `commit-autolink-check`                                                        | PASS   | 1612 messages                                                                                        |
+| web `check:typescript` / `check:svelte`                                        | PASS   | 630 files, 0 problems                                                                                |
+| web eslint (`tscompat` off) + prettier on changed files                        | PASS   |                                                                                                      |
+| web unit tests                                                                 | PASS   | 6414 passed                                                                                          |
+| docs prettier (`qnap.md`)                                                      | PASS   |                                                                                                      |
+| server / mobile / ML / e2e gates                                               | N/A    | trees byte-identical to the 10/10-green `a40462cff98`                                                |
+
+## Remote CI Verification
+
+See the follow-up commit on this branch.
+
+## Follow-ups
+
+- Fork sync of #992 and #819 (per-user favorites, large) when wanted — `make upstream-sync-fork-main`.
+- Optional: port 32111's `invalidate('album:data')` refresh model onto the fork album page.
