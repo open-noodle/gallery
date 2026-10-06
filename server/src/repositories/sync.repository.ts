@@ -642,6 +642,22 @@ class MemoryToAssetSync extends BaseSync {
       .where('memoriesId', 'in', (eb) => eb.selectFrom('memory').select('id').where('ownerId', '=', options.userId))
       .stream();
   }
+
+  /**
+   * Gallery: the links of exactly the memory types a client is sent (SyncService's
+   * `syncedMemoryTypes`). Upstream's getUpsertsV1 hard-codes on_this_day, which would strip the
+   * photos from every rule memory an installed Gallery app receives.
+   */
+  @GenerateSql({ params: [dummyQueryOptions, [MemoryType.OnThisDay, MemoryType.Rule]], stream: true })
+  getUpsertsForTypes(options: SyncQueryOptions, types: MemoryType[]) {
+    return this.upsertQuery('memory_asset', options)
+      .select(['memoriesId as memoryId', 'assetId as assetId'])
+      .select('updateId')
+      .where('memoriesId', 'in', (eb) =>
+        eb.selectFrom('memory').select('id').where('ownerId', '=', options.userId).where('type', 'in', types),
+      )
+      .stream();
+  }
 }
 
 class PartnerSync extends BaseSync {
