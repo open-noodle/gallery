@@ -68,3 +68,4 @@
 1794000000000-AddAssetFavoriteTables
 1794100000000-DropAssetIsFavoriteColumn
 1796000000000-AddAssetFaceCreatedBy
+1797000000000-AddAssetLocalDateTimeIndex
