@@ -37,6 +37,7 @@ import { favoriteViewerId, rejectSharedLinkFavoriteFilter } from 'src/utils/favo
 import { isSmartSearchEnabled } from 'src/utils/misc.js';
 import { decodeSearchCursor, encodeSearchCursor } from 'src/utils/search-cursor.js';
 import { applyLockedVisibilityPolicy, collectFilterIds } from 'src/utils/search-filter.js';
+import { ViewerScope } from 'src/utils/viewer-scope.js';
 
 // Opt-in env flag for per-phase smart-search timing logs. Set
 // GALLERY_SEARCH_TIMING=true to emit one `log`-level line per smart search
@@ -44,8 +45,6 @@ import { applyLockedVisibilityPolicy, collectFilterIds } from 'src/utils/search-
 // module load so toggling requires a server restart (keeps the hot path free
 // of env reads).
 const searchTimingEnabled = process.env.GALLERY_SEARCH_TIMING === 'true';
-
-const unique = <T>(items: T[]) => [...new Set(items)];
 
 type ResolvedSmartSearch = {
   options: Omit<SmartSearchDto, 'page' | 'size' | 'order' | 'visibility'> & {
@@ -67,19 +66,6 @@ type ResolvedSmartSearch = {
   embeddingSource: 'cache' | 'ml' | 'asset';
   encodeMs: number;
   timelineSpaceCount: number;
-};
-
-type ScopedPersonFilterOptions = {
-  personIds?: string[];
-  identityIds?: string[];
-  spacePersonIds?: string[];
-  forceEmptyResult?: boolean;
-  withSharedSpaces?: boolean;
-  spaceId?: string;
-  albumId?: string;
-  albumIds?: string[];
-  timelineSpaceIds?: string[];
-  visibility?: AssetVisibility | 'not-locked';
 };
 
 /**
@@ -143,7 +129,7 @@ export class SearchService extends BaseService {
    * answers "what did I just add", and /recently-added is itself an owner surface.
    */
   async getExploreData(auth: AuthDto) {
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, true);
+    const { timelineSpaceIds } = await this.resolveViewerScope(auth, 'search', { withSharedSpaces: true });
     const options = { maxFields: 12, minAssetsPerField: 5, timelineSpaceIds };
 
     const cities = await this.assetRepository.getAssetIdByCity(auth.user.id, options);
@@ -236,10 +222,10 @@ export class SearchService extends BaseService {
 
     const page = dto.page ?? 1;
     const size = dto.size;
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
-      favoriteScoped: dto.isFavorite === true,
-    });
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
+    const resolvedDto = {
+      ...dto,
+      ...(await this.resolveViewerScope(auth, 'search', { ...dto, favoriteScoped: dto.isFavorite === true })),
+    };
     const { hasNextPage, items } = await this.searchRepository.searchMetadata(
       { page, size },
       {
@@ -278,10 +264,10 @@ export class SearchService extends BaseService {
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
     }
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
-      favoriteScoped: dto.isFavorite === true,
-    });
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
+    const resolvedDto = {
+      ...dto,
+      ...(await this.resolveViewerScope(auth, 'search', { ...dto, favoriteScoped: dto.isFavorite === true })),
+    };
 
     return await this.searchRepository.searchStatistics({
       ...resolvedDto,
@@ -315,10 +301,10 @@ export class SearchService extends BaseService {
     }
 
     const userIds = await this.getUserIdsToSearch(auth, dto.visibility);
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
-      favoriteScoped: dto.isFavorite === true,
-    });
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
+    const resolvedDto = {
+      ...dto,
+      ...(await this.resolveViewerScope(auth, 'search', { ...dto, favoriteScoped: dto.isFavorite === true })),
+    };
     const items = await this.searchRepository.searchRandom(dto.size, {
       ...resolvedDto,
       authUserId: auth.user.id,
@@ -349,10 +335,10 @@ export class SearchService extends BaseService {
     }
 
     const userIds = await this.getUserIdsToSearch(auth, dto.visibility);
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, dto.withSharedSpaces || !!dto.albumIds?.length, {
-      favoriteScoped: dto.isFavorite === true,
-    });
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds });
+    const resolvedDto = {
+      ...dto,
+      ...(await this.resolveViewerScope(auth, 'search', { ...dto, favoriteScoped: dto.isFavorite === true })),
+    };
     const items = await this.searchRepository.searchLargeAssets(dto.size, {
       ...resolvedDto,
       visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
@@ -421,7 +407,7 @@ export class SearchService extends BaseService {
   /** #867: /places is the "view all" of the Explore strip, so it carries the same scope. */
   async getAssetsByCity(auth: AuthDto): Promise<AssetResponseDto[]> {
     const userIds = await this.getUserIdsToSearch(auth);
-    const timelineSpaceIds = await this.getTimelineSpaceIds(auth, true);
+    const { timelineSpaceIds } = await this.resolveViewerScope(auth, 'search', { withSharedSpaces: true });
     const assets = await this.searchRepository.getAssetsByCity(userIds, timelineSpaceIds, auth.user.id);
     return assets.map((asset) => mapAsset(asset, { auth }));
   }
@@ -447,19 +433,9 @@ export class SearchService extends BaseService {
 
     const userIds = await this.getUserIdsToSearch(auth);
 
-    let timelineSpaceIds: string[] | undefined;
-    if (dto.withSharedSpaces || dto.albumId) {
-      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-      if (spaceRows.length > 0) {
-        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
-      }
-    }
-
-    // No dto.visibility to merge with — suggestion request DTOs don't expose an explicit visibility
-    // override (unlike search's dto.visibility ?? ...). Resolve the same way search does for the
-    // implicit default so suggestions cover the same asset set search would return (LOW #7).
-    const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, { ...dto, timelineSpaceIds, visibility });
+    // The search surface's not-locked default covers suggestions too, so they list the same asset set
+    // search would return (LOW #7).
+    const resolvedDto = { ...dto, ...(await this.resolveViewerScope(auth, 'search', dto)) };
     const suggestions = await this.getSuggestions(userIds, resolvedDto);
     if (dto.includeNull) {
       suggestions.push(null);
@@ -478,17 +454,8 @@ export class SearchService extends BaseService {
 
     const userIds = await this.getUserIdsToSearch(auth);
 
-    let timelineSpaceIds: string[] | undefined;
-    if (dto.withSharedSpaces) {
-      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-      if (spaceRows.length > 0) {
-        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
-      }
-    }
-
-    // See getSearchSuggestions above — same not-locked/elevated resolution (LOW #7).
-    const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
-    return this.searchRepository.getAccessibleTags(userIds, { ...dto, timelineSpaceIds, visibility });
+    const scope = await this.resolveViewerScope(auth, 'search', dto);
+    return this.searchRepository.getAccessibleTags(userIds, { ...dto, ...scope });
   }
 
   async getFilterSuggestions(auth: AuthDto, dto: FilterSuggestionsRequestDto): Promise<FilterSuggestionsResponseDto> {
@@ -512,41 +479,17 @@ export class SearchService extends BaseService {
 
     const userIds = await this.getUserIdsToSearch(auth);
 
-    let timelineSpaceIds: string[] | undefined;
-    // #763: a SECOND list, for the hasFavorites probe only. Every other facet stays on
-    // `timelineSpaceIds` — widening those would pull a hidden space's cities/tags/people back into
-    // the panel — but "is the Favourites section worth offering" has to span the same spaces the
-    // favourites filter itself now searches, or the section is withheld for favourites the user can
-    // still reach. Only resolved for the withSharedSpaces panel; an album/space-scoped panel has a
-    // single explicit scope and no timeline hide to undo.
-    let favoriteSpaceIds: string[] | undefined;
-    if (dto.withSharedSpaces || dto.albumId) {
-      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-      if (spaceRows.length > 0) {
-        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
-      }
-    }
-    if (dto.withSharedSpaces) {
-      const memberRows = await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id);
-      if (memberRows.length > 0) {
-        favoriteSpaceIds = memberRows.map((row) => row.spaceId);
-      }
-    }
-
-    // See getSearchSuggestions above — same not-locked/elevated resolution (LOW #7).
-    const visibility = auth.session?.hasElevatedPermission ? undefined : 'not-locked';
-    const resolvedDto = await this.resolveScopedPersonFilters(auth, {
+    // #763: `withFavoriteSpaces` adds a SECOND list, for the hasFavorites probe only — see ViewerScope.
+    const resolvedDto = {
       ...dto,
-      timelineSpaceIds,
-      favoriteSpaceIds,
-      visibility,
-    });
+      ...(await this.resolveViewerScope(auth, 'search', { ...dto, withFavoriteSpaces: true })),
+    };
     return await this.searchRepository.getFilterSuggestions(userIds, resolvedDto);
   }
 
   private getSuggestions(
     userIds: string[],
-    dto: SearchSuggestionRequestDto & ScopedPersonFilterOptions,
+    dto: SearchSuggestionRequestDto & ViewerScope,
   ): Promise<Array<string | null>> {
     switch (dto.type) {
       case SearchSuggestionType.COUNTRY: {
@@ -767,36 +710,16 @@ export class SearchService extends BaseService {
 
     // #763: a favourite-filtered smart search spans every space the caller belongs to, and the
     // hasFavorites facet needs that same set even when the search itself is not favourite-filtered
-    // (the facet deliberately ignores its own isFavorite filter). One membership lookup serves both.
-    const favoriteFiltered = 'isFavorite' in dto && dto.isFavorite === true;
-    const memberSpaceRows =
-      dto.withSharedSpaces || favoriteFiltered
-        ? await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id)
-        : [];
-    const memberSpaceIds = memberSpaceRows.map((row) => row.spaceId);
-    const favoriteSpaceIds = dto.withSharedSpaces && memberSpaceIds.length > 0 ? memberSpaceIds : undefined;
-
-    let timelineSpaceIds: string[] | undefined;
-    if (dto.withSharedSpaces || !!('albumIds' in dto && dto.albumIds?.length)) {
-      if (favoriteFiltered) {
-        timelineSpaceIds = memberSpaceIds.length > 0 ? memberSpaceIds : undefined;
-      } else {
-        const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-        if (spaceRows.length > 0) {
-          timelineSpaceIds = spaceRows.map((row) => row.spaceId);
-        }
-      }
-    }
-
-    const visibility = 'visibility' in dto ? dto.visibility : undefined;
-    // Annotate so the 'not-locked' literal is preserved through the generic
-    // resolveScopedPersonFilters inference (no contextual type widens it to string).
-    const resolvedVisibility: AssetVisibility | 'not-locked' | undefined =
-      visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked');
-    const resolvedOptions = await this.resolveScopedPersonFilters(auth, {
+    // (the facet deliberately ignores its own isFavorite filter) — see ViewerScope.favoriteSpaceIds.
+    const scope = await this.resolveViewerScope(auth, 'search', {
       ...dto,
-      timelineSpaceIds,
-      favoriteSpaceIds,
+      favoriteScoped: 'isFavorite' in dto && dto.isFavorite === true,
+      withFavoriteSpaces: true,
+    });
+    const visibility = 'visibility' in dto ? dto.visibility : undefined;
+    const resolvedOptions = {
+      ...dto,
+      ...scope,
       // Undefined under an album scope — the AlbumRead check above is the boundary there, and
       // `albumSharedSpaceScope` in the query builder is what re-gates visibility and trash.
       userIds: albumScoped ? undefined : await this.getUserIdsToSearch(auth, visibility),
@@ -808,8 +731,7 @@ export class SearchService extends BaseService {
       authUserId: auth.user.id,
       embedding,
       maxDistance: machineLearning.clip.maxDistance,
-      visibility: resolvedVisibility,
-    });
+    };
 
     if (options.includeOrder) {
       Object.assign(resolvedOptions, { orderDirection: 'order' in dto ? dto.order : undefined });
@@ -819,7 +741,7 @@ export class SearchService extends BaseService {
       options: resolvedOptions,
       embeddingSource,
       encodeMs,
-      timelineSpaceCount: timelineSpaceIds?.length ?? 0,
+      timelineSpaceCount: scope.timelineSpaceIds?.length ?? 0,
     };
   }
 
@@ -834,61 +756,6 @@ export class SearchService extends BaseService {
       timelineEnabled: true,
     });
     return [auth.user.id, ...partnerIds];
-  }
-
-  /**
-   * #763: `favoriteScoped` resolves EVERY space the caller belongs to instead of only the ones they
-   * show in their timeline. Hiding a space from the home timeline is a browse preference, not a
-   * revocation — a favourite the caller placed inside it stays theirs and must stay findable, which
-   * is the same carve-out the timeline service makes for `isFavorite: true`. Safe only because a
-   * favourite-filtered query narrows to the caller's own `asset_favorite` rows; never pass it for
-   * an unfiltered browse.
-   */
-  private async getTimelineSpaceIds(
-    auth: AuthDto,
-    withSharedSpaces?: boolean,
-    { favoriteScoped = false }: { favoriteScoped?: boolean } = {},
-  ): Promise<string[] | undefined> {
-    if (!withSharedSpaces) {
-      return;
-    }
-
-    const spaceRows = favoriteScoped
-      ? await this.sharedSpaceRepository.getAllMemberSpaceIds(auth.user.id)
-      : await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
-    return spaceRows.length > 0 ? spaceRows.map((row) => row.spaceId) : undefined;
-  }
-
-  private async resolveScopedPersonFilters<T extends ScopedPersonFilterOptions>(
-    auth: AuthDto,
-    dto: T,
-  ): Promise<T & ScopedPersonFilterOptions> {
-    const tokens = dto.personIds?.filter(Boolean) ?? [];
-    const hasScopedTokens = tokens.some((token) => token.includes(':'));
-    const isGlobalSharedScope = dto.withSharedSpaces || !!dto.albumId || !!dto.albumIds?.length;
-    const shouldResolve = tokens.length > 0 && (isGlobalSharedScope || hasScopedTokens);
-
-    if (!shouldResolve) {
-      return dto;
-    }
-
-    const resolution = await this.faceIdentityRepository.resolveScopedPersonTokens({
-      userId: auth.user.id,
-      tokens,
-      scope: {
-        withSharedSpaces: isGlobalSharedScope,
-        timelineSpaceIds: dto.timelineSpaceIds,
-        spaceId: dto.spaceId,
-      },
-    });
-
-    return {
-      ...dto,
-      personIds: unique(resolution.legacyPersonIds),
-      identityIds: unique(resolution.identityIds),
-      spacePersonIds: unique([...(dto.spacePersonIds ?? []), ...resolution.legacySpacePersonIds]),
-      forceEmptyResult: dto.forceEmptyResult || resolution.hasInaccessibleToken,
-    };
   }
 
   private mapResponse(
