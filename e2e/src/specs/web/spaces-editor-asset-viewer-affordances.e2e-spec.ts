@@ -25,12 +25,13 @@ import { utils } from 'src/utils';
 //     edit permission has a hard ceiling at these four — #992 audit item 1.
 //
 // Menu item text is pinned against the real i18n keys (i18n/en.json), not guessed: `to_archive` →
-// "Archive", `add_upload_to_stack` → "Add upload to stack", `refresh_faces` → "Refresh faces",
-// `refresh_metadata` → "Refresh metadata".
+// "Archive", `add_upload_to_stack` → "Upload and {add to stack | create stack}" (an ICU select on
+// whether the asset is already stacked — matched by ADD_UPLOAD_TO_STACK below), `refresh_faces` →
+// "Refresh faces", `refresh_metadata` → "Refresh metadata".
 //
 // Rating control: NOT one of the "absent" affordances above, despite reading that way at first
 // glance. `DetailPanelStarRating` (the info-panel star widget — the only visible rating control;
-// the navbar's own `RatingAction` renders zero DOM, it only wires the 0-5 keyboard shortcuts) is
+// the navbar's `Rate` action renders zero DOM, it only wires the 0-5 keyboard shortcuts) is
 // gated by `isOwner={canEdit}` → `readOnly={!isOwner}`, and `readOnly` only disables the star
 // `<input>`s — the section still renders for a Viewer. So this suite checks interactivity
 // (enabled/disabled), not presence/absence, for the rating control specifically.
@@ -58,6 +59,8 @@ async function expectRatingInteractivity(page: Page, navbar: Locator, expectEnab
     await expect(firstStar).toBeDisabled();
   }
 }
+
+const ADD_UPLOAD_TO_STACK = /^Upload and (add to|create) stack$/;
 
 test.describe("Spaces — asset viewer affordances on a space member's asset (#992 audit item 1 gap)", () => {
   let owner: LoginResponseDto;
@@ -129,7 +132,7 @@ test.describe("Spaces — asset viewer affordances on a space member's asset (#9
 
     // isOwner-gated (menu): absent regardless of space role.
     await expect(navbar.getByRole('menuitem', { name: 'Archive' })).toHaveCount(0);
-    await expect(navbar.getByRole('menuitem', { name: 'Add upload to stack' })).toHaveCount(0);
+    await expect(navbar.getByRole('menuitem', { name: ADD_UPLOAD_TO_STACK })).toHaveCount(0);
     await expect(navbar.getByRole('menuitem', { name: 'View in timeline' })).toHaveCount(0);
 
     await page.keyboard.press('Escape'); // close the menu via the dropdown's own onEscape handler
@@ -157,7 +160,7 @@ test.describe("Spaces — asset viewer affordances on a space member's asset (#9
     // The ceiling: even the space Owner cannot Archive / Add-to-stack / View-in-timeline a
     // fellow member's asset — those stay isOwner-only (#992 audit item 1).
     await expect(navbar.getByRole('menuitem', { name: 'Archive' })).toHaveCount(0);
-    await expect(navbar.getByRole('menuitem', { name: 'Add upload to stack' })).toHaveCount(0);
+    await expect(navbar.getByRole('menuitem', { name: ADD_UPLOAD_TO_STACK })).toHaveCount(0);
     await expect(navbar.getByRole('menuitem', { name: 'View in timeline' })).toHaveCount(0);
 
     await page.keyboard.press('Escape'); // close the menu via the dropdown's own onEscape handler
@@ -182,7 +185,7 @@ test.describe("Spaces — asset viewer affordances on a space member's asset (#9
     await expect(navbar.getByRole('menuitem', { name: 'Refresh metadata' })).toBeVisible();
 
     await expect(navbar.getByRole('menuitem', { name: 'Archive' })).toHaveCount(0);
-    await expect(navbar.getByRole('menuitem', { name: 'Add upload to stack' })).toHaveCount(0);
+    await expect(navbar.getByRole('menuitem', { name: ADD_UPLOAD_TO_STACK })).toHaveCount(0);
     await expect(navbar.getByRole('menuitem', { name: 'View in timeline' })).toHaveCount(0);
 
     await page.keyboard.press('Escape'); // close the menu via the dropdown's own onEscape handler
@@ -209,7 +212,7 @@ test.describe("Spaces — asset viewer affordances on a space member's asset (#9
     await expect(navbar.getByRole('menuitem', { name: 'Refresh faces' })).toBeVisible();
     await expect(navbar.getByRole('menuitem', { name: 'Refresh metadata' })).toBeVisible();
     await expect(navbar.getByRole('menuitem', { name: 'Archive' })).toBeVisible();
-    await expect(navbar.getByRole('menuitem', { name: 'Add upload to stack' })).toBeVisible();
+    await expect(navbar.getByRole('menuitem', { name: ADD_UPLOAD_TO_STACK })).toBeVisible();
     await expect(navbar.getByRole('menuitem', { name: 'View in timeline' })).toBeVisible();
 
     await page.keyboard.press('Escape'); // close the menu via the dropdown's own onEscape handler
