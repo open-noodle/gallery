@@ -3428,8 +3428,8 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { name: 'Updated Person' }] })
-  updatePerson(id: string, values: Updateable<SharedSpacePersonTable>) {
-    return this.db
+  updatePerson(id: string, values: Updateable<SharedSpacePersonTable>, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .updateTable('shared_space_person')
       .set(values)
       .where('id', '=', id)
