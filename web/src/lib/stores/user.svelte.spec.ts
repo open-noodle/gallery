@@ -1,8 +1,11 @@
+import { getAllSpaces } from '@immich/sdk';
 import { get } from 'svelte/store';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { recentSpacesDropdown } from '$lib/stores/preferences.store';
-import { userInteraction } from '$lib/stores/user.svelte';
+import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
+
+vi.mock('@immich/sdk', async (orig) => ({ ...(await orig<typeof import('@immich/sdk')>()), getAllSpaces: vi.fn() }));
 
 describe('userInteraction.recentSpaces', () => {
   beforeEach(() => {
@@ -48,6 +51,38 @@ describe('userInteraction.recentSpaces', () => {
 
     expect(userInteraction.recentSpaces).toBeUndefined();
     expect(userInteraction.spaceAlbums?.s1).toBeUndefined();
+  });
+});
+
+describe('loadSpaces', () => {
+  beforeEach(() => {
+    userInteraction.recentSpaces = undefined;
+    vi.mocked(getAllSpaces).mockReset();
+  });
+
+  it('fetches the spaces list once into the shared cache', async () => {
+    const spaces = [sharedSpaceFactory.build()];
+    vi.mocked(getAllSpaces).mockResolvedValue(spaces);
+
+    loadSpaces();
+    loadSpaces();
+    await vi.waitFor(() => expect(userInteraction.recentSpaces).toEqual(spaces));
+    loadSpaces();
+
+    expect(getAllSpaces).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries on the next call after a failed fetch', async () => {
+    const spaces = [sharedSpaceFactory.build()];
+    vi.mocked(getAllSpaces).mockRejectedValueOnce(new Error('network')).mockResolvedValue(spaces);
+
+    loadSpaces();
+    await vi.waitFor(() => {
+      loadSpaces();
+      expect(userInteraction.recentSpaces).toEqual(spaces);
+    });
+
+    expect(getAllSpaces).toHaveBeenCalledTimes(2);
   });
 });
 
