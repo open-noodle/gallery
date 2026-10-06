@@ -140,4 +140,28 @@ migration count 71, manifest now complete.
 
 ## Remote CI
 
-Pending — dispatched against the branch tip after push.
+**10/10 green.** Final tip `7a7aa8cf197`; seven workflows validated on `657a7e59eac`, whose tree differs from the
+tip only in three mobile test files and one whitespace-only `dart format` change in
+`mobile/lib/.../sync_api.repository.dart` — none of those seven runs mobile tests, and Build Mobile is unaffected by
+whitespace.
+
+| Workflow                            | Result  | Commit        | Run           |
+| ----------------------------------- | ------- | ------------- | ------------- |
+| Test (22 jobs)                      | success | `7a7aa8cf197` | `37517195153` |
+| Static Code Analysis                | success | `7a7aa8cf197` | `37517209695` |
+| Gallery Mobile Smoke                | success | `7a7aa8cf197` | `37517224597` |
+| Docker (incl. OpenVINO nightly)     | success | `657a7e59eac` | `37514795628` |
+| Gallery Build Mobile                | success | `657a7e59eac` | `37514676858` |
+| Gallery Rebase Smoke                | success | `657a7e59eac` | `37514867686` |
+| Storage Migration Tests             | success | `657a7e59eac` | `37514936400` |
+| Storage Migration E2E               | success | `657a7e59eac` | `37515145677` |
+| Gallery Revert-to-Immich Validation | success | `657a7e59eac` | `37515006673` |
+| Gallery ML Smoke                    | success | `657a7e59eac` | `37515076929` |
+
+Fixed during CI (both mobile-only, the gates left to CI):
+
+1. Round 1 — Static Code Analysis, Mobile Smoke, Unit Test Mobile: fork-only cases in
+   `sync_stream_repository_test.dart` still called `updateMemoriesV1(SyncMemoryV1(...))`, renamed by immich-32167.
+   The Shape S detector reports exactly this name when run against that commit.
+2. Round 2 — `dart format` on a ternary in `sync_api.repository.dart`, and the new rule-title pin using `context.t`
+   without an EasyLocalization ancestor (now `StaticTranslations.instance` in a plain `test`).
