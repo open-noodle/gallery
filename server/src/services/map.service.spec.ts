@@ -13,6 +13,7 @@ describe(MapService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(MapService));
+    vi.spyOn(sut, 'resolveViewerScope').mockResolvedValue({});
   });
 
   describe('getMapMarkers', () => {
@@ -87,7 +88,6 @@ describe(MapService.name, () => {
         country: asset.exifInfo.country,
       };
       mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.map.getMapMarkers.mockResolvedValue([marker]);
       const album1 = AlbumFactory.create();
       const album2 = AlbumFactory.from().albumUser({ userId: userStub.user1.id }).build();
@@ -100,103 +100,24 @@ describe(MapService.name, () => {
       expect(mocks.album.getAllIds).toHaveBeenCalledWith(auth.user.id);
     });
 
-    it('should pass timeline space IDs when shared albums are included', async () => {
+    it('should pass the viewer’s map scope through to the repository', async () => {
       const auth = AuthFactory.create();
       const spaceId = '00000000-0000-4000-8000-000000000003';
+      const dto = { withSharedAlbums: true, isArchived: true };
+      vi.mocked(sut.resolveViewerScope).mockResolvedValue({ timelineSpaceIds: [spaceId] });
       mocks.partner.getAll.mockResolvedValue([]);
       mocks.album.getAllIds.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.map.getMapMarkers.mockResolvedValue([]);
 
-      await sut.getMapMarkers(auth, { withSharedAlbums: true });
+      await sut.getMapMarkers(auth, dto);
 
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(auth, 'map', dto);
       expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
         auth.user.id,
         [auth.user.id],
         [],
-        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
-      );
-    });
-
-    it('should pass space IDs when withSharedSpaces is true and user has enabled spaces', async () => {
-      const auth = AuthFactory.create();
-      const spaceId = '00000000-0000-4000-8000-000000000001';
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.map.getMapMarkers.mockResolvedValue([]);
-
-      await sut.getMapMarkers(auth, { withSharedSpaces: true });
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
-      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
-        auth.user.id,
-        [auth.user.id],
-        expect.anything(),
-        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
-      );
-    });
-
-    it('should not pass timelineSpaceIds when user has no enabled spaces', async () => {
-      const auth = AuthFactory.create();
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-      mocks.map.getMapMarkers.mockResolvedValue([]);
-
-      await sut.getMapMarkers(auth, { withSharedSpaces: true });
-
-      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
-        auth.user.id,
-        [auth.user.id],
-        expect.anything(),
-        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
-      );
-    });
-
-    it('resolves space IDs even when isFavorite=true (#763 slice 4)', async () => {
-      const auth = AuthFactory.create();
-      const spaceId = '00000000-0000-4000-8000-000000000004';
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.map.getMapMarkers.mockResolvedValue([]);
-
-      await sut.getMapMarkers(auth, { withSharedSpaces: true, isFavorite: true });
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
-      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
-        auth.user.id,
-        [auth.user.id],
-        expect.anything(),
-        expect.objectContaining({ timelineSpaceIds: [spaceId], isFavorite: true }),
-      );
-    });
-
-    it('should resolve space IDs when isArchived=true (archive toggle is additive)', async () => {
-      const auth = AuthFactory.create();
-      const spaceId = '00000000-0000-4000-8000-000000000002';
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-      mocks.map.getMapMarkers.mockResolvedValue([]);
-
-      await sut.getMapMarkers(auth, { withSharedSpaces: true, isArchived: true });
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
-      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
-        auth.user.id,
-        [auth.user.id],
-        expect.anything(),
         expect.objectContaining({ timelineSpaceIds: [spaceId], isArchived: true }),
       );
-    });
-
-    it('should not resolve space IDs when withSharedSpaces is omitted', async () => {
-      const auth = AuthFactory.create();
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.map.getMapMarkers.mockResolvedValue([]);
-
-      await sut.getMapMarkers(auth, {});
-
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
     });
   });
 

@@ -18,9 +18,7 @@ describe(ViewService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(ViewService));
-    // #1041 §6.2: resolved once per request, same as timeline.service.ts.
-    mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue(emptyHiddenScope);
-    mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+    vi.spyOn(sut, 'resolveViewerScope').mockResolvedValue({ hiddenScope: emptyHiddenScope, visibleSpaceIds: [] });
   });
 
   it('should work', () => {
@@ -35,6 +33,7 @@ describe(ViewService.name, () => {
       const result = await sut.getUniqueOriginalPaths(authStub.admin);
 
       expect(result).toEqual(mockPaths);
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(authStub.admin, 'folders');
       expect(mocks.view.getUniqueOriginalPaths).toHaveBeenCalledWith(authStub.admin.user.id, emptyHiddenScope, []);
     });
   });
@@ -54,6 +53,7 @@ describe(ViewService.name, () => {
 
       const result = await sut.getAssetsByOriginalPath(authStub.admin, path);
       expect(result).toEqual(mockAssetReponseDto);
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(authStub.admin, 'folders');
       expect(mocks.view.getAssetsByOriginalPath).toHaveBeenCalledWith(
         authStub.admin.user.id,
         path,
