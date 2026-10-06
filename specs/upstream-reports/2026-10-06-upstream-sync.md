@@ -202,7 +202,25 @@ Mobile Smoke, Storage Migration Tests, Storage Migration E2E). Three red, none f
 - **Docker** — `mise` inside the plugins stage hit the unauthenticated GitHub API rate limit verifying the
   `extism/js-pdk` attestation (403). Infrastructure; other branches' Docker runs on the same image were green.
 
-**Round 2 — fork-synced tip**: see the follow-up commit on this branch.
+**Round 2 — `af00b7f0d43`** (first fork sync): three stale fork tests (fixed, see "Round-2 CI findings") and the
+face-picker name loss; Revert-to-Immich and Build Mobile green again once `main` was synced.
+
+**Round 3 — `d15c614b5cf`** (through #1161): 9/10 green incl. Test; Docker superseded.
+
+**Round 4 — `87f5b4f57c0`** (through #1158): 9/10 green; Test red on the face-picker name loss alone (2 of 3 CI runs).
+Root-caused and fixed (`627c97a0743`, same change merged to `main` as #1164 → `84bc20b27bd`, synced as an empty pick).
+
+**Round 5 — `627c97a0743`**: **10/10 green** (Test after re-running two infrastructure failures: Lint Web killed by the
+runner, Medium Tests unable to pull the Postgres image; Storage Migration Tests after a GHCR `toomanyrequests` re-run).
+
+## Staging RC
+
+`rolling-v330-rc2` (server only; ML unchanged → stays `rolling-v330-rc1`) built from `627c97a0743` and deployed
+(infra-gitops `28d07f5`). Live-DB parity before deploy: 0 orphans, 4 pending (the fork-sync migrations), all applied,
+`No schema drift detected` on both workers, pod 0 restarts. The favourites data migration was checked with two probe
+favourites set before the deploy: both arrived in `asset_favorite`, the `asset.isFavorite` column is gone, and they were
+removed again through `PUT /assets/favorites`. Smoke (temp API key, deleted afterwards): ping, ml-health, server features
+(`localTakenRange`, `AssetFavoritesV1`), `POST /assets/editable`, people, taken-range metadata search, V3 guard.
 
 ## Follow-ups
 
