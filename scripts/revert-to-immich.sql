@@ -433,9 +433,14 @@ DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 ALTER ROLE CURRENT_USER RESET jit;
 
 -- No post-tag upstream migration needs reversing right now. `upstream.version` is
--- 3.2.0 and this branch's `server/src/schema/migrations/` is identical to upstream
--- v3.2.0's (same 96 files), so every upstream migration Gallery carries is one the
--- tagged release also ships.
+-- 3.3.0 and this branch's `server/src/schema/migrations/` is identical to upstream
+-- v3.3.0's (same 100 files), so every upstream migration Gallery carries is one the
+-- tagged release also ships. The 3.2.4 -> 3.3.0 bump removed four more entries, for the
+-- same reason as below: 1789419229196-ConvertUserOAuthIdEmptyStringToNull,
+-- 1790587508209-RenameGeoNamesCountries, 1790616293884-PersonSharing and
+-- 1790693088454-AddPersonUserTableSharedBySharedWithConstraint. v3.3.0 needs the
+-- nullable oauthId and the person_user table; recover their reversals from git history
+-- if a future tag ever drops back below 3.3.0.
 --
 -- That direction matters: reversing a migration the tagged release DOES ship is
 -- actively wrong. Its kysely_migrations row is then missing while its file is
@@ -471,38 +476,6 @@ ALTER ROLE CURRENT_USER RESET jit;
 -- face_repair_scan_flagged_face, which section 2 drops CASCADE. Their only footprint on an upstream
 -- table is the person_personGroupId_key index, removed in section 4. Nothing further to reverse —
 -- only their kysely_migrations rows, in step 8.
-
--- immich-31560 (1789419229196-ConvertUserOAuthIdEmptyStringToNull) made user.oauthId
--- nullable and re-defaulted it to NULL. v3.2.2 still expects NOT NULL DEFAULT ''. These
--- three statements are idempotent by construction: on a DB where the migration never ran
--- the UPDATE matches no rows and the two ALTERs re-assert what is already true, so this
--- is also safe against the tagged :main image.
-UPDATE "user" SET "oauthId" = '' WHERE "oauthId" IS NULL;
-ALTER TABLE "user" ALTER COLUMN "oauthId" SET DEFAULT '';
-ALTER TABLE "user" ALTER COLUMN "oauthId" SET NOT NULL;
-
--- immich-30199 (1790587508209-RenameGeoNamesCountries) rewrote stored country names to their
--- GeoNames forms. Data-only, with no `down()` (the old names came from a removed dependency); the
--- new names are plain strings v3.2.4 reads fine. Nothing to reverse — only its kysely_migrations row.
-
--- immich-31620 (1790616293884-PersonSharing) added person sharing, which Gallery keeps dormant
--- (specs/2026-10-01-upstream-person-sharing-dormant-design.md). Mirrors its down(), idempotent so it
--- is also safe against the tagged :main image where none of this exists. Dropping the table drops its
--- own two triggers; person_delete_shares lives on "person" and goes first. immich-31902's
--- 1790693088454-AddPersonUserTableSharedBySharedWithConstraint only adds a check on person_user, so
--- dropping the table reverses it too.
-DROP TRIGGER IF EXISTS "person_delete_shares" ON "person";
-DROP TABLE IF EXISTS "person_user";
-DROP FUNCTION IF EXISTS person_user_after_insert();
-DROP FUNCTION IF EXISTS person_delete_shares();
-DROP TYPE IF EXISTS "person_user_role_enum";
-DELETE FROM "migration_overrides" WHERE "name" IN (
-  'function_person_user_after_insert',
-  'function_person_delete_shares',
-  'trigger_person_delete_shares',
-  'trigger_person_user_after_insert',
-  'trigger_person_user_updatedAt'
-);
 
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
@@ -617,17 +590,12 @@ DELETE FROM "kysely_migrations"
    -- 1776735180298-ChangeDurationToInteger is missing". Drop the alias row here;
    -- the real 1777667825574 row is always present by revert time and matches the
    -- upstream file, so it stays.
-   '1776735180298-ChangeDurationToInteger',
+   '1776735180298-ChangeDurationToInteger'
 
--- Post-tag upstream migrations pulled in by rebase, paired with the schema
--- rollbacks in step 7. Keep timestamp-sorted.
---
--- `upstream.version` is 3.2.4; this branch sits ahead of that tag and carries upstream
--- migrations the tagged release lacks. Their schema rollbacks are in step 7.
-   '1789419229196-ConvertUserOAuthIdEmptyStringToNull',
-   '1790587508209-RenameGeoNamesCountries',
-   '1790616293884-PersonSharing',
-   '1790693088454-AddPersonUserTableSharedBySharedWithConstraint'
+   -- Post-tag upstream migrations pulled in by rebase would follow here, paired with
+   -- schema rollbacks in step 7 and kept timestamp-sorted. None right now:
+   -- `upstream.version` is 3.3.0 and every upstream migration this branch carries ships
+   -- in that tag (see step 7).
  );
 
 -- -----------------------------------------------------------------------------
