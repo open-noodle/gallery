@@ -4,7 +4,6 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/people_sort.dart';
-import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:openapi/api.dart';
 
 final sharedSpaceApiRepositoryProvider = Provider((ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider)));
@@ -144,24 +143,6 @@ class SharedSpaceApiRepository extends ApiRepository {
       spaceId: dto.spaceId,
       numberOfAssets: dto.assetCount,
     );
-  }
-
-  /// Whether [userId] may edit Space-scoped people in [spaceId] (owner or editor role).
-  /// Mirrors the web resolveSpaceEditable (person.service.ts): the server enforces the role
-  /// on every write, so a membership-lookup failure fails open (returns true) rather than
-  /// hiding a working action. `getMembers` only requires membership, so viewers can call it.
-  Future<bool> isSpaceEditor(String spaceId, String userId) async {
-    try {
-      final members = await getMembers(spaceId);
-      for (final member in members) {
-        if (member.userId == userId) {
-          return roleIsWritable(member.role);
-        }
-      }
-      return false;
-    } catch (_) {
-      return true;
-    }
   }
 
   /// Edits a Space-scoped person via the editor-gated shared-space endpoint. Personal/owned
