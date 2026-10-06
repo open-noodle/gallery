@@ -11,15 +11,7 @@ describe(TimelineService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(TimelineService));
-    // #1041 §6.2: resolved once per request for every /photos-style browse. Default to "nothing
-    // hidden" so pre-existing tests that don't care about the hide-from-timeline feature keep their
-    // original behaviour; tests that DO care override this per-test.
-    mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
-      hiddenSpaceIds: [],
-      hiddenAlbumIds: [],
-      hiddenAlbumSpacePairs: [],
-      hiddenLibraryIds: [],
-    });
+    vi.spyOn(sut, 'resolveViewerScope').mockResolvedValue({});
   });
 
   describe('getTimeBuckets', () => {
@@ -251,36 +243,49 @@ describe(TimelineService.name, () => {
     });
 
     describe('withSharedSpaces', () => {
-      it('should resolve space IDs and pass them as timelineSpaceIds', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-1' }, { spaceId: 'space-2' }]);
+      it('should pass the viewer’s timeline scope through to the asset repository', async () => {
+        const scope = {
+          timelineSpaceIds: ['space-1'],
+          hiddenScope: {
+            hiddenSpaceIds: ['space-2'],
+            hiddenAlbumIds: [],
+            hiddenAlbumSpacePairs: [],
+            hiddenLibraryIds: [],
+          },
+          visibleSpaceIds: ['space-1'],
+          personIds: ['person-1'],
+          identityIds: ['identity-1'],
+          spacePersonIds: ['space-person-1'],
+          forceEmptyResult: false,
+        };
+        vi.mocked(sut.resolveViewerScope).mockResolvedValue(scope);
         mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
 
         await sut.getTimeBuckets(authStub.admin, {
+          personId: 'space-person:space-person-1',
           withSharedSpaces: true,
+          withStacked: true,
           visibility: AssetVisibility.Timeline,
         });
 
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.admin.user.id);
+        expect(sut.resolveViewerScope).toHaveBeenCalledWith(
+          authStub.admin,
+          'timeline',
+          expect.objectContaining({
+            userId: authStub.admin.user.id,
+            withSharedSpaces: true,
+            personIds: ['space-person:space-person-1'],
+          }),
+        );
         expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
           expect.objectContaining({
+            ...scope,
             userIds: [authStub.admin.user.id],
-            timelineSpaceIds: ['space-1', 'space-2'],
+            callerId: authStub.admin.user.id,
+            withStacked: true,
           }),
           authStub.admin,
         );
-      });
-
-      it('should not pass timelineSpaceIds when user has no enabled spaces', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
-        mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
-
-        await sut.getTimeBuckets(authStub.admin, {
-          withSharedSpaces: true,
-          visibility: AssetVisibility.Timeline,
-        });
-
-        const calledWith = mocks.asset.getTimeBuckets.mock.calls[0][0];
-        expect(calledWith.timelineSpaceIds).toBeUndefined();
       });
 
       it('should throw when combined with archive visibility', async () => {
@@ -309,6 +314,8 @@ describe(TimelineService.name, () => {
       // that the timeline-filtered one is not) is the whole point: both return `{ spaceId }[]`, so
       // a test that only checked `timelineSpaceIds` would pass against either.
       it('resolves ALL member spaces — not just timeline-visible ones — when isFavorite is set (#763)', async () => {
+        // Through the real viewer scope: this is the service-level pin on the favourites space source.
+        vi.mocked(sut.resolveViewerScope).mockRestore();
         mocks.sharedSpace.getAllMemberSpaceIds.mockResolvedValue([{ spaceId: 'space-1' }]);
         mocks.asset.getTimeBuckets.mockResolvedValue([]);
 
@@ -320,7 +327,7 @@ describe(TimelineService.name, () => {
           }),
         ).resolves.toEqual([]);
 
-        expect(mocks.sharedSpace.getAllMemberSpaceIds).toHaveBeenCalledWith(authStub.admin.user.id);
+        expect(mocks.sharedSpace.getAllMemberSpaceIds).toHaveBeenCalledWith(authStub.admin.user.id, undefined);
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
         expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -335,6 +342,13 @@ describe(TimelineService.name, () => {
       // The other direction, and the reason the widening above is scoped to `isFavorite: true`:
       // an ordinary browse must keep honouring "don't show this space in my timeline".
       it('keeps the timeline-visible-only scope for a browse that is not favourite-filtered (#763)', async () => {
+        vi.mocked(sut.resolveViewerScope).mockRestore();
+        mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+          hiddenSpaceIds: [],
+          hiddenAlbumIds: [],
+          hiddenAlbumSpacePairs: [],
+          hiddenLibraryIds: [],
+        });
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-visible' }]);
         mocks.asset.getTimeBuckets.mockResolvedValue([]);
 
@@ -345,7 +359,7 @@ describe(TimelineService.name, () => {
           }),
         ).resolves.toEqual([]);
 
-        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.admin.user.id);
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.admin.user.id, undefined);
         expect(mocks.sharedSpace.getAllMemberSpaceIds).not.toHaveBeenCalled();
         expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
           expect.objectContaining({ timelineSpaceIds: ['space-visible'] }),
@@ -360,56 +374,6 @@ describe(TimelineService.name, () => {
             isTrashed: true,
           }),
         ).rejects.toThrow(BadRequestException);
-      });
-
-      it('should pass withStacked through to asset repository when combined with withSharedSpaces', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-1' }]);
-        mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
-
-        await sut.getTimeBuckets(authStub.admin, {
-          withSharedSpaces: true,
-          withStacked: true,
-          visibility: AssetVisibility.Timeline,
-        });
-
-        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-          expect.objectContaining({
-            withStacked: true,
-            timelineSpaceIds: ['space-1'],
-          }),
-          authStub.admin,
-        );
-      });
-
-      it('resolves scoped person tokens before requesting time buckets', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-1' }]);
-        mocks.faceIdentity.resolveScopedPersonTokens.mockResolvedValue({
-          identityIds: ['identity-1'],
-          legacyPersonIds: ['person-1'],
-          legacySpacePersonIds: ['space-person-1'],
-          hasInaccessibleToken: false,
-        });
-        mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
-
-        await sut.getTimeBuckets(authStub.admin, {
-          personIds: ['space-person:space-person-1'],
-          withSharedSpaces: true,
-          visibility: AssetVisibility.Timeline,
-        });
-
-        expect(mocks.faceIdentity.resolveScopedPersonTokens).toHaveBeenCalledWith({
-          userId: authStub.admin.user.id,
-          tokens: ['space-person:space-person-1'],
-          scope: { withSharedSpaces: true, timelineSpaceIds: ['space-1'], spaceId: undefined },
-        });
-        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-          expect.objectContaining({
-            identityIds: ['identity-1'],
-            personIds: ['person-1'],
-            spacePersonIds: ['space-person-1'],
-          }),
-          authStub.admin,
-        );
       });
     });
   });
