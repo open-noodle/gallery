@@ -15,6 +15,7 @@
     grouping?: TimelineGrouping;
     onGroupingChange?: (grouping: TimelineGrouping) => void;
     children?: Snippet;
+    empty?: Snippet;
   }
 
   let {
@@ -22,6 +23,7 @@
     options = {},
     album,
     children,
+    empty: emptySnippet,
     onTimelineBucketActivate,
     temporalAnchor,
     onTemporalAnchorResolved,
@@ -31,13 +33,23 @@
 
   const mountId = nextTimelineMountId();
 
+  /**
+   * Opt-in empty rendering, keyed on the same `__timelineStubAssetCount` global the sibling
+   * bindable-timeline stub uses. Gated on the global being EXPLICITLY 0 rather than on this mock's
+   * own `empty` computation, so every spec that does not set it keeps rendering exactly what it
+   * rendered before this snippet existed.
+   */
+  const emptyStubGlobals = globalThis as typeof globalThis & { __timelineStubAssetCount?: number };
+  const renderEmptySnippet = $derived(emptyStubGlobals.__timelineStubAssetCount === 0);
+
   $effect(() => {
     if (album?.id === 'without-bound-timeline-manager') {
       return;
     }
 
     const tagIds = Array.isArray(options.tagIds) ? options.tagIds : [];
-    const empty = tagIds.includes('tag-no-match') || album?.assetCount === 0;
+    const empty =
+      tagIds.includes('tag-no-match') || album?.assetCount === 0 || emptyStubGlobals.__timelineStubAssetCount === 0;
     const monthsOnly = album?.id === 'timeline-months-only';
 
     const nextTimelineManager = {
@@ -92,4 +104,7 @@
 </div>
 <div data-testid="mock-disabled-asset" data-asset="asset-in-album" data-disabled="true"></div>
 <div data-testid="mock-timeline-asset-count">{timelineManager?.assetCount ?? 0}</div>
+{#if renderEmptySnippet}
+  {@render emptySnippet?.()}
+{/if}
 {@render children?.()}

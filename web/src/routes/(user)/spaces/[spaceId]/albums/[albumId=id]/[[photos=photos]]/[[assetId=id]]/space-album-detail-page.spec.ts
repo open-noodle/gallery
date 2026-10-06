@@ -1112,8 +1112,11 @@ describe('Space album detail page', () => {
   // reasoning) instead of the stripped Download+Remove-only bar it originally shipped with.
   // `canRemoveFromAlbum` stays `canManage`-gated (ownership grants nothing — decision C), while
   // the metadata-edit affordances (Archive/ChangeDate/ChangeLocation/Delete/…) and Share/
-  // Add-to-album/Favorite are gated independently on `isAllUserOwned` — the same two
+  // Add-to-album are gated independently on `isAllUserOwned` — the same two
   // independent axes the merged direct-space timeline and SelectionToolbar.spec.ts encode.
+  // Favorite is NOT on either axis (#763): it writes a per-user `asset_favorite` row rather than
+  // mutating the asset, so `canFavorite` is unconditionally true and the heart shows for every
+  // selection any viewer can see.
   describe('Slice 6: full album-equivalent toolbar (reversal of the stripped bar)', () => {
     it('manager + all-owned selection: Download + RemoveFromAlbum + metadata-edit + Set-cover all present', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
@@ -1135,7 +1138,7 @@ describe('Space album detail page', () => {
       expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
     });
 
-    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover + Add-to-album + Share present (canManage/space-role-gated), metadata-edit + Delete absent (ownership-gated)', async () => {
+    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover + Add-to-album + Share (canManage/space-role-gated) + Favorite (per-user) present, metadata-edit + Delete absent (ownership-gated)', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = false;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
@@ -1147,7 +1150,9 @@ describe('Space album detail page', () => {
       // A space Editor may contribute non-owned assets into an album linked to this space
       // (#764), so the "+" stays — it opens the picker restricted to that space's albums.
       expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /favorite/i })).not.toBeInTheDocument();
+      // #763: favoriting writes a per-user `asset_favorite` row, so it is not ownership-gated —
+      // the heart stays for a non-owned selection.
+      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
 
       await openOverflowMenu();
       expect(screen.getByTestId('download-action')).toBeInTheDocument();
@@ -1193,7 +1198,7 @@ describe('Space album detail page', () => {
       expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
     });
 
-    it('non-manager (viewer) + NOT-owned selection: only Select-all and Download are shown', async () => {
+    it('non-manager (viewer) + NOT-owned selection: only Select-all, Favorite and Download are shown', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = false;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
@@ -1212,7 +1217,9 @@ describe('Space album detail page', () => {
       expect(screen.getByRole('button', { name: 'Select all' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Add to album or space' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /favorite/i })).not.toBeInTheDocument();
+      // #763: favoriting is a per-user overlay write available to anyone who can see the asset,
+      // so even a read-only space viewer gets the heart on a non-owned selection.
+      expect(screen.getByRole('button', { name: /favorite/i })).toBeInTheDocument();
 
       await openOverflowMenu();
       expect(screen.getByTestId('download-action')).toBeInTheDocument();

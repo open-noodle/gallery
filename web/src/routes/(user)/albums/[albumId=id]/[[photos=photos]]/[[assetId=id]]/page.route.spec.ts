@@ -294,7 +294,8 @@ describe('album detail filter panel route', () => {
     expect(screen.getByTestId('active-chip')).toHaveTextContent('favorites');
     expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId":"');
     expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"withPartners":true');
+    // #763 slice 4: favorites no longer suppress partner scope in picker mode.
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"withPartners":true');
   });
 
   it('keeps timelineAlbumId in picker options after filters change and shows filtered empty state', async () => {

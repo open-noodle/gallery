@@ -123,7 +123,11 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
     shareScopedToSpace: isSpaceEditor && !sel.isAllUserOwned,
     canAddToAlbum: sel.isAllUserOwned || isSpaceEditor,
     addToAlbumRestrictedToSpace: !sel.isAllUserOwned && isSpaceEditor,
-    canFavorite: sel.isAllUserOwned,
+    // Not `isAllUserOwned` (#763): a favorite is a per-user row in the `asset_favorite` overlay,
+    // not a flag on the asset, so favoriting never mutates someone else's asset. Any viewer who
+    // can see the selection may favorite it — including a shared-space member favoriting another
+    // member's photo. Mirrors `canFavoriteSelected` in selection-command-handlers.ts.
+    canFavorite: true,
     canEditMetadata: hasEditable,
     // Archive / SetVisibility are NOT metadata edits: rbac-3 restricts visibility changes to
     // owned assets, so they must not ride on canEditMetadata the way they used to.

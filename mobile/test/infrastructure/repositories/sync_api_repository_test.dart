@@ -347,6 +347,44 @@ void main() {
     });
   });
 
+  group('#763: AssetFavoritesV1 is requested ONLY behind a server declaration', () {
+    // AssetFavoritesV1 post-dates capability signalling (v5.7.0), so like SharedSpaceAlbumFoldersV1
+    // it has no version-gate fallback: a server without a declaration (fork 5.2.1–5.6.x) does not
+    // know the type, and an unknown request type 400s the WHOLE /sync/stream request.
+    test('no declaration: EXCLUDES AssetFavoritesV1 at every version', () async {
+      for (final version in [
+        const SemVer(major: 3, minor: 0, patch: 1),
+        const SemVer(major: 5, minor: 2, patch: 0),
+        const SemVer(major: 5, minor: 2, patch: 1),
+        const SemVer(major: 5, minor: 6, patch: 3),
+        const SemVer(major: 5, minor: 7, patch: 1),
+        const SemVer(major: 6, minor: 0, patch: 0),
+      ]) {
+        final types = await capturedRequestTypes(version);
+        expect(types, isNot(contains('AssetFavoritesV1')), reason: 'no declaration must never send it at $version');
+        clearInteractions(mockHttpClient);
+      }
+    });
+
+    test('a declaring server INCLUDES AssetFavoritesV1 regardless of its reported version', () async {
+      // RC images stamp the bare upstream base version, unbranded dev servers the upstream
+      // version: the declaration must win.
+      for (final version in [const SemVer(major: 3, minor: 2, patch: 2), const SemVer(major: 5, minor: 7, patch: 1)]) {
+        final types = await capturedRequestTypes(version, supportedSyncTypes: {'AssetFavoritesV1', 'AssetsV1'});
+        expect(types, contains('AssetFavoritesV1'), reason: 'declared capability must open the gate at $version');
+        clearInteractions(mockHttpClient);
+      }
+    });
+
+    test('a declaring server WITHOUT AssetFavoritesV1 (released 5.7.x) EXCLUDES it', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 6, minor: 0, patch: 0),
+        supportedSyncTypes: {'AssetsV1', 'SharedSpaceAlbumFoldersV1'},
+      );
+      expect(types, isNot(contains('AssetFavoritesV1')), reason: 'the declaration is authoritative in both directions');
+    });
+  });
+
   test('streamChanges stops processing stream when abort is called', () async {
     int onDataCallCount = 0;
     bool abortWasCalledInCallback = false;

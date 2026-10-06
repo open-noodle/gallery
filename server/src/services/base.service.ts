@@ -23,6 +23,7 @@ import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -122,6 +123,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   AppRepository,
   AssetRepository,
   AssetEditRepository,
+  AssetFavoriteRepository,
   AssetFileRepository,
   AssetJobRepository,
   AuthChallengeRepository,
@@ -199,6 +201,7 @@ export class BaseService {
     protected appRepository: AppRepository,
     protected assetRepository: AssetRepository,
     protected assetEditRepository: AssetEditRepository,
+    protected assetFavoriteRepository: AssetFavoriteRepository,
     protected assetFileRepository: AssetFileRepository,
     protected assetJobRepository: AssetJobRepository,
     protected authChallengeRepository: AuthChallengeRepository,
@@ -297,6 +300,7 @@ export class BaseService {
       ctx.appRepository,
       ctx.assetRepository,
       ctx.assetEditRepository,
+      ctx.assetFavoriteRepository,
       ctx.assetFileRepository,
       ctx.assetJobRepository,
       ctx.authChallengeRepository,

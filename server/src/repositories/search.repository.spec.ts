@@ -891,4 +891,35 @@ describe(SearchRepository.name, () => {
       expect(sql).not.toContain(ESCAPE_CLAUSE);
     });
   });
+
+  // #763 E10 — sibling of the withTimeBucketAssetFilters block in asset.repository.spec.ts, for
+  // the search builder. `asset_favorite` rows outlive access loss by design (spec §5.2), so an
+  // `isFavorite` search is only safe because the favorite predicate is ANDed with a scope
+  // recomputed from live membership: the timelineSpaceIds arm while the caller has member-spaces,
+  // a bare `asset.ownerId = ...` once they do not. End-to-end coverage lives in
+  // test/medium/specs/services/favorite-access-revocation.medium.spec.ts.
+  describe('favorite scoping under access revocation (#763 E10)', () => {
+    const CALLER = '00000000-0000-0000-0000-000000000000';
+    const SPACE = '11111111-1111-1111-1111-111111111111';
+
+    it('scopes a favorite search to owned assets when the caller has no member-spaces', () => {
+      const sql = buildAssetSearchSql({ isFavorite: true, userIds: [CALLER], authUserId: CALLER });
+
+      expect(sql).toContain('"asset_favorite"');
+      expect(sql).toContain('"asset"."ownerId" = any');
+      expect(sql).not.toContain('"shared_space_asset"');
+    });
+
+    it('widens to the space arm only while member-spaces are supplied', () => {
+      const sql = buildAssetSearchSql({
+        isFavorite: true,
+        userIds: [CALLER],
+        authUserId: CALLER,
+        timelineSpaceIds: [SPACE],
+      });
+
+      expect(sql).toContain('"asset_favorite"');
+      expect(sql).toContain('"shared_space_asset"');
+    });
+  });
 });

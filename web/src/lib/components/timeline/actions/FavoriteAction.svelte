@@ -25,7 +25,7 @@
     loading = true;
 
     try {
-      const assets = assetMultiSelectManager.ownedAssets.filter((asset) => asset.isFavorite !== isFavorite);
+      const assets = assetMultiSelectManager.assets.filter((asset) => asset.isFavorite !== isFavorite);
       await toggleFavoriteAssets(assets, isFavorite, onFavorite);
       assetMultiSelectManager.clear();
     } finally {
