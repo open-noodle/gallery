@@ -292,6 +292,25 @@ describe(MapRepository.name, () => {
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
+
+    // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay,
+    // not the ownership-masked asset.isFavorite column. asset.isFavorite is left at its default
+    // (false) on both assets; only a direct asset_favorite insert marks the caller's favorite.
+    it('filters isFavorite from the callers overlay, not asset.isFavorite (#763)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favorited } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await withGps(ctx, favorited.id, 10, 10);
+      await withGps(ctx, notFavorited.id, 20, 20);
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
+
+      const favoriteResults = await sut.getMapMarkers(user.id, [user.id], [], { isFavorite: true });
+      expect(favoriteResults.map((r) => r.id)).toEqual([favorited.id]);
+
+      const nonFavoriteResults = await sut.getMapMarkers(user.id, [user.id], [], { isFavorite: false });
+      expect(nonFavoriteResults.map((r) => r.id)).toEqual([notFavorited.id]);
+    });
   });
 
   describe('getAlbumMapMarkers', () => {

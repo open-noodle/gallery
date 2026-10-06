@@ -57,6 +57,10 @@ describe(DuplicateService.name, () => {
     // Default to "no editable spaces" so the new merge branch is a no-op for
     // existing tests. Tests that exercise the merge override per case.
     mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set());
+    // #763 (E21): default no-op so existing tests that hit the metadata-merge branch
+    // (idsToKeep.length === 1 && idsToTrash.length > 0) don't need to know about the favorite
+    // union unless they're specifically asserting on it.
+    mocks.assetFavorite.mergeOnto.mockResolvedValue(undefined as any);
   });
 
   it('should work', () => {
@@ -449,7 +453,7 @@ describe(DuplicateService.name, () => {
     });
 
     it('should not merge metadata when multiple assets are kept', async () => {
-      const asset1 = AssetFactory.create({ isFavorite: true });
+      const asset1 = AssetFactory.create();
       const asset2 = AssetFactory.create();
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
       mocks.duplicateRepository.get.mockResolvedValue({

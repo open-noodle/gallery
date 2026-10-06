@@ -3,6 +3,7 @@ import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.respons
 import { AssetStatus, AssetVisibility } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
@@ -28,6 +29,11 @@ const setup = (db?: Kysely<DB>) => {
       AccessRepository,
       AlbumRepository,
       AssetRepository,
+      // gallery-fork (#763): per-user favorites live in their own overlay table, so the keeper's
+      // merged favorite is written by AssetFavoriteRepository.mergeOnto rather than an
+      // asset."isFavorite" column. Real rather than mocked: 'should merge isFavorite into the
+      // keeper' asserts the merged row is readable back through AssetRepository.getById.
+      AssetFavoriteRepository,
       ConfigRepository,
       DuplicateRepository,
       // gallery-fork: resolveGroup carries the keeper's shared-space membership (#317), so it

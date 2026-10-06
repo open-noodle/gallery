@@ -102,3 +102,38 @@ describe('withTimeBucketAssetFilters text filters escape LIKE wildcards', () => 
     expect(parameters).toContain(String.raw`100\%\_done`);
   });
 });
+
+// #763 E10 — the SQL half of the access-revocation invariant. `asset_favorite` rows survive
+// access loss by design (spec §5.2), so a favorite-filtered timeline is only safe because the
+// favorite predicate is ANDed with an RBAC scope that is recomputed from live membership each
+// request: the timelineSpaceIds arm when the caller has member-spaces, a bare
+// `asset.ownerId = ...` when they no longer do. Behaviour is pinned end-to-end in
+// test/medium/specs/services/favorite-access-revocation.medium.spec.ts; these compile-only
+// assertions catch the same regression in the unit job, without a database.
+describe('withTimeBucketAssetFilters favorite scoping (#763 E10)', () => {
+  const CALLER = '00000000-0000-0000-0000-000000000000';
+  const SPACE = '11111111-1111-1111-1111-111111111111';
+
+  it('scopes a favorite-filtered timeline to owned assets when the caller has no member-spaces', () => {
+    const sql = compileTimeBucketFilters({ isFavorite: true, userIds: [CALLER], authUserId: CALLER });
+
+    // The favorite predicate is present...
+    expect(sql).toContain('"asset_favorite"');
+    // ...but never alone: without timelineSpaceIds the only reachable rows are the caller's own,
+    // so a lingering overlay row on someone else's asset cannot surface it.
+    expect(sql).toContain('"asset"."ownerId" = any');
+    expect(sql).not.toContain('"shared_space_asset"');
+  });
+
+  it('widens to the space arm only while member-spaces are supplied', () => {
+    const sql = compileTimeBucketFilters({
+      isFavorite: true,
+      userIds: [CALLER],
+      authUserId: CALLER,
+      timelineSpaceIds: [SPACE],
+    });
+
+    expect(sql).toContain('"asset_favorite"');
+    expect(sql).toContain('"shared_space_asset"');
+  });
+});

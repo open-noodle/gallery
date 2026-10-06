@@ -28,6 +28,7 @@ import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -221,9 +222,23 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
     return { stack: { ...stack, primaryAssetId: assetIds[0] }, result };
   }
 
-  async newAsset(dto: Partial<Insertable<AssetTable>> = {}) {
-    const asset = mediumFactory.assetInsert(dto);
+  /**
+   * #763: `asset.isFavorite` is gone — a favorite is an `asset_favorite` row per (user, asset).
+   * Fixtures (upstream's and the fork's) still say `isFavorite: true` to mean "the OWNER has
+   * favorited this", so translate it here rather than rewriting every call site. Keeping the
+   * knob absorbs the idiom for tests that arrive from upstream later, too.
+   */
+  async newAsset(dto: Partial<Insertable<AssetTable>> & { isFavorite?: boolean } = {}) {
+    const { isFavorite, ...assetDto } = dto;
+    const asset = mediumFactory.assetInsert(assetDto);
     const result = await this.get(AssetRepository).create(asset);
+    if (isFavorite) {
+      await this.database
+        .insertInto('asset_favorite')
+        .values({ userId: asset.ownerId, assetId: asset.id })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    }
     return { asset, result };
   }
 
@@ -639,6 +654,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case ApiKeyRepository:
     case AssetRepository:
     case AssetEditRepository:
+    case AssetFavoriteRepository:
     case AssetFileRepository:
     case AssetJobRepository:
     case ClusterGroupRepository:
@@ -814,8 +830,11 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
       return automock(StorageRepository, { args: [{ setContext: () => {} }] });
     }
 
+    // #763: job.service.spec's websocket-payload staleness test (job.service-favorite-payload.spec.ts)
+    // needs to assert on WebsocketRepository.clientSend calls from a real JobService constructed via
+    // newMediumService — not previously wired here since no medium test had exercised that path.
     case WebsocketRepository: {
-      return automock(WebsocketRepository, { args: [undefined, { setContext: () => {} }] });
+      return automock(WebsocketRepository, { args: [undefined, { setContext: () => {} }], strict: false });
     }
 
     default: {
@@ -834,7 +853,6 @@ const assetInsert = (asset: Partial<Insertable<AssetTable>> = {}) => {
     type: AssetType.Image,
     originalPath: '/path/to/something.jpg',
     ownerId: 'not-a-valid-uuid',
-    isFavorite: false,
     fileCreatedAt: now,
     fileModifiedAt: now,
     localDateTime: now,

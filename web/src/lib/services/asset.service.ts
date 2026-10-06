@@ -12,6 +12,7 @@ import {
   removeAssetEdits,
   runAssetJobs,
   updateAsset,
+  updateAssetFavorites,
   type AlbumResponseDto,
   type AssetEditActionItemDto,
   type AssetJobsDto,
@@ -301,7 +302,10 @@ export const getAssetActions = (
   const Favorite: ActionItem = {
     title: $t('to_favorite'),
     icon: mdiHeartOutline,
-    $if: () => isOwner && !asset.isFavorite,
+    // #763: favoriting is per-user — any authenticated reader may favorite. Shared-link
+    // sessions are explicitly excluded: auth.user there is the LINK OWNER, and an anonymous
+    // visitor must never write favorites in the owner's name (spec §5.1).
+    $if: () => !!authUser && !sharedLink && !asset.isFavorite,
     onAction: () => handleFavorite(asset),
     shortcuts: [{ key: 'f' }],
   };
@@ -309,7 +313,7 @@ export const getAssetActions = (
   const Unfavorite: ActionItem = {
     title: $t('unfavorite'),
     icon: mdiHeart,
-    $if: () => isOwner && asset.isFavorite,
+    $if: () => !!authUser && !sharedLink && asset.isFavorite,
     onAction: () => handleUnfavorite(asset),
     shortcuts: [{ key: 'f' }],
   };
@@ -583,9 +587,9 @@ const handleFavorite = async (asset: AssetResponseDto) => {
   const $t = await getFormatter();
 
   try {
-    const response = await updateAsset({ id: asset.id, updateAssetDto: { isFavorite: true } });
+    await updateAssetFavorites({ assetFavoriteUpdateDto: { ids: [asset.id], isFavorite: true } });
     toastManager.primary($t('added_to_favorites'));
-    eventManager.emit('AssetUpdate', response);
+    eventManager.emit('AssetUpdate', { ...asset, isFavorite: true });
   } catch (error) {
     handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: asset.isFavorite } }));
   }
@@ -595,9 +599,9 @@ const handleUnfavorite = async (asset: AssetResponseDto) => {
   const $t = await getFormatter();
 
   try {
-    const response = await updateAsset({ id: asset.id, updateAssetDto: { isFavorite: false } });
+    await updateAssetFavorites({ assetFavoriteUpdateDto: { ids: [asset.id], isFavorite: false } });
     toastManager.primary($t('removed_from_favorites'));
-    eventManager.emit('AssetUpdate', response);
+    eventManager.emit('AssetUpdate', { ...asset, isFavorite: false });
   } catch (error) {
     handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: asset.isFavorite } }));
   }

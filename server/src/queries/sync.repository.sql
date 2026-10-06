@@ -77,19 +77,24 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "album_asset"."updateId"
 from
   "album_asset" as "album_asset"
   inner join "asset" on "asset"."id" = "album_asset"."assetId"
 where
-  "album_asset"."updateId" < $3
-  and "album_asset"."updateId" <= $4
-  and "album_asset"."updateId" > $5
-  and "album_asset"."albumId" = $6
+  "album_asset"."updateId" < $2
+  and "album_asset"."updateId" <= $3
+  and "album_asset"."updateId" > $4
+  and "album_asset"."albumId" = $5
 order by
   "album_asset"."updateId" asc
 
@@ -114,20 +119,25 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
   inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
   inner join "album_user" on "album_user"."albumId" = "album_asset"."albumId"
 where
-  "asset"."updateId" < $3
-  and "asset"."updateId" > $4
-  and "album_asset"."updateId" <= $5
-  and "album_user"."userId" = $6
+  "asset"."updateId" < $2
+  and "asset"."updateId" > $3
+  and "album_asset"."updateId" <= $4
+  and "album_user"."userId" = $5
 order by
   "asset"."updateId" asc
 
@@ -153,18 +163,23 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite"
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite"
 from
   "album_asset" as "album_asset"
   inner join "asset" on "asset"."id" = "album_asset"."assetId"
   inner join "album_user" on "album_user"."albumId" = "album_asset"."albumId"
 where
-  "album_asset"."updateId" < $3
-  and "album_asset"."updateId" > $4
-  and "album_user"."userId" = $5
+  "album_asset"."updateId" < $2
+  and "album_asset"."updateId" > $3
+  and "album_user"."userId" = $4
 order by
   "album_asset"."updateId" asc
 
@@ -423,7 +438,6 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
-  "asset"."isFavorite",
   "asset"."visibility",
   "asset"."duration",
   "asset"."livePhotoVideoId",
@@ -432,13 +446,22 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
 where
-  "asset"."updateId" < $1
-  and "asset"."updateId" > $2
-  and "ownerId" = $3
+  "asset"."updateId" < $2
+  and "asset"."updateId" > $3
+  and "ownerId" = $4
 order by
   "asset"."updateId" asc
 
@@ -685,6 +708,32 @@ where
 order by
   "asset_ocr"."updateId" asc
 
+-- SyncRepository.assetFavorite.getDeletes
+select
+  "asset_favorite_audit"."id",
+  "asset_favorite_audit"."assetId"
+from
+  "asset_favorite_audit" as "asset_favorite_audit"
+where
+  "asset_favorite_audit"."id" < $1
+  and "asset_favorite_audit"."id" > $2
+  and "asset_favorite_audit"."userId" = $3
+order by
+  "asset_favorite_audit"."id" asc
+
+-- SyncRepository.assetFavorite.getUpserts
+select
+  "asset_favorite"."assetId",
+  "asset_favorite"."updateId"
+from
+  "asset_favorite" as "asset_favorite"
+where
+  "asset_favorite"."updateId" < $1
+  and "asset_favorite"."updateId" > $2
+  and "asset_favorite"."userId" = $3
+order by
+  "asset_favorite"."updateId" asc
+
 -- SyncRepository.authUser.getUpserts
 select
   "id",
@@ -880,7 +929,15 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  $1 as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
@@ -933,7 +990,15 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  $1 as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
@@ -1389,20 +1454,25 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "shared_space_asset"."updateId"
 from
   "shared_space_asset" as "shared_space_asset"
   inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
-  "shared_space_asset"."updateId" < $3
-  and "shared_space_asset"."updateId" <= $4
-  and "shared_space_asset"."updateId" > $5
-  and "shared_space_asset"."spaceId" = $6
-  and "asset"."visibility" in ($7, $8)
+  "shared_space_asset"."updateId" < $2
+  and "shared_space_asset"."updateId" <= $3
+  and "shared_space_asset"."updateId" > $4
+  and "shared_space_asset"."spaceId" = $5
+  and "asset"."visibility" in ($6, $7)
   and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
@@ -1428,33 +1498,38 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "shared_space_asset"."updateId"
 from
   "shared_space_asset" as "shared_space_asset"
   inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
 where
-  "shared_space_asset"."updateId" < $3
-  and "shared_space_asset"."updateId" > $4
+  "shared_space_asset"."updateId" < $2
+  and "shared_space_asset"."updateId" > $3
   and "shared_space_asset"."spaceId" in (
     select
       "shared_space"."id"
     from
       "shared_space"
     where
-      "shared_space"."createdById" = $5
+      "shared_space"."createdById" = $4
     union
     select
       "shared_space_member"."spaceId" as "id"
     from
       "shared_space_member"
     where
-      "shared_space_member"."userId" = $6
+      "shared_space_member"."userId" = $5
   )
-  and "asset"."visibility" in ($7, $8)
+  and "asset"."visibility" in ($6, $7)
   and "asset"."deletedAt" is null
 order by
   "shared_space_asset"."updateId" asc
@@ -1480,34 +1555,39 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
   inner join "shared_space_asset" on "shared_space_asset"."assetId" = "asset"."id"
 where
-  "asset"."updateId" < $3
-  and "asset"."updateId" > $4
-  and "shared_space_asset"."updateId" <= $5
+  "asset"."updateId" < $2
+  and "asset"."updateId" > $3
+  and "shared_space_asset"."updateId" <= $4
   and "shared_space_asset"."spaceId" in (
     select
       "shared_space"."id"
     from
       "shared_space"
     where
-      "shared_space"."createdById" = $6
+      "shared_space"."createdById" = $5
     union
     select
       "shared_space_member"."spaceId" as "id"
     from
       "shared_space_member"
     where
-      "shared_space_member"."userId" = $7
+      "shared_space_member"."userId" = $6
   )
-  and "asset"."visibility" in ($8, $9)
+  and "asset"."visibility" in ($7, $8)
 order by
   "asset"."updateId" asc
 
@@ -1862,22 +1942,27 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
 where
-  "asset"."updateId" < $3
-  and "asset"."updateId" <= $4
-  and "asset"."updateId" > $5
-  and "asset"."libraryId" = $6
+  "asset"."updateId" < $2
+  and "asset"."updateId" <= $3
+  and "asset"."updateId" > $4
+  and "asset"."libraryId" = $5
   and (
-    "asset"."ownerId" = $7
+    "asset"."ownerId" = $6
     or (
-      "asset"."visibility" in ($8, $9)
+      "asset"."visibility" in ($7, $8)
       and "asset"."deletedAt" is null
     )
   )
@@ -1905,16 +1990,21 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
 where
-  "asset"."updateId" < $3
-  and "asset"."updateId" > $4
+  "asset"."updateId" < $2
+  and "asset"."updateId" > $3
   and "asset"."libraryId" is not null
   and "asset"."libraryId" in (
     select
@@ -1922,7 +2012,7 @@ where
     from
       "library"
     where
-      "library"."ownerId" = $5
+      "library"."ownerId" = $4
       and "library"."deletedAt" is null
     union
     select
@@ -1936,19 +2026,19 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $6
+          "shared_space"."createdById" = $5
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $7
+          "shared_space_member"."userId" = $6
       )
   )
   and (
-    "asset"."ownerId" = $8
-    or "asset"."visibility" in ($9, $10)
+    "asset"."ownerId" = $7
+    or "asset"."visibility" in ($8, $9)
   )
 order by
   "asset"."updateId" asc
@@ -2810,22 +2900,27 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "album_asset"."updateId"
 from
   "album_asset"
   inner join "asset" on "asset"."id" = "album_asset"."assetId"
   inner join "album" on "album"."id" = "album_asset"."albumId"
 where
-  "album_asset"."albumId" = $3
+  "album_asset"."albumId" = $2
   and "album"."deletedAt" is null
-  and "album_asset"."updateId" < $4
-  and "album_asset"."updateId" <= $5
-  and "album_asset"."updateId" > $6
-  and "asset"."visibility" in ($7, $8)
+  and "album_asset"."updateId" < $3
+  and "album_asset"."updateId" <= $4
+  and "album_asset"."updateId" > $5
+  and "asset"."visibility" in ($6, $7)
   and "asset"."deletedAt" is null
 union
 select
@@ -2848,29 +2943,34 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $9 then "asset"."isFavorite"
-    else $10
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $8::uuid
+  ) as "isFavorite",
   "album_space_asset"."updateId"
 from
   "album_space_asset"
   inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
   inner join "album" on "album"."id" = "album_space_asset"."albumId"
 where
-  "album_space_asset"."albumId" = $11
+  "album_space_asset"."albumId" = $9
   and "album"."deletedAt" is null
-  and "album_space_asset"."updateId" < $12
-  and "album_space_asset"."updateId" <= $13
-  and "album_space_asset"."updateId" > $14
-  and "asset"."visibility" in ($15, $16)
+  and "album_space_asset"."updateId" < $10
+  and "album_space_asset"."updateId" <= $11
+  and "album_space_asset"."updateId" > $12
+  and "asset"."visibility" in ($13, $14)
   and exists (
     select
       1 as "one"
     from
       "shared_space_album"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-      and "shared_space_member"."userId" = $17::uuid
+      and "shared_space_member"."userId" = $15::uuid
     where
       "shared_space_album"."albumId" = "album_space_asset"."albumId"
       and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
@@ -2900,20 +3000,25 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset"
   inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
   inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
 where
-  "asset"."updateId" < $3
-  and "asset"."updateId" > $4
-  and "album_asset"."updateId" <= $5
-  and "shared_space_album_user"."userId" = $6
+  "asset"."updateId" < $2
+  and "asset"."updateId" > $3
+  and "album_asset"."updateId" <= $4
+  and "shared_space_album_user"."userId" = $5
   and "album_asset"."albumId" in (
     select
       "shared_space_album"."albumId" as "id"
@@ -2928,17 +3033,17 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $7
+          "shared_space"."createdById" = $6
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $8
+          "shared_space_member"."userId" = $7
       )
   )
-  and "asset"."visibility" in ($9, $10)
+  and "asset"."visibility" in ($8, $9)
 union
 select
   "asset"."id",
@@ -2960,20 +3065,25 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $11 then "asset"."isFavorite"
-    else $12
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $10::uuid
+  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset"
   inner join "album_space_asset" on "album_space_asset"."assetId" = "asset"."id"
   inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
 where
-  "asset"."updateId" < $13
-  and "asset"."updateId" > $14
-  and "album_space_asset"."updateId" <= $15
-  and "shared_space_album_user"."userId" = $16
+  "asset"."updateId" < $11
+  and "asset"."updateId" > $12
+  and "album_space_asset"."updateId" <= $13
+  and "shared_space_album_user"."userId" = $14
   and "album_space_asset"."albumId" in (
     select
       "shared_space_album"."albumId" as "id"
@@ -2988,24 +3098,24 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $17
+          "shared_space"."createdById" = $15
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $18
+          "shared_space_member"."userId" = $16
       )
   )
-  and "asset"."visibility" in ($19, $20)
+  and "asset"."visibility" in ($17, $18)
   and exists (
     select
       1 as "one"
     from
       "shared_space_album"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-      and "shared_space_member"."userId" = $21::uuid
+      and "shared_space_member"."userId" = $19::uuid
     where
       "shared_space_album"."albumId" = "album_space_asset"."albumId"
       and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
@@ -3034,17 +3144,22 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $1 then "asset"."isFavorite"
-    else $2
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavorite",
   "album_asset"."updateId"
 from
   "album_asset"
   inner join "asset" on "asset"."id" = "album_asset"."assetId"
   inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_asset"."albumId"
 where
-  "shared_space_album_user"."userId" = $3
+  "shared_space_album_user"."userId" = $2
   and "album_asset"."albumId" in (
     select
       "shared_space_album"."albumId" as "id"
@@ -3059,19 +3174,19 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $4
+          "shared_space"."createdById" = $3
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $5
+          "shared_space_member"."userId" = $4
       )
   )
-  and "album_asset"."updateId" < $6
-  and "album_asset"."updateId" > $7
-  and "asset"."visibility" in ($8, $9)
+  and "album_asset"."updateId" < $5
+  and "album_asset"."updateId" > $6
+  and "asset"."visibility" in ($7, $8)
   and "asset"."deletedAt" is null
 union
 select
@@ -3094,17 +3209,22 @@ select
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  case
-    when "asset"."ownerId" = $10 then "asset"."isFavorite"
-    else $11
-  end as "isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $9::uuid
+  ) as "isFavorite",
   "album_space_asset"."updateId"
 from
   "album_space_asset"
   inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
   inner join "shared_space_album_user" on "shared_space_album_user"."albumId" = "album_space_asset"."albumId"
 where
-  "shared_space_album_user"."userId" = $12
+  "shared_space_album_user"."userId" = $10
   and "album_space_asset"."albumId" in (
     select
       "shared_space_album"."albumId" as "id"
@@ -3119,26 +3239,26 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $13
+          "shared_space"."createdById" = $11
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $14
+          "shared_space_member"."userId" = $12
       )
   )
-  and "album_space_asset"."updateId" < $15
-  and "album_space_asset"."updateId" > $16
-  and "asset"."visibility" in ($17, $18)
+  and "album_space_asset"."updateId" < $13
+  and "album_space_asset"."updateId" > $14
+  and "asset"."visibility" in ($15, $16)
   and exists (
     select
       1 as "one"
     from
       "shared_space_album"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-      and "shared_space_member"."userId" = $19::uuid
+      and "shared_space_member"."userId" = $17::uuid
     where
       "shared_space_album"."albumId" = "album_space_asset"."albumId"
       and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"

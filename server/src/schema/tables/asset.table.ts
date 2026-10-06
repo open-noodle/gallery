@@ -90,9 +90,6 @@ export class AssetTable {
   @Column({ type: 'timestamp with time zone' })
   fileModifiedAt!: Timestamp;
 
-  @Column({ type: 'boolean', default: false })
-  isFavorite!: Generated<boolean>;
-
   @Column({ type: 'integer', nullable: true })
   duration!: number | null;
 
