@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { Duration } from 'luxon';
-import { readFile } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
 import { MachineLearningConfig } from 'src/dtos/config.dto.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 
@@ -333,21 +331,12 @@ export class MachineLearningRepository {
     formData.append('entries', JSON.stringify(config));
 
     if ('imagePath' in payload) {
-      let fileBuffer: Buffer;
-      if (isAbsolute(payload.imagePath)) {
-        fileBuffer = await readFile(payload.imagePath);
-      } else {
-        // Dynamic import to avoid circular dependency:
-        // MachineLearningRepository -> StorageService -> BaseService -> MachineLearningRepository
-        const { StorageService } = await import('../services/storage.service.js');
-        const backend = StorageService.resolveBackendForKey(payload.imagePath);
-        const { stream } = await backend.get(payload.imagePath);
-        const chunks: Buffer[] = [];
-        for await (const chunk of stream) {
-          chunks.push(Buffer.from(chunk));
-        }
-        fileBuffer = Buffer.concat(chunks);
-      }
+      // Dynamic import to avoid circular dependency:
+      // MachineLearningRepository -> StorageService -> BaseService -> MachineLearningRepository
+      // Needs StorageService.onBootstrap to have set the backends, which every worker does on
+      // AppBootstrap before it runs jobs.
+      const { StorageService } = await import('../services/storage.service.js');
+      const fileBuffer = await StorageService.resolveBackendForKey(payload.imagePath).readAll(payload.imagePath);
       formData.append('image', new Blob([new Uint8Array(fileBuffer)]));
     } else if ('text' in payload) {
       formData.append('text', payload.text);

@@ -15,6 +15,7 @@ import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum.js';
 import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
@@ -199,7 +200,7 @@ describe(AssetMediaService.name, () => {
   beforeAll(() => {
     // Initialize the disk backend for StorageService so that serveFromBackend works in tests.
     // The DiskStorageBackend returns absolute paths as-is, so the mediaLocation value doesn't matter.
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
