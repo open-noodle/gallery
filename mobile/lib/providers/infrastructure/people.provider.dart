@@ -4,8 +4,10 @@ import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
+import 'package:immich_mobile/utils/space_permissions.dart';
 
 final peopleServiceProvider = Provider<PeopleService>(
   (ref) => PeopleService(
@@ -16,17 +18,29 @@ final peopleServiceProvider = Provider<PeopleService>(
 );
 
 /// Whether the viewer may edit Space-scoped people in [spaceId] (owner or editor role),
-/// mirroring the web People page (isSpaceEditor). Cached per space for the container lifetime
-/// and re-resolved on login change; defaults to editable until resolved and fails open, since
-/// the server enforces the role on every write. Personal/owned people (null spaceId) never
-/// consult this — they are always editable by their owner.
+/// mirroring the web People page (isSpaceEditor). Read from the viewer's own row in the
+/// already-loaded spaces list ([sharedSpacesProvider] — `getAll` embeds `members`), so it
+/// re-resolves whenever that list is refreshed or the login changes. Defaults to editable and
+/// fails open — while loading (callers read `.valueOrNull ?? true`), on a failed list, for a
+/// space missing from it, or with no resolved user — since the server enforces the role on every
+/// write. Personal/owned people (null spaceId) never consult this — they are always editable by
+/// their owner.
 final driftSpaceEditableProvider = FutureProvider.family<bool, String>((ref, spaceId) async {
   final userId = ref.watch(currentUserProvider.select((user) => user?.id));
   if (userId == null) {
     return true;
   }
-  final repository = ref.watch(sharedSpaceApiRepositoryProvider);
-  return repository.isSpaceEditor(spaceId, userId);
+  try {
+    final spaces = await ref.watch(sharedSpacesProvider.future);
+    for (final space in spaces) {
+      if (space.id == spaceId) {
+        return spaceIsWritable(space, userId);
+      }
+    }
+  } catch (_) {
+    // Offline or a failed list: keep offering edits, the server enforces the role.
+  }
+  return true;
 });
 
 // ignore: unused-code
