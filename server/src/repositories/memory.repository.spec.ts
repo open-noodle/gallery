@@ -74,6 +74,22 @@ describe(MemoryRepository.name, () => {
       }
     });
 
+    it('bounds the implicit showAt filter by the wall clock read as UTC, like isUpcoming', () => {
+      // immich-32166: showAt stores a calendar date as UTC midnight, so comparing it against the
+      // real instant hides a day's memories for the server's UTC offset after local midnight.
+      const now = vi
+        .spyOn(DateTime, 'now')
+        .mockReturnValue(DateTime.fromISO('2026-04-30T08:00:00', { zone: 'America/New_York' }) as DateTime<true>);
+
+      try {
+        const query = sut.searchBuilder(userId, {}).selectAll('memory').compile();
+
+        expect(query.parameters[0]).toEqual(new Date('2026-04-30T08:00:00.000Z'));
+      } finally {
+        now.mockRestore();
+      }
+    });
+
     it('filters by the full visibility window when a date filter is provided', () => {
       const query = sut
         .searchBuilder('00000000-0000-0000-0000-000000000000', { for: new Date('2026-04-30T12:00:00.000Z') })
