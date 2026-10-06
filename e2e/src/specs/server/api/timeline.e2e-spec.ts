@@ -366,6 +366,186 @@ describe('/timeline', () => {
     });
   });
 
+  describe('GET /timeline — cross-scope favorites (#763 slice 4)', () => {
+    beforeAll(async () => {
+      // spaceViewer favorites the space asset they can only READ (owned by spaceOwner);
+      // spaceOwner favorites the partner's asset AND their own in-space asset.
+      await request(app)
+        .put('/assets/favorites')
+        .set(asBearerAuth(ctx.spaceViewer.token!))
+        .send({ ids: [ctx.spaceAssetId], isFavorite: true });
+      await request(app)
+        .put('/assets/favorites')
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ ids: [ctx.partnerAssetId!, ctx.spaceAssetId], isFavorite: true });
+    });
+
+    it('isFavorite=true + withSharedSpaces returns the NON-OWNED space favorite in the payload (E15)', async () => {
+      const buckets = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true&isFavorite=true')
+        .set(asBearerAuth(ctx.spaceViewer.token!));
+      expect(buckets.status).toBe(200);
+      // spaceViewer owns nothing; their only favorite is the space asset → exactly 1.
+      expect(total(buckets.body)).toBe(1);
+
+      const timeBucket = (buckets.body as Array<{ timeBucket: string }>)[0].timeBucket;
+      const bucket = await request(app)
+        .get(
+          `/timeline/bucket?visibility=timeline&withSharedSpaces=true&isFavorite=true&timeBucket=${encodeURIComponent(timeBucket)}`,
+        )
+        .set(asBearerAuth(ctx.spaceViewer.token!));
+      expect(bucket.status).toBe(200);
+      // §10.9: the non-owned favorite must actually be IN the payload, with the caller's flag.
+      expect(bucket.body.id).toContain(ctx.spaceAssetId);
+      expect(bucket.body.isFavorite[bucket.body.id.indexOf(ctx.spaceAssetId)]).toBe(true);
+    });
+
+    it('isFavorite=true + withPartners returns the partner-owned favorite (E16)', async () => {
+      const buckets = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withPartners=true&isFavorite=true')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(buckets.status).toBe(200);
+      // spaceOwner favorited partnerAssetId + their own spaceAssetId → 2.
+      expect(total(buckets.body)).toBe(2);
+
+      const timeBucket = (buckets.body as Array<{ timeBucket: string }>)[0].timeBucket;
+      const bucket = await request(app)
+        .get(
+          `/timeline/bucket?visibility=timeline&withPartners=true&isFavorite=true&timeBucket=${encodeURIComponent(timeBucket)}`,
+        )
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(bucket.status).toBe(200);
+      expect(bucket.body.id).toContain(ctx.partnerAssetId);
+    });
+
+    it('isFavorite=FALSE also composes with both scopes — the old guard tripped on false too (E16b)', async () => {
+      // spaceViewer: readable timeline = the 1 space asset, which they favorited → not-favorited = 0.
+      const spaces = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true&isFavorite=false')
+        .set(asBearerAuth(ctx.spaceViewer.token!));
+      expect(spaces.status).toBe(200);
+      expect(total(spaces.body)).toBe(0);
+
+      // spaceOwner: own 2 + partner 1, minus their 2 favorites → 1 (ownerAssetId).
+      const partners = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withPartners=true&isFavorite=false')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(partners.status).toBe(200);
+      expect(total(partners.body)).toBe(1);
+    });
+
+    it('favorites + spaces + partners simultaneously, and an own-and-in-space favorite appears ONCE', async () => {
+      const buckets = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withPartners=true&withSharedSpaces=true&isFavorite=true')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(buckets.status).toBe(200);
+      // spaceAssetId is owned by the caller AND in the space (two scope branches) — it must
+      // count once. partnerAssetId + spaceAssetId → exactly 2.
+      expect(total(buckets.body)).toBe(2);
+
+      const timeBucket = (buckets.body as Array<{ timeBucket: string }>)[0].timeBucket;
+      const bucket = await request(app)
+        .get(
+          `/timeline/bucket?visibility=timeline&withPartners=true&withSharedSpaces=true&isFavorite=true&timeBucket=${encodeURIComponent(timeBucket)}`,
+        )
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const ids = bucket.body.id as string[];
+      expect(ids.filter((id) => id === ctx.spaceAssetId)).toHaveLength(1);
+    });
+
+    // REVERSED 2026-09-06, deliberately. This test previously asserted that showInTimeline=false
+    // hides space favorites "like any other space content". A tester hit that on pr-819-rc.2 and
+    // reported it as a bug: favoriting inside a hidden space gave "Added to favorites" and the
+    // photo never appeared under Favorites, with no way to reach it.
+    //
+    // Favorites are now EXEMPT from the hide, which is the same carve-out #1041 already makes for
+    // Favorites/Archive/Trash: those are curation and recovery surfaces, where subtracting an asset
+    // strands it instead of merely decluttering a browse. `showInTimeline` keeps its meaning for
+    // every other query — the sibling test at ~:290 still pins that, and so does a unit test on
+    // which resolver each browse calls. Favoriting is an explicit, per-asset act; a browse
+    // preference should not silently annul it.
+    it('showInTimeline=false does NOT hide your own favorites — they stay reachable (#763)', async () => {
+      // Mirror the toggle pattern of the existing 'toggling showInTimeline=false' test in this
+      // file (~:290) — same endpoint, same restore-afterwards discipline (try/finally).
+      try {
+        const disable = await request(app)
+          .patch(`/shared-spaces/${ctx.spaceId}/members/me/timeline`)
+          .set(asBearerAuth(ctx.spaceViewer.token!))
+          .send({ showInTimeline: false });
+        expect(disable.status).toBe(200);
+
+        const { status, body } = await request(app)
+          .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true&isFavorite=true')
+          .set(asBearerAuth(ctx.spaceViewer.token!));
+        expect(status).toBe(200);
+        // Still 1 — the same count the finally block asserts once the space is shown again, which
+        // is the point: the toggle no longer changes what the favorites surface returns.
+        expect(total(body)).toBe(1);
+      } finally {
+        const restore = await request(app)
+          .patch(`/shared-spaces/${ctx.spaceId}/members/me/timeline`)
+          .set(asBearerAuth(ctx.spaceViewer.token!))
+          .send({ showInTimeline: true });
+        expect(restore.status).toBe(200);
+
+        const { status, body } = await request(app)
+          .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true&isFavorite=true')
+          .set(asBearerAuth(ctx.spaceViewer.token!));
+        expect(status).toBe(200);
+        expect(total(body)).toBe(1);
+      }
+    });
+
+    it('withSharedSpaces + isFavorite WITHOUT explicit visibility still 400s (archive arm untouched)', async () => {
+      const { status } = await request(app)
+        .get('/timeline/buckets?withSharedSpaces=true&isFavorite=true')
+        .set(asBearerAuth(ctx.spaceViewer.token!));
+      expect(status).toBe(400);
+    });
+  });
+
+  describe('GET /timeline — favorited stack children surface standalone (#763 slice 4, E31)', () => {
+    let stackUser: { accessToken: string };
+    let primaryId: string;
+    let childId: string;
+
+    beforeAll(async () => {
+      const login = await utils.userSetup(ctx.admin.token!, createUserDto.create('stack-fav'));
+      stackUser = login;
+      const [a, b] = await Promise.all([utils.createAsset(login.accessToken), utils.createAsset(login.accessToken)]);
+      const stack = await utils.createStack(login.accessToken, [a.id, b.id]);
+      primaryId = stack.primaryAssetId;
+      childId = stack.primaryAssetId === a.id ? b.id : a.id;
+      // Favorite ONLY the child.
+      await request(app)
+        .put('/assets/favorites')
+        .set(asBearerAuth(login.accessToken))
+        .send({ ids: [childId], isFavorite: true });
+    });
+
+    it('unfiltered withStacked timeline still collapses to the primary (regression)', async () => {
+      const { body } = await request(app)
+        .get('/timeline/buckets?withStacked=true')
+        .set(asBearerAuth(stackUser.accessToken));
+      expect(total(body)).toBe(1);
+    });
+
+    it('isFavorite=true + withStacked returns the favorited CHILD standalone (E31, §5.4)', async () => {
+      const buckets = await request(app)
+        .get('/timeline/buckets?withStacked=true&isFavorite=true')
+        .set(asBearerAuth(stackUser.accessToken));
+      expect(buckets.status).toBe(200);
+      expect(total(buckets.body)).toBe(1);
+
+      const timeBucket = (buckets.body as Array<{ timeBucket: string }>)[0].timeBucket;
+      const bucket = await request(app)
+        .get(`/timeline/bucket?withStacked=true&isFavorite=true&timeBucket=${encodeURIComponent(timeBucket)}`)
+        .set(asBearerAuth(stackUser.accessToken));
+      expect(bucket.body.id).toContain(childId);
+      expect(bucket.body.id).not.toContain(primaryId);
+    });
+  });
+
   describe('GET /timeline/buckets — visibility filters', () => {
     // Dedicated user with 4 assets in different visibility states. Using a fresh user
     // (not spaceOwner) keeps the asset counts deterministic and avoids polluting other
