@@ -22,7 +22,7 @@ void main() {
     updatedAt: DateTime(2026),
     ownerId: 'user-1',
     type: MemoryTypeEnum.birthday,
-    data: MemoryData(year: 1995, personName: personName),
+    data: MemoryData({'year': 1995, 'personName': personName}),
     isSaved: false,
     memoryAt: DateTime(2026),
     assets: assets,
