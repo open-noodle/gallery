@@ -21,6 +21,13 @@ export function targetTokens(target: VerdictTarget): string[] {
   return tokens;
 }
 
+// Is this person (personal or space) a face-suggestion scan target? Named (whitespace is not a name), visible,
+// and a person rather than a pet. The SQL prefilters that queue scans (getScannablePeopleWithUnassignedFaces and
+// its space twin) mirror it with BTRIM, which strips spaces only: a name of tabs is queued there and skipped
+// here, a harmless no-op.
+export const isSuggestionScanTarget = (person: { name: string; isHidden: boolean; type: string }): boolean =>
+  person.name.trim() !== '' && !person.isHidden && person.type === 'person';
+
 export interface VerdictMaps {
   // Faces a human has already placed (face_identity_face.source='manual'). Owner-agnostic: a placed face is
   // dropped no matter which owner is suspected — this is what makes the age-gap childhood-photo case stop

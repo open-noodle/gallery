@@ -1619,6 +1619,7 @@ describe(PersonRepository.name, () => {
 
       const { person: named } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', isHidden: false });
       const { person: unnamed } = await ctx.newPerson({ ownerId: user.id, name: '', isHidden: false });
+      const { person: blank } = await ctx.newPerson({ ownerId: user.id, name: ' '.repeat(3), isHidden: false });
       const { person: hidden } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden', isHidden: true });
       const { person: pet } = await ctx.newPerson({ ownerId: user.id, name: 'Rex', isHidden: false, type: 'pet' });
       const { person: otherOwner } = await ctx.newPerson({ ownerId: otherUser.id, name: 'Bob', isHidden: false });
@@ -1626,6 +1627,8 @@ describe(PersonRepository.name, () => {
       // user owns an unassigned ML face, and `named` has their own reference face → `named` is eligible
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await giveOwnFace(ctx, asset.id, named.personGroupId);
+      // `blank` has a reference face too, so only its whitespace-only name keeps it out
+      await giveOwnFace(ctx, asset.id, blank.personGroupId);
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       // otherUser has NO unassigned face → `otherOwner` excluded
       const { asset: a2 } = await ctx.newAsset({ ownerId: otherUser.id });
@@ -1638,6 +1641,7 @@ describe(PersonRepository.name, () => {
 
       expect(ids).toContain(named.personGroupId);
       expect(ids).not.toContain(unnamed.personGroupId);
+      expect(ids).not.toContain(blank.personGroupId);
       expect(ids).not.toContain(hidden.personGroupId);
       expect(ids).not.toContain(pet.personGroupId);
       expect(ids).not.toContain(otherOwner.personGroupId);

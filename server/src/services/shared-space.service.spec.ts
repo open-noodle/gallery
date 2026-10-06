@@ -7600,7 +7600,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.claimPendingForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('denies removed members with no state change', async () => {
@@ -7614,7 +7614,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.claimPendingForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('rejects a person from another space before identity creation', async () => {
@@ -7630,7 +7630,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.claimPendingForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('no-ops stale or unreadable candidates with no identity creation', async () => {
@@ -7653,7 +7653,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.claimPendingForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('ensures identity, marks confirmed, replaces identity link, then resolves other pending rows', async () => {
@@ -7694,7 +7694,7 @@ describe(SharedSpaceService.name, () => {
         },
         mocks.database,
       );
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith('face-1', mocks.database);
+      expect(mocks.facePersonVerdict.drainPendingForFaces).toHaveBeenCalledWith(['face-1'], mocks.database);
       // S11 (slice 11d): the editor just stated a fact that contradicts any durable rejected/ignored row for
       // this same target — clear it. Target shape is spacePersonId, NOT personId — this is the space twin.
       expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
@@ -7713,7 +7713,7 @@ describe(SharedSpaceService.name, () => {
         mocks.faceIdentity.replaceFaceIdentity.mock.invocationCallOrder[0],
       );
       expect(mocks.faceIdentity.replaceFaceIdentity.mock.invocationCallOrder[0]).toBeLessThan(
-        mocks.facePersonVerdict.resolveAssignedFace.mock.invocationCallOrder[0],
+        mocks.facePersonVerdict.drainPendingForFaces.mock.invocationCallOrder[0],
       );
     });
 
@@ -7737,7 +7737,7 @@ describe(SharedSpaceService.name, () => {
         mocks.database,
       );
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('does not confirm a space suggestion when suggestions are disabled but the band is still valid', async () => {
@@ -7846,7 +7846,7 @@ describe(SharedSpaceService.name, () => {
         { assetFaceId: 'face-1', identityId: 'space-identity-1', source: 'manual' },
         mocks.database,
       );
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith('face-1', mocks.database);
+      expect(mocks.facePersonVerdict.drainPendingForFaces).toHaveBeenCalledWith(['face-1'], mocks.database);
       expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
         [{ personId: 'space-person-1', assetFaceId: 'face-1' }],
         undefined,
@@ -8301,7 +8301,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.facePersonVerdict.markIgnoredForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('denies removed members with no state change', async () => {
@@ -8316,7 +8316,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.facePersonVerdict.markIgnoredForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('rejects a person from another space before mutation', async () => {
@@ -8333,7 +8333,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.facePersonVerdict.markIgnoredForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('no-ops a genuinely unreachable candidate (asset left the space) without touching identity links', async () => {
@@ -8349,7 +8349,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.facePersonVerdict.markIgnoredForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('D9: reachable but drained (no pending row) still records the verdict', async () => {
@@ -8407,7 +8407,7 @@ describe(SharedSpaceService.name, () => {
       });
       expect(mocks.facePersonVerdict.markIgnoredForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('ignore marks only the target suggestion with identity + actor, without touching identity links or other suggestions', async () => {
@@ -8427,7 +8427,7 @@ describe(SharedSpaceService.name, () => {
       });
       expect(mocks.facePersonVerdict.markRejectedForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
 
     it('dismiss wraps reject for compatibility', async () => {
@@ -8445,7 +8445,7 @@ describe(SharedSpaceService.name, () => {
       });
       expect(mocks.facePersonVerdict.markIgnoredForSpacePerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
-      expect(mocks.facePersonVerdict.resolveAssignedFace).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.drainPendingForFaces).not.toHaveBeenCalled();
     });
   });
 
@@ -12066,7 +12066,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith(personB, personA);
-      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith('moved-face');
+      expect(mocks.facePersonVerdict.drainPendingForFaces).toHaveBeenCalledWith(['moved-face']);
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
       expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([personA]);
       expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);

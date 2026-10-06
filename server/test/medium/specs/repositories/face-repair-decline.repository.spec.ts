@@ -145,7 +145,7 @@ describe(FaceRepairDeclineRepository.name, () => {
     expect(remaining.map((r) => r.id)).toEqual([rowOther.id]); // positive control: untouched
   });
 
-  // H6: face-verdict.service.ts calls this for every suspected owner in a scan, unchunked. minFaces is
+  // H6: face-assignment.service.ts calls this for every suspected owner in a scan, unchunked. minFaces is
   // admin-settable, so a full-library scan can pass every flagged face's suspected-owner person id — far
   // larger than Postgres's 65 535 bind-parameter ceiling (one id is one bind parameter). Mirrors the
   // removeClusterMutes (F20) chunking test above.

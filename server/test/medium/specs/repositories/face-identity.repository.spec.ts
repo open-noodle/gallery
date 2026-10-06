@@ -5631,7 +5631,7 @@ describe(FaceIdentityRepository.name, () => {
     });
   });
 
-  // H6: face-verdict.service.ts calls this for every flagged face in a scan, unchunked. minFaces is
+  // H6: face-assignment.service.ts calls this for every flagged face in a scan, unchunked. minFaces is
   // admin-settable, so a full-library scan can pass every flagged face in the instance — far larger than
   // Postgres's 65 535 bind-parameter ceiling (one id is one bind parameter). Mirrors the
   // demoteManualFaceLinks (F20) test above.
@@ -5663,7 +5663,7 @@ describe(FaceIdentityRepository.name, () => {
     });
   });
 
-  // H6: face-verdict.service.ts calls this for every owner among a scan's suspected owners, unchunked.
+  // H6: face-assignment.service.ts calls this for every owner among a scan's suspected owners, unchunked.
   // Same bind-parameter ceiling concern as getManualLinkedFaceIds above.
   describe('getPersonVerdictTokens (H6)', () => {
     it('resolves tokens for a person among a personId list far larger than the bind-parameter ceiling', async () => {
