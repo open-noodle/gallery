@@ -20,7 +20,7 @@ void main() {
     updatedAt: DateTime(2026),
     ownerId: 'user-1',
     type: type,
-    data: MemoryData(year: year, personName: personName),
+    data: MemoryData({'year': year, 'personName': ?personName}),
     isSaved: false,
     memoryAt: DateTime(2026),
     assets: [],
