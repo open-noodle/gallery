@@ -5,11 +5,13 @@
 - **Upstream ref**: `upstream/release/v3.3`, `d15972e7223` → `d1c1a65ed3b` (past `v3.3.0-rc.2`, no rc.3 tag yet)
 - **Upstream commits pulled**: 8 (batches 82–84 of the regenerated plan)
 - **Conflicts resolved**: 8 stops across the replay (6 in batch 83, 2 in batch 84), all inside a pre-declared file set
-- **Fork sync**: none. `origin/main` gained #992 and #819 since `da5480ae42b`; they are deliberately not part of
-  this cycle (scope: only what is on upstream's 3.3.0 RC line).
-- **Risk level**: LOW
+- **Fork sync**: `da5480ae42b` → `f047d921872` (`origin/main` tip): #992, #819, #1156, #1159. Requested after the
+  upstream batches landed; see "Fork sync" below. `sync-fork-main` threw on #992 and on #1156, so all four were
+  finished by hand and `integratedForkHead` / `appendHistory` were reconciled manually.
+- **Risk level**: LOW (upstream) / MEDIUM (fork sync: two large features replayed onto rolling's vocabulary)
 - **Recommendation**: PROCEED (stays off `main`; v3.3.0 is still an RC)
-- **Backup**: local branch `backup/rolling-pre-2026-10-06` (`a40462cff98`)
+- **Backup**: local branch `backup/rolling-pre-2026-10-06` (`a40462cff98`); before the fork sync `backup/rolling-pre-forksync-2026-10-06`
+  (`54d76b5c758`) and `backup/rolling-pre-forksync2-2026-10-06` (`0586bf047b3`)
 
 ## Incoming Upstream Changes
 
@@ -107,11 +109,89 @@ None incoming. Server and mobile trees unchanged.
 | docs prettier (`qnap.md`)                                                      | PASS   |                                                                                                      |
 | server / mobile / ML / e2e gates                                               | N/A    | trees byte-identical to the 10/10-green `a40462cff98`                                                |
 
+## Fork sync
+
+| Fork PR                                        | Rolling commit | Stops   | Notes                                                                                                                                 |
+| ---------------------------------------------- | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| #992 space editors edit members' assets (#734) | `a30ec455390`  | 7 files | hand-resolved, see below                                                                                                              |
+| #819 per-user favorites (#763)                 | `0586bf047b3`  | 8 files | hand-resolved, see below                                                                                                              |
+| #1156 one face-assignment module               | `ffb8e599064`  | 1 file  | `face-suggestion.service.ts`: took #1156's `getSettledFaceIds`; rolling's side differed from base only by `isDisjointFrom` (asserted) |
+| #1159 S3 backend owns its proxy read slot      | `87a9b2a57ef`  | 0       | clean; per-file numstat identical to `main`                                                                                           |
+
+### #992 on rolling
+
+- **Tag**: `TagAction.svelte` stays deleted (immich-31976 turned it into the bulk `Tag` ActionItem).
+  `getAssetBulkActions` takes a new `editableSelectedAssetIds` option, which `SelectionToolbar` passes; with it, Tag sends
+  only the editable subset (skipped-count toast, no modal for an empty subset); without it, upstream's all-owned
+  behaviour stands. #992's `TagAction.spec.ts` is ported to `asset.service.spec.ts` — red against the pre-port action
+  (2 of 3), green after.
+- **Rating**: the navbar `RatingAction` is gone (immich-31804); the `isEditable()` gate moves onto the `Rate` ActionItem.
+  #992's `W-rating` tests now fire on `document.body` with `commandPaletteManager.enable()` (the dispatcher the app enables
+  in `+layout.ts`) and wait for the async handler; the negative case was proved red with the gate removed.
+- **Server**: `update()` / `updateAll()` keep upstream's `on_asset_update` websocket sends beside the cross-owner logging.
+- **Toolchain drift** (newer unicorn rules on rolling): `face-box-drag.ts` (`prefer-continue`),
+  `shared-space.service.ts` (`prefer-early-return`); `detail-panel.spec.ts`'s person fixture gains the dormant sharing arrays.
+- Fork migration `1796000000000-AddAssetFaceCreatedBy` arrives with its ORDER and revert-script entries.
+
+### #819 on rolling
+
+- `searchLargeAssets` keeps upstream's Hidden-visibility filter beside the per-caller `isFavoriteForUser` select;
+  the generated SQL takes the renumbered `$6`.
+- Web `asset.service` keeps `updateAsset` (the Rate action uses it) next to `updateAssetFavorites`; the three new favorite
+  tests use rolling's `onAction({ action, event })` signature.
+- `#7703` in the squashed message (upstream's e2e refactor) rewritten to `immich-7703`.
+- **Dropped-column sweep**: no rolling-only upstream code, migration or generated query still reads `asset.isFavorite`;
+  remaining hits are `person."isFavorite"` or #819's own overlay handling. Migrations `1794000000000` /
+  `1794100000000` apply cleanly on a fresh DB after every upstream migration.
+
+### #1156 on rolling
+
+The rolling-only dormant-sharing pin `refuses to reassign faces onto another owner's row` probed `person.reassignFace`,
+which the new `FaceAssignmentService.assignFaces` path never calls. The guard itself (`assertOwnRecord`) is intact; the
+probe now asserts `assignFaces` is not called on the 400 and is called with the face on the caller's own request.
+
+### Verification after the fork sync
+
+| Check                                                                         | Status | Notes                                                                                                         |
+| ----------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| server `pnpm build` / `pnpm check`                                            | PASS   | 70 Gallery migrations synced                                                                                  |
+| OpenAPI spec + TS SDK regenerated                                             | PASS   | byte-identical to the merged files                                                                            |
+| SQL: fresh DB `migrations:run`, `migrations:generate`, `mise //:sql`          | PASS   | no schema drift; 42 query files rewritten byte-identical (twice: after #819 and after #1159)                  |
+| server eslint + prettier (all touched files)                                  | PASS   | after the two unicorn fixes                                                                                   |
+| server unit                                                                   | PASS   | 6590 passed, two consecutive full runs                                                                        |
+| server medium (40 touched specs)                                              | PASS   | 1538 passed; one failure was a stale local plugin-core wasm (pre-immich-32027), green after `mise //:plugins` |
+| web tsc / svelte-check / eslint / unit                                        | PASS   | 643 files 0 problems; 6548 passed                                                                             |
+| e2e `pnpm check` + eslint + prettier                                          | PASS   |                                                                                                               |
+| mobile codegen + `dart analyze --fatal-infos` + format + `flutter test`       | PASS   | Flutter 3.47.2; 4057 passed                                                                                   |
+| revert-to-immich coverage + `IN`-list comma audit                             | PASS   |                                                                                                               |
+| invariants / fork patches / ownership / autolink / branding / preflight (301) | PASS   |                                                                                                               |
+
+Local server unit runs before the final two hit the known supertest socket family (`ECONNRESET` / `socket hang up`, a
+different untouched controller spec each run). A control on the pre-sync tree (`54d76b5c758`, CI-green) failed 2 of 3
+runs the same way at load average ~30, so it is pre-existing and load-driven, not introduced here.
+
 ## Remote CI Verification
 
-See the follow-up commit on this branch.
+**Round 1 — `54d76b5c758` (upstream batches only)**: 7/10 green (Test, Static Code Analysis, Rebase Smoke, ML Smoke,
+Mobile Smoke, Storage Migration Tests, Storage Migration E2E). Three red, none from this cycle's code:
+
+- **Revert-to-Immich Validation** — the Docker-boot half runs against the released `:main` image, which now carries #819's
+  `1794000000000-AddAssetFavoriteTables`; the branch's revert script did not yet know it. Fixed by the fork sync.
+- **Gallery Build Mobile** — `build_runner` crashed restoring `mobile/.dart_tool` from the fixed `build-mobile-gradle-*-main`
+  cache, saved on `main` after #992 added `asset_editable_dto.dart`; the branch lacked that output
+  ("Tried to delete from package not in the build"). Resolved for this branch by the fork sync; the cache key is a
+  follow-up (below).
+- **Docker** — `mise` inside the plugins stage hit the unauthenticated GitHub API rate limit verifying the
+  `extism/js-pdk` attestation (403). Infrastructure; other branches' Docker runs on the same image were green.
+
+**Round 2 — fork-synced tip**: see the follow-up commit on this branch.
 
 ## Follow-ups
 
-- Fork sync of #992 and #819 (per-user favorites, large) when wanted — `make upstream-sync-fork-main`.
+- `gallery-build-mobile.yml` caches `mobile/.dart_tool` (build_runner incremental state) under a fixed `-main` key: any
+  branch whose generated OpenAPI set lacks a model `main` has crashes in codegen. Exclude `mobile/.dart_tool/build` or key
+  it on the spec hash.
+- `person.service.spec.ts` (also on `main`): five face-detection tests still assert
+  `expect(mocks.person.reassignFace).not.toHaveBeenCalled()`, which no longer guards anything after #1156.
+- #819's squashed commit on `main` cites `#7703` (an immich PR); rewritten on rolling only.
 - Optional: port 32111's `invalidate('album:data')` refresh model onto the fork album page.
