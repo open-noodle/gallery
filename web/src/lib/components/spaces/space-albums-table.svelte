@@ -6,6 +6,7 @@
     toggleSpaceAlbumGroupCollapsing,
     type SpaceAlbumGroup,
   } from '$lib/utils/space-album-grouping';
+  import LazyChunks from '$lib/components/shared-components/lazy-chunks.svelte';
   import { buildFolderSummaries, EMPTY_FOLDER_SUMMARY, getFolderContents } from '$lib/utils/space-album-folders';
   import { dateFormats } from '$lib/constants';
   import { Route } from '$lib/route';
@@ -13,7 +14,6 @@
   import { ContextMenuButton, Icon } from '@immich/ui';
   import { mdiChevronRight, mdiFolder } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { slide } from 'svelte/transition';
 
   interface Props {
     spaceId: string;
@@ -68,7 +68,7 @@
 
 {#snippet albumRow(album: SharedSpaceLinkedAlbumDto)}
   <tr
-    class="flex w-full place-items-center border-3 border-transparent p-2 text-center [contain-intrinsic-height:auto_3.5rem] [content-visibility:auto] odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
+    class="flex w-full place-items-center border-3 border-transparent p-2 text-center odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
   >
     <td class="text-md w-8/12 items-center text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">
       <a
@@ -114,6 +114,17 @@
       />
     </td>
   </tr>
+{/snippet}
+
+<!-- Rows mount in chunks near the viewport (see LazyChunks); a row is ~3.5rem tall. -->
+{#snippet albumRows(rowAlbums: SharedSpaceLinkedAlbumDto[])}
+  <LazyChunks items={rowAlbums} chunkSize={50} estimateHeight={(count) => count * 56} tag="tbody" class="block w-full">
+    {#snippet chunk(chunkAlbums)}
+      {#each chunkAlbums as album (album.id)}
+        {@render albumRow(album)}
+      {/each}
+    {/snippet}
+  </LazyChunks>
 {/snippet}
 
 {#snippet folderRow(folder: SharedSpaceAlbumFolderDto)}
@@ -200,18 +211,10 @@
         </tr>
       </tbody>
       {#if !collapsed}
-        <tbody class="mt-2 block w-full" transition:slide={{ duration: 300 }}>
-          {#each group.albums as album (album.id)}
-            {@render albumRow(album)}
-          {/each}
-        </tbody>
+        {@render albumRows(group.albums)}
       {/if}
     {/each}
   {:else}
-    <tbody>
-      {#each albums as album (album.id)}
-        {@render albumRow(album)}
-      {/each}
-    </tbody>
+    {@render albumRows(albums)}
   {/if}
 </table>

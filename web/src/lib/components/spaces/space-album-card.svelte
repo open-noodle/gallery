@@ -58,7 +58,7 @@
     setActiveDragPayload(payload);
   }}
   ondragend={() => setActiveDragPayload(null)}
-  class="group relative rounded-2xl border border-transparent p-5 [contain-intrinsic-height:auto_20rem] [content-visibility:auto] hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
+  class="group relative rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
 >
   <!-- ⋯ menu — sibling of the anchor, not inside it. Every member sees it (the "my timeline" item
        is a personal preference, not an editor action); only canManage adds the space-wide items. -->
