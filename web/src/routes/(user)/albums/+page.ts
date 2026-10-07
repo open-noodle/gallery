@@ -5,9 +5,11 @@ import type { PageLoad } from './$types';
 
 export const load = (async ({ url }) => {
   await authenticate(url);
-  const sharedAlbums = await getAllAlbums({ isShared: true });
-  const albums = await getAllAlbums({ isOwned: true });
-  const $t = await getFormatter();
+  const [sharedAlbums, albums, $t] = await Promise.all([
+    getAllAlbums({ isShared: true }),
+    getAllAlbums({ isOwned: true }),
+    getFormatter(),
+  ]);
 
   return {
     albums,
