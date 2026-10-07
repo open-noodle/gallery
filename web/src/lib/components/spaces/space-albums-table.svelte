@@ -1,6 +1,4 @@
 <script lang="ts">
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { SortOrder, locale } from '$lib/stores/preferences.store';
   import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
   import {
@@ -12,8 +10,8 @@
   import { dateFormats } from '$lib/constants';
   import { Route } from '$lib/route';
   import { type SharedSpaceAlbumFolderDto, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-  import { Icon } from '@immich/ui';
-  import { mdiChevronRight, mdiDotsVertical, mdiFolder } from '@mdi/js';
+  import { ContextMenuButton, Icon } from '@immich/ui';
+  import { mdiChevronRight, mdiFolder } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
 
@@ -70,7 +68,7 @@
 
 {#snippet albumRow(album: SharedSpaceLinkedAlbumDto)}
   <tr
-    class="flex w-full place-items-center border-3 border-transparent p-2 text-center odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
+    class="flex w-full place-items-center border-3 border-transparent p-2 text-center [contain-intrinsic-height:auto_3.5rem] [content-visibility:auto] odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
   >
     <td class="text-md w-8/12 items-center text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">
       <a
@@ -93,31 +91,27 @@
     <!-- Every member sees the menu (the "my timeline" item is a personal preference, not an
          editor action); only canManage adds the space-wide items. -->
     <td class="text-md w-1/12 text-end" data-testid="space-album-row-menu-{album.id}">
-      <ButtonContextMenu
-        icon={mdiDotsVertical}
-        title={$t('more')}
-        color="secondary"
-        variant="ghost"
-        size="medium"
-        align="top-right"
-        direction="left"
-      >
-        <MenuOption
-          text={album.hiddenFromMyTimeline
-            ? $t('space_albums_show_in_my_timeline')
-            : $t('space_albums_hide_from_my_timeline')}
-          onClick={() => onToggleMyTimeline?.(album)}
-        />
-        {#if canManage}
-          <MenuOption
-            text={album.showInTimeline
+      <!-- @immich/ui only mounts the menu once opened; see space-album-card. -->
+      <ContextMenuButton
+        aria-label={$t('more')}
+        position="top-left"
+        items={[
+          {
+            title: album.hiddenFromMyTimeline
+              ? $t('space_albums_show_in_my_timeline')
+              : $t('space_albums_hide_from_my_timeline'),
+            onAction: () => onToggleMyTimeline?.(album),
+          },
+          {
+            title: album.showInTimeline
               ? $t('space_albums_hide_from_space_photos')
-              : $t('spaces_linked_albums_show_in_timeline')}
-            onClick={() => onToggleTimeline?.(album)}
-          />
-          <MenuOption text={$t('spaces_linked_albums_unlink')} onClick={() => onUnlink?.(album)} />
-        {/if}
-      </ButtonContextMenu>
+              : $t('spaces_linked_albums_show_in_timeline'),
+            $if: () => canManage,
+            onAction: () => onToggleTimeline?.(album),
+          },
+          { title: $t('spaces_linked_albums_unlink'), $if: () => canManage, onAction: () => onUnlink?.(album) },
+        ]}
+      />
     </td>
   </tr>
 {/snippet}

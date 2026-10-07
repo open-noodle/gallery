@@ -40,8 +40,10 @@ const { modalManagerMock } = vi.hoisted(() => ({
 
 vi.mock('@immich/ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('@immich/ui')>();
+  const { default: MockContextMenuButton } = await import('@test-data/mocks/action-context-menu.stub.svelte');
   return {
     ...original,
+    ContextMenuButton: MockContextMenuButton,
     modalManager: modalManagerMock,
     toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
   };
