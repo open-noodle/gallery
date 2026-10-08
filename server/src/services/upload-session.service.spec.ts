@@ -5,6 +5,7 @@ import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetMediaStatus } from 'src/dtos/asset-media-response.dto.js';
 import { UploadSessionCreateDto } from 'src/dtos/upload-session.dto.js';
 import { DatabaseLock, StorageFolder } from 'src/enum.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { UploadSessionService } from 'src/services/upload-session.service.js';
@@ -65,7 +66,7 @@ describe(UploadSessionService.name, () => {
   beforeAll(() => {
     // Initialize the disk backend for StorageService so that AssetMediaService.uploadAsset's
     // internal writeBackend resolution works when finalize hands off to it for real.
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
