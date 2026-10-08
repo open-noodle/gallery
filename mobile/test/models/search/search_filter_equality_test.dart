@@ -42,10 +42,10 @@ void main() {
       expect(a.hashCode == b.hashCode, false);
     });
 
-    test('locationPresence round-trips through toMap/fromMap', () {
+    test('copyWith keeps locationPresence when changing another location field', () {
       const original = SearchLocationFilter(locationPresence: 'noGps');
 
-      expect(SearchLocationFilter.fromMap(original.toMap()).locationPresence, 'noGps');
+      expect(original.copyWith(country: 'France').locationPresence, 'noGps');
     });
   });
 }
