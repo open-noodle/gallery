@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Kysely, Transaction, sql } from 'kysely';
+import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
@@ -11,7 +12,6 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonId, PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
-import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IPersonJob } from 'src/types.js';
 import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code.js';
 

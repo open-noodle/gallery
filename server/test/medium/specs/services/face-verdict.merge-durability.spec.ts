@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { SharedSpaceRole, SourceType } from 'src/enum.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
@@ -9,7 +10,6 @@ import { PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
-import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IdentityMergePropagationService, MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import {
   rekeyVerdictIdentity,
