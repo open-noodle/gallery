@@ -458,10 +458,12 @@ export class CleanupService extends BaseService {
     let batch: Array<{ name: JobName.AssetAnalyzeQuality; data: { id: string } }> = [];
     for await (const { id } of this.cleanupRepository.streamAssetsForQualityAnalysis(!!force)) {
       batch.push({ name: JobName.AssetAnalyzeQuality, data: { id } });
-      if (batch.length >= 1000) {
-        await this.jobRepository.queueAll(batch);
-        batch = [];
+      if (batch.length < 1000) {
+        continue;
       }
+
+      await this.jobRepository.queueAll(batch);
+      batch = [];
     }
     await this.jobRepository.queueAll(batch);
 
