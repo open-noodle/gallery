@@ -19,6 +19,7 @@ import {
   CleanupStrictnessValue,
 } from 'src/utils/cleanup.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
+import { favoriteExistsForOwner } from 'src/utils/favorite.js';
 
 /**
  * `afterLocalDateTime` is the previous window's last `cursorT` (full precision). A `Date` is accepted
@@ -103,7 +104,9 @@ const cleanupAssetColumns = <E extends readonly unknown[]>(
     eb.fn.coalesce('asset.height', 'asset_exif.exifImageHeight').as('height'),
     'asset.duration' as const,
     cleanupFileSizeExpr.as('fileSize'),
-    'asset.isFavorite' as const,
+    // Per-user favorites (#763): every cleanup query is owner-scoped, so the owner's overlay row is
+    // the caller's.
+    favoriteExistsForOwner(eb).as('isFavorite'),
     eb
       .exists(
         eb
@@ -458,7 +461,27 @@ export class CleanupRepository {
 
     await this.db.transaction().execute(async (trx) => {
       if (favoriteIds.length > 0) {
-        await trx.updateTable('asset').set({ isFavorite: true }).where('id', 'in', favoriteIds).execute();
+        // Per-user favorites (#763): a favorite is an `asset_favorite` row, written the way
+        // AssetFavoriteRepository.addAll writes it — including bumping the owned asset's updatedAt
+        // for clients that predate the favorites sync stream — but inside this transaction.
+        const changed = await trx
+          .insertInto('asset_favorite')
+          .values(favoriteIds.map((assetId) => ({ userId, assetId })))
+          .onConflict((oc) => oc.doNothing())
+          .returning('assetId')
+          .execute();
+        if (changed.length > 0) {
+          await trx
+            .updateTable('asset')
+            .set({ updatedAt: sql`clock_timestamp()` })
+            .where('ownerId', '=', userId)
+            .where(
+              'id',
+              'in',
+              changed.map(({ assetId }) => assetId),
+            )
+            .execute();
+        }
       }
 
       if (keepAll.length > 0) {
