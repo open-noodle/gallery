@@ -74,7 +74,8 @@ export class FaceDissolveService extends BaseService {
     }
 
     this.logger.log(
-      `Dissolved person ${personId} (${person.name}): ${result.faces} faces, ` +
+      `Dissolved person ${personId} (${person.name}): ${result.faces} faces ` +
+        `(${result.handDrawnUnassigned} hand-drawn kept and unassigned), ` +
         `${result.assetsCleared} assets requeued, outcome=${dto.outcome}, scope=${dto.scope}`,
     );
 
@@ -116,6 +117,11 @@ export class FaceDissolveService extends BaseService {
     // which is exactly why the admin must be told it will still happen.
     if (dto.outcome === 'unassign' && counts.faces > 0 && counts.remainingLiveFaces === 0) {
       warnings.push({ code: 'person-will-be-cleaned-up', count: 0 });
+    }
+    // A dissolve never deletes a box someone drew by hand (handDrawnFacePredicate): a delete outcome keeps
+    // and unassigns those instead. The admin chose "delete", so the dialog must say which faces survive it.
+    if (dto.outcome !== 'unassign' && counts.handDrawn > 0) {
+      warnings.push({ code: 'hand-drawn-kept', count: counts.handDrawn });
     }
     if (dto.redetect && counts.notRedetectable > 0) {
       warnings.push({ code: 'not-redetectable', count: counts.notRedetectable });

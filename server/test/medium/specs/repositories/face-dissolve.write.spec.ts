@@ -12,6 +12,7 @@ import {
   seedUser,
   setFacesRecognizedAt,
 } from 'test/medium/specs/repositories/face-dissolve.fixtures.js';
+import { newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let db: Kysely<DB>;
@@ -213,5 +214,107 @@ describe('FaceDissolveRepository.dissolve', () => {
       .where('assetId', '=', asset.id)
       .execute();
     expect(status.facesRecognizedAt).toEqual(watermark);
+  });
+
+  // A dissolve never deletes a box someone drew by hand: `createdBy` is the sole deletability signal for those
+  // (space-editor-face-assignment design §6.6). Both delete outcomes unassign them instead — same treatment as
+  // `unassign` — while the detector face beside them, in the same scope, is deleted as before.
+  it.each(['delete-faces', 'delete-faces-and-person'] as const)(
+    'keeps and unassigns a hand-drawn face on %s while deleting the detector face beside it',
+    async (outcome) => {
+      const repo = new FaceDissolveRepository(db);
+      const user = await seedUser(db);
+      const editor = await seedUser(db);
+      const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+      const asset = await seedAsset(db, { ownerId: user.id });
+      const detected = await seedFace(db, {
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+        withEmbedding: true,
+      });
+      const handDrawn = await seedFace(db, {
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+        sourceType: SourceType.Manual,
+        createdBy: editor.id,
+      });
+
+      // The human-placement record must go with the person link, exactly as `unassign` clears it — a stale
+      // link marks the face settled forever (person.repository.ts:327).
+      const identityId = newUuid();
+      await db.insertInto('face_identity').values({ id: identityId }).execute();
+      await db
+        .insertInto('face_identity_face')
+        .values({ identityId, assetFaceId: handDrawn.id, source: 'manual' })
+        .execute();
+
+      const counts = await repo.getCounts(person.personGroupId, DissolveScope.All);
+      expect(counts.faces).toBe(2);
+      expect(counts.handDrawn).toBe(1);
+
+      const result = await repo.dissolve({
+        personGroupId: person.personGroupId,
+        scope: DissolveScope.All,
+        outcome,
+        redetect: true,
+      });
+
+      // Preview and apply describe the same set: both faces are touched, one of them kept.
+      expect(result.faces).toBe(counts.faces);
+      expect(result.handDrawnUnassigned).toBe(counts.handDrawn);
+
+      expect(await db.selectFrom('asset_face').select('id').where('id', '=', detected.id).execute()).toEqual([]);
+
+      const kept = await db
+        .selectFrom('asset_face')
+        .select(['id', 'personGroupId', 'createdBy', 'deletedAt'])
+        .where('id', '=', handDrawn.id)
+        .executeTakeFirst();
+      expect(kept).toEqual({ id: handDrawn.id, personGroupId: null, createdBy: editor.id, deletedAt: null });
+
+      expect(
+        await db
+          .selectFrom('face_identity_face')
+          .select('assetFaceId')
+          .where('assetFaceId', '=', handDrawn.id)
+          .execute(),
+      ).toEqual([]);
+
+      // On delete-faces-and-person the person row is gone and the hand-drawn box still survived it.
+      const personRows = await db
+        .selectFrom('person')
+        .select('personGroupId')
+        .where('personGroupId', '=', person.personGroupId)
+        .execute();
+      expect(personRows).toHaveLength(outcome === 'delete-faces-and-person' ? 0 : 1);
+    },
+  );
+
+  it('leaves an out-of-scope hand-drawn face entirely alone', async () => {
+    const repo = new FaceDissolveRepository(db);
+    const user = await seedUser(db);
+    const person = await seedPerson(db, { ownerId: user.id, name: 'Target' });
+    const asset = await seedAsset(db, { ownerId: user.id });
+    await seedFace(db, { assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
+    const handDrawn = await seedFace(db, {
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.Manual,
+      createdBy: user.id,
+    });
+
+    const counts = await repo.getCounts(person.personGroupId, DissolveScope.Exif);
+    expect(counts.handDrawn).toBe(0);
+
+    const result = await repo.dissolve({
+      personGroupId: person.personGroupId,
+      scope: DissolveScope.Exif,
+      outcome: 'delete-faces',
+      redetect: true,
+    });
+
+    expect(result).toMatchObject({ faces: 1, handDrawnUnassigned: 0 });
+    const [row] = await db.selectFrom('asset_face').select('personGroupId').where('id', '=', handDrawn.id).execute();
+    expect(row.personGroupId).toBe(person.personGroupId);
   });
 });

@@ -46,6 +46,10 @@ select
   ) as "softDeleted",
   count(*) filter (
     where
+      "asset_face"."createdBy" is not null
+  ) as "handDrawn",
+  count(*) filter (
+    where
       (
         "asset_face"."sourceType" = $2
         and exists (
