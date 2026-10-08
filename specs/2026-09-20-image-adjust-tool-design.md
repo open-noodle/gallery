@@ -83,6 +83,32 @@ docs**:
    input first, then apply (amount, offset)" is what produces that,
    not any actual reordering of calls.
 
+A third gotcha existed here briefly (`.recomb()` narrowing a non-sRGB
+pipeline's data to 8-bit while `linear()`'s coefficients were still
+computed for 16-bit, clipping saturation+contrast/invert to solid
+black/white on any non-sRGB photo) but it's gone, not fixed-and-kept: the
+2026-10-08 rebase below moved Adjust onto a pass that's unconditionally
+8-bit, so the bug's precondition no longer exists. No code or test
+describes it any more — see that section for the real current behaviour.
+
+**Old mobile apps must not be sent `adjust` edits.** The new action flows
+into the `AssetEditV1` delta-sync stream, and a mobile app built before
+this feature has a generated Dart enum without `adjust`. Its `fromJson`
+returns null for the unrecognized string and the non-null assertion on it
+throws — inside `_parseLines()`, before any per-entity handling, so the
+whole batch dies rather than the one edit. The batch is then never
+acknowledged, the checkpoint never advances, and every retry replays the
+same failure: one `adjust` edit saved on web permanently wedges that
+user's phone sync. Server and mobile release independently, so there is no
+way to ship the Dart fix to already-installed apps; the server has to
+withhold what they cannot parse. `clientSupports()`
+(`server/src/utils/client-capability.ts`) is the server-side counterpart
+to mobile's `ServerCapability` and gates this on the app version parsed
+from the request's `User-Agent`, with unknown counting as unsupported.
+The websocket `AssetEditReadyV2` path needs no gate — its handler wraps
+the same parse in a try/catch, so it degrades to "edit not applied"
+instead of wedging.
+
 **Where it runs (revised 2026-10-08, Immich v3.3.0 rebase)**: upstream
 v3.3 stopped applying edits in the decode pipeline. `decodeImage()` now
 returns an unedited 8-bit bitmap, and each output (thumbnail, preview,
