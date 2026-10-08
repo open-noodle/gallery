@@ -166,14 +166,9 @@ describe('uploadFiles chunked upload', () => {
       }
 
       patchCalls++;
-      if (patchCalls < totalChunks) {
-        return { status: 204 };
-      }
-
-      return {
-        status: 201,
-        body: JSON.stringify({ id: assetId, status: 'created' }),
-      };
+      return patchCalls < totalChunks
+        ? { status: 204 }
+        : { status: 201, body: JSON.stringify({ id: assetId, status: 'created' }) };
     });
   };
 
