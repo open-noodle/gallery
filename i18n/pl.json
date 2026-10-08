@@ -39,6 +39,7 @@
   "add_to_albums": "Dodaj do albumów",
   "add_to_albums_count": "Dodaj do albumów ({count})",
   "add_to_bottom_bar": "Dodaj do",
+  "add_to_collection_non_owned_space_albums_only": "Twój wybór zawiera zdjęcia należące do innych osób. Można je dodać tylko do albumów w Space, w którym jesteś właścicielem lub edytorem.",
   "add_to_collection_restricted_to_space": "Twój wybór zawiera zdjęcia należące do innych członków, więc mogą je przyjąć tylko albumy w tym Space.",
   "add_to_collections_count": "Dodaj do {count}",
   "add_to_shared_album": "Dodaj do udostępnionego albumu",

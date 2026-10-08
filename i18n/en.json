@@ -40,6 +40,7 @@
   "add_to_albums": "Add to albums",
   "add_to_albums_count": "Add to albums ({count})",
   "add_to_bottom_bar": "Add to",
+  "add_to_collection_non_owned_space_albums_only": "Your selection includes photos owned by other people. Those can only be added to albums in a space where you are an owner or editor.",
   "add_to_collection_restricted_to_space": "Your selection includes photos owned by other members, so only albums in this space can accept them.",
   "add_to_collections_count": "Add to {count}",
   "add_to_shared_album": "Add to shared album",

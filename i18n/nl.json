@@ -39,6 +39,7 @@
   "add_to_albums": "Toevoegen aan albums",
   "add_to_albums_count": "Toevoegen aan albums ({count})",
   "add_to_bottom_bar": "Toevoegen aan",
+  "add_to_collection_non_owned_space_albums_only": "Je selectie bevat foto's van anderen. Die kunnen alleen worden toegevoegd aan albums in een Space waarin je eigenaar of bewerker bent.",
   "add_to_collection_restricted_to_space": "Je selectie bevat foto's van andere leden, dus alleen albums in deze Space kunnen ze bevatten.",
   "add_to_collections_count": "Toevoegen aan {count}",
   "add_to_shared_album": "Aan gedeeld album toevoegen",

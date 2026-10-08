@@ -104,7 +104,7 @@ from
   and "asset"."ownerId" != $5
   and "asset"."visibility" in ($6, $7)
 where
-  "link"."albumId" = $8
+  "link"."albumId" in ($8)
   and (
     exists (
       select
@@ -140,6 +140,57 @@ where
   )
 order by
   "asset"."id"
+
+-- SharedSpaceRepository.getContributableAssetCounts
+select
+  "link"."albumId" as "albumId",
+  count(distinct "asset"."id") as "count"
+from
+  "shared_space_album" as "link"
+  inner join "shared_space_member" as "m" on "m"."spaceId" = "link"."spaceId"
+  and "m"."userId" = $1
+  and "m"."role" in ($2, $3)
+  inner join "asset" on "asset"."id" in ($4)
+  and "asset"."deletedAt" is null
+  and "asset"."ownerId" != $5
+  and "asset"."visibility" in ($6, $7)
+where
+  "link"."albumId" in ($8)
+  and (
+    exists (
+      select
+        1 as "x"
+      from
+        "shared_space_asset" as "sd"
+      where
+        "sd"."spaceId" = "link"."spaceId"
+        and "sd"."assetId" = "asset"."id"
+    )
+    or exists (
+      select
+        1 as "x"
+      from
+        "shared_space_library" as "sl"
+      where
+        "sl"."spaceId" = "link"."spaceId"
+        and "sl"."libraryId" = "asset"."libraryId"
+        and "asset"."isOffline" = $9
+    )
+    or exists (
+      select
+        1 as "x"
+      from
+        "shared_space_album" as "sa2"
+        inner join "album_asset" as "aa2" on "aa2"."albumId" = "sa2"."albumId"
+        inner join "album" as "al2" on "al2"."id" = "sa2"."albumId"
+        and "al2"."deletedAt" is null
+      where
+        "sa2"."spaceId" = "link"."spaceId"
+        and "aa2"."assetId" = "asset"."id"
+    )
+  )
+group by
+  "link"."albumId"
 
 -- SharedSpaceRepository.getMemberSpaceIdsLinkingAlbum
 select

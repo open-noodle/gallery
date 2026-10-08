@@ -39,6 +39,7 @@
   "add_to_albums": "加入相簿",
   "add_to_albums_count": "將 ({count}) 個項目加入相簿",
   "add_to_bottom_bar": "新增到",
+  "add_to_collection_non_owned_space_albums_only": "您的選擇包含其他人的照片。這些照片只能加入您擔任擁有者或編輯者的 Space 中的相簿。",
   "add_to_collection_restricted_to_space": "您的選擇包含其他成員的照片，因此只有此 Space 中的相簿可以接收它們。",
   "add_to_collections_count": "加入到 {count}",
   "add_to_shared_album": "加入到共享相簿",
