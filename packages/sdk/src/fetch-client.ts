@@ -658,6 +658,8 @@ export type DissolveResponseDto = {
         assets: number;
         exif: number;
         faces: number;
+        /** In-scope hand-drawn faces; a delete outcome unassigns these instead */
+        handDrawn: number;
         mlWithEmbedding: number;
         mlWithoutEmbedding: number;
         notRedetectable: number;

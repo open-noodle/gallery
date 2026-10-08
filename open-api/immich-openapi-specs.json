@@ -31146,6 +31146,12 @@
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
+              "handDrawn": {
+                "description": "In-scope hand-drawn faces; a delete outcome unassigns these instead",
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
               "mlWithEmbedding": {
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
@@ -31186,7 +31192,8 @@
               "assets",
               "sharedAssets",
               "notRedetectable",
-              "remainingLiveFaces"
+              "remainingLiveFaces",
+              "handDrawn"
             ],
             "type": "object"
           },
