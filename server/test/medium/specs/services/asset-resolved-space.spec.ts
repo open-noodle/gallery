@@ -227,7 +227,9 @@ describe('AssetService.get resolvedSpaceId', () => {
     // Opened from inside the hidden space (e.g. /spaces/{id}/photos/{assetId}): that space's people.
     const detail = await fx.getAsset(authFor(fx.viewer), hiddenSpace.space.id);
 
-    expect(detail.resolvedSpaceId).toBeUndefined();
+    // An explicit spaceId is echoed back as the resolved space (#992), even though the
+    // timeline-enabled space sorts first and would win the no-context lookup.
+    expect(detail.resolvedSpaceId).toBe(hiddenSpace.space.id);
     expect(detail.people).toEqual([
       expect.objectContaining({ name: 'Andressa', spacePersonId: hiddenSpace.spacePerson.id }),
     ]);
