@@ -29,13 +29,7 @@
   import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
   import { appendUniqueById, sortPeople } from '$lib/utils/people-utils';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
-  import {
-    getAllPeople,
-    getPeopleFaceStatistics,
-    getPerson,
-    searchPerson,
-    type PersonResponseDto,
-  } from '@immich/sdk';
+  import { getAllPeople, getPeopleFaceStatistics, getPerson, searchPerson, type PersonResponseDto } from '@immich/sdk';
   import { Button, Icon, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountMultipleCheckOutline,
