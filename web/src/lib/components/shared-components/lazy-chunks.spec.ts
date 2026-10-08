@@ -22,7 +22,7 @@ describe('LazyChunks', () => {
 
   const chunk = createRawSnippet((items: () => number[]) => ({ render: () => `<p>${items().join(',')}</p>` }));
   const renderChunks = () =>
-    render(LazyChunks<number>, {
+    render(LazyChunks, {
       items: Array.from({ length: 10 }, (_, i) => i),
       chunkSize: 4,
       estimateHeight: (count: number) => count * 10,

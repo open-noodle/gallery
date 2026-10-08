@@ -78,15 +78,14 @@ async function expectThumbnailVisible(page: Page, assetId: string) {
   await expect(page.locator(`[data-thumbnail-focus-container][data-asset="${assetId}"]`)).toBeVisible();
 }
 
-// Clicks the given card/row's "⋯" menu button. Both space-album-card.svelte and
-// space-albums-table.svelte scope the popover under the same `data-testid`-wrapped container as
-// the trigger, so a locator scoped to that container disambiguates its items from the space page's
-// own "More" overflow menu, which shares several identically-worded items ("Hide from timeline" is
-// gone since slice 11's split, but menu items are still generically named enough to collide).
-async function openCardMenu(card: Locator) {
+// Scope the trigger to the album card, then locate @immich/ui's open menu at page level:
+// ContextMenuButton portals its menu outside the card's test-id wrapper.
+async function openCardMenu(card: Locator): Promise<Locator> {
   const cardMenu = card.getByTestId('space-album-card-menu');
   await cardMenu.getByRole('button', { name: 'More' }).click();
-  return cardMenu;
+  const menu = card.page().getByRole('menu');
+  await expect(menu).toBeVisible();
+  return menu;
 }
 
 // SPACE-level member-scoped toggle, HIDE direction: fetches the "how many of my own photos would
