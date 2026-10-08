@@ -34,7 +34,6 @@
     getPeopleFaceStatistics,
     getPerson,
     searchPerson,
-    updatePerson,
     type PersonResponseDto,
   } from '@immich/sdk';
   import { Button, Icon, modalManager, toastManager } from '@immich/ui';
