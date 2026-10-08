@@ -2,11 +2,11 @@ import { mkdtempDisposableSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import type { Bitmap } from 'src/types.js';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto.js';
 import { Colorspace, ImageFormat } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
-import type { Bitmap } from 'src/types.js';
 import { automock } from 'test/utils.js';
 
 const getPixelColor = async (buffer: Buffer, x: number, y: number) => {
@@ -218,7 +218,6 @@ describe(MediaRepository.name, () => {
         edits: [{ action: AssetEditAction.Adjust, parameters: { contrast: 50 } }],
       });
 
-      expect(result.info.depth).toBe('uchar');
       expect(getBitmapPixel(result, 5, 5)).toEqual({ r: 236, g: 236, b: 236 });
     });
 

@@ -186,14 +186,14 @@ export class MediaRepository {
    * inside the linear-light scRGB pipeline would make the saved result disagree with the web editor's live preview.
    */
   private async adjust(image: Bitmap, parameters: AdjustParameters): Promise<Bitmap> {
-    // The scRGB pass reports `premultiplied: true` while handing back straight-alpha bytes; passing that flag through
-    // would make sharp un-premultiply them again and corrupt every semi-transparent pixel.
-    const pipeline = this.raw({ data: image.data, info: { ...image.info, premultiplied: false } });
+    // At runtime `info` is sharp's full OutputInfo, and the scRGB pass reports `premultiplied: true` on it while
+    // handing back straight-alpha bytes. Passing that flag through would make sharp un-premultiply them again and
+    // corrupt every semi-transparent pixel, so only the geometry is forwarded.
+    const { width, height, channels } = image.info;
+    const pipeline = this.raw({ data: image.data, info: { width, height, channels } });
     // transform() always hands back 8-bit bitmaps (sharp's raw output defaults to uchar, and the source colorspace is
     // tagged on afterwards rather than encoded in the pixel depth), so the value range here is always 0-255.
-    return await this.applyAdjust(pipeline, parameters, 255)
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    return await this.applyAdjust(pipeline, parameters, 255).raw().toBuffer({ resolveWithObject: true });
   }
 
   // Deliberately implemented against the CSS Filter Effects formulas (not sharp's own
