@@ -159,6 +159,39 @@ single-operator, and the alternative is a `SELECT … FOR UPDATE` over every in-
 - **delete-faces-and-person** — plus the person row and a `FileDelete` for `thumbnailPath` (mirrors
   `removeAllPeople`), skipped when the path is empty (L7).
 
+**[shipped, 2026-10-09] A dissolve never deletes a hand-drawn face box.** A face with
+`asset_face.createdBy IS NOT NULL` was drawn by a person, not produced by the detector or a metadata import.
+`createdBy` is the **sole** deletability signal for such a box
+(`specs/2026-08-23-space-editor-face-assignment-design.md` §6.6): the space editor who drew it may delete it,
+and nothing else is allowed to treat it as disposable detector output. `sourceType` cannot stand in for it —
+owner-drawn boxes are `manual` with `createdBy` NULL, and hand-drawn ones are not re-creatable by any
+re-detection, so a bulk delete would destroy human work the "repair" can never put back.
+
+So both delete outcomes split the in-scope set:
+
+- in-scope faces with `createdBy` set get the **`unassign` treatment** — `face_identity_face` rows deleted
+  (keyed by face id), then `personGroupId = NULL` — and stay on the photo, unnamed, ready to be assigned;
+- every other in-scope face is deleted as before.
+
+The rule lives in the shared predicate layer (`server/src/utils/face-dissolve.ts`):
+`handDrawnFacePredicate` and `dissolveDeletableFacePredicate` (in-scope AND NOT hand-drawn). `getCounts`
+counts the kept faces as `handDrawn` with the same predicate, and the service emits a `hand-drawn-kept`
+warning on both delete outcomes, so the dialog says "N hand-drawn faces will be kept and unassigned" before
+the admin confirms. `faces` (and therefore `expectedFaceCount`) still counts them: they are touched.
+
+Ordering: the hand-drawn unassign runs **before** the delete and before the person row is removed. Nothing
+would cascade into them anyway — `asset_face.personGroupId` references `person_group` with `ON DELETE SET NULL`,
+and deleting a `person` row does not delete its `person_group` — but unassigning first means no statement of
+`delete-faces-and-person` ever sees them carrying this person's id. The watermark clear is unchanged: it still
+covers every in-scope face's asset, hand-drawn included. Re-detection over a kept box is pre-existing
+behaviour, not new: `handleDetectFaces` matches any non-pet existing face at IoU > 0.5 and writes the
+embedding onto it rather than adding a second box, and it only ever removes `machine-learning` faces, so a
+kept hand-drawn box is neither duplicated nor deleted by the re-detection pass. (A soft-deleted hand-drawn box
+is likewise kept, so it can still absorb a detection per L12 — the same as `unassign` has always behaved.)
+
+Space links are treated exactly as `unassign` treats them: a kept hand-drawn face keeps its
+`shared_space_person_face` row, so the space person it was drawn for is not counted as orphaned by this dissolve.
+
 Deliberately **not** writing negative `face_person_verdict` rows on unassign. Negatives are the face-by-face
 layer from the review unification work; 3,000 of them is the wrong tool. Dissolve is the bulk reset.
 
@@ -345,6 +378,7 @@ Mocked repositories cannot see cascades or the re-detect gate, which are the who
 | `scope: 'exif'` on a person with only ML faces               | 200, zero affected, preview says so                                                                                                                                                     |
 | `redetect: false` with a delete outcome                      | 400 — never a silent override                                                                                                                                                           |
 | Non-admin caller                                             | 403                                                                                                                                                                                     |
+| Hand-drawn face (`createdBy` set) in scope, delete outcome  | **Kept and unassigned**, never deleted; counted as `handDrawn` and warned about (`hand-drawn-kept`) — §3                                                                                |
 | Concurrent dissolve of the same person                       | Second gets 409 via `expectedFaceCount` — **best-effort**: the guard is a read compared outside the write transaction, so two applies landing inside that gap can both pass it (see §3) |
 
 ### Unit / web / e2e
