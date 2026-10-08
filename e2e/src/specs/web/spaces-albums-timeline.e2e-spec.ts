@@ -79,11 +79,14 @@ async function expectThumbnailVisible(page: Page, assetId: string) {
 }
 
 // Scope the trigger to the album card, then locate @immich/ui's open menu at page level:
-// ContextMenuButton portals its menu outside the card's test-id wrapper.
+// ContextMenuButton portals its menu outside the card's test-id wrapper. A bare
+// getByRole('menu') is ambiguous there, because the space header's ButtonContextMenus ("Edit",
+// "More") keep their collapsed `ul role=menu` mounted while closed, so match only the open one.
 async function openCardMenu(card: Locator): Promise<Locator> {
+  const page = card.page();
   const cardMenu = card.getByTestId('space-album-card-menu');
   await cardMenu.getByRole('button', { name: 'More' }).click();
-  const menu = card.page().getByRole('menu');
+  const menu = page.getByRole('menu').and(page.locator('[data-state="open"]'));
   await expect(menu).toBeVisible();
   return menu;
 }
