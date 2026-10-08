@@ -161,7 +161,15 @@ select
     ),
     0
   ) as "fileSize",
-  "asset"."isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
   exists (
     select
       1 as "one"
@@ -233,16 +241,13 @@ on conflict ("userId", "queue", "assetId") do nothing
 
 -- CleanupRepository.applyCommitDecisions
 begin
-update "asset"
-set
-  "isFavorite" = $1
-where
-  "id" in ($2)
 insert into
-  "cleanup_decision" ("userId", "queue", "assetId", "decision")
+  "asset_favorite" ("userId", "assetId")
 values
-  ($1, $2, $3, $4)
-on conflict ("userId", "queue", "assetId") do nothing
+  ($1, $2)
+on conflict do nothing
+returning
+  "assetId"
 rollback
 
 -- CleanupRepository.deleteDecisions
@@ -356,7 +361,15 @@ select
     ),
     0
   ) as "fileSize",
-  "asset"."isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
   exists (
     select
       1 as "one"
@@ -430,7 +443,15 @@ select
     ),
     0
   ) as "fileSize",
-  "asset"."isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
   exists (
     select
       1 as "one"
@@ -507,7 +528,15 @@ select
     ),
     0
   ) as "fileSize",
-  "asset"."isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
   exists (
     select
       1 as "one"
@@ -845,7 +874,15 @@ select
     ),
     0
   ) as "fileSize",
-  "asset"."isFavorite",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = "asset"."ownerId"
+  ) as "isFavorite",
   exists (
     select
       1 as "one"
