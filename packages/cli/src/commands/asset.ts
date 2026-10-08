@@ -473,10 +473,7 @@ const readInlineSidecar = async (sidecarPath: string): Promise<string | undefine
     // Round-trip check: re-encoding a truly UTF-8 buffer must reproduce it byte-for-byte. A
     // buffer containing invalid UTF-8 sequences decodes with U+FFFD replacement characters,
     // which breaks the round trip.
-    if (!Buffer.from(text, 'utf8').equals(buffer)) {
-      return undefined;
-    }
-    return text;
+    return Buffer.from(text, 'utf8').equals(buffer) ? text : undefined;
   } catch {
     return undefined;
   }
@@ -497,10 +494,8 @@ const uploadFileChunked = async (
     fileCreatedAt: stats.mtime.toISOString(),
     fileModifiedAt: stats.mtime.toISOString(),
     isFavorite: false,
+    ...(visibility && { visibility }),
   };
-  if (visibility) {
-    sessionCreateDto.visibility = visibility;
-  }
 
   const sidecarPath = findSidecar(input);
   if (sidecarPath) {
