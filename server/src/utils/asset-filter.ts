@@ -95,8 +95,7 @@ export function assetFilterConditions(
         ),
       ),
     );
-  }
-  if (f.locationPresence === 'noPlaceName') {
+  } else if (f.locationPresence === 'noPlaceName') {
     conditions.push(
       eb.exists(
         eb
