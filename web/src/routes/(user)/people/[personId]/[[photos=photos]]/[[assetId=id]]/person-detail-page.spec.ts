@@ -587,7 +587,7 @@ describe('Person detail page', () => {
   // #1098: a space editor naming a person from someone else's library owns none of the existing
   // people, so an owner-only search suggested nothing.
   it('suggests shared-space people while a space editor renames a space-primary person', async () => {
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    mockSpaceRoles({ 'editor-space-rename': SharedSpaceRole.Editor });
     sdkMock.searchPerson.mockResolvedValue([
       makePerson({
         id: 'space-person-norgy',
@@ -603,7 +603,7 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'editor-space-rename' }));
+    await waitFor(() => expect(sdkMock.getAllSpaces).toHaveBeenCalled());
     await userEvent.click(screen.getByTitle('edit_name'));
     await userEvent.type(screen.getByPlaceholderText('name_or_nickname'), 'Norg');
 
@@ -618,7 +618,7 @@ describe('Person detail page', () => {
   });
 
   it('offers to merge into a shared-space person whose name the renamed person now matches', async () => {
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    mockSpaceRoles({ 'editor-space-merge': SharedSpaceRole.Editor });
     const norgy = makePerson({
       id: 'space-person-norgy',
       name: 'Norgy',
@@ -635,7 +635,7 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'editor-space-merge' }));
+    await waitFor(() => expect(sdkMock.getAllSpaces).toHaveBeenCalled());
     await userEvent.click(screen.getByTitle('edit_name'));
     await userEvent.type(screen.getByPlaceholderText('name_or_nickname'), 'Norgy');
     await userEvent.click(screen.getByText('done'));
