@@ -83,6 +83,25 @@ docs**:
    input first, then apply (amount, offset)" is what produces that,
    not any actual reordering of calls.
 
+**Where it runs (revised 2026-10-08, Immich v3.3.0 rebase)**: upstream
+v3.3 stopped applying edits in the decode pipeline. `decodeImage()` now
+returns an unedited 8-bit bitmap, and each output (thumbnail, preview,
+fullsize, thumbhash) runs `transform()`, which applies crop/rotate/mirror
+and the resize in **linear-light scRGB**. The CSS formulas above are
+defined on gamma-encoded values, so Adjust can't join that pass without
+drifting from the live preview. It runs as a separate pass
+(`MediaRepository.adjust()`) on the bitmap `transform()` returns, after
+geometry and resize. That matches the preview, which also filters the
+scaled image on screen. Two consequences:
+- The value range is always 0–255. `transform()`'s raw output is always
+  8-bit, wide-gamut sources included; the colourspace is tagged on
+  afterwards and isn't stored in the pixel depth. The old
+  "16-bit midpoint for non-sRGB pipelines" rule no longer applies.
+- The scRGB pass reports `premultiplied: true` on its output info but
+  returns straight-alpha bytes. `adjust()` clears the flag before
+  re-reading the bitmap; otherwise sharp un-premultiplies again and
+  corrupts semi-transparent pixels (there is a regression test for this).
+
 **Client**: not a new top-level tool. `EditManager.applyEdits()` only ever
 submits the *selected* tool's manager's `.edits` — one manager per
 top-level tool — and Edit/Crop are both modes inside Transform, not a
