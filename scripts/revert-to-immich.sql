@@ -361,7 +361,9 @@ DELETE FROM "migration_overrides"
    'trigger_shared_space_updatedAt',
    'trigger_user_group_updatedAt',
    'trigger_shared_space_album_folder_updatedAt',
-   'trigger_asset_favorite_delete_audit'
+   'trigger_asset_favorite_delete_audit',
+   'trigger_family_union_updatedAt',
+   'index_family_union_partner_key_uq'
  );
 
 -- -----------------------------------------------------------------------------
@@ -644,7 +646,8 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairLock%'
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
       OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
-      OR "name" LIKE '%AssetFavoriteTables%';
+      OR "name" LIKE '%AssetFavoriteTables%'
+      OR "name" LIKE '%FamilyRelationships%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -674,7 +677,9 @@ BEGIN
        'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
        'face_repair_scan_flagged_face', 'face_repair_lock',
        'pet_search',
-       'asset_favorite_audit', 'asset_favorite'
+       'asset_favorite_audit', 'asset_favorite',
+       'family_access', 'family_union_child', 'family_union_partner',
+       'family_union'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;
