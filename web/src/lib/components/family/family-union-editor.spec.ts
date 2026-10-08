@@ -10,17 +10,20 @@ function renderEditor(props: {
   endDate?: string | null;
   onSave?: (payload: { status: FamilyUnionStatus; startDate: string | null; endDate: string | null }) => void;
   onCancel?: () => void;
+  onDelete?: () => void;
 }) {
   const onSave = props.onSave ?? vi.fn();
   const onCancel = props.onCancel ?? vi.fn();
+  const onDelete = props.onDelete ?? vi.fn();
   const result = render(FamilyUnionEditor, {
     status: props.status ?? FamilyUnionStatus.Partnered,
     startDate: props.startDate ?? null,
     endDate: props.endDate ?? null,
     onSave,
     onCancel,
+    onDelete,
   });
-  return { ...result, onSave, onCancel };
+  return { ...result, onSave, onCancel, onDelete };
 }
 
 function pickStatus(status: FamilyUnionStatus) {
