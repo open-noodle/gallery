@@ -5035,7 +5035,7 @@ export class SharedSpaceRepository {
             this.db
               .selectFrom('shared_space_member')
               .innerJoin('asset', (join) => join.on('asset.id', '=', assetId).on('asset.deletedAt', 'is', null))
-              .select('shared_space_member.spaceId')
+              .select(['shared_space_member.spaceId', 'shared_space_member.showInTimeline'])
               .where('shared_space_member.userId', '=', userId)
               .where((eb) =>
                 spaceAlbumAssetExists(eb, {

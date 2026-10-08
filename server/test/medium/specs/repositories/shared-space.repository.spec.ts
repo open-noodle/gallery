@@ -5997,10 +5997,10 @@ describe('getPersonAssetIds — visibility scoping', () => {
   // #1115: AssetService.get resolves an asset with no space context through this lookup, and the Info
   // panel's person chip then filters /photos by the resolved space's `space-person:` token. /photos
   // only honours tokens from spaces the viewer shows on their timeline, so the pick must prefer those.
-  // A space reaches an asset through two arms here (a direct shared_space_asset row or a linked
-  // library); every case runs through both.
+  // A space reaches an asset through three arms here (a direct shared_space_asset row, a linked
+  // library, or a linked album); every case runs through the first two, and the album arm has its own.
   describe('findSpaceForAssetAndUser', () => {
-    type Arm = 'direct' | 'library';
+    type Arm = 'direct' | 'library' | 'album';
 
     // Ascending ids, so a case can decide which space sorts first independently of insertion order.
     const sortedIds = (count: number) => Array.from({ length: count }, () => newUuid()).sort();
@@ -6039,6 +6039,11 @@ describe('getPersonAssetIds — visibility scoping', () => {
         }
         if (input.arms.includes('library')) {
           await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+        }
+        if (input.arms.includes('album')) {
+          const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Linked' });
+          await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+          await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
         }
         return space;
       };
@@ -6116,6 +6121,24 @@ describe('getPersonAssetIds — visibility scoping', () => {
         await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({ spaceId: lowestId });
       }
     });
+
+    it.each([
+      { hiddenArm: 'direct' as Arm, timelineArm: 'album' as Arm },
+      { hiddenArm: 'album' as Arm, timelineArm: 'library' as Arm },
+    ])(
+      'prefers the timeline-enabled space across the linked-album arm (hidden via $hiddenArm, timeline via $timelineArm)',
+      async ({ hiddenArm, timelineArm }) => {
+        const { sut, viewer, asset, addSpace } = await setupAsset();
+        const [lowerId, higherId] = sortedIds(2);
+
+        await addSpace({ id: lowerId, arms: [hiddenArm], viewerTimeline: false });
+        const timelineSpace = await addSpace({ id: higherId, arms: [timelineArm] });
+
+        await expect(sut.findSpaceForAssetAndUser(asset.id, viewer.id)).resolves.toEqual({
+          spaceId: timelineSpace.id,
+        });
+      },
+    );
 
     it('prefers the timeline-enabled space among several hidden ones', async () => {
       const { sut, viewer, asset, addSpace } = await setupAsset();
