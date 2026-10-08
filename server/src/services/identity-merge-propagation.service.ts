@@ -11,6 +11,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonId, PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
+import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IPersonJob } from 'src/types.js';
 import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code.js';
 
@@ -124,6 +125,9 @@ export type IdentityMergePropagationPlan = {
 
 type IdentityMergePropagationDependencies = {
   databaseRepository: DatabaseRepository;
+  // The one placement sequence for "these faces now belong to this person" (#1156); the space reassign
+  // path (#765) joins its transaction rather than hand-writing the move/relink/drain/clear steps.
+  faceAssignmentService: FaceAssignmentService;
   faceIdentityRepository: FaceIdentityRepository;
   jobRepository: JobRepository;
   logger: LoggingRepository;
@@ -186,6 +190,13 @@ export class IdentityMergePropagationService {
    * The target person is always owner-aligned: it is resolved (or created) under the *asset's* owner,
    * matching how every other face-holding person is created in this codebase. Per D4, a `new` target
    * mints one person per distinct asset owner, not one per face.
+   *
+   * Atomic like the global reassign paths: target resolution, person creation and the face placement
+   * (FaceAssignmentService.assignFaces — move, identity relink, pending-suggestion drain, negative-verdict
+   * clearing) all commit in ONE transaction, so a failure part-way leaves no half-moved face, no face on
+   * the new person still carrying its old identity (D14), and no orphaned newly-created person. The
+   * projection refresh, thumbnail jobs and feature-photo repairs run only after the commit: they queue
+   * jobs, which must never see (or outlive) a placement that was rolled back.
    */
   async reassignSpaceFacesToTarget(
     faces: SpaceReassignSourceFace[],
@@ -195,13 +206,39 @@ export class IdentityMergePropagationService {
       return { reassigned: 0, targetPersonIds: [] };
     }
 
+    const { assigned, createdPersons, featurePhotoRepairPersons } = await this.deps.databaseRepository.transaction(
+      (trx) => this.placeSpaceFacesOnTarget(faces, target, trx),
+    );
+
+    // Post-commit follow-ups. Every person created above already carries its feature face; without the
+    // thumbnail job its thumbnailPath stays '' and getThumbnail rejects it outright — the same pairing
+    // every other faceAssetId-at-creation site makes (person.service.ts, pet-detection.service.ts, ...).
+    for (const created of createdPersons) {
+      await this.deps.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: created });
+    }
+    // After the identity relink has committed — the match job resolves the target space person from
+    // face_identity_face, so evicting before the swap would re-add the OLD person.
+    for (const face of assigned) {
+      await this.refreshSharedSpaceFacesAfterReassign(face.assetId, face.assetFaceId);
+    }
+    // After the move, so getRandomFace never hands back a face that was about to leave (same ordering as
+    // PersonService.reassignFaces).
+    await this.repairFeaturePhotos(featurePhotoRepairPersons.values());
+
+    return { reassigned: assigned.length, targetPersonIds: [...new Set(assigned.map((face) => face.targetPersonId))] };
+  }
+
+  private async placeSpaceFacesOnTarget(
+    faces: SpaceReassignSourceFace[],
+    target: SpaceFaceReassignTarget,
+    trx: Transaction<DB>,
+  ) {
     // The two feature-photo repairs the global reassign path performs (PersonService.reassignFaces /
     // reassignFacesById) and which this path must mirror:
     //   (a) the moved face WAS the source person's feature face — leaving it would show that person's
     //       owner (often a different member) a face that now belongs to someone else as its avatar;
     //   (b) the resolved target person had no feature face at all.
-    // Both are collected here and applied after the loop, so getRandomFace never picks a face that is
-    // about to move (same ordering as PersonService.reassignFaces).
+    // Both are collected here and applied by the caller after the commit.
     // Keyed by personGroupId (1:1 with a person under Option M), valued by the PersonId the repair
     // needs — `person` is keyed by (ownerId, personGroupId), so the owner has to travel with it.
     const featurePhotoRepairPersons = new Map<string, PersonId>();
@@ -212,18 +249,19 @@ export class IdentityMergePropagationService {
     // Persons created below always get faceAssetId set at creation, so they are pre-marked as
     // inspected — (b) can never apply to them, and the lookup would be a wasted round trip.
     const inspectedTargetPersonGroupIds = new Set<string>();
+    const createdPersons: PersonId[] = [];
 
     // A space-person target resolves to ONE identity for the whole batch; the per-owner person that
     // carries it is resolved (or created) below, per face's asset owner.
     let targetIdentityId: string | undefined;
     if (target.type === 'existing' && target.profile.type === 'space-person') {
-      const identity = await this.deps.faceIdentityRepository.ensureSpacePersonIdentity(target.profile.id);
+      const identity = await this.deps.faceIdentityRepository.ensureSpacePersonIdentity(target.profile.id, trx);
       targetIdentityId = identity.id;
     }
 
     const personIdByOwner = new Map<string, string>();
-    const targetPersonIds = new Set<string>();
-    let reassigned = 0;
+    // Insertion-ordered: one assignFaces call per resolved target person, faces in input order.
+    const facesByTarget = new Map<string, SpaceReassignSourceFace[]>();
 
     for (const face of faces) {
       let targetPersonId: string;
@@ -244,42 +282,34 @@ export class IdentityMergePropagationService {
           const existing = await this.deps.faceIdentityRepository.getPersonByIdentity(
             face.assetOwnerId,
             targetIdentityId,
+            undefined,
+            trx,
           );
-          // The identity MUST be set at creation. replaceFaceIdentity below calls ensurePersonIdentity,
-          // which mints a BRAND-NEW identity for an identity-less person — that would project the face
-          // under a duplicate space person instead of the target, silently re-breaking #765.
+          // The identity MUST be set at creation. assignFaces' relink calls ensurePersonIdentity, which
+          // mints a BRAND-NEW identity for an identity-less person — that would project the face under a
+          // duplicate space person instead of the target, silently re-breaking #765.
           if (existing) {
             targetPersonId = existing.personGroupId;
           } else {
-            const created = await this.deps.personRepository.createWithGroup({
-              ownerId: face.assetOwnerId,
-              identityId: targetIdentityId,
-              faceAssetId: face.assetFaceId,
-            });
+            const created = await this.deps.personRepository.createWithGroup(
+              { ownerId: face.assetOwnerId, identityId: targetIdentityId, faceAssetId: face.assetFaceId },
+              trx,
+            );
             targetPersonId = created.personGroupId;
             inspectedTargetPersonGroupIds.add(targetPersonId);
-            // Every other site that sets faceAssetId at creation also queues thumbnail generation
-            // (person.service.ts, pet-detection.service.ts, media.service.ts) — without it the person
-            // has a feature face but thumbnailPath stays '', and getThumbnail rejects that outright.
-            await this.deps.jobRepository.queue({
-              name: JobName.PersonGenerateThumbnail,
-              data: { ownerId: created.ownerId, personGroupId: created.personGroupId },
-            });
+            createdPersons.push({ ownerId: created.ownerId, personGroupId: created.personGroupId });
           }
           personIdByOwner.set(face.assetOwnerId, targetPersonId);
         } else {
           // target.type === 'new': deliberately identity-less so ensurePersonIdentity mints a fresh
           // identity, which is what makes this a genuinely new person/space person.
-          const created = await this.deps.personRepository.createWithGroup({
-            ownerId: face.assetOwnerId,
-            faceAssetId: face.assetFaceId,
-          });
+          const created = await this.deps.personRepository.createWithGroup(
+            { ownerId: face.assetOwnerId, faceAssetId: face.assetFaceId },
+            trx,
+          );
           targetPersonId = created.personGroupId;
           inspectedTargetPersonGroupIds.add(targetPersonId);
-          await this.deps.jobRepository.queue({
-            name: JobName.PersonGenerateThumbnail,
-            data: { ownerId: created.ownerId, personGroupId: created.personGroupId },
-          });
+          createdPersons.push({ ownerId: created.ownerId, personGroupId: created.personGroupId });
           personIdByOwner.set(face.assetOwnerId, targetPersonId);
         }
       }
@@ -288,7 +318,7 @@ export class IdentityMergePropagationService {
       // client named) has no feature face; without this it stays avatar-less forever.
       if (!inspectedTargetPersonGroupIds.has(targetPersonId)) {
         inspectedTargetPersonGroupIds.add(targetPersonId);
-        const targetPerson = await this.deps.personRepository.getByGroupIdOnly(targetPersonId);
+        const targetPerson = await this.deps.personRepository.getByGroupIdOnly(targetPersonId, trx);
         if (targetPerson && targetPerson.faceAssetId === null) {
           featurePhotoRepairPersons.set(targetPersonId, {
             ownerId: targetPerson.ownerId,
@@ -297,8 +327,8 @@ export class IdentityMergePropagationService {
         }
       }
 
-      // (a) Read BEFORE reassignFace rewrites asset_face.personGroupId, which is what identifies the
-      // source person at all.
+      // (a) Read BEFORE the move rewrites asset_face.personGroupId, which is what identifies the source
+      // person at all. Every move happens after this loop, so this always sees the pre-move state.
       if (face.personGroupId) {
         const sourceGroupId = face.personGroupId;
         let sourcePerson = sourcePersonByGroupId.get(sourceGroupId);
@@ -306,7 +336,7 @@ export class IdentityMergePropagationService {
           // Owner-agnostic by group id, per Option M's 1:1 person_group-to-person invariant: the
           // owner of the source person travels with the row, since `person` is keyed by
           // (ownerId, personGroupId) and the repair needs both.
-          const row = await this.deps.personRepository.getByGroupIdOnly(sourceGroupId);
+          const row = await this.deps.personRepository.getByGroupIdOnly(sourceGroupId, trx);
           sourcePerson = row ? { ownerId: row.ownerId, faceAssetId: row.faceAssetId } : null;
           sourcePersonByGroupId.set(sourceGroupId, sourcePerson);
         }
@@ -318,24 +348,30 @@ export class IdentityMergePropagationService {
         }
       }
 
-      await this.deps.personRepository.reassignFace(face.assetFaceId, targetPersonId);
-      const identity = await this.deps.faceIdentityRepository.ensurePersonIdentity(targetPersonId);
-      await this.deps.faceIdentityRepository.replaceFaceIdentity({
-        assetFaceId: face.assetFaceId,
-        identityId: identity.id,
-        source: 'manual',
-      });
-      // Must run AFTER the identity relink — the match job resolves the target space person from
-      // face_identity_face.
-      await this.refreshSharedSpaceFacesAfterReassign(face.assetId, face.assetFaceId);
-
-      targetPersonIds.add(targetPersonId);
-      reassigned += 1;
+      const group = facesByTarget.get(targetPersonId);
+      if (group) {
+        group.push(face);
+      } else {
+        facesByTarget.set(targetPersonId, [face]);
+      }
     }
 
-    await this.repairFeaturePhotos(featurePhotoRepairPersons.values());
+    const assigned: Array<SpaceReassignSourceFace & { targetPersonId: string }> = [];
+    for (const [targetPersonId, group] of facesByTarget) {
+      const assignedIds = new Set(
+        await this.deps.faceAssignmentService.assignFaces(
+          { personGroupId: targetPersonId, faceIds: group.map((face) => face.assetFaceId), strength: 'manual' },
+          trx,
+        ),
+      );
+      for (const face of group) {
+        if (assignedIds.has(face.assetFaceId)) {
+          assigned.push({ ...face, targetPersonId });
+        }
+      }
+    }
 
-    return { reassigned, targetPersonIds: [...targetPersonIds] };
+    return { assigned, createdPersons, featurePhotoRepairPersons };
   }
 
   /**

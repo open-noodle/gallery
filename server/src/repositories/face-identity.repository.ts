@@ -3006,8 +3006,13 @@ export class FaceIdentityRepository {
     return rows.map((row) => row.id);
   }
 
-  getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
-    return this.db
+  getPersonByIdentity(
+    ownerId: string,
+    identityId: string,
+    excludePersonId?: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
+    return db
       .selectFrom('person')
       .select(['personGroupId'])
       .where('ownerId', '=', ownerId)
