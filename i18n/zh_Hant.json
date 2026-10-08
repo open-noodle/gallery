@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_exif": "來自詮釋資料",
     "face_cleanup_dissolve_scope_ml": "已偵測",
     "face_cleanup_dissolve_scope_no_embedding": "無嵌入向量",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "{count} 張手動繪製的臉孔將被保留並取消關聯。刪除操作絕不會移除手動繪製的區域——它會以未命名狀態保留在相片上，可再次關聯。",
     "face_cleanup_dissolve_warn_metadata_import_on": "「啟用臉孔匯入」已開啟。強制擷取詮釋資料或重新掃描媒體庫會重新建立這些區域。",
     "face_cleanup_dissolve_warn_not_redetectable": "有 {count} 張相片什麼也無法復原。它們已隱藏、在垃圾桶中，或沒有預覽檔案。",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "這會讓該人物完全沒有臉孔。即使你選擇保留，夜間清理作業仍會將其刪除。",

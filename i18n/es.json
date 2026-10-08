@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_exif": "De los metadatos",
     "face_cleanup_dissolve_scope_ml": "Detectadas",
     "face_cleanup_dissolve_scope_no_embedding": "Sin embedding",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "Se conservarán {count} caras dibujadas a mano y se les quitará la asignación. Eliminar nunca borra una región dibujada a mano: se queda en la foto, sin nombre, lista para volver a asignarla.",
     "face_cleanup_dissolve_warn_metadata_import_on": "«Activar importación de caras» está activado. Una extracción de metadatos forzada o un nuevo escaneo de la biblioteca puede volver a crear estas regiones.",
     "face_cleanup_dissolve_warn_not_redetectable": "En {count} fotos no se recuperará nada. Están ocultas, en la papelera o no tienen archivo de vista previa.",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "Así la persona se queda sin ninguna cara. La tarea de limpieza nocturna la eliminará igualmente, aunque hayas elegido conservarla.",

@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_exif": "来自元数据",
     "face_cleanup_dissolve_scope_ml": "已检测",
     "face_cleanup_dissolve_scope_no_embedding": "无嵌入向量",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "{count} 张手动绘制的人脸将被保留并取消关联。删除操作绝不会移除手动绘制的区域——它会以未命名状态保留在照片上，可再次关联。",
     "face_cleanup_dissolve_warn_metadata_import_on": "“启用人脸导入”已开启。强制提取元数据或重新扫描资源库会重新创建这些区域。",
     "face_cleanup_dissolve_warn_not_redetectable": "有 {count} 张照片什么也恢复不了。它们已隐藏、在回收站中，或没有预览文件。",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "这会让该人物完全没有人脸。即使你选择保留，夜间清理任务仍会将其删除。",

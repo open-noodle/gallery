@@ -194,6 +194,7 @@
     "face_cleanup_dissolve_scope_exif": "Depuis les métadonnées",
     "face_cleanup_dissolve_scope_ml": "Détectés",
     "face_cleanup_dissolve_scope_no_embedding": "Sans embedding",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "{count} visages dessinés à la main seront conservés et dissociés. Une suppression ne retire jamais une zone dessinée à la main : elle reste sur la photo, sans nom, prête à être de nouveau associée.",
     "face_cleanup_dissolve_warn_metadata_import_on": "« Active l'importation des visages » est activé. Une extraction des métadonnées forcée ou une nouvelle analyse de la bibliothèque peut recréer ces zones.",
     "face_cleanup_dissolve_warn_not_redetectable": "Sur {count} photos, rien ne sera récupéré. Elles sont masquées, dans la corbeille ou sans fichier d'aperçu.",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "La personne se retrouve alors sans aucun visage. La tâche de nettoyage de nuit la supprimera quand même, même si vous avez choisi de la conserver.",

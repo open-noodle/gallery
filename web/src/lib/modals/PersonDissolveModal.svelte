@@ -34,7 +34,7 @@
     { value: 'unassign', label: 'admin.face_cleanup_dissolve_outcome_unassign' },
   ];
 
-  // Contract with buildWarnings() in face-dissolve.service.ts — those six codes and no others. Typed
+  // Contract with buildWarnings() in face-dissolve.service.ts — those seven codes and no others. Typed
   // `Translations`, not `string`: `$t` only accepts keys that exist in en.json, so a typo here is a build
   // error rather than a raw key rendered at an admin. An unknown code renders nothing at all.
   const WARNING_KEY_BY_CODE: Record<string, Translations | undefined> = {
@@ -44,6 +44,7 @@
     'not-redetectable': 'admin.face_cleanup_dissolve_warn_not_redetectable',
     'shared-assets': 'admin.face_cleanup_dissolve_warn_shared_assets',
     'metadata-import-on': 'admin.face_cleanup_dissolve_warn_metadata_import_on',
+    'hand-drawn-kept': 'admin.face_cleanup_dissolve_warn_hand_drawn_kept',
   };
 
   const PREVIEW_DEBOUNCE_MS = 250;
