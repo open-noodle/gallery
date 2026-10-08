@@ -575,10 +575,10 @@ DELETE FROM "kysely_migrations"
   '1794100000000-DropAssetIsFavoriteColumn',
   '1796000000000-AddAssetFaceCreatedBy',
   '1797000000000-AddAssetLocalDateTimeIndex',
-  '1797000000000-AddPhotoGuessingGame',
-  '1797100000000-AddDailyGameChallenge',
-  '1797200000000-AddSpaceDailyChallengeEnabled',
-  '1797300000000-AddSoloGameChallenge',
+  '1798000000000-AddPhotoGuessingGame',
+  '1798100000000-AddDailyGameChallenge',
+  '1798200000000-AddSpaceDailyChallengeEnabled',
+  '1798300000000-AddSoloGameChallenge',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
