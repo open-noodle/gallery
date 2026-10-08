@@ -173,9 +173,12 @@ const paginate = <T extends { id: string }>(
   return { items: rows, next: null };
 };
 
-const mapCleanupAssetRow = <T extends { fileSize: unknown; inAlbum: unknown; kept: unknown }>(row: T) => ({
+const mapCleanupAssetRow = <T extends { fileSize: unknown; isFavorite: unknown; inAlbum: unknown; kept: unknown }>(
+  row: T,
+) => ({
   ...row,
   fileSize: Number(row.fileSize),
+  isFavorite: Boolean(row.isFavorite),
   inAlbum: Boolean(row.inAlbum),
   kept: Boolean(row.kept),
 });
