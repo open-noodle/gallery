@@ -41,7 +41,7 @@ describe('/search', () => {
   // let assetPhiladelphia: AssetMediaResponseDto;
   // let assetOrychophragmus: AssetMediaResponseDto;
   // let assetRidge: AssetMediaResponseDto;
-  // let assetPolemonium: AssetMediaResponseDto;
+  let assetPolemonium: AssetMediaResponseDto;
   // let assetWood: AssetMediaResponseDto;
   // let assetGlarus: AssetMediaResponseDto;
   let assetHeic: AssetMediaResponseDto;
@@ -51,6 +51,12 @@ describe('/search', () => {
   let assetOneJpg5: AssetMediaResponseDto;
   let assetSprings: AssetMediaResponseDto;
   let assetLast: AssetMediaResponseDto;
+  // The asset with the latest local taken time, which is what /search/metadata sorts by. It is not
+  // assetLast: polemonium_reptans.jpg has no date in its metadata, so it falls back to its upload
+  // time, kept in the zone of the coordinates set below (St. Petersburg, UTC+3, no DST). Its local
+  // time is therefore 3 hours ahead of the UTC wall clock that wood_anemones.jpg (null island, no
+  // zone) gets, though it was uploaded just before it. Issue #1147.
+  let assetNewest: AssetMediaResponseDto;
 
   beforeAll(async () => {
     await utils.resetDatabase();
@@ -145,11 +151,12 @@ describe('/search', () => {
       // assetPhiladelphia,
       // assetOrychophragmus,
       // assetRidge,
-      // assetPolemonium,
+      assetPolemonium,
       // assetWood,
     ] = assets;
 
     assetLast = assets.at(-1) as AssetMediaResponseDto;
+    assetNewest = assetPolemonium;
 
     await deleteAssets({ assetBulkDeleteDto: { ids: [assetSilver.id] } }, { headers: asBearerAuth(admin.accessToken) });
   }, 30_000);
@@ -162,7 +169,7 @@ describe('/search', () => {
     const searchTests = [
       {
         should: 'should get my assets',
-        deferred: () => ({ dto: { size: 1 }, assets: [assetLast] }),
+        deferred: () => ({ dto: { size: 1 }, assets: [assetNewest] }),
       },
       {
         should: 'should sort my assets in reverse',
@@ -187,7 +194,7 @@ describe('/search', () => {
       },
       {
         should: 'should search by isFavorite (false)',
-        deferred: () => ({ dto: { size: 1, isFavorite: false }, assets: [assetLast] }),
+        deferred: () => ({ dto: { size: 1, isFavorite: false }, assets: [assetNewest] }),
       },
       {
         should: 'should search by visibility (AssetVisibility.Archive)',
@@ -195,11 +202,11 @@ describe('/search', () => {
       },
       {
         should: 'should search by visibility (AssetVisibility.Timeline)',
-        deferred: () => ({ dto: { size: 1, visibility: AssetVisibility.Timeline }, assets: [assetLast] }),
+        deferred: () => ({ dto: { size: 1, visibility: AssetVisibility.Timeline }, assets: [assetNewest] }),
       },
       {
         should: 'should search by type (image)',
-        deferred: () => ({ dto: { size: 1, type: 'IMAGE' }, assets: [assetLast] }),
+        deferred: () => ({ dto: { size: 1, type: 'IMAGE' }, assets: [assetNewest] }),
       },
       {
         should: 'should search by type (video)',
@@ -241,12 +248,13 @@ describe('/search', () => {
         should: 'should search by takenAfter',
         deferred: () => ({
           dto: { size: 1, takenAfter: DateTime.fromObject({ year: 1234 }).toJSDate() },
-          assets: [assetLast],
+          assets: [assetNewest],
         }),
       },
       {
         should: 'should search by takenAfter (no results)',
-        deferred: () => ({ dto: { takenAfter: today.plus({ hour: 1 }).toJSDate() }, assets: [] }),
+        // a day ahead: taken times are local, and a zone can be up to 14 hours ahead of UTC
+        deferred: () => ({ dto: { takenAfter: today.plus({ days: 1 }).toJSDate() }, assets: [] }),
       },
       {
         should: 'should search by originalFilename',
@@ -349,7 +357,7 @@ describe('/search', () => {
         should: 'should allow searching the upload library (libraryId: null)',
         deferred: () => ({
           dto: { libraryId: null, size: 1 },
-          assets: [assetLast],
+          assets: [assetNewest],
         }),
       },
     ];
