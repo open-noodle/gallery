@@ -19,6 +19,7 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash-es';
 import { InjectKysely } from 'nestjs-kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import type { LocationPresence } from 'src/repositories/search.repository.js';
 import { type LockableProperty, Stack, lockableProperties } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -31,7 +32,6 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum.js';
-import type { LocationPresence } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
