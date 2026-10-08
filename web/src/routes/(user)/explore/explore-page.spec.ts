@@ -83,6 +83,19 @@ describe('Explore page', () => {
     );
   });
 
+  // immich-32238 moved the favorite heart into upstream's PersonIndicator badge. Its "shared with me"
+  // icon keys off `otherPeople`, which Gallery always sends empty (person sharing is dormant).
+  it('badges a favorite person and leaves others unmarked', () => {
+    renderPage([
+      makePerson({ id: 'person-1', name: 'Alice', isFavorite: true }),
+      makePerson({ id: 'person-2', name: 'Bob', isFavorite: false }),
+    ]);
+
+    expect(screen.getAllByTitle('favorite')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Alice/ })).toContainElement(screen.getByTitle('favorite'));
+    expect(screen.queryByTitle('shared_with_me')).toBeNull();
+  });
+
   // #867: place tiles used to open the deprecated /search view, which is owner-scoped and cannot
   // show shared-space assets. Send them to the filtered /photos timeline instead.
   it('links a place tile to the photos timeline filtered by that city', () => {
