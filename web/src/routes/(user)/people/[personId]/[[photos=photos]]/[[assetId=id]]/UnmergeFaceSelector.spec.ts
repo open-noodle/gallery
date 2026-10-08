@@ -63,6 +63,9 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
     // A real owned person always carries a user-person primaryProfile; keep it present so a guard
     // rewritten as `!!personAssets.primaryProfile` would still correctly treat this as personal.
     primaryProfile: { type: Type.UserPerson, id },
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
     ...overrides,
   };
 }

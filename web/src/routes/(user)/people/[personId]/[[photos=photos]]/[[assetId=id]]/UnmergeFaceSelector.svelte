@@ -73,6 +73,10 @@
     isHidden: person.isHidden,
     updatedAt: person.updatedAt,
     primaryProfile: { type: ScopedPrimaryProfileType.SpacePerson, id: person.id, spaceId },
+    // Upstream person sharing is dormant in Gallery, and a space person is never shared that way.
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
   });
 
   onMount(async () => {
