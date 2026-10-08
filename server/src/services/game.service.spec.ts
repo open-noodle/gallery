@@ -3,6 +3,7 @@ import { Settings } from 'luxon';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { CacheControl, SharedSpaceRole, UserMetadataKey } from 'src/enum.js';
 import { NOT_PLACE_PROMPT_EMBEDDING, PLACE_PROMPT_EMBEDDING } from 'src/repositories/game.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { PERSONAL_NO_ROUNDS_MESSAGE } from 'src/services/game/personal-pool.js';
 import { GameService } from 'src/services/game.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -67,7 +68,7 @@ describe(GameService.name, () => {
     // Initialize the disk backend for StorageService so that getRoundImage's serveFromBackend
     // call works in tests. The DiskStorageBackend returns absolute paths as-is, so the
     // mediaLocation value doesn't matter. Same pattern as asset-media.service.spec.ts.
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
