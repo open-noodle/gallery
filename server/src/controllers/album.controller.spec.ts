@@ -35,4 +35,27 @@ describe(AlbumController.name, () => {
       expect(body).toEqual(factory.responses.validationError([{ path: ['assetId'], message: 'Invalid UUID' }]));
     });
   });
+
+  describe('POST /albums/add-targets', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).post('/albums/add-targets').send({ albumIds: [], assetIds: [] });
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should reject an invalid asset id', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post('/albums/add-targets')
+        .send({ albumIds: [], assetIds: ['invalid'] });
+      expect(status).toEqual(400);
+    });
+
+    it('should answer 200, not 201', async () => {
+      service.getAddTargets.mockResolvedValue({ albums: [], shareableAssetCount: 0 });
+      const { status, body } = await request(ctx.getHttpServer())
+        .post('/albums/add-targets')
+        .send({ albumIds: [], assetIds: [] });
+      expect(status).toEqual(200);
+      expect(body).toEqual({ albums: [], shareableAssetCount: 0 });
+    });
+  });
 });

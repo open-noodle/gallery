@@ -5,6 +5,8 @@ import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AlbumNameDto } from 'src/dtos/album-name.dto.js';
 import {
   AddUsersDto,
+  AlbumAddTargetsDto,
+  AlbumAddTargetsResponseDto,
   AlbumResponseDto,
   AlbumStatisticsResponseDto,
   AlbumUserParamDto,
@@ -146,6 +148,19 @@ export class AlbumController {
   })
   addAssetsToAlbums(@Auth() auth: AuthDto, @Body() dto: AlbumsAddAssetsDto): Promise<AlbumsAddAssetsResponseDto> {
     return this.service.addAssetsToAlbums(auth, dto);
+  }
+
+  @Post('add-targets')
+  @Authenticated({ permission: Permission.AlbumAssetCreate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Resolve which albums accept the given assets',
+    description:
+      'For each candidate album the caller may add to, returns how many of the given assets it would accept — assets the caller may share, plus assets they may contribute to a space-linked album as a space Owner or Editor. Albums that accept nothing are omitted. Nothing is written.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  getAlbumAddTargets(@Auth() auth: AuthDto, @Body() dto: AlbumAddTargetsDto): Promise<AlbumAddTargetsResponseDto> {
+    return this.service.getAddTargets(auth, dto);
   }
 
   @Delete(':id/assets')

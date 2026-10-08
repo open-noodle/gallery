@@ -40,6 +40,7 @@
   "add_to_albums": "Zu Alben hinzufügen",
   "add_to_albums_count": "Zu Alben hinzufügen ({count})",
   "add_to_bottom_bar": "Hinzufügen zu",
+  "add_to_collection_non_owned_space_albums_only": "Deine Auswahl enthält Fotos anderer Personen. Diese können nur zu Alben in einem Space hinzugefügt werden, in dem du Besitzer oder Bearbeiter bist.",
   "add_to_collection_restricted_to_space": "Deine Auswahl enthält Fotos anderer Mitglieder, daher können sie nur in Alben in diesem Space aufgenommen werden.",
   "add_to_collections_count": "Zu {count} hinzufügen",
   "add_to_shared_album": "Zu geteiltem Album hinzufügen",

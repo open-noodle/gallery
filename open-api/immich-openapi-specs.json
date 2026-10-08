@@ -3303,6 +3303,62 @@
         "x-immich-state": "Stable"
       }
     },
+    "/albums/add-targets": {
+      "post": {
+        "description": "For each candidate album the caller may add to, returns how many of the given assets it would accept — assets the caller may share, plus assets they may contribute to a space-linked album as a space Owner or Editor. Albums that accept nothing are omitted. Nothing is written.",
+        "operationId": "getAlbumAddTargets",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlbumAddTargetsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumAddTargetsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Resolve which albums accept the given assets",
+        "tags": [
+          "Albums"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "albumAsset.create",
+        "x-immich-state": "Stable"
+      }
+    },
     "/albums/assets": {
       "put": {
         "description": "Send a list of asset IDs and album IDs to add each asset to each album.",
@@ -28395,6 +28451,74 @@
         },
         "required": [
           "isOnboarded"
+        ],
+        "type": "object"
+      },
+      "AlbumAddTargetDto": {
+        "properties": {
+          "acceptedAssetCount": {
+            "description": "How many of the requested assets this album accepts (already-present assets included)",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "albumId": {
+            "description": "Album ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "acceptedAssetCount",
+          "albumId"
+        ],
+        "type": "object"
+      },
+      "AlbumAddTargetsDto": {
+        "properties": {
+          "albumIds": {
+            "description": "Candidate album IDs",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "assetIds": {
+            "description": "Asset IDs the caller wants to add",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "albumIds",
+          "assetIds"
+        ],
+        "type": "object"
+      },
+      "AlbumAddTargetsResponseDto": {
+        "properties": {
+          "albums": {
+            "description": "Requested albums that accept at least one of the assets; all others are omitted",
+            "items": {
+              "$ref": "#/components/schemas/AlbumAddTargetDto"
+            },
+            "type": "array"
+          },
+          "shareableAssetCount": {
+            "description": "How many of the requested assets the caller may place in any album, including a new one",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "albums",
+          "shareableAssetCount"
         ],
         "type": "object"
       },

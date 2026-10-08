@@ -235,6 +235,126 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
       expect(byId[freshOwn.id]).toEqual({ id: freshOwn.id, success: true });
       expect(byId[assetOnlyInT]).toEqual({ id: assetOnlyInT, success: false, error: 'no_permission' });
     });
+
+    it('space Editor contributes a non-owned asset from an external library linked to the space', async () => {
+      const { ctx } = setup();
+      const { library } = await ctx.newLibrary({ ownerId: actors.carol.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: spaceS, libraryId: library.id, addedById: actors.carol.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: actors.carol.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+
+      const [res] = await sut.addAssets(authOf('spaceEditor'), albumL, { ids: [asset.id] });
+      expect(res).toEqual({ id: asset.id, success: true });
+      expect(await isContributionRow(asset.id)).toMatchObject({ albumId: albumL, spaceId: spaceS });
+      expect(await isAlbumAssetRow(asset.id)).toBe(false);
+    });
+
+    it('bulk path (addAssetsToAlbums) lets a space Editor contribute a non-owned pool asset', async () => {
+      const { ctx } = setup();
+      const { asset } = await ctx.newAsset({ ownerId: actors.carol.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: spaceS, assetId: asset.id, addedById: actors.carol.id });
+      const { result: second } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Second linked' });
+      await spaceRepo.addAlbum({ spaceId: spaceS, albumId: second.id, addedById: actors.spaceOwner.id });
+
+      const res = await sut.addAssetsToAlbums(authOf('spaceEditor'), {
+        albumIds: [albumL, second.id],
+        assetIds: [asset.id],
+      });
+      expect(res).toEqual({ success: true });
+      expect(await isContributionRow(asset.id)).toMatchObject({ albumId: albumL, spaceId: spaceS });
+      expect(await isAlbumAssetRow(asset.id)).toBe(false);
+
+      const again = await sut.addAssetsToAlbums(authOf('spaceEditor'), {
+        albumIds: [albumL, second.id],
+        assetIds: [asset.id],
+      });
+      expect(again).toEqual({ success: false, error: 'duplicate' });
+    });
+
+    it('bulk path still refuses a non-owned asset for albums not linked to the space → NO_PERMISSION', async () => {
+      const { ctx } = setup();
+      const { asset } = await ctx.newAsset({ ownerId: actors.carol.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: spaceS, assetId: asset.id, addedById: actors.carol.id });
+      const { result: own } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Personal 1' });
+      const { result: own2 } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Personal 2' });
+
+      const res = await sut.addAssetsToAlbums(authOf('spaceEditor'), {
+        albumIds: [own.id, own2.id],
+        assetIds: [asset.id],
+      });
+      expect(res).toEqual({ success: false, error: 'no_permission' });
+      const rows = await db.selectFrom('album_space_asset').select('albumId').where('assetId', '=', asset.id).execute();
+      expect(rows).toEqual([]);
+    });
+  });
+
+  // ===============================================================================================
+  // ADD TARGETS — the picker's read-only view of the ADD rules above
+  // ===============================================================================================
+  describe('ADD TARGETS', () => {
+    it('non-owned space photo: only the space-linked album is a target, and nothing is shareable', async () => {
+      const { ctx } = setup();
+      const { asset } = await ctx.newAsset({ ownerId: actors.carol.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: spaceS, assetId: asset.id, addedById: actors.carol.id });
+      const { result: own } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Personal' });
+
+      const res = await sut.getAddTargets(authOf('spaceEditor'), { albumIds: [albumL, own.id], assetIds: [asset.id] });
+      expect(res).toEqual({ albums: [{ albumId: albumL, acceptedAssetCount: 1 }], shareableAssetCount: 0 });
+    });
+
+    it('non-owned external-library photo linked to the space counts for the linked album', async () => {
+      const { ctx } = setup();
+      const { library } = await ctx.newLibrary({ ownerId: actors.carol.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: spaceS, libraryId: library.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: actors.carol.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+
+      const res = await sut.getAddTargets(authOf('spaceEditor'), { albumIds: [albumL], assetIds: [asset.id] });
+      expect(res.albums).toEqual([{ albumId: albumL, acceptedAssetCount: 1 }]);
+    });
+
+    it('mixed selection: a personal album takes the owned part, the linked album takes both', async () => {
+      const { ctx } = setup();
+      const { asset: theirs } = await ctx.newAsset({ ownerId: actors.carol.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: spaceS, assetId: theirs.id, addedById: actors.carol.id });
+      const { asset: mine } = await ctx.newAsset({
+        ownerId: actors.spaceEditor.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { result: own } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Personal' });
+
+      const res = await sut.getAddTargets(authOf('spaceEditor'), {
+        albumIds: [albumL, own.id],
+        assetIds: [theirs.id, mine.id],
+      });
+      expect(res.shareableAssetCount).toBe(1);
+      expect(res.albums).toEqual(
+        expect.arrayContaining([
+          { albumId: albumL, acceptedAssetCount: 2 },
+          { albumId: own.id, acceptedAssetCount: 1 },
+        ]),
+      );
+      expect(res.albums).toHaveLength(2);
+    });
+
+    it('space Viewer gets no targets for a non-owned photo (no AlbumAssetCreate on the linked album)', async () => {
+      const res = await sut.getAddTargets(authOf('spaceViewer'), { albumIds: [albumL], assetIds: [assetCarol] });
+      expect(res).toEqual({ albums: [], shareableAssetCount: 0 });
+    });
+
+    it('Hidden and other-space assets are not counted', async () => {
+      const res = await sut.getAddTargets(authOf('spaceEditor'), {
+        albumIds: [albumL],
+        assetIds: [assetHidden, assetOnlyInT],
+      });
+      expect(res).toEqual({ albums: [], shareableAssetCount: 0 });
+    });
   });
 
   // ===============================================================================================

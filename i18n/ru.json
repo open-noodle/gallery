@@ -40,6 +40,7 @@
   "add_to_albums": "Добавить в альбомы",
   "add_to_albums_count": "Добавить в альбомы ({count})",
   "add_to_bottom_bar": "Добавить в",
+  "add_to_collection_non_owned_space_albums_only": "Ваш выбор содержит фотографии других людей. Их можно добавить только в альбомы Space, в котором вы владелец или редактор.",
   "add_to_collection_restricted_to_space": "Ваш выбор содержит фотографии других участников, поэтому принять их могут только альбомы в этом Space.",
   "add_to_collections_count": "Добавить в {count}",
   "add_to_shared_album": "Добавить в общий альбом",

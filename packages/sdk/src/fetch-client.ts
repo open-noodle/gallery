@@ -1299,6 +1299,24 @@ export type CreateAlbumDto = {
     /** Album description */
     description?: string | null;
 };
+export type AlbumAddTargetsDto = {
+    /** Candidate album IDs */
+    albumIds: string[];
+    /** Asset IDs the caller wants to add */
+    assetIds: string[];
+};
+export type AlbumAddTargetDto = {
+    /** How many of the requested assets this album accepts (already-present assets included) */
+    acceptedAssetCount: number;
+    /** Album ID */
+    albumId: string;
+};
+export type AlbumAddTargetsResponseDto = {
+    /** Requested albums that accept at least one of the assets; all others are omitted */
+    albums: AlbumAddTargetDto[];
+    /** How many of the requested assets the caller may place in any album, including a new one */
+    shareableAssetCount: number;
+};
 export type AlbumsAddAssetsDto = {
     /** Album IDs */
     albumIds: string[];
@@ -6016,6 +6034,21 @@ export function createAlbum({ createAlbumDto }: {
         ...opts,
         method: "POST",
         body: createAlbumDto
+    })));
+}
+/**
+ * Resolve which albums accept the given assets
+ */
+export function getAlbumAddTargets({ albumAddTargetsDto }: {
+    albumAddTargetsDto: AlbumAddTargetsDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AlbumAddTargetsResponseDto;
+    }>("/albums/add-targets", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: albumAddTargetsDto
     })));
 }
 /**
