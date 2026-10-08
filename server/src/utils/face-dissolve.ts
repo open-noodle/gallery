@@ -66,3 +66,25 @@ export const dissolveFacePredicate = (
   scope: DissolveScope,
 ): Expression<SqlBool> =>
   eb.and([eb('asset_face.personGroupId', '=', personGroupId), dissolveScopePredicate(eb, scope)]);
+
+/**
+ * A box someone drew by hand. `createdBy` is the SOLE deletability signal for a hand-drawn face
+ * (specs/2026-08-23-space-editor-face-assignment-design.md §6.6): it is NULL for every detector face and every
+ * pre-existing row, and `sourceType` cannot stand in for it (owner-drawn boxes are `manual` with no `createdBy`).
+ *
+ * A dissolve never deletes one. Both delete outcomes UNASSIGN in-scope hand-drawn faces instead — the exact
+ * treatment the `unassign` outcome gives every face — so the box stays on the photo, unnamed, ready to assign.
+ * The preview counts them (`handDrawn`) with this same predicate, so the dialog and the transaction agree.
+ */
+export const handDrawnFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expression<SqlBool> =>
+  eb('asset_face.createdBy', 'is not', null);
+
+/**
+ * The faces a DELETE outcome actually deletes: in scope, and not hand-drawn. Shared for the same reason as
+ * dissolveFacePredicate — the repository's delete statement must not be able to disagree with this rule.
+ */
+export const dissolveDeletableFacePredicate = (
+  eb: ExpressionBuilder<DB, 'asset_face'>,
+  personGroupId: string,
+  scope: DissolveScope,
+): Expression<SqlBool> => eb.and([dissolveFacePredicate(eb, personGroupId, scope), eb.not(handDrawnFacePredicate(eb))]);

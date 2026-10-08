@@ -38,6 +38,8 @@ describe(FaceDissolveService.name, () => {
     // Non-zero by default: the "this person will be cleaned up anyway" warning must NOT fire unless a test
     // explicitly says the dissolve leaves the person faceless.
     remainingLiveFaces: 4,
+    // Zero by default: the "hand-drawn faces will be kept" warning must only fire when a test seeds them.
+    handDrawn: 0,
   };
 
   beforeEach(() => {
@@ -48,6 +50,7 @@ describe(FaceDissolveService.name, () => {
     mocks.faceDissolve.getCounts.mockResolvedValue(counts);
     mocks.faceDissolve.dissolve.mockResolvedValue({
       faces: 10,
+      handDrawnUnassigned: 0,
       assetsCleared: 8,
       orphanedSpacePersonIds: [],
       deletedThumbnailPath: '/t.jpg',
@@ -113,6 +116,7 @@ describe(FaceDissolveService.name, () => {
   it('does not queue a file delete for an empty thumbnail path', async () => {
     mocks.faceDissolve.dissolve.mockResolvedValue({
       faces: 10,
+      handDrawnUnassigned: 0,
       assetsCleared: 8,
       orphanedSpacePersonIds: [],
       deletedThumbnailPath: null,
@@ -210,6 +214,24 @@ describe(FaceDissolveService.name, () => {
     mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, faces: 0, remainingLiveFaces: 0 });
     const noop = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false, expectedFaceCount: 0 }));
     expect(noop.warnings).not.toContainEqual(expect.objectContaining({ code: 'person-will-be-cleaned-up' }));
+  });
+
+  it('warns that a delete outcome keeps and unassigns hand-drawn faces instead of deleting them', async () => {
+    mocks.faceDissolve.getCounts.mockResolvedValue({ ...counts, handDrawn: 2 });
+
+    const deleting = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
+    expect(deleting.warnings).toContainEqual({ code: 'hand-drawn-kept', count: 2 });
+
+    const deletingPerson = await sut.preview('person-1', dto({ outcome: 'delete-faces-and-person' }));
+    expect(deletingPerson.warnings).toContainEqual({ code: 'hand-drawn-kept', count: 2 });
+
+    // `unassign` already does exactly this to every face, so there is nothing to call out.
+    const unassigning = await sut.preview('person-1', dto({ outcome: 'unassign', redetect: false }));
+    expect(unassigning.warnings).not.toContainEqual(expect.objectContaining({ code: 'hand-drawn-kept' }));
+
+    mocks.faceDissolve.getCounts.mockResolvedValue(counts);
+    const none = await sut.preview('person-1', dto({ outcome: 'delete-faces' }));
+    expect(none.warnings).not.toContainEqual(expect.objectContaining({ code: 'hand-drawn-kept' }));
   });
 
   it('preview never writes', async () => {

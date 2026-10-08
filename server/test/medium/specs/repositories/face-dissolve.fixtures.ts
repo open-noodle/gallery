@@ -63,6 +63,8 @@ export const seedFace = async (
     withEmbedding?: boolean;
     isPet?: boolean;
     deletedAt?: Date;
+    /** A hand-drawn box: the user who drew it (asset_face.createdBy). Omitted = a detector/import face. */
+    createdBy?: string;
   },
 ) => {
   const face = mediumFactory.assetFaceInsert({
@@ -70,6 +72,7 @@ export const seedFace = async (
     personGroupId: dto.personGroupId,
     sourceType: dto.sourceType ?? SourceType.MachineLearning,
     deletedAt: dto.deletedAt,
+    createdBy: dto.createdBy ?? null,
   });
   await db.insertInto('asset_face').values(face).execute();
 

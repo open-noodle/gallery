@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { ExpressionBuilder, Kysely, Transaction, sql } from 'kysely';
+import { Expression, ExpressionBuilder, Kysely, SqlBool, Transaction, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
-import { DissolveScope, dissolveFacePredicate, dissolveScopePredicate } from 'src/utils/face-dissolve.js';
+import {
+  DissolveScope,
+  dissolveDeletableFacePredicate,
+  dissolveFacePredicate,
+  dissolveScopePredicate,
+  handDrawnFacePredicate,
+} from 'src/utils/face-dissolve.js';
 
 export interface DissolveWriteInput {
   /**
@@ -19,7 +25,10 @@ export interface DissolveWriteInput {
 }
 
 export interface DissolveWriteResult {
+  /** Every in-scope face touched: deleted plus unassigned. */
   faces: number;
+  /** Of `faces`, the hand-drawn ones a delete outcome kept and unassigned instead (always 0 for `unassign`). */
+  handDrawnUnassigned: number;
   assetsCleared: number;
   orphanedSpacePersonIds: string[];
   deletedThumbnailPath: string | null;
@@ -41,6 +50,11 @@ export interface DissolveCounts {
    * outcome that keeps it. We do not queue that job ourselves (L2), but the dialog must not imply survival.
    */
   remainingLiveFaces: number;
+  /**
+   * In-scope faces someone drew by hand (`createdBy IS NOT NULL`). A delete outcome never deletes these — it
+   * unassigns them instead (handDrawnFacePredicate) — so the dialog has to say so. Included in `faces`.
+   */
+  handDrawn: number;
 }
 
 export interface PersonHealthRow {
@@ -121,6 +135,10 @@ export class FaceDissolveRepository {
         eb.fn.countAll<number>().as('faces'),
         eb.fn.countAll<number>().filterWhere('asset_face.sourceType', '=', SourceType.Exif).as('exif'),
         eb.fn.countAll<number>().filterWhere('asset_face.deletedAt', 'is not', null).as('softDeleted'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((inner) => handDrawnFacePredicate(inner))
+          .as('handDrawn'),
         eb.fn
           .countAll<number>()
           .filterWhere((inner) =>
@@ -228,6 +246,7 @@ export class FaceDissolveRepository {
       sharedAssets: Number(sharedRow.count),
       notRedetectable: Number(notRedetectableRow.count),
       remainingLiveFaces: Number(remainingLiveRow.count),
+      handDrawn: Number(faceRow.handDrawn),
     };
   }
 
@@ -308,7 +327,8 @@ export class FaceDissolveRepository {
    * One transaction. Ordering is load-bearing:
    *  1. capture space-person ids first (L1) — afterwards the shared_space_person_face rows are gone;
    *  2. clear the watermark — afterwards there is no personGroupId to find the assets by;
-   *  3. only then write.
+   *  3. only then write — and on a delete outcome, unassign the in-scope hand-drawn faces BEFORE deleting the
+   *     rest and before the person row goes, so nothing a person-delete touches still points at them.
    * Every statement is scoped by personGroupId + scope. Never call the unscoped GC helpers here (L1/L2/L5).
    */
   async dissolve(input: DissolveWriteInput): Promise<DissolveWriteResult> {
@@ -328,33 +348,45 @@ export class FaceDissolveRepository {
 
       const assetsCleared = redetect ? await this.clearFacesRecognizedAt(personGroupId, scope, trx) : 0;
 
-      let faces: number;
-      if (outcome === 'unassign') {
-        // Clear the human-placement record too. Leaving it marks the faces settled forever, excluding them
-        // from recognition and suggestions — the bug documented at person.repository.ts:327. Keyed by OUR
-        // face ids, never by identityId: identities are shared across people after a merge (L4).
+      // Unassign = clear the human-placement record AND the person link. Clearing only the link is the bug
+      // documented at person.repository.ts:327: stale face_identity_face rows mark the faces settled forever,
+      // excluding them from recognition and suggestions. Keyed by OUR face ids, never by identityId:
+      // identities are shared across people after a merge (L4).
+      const unassignWhere = async (where: (eb: ExpressionBuilder<DB, 'asset_face'>) => Expression<SqlBool>) => {
         await trx
           .deleteFrom('face_identity_face')
           .where('assetFaceId', 'in', (eb) =>
             eb
               .selectFrom('asset_face')
               .select('id')
-              .where((inner) => inScope(inner)),
+              .where((inner) => where(inner)),
           )
           .execute();
 
         const updated = await trx
           .updateTable('asset_face')
           .set({ personGroupId: null })
-          .where((eb) => inScope(eb))
+          .where((eb) => where(eb))
           .executeTakeFirst();
-        faces = Number(updated.numUpdatedRows ?? 0);
+        return Number(updated.numUpdatedRows ?? 0);
+      };
+
+      let faces: number;
+      let handDrawnUnassigned = 0;
+      if (outcome === 'unassign') {
+        faces = await unassignWhere(inScope);
       } else {
+        // A dissolve never deletes a hand-drawn box (handDrawnFacePredicate). Those in scope get the unassign
+        // treatment instead, BEFORE the delete, so they no longer carry this personGroupId by the time the
+        // person row goes (delete-faces-and-person). The delete is additionally scoped by
+        // dissolveDeletableFacePredicate, so the rule holds even without relying on that ordering.
+        handDrawnUnassigned = await unassignWhere((eb) => eb.and([inScope(eb), handDrawnFacePredicate(eb)]));
+
         const deleted = await trx
           .deleteFrom('asset_face')
-          .where((eb) => inScope(eb))
+          .where((eb) => dissolveDeletableFacePredicate(eb, personGroupId, scope))
           .executeTakeFirst();
-        faces = Number(deleted.numDeletedRows ?? 0);
+        faces = Number(deleted.numDeletedRows ?? 0) + handDrawnUnassigned;
       }
 
       // Only the space persons WE orphaned. deleteAllOrphanedPersons() is instance-wide (L1).
@@ -392,7 +424,7 @@ export class FaceDissolveRepository {
         }
       }
 
-      return { faces, assetsCleared, orphanedSpacePersonIds, deletedThumbnailPath };
+      return { faces, handDrawnUnassigned, assetsCleared, orphanedSpacePersonIds, deletedThumbnailPath };
     });
   }
 }

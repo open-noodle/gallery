@@ -43,6 +43,7 @@ const DissolveCountsSchema = z.object({
   sharedAssets: z.number().int(),
   notRedetectable: z.number().int(),
   remainingLiveFaces: z.number().int(),
+  handDrawn: z.number().int().describe('In-scope hand-drawn faces; a delete outcome unassigns these instead'),
 });
 
 const DissolveWarningSchema = z.object({ code: z.string(), count: z.number().int() });
