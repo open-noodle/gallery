@@ -17,6 +17,9 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
     updatedAt: '2026-01-02T00:00:00.000Z',
     type: 'person',
     species: null,
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
     ...overrides,
   };
 }
