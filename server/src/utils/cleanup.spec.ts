@@ -29,10 +29,12 @@ const boxBlur = (src: Uint8Array, w: number, h: number) => {
         for (let dx = -2; dx <= 2; dx++) {
           const xx = x + dx;
           const yy = y + dy;
-          if (xx >= 0 && yy >= 0 && xx < w && yy < h) {
-            sum += src[yy * w + xx];
-            n++;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) {
+            continue;
           }
+
+          sum += src[yy * w + xx];
+          n++;
         }
       out[y * w + x] = Math.round(sum / n);
     }
