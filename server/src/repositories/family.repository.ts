@@ -282,13 +282,7 @@ export class FamilyRepository {
       }
     }
 
-    const groups = new Map<string, string[]>();
-    for (const key of parent.keys()) {
-      const root = find(key);
-      const group = groups.get(root) ?? [];
-      group.push(key);
-      groups.set(root, group);
-    }
+    const groups = Map.groupBy(parent.keys(), (key) => find(key));
 
     const clusters: RawCluster[] = [];
     for (const group of groups.values()) {
@@ -418,15 +412,16 @@ export class FamilyRepository {
       await trx.insertInto('family_union_partner').values({ unionId, identityId }).execute();
 
       const partnerIds = await this.getPartnerIds(unionId, trx);
-      if (partnerIds.length === 2) {
-        const union = await trx
-          .selectFrom('family_union')
-          .select('startDate')
-          .where('id', '=', unionId)
-          .executeTakeFirstOrThrow();
-        const partnerKey = computePartnerKey(partnerIds, union.startDate);
-        await trx.updateTable('family_union').set({ partnerKey }).where('id', '=', unionId).execute();
+      if (partnerIds.length !== 2) {
+        return;
       }
+      const union = await trx
+        .selectFrom('family_union')
+        .select('startDate')
+        .where('id', '=', unionId)
+        .executeTakeFirstOrThrow();
+      const partnerKey = computePartnerKey(partnerIds, union.startDate);
+      await trx.updateTable('family_union').set({ partnerKey }).where('id', '=', unionId).execute();
     };
 
     return db === this.db ? this.db.transaction().execute(run) : run(db);
