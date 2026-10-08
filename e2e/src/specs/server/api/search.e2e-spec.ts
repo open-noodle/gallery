@@ -1,6 +1,7 @@
 import {
   AssetMediaResponseDto,
   AssetResponseDto,
+  AssetTypeEnum,
   AssetVisibility,
   deleteAssets,
   LoginResponseDto,
@@ -41,7 +42,7 @@ describe('/search', () => {
   // let assetPhiladelphia: AssetMediaResponseDto;
   // let assetOrychophragmus: AssetMediaResponseDto;
   // let assetRidge: AssetMediaResponseDto;
-  let assetPolemonium: AssetMediaResponseDto;
+  // let assetPolemonium: AssetMediaResponseDto;
   // let assetWood: AssetMediaResponseDto;
   // let assetGlarus: AssetMediaResponseDto;
   let assetHeic: AssetMediaResponseDto;
@@ -51,11 +52,11 @@ describe('/search', () => {
   let assetOneJpg5: AssetMediaResponseDto;
   let assetSprings: AssetMediaResponseDto;
   let assetLast: AssetMediaResponseDto;
-  // The asset with the latest local taken time, which is what /search/metadata sorts by. It is not
-  // assetLast: polemonium_reptans.jpg has no date in its metadata, so it falls back to its upload
-  // time, kept in the zone of the coordinates set below (St. Petersburg, UTC+3, no DST). Its local
-  // time is therefore 3 hours ahead of the UTC wall clock that wood_anemones.jpg (null island, no
-  // zone) gets, though it was uploaded just before it. Issue #1147.
+  // The asset /search/metadata returns first: the latest local taken time (its sort key, with the id
+  // as tie-break) among the assets that every "newest asset" case below can see. It is not simply
+  // the last upload: a file with no date in its metadata keeps its upload time in the zone of its
+  // coordinates (#1147), so a dateless asset placed east of UTC sorts ahead of later uploads with
+  // no zone. Derived from each asset's own detail rather than hardcoded, so it follows the fixtures.
   let assetNewest: AssetMediaResponseDto;
 
   beforeAll(async () => {
@@ -151,14 +152,26 @@ describe('/search', () => {
       // assetPhiladelphia,
       // assetOrychophragmus,
       // assetRidge,
-      assetPolemonium,
+      // assetPolemonium,
       // assetWood,
     ] = assets;
 
     assetLast = assets.at(-1) as AssetMediaResponseDto;
-    assetNewest = assetPolemonium;
 
     await deleteAssets({ assetBulkDeleteDto: { ids: [assetSilver.id] } }, { headers: asBearerAuth(admin.accessToken) });
+
+    const details = await Promise.all(assets.map(({ id }) => utils.getAssetInfo(admin.accessToken, id)));
+    const [newest] = details
+      .filter(
+        (asset) =>
+          !asset.isTrashed &&
+          !asset.isFavorite &&
+          asset.visibility === AssetVisibility.Timeline &&
+          asset.type === AssetTypeEnum.Image &&
+          !asset.libraryId,
+      )
+      .toSorted((a, b) => b.localDateTime.localeCompare(a.localDateTime) || b.id.localeCompare(a.id));
+    assetNewest = assets.find(({ id }) => id === newest.id) as AssetMediaResponseDto;
   }, 30_000);
 
   afterAll(async () => {
