@@ -1,12 +1,15 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { Mocked } from 'vitest';
+import { Mocked, vi } from 'vitest';
 import { AssetVisibility, JobName, SharedSpaceRole } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
+import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -37,6 +40,11 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
       ConfigRepository,
       DatabaseRepository,
       FaceIdentityRepository,
+      // FaceAssignmentService's repositories: the space reassign places faces through it (#1156), so the
+      // drain/clear half of the placement runs for real here too.
+      FacePersonVerdictRepository,
+      FaceRepairDeclineRepository,
+      FaceRepairRepository,
       PersonRepository,
       SearchRepository,
       SharedSpaceRepository,
@@ -717,5 +725,123 @@ describe('Shared space person face reassign (#765)', () => {
       .where('assetFaceId', '=', fx.wrong.faceId)
       .execute();
     expect(faceRows).toHaveLength(1);
+  });
+
+  // The space reassign commits as one unit, like the global reassign paths (#1156): creating the target person,
+  // moving the faces, relinking their identities and draining their pending suggestions either all land or none
+  // do. A torn state — a face on the new person still carrying the old identity — is what FaceIdentityBackfill
+  // resolves back to the old person, silently reverting the user's correction (D14).
+  it('rolls the whole reassign back when the placement fails part-way', async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    const verdicts = fx.ctx.get(FacePersonVerdictRepository);
+    const { person: suggested } = await fx.ctx.newPerson({ ownerId: fx.owner.id, name: 'Suggested' });
+    await verdicts.upsertPending([
+      { personGroupId: suggested.personGroupId, assetFaceId: fx.wrong.faceId, distance: 0.6 },
+    ]);
+    const faceIds = [fx.wrong.faceId, fx.retained!.faceId];
+
+    const snapshot = () =>
+      Promise.all([
+        fx.ctx.database
+          .selectFrom('asset_face')
+          .select(['id', 'personGroupId'])
+          .where('id', 'in', faceIds)
+          .orderBy('id')
+          .execute(),
+        fx.ctx.database
+          .selectFrom('face_identity_face')
+          .select(['assetFaceId', 'identityId', 'source'])
+          .where('assetFaceId', 'in', faceIds)
+          .orderBy('assetFaceId')
+          .execute(),
+        fx.ctx.database
+          .selectFrom('person')
+          .select('personGroupId')
+          .where('ownerId', '=', fx.owner.id)
+          .orderBy('personGroupId')
+          .execute(),
+        fx.ctx.database
+          .selectFrom('face_person_verdict')
+          .select(['personGroupId', 'status'])
+          .where('assetFaceId', 'in', faceIds)
+          .execute(),
+        fx.ctx.database
+          .selectFrom('shared_space_person_face')
+          .select(['personId', 'assetFaceId'])
+          .where('assetFaceId', 'in', faceIds)
+          .orderBy('assetFaceId')
+          .execute(),
+      ]).then(([faces, links, people, verdictRows, projection]) => ({ faces, links, people, verdictRows, projection }));
+
+    const before = await snapshot();
+    // Pre-conditions, so the equality below cannot pass vacuously: both faces sit on the wrong person and are
+    // projected under the source space person, and the suggestion is pending.
+    expect(before.faces.map((face) => face.personGroupId)).toEqual([
+      fx.wrong.person.personGroupId,
+      fx.wrong.person.personGroupId,
+    ]);
+    expect(before.projection.map((row) => row.personId)).toEqual([fx.sourcePerson.id, fx.sourcePerson.id]);
+    expect(before.verdictRows).toEqual([{ personGroupId: suggested.personGroupId, status: 'pending' }]);
+
+    // Fail the placement's LAST write. By then the new person has been created, both faces moved and relinked,
+    // and the pending suggestion drained — so every one of those writes has to be rolled back.
+    const clearNegative = vi
+      .spyOn(verdicts, 'clearNegativeForTarget')
+      .mockRejectedValueOnce(new Error('injected placement failure'));
+
+    await expect(
+      fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+        assetIds: [fx.wrong.asset.id, fx.retained!.asset.id],
+        target: { type: 'new' },
+      }),
+    ).rejects.toThrow('injected placement failure');
+    expect(clearNegative).toHaveBeenCalledTimes(1);
+
+    expect(await snapshot()).toEqual(before);
+    // Nothing that runs after the commit ran: no eviction (checked above via the projection), no match job for
+    // a move that never happened, no thumbnail job for a person that was never created.
+    expect(fx.jobs.queue.mock.calls.map(([job]) => job.name)).not.toContain(JobName.SharedSpaceFaceMatch);
+    expect(fx.jobs.queue.mock.calls.map(([job]) => job.name)).not.toContain(JobName.PersonGenerateThumbnail);
+
+    // And the same reassign succeeds once the failure is gone: the rollback left nothing half-done to trip on.
+    const result = await fx.sharedSpaceService.reassignSpacePersonFaces(
+      authFor(fx.editor),
+      fx.space.id,
+      fx.sourcePerson.id,
+      { assetIds: [fx.wrong.asset.id, fx.retained!.asset.id], target: { type: 'new' } },
+    );
+    expect(result).toEqual({ reassigned: 2 });
+  });
+
+  it("drains the reassigned face's pending suggestions, like the global reassign", async () => {
+    const fx = await setupSingleFaceFixture({ retainedFace: true });
+    const verdicts = fx.ctx.get(FacePersonVerdictRepository);
+    const { person: suggested } = await fx.ctx.newPerson({ ownerId: fx.owner.id, name: 'Suggested' });
+    await verdicts.upsertPending([
+      { personGroupId: suggested.personGroupId, assetFaceId: fx.wrong.faceId, distance: 0.6 },
+      { personGroupId: suggested.personGroupId, assetFaceId: fx.retained!.faceId, distance: 0.6 },
+    ]);
+
+    await fx.sharedSpaceService.reassignSpacePersonFaces(authFor(fx.editor), fx.space.id, fx.sourcePerson.id, {
+      assetIds: [fx.wrong.asset.id],
+      target: { type: 'new' },
+    });
+
+    // A human just placed the face: a still-pending suggestion for it would resurface in review.
+    const pending = await fx.ctx.database
+      .selectFrom('face_person_verdict')
+      .select('assetFaceId')
+      .where('status', '=', 'pending')
+      .where('assetFaceId', 'in', [fx.wrong.faceId, fx.retained!.faceId])
+      .execute();
+    // Only the face that was NOT reassigned keeps its suggestion.
+    expect(pending).toEqual([{ assetFaceId: fx.retained!.faceId }]);
+
+    const link = await fx.ctx.database
+      .selectFrom('face_identity_face')
+      .select('source')
+      .where('assetFaceId', '=', fx.wrong.faceId)
+      .executeTakeFirstOrThrow();
+    expect(link.source).toBe('manual');
   });
 });

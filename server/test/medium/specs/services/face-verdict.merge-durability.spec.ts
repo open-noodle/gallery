@@ -9,6 +9,7 @@ import { PersonRepository } from 'src/repositories/person.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
+import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IdentityMergePropagationService, MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import {
   rekeyVerdictIdentity,
@@ -28,7 +29,7 @@ const ALLOW_MERGE: MergeAuthorizer = () => Promise.resolve();
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db: Kysely<DB> = defaultDatabase) => {
-  const { ctx } = newMediumService(BaseService, {
+  const { ctx, sut: base } = newMediumService(BaseService, {
     database: db,
     real: [
       DatabaseRepository,
@@ -41,8 +42,11 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   });
   const jobRepository = ctx.getMock(JobRepository);
   jobRepository.queue.mockResolvedValue();
+  // The BaseService instance builds the shared FaceAssignmentService over the same repositories.
+  const { faceAssignmentService } = base as unknown as { faceAssignmentService: FaceAssignmentService };
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
+    faceAssignmentService,
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
     jobRepository,
     logger: ctx.getMock(LoggingRepository),

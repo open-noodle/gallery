@@ -1249,8 +1249,8 @@ export class PersonRepository {
    * is deliberate: it is the one place M's 1:1 bet is load-bearing.
    */
   @GenerateSql({ params: [DummyValue.UUID] })
-  getByGroupIdOnly(personGroupId: string) {
-    return this.db //
+  getByGroupIdOnly(personGroupId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db //
       .selectFrom('person')
       .selectAll('person')
       .where('person.personGroupId', '=', personGroupId)
@@ -1517,8 +1517,8 @@ export class PersonRepository {
     };
   }
 
-  create(person: Insertable<PersonTable>) {
-    return this.db.insertInto('person').values(person).returningAll().executeTakeFirstOrThrow();
+  create(person: Insertable<PersonTable>, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db.insertInto('person').values(person).returningAll().executeTakeFirstOrThrow();
   }
 
   /**
@@ -1529,9 +1529,12 @@ export class PersonRepository {
    * was a standalone primary key — and it is the only sanctioned way to mint a person, so the 1:1
    * invariant cannot be broken by accident at a call site.
    */
-  async createWithGroup(person: Omit<Insertable<PersonTable>, 'personGroupId'>) {
-    const group = await this.createGroup(person.ownerId);
-    return this.create({ ...person, personGroupId: group.id });
+  async createWithGroup(
+    person: Omit<Insertable<PersonTable>, 'personGroupId'>,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
+    const group = await this.createGroup(person.ownerId, db);
+    return this.create({ ...person, personGroupId: group.id }, db);
   }
 
   async createAll(people: Insertable<PersonTable>[]) {
@@ -1543,8 +1546,8 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  createGroup(ownerId: string) {
-    return this.db
+  createGroup(ownerId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .insertInto('person_group')
       .columns(['clusterGroupId'])
       .expression((eb) => eb.selectFrom('user').select('user.clusterGroupId').where('user.id', '=', ownerId))
