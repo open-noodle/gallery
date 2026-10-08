@@ -102,6 +102,39 @@ scaled image on screen. Two consequences:
   re-reading the bitmap; otherwise sharp un-premultiplies again and
   corrupts semi-transparent pixels (there is a regression test for this).
 
+**Old mobile apps must also not be allowed to delete `adjust` edits.**
+Not being sent the record is only half the problem: because mobile maps
+`adjust` to its `other` sentinel and `remote_asset.repository.dart`'s
+`getAssetEdits()` filters every `other` row out, the mobile editor opens
+without ever knowing an `adjust` edit exists. It then submits the
+crop/rotate/mirror it does know about, and `AssetEditRepository.replaceAll()`
+is a true full replace — so saving a crop on the phone silently destroyed
+an Adjust edit made on web. Both of the mobile editor's save paths are
+affected: a non-empty edit list goes to `editAsset()`, and an empty one
+(every spatial edit cleared) goes to `removeAssetEdits()` via
+`applyEdits()` in `mobile/lib/domain/services/asset.service.dart`.
+`withPreservedAdjustEdit()` (`asset.service.ts`) carries the stored
+`adjust` edit over on both, appended last so crop stays the first action.
+
+The gate there is **`session.isMobileApp` AND an unsupported
+`appVersion`**, never the version alone, and that distinction is the whole
+reason `isMobileAppUA()` exists alongside `getAppVersionFromUA()`.
+Omission is how web *deletes* an action: `TransformManager.getEdits()`
+drops `adjust` once all four sliders and invert are back at their
+defaults, and `onActivate()` pre-populates them from the existing edit, so
+a user can open the editor, see the saved values, zero them out and save —
+a deliberate removal that must be honoured. A browser reports no
+`appVersion` either, so `!clientSupports(appVersion, …)` is equally true
+of every web save; preserving on that condition alone would undo every
+deliberate web removal, a worse bug than the one being fixed. Only the
+`User-Agent` scheme separates "is the mobile app, version unreadable"
+from "is not the mobile app at all".
+
+`trim` is mapped to `other` and filtered on mobile identically but needs
+no such handling: it is video-only and `editAsset()` already rejects
+mixing trim with spatial edits, so the mobile image editor can never
+submit an action set that collides with a stored trim.
+
 **Client**: not a new top-level tool. `EditManager.applyEdits()` only ever
 submits the *selected* tool's manager's `.edits` — one manager per
 top-level tool — and Edit/Crop are both modes inside Transform, not a
