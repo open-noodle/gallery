@@ -433,9 +433,10 @@ DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 ALTER ROLE CURRENT_USER RESET jit;
 
 -- No post-tag upstream migration needs reversing right now. `upstream.version` is
--- 3.3.0 and this branch's `server/src/schema/migrations/` is identical to upstream
--- v3.3.0's (same 100 files), so every upstream migration Gallery carries is one the
--- tagged release also ships. The 3.2.4 -> 3.3.0 bump removed four more entries, for the
+-- 3.3.1 and this branch's `server/src/schema/migrations/` is identical to upstream
+-- v3.3.1's (same 100 files, unchanged from v3.3.0), so every upstream migration Gallery
+-- carries is one the tagged release also ships. The 3.3.0 -> 3.3.1 bump removed nothing.
+-- The 3.2.4 -> 3.3.0 bump removed four more entries, for the
 -- same reason as below: 1789419229196-ConvertUserOAuthIdEmptyStringToNull,
 -- 1790587508209-RenameGeoNamesCountries, 1790616293884-PersonSharing and
 -- 1790693088454-AddPersonUserTableSharedBySharedWithConstraint. v3.3.0 needs the
@@ -594,7 +595,7 @@ DELETE FROM "kysely_migrations"
 
    -- Post-tag upstream migrations pulled in by rebase would follow here, paired with
    -- schema rollbacks in step 7 and kept timestamp-sorted. None right now:
-   -- `upstream.version` is 3.3.0 and every upstream migration this branch carries ships
+   -- `upstream.version` is 3.3.1 and every upstream migration this branch carries ships
    -- in that tag (see step 7).
  );
 
