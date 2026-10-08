@@ -6403,7 +6403,6 @@ describe(PersonService.name, () => {
     mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
     mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
     mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-    mocks.person.reassignFace.mockResolvedValue(1);
   };
 
   // Regression coverage for #765: "Fix incorrect match" appeared to succeed but the photo
@@ -6412,6 +6411,13 @@ describe(PersonService.name, () => {
   // projection, which was never refreshed. Editors also could not reassign at all, because
   // both gates were owner-only.
   describe('reassign — shared space projection refresh (#765)', () => {
+    // The four-write placement now lives in FaceAssignmentService (#1156); stub it so these tests pin
+    // the refresh around it, not the module's own writes.
+    let faceAssignment: ReturnType<typeof useFaceAssignment>;
+    beforeEach(() => {
+      faceAssignment = useFaceAssignment();
+    });
+
     it('evicts the stale space assignment and queues a re-match for each space', async () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
@@ -6497,7 +6503,6 @@ describe(PersonService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([faceA.id, faceB.id]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getFacesByIds
         .mockResolvedValueOnce([getForAssetFace(faceA)])
         .mockResolvedValueOnce([getForAssetFace(faceB)]);
@@ -6572,9 +6577,9 @@ describe(PersonService.name, () => {
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
 
       const order: string[] = [];
-      mocks.faceIdentity.replaceFaceIdentity.mockImplementation(() => {
+      faceAssignment.assignFaces.mockImplementation(({ faceIds }) => {
         order.push('identity');
-        return Promise.resolve({} as any);
+        return Promise.resolve(faceIds);
       });
       mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockImplementation(() => {
         order.push('evict');
@@ -6600,6 +6605,14 @@ describe(PersonService.name, () => {
   });
 
   describe('reassign — shared space editor permissions (#765)', () => {
+    // The four-write placement now lives in FaceAssignmentService (#1156); stub it so these tests pin
+    // which faces the gates let through, not the module's own writes.
+    let faceAssignment: ReturnType<typeof useFaceAssignment>;
+    const assignedFaceIds = () => faceAssignment.assignFaces.mock.calls.flatMap(([input]) => input.faceIds);
+    beforeEach(() => {
+      faceAssignment = useFaceAssignment();
+    });
+
     it('allows a space editor to reassign onto a person they do not own', async () => {
       const auth = AuthFactory.create();
       const face = AssetFaceFactory.create();
@@ -6611,7 +6624,6 @@ describe(PersonService.name, () => {
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.reassignFace.mockResolvedValue(1);
 
       await expect(sut.reassignFacesById(auth, person.personGroupId, { id: face.id })).resolves.toBeDefined();
 
@@ -6619,7 +6631,11 @@ describe(PersonService.name, () => {
         auth.user.id,
         new Set([person.personGroupId]),
       );
-      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.personGroupId);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [face.id],
+        strength: 'manual',
+      });
     });
 
     it('denies a space viewer, who has read but not edit access to the person', async () => {
@@ -6637,7 +6653,7 @@ describe(PersonService.name, () => {
         BadRequestException,
       );
 
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(assignedFaceIds()).toEqual([]);
     });
 
     it("allows a space editor to reassign a face on another member's asset", async () => {
@@ -6651,11 +6667,14 @@ describe(PersonService.name, () => {
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([face.assetId]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.reassignFace.mockResolvedValue(1);
 
       await expect(sut.reassignFacesById(auth, person.personGroupId, { id: face.id })).resolves.toBeDefined();
 
-      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.personGroupId);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [face.id],
+        strength: 'manual',
+      });
     });
 
     it("denies reassigning a face on another member's asset without space edit rights", async () => {
@@ -6673,7 +6692,7 @@ describe(PersonService.name, () => {
         BadRequestException,
       );
 
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(assignedFaceIds()).toEqual([]);
     });
 
     it('allows a space editor to reassign on the bulk path', async () => {
@@ -6687,7 +6706,6 @@ describe(PersonService.name, () => {
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([face.assetId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
-      mocks.person.reassignFace.mockResolvedValue(1);
 
       await expect(
         sut.reassignFaces(auth, person.personGroupId, {
@@ -6695,7 +6713,11 @@ describe(PersonService.name, () => {
         }),
       ).resolves.toBeDefined();
 
-      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.personGroupId);
+      expect(faceAssignment.assignFaces).toHaveBeenCalledWith({
+        personGroupId: person.personGroupId,
+        faceIds: [face.id],
+        strength: 'manual',
+      });
     });
 
     it('rejects an unknown face id as a bad request rather than leaking a lookup failure', async () => {
@@ -6711,7 +6733,7 @@ describe(PersonService.name, () => {
         sut.reassignFacesById(AuthFactory.create(), person.personGroupId, { id: newUuid() }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(assignedFaceIds()).toEqual([]);
     });
 
     it('propagates a genuine database failure instead of masking it as a bad request', async () => {
@@ -6734,7 +6756,6 @@ describe(PersonService.name, () => {
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.reassignFace.mockResolvedValue(1);
 
       await sut.reassignFacesById(auth, person.personGroupId, { id: face.id });
 
@@ -6757,6 +6778,14 @@ describe(PersonService.name, () => {
   // broader asset permission (AssetRead/AssetView, which also admit partners and album members) — every
   // one of which would admit a principal that failed the owner-only gates being replaced.
   describe('reassign — authorization is no wider than the owner-only gates it replaced (#765)', () => {
+    // The four-write placement now lives in FaceAssignmentService (#1156); stub it so these tests pin
+    // which faces the gates let through, not the module's own writes.
+    let faceAssignment: ReturnType<typeof useFaceAssignment>;
+    const assignedFaceIds = () => faceAssignment.assignFaces.mock.calls.flatMap(([input]) => input.faceIds);
+    beforeEach(() => {
+      faceAssignment = useFaceAssignment();
+    });
+
     // Both entry points share the two helpers, so every row of the matrix is asserted against both.
     const entryPoints = {
       reassignFacesById: (
@@ -6807,7 +6836,7 @@ describe(PersonService.name, () => {
         );
 
         expect(mocks.access.person.checkSharedSpaceAccess).not.toHaveBeenCalled();
-        expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+        expect(assignedFaceIds()).toEqual([]);
       },
     );
 
@@ -6832,7 +6861,7 @@ describe(PersonService.name, () => {
         expect(mocks.access.asset.checkSpaceAccess).not.toHaveBeenCalled();
         expect(mocks.access.asset.checkPartnerAccess).not.toHaveBeenCalled();
         expect(mocks.access.asset.checkAlbumAccess).not.toHaveBeenCalled();
-        expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+        expect(assignedFaceIds()).toEqual([]);
       },
     );
 
@@ -6845,7 +6874,7 @@ describe(PersonService.name, () => {
 
       await expect(call(admin, person.personGroupId, face)).rejects.toThrow('Not found or no person.update access');
 
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(assignedFaceIds()).toEqual([]);
     });
 
     it.each(bothEntryPoints)('%s refuses an admin at the face gate', async (name, call) => {
@@ -6859,7 +6888,7 @@ describe(PersonService.name, () => {
 
       await expectFaceGateRefusal(name, () => call(admin, person.personGroupId, face));
 
-      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      expect(assignedFaceIds()).toEqual([]);
     });
 
     it.each(bothEntryPoints)('%s rejects a denied target before looking the face up at all', async (_name, call) => {
@@ -6899,7 +6928,6 @@ describe(PersonService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([faceA.id, faceB.id]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getFacesByIds
         .mockResolvedValueOnce([getForAssetFace(faceA)])
         .mockResolvedValueOnce([getForAssetFace(faceB)]);
@@ -6930,7 +6958,6 @@ describe(PersonService.name, () => {
       );
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getFacesByIds
         .mockResolvedValueOnce([getForAssetFace(faceA)])
         .mockResolvedValueOnce([getForAssetFace(faceB)]);
@@ -6942,7 +6969,7 @@ describe(PersonService.name, () => {
         ],
       });
 
-      expect(mocks.person.reassignFace.mock.calls).toEqual([[faceA.id, person.personGroupId]]);
+      expect(assignedFaceIds()).toEqual([faceA.id]);
     });
   });
 
