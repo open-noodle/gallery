@@ -62,6 +62,11 @@ void main() {
     'birthDate': null,
     'thumbnailPath': '',
     'isHidden': false,
+    // Required since the v3.3.0 base (upstream person sharing). The server always emits them;
+    // Gallery keeps person sharing dormant, so they are always empty.
+    'otherPeople': <dynamic>[],
+    'sharedBy': <dynamic>[],
+    'sharedWith': <dynamic>[],
   };
 
   Map<String, dynamic> knownRelation(String relation, {required String id, required String name}) => {
