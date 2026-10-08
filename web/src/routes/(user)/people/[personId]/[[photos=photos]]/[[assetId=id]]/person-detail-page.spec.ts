@@ -588,7 +588,7 @@ describe('Person detail page', () => {
     // The reassign endpoint is Editor-gated server-side, so offering this to a viewer only buys them
     // a 403 (and, before the sibling fix, a danger toast plus an optimistically emptied grid).
     mockAssetMultiSelectManager.selectionActive = true;
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Viewer)]);
+    mockSpaceRoles({ 'viewer-space-reassign-gate': SharedSpaceRole.Viewer });
     renderPage({
       person: makePerson({
         id: 'space-person-1',
@@ -596,13 +596,13 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'viewer-space-reassign-gate' }));
+    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
     await waitFor(() => expect(screen.queryByText('fix_incorrect_match')).not.toBeInTheDocument());
   });
 
   it('keeps "Fix incorrect match" in the selection toolbar for space editors', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
-    sdkMock.getMembers.mockResolvedValue([makeMember('current-user-id', SharedSpaceRole.Editor)]);
+    mockSpaceRoles({ 'editor-space-reassign-gate': SharedSpaceRole.Editor });
     renderPage({
       person: makePerson({
         id: 'space-person-1',
@@ -610,7 +610,7 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(sdkMock.getMembers).toHaveBeenCalledWith({ id: 'editor-space-reassign-gate' }));
+    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
     expect(screen.getByText('fix_incorrect_match')).toBeInTheDocument();
   });
 
