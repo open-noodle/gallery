@@ -46,10 +46,11 @@ export class StorageMigrationService extends BaseService {
       const kind = MIGRATION_FILE_TYPE_TO_KIND[fileType];
       const routing = config.storage.routing[kind];
       const resolved = resolveRouting(routing, envBackend);
-      if (resolved !== target) {
-        const via = routing === StorageRouting.Auto ? ' (via IMMICH_STORAGE_BACKEND)' : '';
-        offending.set(kind, `${kind} is routed to ${resolved}${via}`);
+      if (resolved === target) {
+        continue;
       }
+      const via = routing === StorageRouting.Auto ? ' (via IMMICH_STORAGE_BACKEND)' : '';
+      offending.set(kind, `${kind} is routed to ${resolved}${via}`);
     }
 
     if (offending.size > 0) {
