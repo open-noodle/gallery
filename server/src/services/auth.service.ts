@@ -35,7 +35,7 @@ import { isGranted } from 'src/utils/access.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
-import { getUserAgentDetails } from 'src/utils/request.js';
+import { getUserAgentDetails, isMobileAppUA } from 'src/utils/request.js';
 
 export interface LoginDetails {
   isSecure: boolean;
@@ -607,6 +607,10 @@ export class AuthService extends BaseService {
           // that write, so it still holds the previous value on the request where an app upgrade
           // first shows up. The header is authoritative for the request being served.
           appVersion,
+          // Same reasoning, and from the same header: whether this request came from the native
+          // mobile app at all. There is no session column for it, because it is a property of the
+          // request rather than of the session.
+          isMobileApp: isMobileAppUA(headers['user-agent'] ?? ''),
         },
       };
     }

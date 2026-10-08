@@ -128,7 +128,9 @@ const makeWritable = () => {
 
 const authWithAppVersion = (appVersion: string | null) => ({
   ...authStub.user1,
-  session: { id: 'token-id', hasElevatedPermission: false, appVersion },
+  // The delta sync stream is only ever consumed by the mobile app, so these sessions are
+  // mobile ones; the AssetEditsV1 gate reads only the version.
+  session: { id: 'token-id', hasElevatedPermission: false, appVersion, isMobileApp: true },
 });
 
 const assetEditRow = (action: AssetEditAction, parameters: Record<string, unknown>) => ({

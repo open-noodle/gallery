@@ -44,6 +44,12 @@ const dto = {
   password: 'password',
 };
 
+const bearerRequestWithUserAgent = (userAgent: string) => ({
+  headers: { authorization: 'Bearer auth_token', 'user-agent': userAgent },
+  queryParams: {},
+  metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+});
+
 describe(AuthService.name, () => {
   let sut: AuthService;
   let mocks: ServiceMocks;
@@ -398,6 +404,7 @@ describe(AuthService.name, () => {
           id: session.id,
           hasElevatedPermission: false,
           appVersion: null,
+          isMobileApp: false,
         },
       });
     });
@@ -427,6 +434,47 @@ describe(AuthService.name, () => {
       });
 
       expect(auth.session?.appVersion).toBe('5.7.0');
+    });
+
+    describe('isMobileApp', () => {
+      beforeEach(() => {
+        const session = SessionFactory.create();
+
+        mocks.session.getByToken.mockResolvedValue({
+          id: session.id,
+          updatedAt: session.updatedAt,
+          user: UserFactory.create(),
+          pinExpiresAt: null,
+          appVersion: null,
+        });
+        mocks.session.update.mockResolvedValue(session);
+      });
+
+      it('should be true for the native mobile app', async () => {
+        await expect(sut.authenticate(bearerRequestWithUserAgent('immich-android/5.6.0'))).resolves.toMatchObject({
+          session: { isMobileApp: true },
+        });
+      });
+
+      it('should be true for a mobile app whose version cannot be read', async () => {
+        // The whole point of the flag: `appVersion` is null here, and callers must still be able
+        // to tell this apart from a browser, which also reports no version.
+        const auth = await sut.authenticate(bearerRequestWithUserAgent('immich-ios/'));
+
+        expect(auth.session?.appVersion).toBeNull();
+        expect(auth.session?.isMobileApp).toBe(true);
+      });
+
+      it('should be false for a browser', async () => {
+        const auth = await sut.authenticate(
+          bearerRequestWithUserAgent(
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+          ),
+        );
+
+        expect(auth.session?.appVersion).toBeNull();
+        expect(auth.session?.isMobileApp).toBe(false);
+      });
     });
   });
 
@@ -593,6 +641,7 @@ describe(AuthService.name, () => {
           id: session.id,
           hasElevatedPermission: false,
           appVersion: null,
+          isMobileApp: false,
         },
       });
     });
@@ -2067,6 +2116,7 @@ describe(AuthService.name, () => {
           id: session.id,
           hasElevatedPermission: false,
           appVersion: null,
+          isMobileApp: false,
         },
       });
     });
@@ -2362,6 +2412,7 @@ describe(AuthService.name, () => {
           id: session.id,
           hasElevatedPermission: false,
           appVersion: null,
+          isMobileApp: false,
         },
       });
     });

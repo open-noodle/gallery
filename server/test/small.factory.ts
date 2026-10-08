@@ -54,6 +54,7 @@ const authFactory = ({
     hasElevatedPermission?: boolean;
     oauthBearerToken?: string | null;
     appVersion?: string | null;
+    isMobileApp?: boolean;
   };
   user?: Omit<
     Partial<UserAdmin>,
@@ -76,6 +77,7 @@ const authFactory = ({
       id: session.id ?? newUuid(),
       hasElevatedPermission: session.hasElevatedPermission ?? false,
       appVersion: session.appVersion ?? null,
+      isMobileApp: session.isMobileApp ?? false,
     };
   }
 

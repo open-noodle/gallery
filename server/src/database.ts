@@ -210,6 +210,13 @@ export type AuthSession = {
    * parse - see `clientSupports()` in src/utils/client-capability.ts.
    */
   appVersion: string | null;
+  /**
+   * Whether the `User-Agent` of the current request is the native mobile app's own scheme (see
+   * `isMobileAppUA`). Distinct from `appVersion !== null`, which cannot tell an unparseable mobile
+   * build apart from a browser - both report no version. Behaviour that must apply only to the
+   * mobile app needs this alongside `appVersion`, never `appVersion` on its own.
+   */
+  isMobileApp: boolean;
 };
 
 export type Partner = {
