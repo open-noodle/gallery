@@ -195,6 +195,7 @@
     "face_cleanup_dissolve_scope_exif": "Z metadanych",
     "face_cleanup_dissolve_scope_ml": "Wykryte",
     "face_cleanup_dissolve_scope_no_embedding": "Bez embeddingu",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "Twarze narysowane ręcznie ({count}) zostaną zachowane, a ich przypisanie usunięte. Usuwanie nigdy nie kasuje obszaru narysowanego ręcznie — zostaje on na zdjęciu, bez nazwy, gotowy do ponownego przypisania.",
     "face_cleanup_dissolve_warn_metadata_import_on": "„Włącz import twarzy” jest włączone. Wymuszone wyodrębnienie metadanych lub ponowne skanowanie biblioteki może odtworzyć te obszary.",
     "face_cleanup_dissolve_warn_not_redetectable": "W przypadku {count} zdjęć nic nie zostanie odzyskane. Są ukryte, w koszu albo nie mają pliku podglądu.",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "Osoba zostanie wtedy bez żadnych twarzy. Nocne zadanie porządkowe i tak ją usunie, mimo że chcesz ją zachować.",

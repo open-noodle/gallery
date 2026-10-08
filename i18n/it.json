@@ -195,6 +195,7 @@
     "face_cleanup_dissolve_scope_exif": "Dai metadati",
     "face_cleanup_dissolve_scope_ml": "Rilevati",
     "face_cleanup_dissolve_scope_no_embedding": "Senza embedding",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "{count} volti disegnati a mano verranno mantenuti e la loro assegnazione rimossa. Un'eliminazione non rimuove mai una regione disegnata a mano: resta sulla foto, senza nome, pronta per essere assegnata di nuovo.",
     "face_cleanup_dissolve_warn_metadata_import_on": "«Abilita l'importazione dei volti» è attivo. Un'estrazione dei metadati forzata o una nuova scansione della libreria può ricreare queste regioni.",
     "face_cleanup_dissolve_warn_not_redetectable": "Su {count} foto non verrà recuperato nulla. Sono nascoste, nel cestino o senza file di anteprima.",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "In questo modo la persona resta senza alcun volto. L'attività di pulizia notturna la eliminerà comunque, anche se hai scelto di conservarla.",

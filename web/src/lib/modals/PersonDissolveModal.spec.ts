@@ -21,6 +21,7 @@ const counts = {
   sharedAssets: 1861,
   notRedetectable: 44,
   remainingLiveFaces: 0,
+  handDrawn: 0,
 };
 
 describe('PersonDissolveModal', () => {
@@ -75,6 +76,21 @@ describe('PersonDissolveModal', () => {
     // nothing, so the sentence itself carries no digits — /44/ alone is satisfied by the counts grid and
     // would still pass with the warning list deleted. This pins the warning row itself.
     expect(screen.getByTestId('dissolve-warning-not-redetectable')).toBeVisible();
+  });
+
+  it('tells the admin which hand-drawn faces a delete keeps and unassigns', async () => {
+    vi.mocked(previewDissolvePerson).mockResolvedValue({
+      personId: 'p1',
+      counts: { ...counts, handDrawn: 2 },
+      expectedFaceCount: 3175,
+      warnings: [{ code: 'hand-drawn-kept', count: 2 }],
+    } as never);
+    open();
+    // Pinned by test id, not text: with no dictionary loaded `$t` renders the bare key. An unmapped code
+    // renders nothing at all, so this fails if the code-to-key map loses the entry.
+    expect(await screen.findByTestId('dissolve-warning-hand-drawn-kept')).toHaveTextContent(
+      'admin.face_cleanup_dissolve_warn_hand_drawn_kept',
+    );
   });
 
   it('forces redetect on for a delete outcome', async () => {

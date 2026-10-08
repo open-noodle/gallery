@@ -195,6 +195,7 @@
     "face_cleanup_dissolve_scope_exif": "From metadata",
     "face_cleanup_dissolve_scope_ml": "Detected",
     "face_cleanup_dissolve_scope_no_embedding": "No embedding",
+    "face_cleanup_dissolve_warn_hand_drawn_kept": "{count} hand-drawn faces will be kept and unassigned. A delete never removes a box someone drew by hand — it stays on the photo, unnamed, ready to be assigned again.",
     "face_cleanup_dissolve_warn_metadata_import_on": "Import faces from metadata is on. A forced metadata extraction or a library rescan can re-create these regions.",
     "face_cleanup_dissolve_warn_not_redetectable": "On {count} photos nothing will be recovered. They are hidden, trashed, or have no preview file.",
     "face_cleanup_dissolve_warn_person_will_be_cleaned_up": "This leaves the person with no faces at all. The nightly cleanup task will delete it anyway, even though you chose to keep it.",
