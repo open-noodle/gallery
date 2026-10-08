@@ -10,6 +10,9 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
     thumbnailPath: '/thumb.jpg',
     isHidden: false,
     updatedAt: '2026-01-02T00:00:00.000Z',
+    otherPeople: [],
+    sharedBy: [],
+    sharedWith: [],
     ...overrides,
   };
 }
