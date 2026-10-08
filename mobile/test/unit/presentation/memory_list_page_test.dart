@@ -19,7 +19,7 @@ void main() {
     updatedAt: DateTime(2026),
     ownerId: 'user-1',
     type: type,
-    data: MemoryData(year: memoryAt.year, personName: personName),
+    data: MemoryData({'year': memoryAt.year, 'personName': ?personName}),
     isSaved: false,
     memoryAt: memoryAt,
     assets: [RemoteAssetFactory.create()],
@@ -61,6 +61,28 @@ void main() {
       await tester.pump();
 
       expect(find.text("Alice's birthday"), findsOneWidget);
+      expect(find.text('October 7, 2025'), findsNothing);
+    });
+
+    // Gallery: rule memories (#418) keep their rule title; `preferDate` only re-titles on this day.
+    testWidgets('keeps the rule title for a rule memory', (tester) async {
+      final memoryAt = DateTime(2025, 10, 7);
+      await pumpPage(tester, [
+        Memory(
+          id: 'memory-rule',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          ownerId: 'user-1',
+          type: MemoryTypeEnum.rule,
+          data: const MemoryData({'ruleId': 'month_recap', 'title': 'September 2025'}),
+          isSaved: false,
+          memoryAt: memoryAt,
+          assets: [RemoteAssetFactory.create()],
+        ),
+      ]);
+      await tester.pump();
+
+      expect(find.text('September 2025'), findsOneWidget);
       expect(find.text('October 7, 2025'), findsNothing);
     });
   });
