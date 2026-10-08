@@ -39,12 +39,21 @@ describe('/games/solo', () => {
     admin = await utils.adminSetup();
   });
 
-  /** A brand new player with `photoCount` of their own photos and no space membership at all. */
+  /**
+   * A brand new player with `photoCount` of their own photos and no space membership at all.
+   *
+   * `beforeUpload` runs once the player exists but before any photo is uploaded. A block that waits
+   * on `assetUpload` must connect its websocket there: the event is only seen by a socket that is
+   * already connected when the server emits it, so connecting after the uploads races the
+   * thumbnail job and, when the job wins, the wait can never settle.
+   */
   const freshPlayer = async (
     key: string,
     photoCount: number,
+    beforeUpload?: (player: LoginResponseDto) => Promise<void>,
   ): Promise<{ player: LoginResponseDto; assets: Array<{ id: string; filename: string }> }> => {
     const player = await utils.userSetup(admin.accessToken, createUserDto.create(key));
+    await beforeUpload?.(player);
     const assets = await Promise.all(
       Array.from({ length: photoCount }, async (_, i) => {
         const filename = `${key}-${i}.png`;
@@ -234,8 +243,9 @@ describe('/games/solo', () => {
     let challenge: GameChallengeResponseDto;
 
     beforeAll(async () => {
-      ({ player, assets } = await freshPlayer('solo-play', 4));
-      websocket = await utils.connectWebsocket(player.accessToken);
+      ({ player, assets } = await freshPlayer('solo-play', 4, async (fresh) => {
+        websocket = await utils.connectWebsocket(fresh.accessToken);
+      }));
       // getRoundImage 404s until the round's asset has a Preview file, which the async
       // thumbnailGeneration job writes - and which it re-checks on every request, not just at
       // generation. Which photo lands on which round is deliberately hidden until it is guessed,
@@ -245,7 +255,7 @@ describe('/games/solo', () => {
       const created = await createSolo(player, { roundCount: 4 });
       expect(created.status).toBe(201);
       challenge = created.body as GameChallengeResponseDto;
-    });
+    }, 30_000);
 
     afterAll(() => {
       utils.disconnectWebsocket(websocket);
@@ -462,13 +472,14 @@ describe('/games/solo', () => {
     let assets: Array<{ id: string; filename: string }>;
 
     beforeAll(async () => {
-      ({ player, assets } = await freshPlayer('solo-walkthrough', 4));
-      websocket = await utils.connectWebsocket(player.accessToken);
+      ({ player, assets } = await freshPlayer('solo-walkthrough', 4, async (fresh) => {
+        websocket = await utils.connectWebsocket(fresh.accessToken);
+      }));
       // Same reason as the free-play block: getRoundImage 404s until the async thumbnailGeneration
       // job has written a Preview file, and which photo lands on which round is hidden until it is
       // guessed - so every upload is waited on rather than one targeted id.
       await Promise.all(assets.map((asset) => utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id })));
-    });
+    }, 30_000);
 
     afterAll(() => {
       utils.disconnectWebsocket(websocket);
@@ -709,7 +720,7 @@ describe('/games/solo', () => {
           { id: partner.userId, partnerUpdateDto: { inTimeline: true } },
           { headers: asBearerAuth(player.accessToken) },
         );
-      });
+      }, 30_000);
 
       afterAll(() => {
         utils.disconnectWebsocket(websocket);
