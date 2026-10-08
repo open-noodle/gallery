@@ -203,6 +203,13 @@ export type Album = Selectable<AlbumTable> & {
 export type AuthSession = {
   id: string;
   hasElevatedPermission: boolean;
+  /**
+   * Mobile app version parsed from the `User-Agent` of the current request, or null for any client
+   * that is not a Gallery/Immich mobile build (browser, CLI, third-party script) and for mobile
+   * builds whose user agent cannot be parsed. Used to withhold payloads an older app would fail to
+   * parse - see `clientSupports()` in src/utils/client-capability.ts.
+   */
+  appVersion: string | null;
 };
 
 export type Partner = {

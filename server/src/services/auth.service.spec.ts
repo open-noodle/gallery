@@ -397,8 +397,36 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
         },
       });
+    });
+
+    it('should report the app version from the current request, not the stored session column', async () => {
+      // The stored column is read before it is written back, so it still holds the previous value
+      // on the request where an app upgrade first appears. Code that gates a payload on the app
+      // version (see clientSupports()) has to see the version actually making the request.
+      const session = SessionFactory.create();
+      const sessionWithToken = {
+        id: session.id,
+        updatedAt: session.updatedAt,
+        user: UserFactory.create(),
+        pinExpiresAt: null,
+        appVersion: '5.6.0',
+        oauthSid: null,
+      };
+
+      mocks.session.getByToken.mockResolvedValue(sessionWithToken);
+      // A changed app version also writes the new value back to the session row.
+      mocks.session.update.mockResolvedValue(session);
+
+      const auth = await sut.authenticate({
+        headers: { authorization: 'Bearer auth_token', 'user-agent': 'immich-android/5.7.0' },
+        queryParams: {},
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+      });
+
+      expect(auth.session?.appVersion).toBe('5.7.0');
     });
   });
 
@@ -564,6 +592,7 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
         },
       });
     });
@@ -2037,6 +2066,7 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
         },
       });
     });
@@ -2331,6 +2361,7 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
         },
       });
     });

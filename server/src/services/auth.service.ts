@@ -602,6 +602,11 @@ export class AuthService extends BaseService {
         session: {
           id: session.id,
           hasElevatedPermission,
+          // The version parsed from *this* request's user agent, not the `session.appVersion`
+          // column: the column is only written back above when it has changed, and is read before
+          // that write, so it still holds the previous value on the request where an app upgrade
+          // first shows up. The header is authoritative for the request being served.
+          appVersion,
         },
       };
     }

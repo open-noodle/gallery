@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
+import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto.js';
 import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { SYNC_TYPES_ORDER, SyncService, send } from 'src/services/sync.service.js';
 import { ClientDisconnectedError } from 'src/utils/response.js';
@@ -123,6 +124,53 @@ const makeWritable = () => {
     },
   });
   return { writable, chunks };
+};
+
+const authWithAppVersion = (appVersion: string | null) => ({
+  ...authStub.user1,
+  session: { id: 'token-id', hasElevatedPermission: false, appVersion },
+});
+
+const assetEditRow = (action: AssetEditAction, parameters: Record<string, unknown>) => ({
+  updateId: newUuid(),
+  id: newUuid(),
+  assetId: 'a1',
+  sequence: 0,
+  action,
+  parameters,
+});
+
+/**
+ * Runs an AssetEditsV1 sync for a session reporting `appVersion`, over an upsert batch holding one
+ * edit of every action, and returns the actions that actually reached the client.
+ */
+const streamAssetEdits = async (
+  sut: SyncService,
+  mocks: ServiceMocks,
+  syncSubs: ReturnType<typeof setupSyncMocks>,
+  appVersion: string | null,
+) => {
+  const { writable, chunks } = makeWritable();
+
+  mocks.session.isPendingSyncReset.mockResolvedValue(false);
+  mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+  mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+  syncSubs.assetEdit.getDeletes.mockReturnValue(makeStream([]));
+  syncSubs.assetEdit.getUpserts.mockReturnValue(
+    makeStream([
+      assetEditRow(AssetEditAction.Crop, { x: 0, y: 0, width: 10, height: 10 }),
+      assetEditRow(AssetEditAction.Rotate, { angle: 90 }),
+      assetEditRow(AssetEditAction.Mirror, { axis: MirrorAxis.Horizontal }),
+      assetEditRow(AssetEditAction.Trim, { startTime: 0, endTime: 1 }),
+      assetEditRow(AssetEditAction.Adjust, { exposure: 20, invert: true }),
+    ]),
+  );
+
+  await sut.stream(authWithAppVersion(appVersion), writable, { types: [SyncRequestType.AssetEditsV1] });
+
+  return parseChunks(chunks)
+    .filter((m: any) => m.type === SyncEntityType.AssetEditV1)
+    .map((m: any) => m.data.action);
 };
 
 const parseChunks = (chunks: string[]) => {
@@ -596,6 +644,76 @@ describe(SyncService.name, () => {
       const messages = parseChunks(chunks);
       expect(messages.some((m: any) => m.type === SyncEntityType.AssetEditDeleteV1)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.AssetEditV1)).toBe(true);
+    });
+
+    describe('AssetEditsV1 adjust-action gating', () => {
+      // An app built before the Adjust tool has a generated Dart AssetEditAction without
+      // `adjust`; its fromJson returns null for the unrecognized string and the resulting
+      // exception fails the whole sync batch, which is then never acknowledged - so the same
+      // failure replays on every retry until the app is updated. The server must therefore not
+      // send `adjust` edits to an app that cannot be confirmed to understand them.
+      it('should omit adjust edits for an app version that predates the Adjust tool', async () => {
+        const actions = await streamAssetEdits(sut, mocks, syncSubs, '5.6.0');
+
+        expect(actions).not.toContain(AssetEditAction.Adjust);
+      });
+
+      it.each([{ appVersion: '5.7.0' }, { appVersion: '5.8.0' }, { appVersion: '6.1.2' }])(
+        'should send adjust edits to app version $appVersion',
+        async ({ appVersion }) => {
+          const actions = await streamAssetEdits(sut, mocks, syncSubs, appVersion);
+
+          expect(actions).toContain(AssetEditAction.Adjust);
+        },
+      );
+
+      it.each([
+        // null covers every client whose user agent carries no app version, and any mobile
+        // session older than the appVersion column. Withholding is the safe default: a client
+        // wrongly treated as old only misses these records on this one channel, while a client
+        // wrongly treated as new can be wedged permanently.
+        { label: 'an unknown app version', appVersion: null },
+        { label: 'an unparseable app version', appVersion: 'nightly' },
+      ])('should omit adjust edits for $label', async ({ appVersion }) => {
+        const actions = await streamAssetEdits(sut, mocks, syncSubs, appVersion);
+
+        expect(actions).not.toContain(AssetEditAction.Adjust);
+      });
+
+      it.each([
+        { appVersion: '5.6.0', label: 'an old app' },
+        { appVersion: '5.7.0', label: 'a new app' },
+        { appVersion: null, label: 'an unknown app' },
+      ])('should send every crop, rotate, mirror and trim edit to $label', async ({ appVersion }) => {
+        const actions = await streamAssetEdits(sut, mocks, syncSubs, appVersion);
+
+        expect(actions).toEqual(
+          expect.arrayContaining([
+            AssetEditAction.Crop,
+            AssetEditAction.Rotate,
+            AssetEditAction.Mirror,
+            AssetEditAction.Trim,
+          ]),
+        );
+      });
+
+      it('should still send asset-edit deletes to an old app', async () => {
+        // Deletes carry only an edit id, no action, so there is nothing an old client can fail to
+        // parse - and withholding them would leave a deleted edit applied on the device forever.
+        const { writable, chunks } = makeWritable();
+        const deleteId = newUuid();
+
+        mocks.session.isPendingSyncReset.mockResolvedValue(false);
+        mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+        mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+        syncSubs.assetEdit.getDeletes.mockReturnValue(makeStream([{ id: deleteId, editId: newUuid() }]));
+        syncSubs.assetEdit.getUpserts.mockReturnValue(makeStream([]));
+
+        await sut.stream(authWithAppVersion('5.6.0'), writable, { types: [SyncRequestType.AssetEditsV1] });
+
+        const messages = parseChunks(chunks);
+        expect(messages.some((m: any) => m.type === SyncEntityType.AssetEditDeleteV1)).toBe(true);
+      });
     });
 
     it('should handle AlbumsV1 sync type', async () => {

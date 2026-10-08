@@ -27,7 +27,7 @@ describe('requireElevatedPermission', () => {
         quotaUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
-      session: { id: newUuid(), hasElevatedPermission: false },
+      session: { id: newUuid(), hasElevatedPermission: false, appVersion: null },
     };
 
     expect(() => requireElevatedPermission(auth)).toThrow(UnauthorizedException);
@@ -59,7 +59,7 @@ describe('requireElevatedPermission', () => {
         quotaUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
-      session: { id: newUuid(), hasElevatedPermission: true },
+      session: { id: newUuid(), hasElevatedPermission: true, appVersion: null },
     };
 
     expect(() => requireElevatedPermission(auth)).not.toThrow();
