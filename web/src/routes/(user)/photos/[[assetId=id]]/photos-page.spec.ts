@@ -1448,6 +1448,8 @@ describe('Photos page — empty state under active filters (#763)', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     timelineStubGlobals.__timelineStubAssetCount = 0;
   });
