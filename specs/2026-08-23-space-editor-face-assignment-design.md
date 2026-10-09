@@ -391,10 +391,29 @@ identity rewrite, not merely a 200.
 Detach. Removes the `shared_space_person_face` row and writes a negative verdict so the suggestion
 pipeline does not immediately re-offer it.
 
-**Does not** delete `face_identity_face`. Detaching from _this_ space's person must not blank the
-face's global identity and thereby mutate space B (§5.1). New repository method
+~~**Does not** delete `face_identity_face`. Detaching from _this_ space's person must not blank the
+face's global identity and thereby mutate space B (§5.1).~~ New repository method
 `removePersonFace(personId, assetFaceId)` — the existing removals are bulk-by-asset and
 bulk-by-library only.
+
+> **REVISED 2026-10-09 — detach removes the identity link too.** The struck rule predates the
+> §6.3.1 revision and was never updated with it. Since then detach cleared the owner's
+> `asset_face.personGroupId` but kept `face_identity_face`. That is the exact split §6.3.1 says attach
+> must never produce. It surfaced on the 5.8.0 RC: an editor unassigned a dog from a photo, and
+> the asset detail (reads the tag) dropped it. The dog's grid still listed the photo, both on the
+> owner's person page and in the space's filtered timeline, with the count unchanged after a reload.
+> Every person grid reads `face_identity_face`. A `space-person:` filter token resolves to the
+> space person's `identityId` (`resolveScopedPersonTokens`), so the space grid reads it as well, not
+> the `shared_space_person_face` projection the original text assumed.
+>
+> Detach now deletes the face's link **while it still points at the detached space person's
+> identity** (`unlinkFaceFromIdentity`), in the same transaction. The gate is the one attach's
+> `writeIdentity` uses: the owner is a space member, or the owner has no person on the face. A
+> non-member's own tag keeps its identity (§3). The rejected verdict then carries `identityId`
+> as well as `spacePersonId`, since it is the only remaining record that the face is not that human.
+>
+> F-22's "B unaffected" goes with it. As with F-20's attach, a space B person on the same identity
+> loses the face. That is the §5.1 decision applied in the other direction, not a new leak.
 
 **It must call `recountPersons`.** `addPersonFaces` recounts on the way in
 (`shared-space.repository.ts:2660`), so a detach that does not recount leaves
@@ -608,7 +627,7 @@ is already known from the space route's data, and the face list only ever comes 
 | ---- | ------------------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
 | F-20 | B has a person sharing the identity Anna attaches to                      | Anna attaches in A     | the face appears for B's person too — **documented, pinned**                       |
 | F-21 | the same, B's person is named differently                                 | Anna attaches in A     | B's `shared_space_person.name` unchanged                                           |
-| F-22 | Anna detaches in A                                                        | —                      | `face_identity_face` untouched; B unaffected (§6.4)                                |
+| F-22 | Anna detaches in A                                                        | —                      | ~~`face_identity_face` untouched; B unaffected~~ **revised 2026-10-09**, see §6.4  |
 | F-23 | Bob views the asset in his own timeline, no space context                 | after F-1              | `asset_face.personId` unchanged; his People page unchanged                         |
 | F-39 | Bob's own person carries identity X; Anna attaches an unrelated face in A | Bob re-reads the asset | the name and birthday `applyResolvedPersonMetadata` resolves for Bob are unchanged |
 

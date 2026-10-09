@@ -8182,6 +8182,17 @@ describe(SharedSpaceService.name, () => {
         { assetFaceId: 'face-1', personGroupId: null, expectedPersonGroupId: 'owner-person-1' },
         mocks.database,
       );
+      // Both owner layers move together: the person grids read the identity link, not the tag.
+      expect(mocks.faceIdentity.unlinkFaceFromIdentity).toHaveBeenCalledWith(
+        { assetFaceId: 'face-1', identityId: 'identity-1' },
+        mocks.database,
+      );
+      expect(mocks.facePersonVerdict.markRejectedForSpacePerson).toHaveBeenCalledWith(
+        'space-person-1',
+        'face-1',
+        expect.objectContaining({ identityId: 'identity-1' }),
+        mocks.database,
+      );
     });
 
     // The guard on the propagation above. An editor detaching space person "Uncle Tom" must never
@@ -8229,6 +8240,13 @@ describe(SharedSpaceService.name, () => {
 
       expect(mocks.sharedSpace.removePersonFace).toHaveBeenCalledWith('space-person-1', 'face-1', mocks.database);
       expect(mocks.person.setFaceOwnerPerson).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.unlinkFaceFromIdentity).not.toHaveBeenCalled();
+      expect(mocks.facePersonVerdict.markRejectedForSpacePerson).toHaveBeenCalledWith(
+        'space-person-1',
+        'face-1',
+        expect.objectContaining({ identityId: undefined }),
+        mocks.database,
+      );
     });
 
     // F-25 (spec §6.7): the detach twin of F-24. An editor un-naming a face on someone ELSE's

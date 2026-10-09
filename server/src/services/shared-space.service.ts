@@ -2123,9 +2123,10 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * Spec §6.4 (Slice 4): detach a face from a space person. Removes only the space's own
-   * `shared_space_person_face` projection row — deliberately leaves `face_identity_face` alone,
-   * or the face's global identity would be blanked for every other space sharing it (§5.1, F-22).
+   * Spec §6.4 (Slice 4, revised): detach a face from a space person. Removes the space's
+   * `shared_space_person_face` projection row and, where the owner layer is the space's to touch,
+   * the face's `face_identity_face` link to this person's identity and the owner's tag. Like attach,
+   * the identity change reaches every space sharing that identity (§5.1).
    *
    * Writes a negative verdict first so the suggestion pipeline does not immediately re-offer the
    * face back to this same person, mirroring the reassign arm of `attachFaceToSpacePerson`.
@@ -2152,13 +2153,28 @@ export class SharedSpaceService extends BaseService {
       // owner-layer clear at the end of this transaction.
       const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(spaceId, assetFaceId, trx);
 
+      // §6.4 (revised): every person grid -- the owner's person page and the space's filtered timeline,
+      // which resolves a space person to its identity -- reads `face_identity_face`, so a detach that
+      // leaves the face linked to this person's identity keeps the photo on their grid. Take the link
+      // off whenever the owner layer is ours to touch, the same gate attach's `writeIdentity` uses: an
+      // owner who is a space member, or one who never named this face (the identity is then only what
+      // a space attach gave it). A non-member's own tag keeps its identity (§3).
+      const unlinkIdentity = !!person.identityId && (!!ownerLink?.ownerIsSpaceMember || !ownerLink?.personGroupId);
+
+      // With the link gone, the verdict is the only record that the face is not this human, so it
+      // carries the identity for identity-keyed readers too.
       await this.facePersonVerdictRepository.markRejectedForSpacePerson(
         person.id,
         assetFaceId,
-        { source: 'suggestion', actorId: auth.user.id },
+        { identityId: unlinkIdentity ? person.identityId : undefined, source: 'suggestion', actorId: auth.user.id },
         trx,
       );
       await this.sharedSpaceRepository.removePersonFace(person.id, assetFaceId, trx);
+      if (unlinkIdentity) {
+        // Conditional on the link still naming this person: a face whose identity is some other human
+        // was never a statement about the person being detached.
+        await this.faceIdentityRepository.unlinkFaceFromIdentity({ assetFaceId, identityId: person.identityId! }, trx);
+      }
 
       // §6.3.1 (revised): propagate the detach into the OWNER's layer, so a face unassigned in the
       // space also stops being tagged on the owner's own copy of the photo. Without this the space
@@ -2207,9 +2223,9 @@ export class SharedSpaceService extends BaseService {
    * the space's people list, the same failure mode `confirmSpacePersonFaceSuggestion` guards
    * against for the suggestion path.
    *
-   * F-33: the `(spaceId, identityId)` unique index is the trap. A face left over from an earlier
-   * attach/detach cycle (Task 1 deliberately never touches `face_identity_face`) or from ML
-   * backfill may already resolve to an identity that some OTHER space person here already holds.
+   * F-33: the `(spaceId, identityId)` unique index is the trap. A face whose identity a detach
+   * left in place (a non-member owner's own tag, §3), or one linked by ML backfill, may already
+   * resolve to an identity that some OTHER space person here already holds.
    * `createOrGetPersonForIdentity` is used whenever the seed face already carries an identity, so
    * that case returns the existing person instead of racing a plain insert into a duplicate key.
    */
