@@ -1,5 +1,6 @@
 <script lang="ts">
   import AlbumCard from '$lib/components/album-page/AlbumCard.svelte';
+  import LazyAlbumGrid from '$lib/components/shared-components/lazy-album-grid.svelte';
   import Portal from '$lib/elements/Portal.svelte';
   import { Route } from '$lib/route';
   import { getAlbumActions } from '$lib/services/album.service';
@@ -31,6 +32,8 @@
   let isCollapsed = $derived(!!group && isAlbumGroupCollapsed($albumViewSettings, group.id));
   let iconRotation = $derived(isCollapsed ? 'rotate-0' : 'rotate-90');
   let contextMenuAnchor: HTMLDivElement | undefined = $state();
+  // Covers of the first screenful load eagerly; the grid itself mounts in chunks (LazyAlbumGrid).
+  const preloadIds = $derived(new Set(albums.slice(0, 20).map(({ id }) => id)));
 
   const oncontextmenu = async (event: MouseEvent, items: ActionItem[]) => {
     event.preventDefault();
@@ -64,26 +67,30 @@
 
 <div class="mt-4">
   {#if !isCollapsed}
-    <div class="grid grid-auto-fill-56 gap-y-4" transition:slide={{ duration: 300 }}>
-      {#each albums as album, index (album.id)}
-        {@const { Edit, Share, Download, Leave, Delete } = getAlbumActions($t, album)}
-        {@const items = [Edit, Share, Download, Leave, Delete]}
-        <a
-          href={Route.viewAlbum(album)}
-          class="h-fit"
-          animate:flip={{ duration: 400 }}
-          oncontextmenu={(event) => oncontextmenu(event, items)}
-        >
-          <AlbumCard
-            {album}
-            {showOwner}
-            {showDateRange}
-            {showItemCount}
-            preload={index < 20}
-            contextMenuItems={items}
-          />
-        </a>
-      {/each}
+    <div transition:slide={{ duration: 300 }}>
+      <LazyAlbumGrid items={albums}>
+        {#snippet chunk(chunkAlbums)}
+          {#each chunkAlbums as album (album.id)}
+            {@const { Edit, Share, Download, Leave, Delete } = getAlbumActions($t, album)}
+            {@const items = [Edit, Share, Download, Leave, Delete]}
+            <a
+              href={Route.viewAlbum(album)}
+              class="h-fit"
+              animate:flip={{ duration: 400 }}
+              oncontextmenu={(event) => oncontextmenu(event, items)}
+            >
+              <AlbumCard
+                {album}
+                {showOwner}
+                {showDateRange}
+                {showItemCount}
+                preload={preloadIds.has(album.id)}
+                contextMenuItems={items}
+              />
+            </a>
+          {/each}
+        {/snippet}
+      </LazyAlbumGrid>
     </div>
   {/if}
 </div>

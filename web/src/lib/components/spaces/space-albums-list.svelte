@@ -17,6 +17,7 @@
     getFolderContents,
   } from '$lib/utils/space-album-folders';
   import type { DragPayload } from '$lib/utils/space-album-folder-dnd';
+  import LazyAlbumGrid from '$lib/components/shared-components/lazy-album-grid.svelte';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import SpaceAlbumCard from '$lib/components/spaces/space-album-card.svelte';
   import SpaceAlbumFolderCard from '$lib/components/spaces/space-album-folder-card.svelte';
@@ -151,40 +152,58 @@
   });
 </script>
 
+{#snippet albumCard(album: SharedSpaceLinkedAlbumDto)}
+  <SpaceAlbumCard
+    {spaceId}
+    {album}
+    {canManage}
+    {onUnlink}
+    {onToggleTimeline}
+    {onToggleMyTimeline}
+    onMove={onMoveAlbum}
+  />
+{/snippet}
+
+{#snippet albumGrid(gridAlbums: SharedSpaceLinkedAlbumDto[])}
+  <LazyAlbumGrid items={gridAlbums}>
+    {#snippet chunk(chunkAlbums)}
+      {#each chunkAlbums as album (album.id)}
+        {@render albumCard(album)}
+      {/each}
+    {/snippet}
+  </LazyAlbumGrid>
+{/snippet}
+
 {#if isSearching}
   {#if searchHits.length === 0}
-    <p data-testid="space-albums-no-results" class="p-4 text-center text-gray-500">{$t('space_albums_no_matching')}</p>
+    <p data-testid="space-albums-no-results" class="p-4 text-center text-gray-500">
+      {$t('space_albums_no_matching')}
+    </p>
   {:else if $spaceAlbumViewSettings.view === AlbumViewMode.List}
     <!-- Respect the user's List/Cover preference during a search too — it must not be silently
-         discarded for the duration of the query. Deliberately UNGROUPED and with no folder rows
-         (search escapes the folder tree entirely). -->
+       discarded for the duration of the query. Deliberately UNGROUPED and with no folder rows
+       (search escapes the folder tree entirely). -->
     <SpaceAlbumsTable {spaceId} albums={searchHitAlbums} {canManage} {onUnlink} {onToggleTimeline} />
   {:else}
     <!-- Flattened, deliberately UNGROUPED: the path subtitle is the organising signal. -->
-    <div class="grid grid-auto-fill-56 gap-y-4">
-      {#each searchHits as hit (hit.album.id)}
-        <div>
-          <SpaceAlbumCard
-            {spaceId}
-            album={hit.album}
-            {canManage}
-            {onUnlink}
-            {onToggleTimeline}
-            {onToggleMyTimeline}
-            onMove={onMoveAlbum}
-          />
-          {#if hit.path.length > 0}
-            <p class="px-5 text-xs opacity-70" data-testid="space-album-search-path-{hit.album.id}">
-              {hit.path.join(' › ')}
-            </p>
-          {/if}
-        </div>
-      {/each}
-    </div>
+    <LazyAlbumGrid items={searchHits}>
+      {#snippet chunk(chunkHits)}
+        {#each chunkHits as hit (hit.album.id)}
+          <div>
+            {@render albumCard(hit.album)}
+            {#if hit.path.length > 0}
+              <p class="px-5 text-xs opacity-70" data-testid="space-album-search-path-{hit.album.id}">
+                {hit.path.join(' › ')}
+              </p>
+            {/if}
+          </div>
+        {/each}
+      {/snippet}
+    </LazyAlbumGrid>
   {/if}
 {:else if currentFolderId && levelAlbums.length === 0 && sortedFolders.length === 0}
   <!-- Reusing the space-level empty state here would wrongly claim the space has no albums at
-       all, when it only means THIS folder is empty. -->
+     all, when it only means THIS folder is empty. -->
   <p class="p-8 text-center text-gray-500" data-testid="space-album-folder-empty">
     {$t('space_album_folder_empty')}
   </p>
@@ -264,43 +283,21 @@
             <hr class="dark:border-immich-dark-gray" />
           </div>
           {#if !collapsed}
-            <div class="mt-4 grid grid-auto-fill-56 gap-y-4" transition:slide={{ duration: 300 }}>
-              {#each group.albums as album (album.id)}
-                <SpaceAlbumCard
-                  {spaceId}
-                  {album}
-                  {canManage}
-                  {onUnlink}
-                  {onToggleTimeline}
-                  {onToggleMyTimeline}
-                  onMove={onMoveAlbum}
-                />
-              {/each}
+            <div class="mt-4" transition:slide={{ duration: 300 }}>
+              {@render albumGrid(group.albums)}
             </div>
           {/if}
         {/each}
       {:else}
-        <div class="grid grid-auto-fill-56 gap-y-4">
-          {#each sorted as album (album.id)}
-            <SpaceAlbumCard
-              {spaceId}
-              {album}
-              {canManage}
-              {onUnlink}
-              {onToggleTimeline}
-              {onToggleMyTimeline}
-              onMove={onMoveAlbum}
-            />
-          {/each}
-        </div>
+        {@render albumGrid(sorted)}
       {/if}
     {/if}
   {/if}
 {:else}
   <!-- Reachable on first paint (folders starts empty and is only filled by the caller's
-       on-mount reload, so a space whose albums all live in folders is briefly like this) and,
-       without foldersUnavailable being set, on a load failure — never leave the pane silently
-       blank while that resolves. -->
+     on-mount reload, so a space whose albums all live in folders is briefly like this) and,
+     without foldersUnavailable being set, on a load failure — never leave the pane silently
+     blank while that resolves. -->
   <div class="flex justify-center p-8" data-testid="space-albums-loading">
     <LoadingSpinner />
   </div>

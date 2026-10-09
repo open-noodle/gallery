@@ -1,6 +1,7 @@
 <script lang="ts">
   import AlbumTableHeader from '$lib/components/album-page/AlbumsTableHeader.svelte';
   import AlbumTableRow from '$lib/components/album-page/AlbumsTableRow.svelte';
+  import LazyChunks from '$lib/components/shared-components/lazy-chunks.svelte';
   import { AlbumGroupBy, albumViewSettings } from '$lib/stores/preferences.store';
   import {
     isAlbumGroupCollapsed,
@@ -8,10 +9,10 @@
     toggleAlbumGroupCollapsing,
     type AlbumGroup,
   } from '$lib/utils/album-utils';
+  import type { AlbumResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { slide } from 'svelte/transition';
 
   type Props = {
     groupedAlbums: AlbumGroup[];
@@ -20,6 +21,25 @@
 
   const { groupedAlbums, albumGroupOption = AlbumGroupBy.None }: Props = $props();
 </script>
+
+<!-- Rows mount in chunks near the viewport (LazyChunks), one <tbody> per chunk. A run of chunks
+     still reads as one bordered box: every chunk draws the side borders, and only the first and
+     last chunk of the run add the top/bottom edge and rounded corners. -->
+{#snippet albumRows(rowAlbums: AlbumResponseDto[], extraClass = '')}
+  <LazyChunks
+    items={rowAlbums}
+    chunkSize={50}
+    estimateHeight={(count) => count * 48}
+    tag="tbody"
+    class="block w-full border-x dark:border-immich-dark-gray dark:text-immich-dark-fg [&:not(:has(+[data-chunk]))]:rounded-b-md [&:not(:has(+[data-chunk]))]:border-b [&:not([data-chunk]+*)]:rounded-t-md [&:not([data-chunk]+*)]:border-t {extraClass}"
+  >
+    {#snippet chunk(chunkAlbums)}
+      {#each chunkAlbums as album (album.id)}
+        <AlbumTableRow {album} />
+      {/each}
+    {/snippet}
+  </LazyChunks>
+{/snippet}
 
 <table class="mt-2 w-full text-start">
   <thead
@@ -32,11 +52,7 @@
     </tr>
   </thead>
   {#if albumGroupOption === AlbumGroupBy.None}
-    <tbody class="block w-full overflow-y-auto rounded-md border dark:border-immich-dark-gray dark:text-immich-dark-fg">
-      {#each groupedAlbums[0].albums as album (album.id)}
-        <AlbumTableRow {album} />
-      {/each}
-    </tbody>
+    {@render albumRows(groupedAlbums[0].albums)}
   {:else}
     {#each groupedAlbums as albumGroup (albumGroup.id)}
       {@const isCollapsed = isAlbumGroupCollapsed($albumViewSettings, albumGroup.id)}
@@ -63,14 +79,7 @@
         </tr>
       </tbody>
       {#if !isCollapsed}
-        <tbody
-          class="mt-4 block w-full overflow-y-auto rounded-md border dark:border-immich-dark-gray dark:text-immich-dark-fg"
-          transition:slide={{ duration: 300 }}
-        >
-          {#each albumGroup.albums as album (album.id)}
-            <AlbumTableRow {album} />
-          {/each}
-        </tbody>
+        {@render albumRows(albumGroup.albums, '[&:not([data-chunk]+*)]:mt-4')}
       {/if}
     {/each}
   {/if}

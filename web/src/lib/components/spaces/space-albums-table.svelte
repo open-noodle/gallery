@@ -1,6 +1,4 @@
 <script lang="ts">
-  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
-  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { SortOrder, locale } from '$lib/stores/preferences.store';
   import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
   import {
@@ -8,14 +6,14 @@
     toggleSpaceAlbumGroupCollapsing,
     type SpaceAlbumGroup,
   } from '$lib/utils/space-album-grouping';
+  import LazyChunks from '$lib/components/shared-components/lazy-chunks.svelte';
   import { buildFolderSummaries, EMPTY_FOLDER_SUMMARY, getFolderContents } from '$lib/utils/space-album-folders';
   import { dateFormats } from '$lib/constants';
   import { Route } from '$lib/route';
   import { type SharedSpaceAlbumFolderDto, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-  import { Icon } from '@immich/ui';
-  import { mdiChevronRight, mdiDotsVertical, mdiFolder } from '@mdi/js';
+  import { ContextMenuButton, Icon } from '@immich/ui';
+  import { mdiChevronRight, mdiFolder } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { slide } from 'svelte/transition';
 
   interface Props {
     spaceId: string;
@@ -93,33 +91,40 @@
     <!-- Every member sees the menu (the "my timeline" item is a personal preference, not an
          editor action); only canManage adds the space-wide items. -->
     <td class="text-md w-1/12 text-end" data-testid="space-album-row-menu-{album.id}">
-      <ButtonContextMenu
-        icon={mdiDotsVertical}
-        title={$t('more')}
-        color="secondary"
-        variant="ghost"
-        size="medium"
-        align="top-right"
-        direction="left"
-      >
-        <MenuOption
-          text={album.hiddenFromMyTimeline
-            ? $t('space_albums_show_in_my_timeline')
-            : $t('space_albums_hide_from_my_timeline')}
-          onClick={() => onToggleMyTimeline?.(album)}
-        />
-        {#if canManage}
-          <MenuOption
-            text={album.showInTimeline
+      <!-- @immich/ui only mounts the menu once opened; see space-album-card. -->
+      <ContextMenuButton
+        aria-label={$t('more')}
+        position="top-left"
+        items={[
+          {
+            title: album.hiddenFromMyTimeline
+              ? $t('space_albums_show_in_my_timeline')
+              : $t('space_albums_hide_from_my_timeline'),
+            onAction: () => onToggleMyTimeline?.(album),
+          },
+          {
+            title: album.showInTimeline
               ? $t('space_albums_hide_from_space_photos')
-              : $t('spaces_linked_albums_show_in_timeline')}
-            onClick={() => onToggleTimeline?.(album)}
-          />
-          <MenuOption text={$t('spaces_linked_albums_unlink')} onClick={() => onUnlink?.(album)} />
-        {/if}
-      </ButtonContextMenu>
+              : $t('spaces_linked_albums_show_in_timeline'),
+            $if: () => canManage,
+            onAction: () => onToggleTimeline?.(album),
+          },
+          { title: $t('spaces_linked_albums_unlink'), $if: () => canManage, onAction: () => onUnlink?.(album) },
+        ]}
+      />
     </td>
   </tr>
+{/snippet}
+
+<!-- Rows mount in chunks near the viewport (see LazyChunks); a row is ~3.5rem tall. -->
+{#snippet albumRows(rowAlbums: SharedSpaceLinkedAlbumDto[])}
+  <LazyChunks items={rowAlbums} chunkSize={50} estimateHeight={(count) => count * 56} tag="tbody" class="block w-full">
+    {#snippet chunk(chunkAlbums)}
+      {#each chunkAlbums as album (album.id)}
+        {@render albumRow(album)}
+      {/each}
+    {/snippet}
+  </LazyChunks>
 {/snippet}
 
 {#snippet folderRow(folder: SharedSpaceAlbumFolderDto)}
@@ -206,18 +211,10 @@
         </tr>
       </tbody>
       {#if !collapsed}
-        <tbody class="mt-2 block w-full" transition:slide={{ duration: 300 }}>
-          {#each group.albums as album (album.id)}
-            {@render albumRow(album)}
-          {/each}
-        </tbody>
+        {@render albumRows(group.albums)}
       {/if}
     {/each}
   {:else}
-    <tbody>
-      {#each albums as album (album.id)}
-        {@render albumRow(album)}
-      {/each}
-    </tbody>
+    {@render albumRows(albums)}
   {/if}
 </table>
