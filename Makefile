@@ -147,7 +147,7 @@ gallery-ml-smoke:
 
 .PHONY: fork-ownership-coverage-check
 fork-ownership-coverage-check:
-	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
+	git diff --name-only "upstream/$$(awk '$$1 == "upstream_branch:" { print $$2; exit }' docs/fork/ownership.yml)...origin/main" | sort > /tmp/gallery-fork-files.txt
 	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml --expected-head "$$(git rev-parse origin/main)"
 
 prod:
