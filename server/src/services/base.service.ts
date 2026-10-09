@@ -10,6 +10,7 @@ import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE, SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFace, UserAdmin } from 'src/database.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
 import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
@@ -41,6 +42,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -93,6 +95,7 @@ import {
   requirePersonAccess,
 } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
+import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph.js';
 import {
   ContentDisposition,
   ImmichFileResponse,
@@ -178,6 +181,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   ViewRepository,
   WebsocketRepository,
   WorkflowRepository,
+  FamilyRepository,
 ] as const;
 
 @Injectable()
@@ -253,6 +257,7 @@ export class BaseService {
     protected viewRepository: ViewRepository,
     protected websocketRepository: WebsocketRepository,
     protected workflowRepository: WorkflowRepository,
+    protected familyRepository: FamilyRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -268,6 +273,7 @@ export class BaseService {
     this.identityMergePropagationService = new IdentityMergePropagationService({
       databaseRepository,
       faceIdentityRepository,
+      familyRepository,
       jobRepository,
       logger: this.logger,
       personRepository,
@@ -351,6 +357,7 @@ export class BaseService {
       ctx.viewRepository,
       ctx.websocketRepository,
       ctx.workflowRepository,
+      ctx.familyRepository,
     );
 
     service.logger.setContext(BaseService.name);
@@ -376,6 +383,27 @@ export class BaseService {
 
   updateConfig(newConfig: SystemConfig) {
     return updateConfig(this.configRepos, newConfig);
+  }
+
+  // Gallery-fork: family relationships. The single entry point every service uses to attach a
+  // `familyRelationLabel` to a person it is about to return — `PersonService` (getAll/getById)
+  // and `AssetService` (the embedded `people` on a returned asset) both call this rather than
+  // each re-deriving access/graph logic, so there is exactly one composition of
+  // `resolveFamilyAccessLevel`/`buildFamilyGraph`/`resolveFamilyRootId`
+  // (`src/utils/family-graph.ts`) for the whole app, not one per caller.
+  //
+  // `this.familyRepository`/etc. are `protected`, so TS refuses to widen `this` itself to the
+  // (structurally public) `FamilyLabelRepositories` shape — this object literal is the fix:
+  // accessing protected members from inside a `BaseService` method is fine, and the literal's
+  // own properties are ordinary public ones.
+  protected async getFamilyLabelSet(auth: AuthDto): Promise<FamilyLabelSet> {
+    const { familyTree } = await this.getConfig({ withCache: false });
+    const repos: FamilyLabelRepositories = {
+      familyRepository: this.familyRepository,
+      faceIdentityRepository: this.faceIdentityRepository,
+      userRepository: this.userRepository,
+    };
+    return resolveFamilyLabelSet(repos, familyTree, auth.user.id);
   }
 
   requireAccess(request: AccessRequest) {

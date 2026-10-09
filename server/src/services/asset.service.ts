@@ -42,6 +42,7 @@ import {
   AssetStatus,
   AssetType,
   AssetVisibility,
+  FamilyAccessLevel,
   JobName,
   JobStatus,
   Permission,
@@ -184,6 +185,14 @@ export class AssetService extends BaseService {
       data.canEdit = editable.has(id);
     }
 
+    // Gallery-fork: family relationships. Applied LAST, after every space-scoping/hidden-people
+    // branch above, and unconditionally across all of them — access to `familyRelationLabel`
+    // comes from the family grant alone, never from a space role, so a space-sourced person (or
+    // one reached through an album/partner share) must not silently lose its label. `person.id`
+    // is never reassigned by `applySpacePeople` (it only overlays display fields), so the
+    // owner-scoped `identityByPersonId` built from `asset.faces` still applies to every branch.
+    await this.applyFamilyRelationLabels(auth, data, asset.faces ?? []);
+
     return data;
   }
 
@@ -192,6 +201,45 @@ export class AssetService extends BaseService {
     // the same call the write will make, so the answer cannot drift from enforcement.
     const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
     return { editableAssetIds: [...editable] };
+  }
+
+  private buildIdentityByPersonId(faces: ShallowDehydrateObject<AssetFace>[]): Map<string, string> {
+    const identityByPersonId = new Map<string, string>();
+    for (const face of faces) {
+      // Keyed on `personGroupId`, not `person.id`: since upstream's cluster groups landed, the
+      // `id` on a mapped `PersonResponseDto` is the person GROUP id, so keying this map on the
+      // per-cluster `person.id` would never match the `person.id` the callers look up.
+      if (face.person?.personGroupId && face.person.identityId) {
+        identityByPersonId.set(face.person.personGroupId, face.person.identityId);
+      }
+    }
+    return identityByPersonId;
+  }
+
+  // ONE graph load per request (`getFamilyLabelSet`, `BaseService`) regardless of how many people
+  // this one asset carries — never one per person, and this is only ever called once per `get()`
+  // call, never once per asset in a list (see the base slice's report for why list/search/
+  // timeline responses are out of scope here: none of them fetch the `faces` relation at all, so
+  // `mapAsset`'s `people` array is already empty for every OTHER caller of `mapAsset`).
+  private async applyFamilyRelationLabels(
+    auth: AuthDto,
+    data: AssetResponseDto,
+    faces: ShallowDehydrateObject<AssetFace>[],
+  ): Promise<void> {
+    const people = data.people;
+    if (!people?.length) {
+      return;
+    }
+
+    const labelSet = await this.getFamilyLabelSet(auth);
+    if (labelSet.level === FamilyAccessLevel.None) {
+      return;
+    }
+
+    const identityByPersonId = this.buildIdentityByPersonId(faces);
+    for (const person of people) {
+      person.familyRelationLabel = labelSet.label(identityByPersonId.get(person.id));
+    }
   }
 
   private async applyResolvedPersonMetadata(
@@ -204,12 +252,7 @@ export class AssetService extends BaseService {
       return;
     }
 
-    const identityByPersonId = new Map<string, string>();
-    for (const face of faces) {
-      if (face.person?.personGroupId && face.person.identityId) {
-        identityByPersonId.set(face.person.personGroupId, face.person.identityId);
-      }
-    }
+    const identityByPersonId = this.buildIdentityByPersonId(faces);
 
     // Shared with PersonService.getFacesById, the sibling read path the Info panel uses for the
     // owner — the two have to resolve identically or the age appears on one surface only (#808).

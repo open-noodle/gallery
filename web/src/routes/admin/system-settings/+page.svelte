@@ -2,6 +2,7 @@
   import ClassificationSettings from './ClassificationSettings.svelte';
   import AuthSettings from './AuthSettings.svelte';
   import BackupSettings from './BackupSettings.svelte';
+  import FamilySettings from './FamilySettings.svelte';
   import FFmpegSettings from './FFmpegSettings.svelte';
   import ImageSettings from './ImageSettings.svelte';
   import JobSettings from './JobSettings.svelte';
@@ -35,6 +36,7 @@
     mdiChartPie,
     mdiClockOutline,
     mdiDatabaseOutline,
+    mdiFamilyTree,
     mdiFileCheckOutline,
     mdiFileDocumentOutline,
     mdiFolderOutline,
@@ -82,6 +84,15 @@
       subtitle: $t('admin.backup_settings_description'),
       key: 'backup',
       icon: mdiBackupRestore,
+    },
+    // Gallery-fork: instance toggle, default access and per-user grants for family
+    // relationships (D2 in the family-relationships design).
+    {
+      component: FamilySettings,
+      title: $t('admin.family_admin_settings'),
+      subtitle: $t('admin.family_admin_settings_description'),
+      key: 'family',
+      icon: mdiFamilyTree,
     },
     {
       component: ImageSettings,
