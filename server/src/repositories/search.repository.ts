@@ -113,6 +113,9 @@ export interface SearchPathOptions {
   thumbnailPath?: string;
 }
 
+/** Which "missing location" state to filter for. The two values are disjoint. */
+export type LocationPresence = 'noGps' | 'noPlaceName';
+
 export interface SearchExifOptions {
   city?: string | null;
   country?: string | null;
@@ -123,6 +126,11 @@ export interface SearchExifOptions {
   description?: string | null;
   rating?: number | null;
   ratingIsMinimum?: boolean;
+  /**
+   * Absence-of-location filter. Mutually exclusive with city/state/country — it is a member of the
+   * same location group, never an extra narrowing on top of one.
+   */
+  locationPresence?: LocationPresence;
 }
 
 export interface SearchEmbeddingOptions {
@@ -275,7 +283,7 @@ type SmartFacetExclude =
 
 const smartFacetFilterExcludes: Partial<Record<SmartFacetExclude, (keyof AssetFilter)[]>> = {
   time: ['takenAfter', 'takenBefore'],
-  location: ['country', 'city'],
+  location: ['country', 'city', 'locationPresence'],
   city: ['city'],
   camera: ['make', 'model'],
   cameraModel: ['model'],
@@ -297,6 +305,8 @@ export interface SmartSearchFacetsResult {
   hasFavorites: boolean;
   hasAssetsInAlbum: boolean;
   hasAssetsNotInAlbum: boolean;
+  hasNoGpsAssets: boolean;
+  hasNoPlaceNameAssets: boolean;
 }
 
 export type LargeAssetSearchOptions = AssetSearchOptions & { minFileSize?: number };
@@ -392,6 +402,16 @@ interface FilterSuggestionFilterOptions {
    */
   state?: string;
   city?: string;
+  /**
+   * Absence-of-location filter. A first-class facet key like `state`, so that an active selection
+   * narrows *every* suggestion list — people, tags, camera makes, ratings, media types — the way
+   * `country` / `state` / `city` already do. It is also a member of the location group, so it must
+   * join the same self-exclusion `without(...)` calls those do, or the entry that reports it
+   * (`hasNoGpsAssets` / `hasNoPlaceNameAssets`) would collapse the moment it is selected. The location
+   * group members that a list must NOT be narrowed by are excluded per call site via `without(...)`,
+   * never here.
+   */
+  locationPresence?: LocationPresence;
   make?: string;
   model?: string;
   /** Lens model. Same reasoning as `state`, for the camera group. */
@@ -444,6 +464,8 @@ export interface FilterSuggestionsResult {
   hasFavorites: boolean;
   hasAssetsInAlbum: boolean;
   hasAssetsNotInAlbum: boolean;
+  hasNoGpsAssets: boolean;
+  hasNoPlaceNameAssets: boolean;
 }
 
 /** Skip threshold when disabled (0), undefined, or at max cosine distance (>= 2) since it would filter nothing */
@@ -758,6 +780,7 @@ export class SearchRepository {
       const mediaTypes = await this.getSmartFacetMediaTypes(trx, options);
       const hasFavorites = await this.getSmartFacetHasFavorites(trx, options);
       const albumMembership = await this.getSmartFacetAlbumMembership(trx, options);
+      const locationPresenceFlags = await this.getSmartFacetLocationPresenceFlags(trx, options);
 
       return {
         total,
@@ -773,6 +796,7 @@ export class SearchRepository {
         hasUnnamedPeople: peopleResult.hasUnnamedPeople,
         hasFavorites,
         ...albumMembership,
+        ...locationPresenceFlags,
       };
     });
   }
@@ -785,6 +809,11 @@ export class SearchRepository {
         options,
         'city',
         'country',
+        // A location-group member, like city/country above: it must stay out of the shared candidate
+        // table so per-facet calls can exclude it via `buildSmartFacetFilteredAssetIds`'s `exclude:
+        // 'location'` (otherwise the flags/country list computed with the location group "excluded"
+        // would still be narrowed by it here, and the sibling entry would vanish on selection).
+        'locationPresence',
         'make',
         'model',
         'rating',
@@ -885,6 +914,15 @@ export class SearchRepository {
         qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),
       )
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`));
+  }
+
+  private async getSmartFacetLocationPresenceFlags(
+    trx: Kysely<DB>,
+    options: SmartSearchFacetsOptions,
+  ): Promise<{ hasNoGpsAssets: boolean; hasNoPlaceNameAssets: boolean }> {
+    // Same reasoning as getLocationPresenceFlags below: the location group excludes itself so the
+    // sibling entry does not vanish once one is selected.
+    return this.computeLocationPresenceFlags(trx, this.buildSmartFacetFilteredAssetIds(trx, options, 'location'));
   }
 
   private async getSmartFacetTotal(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<number> {
@@ -1460,7 +1498,11 @@ export class SearchRepository {
     // `state` is excluded for exactly that reason too (a state implies its country), and because the
     // whole location group is replaced by one click in the panel: country / state / city are ONE
     // filter (`handleLocationChange`), so the top level of it must never be narrowed by its children.
-    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'country', 'state', 'city'));
+    // `locationPresence` joins the group for the same reason.
+    const filteredIds = this.buildFilteredAssetIds(
+      userIds,
+      without(options, 'country', 'state', 'city', 'locationPresence'),
+    );
     const res = await this.db
       .selectFrom('asset_exif')
       .select('country')
@@ -1707,22 +1749,33 @@ export class SearchRepository {
     ],
   })
   async getFilterSuggestions(userIds: string[], options: FilterSuggestionsOptions): Promise<FilterSuggestionsResult> {
-    const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes, hasFavorites, albumMembership] =
-      await Promise.all([
-        // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
-        // country, so leaving it applied would collapse the country selector to a single row —
-        // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
-        this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city')),
-        // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
-        // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
-        this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
-        this.getFilteredTags(userIds, without(options, 'tagIds')),
-        this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
-        this.getFilteredRatings(userIds, without(options, 'rating')),
-        this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
-        this.getFilteredHasFavorites(userIds, without(options, 'isFavorite')),
-        this.getFilteredAlbumMembership(userIds, without(options, 'isInAlbum', 'isNotInAlbum')),
-      ]);
+    const [
+      countries,
+      cameraMakes,
+      tags,
+      peopleResult,
+      ratings,
+      mediaTypes,
+      hasFavorites,
+      albumMembership,
+      locationPresenceFlags,
+    ] = await Promise.all([
+      // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
+      // country, so leaving it applied would collapse the country selector to a single row —
+      // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
+      // `locationPresence` joins the group for the same reason.
+      this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city', 'locationPresence')),
+      // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
+      // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
+      this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
+      this.getFilteredTags(userIds, without(options, 'tagIds')),
+      this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
+      this.getFilteredRatings(userIds, without(options, 'rating')),
+      this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
+      this.getFilteredHasFavorites(userIds, without(options, 'isFavorite')),
+      this.getFilteredAlbumMembership(userIds, without(options, 'isInAlbum', 'isNotInAlbum')),
+      this.getLocationPresenceFlags(userIds, options),
+    ]);
 
     return {
       countries,
@@ -1734,6 +1787,7 @@ export class SearchRepository {
       hasUnnamedPeople: peopleResult.hasUnnamedPeople,
       hasFavorites,
       ...albumMembership,
+      ...locationPresenceFlags,
     };
   }
 
@@ -1916,6 +1970,47 @@ export class SearchRepository {
           options.isFavorite ? favoriteExistsFor(eb, userIds[0]) : eb.not(favoriteExistsFor(eb, userIds[0])),
         ),
       );
+  }
+
+  /**
+   * Counts, within an already-scoped set of asset ids, whether either absence-of-location state
+   * exists. A LEFT join is load-bearing: an asset with no `asset_exif` row at all must still count
+   * towards `hasNoGpsAssets` (mirrors the `noGps` NOT EXISTS predicate elsewhere in this file), which
+   * an INNER join would silently drop.
+   */
+  private async computeLocationPresenceFlags(
+    db: Kysely<DB>,
+    filteredIds: SelectQueryBuilder<DB, any, any>,
+  ): Promise<{ hasNoGpsAssets: boolean; hasNoPlaceNameAssets: boolean }> {
+    const row = await db
+      .selectFrom('asset')
+      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .where('asset.id', 'in', filteredIds)
+      .select((eb) => [
+        eb.fn.count<number>(sql`case when "asset_exif"."latitude" is null then 1 end`).as('noGps'),
+        eb.fn
+          .count<number>(sql`case when "asset_exif"."latitude" is not null and "asset_exif"."city" is null then 1 end`)
+          .as('noPlaceName'),
+      ])
+      .executeTakeFirst();
+
+    return {
+      hasNoGpsAssets: Number(row?.noGps ?? 0) > 0,
+      hasNoPlaceNameAssets: Number(row?.noPlaceName ?? 0) > 0,
+    };
+  }
+
+  private getLocationPresenceFlags(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<{ hasNoGpsAssets: boolean; hasNoPlaceNameAssets: boolean }> {
+    // The location group excludes itself, exactly like getCountries — otherwise selecting one entry
+    // recomputes the other inside the already-narrowed set and the sibling entry disappears.
+    const filteredIds = this.buildFilteredAssetIds(
+      userIds,
+      without(options, 'country', 'state', 'city', 'locationPresence'),
+    );
+    return this.computeLocationPresenceFlags(this.db, filteredIds);
   }
 
   private async getFilteredCountries(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {

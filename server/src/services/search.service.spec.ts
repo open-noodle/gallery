@@ -1162,6 +1162,8 @@ describe(SearchService.name, () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     };
 
     beforeEach(() => {
@@ -1711,6 +1713,8 @@ describe(SearchService.name, () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     };
 
     // #763: the Favourites section is offered based on a WIDER space scope than every other facet.
@@ -1760,6 +1764,8 @@ describe(SearchService.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
       (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
         people: [{ id: 'p1', name: 'Alice' }],
@@ -1847,6 +1853,8 @@ describe(SearchService.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
 
       const result = await sut.getFilterSuggestions(auth, { albumId });

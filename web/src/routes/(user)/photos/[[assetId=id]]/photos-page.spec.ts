@@ -277,6 +277,8 @@ describe('Photos page search URL state', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     sdkMock.searchSmartFacets.mockResolvedValue({
       total: 12,
@@ -293,6 +295,8 @@ describe('Photos page search URL state', () => {
       hasFavorites: true,
       hasAssetsInAlbum: true,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     sdkMock.getSearchSuggestions.mockResolvedValue([]);
   });
@@ -1444,6 +1448,8 @@ describe('Photos page — empty state under active filters (#763)', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     timelineStubGlobals.__timelineStubAssetCount = 0;
   });

@@ -201,6 +201,8 @@ describe(SearchController.name, () => {
           hasFavorites: true,
           hasAssetsInAlbum: true,
           hasAssetsNotInAlbum: true,
+          hasNoGpsAssets: false,
+          hasNoPlaceNameAssets: false,
         });
       });
 
@@ -506,6 +508,8 @@ describe(SearchController.name, () => {
           hasFavorites: false,
           hasAssetsInAlbum: false,
           hasAssetsNotInAlbum: false,
+          hasNoGpsAssets: false,
+          hasNoPlaceNameAssets: false,
         });
 
         const { status, body } = await request(ctx.getHttpServer())
@@ -524,6 +528,8 @@ describe(SearchController.name, () => {
           hasFavorites: false,
           hasAssetsInAlbum: false,
           hasAssetsNotInAlbum: false,
+          hasNoGpsAssets: false,
+          hasNoPlaceNameAssets: false,
         });
         expect(service.getFilterSuggestions).toHaveBeenCalledWith(
           expect.anything(),
@@ -581,6 +587,8 @@ describe(SearchController.name, () => {
           hasFavorites: false,
           hasAssetsInAlbum: false,
           hasAssetsNotInAlbum: false,
+          hasNoGpsAssets: false,
+          hasNoPlaceNameAssets: false,
         });
 
         const { status } = await request(ctx.getHttpServer())
@@ -611,6 +619,8 @@ describe(SearchController.name, () => {
           hasFavorites: false,
           hasAssetsInAlbum: false,
           hasAssetsNotInAlbum: false,
+          hasNoGpsAssets: false,
+          hasNoPlaceNameAssets: false,
         });
 
         const { status } = await request(ctx.getHttpServer())

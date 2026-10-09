@@ -19,6 +19,7 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash-es';
 import { InjectKysely } from 'nestjs-kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import type { LocationPresence } from 'src/repositories/search.repository.js';
 import { type LockableProperty, Stack, lockableProperties } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -147,6 +148,11 @@ interface AssetBuilderOptions {
   model?: string;
   lensModel?: string;
   state?: string;
+  /**
+   * Absence-of-location filter. Mutually exclusive with city/state/country — it is a member of the
+   * same location group, never an extra narrowing on top of one.
+   */
+  locationPresence?: LocationPresence;
   originalFileName?: string;
   description?: string;
   ocr?: string;

@@ -1193,6 +1193,93 @@ describe('LocationFilter', () => {
       expect(queryByTestId('location-city-Munich')).toBeTruthy();
     });
   });
+
+  it('offers both absence-of-location rows when the server says they would match', () => {
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+        hasNoGpsAssets: true,
+        hasNoPlaceNameAssets: true,
+      },
+    });
+
+    expect(getByTestId('location-presence-noGps')).toBeTruthy();
+    expect(getByTestId('location-presence-noPlaceName')).toBeTruthy();
+  });
+
+  it('offers the row instead of the empty-state message when no country has ever been geotagged', () => {
+    // A library where every asset lacks GPS entirely has no countries to list at all — the
+    // empty-state guard must not swallow the very row this feature exists to offer.
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: [],
+        onCityFetch: () => Promise.resolve([]),
+        onSelectionChange: () => {},
+        hasNoGpsAssets: true,
+      },
+    });
+
+    expect(getByTestId('location-presence-noGps')).toBeTruthy();
+    expect(queryByTestId('location-empty')).toBeNull();
+  });
+
+  it('hides a row the server says would match nothing', () => {
+    const { queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
+      },
+    });
+
+    expect(queryByTestId('location-presence-noGps')).toBeNull();
+    expect(queryByTestId('location-presence-noPlaceName')).toBeNull();
+  });
+
+  it('reports the selection so the panel can replace the whole location group', async () => {
+    let selected: string | undefined | 'unset' = 'unset';
+
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+        hasNoGpsAssets: true,
+        selectedCountry: 'France',
+        selectedCity: 'Paris',
+        onLocationPresenceChange: (value?: 'noGps' | 'noPlaceName') => {
+          selected = value;
+        },
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-presence-noGps'));
+    expect(selected).toBe('noGps');
+  });
+
+  it('clears the active presence row when clicked again', async () => {
+    let selected: string | undefined | 'unset' = 'unset';
+
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+        hasNoGpsAssets: true,
+        selectedLocationPresence: 'noGps',
+        onLocationPresenceChange: (value?: 'noGps' | 'noPlaceName') => {
+          selected = value;
+        },
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-presence-noGps'));
+    expect(selected).toBeUndefined();
+  });
 });
 
 describe('CameraFilter', () => {

@@ -1,4 +1,4 @@
-import { AssetTypeEnum } from '@immich/sdk';
+import { AssetTypeEnum, LocationPresence } from '@immich/sdk';
 import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import type { SearchTerms } from '$lib/services/search.service';
 
@@ -35,6 +35,10 @@ export function filterStateToSearchTerms(filters: FilterState): SearchTerms {
   }
   if (filters.state) {
     terms.state = filters.state;
+  }
+  if (filters.locationPresence) {
+    terms.locationPresence =
+      filters.locationPresence === 'noGps' ? LocationPresence.NoGps : LocationPresence.NoPlaceName;
   }
   if (filters.ownerId) {
     terms.ownerId = filters.ownerId;

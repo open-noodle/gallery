@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { FilterPanelConfig } from '../filter-panel';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
+import LocationFilter from '../location-filter.svelte';
 import PeopleFilter from '../people-filter.svelte';
 
 describe('Orphaned selections', () => {
@@ -135,6 +136,23 @@ describe('Orphaned selections', () => {
     expect(orphanedItem).toBeTruthy();
     expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
+  });
+
+  it('keeps a selected absence-of-location row visible after its flag goes false', () => {
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: [],
+        onCityFetch: () => Promise.resolve([]),
+        onSelectionChange: () => {},
+        hasNoGpsAssets: false,
+        selectedLocationPresence: 'noGps',
+      },
+    });
+
+    // An active filter must never be reachable only through the chip. Note countries is EMPTY here:
+    // this also proves the empty-state guard admits a lone presence selection instead of rendering
+    // the "No locations found" message over it.
+    expect(getByTestId('location-presence-noGps')).toBeTruthy();
   });
 
   it('should show orphaned camera make at top of camera list with opacity-50', async () => {
