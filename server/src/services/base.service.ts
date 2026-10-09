@@ -41,6 +41,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -139,6 +140,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   FaceRepairScanRepository,
   FaceRepairDeclineRepository,
   FacePersonVerdictRepository,
+  GameRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
@@ -214,6 +216,7 @@ export class BaseService {
     protected faceRepairScanRepository: FaceRepairScanRepository,
     protected faceRepairDeclineRepository: FaceRepairDeclineRepository,
     protected facePersonVerdictRepository: FacePersonVerdictRepository,
+    protected gameRepository: GameRepository,
     protected integrityRepository: IntegrityRepository,
     protected jobRepository: JobRepository,
     protected libraryRepository: LibraryRepository,
@@ -312,6 +315,7 @@ export class BaseService {
       ctx.faceRepairScanRepository,
       ctx.faceRepairDeclineRepository,
       ctx.facePersonVerdictRepository,
+      ctx.gameRepository,
       ctx.integrityRepository,
       ctx.jobRepository,
       ctx.libraryRepository,

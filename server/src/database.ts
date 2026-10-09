@@ -296,6 +296,7 @@ export type SharedSpace = {
   thumbnailCropY: number | null;
   faceRecognitionEnabled: boolean;
   petsEnabled: boolean;
+  dailyChallengeEnabled: boolean | null;
   lastActivityAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

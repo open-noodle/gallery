@@ -448,6 +448,10 @@ features:
         - server/src/schema/migrations-gallery/1794100000000-DropAssetIsFavoriteColumn.ts
         - server/src/schema/migrations-gallery/1796000000000-AddAssetFaceCreatedBy.ts
         - server/src/schema/migrations-gallery/1797000000000-AddAssetLocalDateTimeIndex.ts
+        - server/src/schema/migrations-gallery/1798000000000-AddPhotoGuessingGame.ts
+        - server/src/schema/migrations-gallery/1798100000000-AddDailyGameChallenge.ts
+        - server/src/schema/migrations-gallery/1798200000000-AddSpaceDailyChallengeEnabled.ts
+        - server/src/schema/migrations-gallery/1798300000000-AddSoloGameChallenge.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
