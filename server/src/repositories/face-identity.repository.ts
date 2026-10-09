@@ -2681,6 +2681,20 @@ export class FaceIdentityRepository {
     await this.db.deleteFrom('face_identity_face').where('assetFaceId', 'in', assetFaceIds).execute();
   }
 
+  // Removes the face's link only while it still points at `identityId`. Returns whether a row went.
+  @GenerateSql({ params: [{ assetFaceId: DummyValue.UUID, identityId: DummyValue.UUID }] })
+  async unlinkFaceFromIdentity(
+    input: { assetFaceId: string; identityId: string },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<boolean> {
+    const result = await db
+      .deleteFrom('face_identity_face')
+      .where('assetFaceId', '=', input.assetFaceId)
+      .where('identityId', '=', input.identityId)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows) > 0;
+  }
+
   @GenerateSql({ params: [SourceType.MachineLearning] })
   async unlinkFacesBySourceType(sourceType: SourceType, options: { excludePetFaces?: boolean } = {}): Promise<void> {
     await this.db

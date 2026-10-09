@@ -3829,9 +3829,9 @@ export class SharedSpaceRepository {
    * Spec §6.4 (Slice 4): detach one face from one space person. Unlike the two bulk removals
    * above, this is the single-pair primitive the DELETE route uses.
    *
-   * Deliberately deletes ONLY the `shared_space_person_face` projection row — never
-   * `face_identity_face` (F-22). That link is the face's GLOBAL identity; blanking it here would
-   * mutate every other space sharing the same identity (§5.1).
+   * Deletes ONLY the `shared_space_person_face` projection row. Whether the face's
+   * `face_identity_face` link goes too is the service's call (`detachFaceFromSpacePerson`, §6.4
+   * revised): that link is the face's GLOBAL identity, shared by every space (§5.1).
    *
    * Must recount (F-32): `addPersonFaces` recounts on the way in, so a detach that skips this
    * leaves `faceCount`/`assetCount` overstated — columns the people-list ordering index and the
