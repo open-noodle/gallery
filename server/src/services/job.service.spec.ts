@@ -282,7 +282,13 @@ describe(JobService.name, () => {
       },
       {
         item: { name: JobName.AssetGenerateThumbnails, data: { id: 'asset-1', source: 'upload' } },
-        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr, JobName.PetDetection],
+        jobs: [
+          JobName.SmartSearch,
+          JobName.AssetDetectFaces,
+          JobName.Ocr,
+          JobName.PetDetection,
+          JobName.AssetAnalyzeQuality,
+        ],
         stub: [AssetFactory.create({ id: 'asset-1', livePhotoVideoId: newUuid() })],
       },
       {
@@ -292,6 +298,7 @@ describe(JobService.name, () => {
           JobName.AssetDetectFaces,
           JobName.Ocr,
           JobName.PetDetection,
+          JobName.AssetAnalyzeQuality,
           JobName.AssetEncodeVideo,
         ],
         stub: [AssetFactory.create({ id: 'asset-1', type: AssetType.Video })],
@@ -630,6 +637,7 @@ describe(JobService.name, () => {
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
         { name: JobName.PetDetection, data: { id, source: 'upload' } },
+        { name: JobName.AssetAnalyzeQuality, data: { id, source: 'upload' } },
       ]);
     });
 
@@ -649,6 +657,7 @@ describe(JobService.name, () => {
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
         { name: JobName.PetDetection, data: { id, source: 'upload' } },
+        { name: JobName.AssetAnalyzeQuality, data: { id, source: 'upload' } },
         { name: JobName.AssetEncodeVideo, data: { id, source: 'upload' } },
       ]);
     });
@@ -700,6 +709,7 @@ describe(JobService.name, () => {
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
         { name: JobName.PetDetection, data: { id, source: 'upload' } },
+        { name: JobName.AssetAnalyzeQuality, data: { id, source: 'upload' } },
       ]);
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();

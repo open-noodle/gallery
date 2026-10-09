@@ -75,7 +75,7 @@ describe(QueueService.name, () => {
     it('should update concurrency', () => {
       sut.onConfigUpdate({ newConfig: defaults, oldConfig: {} as SystemConfig });
 
-      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(24);
+      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(25);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(5, QueueName.FacialRecognition, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(7, QueueName.DuplicateDetection, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(8, QueueName.BackgroundTask, 5);
@@ -616,6 +616,7 @@ describe(QueueService.name, () => {
         [QueueName.IntegrityCheck]: expected,
         [QueueName.Editor]: expected,
         [QueueName.Classification]: expected,
+        [QueueName.QualityAnalysis]: expected,
         [QueueName.StorageBackendMigration]: expected,
       });
     });
@@ -945,6 +946,18 @@ describe(QueueService.name, () => {
       await sut.runCommandLegacy(QueueName.PetRecognition, { command: QueueCommand.Start, force: false });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PetRecognitionQueueAll, data: { force: false } });
+    });
+
+    it('should handle a start quality analysis command', async () => {
+      mocks.job.isActive.mockResolvedValue(false);
+      mocks.job.getJobCounts.mockResolvedValue(factory.queueStatistics());
+
+      await sut.runCommandLegacy(QueueName.QualityAnalysis, { command: QueueCommand.Start, force: false });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetAnalyzeQualityQueueAll,
+        data: { force: false },
+      });
     });
 
     it('should handle a start people backfill command', async () => {
