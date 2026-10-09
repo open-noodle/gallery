@@ -366,6 +366,36 @@ export class SharedSpaceRepository {
       return [];
     }
 
+    return this.contributableAssetsQuery(userId, [albumId], assetIds)
+      .select(['asset.id as assetId', 'link.spaceId as spaceId'])
+      .distinctOn('asset.id')
+      .orderBy('asset.id')
+      .execute();
+  }
+
+  /**
+   * Batched form of {@link getContributableAssetSpaces} for the add-to-album picker: per album in
+   * `albumIds`, how many of `assetIds` may be contributed to it. Albums with none are absent. Chunked
+   * on `assetIds`, so a caller must sum `count` per album across rows.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID], [DummyValue.UUID]] })
+  @ChunkedArray({ paramIndex: 2 })
+  async getContributableAssetCounts(
+    userId: string,
+    albumIds: string[],
+    assetIds: string[],
+  ): Promise<{ albumId: string; count: number }[]> {
+    if (albumIds.length === 0 || assetIds.length === 0) {
+      return [];
+    }
+
+    return this.contributableAssetsQuery(userId, albumIds, assetIds)
+      .select((eb) => ['link.albumId as albumId', eb.fn.count<number>('asset.id').distinct().as('count')])
+      .groupBy('link.albumId')
+      .execute();
+  }
+
+  private contributableAssetsQuery(userId: string, albumIds: string[], assetIds: string[]) {
     return this.db
       .selectFrom('shared_space_album as link')
       .innerJoin('shared_space_member as m', (join) =>
@@ -383,7 +413,7 @@ export class SharedSpaceRepository {
             .on('asset.ownerId', '!=', userId) // owned assets take the ordinary album_asset path
             .on('asset.visibility', 'in', spaceVisibleAssetVisibilities), // gate out Hidden/Locked
       )
-      .where('link.albumId', '=', albumId)
+      .where('link.albumId', 'in', albumIds)
       .where((eb) =>
         eb.or([
           // Directly shared into the space's pool.
@@ -414,11 +444,7 @@ export class SharedSpaceRepository {
               .whereRef('aa2.assetId', '=', 'asset.id'),
           ),
         ]),
-      )
-      .select(['asset.id as assetId', 'link.spaceId as spaceId'])
-      .distinctOn('asset.id')
-      .orderBy('asset.id')
-      .execute();
+      );
   }
 
   // #752 P0-2: spaces that CURRENTLY link `albumId` and have `userId` as a live member — the
