@@ -13,6 +13,25 @@ export const getAppVersionFromUA = (ua: string) =>
   ua.match(/^Immich_(?:Android|iOS|Unknown)_(?<appVersion>.+)$/)?.groups?.appVersion ??
   null;
 
+/**
+ * Whether the `User-Agent` is the native mobile app's own scheme, regardless of whether a version
+ * could be read out of it.
+ *
+ * This is deliberately **not** `getAppVersionFromUA(ua) !== null`. That is null for two unrelated
+ * cases: a mobile build whose version is missing or unparseable, and every client that is not the
+ * mobile app at all - a browser, the CLI, a third-party script. Behaviour that must apply only to
+ * the mobile app (rather than to "anything whose version we could not read") has to tell those
+ * apart, and only the UA scheme can. See `editAsset()` in src/services/asset.service.ts.
+ *
+ * The version group is therefore matched loosely here where `getAppVersionFromUA` requires at
+ * least one character: `immich-android/` with nothing after the slash is still the mobile app,
+ * it just has no usable version.
+ */
+export const isMobileAppUA = (ua: string) =>
+  /^immich-(?:android|ios|unknown)\//.test(ua) ||
+  // legacy format
+  /^Immich_(?:Android|iOS|Unknown)_/.test(ua);
+
 export const getUserAgentDetails = (headers: IncomingHttpHeaders) => {
   const userAgent = UAParser(headers['user-agent']);
   const appVersion = getAppVersionFromUA(headers['user-agent'] ?? '');

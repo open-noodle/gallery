@@ -32,6 +32,7 @@ import {
 import {
   AssetEditAction,
   type AssetEditActionItem,
+  type AssetEditActionItemResponseDto,
   AssetEditsCreateDto,
   AssetEditsResponseDto,
   type TrimParameters,
@@ -59,6 +60,7 @@ import {
   onBeforeLink,
   onBeforeUnlink,
 } from 'src/utils/asset.util.js';
+import { ClientCapability, clientSupports } from 'src/utils/client-capability.js';
 import { isDeadlockError, retryOnDeadlock, updateLockedColumns } from 'src/utils/database.js';
 import { asDateTimeString, extractTimeZone } from 'src/utils/date.js';
 import { favoriteViewerId } from 'src/utils/favorite.js';
@@ -1181,7 +1183,8 @@ export class AssetService extends BaseService {
       }
     }
 
-    const newEdits = await this.assetEditRepository.replaceAll(id, edits);
+    const editsToPersist = await this.withPreservedAdjustEdit(auth, id, edits);
+    const newEdits = await this.assetEditRepository.replaceAll(id, editsToPersist);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
     // #734: after the write succeeds — a rejected write must log nothing.
@@ -1191,6 +1194,71 @@ export class AssetService extends BaseService {
       assetId: id,
       edits: newEdits,
     };
+  }
+
+  /**
+   * The edit list to persist, with the asset's existing `adjust` edit carried over when - and only
+   * when - the submitting client provably cannot represent one.
+   *
+   * `replaceAll()` is a true full replace, and that is exactly what web wants: omitting an action
+   * is how web *deletes* it. `TransformManager.getEdits()` only emits `adjust` while
+   * `hasAdjustChanges()` holds, and `onActivate()` pre-populates the four sliders from the existing
+   * edit, so a user can open the editor, see the saved values, zero them back out and save - and
+   * the resulting edit list, with no `adjust` in it, is a deliberate removal that must be honoured.
+   *
+   * A mobile app without Adjust support omits `adjust` for an entirely different reason: it has
+   * never heard of it. `AssetEditAction` in mobile/lib/domain/models/asset_edit.model.dart has no
+   * `adjust` member, so `sync_stream.repository.dart` maps the action to the `other` sentinel and
+   * `remote_asset.repository.dart`'s `getAssetEdits()` filters every `other` row out before the
+   * editor is even opened. The mobile editor then submits the crop/rotate/mirror it does know
+   * about, and the full replace destroys an `adjust` edit the user made on web and the app never
+   * showed them. Carrying it over is the only way that save can be non-destructive.
+   *
+   * **The gate is `isMobileApp` AND an unsupported `appVersion`, never the version alone.**
+   * `appVersion` is null for a browser just as it is for an unparseable mobile build, so
+   * `!clientSupports(appVersion, ...)` is equally true of every web save; preserving on that
+   * condition would silently undo web's deliberate removal on every single save - a worse bug than
+   * the one being fixed. `isMobileApp` comes from the UA scheme (see `isMobileAppUA`), which is the
+   * only signal that separates the two cases.
+   *
+   * Clients with no session at all (API keys, shared links) get the plain documented full replace.
+   *
+   * Self-limiting, same shape as the sync-stream gate: once mobile ships Adjust support, sessions
+   * on that release satisfy `clientSupports()` and fall straight through to the full replace with
+   * no change here.
+   *
+   * Scoped to `adjust` on purpose. `trim` is mapped to `other` and filtered on mobile in exactly
+   * the same way, but it is video-only and `editAsset()` already rejects mixing it with spatial
+   * edits, so the mobile image editor can never submit an action set that collides with a stored
+   * trim.
+   */
+  private async withPreservedAdjustEdit(
+    auth: AuthDto,
+    id: string,
+    edits: AssetEditActionItem[],
+    // Supplied by callers that have already read the asset's edits, to avoid a second query.
+    knownExistingEdits?: AssetEditActionItemResponseDto[],
+  ): Promise<AssetEditActionItem[]> {
+    const { session } = auth;
+    if (!session?.isMobileApp || clientSupports(session.appVersion, ClientCapability.AdjustEdits)) {
+      return edits;
+    }
+
+    // A client that sent an `adjust` of its own clearly can represent one; nothing to preserve.
+    if (edits.some((edit) => edit.action === AssetEditAction.Adjust)) {
+      return edits;
+    }
+
+    const existingEdits = knownExistingEdits ?? (await this.assetEditRepository.getAll(id));
+    const existingAdjust = existingEdits.find((edit) => edit.action === AssetEditAction.Adjust);
+    if (!existingAdjust) {
+      return edits;
+    }
+
+    // Appended last, where web's getEdits() also puts it: crop has to stay the first action (the
+    // validation above enforces that), and the compose pipeline applies the colour adjustment
+    // after the geometric ones.
+    return [...edits, { action: existingAdjust.action, parameters: existingAdjust.parameters } as AssetEditActionItem];
   }
 
   async removeAssetEdits(auth: AuthDto, id: string): Promise<void> {
@@ -1212,7 +1280,13 @@ export class AssetService extends BaseService {
       }
     }
 
-    await this.assetEditRepository.replaceAll(id, []);
+    // Same hazard as `editAsset()`: the mobile editor's Save takes *this* path whenever the user
+    // has cleared every crop/rotate/mirror it knows about (`applyEdits()` in
+    // mobile/lib/domain/services/asset.service.dart calls removeEdits for an empty list), so a
+    // client that cannot represent `adjust` would destroy one here too. Web's own "revert to
+    // original" is unaffected - it has no mobile UA, so it keeps deleting everything.
+    const editsToKeep = await this.withPreservedAdjustEdit(auth, id, [], existingEdits);
+    await this.assetEditRepository.replaceAll(id, editsToKeep);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
     // #734: after the write succeeds — a rejected write must log nothing.

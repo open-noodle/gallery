@@ -3306,6 +3306,119 @@ describe(AssetService.name, () => {
 
       expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
     });
+
+    // Reported on PR #1124 review: editing an asset from the mobile app silently deleted an
+    // Adjust edit made on web. replaceAll() is a full replace, and the mobile app has no local
+    // model for the `adjust` action at all (its AssetEditAction has no such member, so sync maps
+    // it to the `other` sentinel and getAssetEdits() filters it out), so the mobile editor
+    // submits crop/rotate/mirror and wipes an edit it was never shown.
+    describe('preserving an adjust edit a client cannot represent', () => {
+      const existingAdjust = {
+        id: 'edit-adjust',
+        action: AssetEditAction.Adjust,
+        parameters: { exposure: 20, invert: true },
+      };
+      const cropEdit = { action: AssetEditAction.Crop, parameters: { x: 10, y: 10, width: 50, height: 50 } };
+
+      const setupImageWithExistingAdjust = (assetId: string) => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+        mocks.asset.getForEdit.mockResolvedValue({
+          type: AssetType.Image,
+          livePhotoVideoId: null,
+          originalPath: '/data/image.jpg',
+          originalFileName: 'image.jpg',
+          duration: null,
+          exifImageWidth: 1920,
+          exifImageHeight: 1080,
+          orientation: null,
+          projectionType: null,
+        });
+        mocks.assetEdit.getAll.mockResolvedValue([existingAdjust] as any);
+        mocks.assetEdit.replaceAll.mockResolvedValue([]);
+      };
+
+      it('should keep the existing adjust edit for a mobile app that predates Adjust support', async () => {
+        const assetId = newUuid();
+        setupImageWithExistingAdjust(assetId);
+
+        await sut.editAsset(factory.auth({ session: { isMobileApp: true, appVersion: '5.6.0' } }), assetId, {
+          edits: [cropEdit],
+        });
+
+        // Appended after the submitted actions: crop has to remain the first action.
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(assetId, [
+          cropEdit,
+          { action: AssetEditAction.Adjust, parameters: existingAdjust.parameters },
+        ]);
+      });
+
+      // The web-regression guard. Web's TransformManager omits `adjust` once all four sliders and
+      // the invert switch are back at their defaults, and onActivate() pre-populates them from the
+      // existing edit - so omission from a web save is a deliberate removal and must still delete.
+      // A browser reports no appVersion either, so gating on the version alone would have broken
+      // this on every single web save.
+      it('should still delete the adjust edit when a non-mobile client omits it', async () => {
+        const assetId = newUuid();
+        setupImageWithExistingAdjust(assetId);
+
+        await sut.editAsset(factory.auth({ session: { isMobileApp: false, appVersion: null } }), assetId, {
+          edits: [cropEdit],
+        });
+
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(assetId, [cropEdit]);
+      });
+
+      it('should still delete the adjust edit for a client with no session at all', async () => {
+        const assetId = newUuid();
+        setupImageWithExistingAdjust(assetId);
+
+        await sut.editAsset(factory.auth({ apiKey: {} }), assetId, { edits: [cropEdit] });
+
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(assetId, [cropEdit]);
+      });
+
+      // Self-limiting: the gate releases itself once mobile ships Adjust support, with no change
+      // to this code.
+      it.each(['5.7.0', '5.8.1', '6.0.0'])(
+        'should stop preserving for a mobile app on %s, which can represent adjust',
+        async (appVersion) => {
+          const assetId = newUuid();
+          setupImageWithExistingAdjust(assetId);
+
+          await sut.editAsset(factory.auth({ session: { isMobileApp: true, appVersion } }), assetId, {
+            edits: [cropEdit],
+          });
+
+          expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(assetId, [cropEdit]);
+        },
+      );
+
+      it('should not append anything when the asset has no adjust edit', async () => {
+        const assetId = newUuid();
+        setupImageWithExistingAdjust(assetId);
+        mocks.assetEdit.getAll.mockResolvedValue([
+          { id: 'edit-rotate', action: AssetEditAction.Rotate, parameters: { angle: 90 } },
+        ] as any);
+
+        await sut.editAsset(factory.auth({ session: { isMobileApp: true, appVersion: '5.6.0' } }), assetId, {
+          edits: [cropEdit],
+        });
+
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(assetId, [cropEdit]);
+      });
+
+      it('should not duplicate an adjust edit the client submitted itself', async () => {
+        const assetId = newUuid();
+        setupImageWithExistingAdjust(assetId);
+        const submittedAdjust = { action: AssetEditAction.Adjust, parameters: { contrast: -5 } };
+
+        await sut.editAsset(factory.auth({ session: { isMobileApp: true, appVersion: '5.6.0' } }), assetId, {
+          edits: [cropEdit, submittedAdjust] as any,
+        });
+
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(assetId, [cropEdit, submittedAdjust]);
+      });
+    });
   });
 
   describe('removeAssetEdits', () => {
@@ -3391,6 +3504,48 @@ describe(AssetService.name, () => {
       await sut.removeAssetEdits(authStub.admin, asset.id);
 
       expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+
+    // The mobile editor's Save reaches this endpoint, not editAsset(), whenever the user has
+    // cleared every crop/rotate/mirror it knows about - applyEdits() in
+    // mobile/lib/domain/services/asset.service.dart calls removeEdits for an empty edit list - so
+    // the same silent destruction of an unrepresentable adjust edit is reachable here.
+    describe('preserving an adjust edit a client cannot represent', () => {
+      const existingAdjust = {
+        id: 'edit-adjust',
+        action: AssetEditAction.Adjust,
+        parameters: { exposure: 20, invert: true },
+      };
+
+      const setupAssetWithExistingAdjust = () => {
+        const asset = AssetFactory.create();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.asset.getById.mockResolvedValue(asset as any);
+        mocks.assetEdit.getAll.mockResolvedValue([
+          { id: 'edit-crop', action: AssetEditAction.Crop, parameters: { x: 0, y: 0, width: 10, height: 10 } },
+          existingAdjust,
+        ] as any);
+        mocks.assetEdit.replaceAll.mockResolvedValue([]);
+        return asset;
+      };
+
+      it('should keep the adjust edit for a mobile app that predates Adjust support', async () => {
+        const asset = setupAssetWithExistingAdjust();
+
+        await sut.removeAssetEdits(factory.auth({ session: { isMobileApp: true, appVersion: '5.6.0' } }), asset.id);
+
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, [
+          { action: AssetEditAction.Adjust, parameters: existingAdjust.parameters },
+        ]);
+      });
+
+      it('should remove everything for a non-mobile client, whose revert is deliberate', async () => {
+        const asset = setupAssetWithExistingAdjust();
+
+        await sut.removeAssetEdits(factory.auth({ session: { isMobileApp: false, appVersion: null } }), asset.id);
+
+        expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, []);
+      });
     });
   });
 

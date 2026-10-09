@@ -203,6 +203,20 @@ export type Album = Selectable<AlbumTable> & {
 export type AuthSession = {
   id: string;
   hasElevatedPermission: boolean;
+  /**
+   * Mobile app version parsed from the `User-Agent` of the current request, or null for any client
+   * that is not a Gallery/Immich mobile build (browser, CLI, third-party script) and for mobile
+   * builds whose user agent cannot be parsed. Used to withhold payloads an older app would fail to
+   * parse - see `clientSupports()` in src/utils/client-capability.ts.
+   */
+  appVersion: string | null;
+  /**
+   * Whether the `User-Agent` of the current request is the native mobile app's own scheme (see
+   * `isMobileAppUA`). Distinct from `appVersion !== null`, which cannot tell an unparseable mobile
+   * build apart from a browser - both report no version. Behaviour that must apply only to the
+   * mobile app needs this alongside `appVersion`, never `appVersion` on its own.
+   */
+  isMobileApp: boolean;
 };
 
 export type Partner = {

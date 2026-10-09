@@ -44,6 +44,12 @@ const dto = {
   password: 'password',
 };
 
+const bearerRequestWithUserAgent = (userAgent: string) => ({
+  headers: { authorization: 'Bearer auth_token', 'user-agent': userAgent },
+  queryParams: {},
+  metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+});
+
 describe(AuthService.name, () => {
   let sut: AuthService;
   let mocks: ServiceMocks;
@@ -397,7 +403,77 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
+          isMobileApp: false,
         },
+      });
+    });
+
+    it('should report the app version from the current request, not the stored session column', async () => {
+      // The stored column is read before it is written back, so it still holds the previous value
+      // on the request where an app upgrade first appears. Code that gates a payload on the app
+      // version (see clientSupports()) has to see the version actually making the request.
+      const session = SessionFactory.create();
+      const sessionWithToken = {
+        id: session.id,
+        updatedAt: session.updatedAt,
+        user: UserFactory.create(),
+        pinExpiresAt: null,
+        appVersion: '5.6.0',
+        oauthSid: null,
+      };
+
+      mocks.session.getByToken.mockResolvedValue(sessionWithToken);
+      // A changed app version also writes the new value back to the session row.
+      mocks.session.update.mockResolvedValue(session);
+
+      const auth = await sut.authenticate({
+        headers: { authorization: 'Bearer auth_token', 'user-agent': 'immich-android/5.7.0' },
+        queryParams: {},
+        metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+      });
+
+      expect(auth.session?.appVersion).toBe('5.7.0');
+    });
+
+    describe('isMobileApp', () => {
+      beforeEach(() => {
+        const session = SessionFactory.create();
+
+        mocks.session.getByToken.mockResolvedValue({
+          id: session.id,
+          updatedAt: session.updatedAt,
+          user: UserFactory.create(),
+          pinExpiresAt: null,
+          appVersion: null,
+        });
+        mocks.session.update.mockResolvedValue(session);
+      });
+
+      it('should be true for the native mobile app', async () => {
+        await expect(sut.authenticate(bearerRequestWithUserAgent('immich-android/5.6.0'))).resolves.toMatchObject({
+          session: { isMobileApp: true },
+        });
+      });
+
+      it('should be true for a mobile app whose version cannot be read', async () => {
+        // The whole point of the flag: `appVersion` is null here, and callers must still be able
+        // to tell this apart from a browser, which also reports no version.
+        const auth = await sut.authenticate(bearerRequestWithUserAgent('immich-ios/'));
+
+        expect(auth.session?.appVersion).toBeNull();
+        expect(auth.session?.isMobileApp).toBe(true);
+      });
+
+      it('should be false for a browser', async () => {
+        const auth = await sut.authenticate(
+          bearerRequestWithUserAgent(
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+          ),
+        );
+
+        expect(auth.session?.appVersion).toBeNull();
+        expect(auth.session?.isMobileApp).toBe(false);
       });
     });
   });
@@ -564,6 +640,8 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
+          isMobileApp: false,
         },
       });
     });
@@ -2037,6 +2115,8 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
+          isMobileApp: false,
         },
       });
     });
@@ -2331,6 +2411,8 @@ describe(AuthService.name, () => {
         session: {
           id: session.id,
           hasElevatedPermission: false,
+          appVersion: null,
+          isMobileApp: false,
         },
       });
     });
