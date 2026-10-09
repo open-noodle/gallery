@@ -198,9 +198,7 @@ describe('transformManager', () => {
       });
 
       it('is not set by onActivate pre-populating fields from an existing adjust edit', async () => {
-        const edits: EditActions = [
-          { action: AssetEditAction.Adjust, parameters: { exposure: 15, invert: true } },
-        ];
+        const edits: EditActions = [{ action: AssetEditAction.Adjust, parameters: { exposure: 15, invert: true } }];
 
         await transformManager.onActivate(assetWithExif(), edits);
 
