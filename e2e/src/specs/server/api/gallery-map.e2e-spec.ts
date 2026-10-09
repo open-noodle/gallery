@@ -491,10 +491,15 @@ describe('/gallery/map/markers', () => {
       ]);
 
       // Random images (distinct checksums, no EXIF) + an explicit GPS write. latitude/longitude are
-      // lockable exif properties (database.ts lockableProperties), so a user-set value is not
-      // clobbered by the metadata-extraction pass that follows the upload.
+      // lockable exif properties (database.ts lockableProperties), but the lock only protects a value
+      // that is already written when metadata extraction reads the row: a PUT that lands while that
+      // pass is in flight is overwritten by it, and the asset silently loses its pin (seen in CI).
+      // So wait for the upload pipeline to finish (assetUpload fires after it) before writing GPS.
+      // The socket must be connected before the upload, or the event can be missed.
+      const ownerWebsocket = await utils.connectWebsocket(owner.accessToken);
       const createGeotagged = async () => {
         const { id } = await utils.createAsset(owner.accessToken);
+        await utils.waitForWebsocketEvent({ event: 'assetUpload', id });
         const { status } = await request(app)
           .put(`/assets/${id}`)
           .set(asBearerAuth(owner.accessToken))
@@ -508,6 +513,7 @@ describe('/gallery/map/markers', () => {
       hiddenAssetId = await createGeotagged();
       lockedAssetId = await createGeotagged();
       trashedAssetId = await createGeotagged();
+      utils.disconnectWebsocket(ownerWebsocket);
 
       const album = await utils.createAlbum(owner.accessToken, {
         albumName: 't22 visibility album',
@@ -549,7 +555,7 @@ describe('/gallery/map/markers', () => {
       }
 
       await utils.deleteAssets(owner.accessToken, [trashedAssetId]);
-    });
+    }, 60_000);
 
     it('pins an ARCHIVED album asset, for the album owner and for a viewer of the shared album', async () => {
       for (const actor of [owner, viewer]) {
@@ -766,10 +772,14 @@ describe('/gallery/map/markers', () => {
       wildcardUser = await utils.userSetup(admin.accessToken, createUserDto.create('t23-wildcard-user'));
 
       // Random images so each filename gets its own asset row, geotagged so each can produce a pin.
+      // GPS is written only after the upload pipeline finishes, so metadata extraction cannot
+      // overwrite it (see the D4 setup above).
+      const ws = await utils.connectWebsocket(wildcardUser.accessToken);
       const createNamed = async (filename: string) => {
         const { id } = await utils.createAsset(wildcardUser.accessToken, {
           assetData: { bytes: makeRandomImage(), filename },
         });
+        await utils.waitForWebsocketEvent({ event: 'assetUpload', id });
         const { status } = await request(app)
           .put(`/assets/${id}`)
           .set(asBearerAuth(wildcardUser.accessToken))
@@ -781,7 +791,8 @@ describe('/gallery/map/markers', () => {
       underscoreAssetId = await createNamed('IMG_0001.png');
       dashAssetId = await createNamed('IMG-0001.png');
       percentAssetId = await createNamed('battery-100%.png');
-    });
+      utils.disconnectWebsocket(ws);
+    }, 60_000);
 
     it('does not treat `_` in an originalFileName filter as a single-char wildcard', async () => {
       const { status, body } = await request(app)
