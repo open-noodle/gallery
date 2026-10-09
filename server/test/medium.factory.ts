@@ -42,6 +42,7 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
@@ -660,6 +661,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case ClusterGroupRepository:
     case DownloadRepository:
     case DuplicateRepository:
+    case FaceDissolveRepository:
     case FaceIdentityRepository:
     case FaceRepairDeclineRepository:
     case FaceRepairRepository:
@@ -752,6 +754,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case ClassificationRepository:
     case ConfigRepository:
     case CryptoRepository:
+    case FaceDissolveRepository:
     case FaceIdentityRepository:
     case FacePersonVerdictRepository:
     case LibraryRepository:
