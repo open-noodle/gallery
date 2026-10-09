@@ -156,6 +156,57 @@ describe('transformManager', () => {
         expect(transformManager.saturation).toBe(0);
         expect(transformManager.invert).toBe(false);
       });
+
+      it('clears hasChanges', () => {
+        transformManager.exposure = 10;
+        expect(transformManager.hasChanges).toBe(true);
+
+        transformManager.reset();
+
+        expect(transformManager.hasChanges).toBe(false);
+      });
+    });
+
+    // Regression coverage for: moving only the sliders/switch didn't set hasChanges, so closing
+    // the editor skipped the "Discard edits?" prompt and threw the adjustment away silently.
+    // Rotate/mirror/crop already set hasChanges via their own methods (see tests elsewhere in this
+    // file); exposure/contrast/saturation/invert have no such method — the slider/switch bindings
+    // write directly to these properties — so hasChanges has to be set from their setters instead.
+    describe('hasChanges', () => {
+      beforeEach(() => {
+        transformManager.reset();
+      });
+
+      it('is set when exposure changes', () => {
+        transformManager.exposure = 10;
+        expect(transformManager.hasChanges).toBe(true);
+      });
+
+      it('is set when contrast changes', () => {
+        transformManager.contrast = -10;
+        expect(transformManager.hasChanges).toBe(true);
+      });
+
+      it('is set when saturation changes', () => {
+        transformManager.saturation = 10;
+        expect(transformManager.hasChanges).toBe(true);
+      });
+
+      it('is set when invert changes', () => {
+        transformManager.invert = true;
+        expect(transformManager.hasChanges).toBe(true);
+      });
+
+      it('is not set by onActivate pre-populating fields from an existing adjust edit', async () => {
+        const edits: EditActions = [
+          { action: AssetEditAction.Adjust, parameters: { exposure: 15, invert: true } },
+        ];
+
+        await transformManager.onActivate(assetWithExif(), edits);
+
+        expect(transformManager.exposure).toBe(15);
+        expect(transformManager.hasChanges).toBe(false);
+      });
     });
   });
 });

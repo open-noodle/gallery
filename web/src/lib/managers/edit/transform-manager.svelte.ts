@@ -83,10 +83,50 @@ class TransformManager implements EditToolManager {
   // Color adjustments, not geometric — kept in this manager (rather than a separate one) because
   // EditManager only ever submits the *selected* tool's edits, and Adjust is a mode inside the
   // Transform tool's panel, not a second top-level tool. See specs/2026-09-20-image-adjust-tool-design.md.
-  exposure = $state(0);
-  contrast = $state(0);
-  saturation = $state(0);
-  invert = $state(false);
+  //
+  // Backed by private fields with a get/set pair (rather than plain `$state`) so that, unlike
+  // rotate()/mirror() which are methods the UI calls, the slider/switch bindings in AdjustPanel.svelte
+  // write directly to these properties via bind:value/bind:checked — the setter is the only place
+  // left to mark hasChanges, matching the `this.hasChanges = true` rotate()/mirror() already do.
+  // onActivate()/reset() restore these from saved state (or defaults) through the private fields
+  // directly, bypassing the setter, so loading an existing edit — or resetting — doesn't itself
+  // count as an unsaved change.
+  #exposure = $state(0);
+  #contrast = $state(0);
+  #saturation = $state(0);
+  #invert = $state(false);
+
+  get exposure() {
+    return this.#exposure;
+  }
+  set exposure(value: number) {
+    this.#exposure = value;
+    this.hasChanges = true;
+  }
+
+  get contrast() {
+    return this.#contrast;
+  }
+  set contrast(value: number) {
+    this.#contrast = value;
+    this.hasChanges = true;
+  }
+
+  get saturation() {
+    return this.#saturation;
+  }
+  set saturation(value: number) {
+    this.#saturation = value;
+    this.hasChanges = true;
+  }
+
+  get invert() {
+    return this.#invert;
+  }
+  set invert(value: boolean) {
+    this.#invert = value;
+    this.hasChanges = true;
+  }
 
   edits = $derived.by(() => this.getEdits());
 
@@ -245,11 +285,13 @@ class TransformManager implements EditToolManager {
 
     // Pre-populate the sliders from any existing Adjust edit, same as rotation/mirror above —
     // always assigned (not conditionally skipped) so reopening after a reset also clears them.
+    // Written through the private fields, not the public setters, so restoring saved values isn't
+    // itself treated as an unsaved change.
     const adjustParams = (edits.find((e) => e.action === 'adjust')?.parameters ?? {}) as AdjustParameters;
-    this.exposure = adjustParams.exposure ?? 0;
-    this.contrast = adjustParams.contrast ?? 0;
-    this.saturation = adjustParams.saturation ?? 0;
-    this.invert = adjustParams.invert ?? false;
+    this.#exposure = adjustParams.exposure ?? 0;
+    this.#contrast = adjustParams.contrast ?? 0;
+    this.#saturation = adjustParams.saturation ?? 0;
+    this.#invert = adjustParams.invert ?? false;
 
     await tick();
 
@@ -275,10 +317,10 @@ class TransformManager implements EditToolManager {
     this.imageRotation = 0;
     this.mirrorHorizontal = false;
     this.mirrorVertical = false;
-    this.exposure = 0;
-    this.contrast = 0;
-    this.saturation = 0;
-    this.invert = false;
+    this.#exposure = 0;
+    this.#contrast = 0;
+    this.#saturation = 0;
+    this.#invert = false;
     this.region = { x: 0, y: 0, width: 100, height: 100 };
     this.cropImageSize = { width: 1000, height: 1000 };
     this.originalImageSize = { width: 1000, height: 1000 };
