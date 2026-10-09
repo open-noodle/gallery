@@ -6,14 +6,15 @@
   tracking `upstream/release/v3.3`.
 - **Upstream**: `e3b16560913` (`v3.3.0`) → **`db6e11ecc85`** = tag **`v3.3.1`**, 15 commits, batches 01–07.
   0 behind. v3.3.1 is a published GitHub Release (2026-10-08 21:52Z), and so is v3.3.0 (2026-10-07).
-- **Fork sync**: none needed (`origin/main` has not moved since the cutover).
+- **Fork sync**: #1169 (`6417a8114ce`, e2e-only: map-marker GPS written after the upload pipeline), clean.
+  The sync's ownership-coverage check needed a tooling fix first (see Inconsistencies).
 - **Backups**: `backup/rolling-pre-2026-10-09-v331` (`4fc5fc2789c`), `backup/rolling-v331-after-b05`.
 - **Replays**: two (to batch 05's tip, then to the tag), 1639 fork commits each. `4fc5fc2789c` (the early take
   of immich-32171) was dropped by git as already applied, as its message predicted.
 - **Product-direction gate**: fired on two people commits; maintainer decisions below.
 - **Base bump**: `branding/config.json` `upstream.version` 3.3.0 → **3.3.1**. `revert-to-immich.sql` unchanged
   (v3.3.1 carries no `server/src/schema` change).
-- **Risk**: LOW–MEDIUM. **Recommendation**: PROCEED to CI.
+- **Risk**: LOW–MEDIUM. **Landed on `main`** on 2026-10-09 (see Landing).
 
 ## Incoming Upstream Changes
 
@@ -92,6 +93,10 @@ Every resolution was a region pick or a constructed text, gated on the resolver'
 - `fix(rebase)`: adapt upstream's memory list test to the raw-map `MemoryData`, pin that rule memories keep
   their rule title (verified red with `preferDate` applied to the rule branch), Explore formatting, fr key order.
 - `chore(rebase)`: advance the upstream base to v3.3.1 (config, README, M8 pin).
+- `fix(rebase)`: review follow-ups (revert-script comments, Explore favorite-badge test).
+- `fix(preflight)`: fork ownership coverage diffs against the manifest's `upstream_branch`, and the
+  manifest cursor moves off the orphaned pre-cutover SHA (two commits; the second points it at a commit
+  that survives this cutover).
 
 ## Fork Feature Verification
 
@@ -126,6 +131,15 @@ No new upstream server migration (`server/src/schema/migrations/` equals the v3.
   except `workflow.repository.ts` is byte-identical to that tip, and its `.sql` equals upstream's delta.
   Docker Desktop would not start locally, so CI's SQL Schema Checks job is the confirmation.
 - Shape K appeared twice (`metadata.service.ts`, `person.repository.ts`), both caught by comparing region sizes.
+- **Fork-sync coverage check broken since the v3.3.0 cutover (tooling, pre-existing).**
+  `fork-ownership-coverage-check` diffed `upstream/main...origin/main`. With `main` on the `release/v3.3` line
+  that merge base is where the release branch left upstream `main`, so upstream's own release-branch bumps
+  (`packages/sdk`, `plugin-sdk`, `plugin-core`) read as three uncovered fork files. It also rejected
+  `last_verified_fork_head` `da5480ae42b`, which the 10-06 force-push orphaned. The target now diffs
+  against `upstream/<manifest upstream_branch>`; the manifest covers all 3553 fork files. The cursor is set
+  to a commit on this branch, so the next fork sync after this cutover does not hit the same orphan.
+- The post-rebase audit's `Generated Artifact Review` flag on the OpenAPI spec is informational: the
+  spec's changed-line multiset equals upstream's own v3.3.0→v3.3.1 delta (26 lines).
 
 ## Local Verification
 
@@ -143,6 +157,17 @@ No new upstream server migration (`server/src/schema/migrations/` equals the v3.
 | branding check, prettier (i18n, docs, server)                                       | PASS                                            |
 | medium tests, web/mobile full suites, ML, e2e                                       | CI                                              |
 
+## Landing
+
+- Maintainer call (2026-10-09): land on the v3.3.1 tag after reviewing the branch. The `OrganizationAdmin`
+  bypass was added to ruleset 13531204 for the push; it should come off right after.
+- `main` `6417a8114ce` → the commit carrying this report, `--force-with-lease` on `6417a8114ce`.
+- Backup: **`main-backup-2026-10-09`** (`6417a8114ce`) on origin, plus local `backup/main-2026-10-09`.
+- Every `main` commit is on the branch (`git cherry` marks #1169 as patch-equivalent). 0 behind `v3.3.1`.
+- `release/v3.3` has one commit past the tag: immich-32262 (`762748f9eae`, memories date in every app
+  language, `memory_title.widget.dart` + its test). Not taken — this cutover is on the tag. Next cycle.
+
 ## Remote CI
 
-Pending — see the CI section appended after the run.
+Not run on the branch before landing (local gates only, above). The full suite runs against `main` after
+the force-push; results are recorded here when it finishes.
