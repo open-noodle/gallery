@@ -9,6 +9,10 @@ There are three kind of issues Immich checks for:
 - Missing files: the path is found in the Immich internal database, but does not actually exist on disk
 - Checksum mismatches: the checksum of the file stored in Immich's database does not match the actual file's checksum anymore
 
+:::warning
+All of these checks are skipped whenever any S3 storage backend is configured — they are not yet S3-aware. This includes installs using [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored), where a mix of disk and S3 files is the normal, permanent state rather than a temporary migration window, not just a one-off S3-only setup. See [open-noodle/gallery#685](https://github.com/open-noodle/gallery/issues/685).
+:::
+
 All three run nightly at 3am by default. For the "Checksum files" check, there are additional time and progress limits, as those are the most taxing checks. With these additional limits, Immich can slowly check checksums of your files over the course of a couple of days.
 
 You can see the results of these checks on the [maintenance](https://my.immich.app/admin/maintenance) page. Here, you can also trigger a full scan (a _check_) for specific jobs, or all of them. In addition, you can also _refresh_ checks. This will only look at items that have currently been reported on, and check if those have been fixed.

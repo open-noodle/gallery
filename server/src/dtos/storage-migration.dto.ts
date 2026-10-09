@@ -37,7 +37,23 @@ const StorageMigrationBatchParamSchema = z
   })
   .meta({ id: 'StorageMigrationBatchParamDto' });
 
+const StorageRoutingStatusEntrySchema = z
+  .object({
+    routedTo: z.enum(['disk', 's3']).describe('The resolved backend new files of this kind are written to'),
+    misplacedCount: z.int().describe('Number of files of this kind currently stored on the other backend'),
+  })
+  .meta({ id: 'StorageRoutingStatusEntryDto' });
+
+const StorageRoutingStatusSchema = z
+  .object({
+    originals: StorageRoutingStatusEntrySchema,
+    thumbnails: StorageRoutingStatusEntrySchema,
+    encodedVideo: StorageRoutingStatusEntrySchema,
+  })
+  .meta({ id: 'StorageRoutingStatusDto' });
+
 export class StorageMigrationFileTypesDto extends createZodDto(StorageMigrationFileTypesSchema) {}
 export class StorageMigrationStartDto extends createZodDto(StorageMigrationStartSchema) {}
 export class StorageMigrationEstimateQueryDto extends createZodDto(StorageMigrationEstimateQuerySchema) {}
 export class StorageMigrationBatchParamDto extends createZodDto(StorageMigrationBatchParamSchema) {}
+export class StorageRoutingStatusDto extends createZodDto(StorageRoutingStatusSchema) {}
