@@ -5,7 +5,7 @@ metadata:
   upstream_branch: release/v3.3
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 6417a8114cee9f8080f5e984d2fa4c645b43351c
+  last_verified_fork_head: a8e6aa61001fcb9dfbd3273bf9de0103556cd1bb
 
 coverage_ignore:
   - specs/**
