@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isApplePlatform as isApplePlatformFor, searchHotkeyLabel } from '$lib/utils/search-hotkey';
   import { Icon, IconButton, Modal, modalManager, ModalBody } from '@immich/ui';
   import { mdiClose, mdiMagnify } from '@mdi/js';
   import { Command } from 'bits-ui';
@@ -42,8 +43,8 @@
   }
   let { manager, variant = 'modal' }: Props = $props();
 
-  const isApplePlatform = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.platform);
-  const hotkeyLabel = isApplePlatform ? '⌘K' : 'Ctrl+K';
+  const isApplePlatform = isApplePlatformFor();
+  const hotkeyLabel = searchHotkeyLabel();
   let modalInput = $state<HTMLInputElement | null>(null);
 
   // Two-way sync with manager.query: the user types into the Command.Input (writes to
