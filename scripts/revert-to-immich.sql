@@ -18,7 +18,13 @@
 --   * User groups and their memberships
 --   * Classification categories and prompts (including the merged copy in
 --     system_metadata's system-config row — that key is stripped too)
---   * Pet detection results (person.type, person.species, petsDetectedAt)
+--   * Pet detection results: every pet, its faces and its embeddings
+--   * Rule memories (Immich only knows on-this-day and birthday memories)
+--   * Video trims: the original duration comes back and the trimmed copy is
+--     no longer referenced
+--   * Other members' photos in links shared from a space, album links to
+--     albums the creator does not own, and asset links left empty by that
+--   * Gallery-only API key permissions
 --   * Asset duplicate checksums
 --   * Library sync state (library_audit, library_user, library.createId)
 --   * Storage migration history
@@ -81,6 +87,165 @@ BEGIN
       MESSAGE = 'revert-to-immich.sql refused: read the header, then set gallery.revert_token = ''i_accept_data_loss'' before running.';
   END IF;
 END $$;
+
+-- -----------------------------------------------------------------------------
+-- 0. Refuse to run while any file lives in S3.
+--
+-- Gallery stores S3 object keys as relative paths in the same columns that hold
+-- absolute disk paths (the four the Storage Migration moves). Stock Immich only
+-- reads from disk, so every such row would point at a file it cannot open.
+-- This runs before any write, so a refusal leaves the database untouched.
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  s3_paths bigint;
+BEGIN
+  SELECT (SELECT count(*) FROM "asset" WHERE "originalPath" NOT LIKE '/%')
+       + (SELECT count(*) FROM "asset_file" WHERE "path" NOT LIKE '/%')
+       + (SELECT count(*) FROM "person" WHERE "thumbnailPath" <> '' AND "thumbnailPath" NOT LIKE '/%')
+       + (SELECT count(*) FROM "user" WHERE "profileImagePath" <> '' AND "profileImagePath" NOT LIKE '/%')
+    INTO s3_paths;
+  IF s3_paths > 0 THEN
+    RAISE EXCEPTION USING
+      MESSAGE = format('revert-to-immich.sql refused: %s file path(s) point at S3 storage, which Immich cannot read. Run the Storage Migration to disk first (Administration > Storage Migration, direction S3 to Disk), then run this script again.', s3_paths);
+  END IF;
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- 0b. Remove Gallery data that stock Immich would misread.
+--
+-- These rows sit in upstream tables, so dropping the fork tables and columns
+-- below would leave them behind looking like ordinary Immich data. Each step
+-- is a no-op when the fork table, column or rows are absent.
+-- -----------------------------------------------------------------------------
+
+-- Pets. Gallery stores them as upstream person/asset_face rows told apart only
+-- by person.type (dropped in section 4) and pet_search (dropped in section 2),
+-- so without this they come back as people. asset_face."personGroupId" is
+-- ON DELETE SET NULL, so the faces must go explicitly; deleting the
+-- person_group then cascades to person. pet_search holds the faces that pet
+-- recognition has not assigned to anyone yet.
+DO $$
+BEGIN
+  IF to_regclass('public.pet_search') IS NOT NULL THEN
+    DELETE FROM "asset_face" WHERE "id" IN (SELECT "faceId" FROM "pet_search");
+  END IF;
+  IF EXISTS (SELECT FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'person' AND column_name = 'type') THEN
+    DELETE FROM "asset_face"
+     WHERE "personGroupId" IN (SELECT "personGroupId" FROM "person" WHERE "type" = 'pet');
+    DELETE FROM "person_group"
+     WHERE "id" IN (SELECT "personGroupId" FROM "person" WHERE "type" = 'pet');
+  END IF;
+END $$;
+
+-- Rule memories. Immich's MemoryType has no 'rule', and its MemoriesV2 sync
+-- stream sends every type, so one such row breaks mobile sync. memory_asset
+-- rows cascade.
+DELETE FROM "memory" WHERE "type" = 'rule';
+
+-- Video trims. Immich only edits images: it would show the trimmed duration and
+-- the trimmed thumbnails over the full-length original. Restore the original
+-- duration (stored in seconds in the edit), then drop the edited files the trim
+-- produced and the edit itself. A trim cannot be combined with an image edit,
+-- so every edited file of a trimmed asset came from the trim. The trimmed video
+-- and thumbnails stay on disk as unreferenced files. The trim also replaced the
+-- thumbhash with the trimmed frame's; clearing it makes Immich's nightly
+-- missing-thumbnails job regenerate it from the original.
+UPDATE "asset"
+   SET "thumbhash" = NULL
+  FROM "asset_edit"
+ WHERE "asset_edit"."assetId" = "asset"."id"
+   AND "asset_edit"."action" = 'trim';
+UPDATE "asset"
+   SET "duration" = round(("asset_edit"."parameters"->>'originalDuration')::numeric * 1000)
+  FROM "asset_edit"
+ WHERE "asset_edit"."assetId" = "asset"."id"
+   AND "asset_edit"."action" = 'trim'
+   AND ("asset_edit"."parameters"->>'originalDuration')::numeric > 0;
+DELETE FROM "asset_file"
+ WHERE "isEdited"
+   AND "assetId" IN (SELECT "assetId" FROM "asset_edit" WHERE "action" = 'trim');
+DELETE FROM "asset_edit" WHERE "action" = 'trim';
+
+-- Share links created from a space. Gallery lets such a link carry other
+-- members' assets and re-checks space membership on every read; Immich grants
+-- whatever shared_link_asset lists, and the whole album for an album link,
+-- with no such check. So keep only what the creator could have shared in plain
+-- Immich (own assets, and partners' assets under the same conditions as
+-- Immich's asset share permission), drop album links to albums the creator
+-- does not own, and drop asset links this leaves empty.
+-- Album links go even when the creator is an editor of the album: this is
+-- deliberately stricter than Immich, which lets album editors share an album.
+-- The asset prune covers every link, not only those with a "spaceId": deleting
+-- a space sets the column to NULL but keeps the other members' asset rows. It
+-- also drops assets of partners removed since the link was made.
+CREATE TEMP TABLE revert_pruned_link ("id" uuid) ON COMMIT DROP;
+WITH pruned AS (
+  DELETE FROM "shared_link_asset" sla
+   USING "shared_link" sl, "asset" a
+   WHERE sla."sharedLinkId" = sl."id"
+     AND sla."assetId" = a."id"
+     AND a."ownerId" <> sl."userId"
+     AND NOT EXISTS (SELECT FROM "partner" p
+                      JOIN "user" u ON u."id" = p."sharedById" AND u."deletedAt" IS NULL
+                     WHERE p."sharedById" = a."ownerId" AND p."sharedWithId" = sl."userId"
+                       AND a."visibility" IN ('timeline', 'hidden'))
+  RETURNING sla."sharedLinkId"
+)
+INSERT INTO revert_pruned_link SELECT DISTINCT "sharedLinkId" FROM pruned;
+DELETE FROM "shared_link" sl
+ WHERE sl."type" = 'INDIVIDUAL'
+   AND sl."id" IN (SELECT "id" FROM revert_pruned_link)
+   AND NOT EXISTS (SELECT FROM "shared_link_asset" sla WHERE sla."sharedLinkId" = sl."id");
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'shared_link' AND column_name = 'spaceId') THEN
+    DELETE FROM "shared_link" sl
+     WHERE sl."spaceId" IS NOT NULL
+       AND sl."type" = 'ALBUM'
+       AND NOT EXISTS (SELECT FROM "album_user" au
+                        WHERE au."albumId" = sl."albumId" AND au."userId" = sl."userId" AND au."role" = 'owner');
+    DELETE FROM "shared_link" sl
+     WHERE sl."spaceId" IS NOT NULL
+       AND sl."type" = 'INDIVIDUAL'
+       AND NOT EXISTS (SELECT FROM "shared_link_asset" sla WHERE sla."sharedLinkId" = sl."id");
+  END IF;
+END $$;
+
+-- Gallery-only system_metadata rows. Immich reads its rows by key and never
+-- looks at these.
+DELETE FROM "system_metadata"
+ WHERE "key" IN (
+   'pet-recognition-state',
+   'classification-config-state',
+   'shared-space-face-job-cleanup-state',
+   'face-suggestion-default-on-state',
+   'person-suggestion-scan-job-cleanup-state'
+ );
+
+-- Gallery-only API key permissions (Gallery's Permission enum minus Immich's).
+-- Immich would carry them as unknown strings.
+UPDATE "api_key" k
+   SET "permissions" = kept."permissions"
+  FROM (
+    SELECT "id", array(
+             SELECT p FROM unnest("permissions") AS p
+              WHERE p <> ALL (ARRAY[
+                'sharedSpace.create', 'sharedSpace.read', 'sharedSpace.update', 'sharedSpace.delete',
+                'sharedSpaceMember.create', 'sharedSpaceMember.update', 'sharedSpaceMember.delete',
+                'sharedSpaceAsset.create', 'sharedSpaceAsset.read', 'sharedSpaceAsset.delete',
+                'sharedSpaceAlbum.create', 'sharedSpaceAlbum.update', 'sharedSpaceAlbum.delete',
+                'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
+                'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
+                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete'
+              ]::character varying[])
+           )::character varying[] AS "permissions"
+      FROM "api_key"
+  ) kept
+ WHERE kept."id" = k."id"
+   AND kept."permissions" <> k."permissions";
 
 -- -----------------------------------------------------------------------------
 -- 1. Drop Gallery-only triggers on Immich-native tables.
@@ -233,12 +398,14 @@ DROP FUNCTION IF EXISTS asset_favorite_delete_audit() CASCADE;
 -- -----------------------------------------------------------------------------
 -- 4. Drop Gallery-added columns from Immich-native tables.
 --
--- The library_createId_idx index is dropped implicitly with library.createId.
+-- Indexes on these columns would go with them; they are dropped by name anyway
+-- so revert-to-immich.spec.ts can check every fork index is covered.
 -- -----------------------------------------------------------------------------
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "type";
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "species";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "petsDetectedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "classifiedAt";
+DROP INDEX IF EXISTS "library_createId_idx";
 ALTER TABLE "library"           DROP COLUMN IF EXISTS "createId";
 -- 1791000000000-RepointFaceReviewToPersonGroup added this unique index to make option M's
 -- one-person-per-group invariant a database fact. It lives on the upstream `person` table, so
@@ -249,12 +416,14 @@ DROP INDEX IF EXISTS "asset_face_personId_idx";
 DROP INDEX IF EXISTS "person_ownerId_identityId_key";
 DROP INDEX IF EXISTS "person_identityId_idx";
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "identityId";
--- #1018: the space a share link was created from. Dropping it implicitly drops
--- shared_link_spaceId_idx; the links themselves survive as owner-only links.
+-- #1018: the space a share link was created from. Section 0b already removed
+-- what these links could only reach through the space.
+DROP INDEX IF EXISTS "shared_link_spaceId_idx";
 ALTER TABLE "shared_link"       DROP COLUMN IF EXISTS "spaceId";
 -- Records which user drew a face box, so a space editor may delete their own and never the
 -- owner's (1796000000000-AddAssetFaceCreatedBy). Upstream has no such column; the FK to "user"
 -- goes with it.
+DROP INDEX IF EXISTS "asset_face_createdBy_idx";
 ALTER TABLE "asset_face"        DROP COLUMN IF EXISTS "createdBy";
 
 -- -----------------------------------------------------------------------------

@@ -180,6 +180,7 @@ export class JobService extends BaseService {
         const edits = await this.assetEditRepository.getWithSyncInfo(item.data.id);
 
         if (asset) {
+          // Trims not gated: sockets carry no client capability; stock apps log the decode error, next sync fixes it.
           this.websocketRepository.clientSend('AssetEditReadyV2', asset.ownerId, {
             asset: {
               id: asset.id,

@@ -70,10 +70,6 @@ export class DuplicateService extends BaseService {
 
     const duplicates = await this.duplicateRepository.getAll(auth.user.id);
     return duplicates.map(({ duplicateId, assets }) => {
-      // #763: deliberately NOT projecting isFavoriteForUser — duplicateRepository.getAll doesn't
-      // project the overlay yet, so this stays `false` for now. Slice 7 covers merging favorite
-      // state across duplicate resolution (resolveGroup, below); wiring the overlay into this
-      // listing view remains open and is not part of that slice.
       const mappedAssets = assets.map((asset) => mapAsset(asset, { auth }));
       return {
         duplicateId,

@@ -204,12 +204,10 @@ describe('/sync — library streams', () => {
       expect(lines.at(-1)?.type).toBe('SyncCompleteV1');
     });
 
-    it('rejects malformed SyncRequestType enum values', async () => {
-      const { status } = await request(app)
-        .post('/sync/stream')
-        .set(asBearerAuth(admin.accessToken))
-        .send({ types: ['NotALibraryType'] });
-      expect(status).toBe(400);
+    it('ignores unknown SyncRequestType values instead of rejecting the request', async () => {
+      // a newer client may request types this server does not know; they are dropped, not 400ed
+      const lines = await syncStream(admin.accessToken, ['NotALibraryType' as SyncRequestType], true);
+      expect(lines.filter((l) => l.type !== 'SyncCompleteV1')).toHaveLength(0);
     });
 
     it('an empty types[] array returns immediately with SyncCompleteV1 only', async () => {
@@ -400,11 +398,25 @@ describe('/sync — library streams', () => {
   });
 
   describe('DTO validation and forward-compat', () => {
-    it('mixing a valid and invalid SyncRequestType rejects the whole request', async () => {
-      const { status } = await request(app)
-        .post('/sync/stream')
-        .set(asBearerAuth(admin.accessToken))
-        .send({ types: [SyncRequestType.LibrariesV1, 'NotReal'] });
+    it('mixing a valid and unknown SyncRequestType still streams the valid type', async () => {
+      const library = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId, name: 'Forward Compat' });
+      const lines = await syncStream(
+        admin.accessToken,
+        [SyncRequestType.LibrariesV1, 'NotReal' as SyncRequestType],
+        true,
+      );
+      const ids = lines.filter((l) => l.type === 'LibraryV1').map((l) => (l.data as { id: string }).id);
+      expect(ids).toContain(library.id);
+      expect(lines.every((l) => ['LibraryV1', 'LibraryDeleteV1', 'SyncCompleteV1'].includes(l.type))).toBe(true);
+      await ackAll(admin.accessToken, lines);
+    });
+
+    it.each([
+      { label: 'a non-string element', body: { types: [SyncRequestType.LibrariesV1, 42] } },
+      { label: 'a non-array types', body: { types: SyncRequestType.LibrariesV1 } },
+      { label: 'a missing types', body: {} },
+    ])('rejects $label with 400', async ({ body }) => {
+      const { status } = await request(app).post('/sync/stream').set(asBearerAuth(admin.accessToken)).send(body);
       expect(status).toBe(400);
     });
 

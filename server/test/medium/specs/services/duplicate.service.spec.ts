@@ -113,6 +113,22 @@ describe(DuplicateService.name, () => {
       expect(duplicates[0].suggestedKeepAssetIds).toEqual([large.id]);
     });
 
+    it("should report the viewer's own favorites", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+
+      const favorite = await newDuplicateAsset(ctx, { ownerId: user.id, duplicateId, isFavorite: true });
+      const plain = await newDuplicateAsset(ctx, { ownerId: user.id, duplicateId });
+      await ctx.database.insertInto('asset_favorite').values({ userId: other.id, assetId: plain.id }).execute();
+
+      const [group] = await sut.getDuplicates(factory.auth({ user: { id: user.id } }));
+
+      const isFavorite = Object.fromEntries(group.assets.map(({ id, isFavorite }) => [id, isFavorite]));
+      expect(isFavorite).toEqual({ [favorite.id]: true, [plain.id]: false });
+    });
+
     it('should not return duplicates owned by someone else', async () => {
       const { sut, ctx } = setup();
       const { user: owner } = await ctx.newUser();

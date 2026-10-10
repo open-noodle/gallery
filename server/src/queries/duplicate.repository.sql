@@ -15,6 +15,15 @@ with
       inner join lateral (
         select
           "asset".*,
+          exists (
+            select
+              1 as "exists"
+            from
+              "asset_favorite"
+            where
+              "asset_favorite"."assetId" = "asset"."id"
+              and "asset_favorite"."userId" = $1::uuid
+          ) as "isFavoriteForUser",
           to_json("asset_exif") as "exifInfo",
           (
             select
@@ -42,7 +51,7 @@ with
       ) as "asset2" on true
     where
       "asset"."visibility" in ('archive', 'timeline')
-      and "asset"."ownerId" = $1::uuid
+      and "asset"."ownerId" = $2::uuid
       and "asset"."duplicateId" is not null
       and "asset"."deletedAt" is null
       and "asset"."stackId" is null
@@ -54,7 +63,7 @@ select
 from
   "duplicates"
 where
-  json_array_length("assets") > $2
+  json_array_length("assets") > $3
 
 -- DuplicateRepository.cleanupSingletonGroups
 with

@@ -28,6 +28,7 @@ on:
       - 'branding/config.json'
       - 'server/package.json'
       - '.github/workflows/gallery-revert-to-immich-validation.yml'
+      - '.github/scripts/revert-to-immich-data.sh'
 
 concurrency:
   group: gallery-revert-to-immich-validation
@@ -41,7 +42,7 @@ jobs:
   validate:
     name: Validate revert-to-immich.sql
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       # Lifted verbatim from docker/docker-compose.yml so the test runs the
       # same images a user would run in production.
@@ -107,6 +108,22 @@ jobs:
           done < <(sed -n '/^DELETE FROM "kysely_migrations"/,/^ *);/p' scripts/revert-to-immich.sql |
             grep -oE "'[0-9]+-[A-Za-z0-9_.]+'" | tr -d "'" | sort -u)
 
+          # Fork-only enum values stored in upstream tables: Permission in api_key.permissions and
+          # SystemMetadataKey rows in system_metadata. The revert prunes each by literal value.
+          # The "Run validation" step reads the same file for the stock sync request types.
+          upstream_enum=$RUNNER_TEMP/upstream-enum.ts
+          gh api -H 'Accept: application/vnd.github.raw' \
+            "repos/immich-app/immich/contents/server/src/enum.ts?ref=${UPSTREAM_TAG}" > "$upstream_enum"
+          enum_values() { awk "/^export enum $1 \\{/,/^\\}/" "$2" | grep -oE "= '[^']+'" | sed "s/^= '//; s/'\$//" | sort -u; }
+          for enum in Permission SystemMetadataKey; do
+            while IFS= read -r value; do
+              if ! grep -qF "'${value}'" scripts/revert-to-immich.sql; then
+                echo "::error file=scripts/revert-to-immich.sql::Gallery-only ${enum} value '${value}' is not removed by the revert"
+                missing=1
+              fi
+            done < <(comm -23 <(enum_values "$enum" server/src/enum.ts) <(enum_values "$enum" "$upstream_enum"))
+          done
+
           exit "$missing"
 
       - name: Log in to GitHub Container Registry
@@ -119,6 +136,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE_DIR: ${{ runner.temp }}/revert-data
         # Everything below lives in one shell so bash variables and the
         # wait_for_server helper persist across the numbered phases in the
         # design doc (3-13). Cleanup is a separate step because it needs
@@ -349,6 +369,10 @@ jobs:
 
           boot_server "$GALLERY_IMAGE" gallery
           if ! wait_for_geodata_init gallery; then exit 1; fi
+
+          # Data the revert has to clean up: favorites, a trimmed video, a rule memory, pets, a space
+          # share link carrying another member's photo and a link carrying a partner's archived photo.
+          .github/scripts/revert-to-immich-data.sh seed
           stop_server
 
           ############################################################
@@ -372,6 +396,9 @@ jobs:
           ############################################################
           # Step 11: run revert-to-immich.sql
           ############################################################
+
+          # A file still in S3 must stop the script before it changes anything.
+          .github/scripts/revert-to-immich-data.sh s3-guard scripts/revert-to-immich.sql
 
           # SET must come BEFORE the script's BEGIN — `cat` appends after
           # `echo`, so ordering is guaranteed. Pipe form keeps both in one
@@ -422,6 +449,16 @@ jobs:
             exit 1
           fi
           echo "::notice::post: no new schema drift compared to pre-phase baseline"
+
+          ############################################################
+          # Step 14: the seeded data, read back through stock Immich
+          ############################################################
+
+          SYNC_TYPES=$(awk '/^export enum SyncRequestType \{/,/^\}/' "$RUNNER_TEMP/upstream-enum.ts" |
+            grep -oE "= '[^']+'" | sed "s/^= '//; s/'$//" |
+            jq -R . | jq -sc 'group_by(sub("V[0-9]+$"; "")) | map(max_by(capture("V(?<v>[0-9]+)$").v | tonumber))')
+          export SYNC_TYPES
+          .github/scripts/revert-to-immich-data.sh assert
 
           echo "::notice::revert-to-immich validation PASSED"
 
