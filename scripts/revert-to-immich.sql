@@ -565,7 +565,7 @@ DELETE FROM "kysely_migrations"
   '1794100000000-DropAssetIsFavoriteColumn',
   '1796000000000-AddAssetFaceCreatedBy',
   '1797000000000-AddAssetLocalDateTimeIndex',
-  -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
+  -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
   -- with "corrupted migrations" on a reverted rolling-derived DB.
@@ -581,16 +581,13 @@ DELETE FROM "kysely_migrations"
    '1782000000000-AddFaceRepairScanFlaggedFace',
    '1783000000000-AddFaceRepairScanInFlightIndex',
 
-   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
-   -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
-   -- upstream name (1777667825574) and its pre-rename name (1776735180298), so
-   -- already-deployed DBs that ran the migration under the pre-rename name keep
-   -- booting. The tagged upstream release ships only 1777667825574, so on a reverted
-   -- DB the pre-rename alias row is an orphan and upstream's migrator aborts with
+   -- Pre-rename name of ChangeDurationToInteger, recorded by builds from before the
+   -- ledger split. A split build renames or deletes these rows on boot; this DELETE
+   -- covers databases never booted by one. The tagged upstream release ships only
+   -- 1777667825574, so an orphan 1776735180298 row makes upstream's migrator abort with
    -- "corrupted migrations: previously executed migration
-   -- 1776735180298-ChangeDurationToInteger is missing". Drop the alias row here;
-   -- the real 1777667825574 row is always present by revert time and matches the
-   -- upstream file, so it stays.
+   -- 1776735180298-ChangeDurationToInteger is missing". The 1777667825574 row matches
+   -- the upstream file, so it stays.
    '1776735180298-ChangeDurationToInteger'
 
    -- Post-tag upstream migrations pulled in by rebase would follow here, paired with
@@ -598,6 +595,11 @@ DELETE FROM "kysely_migrations"
    -- `upstream.version` is 3.3.1 and every upstream migration this branch carries ships
    -- in that tag (see step 7).
  );
+
+-- Gallery builds since the ledger split record fork migrations in their own table instead. The
+-- DELETE above still covers databases last booted by an older build.
+DROP TABLE IF EXISTS "gallery_migrations";
+DROP TABLE IF EXISTS "gallery_migrations_lock";
 
 -- -----------------------------------------------------------------------------
 -- 9. Report what happened and commit.

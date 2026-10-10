@@ -42,8 +42,8 @@ export class AlbumService extends BaseService {
 
   async getNames(auth: AuthDto): Promise<AlbumNameDto[]> {
     const [owned, shared] = await Promise.all([
-      this.albumRepository.getOwnedNames(auth.user.id),
-      this.albumRepository.getSharedNames(auth.user.id),
+      this.spaceAlbumRepository.getOwnedNames(auth.user.id),
+      this.spaceAlbumRepository.getSharedNames(auth.user.id),
     ]);
     return [
       ...owned.map((r) => ({
@@ -324,7 +324,7 @@ export class AlbumService extends BaseService {
 
     const [contributable, alreadyContributed] = await Promise.all([
       this.sharedSpaceRepository.getContributableAssetSpaces(auth.user.id, albumId, deniedIds),
-      this.albumRepository.getContributedAssetIds(albumId, deniedIds),
+      this.spaceAlbumRepository.getContributedAssetIds(albumId, deniedIds),
     ]);
     const spaceByAsset = new Map(contributable.map(({ assetId, spaceId }) => [assetId, spaceId]));
 
@@ -349,7 +349,7 @@ export class AlbumService extends BaseService {
     }
 
     if (toInsert.length > 0) {
-      await this.albumRepository.addContributedAssets(toInsert);
+      await this.spaceAlbumRepository.addContributedAssets(toInsert);
       // D3 (#752 P1-7): a contribution's faces must reach space People without waiting for a coarse
       // reconcile trigger — enqueue the targeted per-asset match, mirroring the space-pool add path
       // (SharedSpaceService.addAssets). The handler re-guards on space + faceRecognitionEnabled.
@@ -463,9 +463,9 @@ export class AlbumService extends BaseService {
       .filter(({ success, error }) => !success && error === BulkIdErrorReason.NOT_FOUND)
       .map(({ id: assetId }) => assetId);
     if (notFoundIds.length > 0) {
-      const contributed = await this.albumRepository.getContributedAssetIds(id, notFoundIds);
+      const contributed = await this.spaceAlbumRepository.getContributedAssetIds(id, notFoundIds);
       if (contributed.size > 0) {
-        await this.albumRepository.removeContributedAssetIds(id, [...contributed]);
+        await this.spaceAlbumRepository.removeContributedAssetIds(id, [...contributed]);
         for (const result of results) {
           if (!contributed.has(result.id)) {
             continue;

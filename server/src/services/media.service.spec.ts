@@ -1016,11 +1016,13 @@ describe(MediaService.name, () => {
       const ensureLocalFile = vi
         .spyOn(
           sut as unknown as {
-            ensureLocalFile: (filePath: string) => Promise<{ localPath: string; cleanup: () => Promise<void> }>;
+            ensureLocalFile: (
+              filePath: string,
+            ) => Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable>;
           },
           'ensureLocalFile',
         )
-        .mockResolvedValue({ localPath: '/tmp/immich-s3-heic.tmp', cleanup });
+        .mockResolvedValue({ localPath: '/tmp/immich-s3-heic.tmp', cleanup, [Symbol.asyncDispose]: cleanup });
       const asset = AssetFactory.from({
         originalFileName: 'IMG_1234.HEIC',
         originalPath: 'upload/user/12/34/asset.HEIC',
@@ -2562,11 +2564,13 @@ describe(MediaService.name, () => {
       const ensureLocalFile = vi
         .spyOn(
           sut as unknown as {
-            ensureLocalFile: (filePath: string) => Promise<{ localPath: string; cleanup: () => Promise<void> }>;
+            ensureLocalFile: (
+              filePath: string,
+            ) => Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable>;
           },
           'ensureLocalFile',
         )
-        .mockResolvedValue({ localPath: '/tmp/immich-s3-person-heic.tmp', cleanup });
+        .mockResolvedValue({ localPath: '/tmp/immich-s3-person-heic.tmp', cleanup, [Symbol.asyncDispose]: cleanup });
       const person = PersonFactory.create();
       const data = {
         ...personThumbnailStub.newThumbnailMiddle,

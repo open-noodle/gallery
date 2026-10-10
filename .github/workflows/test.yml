@@ -69,12 +69,12 @@ jobs:
               - 'docs/docs/developer/fork-surface-guidelines.md'
               - 'Makefile'
               # Everything below is READ BY the preflight specs. Without these the job is SKIPPED on a
-              # PR that reverts the branded-spinner swap or drops the migration compatibility alias --
+              # PR that reverts the branded-spinner swap or drops a migration ledger rename --
               # and a skipped job is indistinguishable from a passing one. Keep in sync with the
               # `path.resolve(process.cwd(), '../../...')` targets in tools/upstream-preflight/src/**.
               - 'web/src/**'
               - 'mobile/lib/**'
-              - 'server/bin/sync-gallery-migrations.mjs'
+              - 'server/src/schema/gallery-migration-ledger.ts'
               - 'server/src/schema/migrations/**'
               - 'server/src/schema/migrations-gallery/**'
               - 'AGENTS.md'
@@ -84,6 +84,7 @@ jobs:
               # fork-deletions.spec.ts asserts paths the fork deleted on purpose stay deleted, so the
               # job has to run on a PR that resurrects one.
               - 'packages/**'
+              - 'mobile/android/app/src/main/res/drawable/**'
             .github:
               - '.github/**'
           force-filters: |

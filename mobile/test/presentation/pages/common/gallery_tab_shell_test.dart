@@ -13,6 +13,7 @@ import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_na
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/routing/auth_guard.dart';
 import 'package:immich_mobile/routing/duplicate_guard.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -99,6 +100,7 @@ RootStackRouter _harnessRouter() => RootStackRouter.build(
 List<Override> _overrides({required bool showSpaces}) => [
   appConfigProvider.overrideWithValue(AppConfig(nav: NavConfig(showSpaces: showSpaces))),
   readonlyModeProvider.overrideWith(_FakeReadonly.new),
+  serverSupportsSpacesProvider.overrideWithValue(true),
 ];
 
 /// Anything below the shell's `AutoTabsRouter`; [GalleryBottomNav] is built

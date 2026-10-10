@@ -305,7 +305,7 @@ export class MemoryService extends BaseService {
       return;
     }
 
-    const oldest = await this.memoryRepository.getOldestMemoryDate();
+    const oldest = await this.memoryRuleAssetRepository.getOldestMemoryDate();
     if (!oldest) {
       state.overlapBackfilledAt = today.toISO()!;
       await this.systemMetadataRepository.set(SystemMetadataKey.MemoriesState, { ...state });
@@ -345,7 +345,7 @@ export class MemoryService extends BaseService {
     availableTypes: Set<string>,
     userTypes: Record<string, boolean>,
   ) {
-    const allRows = (await this.memoryRepository.getForOverlapReconcile(ownerId, {
+    const allRows = (await this.memoryRuleAssetRepository.getForOverlapReconcile(ownerId, {
       from: from.startOf('day').toJSDate(),
       to: to.endOf('day').toJSDate(),
     })) as MemoryOverlapRow[];
@@ -426,7 +426,7 @@ export class MemoryService extends BaseService {
   private getMemoryRules(enabledKeys: Iterable<string>, memories: SystemConfig['memories']): MemoryRule[] {
     return createMemoryRules(enabledKeys, {
       personRepository: this.personRepository,
-      assetRepository: this.assetRepository,
+      memoryRuleAssetRepository: this.memoryRuleAssetRepository,
       memoryRepository: this.memoryRepository,
       themeSearchPort: this.getThemeSearchPort(),
       memories,
@@ -472,7 +472,7 @@ export class MemoryService extends BaseService {
         continue;
       }
 
-      if (await this.memoryRepository.hasRuleMemory(ownerId, candidate.ruleId, candidate.dedupeKey)) {
+      if (await this.memoryRuleAssetRepository.hasRuleMemory(ownerId, candidate.ruleId, candidate.dedupeKey)) {
         continue;
       }
 
@@ -506,7 +506,7 @@ export class MemoryService extends BaseService {
       // recreated afterwards. (Resetting MemoriesState can bring the pair back for a few days;
       // retention clears it.)
       for (const year of candidate.supersedesOnThisDayYears ?? []) {
-        await this.memoryRepository.deleteOnThisDay({ ownerId, year, showAt });
+        await this.memoryRuleAssetRepository.deleteOnThisDay({ ownerId, year, showAt });
       }
       if (isMultiDay) {
         insertedMultiDayRuleIds.add(candidate.ruleId);

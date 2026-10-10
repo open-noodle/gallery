@@ -33,6 +33,9 @@
 import { Kysely } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -79,7 +82,10 @@ const setup = (db?: Kysely<DB>) => {
       FaceIdentityRepository,
       PartnerRepository,
       PersonRepository,
+      FilterSuggestionRepository,
       SearchRepository,
+      FaceSearchRepository,
+      SmartFacetRepository,
       SharedSpaceRepository,
       TagRepository,
     ],

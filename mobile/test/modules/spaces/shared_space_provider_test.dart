@@ -1,12 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
+import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
+import 'package:immich_mobile/utils/semver.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
@@ -259,6 +264,38 @@ void main() {
       final result = await container.read(spaceMemberCandidatesProvider.future);
 
       expect(result.length, equals(2));
+    });
+  });
+
+  group('serverSupportsSpaces', () {
+    test('stock Immich (upstream version, no declaration) hides Spaces', () {
+      expect(serverSupportsSpaces(const SemVer(major: 3, minor: 3, patch: 1), null), isFalse);
+    });
+
+    test('unknown version (not loaded yet or offline) keeps Spaces', () {
+      expect(serverSupportsSpaces(const SemVer(major: 0, minor: 0, patch: 0), null), isTrue);
+    });
+
+    test('fork version above 5.0.0 without a declaration keeps Spaces', () {
+      expect(serverSupportsSpaces(const SemVer(major: 5, minor: 6, patch: 0), null), isTrue);
+    });
+
+    test('the declaration decides whenever present', () {
+      const version = SemVer(major: 3, minor: 3, patch: 1);
+      expect(serverSupportsSpaces(version, {'SharedSpacesV1', 'AssetsV1'}), isTrue);
+      expect(serverSupportsSpaces(const SemVer(major: 6, minor: 0, patch: 0), {'AssetsV1'}), isFalse);
+    });
+
+    test('a server without Spaces gets Albums in the nav even with the Spaces preference on', () {
+      final container = ProviderContainer(
+        overrides: [
+          appConfigProvider.overrideWithValue(const AppConfig(nav: NavConfig(showSpaces: true))),
+          serverSupportsSpacesProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(galleryNavSlotsProvider), galleryNavSlots(showSpaces: false));
     });
   });
 }

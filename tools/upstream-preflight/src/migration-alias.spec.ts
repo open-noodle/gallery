@@ -2,82 +2,55 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// Repo-invariant guard for Slice 18 (findings LOW#16 + LOW#17).
+// Repo-invariant guard for the migration ledger bootstrap.
 //
-// `server/bin/sync-gallery-migrations.mjs` (the npm `postbuild` hook) writes a build-time
-// compatibility alias: it copies `dist/schema/migrations/1777667825574-ChangeDurationToInteger.js`
-// to `dist/schema/migrations/1776735180298-ChangeDurationToInteger.js` (plus `.js.map`/`.d.ts`
-// siblings) when the source file exists. This is LOAD-BEARING: the fork's
-// `ChangeDurationToInteger` migration was originally authored under the upstream timestamp
-// `1777667825574` and shipped in a released v5-RC; some already-deployed RC/staging DBs
-// recorded it in their migration-history table under that OLD name. It was later
-// re-timestamped to `1776735180298` in source. Kysely's migrator hard-fails on boot
-// (`#ensureNoMissingMigrations`) if a migration name recorded in the DB has no matching file
-// on disk, so both filenames must resolve to a migration module in `dist/schema/migrations/`
-// for old and new DBs alike to boot cleanly. Silently dropping this alias entry would brick
-// those already-deployed databases on their next server upgrade.
-//
-// This guard fails the *next* rebase if the `ChangeDurationToInteger` compatibility-alias
-// entry disappears from `compatibilityAliases`, and fails if `CLAUDE.md` regresses to
-// describing the postbuild hook as a plain, alias-free `cp`.
+// `server/src/schema/gallery-migration-ledger.ts` renames rows that earlier builds recorded under a
+// name that no longer has a file. The ChangeDurationToInteger entry is LOAD-BEARING: upstream
+// re-timestamped that migration from `1776735180298` to `1777667825574` after Gallery databases had
+// recorded the old name. Kysely hard-fails on boot (`#ensureNoMissingMigrations`) when a recorded
+// name has no file, and re-running the migration fails on the already-integer column, so the row
+// must be renamed before upstream's migrator runs. Dropping the entry would brick those databases on
+// their next upgrade.
 
-const SYNC_SCRIPT_PATH = path.resolve(
+const LEDGER_PATH = path.resolve(
   process.cwd(),
-  '../../server/bin/sync-gallery-migrations.mjs',
+  '../../server/src/schema/gallery-migration-ledger.ts',
 );
 const CLAUDE_MD_PATH = path.resolve(process.cwd(), '../../CLAUDE.md');
 
-const REQUIRED_ALIAS = {
-  from: '1777667825574-ChangeDurationToInteger',
-  to: '1776735180298-ChangeDurationToInteger',
-};
-
-function readCompatibilityAliases(
-  source: string,
-): Array<{ from: string; to: string }> {
-  const arrayMatch = /compatibilityAliases\s*=\s*\[([\s\S]*?)\];/.exec(source);
-  if (!arrayMatch) {
-    return [];
+function readRenamedMigrations(source: string): Record<string, string | null> {
+  const blockMatch = /renamedMigrations[^=]*=\s*\{([\s\S]*?)\n\};/.exec(source);
+  if (!blockMatch) {
+    return {};
   }
 
-  const entryPattern = /from:\s*'([^']+)'\s*,\s*to:\s*'([^']+)'/g;
-  const aliases: Array<{ from: string; to: string }> = [];
-  let match: RegExpExecArray | null;
-  // eslint-disable-next-line no-cond-assign
-  while ((match = entryPattern.exec(arrayMatch[1])) !== null) {
-    aliases.push({ from: match[1], to: match[2] });
+  const renames: Record<string, string | null> = {};
+  for (const match of blockMatch[1].matchAll(
+    /'([^']+)':\s*(?:'([^']+)'|null)/g,
+  )) {
+    renames[match[1]] = match[2] ?? null;
   }
-
-  return aliases;
+  return renames;
 }
 
-describe('postbuild migration compatibility alias (sync-gallery-migrations.mjs)', () => {
-  it('keeps the ChangeDurationToInteger compatibility alias so already-deployed RC DBs still boot (LOW #16)', () => {
-    const source = fs.readFileSync(SYNC_SCRIPT_PATH, 'utf8');
-    const aliases = readCompatibilityAliases(source);
+describe('migration ledger bootstrap renames (gallery-migration-ledger.ts)', () => {
+  it('keeps the ChangeDurationToInteger rename so databases that recorded the old name still boot', () => {
+    const renames = readRenamedMigrations(fs.readFileSync(LEDGER_PATH, 'utf8'));
 
-    // Inclusion, not exact-equality: future PRs may add further alias entries alongside
-    // this one without breaking the guard.
     expect(
-      aliases,
-      `expected compatibilityAliases in ${SYNC_SCRIPT_PATH} to include ${JSON.stringify(REQUIRED_ALIAS)}, found ${JSON.stringify(aliases)}`,
-    ).toContainEqual(REQUIRED_ALIAS);
+      renames,
+      `expected renamedMigrations in ${LEDGER_PATH} to map the pre-rename ChangeDurationToInteger name`,
+    ).toMatchObject({
+      '1776735180298-ChangeDurationToInteger':
+        '1777667825574-ChangeDurationToInteger',
+    });
   });
 
-  it('documents the postbuild hook as copy + stale-cleanup + compatibility alias, not a plain cp (LOW #17)', () => {
+  it('documents the separate fork ledger and the rename in CLAUDE.md', () => {
     const claudeMd = fs.readFileSync(CLAUDE_MD_PATH, 'utf8');
 
-    expect(
-      claudeMd,
-      'CLAUDE.md should reference the postbuild script by name',
-    ).toContain('sync-gallery-migrations.mjs');
-    expect(
-      claudeMd,
-      'CLAUDE.md should describe the compatibility alias behavior, not just a plain copy',
-    ).toMatch(/compatibility alias/i);
-    expect(
-      claudeMd,
-      'CLAUDE.md should name the aliased migration so the load-bearing rationale is discoverable',
-    ).toContain('ChangeDurationToInteger');
+    expect(claudeMd).toContain('gallery_migrations');
+    expect(claudeMd).toContain('gallery-migration-ledger.ts');
+    expect(claudeMd).toContain('ChangeDurationToInteger');
   });
 });

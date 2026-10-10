@@ -1,8 +1,10 @@
-// server/src/repositories/search.repository.spec.ts
+// Fork query-shape tests for search: smart facets, filter suggestions, searchSmart and searchAssetBuilder.
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import type { DB } from 'src/schema/index.js';
 import { AssetOrder, AssetVisibility } from 'src/enum.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
 
@@ -32,26 +34,26 @@ const compileAssetSearch = (options: Record<string, unknown>) =>
 
 const buildAssetSearchSql = (options: Record<string, unknown>) => compileAssetSearch(options).sql;
 
-const compileFilteredAssetIds = (sut: SearchRepository, options: Record<string, unknown>) =>
+const compileFilteredAssetIds = (sut: FilterSuggestionRepository, options: Record<string, unknown>) =>
   (sut as any).buildFilteredAssetIds(['00000000-0000-0000-0000-000000000000'], options).compile().sql;
 
 // A fresh repository whose private buildFilteredAssetIds is spied on rather than mocked, so the
 // suggestion queries still compile and run against the DummyDriver (empty rows) — what is asserted
 // is the *options* each list narrows by. Fresh per test so no spy state leaks between them.
 const spyOnFilteredAssetIds = () => {
-  const repository = new SearchRepository(offlineKysely());
+  const repository = new FilterSuggestionRepository(offlineKysely());
   const spy = vi.spyOn(repository as any, 'buildFilteredAssetIds');
   return { repository, options: () => spy.mock.calls.map((call) => call[1] as Record<string, unknown>) };
 };
 
-const compileFilteredPeopleQuery = (sut: SearchRepository, options: Record<string, unknown>) =>
+const compileFilteredPeopleQuery = (sut: FilterSuggestionRepository, options: Record<string, unknown>) =>
   (sut as any)
     .buildFilteredGlobalPeopleQuery(
       (sut as any).buildFilteredAssetIds(['00000000-0000-0000-0000-000000000000'], options),
     )
     .compile().sql;
 
-const compileFilteredSpacePeopleQuery = (sut: SearchRepository, options: Record<string, unknown>) =>
+const compileFilteredSpacePeopleQuery = (sut: FilterSuggestionRepository, options: Record<string, unknown>) =>
   (sut as any)
     .buildFilteredSpacePeopleQuery(
       (sut as any).buildFilteredAssetIds(['00000000-0000-0000-0000-000000000000'], options),
@@ -59,11 +61,11 @@ const compileFilteredSpacePeopleQuery = (sut: SearchRepository, options: Record<
     )
     .compile().sql;
 
-const buildFacetCandidateSql = (sut: SearchRepository, options: Record<string, unknown>) =>
+const buildFacetCandidateSql = (sut: SmartFacetRepository, options: Record<string, unknown>) =>
   (sut as any).buildSmartFacetCandidateQuery(offlineKysely(), options).compile().sql;
 
 const buildFacetFilteredIdsSql = (
-  sut: SearchRepository,
+  sut: SmartFacetRepository,
   options: Record<string, unknown>,
   exclude?: 'time' | 'people' | 'location' | 'city' | 'camera' | 'cameraModel' | 'tags' | 'rating' | 'media',
 ) => (sut as any).buildSmartFacetFilteredAssetIds(offlineKysely(), options, exclude).compile().sql;
@@ -105,6 +107,8 @@ const countMatches = (compiledSql: string, pattern: RegExp): number => {
 
 describe(SearchRepository.name, () => {
   const sut = new SearchRepository(offlineKysely());
+  const facets = new SmartFacetRepository(offlineKysely());
+  const suggestions = new FilterSuggestionRepository(offlineKysely());
 
   const baseOptions = {
     embedding: `[${Array.from({ length: 512 }, () => 0.01).join(',')}]`,
@@ -114,7 +118,7 @@ describe(SearchRepository.name, () => {
 
   describe('smart facets query shape', () => {
     it('builds one unordered candidate query from smart_search and does not page-limit facets', () => {
-      const sql = buildFacetCandidateSql(sut, {
+      const sql = buildFacetCandidateSql(facets, {
         ...baseOptions,
         city: 'Berlin',
         personIds: ['00000000-0000-0000-0000-000000000001'],
@@ -134,7 +138,7 @@ describe(SearchRepository.name, () => {
 
     it('time bucket filtering excludes only takenAfter and takenBefore', () => {
       const sql = buildFacetFilteredIdsSql(
-        sut,
+        facets,
         {
           ...baseOptions,
           takenAfter: new Date('2024-01-01T00:00:00.000Z'),
@@ -153,7 +157,7 @@ describe(SearchRepository.name, () => {
 
     it('people filtering excludes global and space people filters', () => {
       const sql = buildFacetFilteredIdsSql(
-        sut,
+        facets,
         {
           ...baseOptions,
           personIds: ['00000000-0000-0000-0000-000000000001'],
@@ -170,20 +174,20 @@ describe(SearchRepository.name, () => {
 
     it('location, camera, tags, rating, and media each exclude only their own group', () => {
       const locationSql = buildFacetFilteredIdsSql(
-        sut,
+        facets,
         { ...baseOptions, country: 'Germany', city: 'Berlin' },
         'location',
       );
-      const citySql = buildFacetFilteredIdsSql(sut, { ...baseOptions, country: 'Germany', city: 'Berlin' }, 'city');
-      const cameraSql = buildFacetFilteredIdsSql(sut, { ...baseOptions, make: 'Sony', model: 'A7' }, 'camera');
-      const modelSql = buildFacetFilteredIdsSql(sut, { ...baseOptions, make: 'Sony', model: 'A7' }, 'cameraModel');
+      const citySql = buildFacetFilteredIdsSql(facets, { ...baseOptions, country: 'Germany', city: 'Berlin' }, 'city');
+      const cameraSql = buildFacetFilteredIdsSql(facets, { ...baseOptions, make: 'Sony', model: 'A7' }, 'camera');
+      const modelSql = buildFacetFilteredIdsSql(facets, { ...baseOptions, make: 'Sony', model: 'A7' }, 'cameraModel');
       const tagsSql = buildFacetFilteredIdsSql(
-        sut,
+        facets,
         { ...baseOptions, tagIds: ['00000000-0000-0000-0000-000000000001'] },
         'tags',
       );
-      const ratingSql = buildFacetFilteredIdsSql(sut, { ...baseOptions, rating: 5 }, 'rating');
-      const mediaSql = buildFacetFilteredIdsSql(sut, { ...baseOptions, type: 'IMAGE' }, 'media');
+      const ratingSql = buildFacetFilteredIdsSql(facets, { ...baseOptions, rating: 5 }, 'rating');
+      const mediaSql = buildFacetFilteredIdsSql(facets, { ...baseOptions, type: 'IMAGE' }, 'media');
 
       expect(locationSql).not.toContain('"asset_exif"."country"');
       expect(locationSql).not.toContain('"asset_exif"."city"');
@@ -199,14 +203,14 @@ describe(SearchRepository.name, () => {
     });
 
     it('rating null filters for unrated assets instead of using minimum rating comparison', () => {
-      const sql = buildFacetFilteredIdsSql(sut, { ...baseOptions, rating: null });
+      const sql = buildFacetFilteredIdsSql(facets, { ...baseOptions, rating: null });
 
       expect(sql).toMatch(/"asset_exif"\."rating"\s+is\s+null/i);
       expect(sql).not.toMatch(/"asset_exif"\."rating"\s*>=/i);
     });
 
     it('total filtering keeps current smart-search rating, person, and tag semantics', () => {
-      const sql = buildFacetFilteredIdsSql(sut, {
+      const sql = buildFacetFilteredIdsSql(facets, {
         ...baseOptions,
         rating: 4,
         personIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
@@ -219,7 +223,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('space person filters emit one EXISTS per selected space person for smart facet totals', () => {
-      const sql = buildFacetFilteredIdsSql(sut, {
+      const sql = buildFacetFilteredIdsSql(facets, {
         ...baseOptions,
         spacePersonIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
       });
@@ -228,7 +232,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('candidate query omits the distance threshold when maxDistance is disabled', () => {
-      const sql = buildFacetCandidateSql(sut, { ...baseOptions, maxDistance: 0 });
+      const sql = buildFacetCandidateSql(facets, { ...baseOptions, maxDistance: 0 });
 
       expect(sql).toContain('"smart_search"."embedding" is not null');
       expect(sql).not.toMatch(/smart_search\.embedding\s*<=>/i);
@@ -396,28 +400,28 @@ describe(SearchRepository.name, () => {
 
   describe('filter suggestions query shape', () => {
     it('uses minimum-threshold rating filtering for facet asset scoping', () => {
-      const sql = compileFilteredAssetIds(sut, { rating: 4 });
+      const sql = compileFilteredAssetIds(suggestions, { rating: 4 });
 
       expect(sql).toMatch(/"asset_exif"\."rating"\s*>=\s*\$\d+/i);
       expect(sql).not.toMatch(/"asset_exif"\."rating"\s*=\s*\$\d+/i);
     });
 
     it('narrows facet assets by an active state', () => {
-      const sql = compileFilteredAssetIds(sut, { state: 'Bavaria' });
+      const sql = compileFilteredAssetIds(suggestions, { state: 'Bavaria' });
 
       expect(sql).toContain('"asset_exif"');
       expect(sql).toMatch(/"asset_exif"\."state"\s*=\s*\$\d+/i);
     });
 
     it('narrows facet assets by an active lens model', () => {
-      const sql = compileFilteredAssetIds(sut, { lensModel: 'RF24-105mm F4 L IS USM' });
+      const sql = compileFilteredAssetIds(suggestions, { lensModel: 'RF24-105mm F4 L IS USM' });
 
       expect(sql).toContain('"asset_exif"');
       expect(sql).toMatch(/"asset_exif"\."lensModel"\s*=\s*\$\d+/i);
     });
 
     it('ANDs the contributor filter with the owner scope instead of replacing it', () => {
-      const sql = compileFilteredAssetIds(sut, { ownerId: '00000000-0000-4000-8000-000000000009' });
+      const sql = compileFilteredAssetIds(suggestions, { ownerId: '00000000-0000-4000-8000-000000000009' });
 
       // The scope predicate resolved by applySuggestionScope must survive …
       expect(sql).toMatch(/"asset"\."ownerId"\s*=\s*any\s*\(\$\d+::uuid\[\]\)/i);
@@ -430,7 +434,7 @@ describe(SearchRepository.name, () => {
     // ownerId is $if-guarded, so the @GenerateSql dummy params (which set none of them) still
     // compile to exactly the same SQL and `mise //:sql` stays a no-op.
     it('adds no exif join or contributor predicate when none of the new dimensions is set', () => {
-      const sql = compileFilteredAssetIds(sut, {});
+      const sql = compileFilteredAssetIds(suggestions, {});
 
       expect(sql).not.toContain('"asset_exif"');
       expect(sql).not.toMatch(/"state"/i);
@@ -439,13 +443,13 @@ describe(SearchRepository.name, () => {
     });
 
     it('orders global people suggestions by favorite first, then name', () => {
-      const sql = compileFilteredPeopleQuery(sut, {});
+      const sql = compileFilteredPeopleQuery(suggestions, {});
 
       expect(sql).toMatch(/order by\s+"person"\."isFavorite"\s+desc,\s*"person"\."name"/i);
     });
 
     it('orders space people suggestions by space-local display name without private fallbacks', () => {
-      const sql = compileFilteredSpacePeopleQuery(sut, {
+      const sql = compileFilteredSpacePeopleQuery(suggestions, {
         spaceId: '11111111-1111-1111-1111-111111111111',
       });
 
@@ -455,14 +459,14 @@ describe(SearchRepository.name, () => {
     });
 
     it('filters facet assets by resolved identity ids', () => {
-      const sql = compileFilteredAssetIds(sut, { identityIds: ['00000000-0000-0000-0000-000000000001'] });
+      const sql = compileFilteredAssetIds(suggestions, { identityIds: ['00000000-0000-0000-0000-000000000001'] });
 
       expect(sql).toContain('"face_identity_face"');
       expect(sql).toContain('"face_identity_face"."identityId"');
     });
 
     it('global person suggestion filters require every selected person', () => {
-      const sql = compileFilteredAssetIds(sut, {
+      const sql = compileFilteredAssetIds(suggestions, {
         personIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
       });
       expect(sql).toContain('"has_people"');
@@ -470,7 +474,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('space person suggestion filters require every selected space person', () => {
-      const sql = compileFilteredAssetIds(sut, {
+      const sql = compileFilteredAssetIds(suggestions, {
         spaceId: '11111111-1111-1111-1111-111111111111',
         personIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
       });
@@ -479,13 +483,13 @@ describe(SearchRepository.name, () => {
     });
 
     it('forceEmptyResult compiles to an impossible predicate', () => {
-      const sql = compileFilteredAssetIds(sut, { forceEmptyResult: true });
+      const sql = compileFilteredAssetIds(suggestions, { forceEmptyResult: true });
 
       expect(sql).toContain('false');
     });
 
     it('filters suggestion asset ids to assets without album membership', () => {
-      const sql = compileFilteredAssetIds(sut, { isNotInAlbum: true });
+      const sql = compileFilteredAssetIds(suggestions, { isNotInAlbum: true });
 
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('not exists');
@@ -493,13 +497,13 @@ describe(SearchRepository.name, () => {
     });
 
     it('does not add album exclusion for false has-no-album filters', () => {
-      const sql = compileFilteredAssetIds(sut, { isNotInAlbum: false });
+      const sql = compileFilteredAssetIds(suggestions, { isNotInAlbum: false });
 
       expect(sql).not.toContain('"album_asset"');
     });
 
     it('filters suggestion asset ids to assets with album membership', () => {
-      const sql = compileFilteredAssetIds(sut, { isInAlbum: true });
+      const sql = compileFilteredAssetIds(suggestions, { isInAlbum: true });
 
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('exists');
@@ -508,7 +512,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('does not add album inclusion for false has-album filters', () => {
-      const sql = compileFilteredAssetIds(sut, { isInAlbum: false });
+      const sql = compileFilteredAssetIds(suggestions, { isInAlbum: false });
 
       expect(sql).not.toContain('"album_asset"');
     });
@@ -651,7 +655,7 @@ describe(SearchRepository.name, () => {
     // union is gated on timeline opt-in so a space asset that landed in an album never
     // leaks to non-members.
     it('buildFilteredAssetIds widens album scope to album participants, no spaces without timeline opt-in', () => {
-      const sql = compileFilteredAssetIds(sut, {
+      const sql = compileFilteredAssetIds(suggestions, {
         albumId: '11111111-1111-1111-1111-111111111111',
         tagIds: ['22222222-2222-2222-2222-222222222222'],
       });
@@ -665,7 +669,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('buildFilteredAssetIds adds timeline-enabled direct and linked-library spaces to album participants', () => {
-      const sql = compileFilteredAssetIds(sut, {
+      const sql = compileFilteredAssetIds(suggestions, {
         albumId: '11111111-1111-1111-1111-111111111111',
         timelineSpaceIds: ['33333333-3333-3333-3333-333333333333'],
       });
@@ -683,7 +687,7 @@ describe(SearchRepository.name, () => {
     it('buildFilteredAssetIds gates album_user participant arm on Archive+Timeline visibility', () => {
       // Without the fix, the album_user EXISTS arm has no visibility predicate and the
       // album-scoped facets expose Hidden assets contributed by another participant.
-      const sql = compileFilteredAssetIds(sut, {
+      const sql = compileFilteredAssetIds(suggestions, {
         albumId: '11111111-1111-1111-1111-111111111111',
       });
 

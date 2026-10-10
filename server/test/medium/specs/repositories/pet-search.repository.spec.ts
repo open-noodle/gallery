@@ -3,13 +3,14 @@
 // kNN search (see spec §4.4). The `describe('pet_search', ...)` block below only proves the
 // schema/migration land correctly, so those tests talk to ctx.database directly, mirroring
 // face-backfill-contributions.medium.spec.ts. Slice 4 (below) adds the repository methods
-// (PersonRepository.refreshPetFaces, SearchRepository.searchPets) that write/read pet_search.
+// (PetFaceRepository.refreshPetFaces, SearchRepository.searchPets) that write/read pet_search.
 import { Kysely, sql } from 'kysely';
 import { VECTOR_INDEX_TABLES } from 'src/constants.js';
 import { VectorIndex } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { PersonRepository } from 'src/repositories/person.repository.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -22,7 +23,7 @@ let db: Kysely<DB>;
 const setup = () => {
   const { ctx } = newMediumService(BaseService, {
     database: db,
-    real: [PersonRepository, SearchRepository],
+    real: [PetFaceRepository, SearchRepository, FaceSearchRepository],
     mock: [LoggingRepository],
   });
   return { ctx };
@@ -155,17 +156,17 @@ describe('pet_search', () => {
   });
 });
 
-describe('PersonRepository.refreshPetFaces', () => {
+describe('PetFaceRepository.refreshPetFaces', () => {
   // 4.4
   it('inserts an asset_face and a pet_search row under the caller-supplied face id', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const embedding = newEmbedding();
     const faceId = newUuid();
 
-    await personRepository.refreshPetFaces(
+    await petFaceRepository.refreshPetFaces(
       [
         {
           id: faceId,
@@ -204,7 +205,7 @@ describe('PersonRepository.refreshPetFaces', () => {
 
   it('R4.7 lands each embedding on its own face by id, not by insert order', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const firstEmbedding = axisEmbedding('first');
@@ -212,7 +213,7 @@ describe('PersonRepository.refreshPetFaces', () => {
     const firstFaceId = newUuid();
     const secondFaceId = newUuid();
 
-    await personRepository.refreshPetFaces(
+    await petFaceRepository.refreshPetFaces(
       [
         { id: firstFaceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 },
         { id: secondFaceId, assetId: asset.id, boundingBoxX1: 3, boundingBoxY1: 3, boundingBoxX2: 4, boundingBoxY2: 4 },
@@ -239,12 +240,12 @@ describe('PersonRepository.refreshPetFaces', () => {
 
   it('R4.5 accepts a null species, so pre-migration rows stay writable and readable', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const faceId = newUuid();
 
-    await personRepository.refreshPetFaces(
+    await petFaceRepository.refreshPetFaces(
       [{ id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 }],
       [{ faceId, embedding: axisEmbedding('first'), species: null }],
     );
@@ -259,13 +260,13 @@ describe('PersonRepository.refreshPetFaces', () => {
 
   it('R4.8 throws when the embedding count does not match the face count', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const faceId = newUuid();
 
     await expect(
-      personRepository.refreshPetFaces(
+      petFaceRepository.refreshPetFaces(
         [
           { id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 },
           { id: newUuid(), assetId: asset.id, boundingBoxX1: 3, boundingBoxY1: 3, boundingBoxX2: 4, boundingBoxY2: 4 },
@@ -282,14 +283,14 @@ describe('PersonRepository.refreshPetFaces', () => {
 
   it('R4.8 throws when an embedding names a face that is not being inserted', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const faceId = newUuid();
     const strayFaceId = newUuid();
 
     await expect(
-      personRepository.refreshPetFaces(
+      petFaceRepository.refreshPetFaces(
         [{ id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 }],
         [{ faceId: strayFaceId, embedding: axisEmbedding('first'), species: 'dog' }],
       ),
@@ -302,9 +303,9 @@ describe('PersonRepository.refreshPetFaces', () => {
 
   it('is a no-op for empty input rather than issuing malformed SQL', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
 
-    await expect(personRepository.refreshPetFaces([], [])).resolves.toBeUndefined();
+    await expect(petFaceRepository.refreshPetFaces([], [])).resolves.toBeUndefined();
   });
 });
 
@@ -432,10 +433,10 @@ const collect = async (stream: AsyncIterableIterator<{ id: string }>) => {
   return ids;
 };
 
-describe('PersonRepository.getUnassignedPetFaces (medium)', () => {
+describe('PetFaceRepository.getUnassignedPetFaces (medium)', () => {
   it('R9.1 returns embedded, unassigned faces and excludes all four disqualifying cases', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
 
     // Included: embedded and unassigned.
@@ -465,7 +466,7 @@ describe('PersonRepository.getUnassignedPetFaces (medium)', () => {
     const { asset: bareAsset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace: embeddingLess } = await ctx.newAssetFace({ assetId: bareAsset.id });
 
-    const ids = await collect(personRepository.getUnassignedPetFaces());
+    const ids = await collect(petFaceRepository.getUnassignedPetFaces());
 
     expect(ids).toContain(wanted.id);
     expect(ids).not.toContain(assigned.id);
@@ -475,14 +476,14 @@ describe('PersonRepository.getUnassignedPetFaces (medium)', () => {
   });
 });
 
-describe('PersonRepository.getPetFaceForRecognition (medium)', () => {
+describe('PetFaceRepository.getPetFaceForRecognition (medium)', () => {
   it('R9.5 excludes a soft-deleted face', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { assetFace } = await newPetFace(ctx, { ownerId: user.id, embedding: axisEmbedding('first') });
 
-    expect(await personRepository.getPetFaceForRecognition(assetFace.id)).toBeDefined();
+    expect(await petFaceRepository.getPetFaceForRecognition(assetFace.id)).toBeDefined();
 
     await ctx.database
       .updateTable('asset_face')
@@ -490,7 +491,7 @@ describe('PersonRepository.getPetFaceForRecognition (medium)', () => {
       .where('id', '=', assetFace.id)
       .execute();
 
-    expect(await personRepository.getPetFaceForRecognition(assetFace.id)).toBeUndefined();
+    expect(await petFaceRepository.getPetFaceForRecognition(assetFace.id)).toBeUndefined();
   });
 });
 
@@ -524,16 +525,16 @@ describe('SearchRepository.searchPets maxDistance boundary (medium)', () => {
   });
 });
 
-describe('PersonRepository.refreshPetFaces dimension guard (medium)', () => {
+describe('PetFaceRepository.refreshPetFaces dimension guard (medium)', () => {
   it('R9.4 rejects a wrong-dimension embedding and leaves no asset_face row behind', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const faceId = newUuid();
 
     await expect(
-      personRepository.refreshPetFaces(
+      petFaceRepository.refreshPetFaces(
         [{ id: faceId, assetId: asset.id, boundingBoxX1: 1, boundingBoxY1: 1, boundingBoxX2: 2, boundingBoxY2: 2 }],
         [{ faceId, embedding: '[1,2,3]', species: 'dog' }],
       ),
@@ -547,10 +548,10 @@ describe('PersonRepository.refreshPetFaces dimension guard (medium)', () => {
   });
 });
 
-describe('PersonRepository.getLatestPetDate (medium)', () => {
+describe('PetFaceRepository.getLatestPetDate (medium)', () => {
   it('R9.2 returns a Date, and a same-day earlier lastRun does not skip the nightly run', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
 
@@ -563,7 +564,7 @@ describe('PersonRepository.getLatestPetDate (medium)', () => {
       .onConflict((oc) => oc.column('assetId').doUpdateSet({ petsDetectedAt }))
       .execute();
 
-    const latestPetDate = await personRepository.getLatestPetDate();
+    const latestPetDate = await petFaceRepository.getLatestPetDate();
     expect(latestPetDate).toBeInstanceOf(Date);
 
     // The nightly guard compares `new Date(state.lastRun) > latestPetDate`. A lastRun earlier the

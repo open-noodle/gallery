@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, JobName, Permission } from 'src/enum.js';
+import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -42,6 +43,7 @@ const setup = () => {
   const result = newMediumService(AlbumService, {
     database: db,
     real: [
+      SpaceAlbumRepository,
       AccessRepository,
       AlbumRepository,
       AlbumUserRepository,

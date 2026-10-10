@@ -53,9 +53,9 @@ export class PetRecognitionService extends BaseService {
       // pet_search truncate is a belt-and-braces guarantee independent of that delete order.
       // Deliberately a FULL purge (buckets included, rebuilt by the requeue) — broader than a
       // model switch's scoped purge, because the admin Reset button promises exactly that.
-      await this.personRepository.deleteAllPets();
+      await this.petFaceRepository.deleteAllPets();
       await this.sharedSpaceRepository.deleteAllPets();
-      await this.personRepository.deleteAllPetSearch();
+      await this.petFaceRepository.deleteAllPetSearch();
       // Requeued unconditionally, for the same reason the purge is: the rebuild is what stops a
       // reset from leaving the library permanently empty of pets. PetDetectionQueueAll gates itself
       // on pet detection being enabled (and rebuilds species buckets rather than individuals when
@@ -85,7 +85,7 @@ export class PetRecognitionService extends BaseService {
       if (nightly) {
         // getLatestPetDate returns a Date directly (F11) — compared against a parsed Date rather
         // than pg-text vs. an ISO-`T` string, which mis-ordered same-day timestamps.
-        const latestPetDate = await this.personRepository.getLatestPetDate();
+        const latestPetDate = await this.petFaceRepository.getLatestPetDate();
         if (state?.lastRun && latestPetDate && new Date(state.lastRun) > latestPetDate) {
           this.logger.debug('Skipping pet recognition nightly since no pet has been added since the last run');
           return JobStatus.Skipped;
@@ -112,7 +112,7 @@ export class PetRecognitionService extends BaseService {
       await this.databaseRepository.prewarm(VectorIndex.Pet);
 
       let jobs: JobItem[] = [];
-      for await (const face of this.personRepository.getUnassignedPetFaces()) {
+      for await (const face of this.petFaceRepository.getUnassignedPetFaces()) {
         jobs.push({ name: JobName.PetRecognition, data: { id: face.id, deferred: false } });
 
         if (!(jobs.length >= JOBS_ASSET_PAGINATION_SIZE)) {
@@ -142,7 +142,7 @@ export class PetRecognitionService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const face = await this.personRepository.getPetFaceForRecognition(id);
+    const face = await this.petFaceRepository.getPetFaceForRecognition(id);
     if (!face || !face.asset) {
       this.logger.warn(`Pet face ${id} not found`);
       return JobStatus.Failed;
@@ -286,7 +286,7 @@ export class PetRecognitionService extends BaseService {
         return;
       }
 
-      // Scoped purge (species buckets survive — see PersonRepository.purgePetRecognitionArtifacts).
+      // Scoped purge (species buckets survive — see PetFaceRepository.purgePetRecognitionArtifacts).
       // Empty both pet queues first: pending old-model detection jobs would re-embed with mixed
       // state and duplicate faces against the requeued force run below.
       await this.jobRepository.empty(QueueName.PetRecognition, true);
@@ -294,7 +294,7 @@ export class PetRecognitionService extends BaseService {
       // empty() drains waiting/delayed jobs; it does NOT kill an ACTIVE one. An in-flight
       // recognition job can still create a person after this purge — it ends up face-less, and
       // generic person cleanup collects it (see R2.6).
-      await this.personRepository.purgePetRecognitionArtifacts();
+      await this.petFaceRepository.purgePetRecognitionArtifacts();
 
       // Stamp state BEFORE any requeue — this is what makes the idempotency re-read above sound.
       const pendingReprocess = recognitionEnabled && !detectionEnabled;

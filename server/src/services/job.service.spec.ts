@@ -1,17 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import type { JobItem } from 'src/types.js';
-import {
-  AssetType,
-  AssetVisibility,
-  ImmichWorker,
-  JobName,
-  JobStatus,
-  ManualJobName,
-  MetadataKey,
-  QueueName,
-  SystemMetadataKey,
-} from 'src/enum.js';
+import { AssetType, AssetVisibility, ImmichWorker, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum.js';
 import { JobService } from 'src/services/job.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { newUuid } from 'test/small.factory.js';
@@ -97,82 +86,6 @@ describe(JobService.name, () => {
 
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('handleFaceSuggestionMaintenance', () => {
-    it('should run on the people backfill queue', () => {
-      const config = new Reflector().get(MetadataKey.JobConfig, sut.handleFaceSuggestionMaintenance);
-
-      expect(config).toEqual(expect.objectContaining({ queue: QueueName.PeopleBackfill }));
-    });
-
-    it('should queue personal and shared-space suggestion fanout jobs when suggestions are enabled', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({
-        machineLearning: {
-          enabled: true,
-          facialRecognition: {
-            enabled: true,
-            maxDistance: 0.5,
-            minFaces: 3,
-            suggestions: { enabled: true, maxDistance: 0.8 },
-          },
-        },
-      });
-
-      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([
-        { name: JobName.PersonSuggestionScanQueueAll, data: {} },
-        { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
-      ]);
-    });
-
-    // PersonService.onBootstrap runs this once per instance and skips it forever after the marker is set, so
-    // the marker must mean "a sweep ran", not "a sweep was queued". Writing it here is what makes a failed
-    // sweep (attempts:1, removeOnFail:true) retry on the next boot instead of being silently recorded as done.
-    it('should record the one-shot sweep marker once the fanout has been queued', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({
-        machineLearning: {
-          enabled: true,
-          facialRecognition: {
-            enabled: true,
-            maxDistance: 0.5,
-            minFaces: 3,
-            suggestions: { enabled: true, maxDistance: 0.8 },
-          },
-        },
-      });
-
-      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.FaceSuggestionDefaultOnState, {
-        sweptAt: expect.any(String),
-      });
-    });
-
-    it('should skip without queueing child fanout jobs when suggestions are disabled', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({
-        machineLearning: {
-          enabled: true,
-          facialRecognition: {
-            enabled: true,
-            maxDistance: 0.5,
-            minFaces: 3,
-            suggestions: { enabled: false, maxDistance: 0.8 },
-          },
-        },
-      });
-
-      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Skipped);
-
-      expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      // A skipped run swept nothing, so it must not claim the one-shot slot — otherwise an admin who ran the
-      // job by hand while the feature was off would consume the boot sweep they never got.
-      expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
-        SystemMetadataKey.FaceSuggestionDefaultOnState,
-        expect.anything(),
-      );
     });
   });
 
@@ -282,23 +195,17 @@ describe(JobService.name, () => {
       },
       {
         item: { name: JobName.AssetGenerateThumbnails, data: { id: 'asset-1', source: 'upload' } },
-        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr, JobName.PetDetection],
+        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr],
         stub: [AssetFactory.create({ id: 'asset-1', livePhotoVideoId: newUuid() })],
       },
       {
         item: { name: JobName.AssetGenerateThumbnails, data: { id: 'asset-1', source: 'upload' } },
-        jobs: [
-          JobName.SmartSearch,
-          JobName.AssetDetectFaces,
-          JobName.Ocr,
-          JobName.PetDetection,
-          JobName.AssetEncodeVideo,
-        ],
+        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr, JobName.AssetEncodeVideo],
         stub: [AssetFactory.create({ id: 'asset-1', type: AssetType.Video })],
       },
       {
         item: { name: JobName.SmartSearch, data: { id: 'asset-1' } },
-        jobs: [JobName.AssetClassify],
+        jobs: [],
       },
       {
         item: { name: JobName.AssetDetectFaces, data: { id: 'asset-1' } },
@@ -595,7 +502,6 @@ describe(JobService.name, () => {
           { name: JobName.SmartSearch, data: expect.anything() },
           { name: JobName.AssetDetectFaces, data: expect.anything() },
           { name: JobName.Ocr, data: expect.anything() },
-          { name: JobName.PetDetection, data: expect.anything() },
         ]),
       );
     });
@@ -629,7 +535,6 @@ describe(JobService.name, () => {
         { name: JobName.SmartSearch, data: { id, source: 'upload' } },
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
-        { name: JobName.PetDetection, data: { id, source: 'upload' } },
       ]);
     });
 
@@ -648,7 +553,6 @@ describe(JobService.name, () => {
         { name: JobName.SmartSearch, data: { id, source: 'upload' } },
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
-        { name: JobName.PetDetection, data: { id, source: 'upload' } },
         { name: JobName.AssetEncodeVideo, data: { id, source: 'upload' } },
       ]);
     });
@@ -699,7 +603,6 @@ describe(JobService.name, () => {
         { name: JobName.SmartSearch, data: { id, source: 'upload' } },
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
-        { name: JobName.PetDetection, data: { id, source: 'upload' } },
       ]);
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
@@ -776,7 +679,6 @@ describe(JobService.name, () => {
           { name: JobName.SmartSearch, data: { id, source: 'upload' } },
           { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
           { name: JobName.Ocr, data: { id, source: 'upload' } },
-          { name: JobName.PetDetection, data: { id, source: 'upload' } },
         ]),
       );
       expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith(
@@ -883,10 +785,6 @@ describe(JobService.name, () => {
         name: JobName.AssetDetectDuplicates,
         data: expect.anything(),
       });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.AssetClassify,
-        data: { id },
-      });
     });
 
     it('should not queue AssetDetectDuplicates when source is sidecar-write', async () => {
@@ -901,10 +799,6 @@ describe(JobService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalledWith({
         name: JobName.AssetDetectDuplicates,
         data: expect.anything(),
-      });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.AssetClassify,
-        data: { id },
       });
     });
   });

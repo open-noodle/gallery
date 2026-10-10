@@ -20,3 +20,8 @@ packages/sdk/fetch-client.ts linguist-generated=true
 # NUL bytes in a sentinel string (now removed — see issue #672) that tripped git's
 # binary-content heuristic against the older blob.
 branding/scripts/*.sh diff
+
+# Upstream stores these with CRLF; -text stops core.autocrlf=input from converting them to LF on commit.
+mobile/lib/main.dart -text
+mobile/lib/providers/server_info.provider.dart -text
+mobile/lib/presentation/pages/search/paginated_search.provider.dart -text

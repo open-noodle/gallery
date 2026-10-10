@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryPersonDayCount } from 'src/repositories/asset.repository.js';
+import { MemoryAsset, MemoryPersonDayCount } from 'src/gallery/memory-rule-asset.repository.js';
 import { DormantPerson } from 'src/repositories/person.repository.js';
 import { DEFAULT_DORMANCY_MONTHS, PersonThrowbackMemoryRule } from 'src/services/memory-rules/person-throwback.rule.js';
 

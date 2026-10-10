@@ -8,6 +8,7 @@ import {
   SharedSpaceRole,
   TimeBucketSize,
 } from 'src/enum.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -33,7 +34,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [],
     mock: [LoggingRepository],
   });
-  return { ctx, sut: ctx.get(AssetRepository) };
+  return { ctx, sut: ctx.get(AssetRepository), memoryRuleAsset: ctx.get(MemoryRuleAssetRepository) };
 };
 
 const seedPeriodAsset = async (
@@ -896,7 +897,7 @@ describe(AssetRepository.name, () => {
 
   describe('getMemoryLocationClusters', () => {
     it('should group previewable timeline assets by country and city within the requested window', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
 
       const addAsset = async ({
@@ -931,7 +932,7 @@ describe(AssetRepository.name, () => {
         withPreview: false,
       });
 
-      const result = await sut.getMemoryLocationClusters(user.id, {
+      const result = await memoryRuleAsset.getMemoryLocationClusters(user.id, {
         takenAfter: new Date('2026-04-01T00:00:00Z'),
         takenBefore: new Date('2026-04-30T23:59:59Z'),
       });
@@ -948,7 +949,7 @@ describe(AssetRepository.name, () => {
 
   describe('getMemoryAssetsForLocation', () => {
     it('should return previewable timeline assets for the requested country and city, including city=null', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const takenAfter = new Date('2026-04-01T00:00:00Z');
       const takenBefore = new Date('2026-04-30T23:59:59Z');
@@ -979,7 +980,7 @@ describe(AssetRepository.name, () => {
       ]);
 
       await expect(
-        sut.getMemoryAssetsForLocation(user.id, {
+        memoryRuleAsset.getMemoryAssetsForLocation(user.id, {
           country: 'France',
           city: 'Paris',
           takenAfter,
@@ -988,7 +989,7 @@ describe(AssetRepository.name, () => {
       ).resolves.toEqual([expect.objectContaining({ id: parisAsset.id })]);
 
       await expect(
-        sut.getMemoryAssetsForLocation(user.id, {
+        memoryRuleAsset.getMemoryAssetsForLocation(user.id, {
           country: 'France',
           city: null,
           takenAfter,
@@ -1000,7 +1001,7 @@ describe(AssetRepository.name, () => {
 
   describe('getMemoryAssetsForPerson', () => {
     it('should return previewable timeline assets for the person before the cutoff and deduplicate multiple faces', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const cutoff = new Date('2026-04-23T23:59:59Z');
@@ -1053,7 +1054,7 @@ describe(AssetRepository.name, () => {
         ctx.newAssetFace({ assetId: afterCutoffAsset.id, personGroupId: person.personGroupId, isVisible: true }),
       ]);
 
-      const result = await sut.getMemoryAssetsForPerson(user.id, person.personGroupId, cutoff);
+      const result = await memoryRuleAsset.getMemoryAssetsForPerson(user.id, person.personGroupId, cutoff);
 
       expect(result.map(({ id }) => id).toSorted()).toEqual([duplicateFaceAsset.id, matchingAsset.id].toSorted());
       expect(result).toEqual(
@@ -1067,13 +1068,13 @@ describe(AssetRepository.name, () => {
 
   describe('getMemoryAssetsForPeriod', () => {
     it('filters by month across years and returns the correct UTC year', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2022-07-20T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') }); // wrong month
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1083,14 +1084,14 @@ describe(AssetRepository.name, () => {
     });
 
     it('unions multiple months', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-08-10T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-09-10T12:00:00Z') }); // excluded
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [6, 7, 8],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1099,13 +1100,13 @@ describe(AssetRepository.name, () => {
     });
 
     it('narrows to a day-of-month across years', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-15T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2022-07-15T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-16T12:00:00Z') }); // wrong day
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         day: 15,
         takenBefore: new Date('2026-01-01T00:00:00Z'),
@@ -1115,7 +1116,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('returns only favorites when favoritesOnly is set', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const fav = await seedPeriodAsset(ctx, user.id, {
         localDateTime: new Date('2023-07-10T12:00:00Z'),
@@ -1123,7 +1124,7 @@ describe(AssetRepository.name, () => {
       });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-11T12:00:00Z'), isFavorite: false });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         favoritesOnly: true,
         takenBefore: new Date('2026-01-01T00:00:00Z'),
@@ -1134,12 +1135,12 @@ describe(AssetRepository.name, () => {
     });
 
     it('excludes assets taken after takenBefore', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
       await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2025-07-10T12:00:00Z') }); // after cutoff
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2024-01-01T00:00:00Z'),
       });
@@ -1149,7 +1150,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('returns city and country for geotagged assets and nulls for ungeotagged', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, {
         localDateTime: new Date('2023-07-10T12:00:00Z'),
@@ -1162,7 +1163,7 @@ describe(AssetRepository.name, () => {
         city: null,
       });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1176,7 +1177,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('excludes assets without a preview, deleted, non-timeline, and other owners; orders by localDateTime asc', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { user: other } = await ctx.newUser();
       const first = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-05T12:00:00Z') });
@@ -1189,7 +1190,7 @@ describe(AssetRepository.name, () => {
       });
       await seedPeriodAsset(ctx, other.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1198,7 +1199,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('returns type and duration on each row', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const image = await seedPeriodAsset(ctx, user.id, {
         localDateTime: new Date('2023-07-10T12:00:00Z'),
@@ -1211,7 +1212,7 @@ describe(AssetRepository.name, () => {
         duration: 5000,
       });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1225,7 +1226,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('type: AssetType.Video returns only videos', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, {
         localDateTime: new Date('2023-07-10T12:00:00Z'),
@@ -1243,7 +1244,7 @@ describe(AssetRepository.name, () => {
         duration: 8000,
       });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         type: AssetType.Video,
         takenBefore: new Date('2026-01-01T00:00:00Z'),
@@ -1257,7 +1258,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('omitting type returns both images and videos', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       await seedPeriodAsset(ctx, user.id, {
         localDateTime: new Date('2023-07-10T12:00:00Z'),
@@ -1275,7 +1276,7 @@ describe(AssetRepository.name, () => {
         duration: 8000,
       });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1284,7 +1285,7 @@ describe(AssetRepository.name, () => {
     });
 
     it('returns a video with a null duration', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const video = await seedPeriodAsset(ctx, user.id, {
         localDateTime: new Date('2023-07-10T12:00:00Z'),
@@ -1292,7 +1293,7 @@ describe(AssetRepository.name, () => {
         duration: null,
       });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore: new Date('2026-01-01T00:00:00Z'),
       });
@@ -1303,12 +1304,12 @@ describe(AssetRepository.name, () => {
     });
 
     it('includes an asset exactly on takenBefore', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const takenBefore = new Date('2023-07-10T12:00:00Z');
       const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: takenBefore });
 
-      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+      const result = await memoryRuleAsset.getMemoryAssetsForPeriod(user.id, {
         months: [7],
         takenBefore,
       });
@@ -1320,7 +1321,7 @@ describe(AssetRepository.name, () => {
   describe('getMemoryFacesForPeriod', () => {
     describe('given assets in and out of the requested months', () => {
       it('then returns only rows in the requested months, unioning multi-month filters', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, memoryRuleAsset } = setup();
         const { user } = await ctx.newUser();
         const person = await seedPerson(ctx, user.id, { name: 'Anna' });
 
@@ -1333,7 +1334,7 @@ describe(AssetRepository.name, () => {
         const september = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-09-10T12:00:00Z') });
         await seedFace(ctx, september.id, person.personGroupId); // excluded — wrong month
 
-        const result = await sut.getMemoryFacesForPeriod(user.id, {
+        const result = await memoryRuleAsset.getMemoryFacesForPeriod(user.id, {
           months: [6, 7, 8],
           takenBefore: new Date('2026-01-01T00:00:00Z'),
         });
@@ -1344,7 +1345,7 @@ describe(AssetRepository.name, () => {
 
     describe('given an asset with two named subjects', () => {
       it('then returns one row per (asset, person)', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, memoryRuleAsset } = setup();
         const { user } = await ctx.newUser();
         const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
         const anna = await seedPerson(ctx, user.id, { name: 'Anna' });
@@ -1352,7 +1353,7 @@ describe(AssetRepository.name, () => {
         await seedFace(ctx, asset.id, anna.personGroupId);
         await seedFace(ctx, asset.id, ben.personGroupId);
 
-        const result = await sut.getMemoryFacesForPeriod(user.id, {
+        const result = await memoryRuleAsset.getMemoryFacesForPeriod(user.id, {
           months: [6],
           takenBefore: new Date('2026-01-01T00:00:00Z'),
         });
@@ -1365,7 +1366,7 @@ describe(AssetRepository.name, () => {
 
     describe('given an asset taken after takenBefore', () => {
       it('then excludes that asset', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, memoryRuleAsset } = setup();
         const { user } = await ctx.newUser();
         const person = await seedPerson(ctx, user.id, { name: 'Anna' });
         const early = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
@@ -1373,7 +1374,7 @@ describe(AssetRepository.name, () => {
         const late = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2025-06-10T12:00:00Z') });
         await seedFace(ctx, late.id, person.personGroupId);
 
-        const result = await sut.getMemoryFacesForPeriod(user.id, {
+        const result = await memoryRuleAsset.getMemoryFacesForPeriod(user.id, {
           months: [6],
           takenBefore: new Date('2024-01-01T00:00:00Z'),
         });
@@ -1385,7 +1386,7 @@ describe(AssetRepository.name, () => {
 
     describe('given an asset at a UTC month/year boundary', () => {
       it('then extracts the year in UTC', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, memoryRuleAsset } = setup();
         const { user } = await ctx.newUser();
         const person = await seedPerson(ctx, user.id, { name: 'Anna' });
         // Local time is Dec 31 23:30 in UTC-1, but the stored localDateTime column (interpreted
@@ -1393,7 +1394,7 @@ describe(AssetRepository.name, () => {
         const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2024-01-01T00:30:00Z') });
         await seedFace(ctx, asset.id, person.personGroupId);
 
-        const result = await sut.getMemoryFacesForPeriod(user.id, {
+        const result = await memoryRuleAsset.getMemoryFacesForPeriod(user.id, {
           months: [1],
           takenBefore: new Date('2026-01-01T00:00:00Z'),
         });
@@ -1404,7 +1405,7 @@ describe(AssetRepository.name, () => {
 
     describe('given exclusion cases', () => {
       it('excludes unnamed people, hidden people, invisible faces, soft-deleted faces, assets without a preview, soft-deleted assets, non-timeline assets, and another owner entirely; includes pets; orders by localDateTime asc', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, memoryRuleAsset } = setup();
         const { user } = await ctx.newUser();
         const { user: other } = await ctx.newUser();
 
@@ -1467,7 +1468,7 @@ describe(AssetRepository.name, () => {
         const petAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-16T12:00:00Z') });
         await seedFace(ctx, petAsset.id, pet.personGroupId);
 
-        const result = await sut.getMemoryFacesForPeriod(user.id, {
+        const result = await memoryRuleAsset.getMemoryFacesForPeriod(user.id, {
           months: [6],
           takenBefore: new Date('2026-01-01T00:00:00Z'),
         });

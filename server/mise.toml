@@ -55,7 +55,11 @@ description = "Migration ORDER commands scoped to the fork-only migrations-galle
 run = { task = "migrations query 'DROP schema public cascade; CREATE schema public;'" }
 
 [tasks."schema-reset"]
-run = [{ task = ":schema-drop" }, { task = "migrations run" }]
+# Not `migrations run`: sql-tools only knows `kysely_migrations` and would skip every fork migration.
+run = [
+  { task = ":schema-drop" },
+  "DB_URL=${DB_URL:-postgres://postgres:postgres@localhost:5432/immich} node ./dist/bin/gallery-migrations.js run",
+]
 
 [tasks."email-dev"]
 env._.path = "./node_modules/.bin"

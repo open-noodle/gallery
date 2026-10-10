@@ -39,9 +39,8 @@ import {
 // Static import (not dynamic `import()`): tsc's node16/nodenext resolution can't resolve a
 // `src/`-aliased specifier inside a dynamic import expression (TS2307), unlike a static
 // import. vitest hoists `vi.mock('kysely', ...)` above every import in this file regardless
-// of source position (same pattern as composite-migration-provider.spec.ts), so the mock is
-// already installed by the time this migration module's top-level `import { sql } from
-// 'kysely'` resolves.
+// of source position, so the mock is already installed by the time this migration module's
+// top-level `import { sql } from 'kysely'` resolves.
 import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger.js';
 import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit.js';
 import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId.js';

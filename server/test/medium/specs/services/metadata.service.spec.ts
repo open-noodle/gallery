@@ -4,6 +4,8 @@ import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -128,7 +130,7 @@ const setupPersonService = (db?: Kysely<DB>) => {
 const setupFaceIdentityBackfillService = (db?: Kysely<DB>) => {
   clearConfigCache();
 
-  const { sut, ctx } = newMediumService(PersonService, {
+  const { sut, ctx } = newMediumService(FaceIdentityMaintenanceService, {
     database: db || defaultDatabase,
     real: [FaceIdentityRepository, SharedSpaceRepository],
     mock: [JobRepository, LoggingRepository],
@@ -146,11 +148,11 @@ const setupSharedSpaceService = (db?: Kysely<DB>) => {
   const { sut, ctx } = newMediumService(SharedSpaceService, {
     database: db || defaultDatabase,
     real: [ConfigRepository, PersonRepository, SharedSpaceRepository],
-    mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
+    mock: [JobRepository, LoggingRepository, QueueMaintenanceRepository, SystemMetadataRepository],
   });
 
   ctx.getMock(JobRepository).queue.mockResolvedValue();
-  ctx.getMock(JobRepository).hasInFlightDedupChain.mockResolvedValue(false);
+  ctx.getMock(QueueMaintenanceRepository).hasInFlightDedupChain.mockResolvedValue(false);
   ctx.getMock(SystemMetadataRepository).get.mockResolvedValue({
     machineLearning: { facialRecognition: { maxDistance: 0.5 } },
   } as any);

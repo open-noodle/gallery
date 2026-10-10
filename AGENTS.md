@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gallery is a community fork of [Immich](https://github.com/immich-app/immich), a self-hosted photo and video management solution. The fork is currently based on **Immich v2.7.5** and regularly rebased onto upstream. Source package names are still `immich` / `immich-web` so the rebase path stays clean — only branding, Docker image names, and fork-only code diverge.
+Gallery is a community fork of [Immich](https://github.com/immich-app/immich), a self-hosted photo and video management solution. The fork is currently based on **Immich v3.3.1** and regularly rebased onto upstream. Source package names are still `immich` / `immich-web` so the rebase path stays clean — only branding, Docker image names, and fork-only code diverge.
 
 Fork-specific features layered on top of upstream include: shared spaces, smart search & filters, user groups, S3-compatible storage, auto-classification, video duplicate detection, pet detection, Google Photos import, image editing & video trimming, and structured JSON logging. See `README.md` for the full list and docs links.
 
@@ -99,37 +99,33 @@ The `make open-api*` targets have been removed; `make open-api` now just prints 
 ### Database Migrations (server/)
 
 ```bash
-pnpm migrations:generate   # Auto-generate migration from schema changes
-pnpm migrations:run        # Apply pending migrations (fresh DB only, see note below)
-pnpm migrations:revert     # Rollback last migration
+pnpm migrations:generate   # Auto-generate migration from schema changes (needs a fully migrated DB)
+pnpm migrations:run        # Apply pending upstream + fork migrations (server migrator, needs `pnpm build`)
+pnpm migrations:revert     # Revert the newest fork migration, or the newest upstream one if none is left
 pnpm schema:reset          # Drop and recreate schema (destructive)
 ```
 
-**Fork migration layout:** Gallery maintains two migration directories in source:
+**Fork migration layout:** Gallery keeps migrations in two source folders and records them in two ledgers:
 
-- `server/src/schema/migrations/` — upstream Immich migrations (replaced during rebases)
-- `server/src/schema/migrations-gallery/` — fork-only migrations (never touched by rebases)
+- `server/src/schema/migrations/`: upstream Immich migrations (replaced during rebases), recorded in `kysely_migrations`
+- `server/src/schema/migrations-gallery/`: fork-only migrations (never touched by rebases), recorded in `gallery_migrations`
 
-**How they come together — the `postbuild` script:**
+`kysely_migrations` therefore only ever holds upstream names, which is what a stock Immich server expects. All fork logic lives in `server/src/schema/gallery-migration-ledger.ts`; `DatabaseRepository.runMigrations()` calls it under the existing migration lock, inside one transaction:
 
-After `nest build` compiles TypeScript to `dist/`, the npm `postbuild` hook (`server/package.json`) runs `server/bin/sync-gallery-migrations.mjs`, which does three things:
+1. **Bootstrap** (idempotent, a no-op on fresh databases): creates `gallery_migrations` if missing, applies the `renamedMigrations` map (rows earlier builds recorded under names with no file: the pre-rename `1776735180298-ChangeDurationToInteger`, RC-era fork names renumbered off timestamp collisions, and the dropped `1773846750001` stub), then moves every row named after a `migrations-gallery` file out of `kysely_migrations`. **The map is load-bearing**: Kysely hard-fails on boot when a recorded name has no file, and re-running `ChangeDurationToInteger` fails on the already-integer column. Add an entry whenever a migration that has shipped anywhere (including RC/staging) is renamed. A renamed row is also re-stamped to at least the newest timestamp of the upstream rows named before it, because a stock Immich migrator (`allowUnorderedMigrations: false`) requires executed rows sorted by `(timestamp, name)` to match file order. Upstream rows recorded out of name order for any other reason still block a stock Immich boot.
+2. **One run in name order across both folders**, each migration recorded in its own ledger. The single order matters: a Gallery database from before upstream's `ClusterGroups` must drop its fork FKs (`1787100000000`) before `1787148183729-ClusterGroups` runs, or that migration fails with `2BP01`. Both migrators keep `allowUnorderedMigrations: true`, because rolling-branch databases recorded some migrations out of name order.
 
-1. **Copies** `dist/schema/migrations-gallery/*.js` into `dist/schema/migrations/`. This means the built `dist/schema/migrations/` folder contains ALL migrations (upstream + fork) in one flat directory.
-2. **Removes stale copies**: if a fork migration file in `migrations-gallery/` was renamed, it deletes the old copy left behind in `dist/schema/migrations/` from a previous build.
-3. **Writes a build-time compatibility alias**: a `compatibilityAliases` array copies the current `1777667825574-ChangeDurationToInteger.js` to a second copy named `1776735180298-ChangeDurationToInteger.js` (`from` → `to`). `ChangeDurationToInteger` was re-timestamped upstream from `1776735180298` to `1777667825574`, and the fork's source now carries only the current `1777667825574` file. Already-deployed v5-RC/staging databases, however, ran the migration under its **pre-rename** `1776735180298` name and recorded _that_ — and Kysely hard-fails on boot if a migration name recorded in the DB has no matching file on disk. The alias makes `dist/schema/migrations/` contain the compiled file under **both** names, so already-deployed DBs (recorded `1776735180298`) and fresh installs (run `1777667825574`) both boot cleanly. **This alias is load-bearing — do not remove it** without a migration path for already-deployed DBs that recorded the pre-rename name.
+**`sql-tools` cannot drive the fork ledger**: it hardcodes `kysely_migrations`. `migrations:run` / `migrations:revert` / `schema:reset` therefore go through `server/src/bin/gallery-migrations.ts` (the server migrator), not `sql-tools`. `migrations:generate` still uses `sql-tools`; it diffs code against the database and imports all of `dist/schema`, so it only needs a database migrated by `migrations:run`. The ORDER manifests and `migrations:verify-order:gallery` are folder-scoped and unaffected. The `postbuild` hook (`server/bin/sync-gallery-migrations.mjs`) deletes compiled migrations in `dist/schema/` that no longer have a source file, because `nest build` never empties `dist/` and a stale file would be run.
 
-The copy step (1) is needed because:
+**Switching and reverting:** an Immich-to-Gallery switch needs no bootstrap work; every fork migration simply runs after the upstream ones already applied. `scripts/revert-to-immich.sql` step 8 drops `gallery_migrations` and `gallery_migrations_lock`, and keeps its `kysely_migrations` DELETE list for databases last booted by a build from before the split.
 
-1. **`sql-tools` CLI** (`migrations:run`, `generate`, `revert`) only reads from one folder (`dist/schema/migrations/`) and cannot be configured for multiple directories
-2. **The server runtime** uses `CompositeMigrationProvider` which reads from both `dist/schema/migrations/` and `dist/schema/migrations-gallery/` — duplicates from the postbuild copy are silently handled via `Object.assign` (last folder wins, identical code)
+**Downgrading to a build from before the split** fails on boot: that build looks for fork rows in `kysely_migrations`, finds none, and re-runs a non-idempotent fork migration (the transaction rolls back, no data is lost). Copy the fork rows back first; when this build boots again it moves them out of `kysely_migrations` once more:
 
-**Why two source directories?** Keeping fork migrations in `migrations-gallery/` means upstream rebases never conflict with fork migration files. The `migrations/` directory gets replaced wholesale during rebases, while `migrations-gallery/` is untouched.
+```sql
+INSERT INTO "kysely_migrations" ("name", "timestamp") SELECT "name", "timestamp" FROM "gallery_migrations" ON CONFLICT ("name") DO NOTHING;
+```
 
-**Runtime migration behavior:** `DatabaseRepository.createMigrator()` uses `allowUnorderedMigrations: true` so fork migrations with timestamps interleaved between upstream ones apply correctly. This is critical for Immich-to-Gallery migration — users who switch from Immich already have upstream migrations applied, and the fork migrations slot in between them.
-
-**`pnpm migrations:run`** uses `sql-tools` which hardcodes `allowUnorderedMigrations: false`. This works on fresh databases (CI, initial setup) but will fail on an existing database that already has upstream migrations applied. For existing databases, the server handles migrations automatically on startup via `DatabaseRepository.runMigrations()`.
-
-**Adding new fork migrations:** Create new migration files in `server/src/schema/migrations-gallery/` with a timestamp that doesn't collide with existing migrations. Use round timestamps (e.g., `1775000000000`) for easy identification.
+**Adding new fork migrations:** Create new migration files in `server/src/schema/migrations-gallery/` with a timestamp that doesn't collide with existing migrations. Use round timestamps (e.g., `1775000000000`) for easy identification. Do not add fork foreign keys onto `person` or `person_group` keys: an upstream migration that rebuilds those keys then fails with `2BP01`, as `ClusterGroups` did. If one is unavoidable, plan the pre/post migration pair (drop before the upstream migration, recreate after it) in the same change.
 
 ## Architecture
 

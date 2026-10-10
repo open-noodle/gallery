@@ -1,145 +1,41 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const defaultServerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const compatibilityAliases = [
-  {
-    from: '1777667825574-ChangeDurationToInteger',
-    to: '1776735180298-ChangeDurationToInteger',
-  },
-  // Renumbered on the rolling branch when fork PR #1060 landed
-  // `1793000000000-AddSharedSpaceAlbumHidden` on the same timestamp. That PR is already on `main`
-  // under its name, so the rolling-only cleanup migration is the one that had to move — but staging
-  // (and any other rolling RC) had ALREADY applied it as `1793000000000` and records that name.
-  // Without this alias those databases boot into a recorded-migration-with-no-file hard failure.
-  {
-    from: '1793300000000-ClearPreOptionMFaceRepairScans',
-    to: '1793000000000-ClearPreOptionMFaceRepairScans',
-  },
-];
+const compiledSuffixes = ['.js', '.js.map', '.d.ts'];
 
-function migrationNames(folder, extension) {
-  if (!existsSync(folder)) {
-    return new Set();
-  }
-
-  return new Set(
-    readdirSync(folder)
-      .filter((file) => file.endsWith(extension))
-      .map((file) => file.slice(0, -extension.length)),
-  );
-}
-
-function migrationSuffix(migrationName) {
-  return migrationName.replace(/^\d+-/, '');
-}
-
-function removeStaleCopiedGalleryMigrations({ distGalleryMigrations, distMigrations, srcMigrations }) {
-  if (!existsSync(distMigrations)) {
-    return 0;
-  }
-
-  const sourceMigrationNames = migrationNames(srcMigrations, '.ts');
-  const galleryMigrationNames = migrationNames(distGalleryMigrations, '.js');
-  const galleryMigrationSuffixes = new Set([...galleryMigrationNames].map(migrationSuffix));
-  let removed = 0;
-
-  for (const file of readdirSync(distMigrations)) {
-    if (!file.endsWith('.js')) {
-      continue;
-    }
-
-    const migrationName = file.slice(0, -'.js'.length);
-    if (sourceMigrationNames.has(migrationName)) {
-      continue;
-    }
-
-    if (galleryMigrationNames.has(migrationName)) {
-      continue;
-    }
-
-    if (!galleryMigrationSuffixes.has(migrationSuffix(migrationName))) {
-      continue;
-    }
-
-    rmSync(path.join(distMigrations, file), { force: true });
-    rmSync(path.join(distMigrations, `${file}.map`), { force: true });
-    rmSync(path.join(distMigrations, `${migrationName}.d.ts`), { force: true });
-    removed += 1;
-  }
-
-  return removed;
-}
-
-function copyGalleryMigrations({ distGalleryMigrations, distMigrations }) {
-  if (!existsSync(distGalleryMigrations)) {
-    return 0;
-  }
-
-  mkdirSync(distMigrations, { recursive: true });
-  let copied = 0;
-
-  for (const file of readdirSync(distGalleryMigrations)) {
-    if (!file.endsWith('.js')) {
-      continue;
-    }
-
-    copyFileSync(path.join(distGalleryMigrations, file), path.join(distMigrations, file));
-    copied += 1;
-  }
-
-  return copied;
-}
-
-function copyIfExists(source, target) {
-  if (!existsSync(source)) {
-    return;
-  }
-
-  copyFileSync(source, target);
-}
-
-function syncCompatibilityAliases({ distMigrations }) {
-  if (!existsSync(distMigrations)) {
-    return 0;
-  }
-
-  let aliased = 0;
-
-  for (const { from, to } of compatibilityAliases) {
-    const source = path.join(distMigrations, `${from}.js`);
-    if (!existsSync(source)) {
-      continue;
-    }
-
-    copyFileSync(source, path.join(distMigrations, `${to}.js`));
-    copyIfExists(path.join(distMigrations, `${from}.js.map`), path.join(distMigrations, `${to}.js.map`));
-    copyIfExists(path.join(distMigrations, `${from}.d.ts`), path.join(distMigrations, `${to}.d.ts`));
-    aliased += 1;
-  }
-
-  return aliased;
-}
-
+// `nest build` never empties dist/, so the compiled migration folders keep files whose source is gone:
+// Gallery migrations copied into dist/schema/migrations by builds before the ledger split, the old
+// compatibility aliases, renamed or deleted migrations. A migrator runs (or demands) every compiled
+// file it finds, so delete each one that has no source next to it in src/.
 export function syncGalleryMigrations({ logger = console, serverRoot = defaultServerRoot } = {}) {
-  const paths = {
-    srcMigrations: path.join(serverRoot, 'src/schema/migrations'),
-    distMigrations: path.join(serverRoot, 'dist/schema/migrations'),
-    distGalleryMigrations: path.join(serverRoot, 'dist/schema/migrations-gallery'),
-  };
+  let removed = 0;
+  for (const folder of ['migrations', 'migrations-gallery']) {
+    const srcMigrations = path.join(serverRoot, 'src/schema', folder);
+    const distMigrations = path.join(serverRoot, 'dist/schema', folder);
+    if (!existsSync(distMigrations)) {
+      continue;
+    }
 
-  const removed = removeStaleCopiedGalleryMigrations(paths);
-  const copied = copyGalleryMigrations(paths);
-  const aliased = syncCompatibilityAliases(paths);
+    for (const file of readdirSync(distMigrations)) {
+      const suffix = compiledSuffixes.find((candidate) => file.endsWith(candidate));
+      if (!suffix || existsSync(path.join(srcMigrations, `${file.slice(0, -suffix.length)}.ts`))) {
+        continue;
+      }
 
-  if (removed > 0 || copied > 0 || aliased > 0) {
-    logger.log(
-      `Synced ${copied} Gallery migrations into dist/schema/migrations; removed ${removed} stale files; wrote ${aliased} compatibility aliases.`,
-    );
+      rmSync(path.join(distMigrations, file), { force: true });
+      if (suffix === '.js') {
+        removed += 1;
+      }
+    }
   }
 
-  return { aliased, copied, removed };
+  if (removed > 0) {
+    logger.log(`Removed ${removed} compiled migrations without a source from dist/schema.`);
+  }
+
+  return { removed };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

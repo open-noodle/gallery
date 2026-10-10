@@ -13,6 +13,7 @@ describe(QueueService.name, () => {
     ({ sut, mocks } = newTestService(QueueService));
 
     mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
+    mocks.queueMaintenance.getJobTypes.mockResolvedValue([]);
   });
 
   it('should work', () => {
@@ -157,13 +158,13 @@ describe(QueueService.name, () => {
 
     it('should reconcile orphaned active jobs before starting workers on microservices', async () => {
       mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
-      mocks.job.reconcileOrphanedActiveJobs.mockResolvedValue();
+      mocks.queueMaintenance.reconcileOrphanedActiveJobs.mockResolvedValue();
 
       sut.setServices([]);
       await sut.onBootstrap();
 
-      expect(mocks.job.reconcileOrphanedActiveJobs).toHaveBeenCalled();
-      const reconcileOrder = mocks.job.reconcileOrphanedActiveJobs.mock.invocationCallOrder[0];
+      expect(mocks.queueMaintenance.reconcileOrphanedActiveJobs).toHaveBeenCalled();
+      const reconcileOrder = mocks.queueMaintenance.reconcileOrphanedActiveJobs.mock.invocationCallOrder[0];
       const startOrder = mocks.job.startWorkers.mock.invocationCallOrder[0];
       expect(reconcileOrder).toBeLessThan(startOrder);
     });
@@ -174,12 +175,12 @@ describe(QueueService.name, () => {
       sut.setServices([]);
       await sut.onBootstrap();
 
-      expect(mocks.job.reconcileOrphanedActiveJobs).not.toHaveBeenCalled();
+      expect(mocks.queueMaintenance.reconcileOrphanedActiveJobs).not.toHaveBeenCalled();
     });
 
     it('still starts workers when orphan reconciliation fails', async () => {
       mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
-      mocks.job.reconcileOrphanedActiveJobs.mockRejectedValue(new Error('redis down'));
+      mocks.queueMaintenance.reconcileOrphanedActiveJobs.mockRejectedValue(new Error('redis down'));
 
       sut.setServices([]);
       await sut.onBootstrap();
@@ -239,7 +240,7 @@ describe(QueueService.name, () => {
         { name: JobName.FacialRecognition, active: 0, waiting: 5, delayed: 0, paused: 0 },
       ];
       mocks.job.getJobCounts.mockResolvedValue(stats);
-      mocks.job.getJobTypes.mockResolvedValue(jobTypes);
+      mocks.queueMaintenance.getJobTypes.mockResolvedValue(jobTypes);
       mocks.job.isPaused.mockResolvedValue(false);
 
       const result = await sut.get(factory.auth(), QueueName.FacialRecognition);
@@ -639,7 +640,7 @@ describe(QueueService.name, () => {
 
       await sut.getAllLegacy(factory.auth());
 
-      expect(mocks.job.getJobTypes).not.toHaveBeenCalled();
+      expect(mocks.queueMaintenance.getJobTypes).not.toHaveBeenCalled();
     });
   });
 

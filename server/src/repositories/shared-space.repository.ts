@@ -4202,7 +4202,7 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [] })
   async deleteAllPets() {
-    // Mirror PersonRepository.deleteAllPets() for the shared-space copies: a pet-detection
+    // Mirror PetFaceRepository.deleteAllPets() for the shared-space copies: a pet-detection
     // reset must clear propagated pet people from every space's People view too. Deleting the
     // shared_space_person row cascades to its shared_space_person_face and _alias children, so
     // only pet-typed rows are removed and human people are left untouched.

@@ -89,6 +89,9 @@ declares literal routes before `:id` (as it already does for `statistics`, `face
   fork's modal and treat `PersonEditBirthDateModal` deletion as keep-fork.
 - Upstream's people-page URL filters and selection are adopted where they do not depend on sharing.
 - Mobile: the person timeline keeps the fork's local-first source; upstream's partner + album timeline is declined.
+- Upstream's sharing UI files (`person-user.service.ts` and the share, filter, edit and selection modals) stay in the
+  tree byte-identical to upstream and unimported, excluded from eslint, svelte-check and tsc, so rebases replay them
+  without a delete/modify conflict. Nothing renders them.
 
 ## Guards
 

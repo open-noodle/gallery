@@ -1,6 +1,8 @@
 import { WorkflowTrigger } from '@immich/plugin-sdk';
 import z from 'zod';
 
+export * from 'src/gallery/enum.js';
+
 export enum AuthType {
   Password = 'password',
   OAuth = 'oauth',
@@ -72,32 +74,6 @@ export enum AlbumUserRole {
 
 export const AlbumUserRoleSchema = z.enum(AlbumUserRole).describe('Album user role').meta({ id: 'AlbumUserRole' });
 
-export enum SharedSpaceRole {
-  Owner = 'owner',
-  Editor = 'editor',
-  Viewer = 'viewer',
-}
-
-export enum SharedSpaceActivityType {
-  AssetAdd = 'asset_add',
-  AssetRemove = 'asset_remove',
-  AssetEdit = 'asset_edit',
-  MemberJoin = 'member_join',
-  MemberLeave = 'member_leave',
-  MemberRemove = 'member_remove',
-  MemberRoleChange = 'member_role_change',
-  CoverChange = 'cover_change',
-  SpaceRename = 'space_rename',
-  SpaceColorChange = 'space_color_change',
-  PersonUpdate = 'person_update',
-  PersonDelete = 'person_delete',
-  PersonMerge = 'person_merge',
-  PersonFaceAssign = 'person_face_assign',
-  PersonFaceDetach = 'person_face_detach',
-  AlbumLink = 'album_link',
-  AlbumUnlink = 'album_unlink',
-}
-
 export enum AssetOrder {
   Asc = 'asc',
   Desc = 'desc',
@@ -111,17 +87,6 @@ export enum AssetOrderBy {
 }
 
 export const AssetOrderBySchema = z.enum(AssetOrderBy).describe('Asset sorting property').meta({ id: 'AssetOrderBy' });
-
-export enum TimeBucketSize {
-  Year = 'year',
-  Month = 'month',
-  Day = 'day',
-}
-
-export const TimeBucketSizeSchema = z
-  .enum(TimeBucketSize)
-  .describe('Timeline bucket granularity')
-  .meta({ id: 'TimeBucketSize' });
 
 export enum MemoryType {
   /** pictures taken on this day X years ago */
@@ -282,34 +247,6 @@ export enum Permission {
   PartnerUpdate = 'partner.update',
   PartnerDelete = 'partner.delete',
 
-  SharedSpaceCreate = 'sharedSpace.create',
-  SharedSpaceRead = 'sharedSpace.read',
-  SharedSpaceUpdate = 'sharedSpace.update',
-  SharedSpaceDelete = 'sharedSpace.delete',
-
-  SharedSpaceMemberCreate = 'sharedSpaceMember.create',
-  SharedSpaceMemberUpdate = 'sharedSpaceMember.update',
-  SharedSpaceMemberDelete = 'sharedSpaceMember.delete',
-
-  SharedSpaceAssetCreate = 'sharedSpaceAsset.create',
-  SharedSpaceAssetRead = 'sharedSpaceAsset.read',
-  SharedSpaceAssetDelete = 'sharedSpaceAsset.delete',
-
-  SharedSpaceLibraryCreate = 'sharedSpaceLibrary.create',
-  SharedSpaceLibraryDelete = 'sharedSpaceLibrary.delete',
-
-  SharedSpaceAlbumCreate = 'sharedSpaceAlbum.create',
-  SharedSpaceAlbumUpdate = 'sharedSpaceAlbum.update',
-  SharedSpaceAlbumDelete = 'sharedSpaceAlbum.delete',
-  SharedSpaceAlbumFolderCreate = 'sharedSpaceAlbumFolder.create',
-  SharedSpaceAlbumFolderUpdate = 'sharedSpaceAlbumFolder.update',
-  SharedSpaceAlbumFolderDelete = 'sharedSpaceAlbumFolder.delete',
-
-  UserGroupCreate = 'userGroup.create',
-  UserGroupRead = 'userGroup.read',
-  UserGroupUpdate = 'userGroup.update',
-  UserGroupDelete = 'userGroup.delete',
-
   PersonCreate = 'person.create',
   PersonRead = 'person.read',
   PersonUpdate = 'person.update',
@@ -412,6 +349,35 @@ export enum Permission {
   AdminSessionRead = 'adminSession.read',
 
   AdminAuthUnlinkAll = 'adminAuth.unlinkAll',
+
+  // Gallery fork permissions, kept last so upstream additions above never collide with them
+  SharedSpaceCreate = 'sharedSpace.create',
+  SharedSpaceRead = 'sharedSpace.read',
+  SharedSpaceUpdate = 'sharedSpace.update',
+  SharedSpaceDelete = 'sharedSpace.delete',
+
+  SharedSpaceMemberCreate = 'sharedSpaceMember.create',
+  SharedSpaceMemberUpdate = 'sharedSpaceMember.update',
+  SharedSpaceMemberDelete = 'sharedSpaceMember.delete',
+
+  SharedSpaceAssetCreate = 'sharedSpaceAsset.create',
+  SharedSpaceAssetRead = 'sharedSpaceAsset.read',
+  SharedSpaceAssetDelete = 'sharedSpaceAsset.delete',
+
+  SharedSpaceLibraryCreate = 'sharedSpaceLibrary.create',
+  SharedSpaceLibraryDelete = 'sharedSpaceLibrary.delete',
+
+  SharedSpaceAlbumCreate = 'sharedSpaceAlbum.create',
+  SharedSpaceAlbumUpdate = 'sharedSpaceAlbum.update',
+  SharedSpaceAlbumDelete = 'sharedSpaceAlbum.delete',
+  SharedSpaceAlbumFolderCreate = 'sharedSpaceAlbumFolder.create',
+  SharedSpaceAlbumFolderUpdate = 'sharedSpaceAlbumFolder.update',
+  SharedSpaceAlbumFolderDelete = 'sharedSpaceAlbumFolder.delete',
+
+  UserGroupCreate = 'userGroup.create',
+  UserGroupRead = 'userGroup.read',
+  UserGroupUpdate = 'userGroup.update',
+  UserGroupDelete = 'userGroup.delete',
 }
 
 export enum SharedLinkType {

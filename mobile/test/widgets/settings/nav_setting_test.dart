@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/nav_setting.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/preference_setting.dart';
 
@@ -37,7 +38,11 @@ void main() {
     await db.close();
   });
 
-  Future<void> pumpNavSetting(WidgetTester tester) => tester.pumpConsumerWidget(const NavSetting());
+  // NavSetting hides itself on a server without Spaces; these tests are about a server that has them.
+  final spacesServer = [serverSupportsSpacesProvider.overrideWithValue(true)];
+
+  Future<void> pumpNavSetting(WidgetTester tester) =>
+      tester.pumpConsumerWidget(const NavSetting(), overrides: spacesServer);
 
   AppConfig readConfig() => SettingsRepository.instance.appConfig;
 
@@ -60,11 +65,20 @@ void main() {
     expect(readConfig().read(SettingsKey.navShowSpaces), true);
   });
 
+  testWidgets('is hidden when the server does not serve Spaces', (tester) async {
+    await tester.pumpConsumerWidget(
+      const NavSetting(),
+      overrides: [serverSupportsSpacesProvider.overrideWithValue(false)],
+    );
+
+    expect(find.byKey(const Key('nav-show-spaces-switch')), findsNothing);
+  });
+
   // Everything above pumps [NavSetting] directly, so none of it would notice
   // the tile being dropped from the Preferences page — which is the only place
   // a user can reach it, and the only way back to Albums in the nav.
   testWidgets('the Preferences settings page lists the nav setting', (tester) async {
-    await tester.pumpConsumerWidget(const PreferenceSetting());
+    await tester.pumpConsumerWidget(const PreferenceSetting(), overrides: spacesServer);
 
     expect(find.byType(NavSetting), findsOneWidget);
     expect(find.byKey(const Key('nav-show-spaces-switch')), findsOneWidget);

@@ -2,6 +2,9 @@ import { Kysely } from 'kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { FilterSuggestionsResponseDto, SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AlbumUserRole, AssetOrder, AssetVisibility, SearchOrderField, SharedSpaceRole } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -35,7 +38,10 @@ const setup = (db?: Kysely<DB>) => {
       // faceIdentityRepository.resolveScopedPersonTokens — wire it real so the resolver runs (returns no
       // scoped tokens for a plain personId) instead of throwing on an undefined repo.
       FaceIdentityRepository,
+      FilterSuggestionRepository,
       SearchRepository,
+      FaceSearchRepository,
+      SmartFacetRepository,
       SharedSpaceRepository,
       PartnerRepository,
       PersonRepository,

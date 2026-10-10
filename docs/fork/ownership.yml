@@ -57,6 +57,14 @@ features:
       - packages/plugin-gallery/**
       - server/src/services/gallery-workflow-host.service.ts
       - server/src/services/gallery-workflow-host.service.spec.ts
+      # Replay-owned: upstream files the fork owns outright. The fork-only people code lives in
+      # server/src/gallery/ (GalleryPeopleService/Controller, FaceIdentityMaintenanceService,
+      # PetFaceRepository); what remains here is upstream code rewritten for Option M and Spaces.
+      # Upstream changes to these files are not merged by conflict resolution: the preflight report
+      # lists every upstream commit touching them ("Touches shared-spaces owned path"), and each one
+      # is replayed by hand and recorded in that cycle's specs/upstream-reports/ entry.
+      - server/src/services/person.service.ts
+      - server/src/repositories/person.repository.ts
       - web/src/lib/components/SchemaSpacePicker.svelte
       - web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte
       - web/src/lib/components/SchemaSpacePicker.spec.ts
@@ -388,7 +396,6 @@ features:
         - server/src/schema/migrations-gallery/1772810000000-AddSharedSpaceActivityTable.ts
         - server/src/schema/migrations-gallery/1772815000000-AddThumbnailCropYToSharedSpace.ts
         - server/src/schema/migrations-gallery/1772820000000-AddSharedSpaceFaceRecognition.ts
-        - server/src/schema/migrations-gallery/1773846750001-AddPersonNameTrigramIndex.ts
         - server/src/schema/migrations-gallery/1774215658876-AddSharedSpaceLibraryTable.ts
         - server/src/schema/migrations-gallery/1774300000000-CreateUserGroupTables.ts
         - server/src/schema/migrations-gallery/1775000000000-AddPetsEnabledToSharedSpace.ts

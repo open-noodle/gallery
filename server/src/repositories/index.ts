@@ -1,16 +1,14 @@
+import { galleryRepositories } from 'src/gallery/index.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository.js';
-import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
-import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -20,11 +18,6 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
-import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -48,9 +41,7 @@ import { ServerInfoRepository } from 'src/repositories/server-info.repository.js
 import { SessionRepository } from 'src/repositories/session.repository.js';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
-import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
 import { SyncRepository } from 'src/repositories/sync.repository.js';
@@ -58,7 +49,6 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { TagRepository } from 'src/repositories/tag.repository.js';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository.js';
 import { TrashRepository } from 'src/repositories/trash.repository.js';
-import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { VersionHistoryRepository } from 'src/repositories/version-history.repository.js';
 import { VideoStreamRepository } from 'src/repositories/video-stream.repository.js';
@@ -72,14 +62,11 @@ export const repositories = [
   AlbumRepository,
   AlbumUserRepository,
   ApiKeyRepository,
-  AppMetricsRepository,
   AppRepository,
   AssetRepository,
   AssetEditRepository,
-  AssetFavoriteRepository,
   AssetFileRepository,
   AssetJobRepository,
-  ClassificationRepository,
   ConfigRepository,
   CronRepository,
   CryptoRepository,
@@ -88,11 +75,6 @@ export const repositories = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
-  FaceIdentityRepository,
-  FacePersonVerdictRepository,
-  FaceRepairDeclineRepository,
-  FaceRepairRepository,
-  FaceRepairScanRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
@@ -117,9 +99,7 @@ export const repositories = [
   ServerInfoRepository,
   SharedLinkRepository,
   SharedLinkAssetRepository,
-  SharedSpaceRepository,
   StackRepository,
-  StorageMigrationRepository,
   StorageRepository,
   SyncRepository,
   SyncCheckpointRepository,
@@ -127,11 +107,11 @@ export const repositories = [
   TagRepository,
   TelemetryRepository,
   TrashRepository,
-  UserGroupRepository,
   UserRepository,
   ViewRepository,
   VersionHistoryRepository,
   VideoStreamRepository,
   WebsocketRepository,
   WorkflowRepository,
+  ...galleryRepositories,
 ];

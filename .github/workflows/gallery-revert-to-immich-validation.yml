@@ -360,14 +360,20 @@ jobs:
           # a future Gallery refactor renames these, update the pattern here
           # — a pattern that returns 0 against a correctly-migrated Gallery
           # DB would turn this check into a false-failure tripwire.
+          # Builds since the ledger split record fork migrations in
+          # gallery_migrations; older images (an explicit gallery_image input)
+          # still record them in kysely_migrations.
+          ledger=$(docker exec database psql \
+            -U "$DB_USERNAME" -d "$DB_DATABASE_NAME" -Atc \
+            "SELECT COALESCE(to_regclass('gallery_migrations')::text, 'kysely_migrations')")
           gallery_rows=$(docker exec database psql \
             -U "$DB_USERNAME" -d "$DB_DATABASE_NAME" -Atc \
-            "SELECT count(*) FROM kysely_migrations WHERE name LIKE '%SharedSpace%'")
+            "SELECT count(*) FROM ${ledger} WHERE name LIKE '%SharedSpace%'")
           if [ "$gallery_rows" -eq 0 ]; then
             echo "::error::Gallery phase applied 0 SharedSpace migrations — GALLERY_IMAGE is probably pointing at an upstream Immich image, not Gallery."
             exit 1
           fi
-          echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in kysely_migrations"
+          echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in ${ledger}"
 
           ############################################################
           # Step 11: run revert-to-immich.sql

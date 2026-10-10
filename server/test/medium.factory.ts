@@ -22,6 +22,13 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -662,6 +669,12 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case DuplicateRepository:
     case FaceIdentityRepository:
     case FaceRepairDeclineRepository:
+    case FilterSuggestionRepository:
+    case MemoryRuleAssetRepository:
+    case SmartFacetRepository:
+    case SpaceAlbumRepository:
+    case PetFaceRepository:
+    case FaceSearchRepository:
     case FaceRepairRepository:
     case FaceRepairScanRepository:
     case FacePersonVerdictRepository:
@@ -754,6 +767,12 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case CryptoRepository:
     case FaceIdentityRepository:
     case FacePersonVerdictRepository:
+    case FilterSuggestionRepository:
+    case MemoryRuleAssetRepository:
+    case SmartFacetRepository:
+    case SpaceAlbumRepository:
+    case PetFaceRepository:
+    case FaceSearchRepository:
     case LibraryRepository:
     case MemoryRepository:
     case IntegrityRepository:
@@ -815,6 +834,10 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
       // give it a real default here in the shared harness instead of every spec having to stub it.
       jobRepository.empty.mockResolvedValue();
       return jobRepository;
+    }
+
+    case QueueMaintenanceRepository: {
+      return automock(QueueMaintenanceRepository, { args: [undefined, { setContext: () => {} }] });
     }
 
     case LoggingRepository as unknown as ClassConstructor<T>: {

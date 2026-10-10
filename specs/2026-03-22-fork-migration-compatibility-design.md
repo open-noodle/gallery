@@ -1,5 +1,9 @@
 # Fork Migration Compatibility Design
 
+> Superseded: the `CompositeMigrationProvider` and the postbuild copy described here were replaced by a separate
+> `gallery_migrations` ledger (`server/src/schema/gallery-migration-ledger.ts`). CLAUDE.md "Fork migration layout"
+> describes the current design.
+
 ## Problem
 
 When migrating from Immich v2.6.1 to Noodle Gallery, the server crashes with:

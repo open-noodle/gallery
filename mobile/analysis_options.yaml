@@ -95,6 +95,26 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # Unimported upstream files kept byte-identical to cut rebase modify/delete stops; they target code the
+    # fork replaced. Same list in build.yaml sources.exclude.
+    - integration_test/module_login/login_input_validation_test.dart
+    - integration_test/module_login/login_test.dart
+    - integration_test/test_utils/general_helper.dart
+    - integration_test/test_utils/login_helper.dart
+    - lib/presentation/pages/search/paginated_search.provider.dart
+    - lib/presentation/pages/search/search.page.dart
+    - lib/providers/search/search_filter.provider.dart
+    - lib/providers/search/search_input_focus.provider.dart
+    - lib/widgets/search/search_filter/camera_picker.dart
+    - lib/widgets/search/search_filter/common/dropdown.dart
+    - lib/widgets/search/search_filter/display_option_picker.dart
+    - lib/widgets/search/search_filter/filter_bottom_sheet_scaffold.dart
+    - lib/widgets/search/search_filter/location_picker.dart
+    - lib/widgets/search/search_filter/media_type_picker.dart
+    - lib/widgets/search/search_filter/people_picker.dart
+    - lib/widgets/search/search_filter/search_filter_chip.dart
+    - lib/widgets/search/search_filter/search_filter_utils.dart
+    - lib/widgets/search/search_filter/star_rating_picker.dart
 
   # NOTE: We explicitly do not use riverpod_lint as there are analyzer version conflicts between
   # our Flutter version and the required old riverpod_lint 2.x

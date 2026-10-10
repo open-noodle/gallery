@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 /// Fork-only tab identity. Distinct from upstream's `TabEnum`
 /// (`home/search/spaces/library`) — the bottom nav redesign keeps the
@@ -27,7 +28,8 @@ List<GalleryTabEnum> galleryNavSlots({required bool showSpaces}) => [
   GalleryTabEnum.library,
 ];
 
-/// The live nav slots, derived from the user's `navShowSpaces` preference.
+/// The live nav slots, derived from the user's `navShowSpaces` preference. A server without Spaces
+/// (stock Immich) gets Albums in slot 1 regardless.
 ///
 /// `autoDispose` for lifecycle symmetry with `appConfigProvider`, which this
 /// watches and which is itself `autoDispose`: without it this provider would
@@ -36,7 +38,7 @@ List<GalleryTabEnum> galleryNavSlots({required bool showSpaces}) => [
 /// autoDispose one without throwing.
 final galleryNavSlotsProvider = Provider.autoDispose<List<GalleryTabEnum>>((ref) {
   final showSpaces = ref.watch(appConfigProvider.select((config) => config.nav.showSpaces));
-  return galleryNavSlots(showSpaces: showSpaces);
+  return galleryNavSlots(showSpaces: showSpaces && ref.watch(serverSupportsSpacesProvider));
 });
 
 /// The currently-active tab in the Gallery bottom-nav shell.

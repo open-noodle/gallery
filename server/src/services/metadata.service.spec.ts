@@ -1311,7 +1311,7 @@ describe(MetadataService.name, () => {
       expect(mocks.asset.update).toHaveBeenCalledTimes(1);
       expect(mocks.job.queue).not.toHaveBeenCalled();
       // M3: AssetHide must still be emitted on a re-extract of an already-Hidden motion asset (e.g. a
-      // retry after a prior emit failed) so asset.service.onAssetHide re-affirms the #757 space purge —
+      // retry after a prior emit failed) so AssetVisibilityTransitionService.onAssetHide re-affirms the #757 space purge —
       // otherwise a retry after a failed emit would silently never converge for this path.
       expect(mocks.event.emit).toHaveBeenCalledWith('AssetHide', {
         assetId: motionAsset.id,

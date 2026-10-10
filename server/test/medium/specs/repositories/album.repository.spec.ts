@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
-import { vi } from 'vitest';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -17,7 +17,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [],
     mock: [LoggingRepository],
   });
-  return { ctx, sut: ctx.get(AlbumRepository) };
+  return { ctx, sut: ctx.get(AlbumRepository), spaceAlbum: ctx.get(SpaceAlbumRepository) };
 };
 
 beforeAll(async () => {
@@ -27,7 +27,7 @@ beforeAll(async () => {
 describe(AlbumRepository.name, () => {
   describe('getOwnedNames', () => {
     it('returns lightweight projection of owned albums', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, spaceAlbum } = setup();
       const { user: owner } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: owner.id });
       const { album } = await ctx.newAlbum({
@@ -37,7 +37,7 @@ describe(AlbumRepository.name, () => {
       });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-      const rows = await sut.getOwnedNames(owner.id);
+      const rows = await spaceAlbum.getOwnedNames(owner.id);
 
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -53,22 +53,12 @@ describe(AlbumRepository.name, () => {
       expect(() => asDateTimeString(rows[0].endDate ?? undefined)).not.toThrow();
     });
 
-    it('does not call updateThumbnails', async () => {
-      const { ctx, sut } = setup();
-      const { user: owner } = await ctx.newUser();
-      const spy = vi.spyOn(sut, 'updateThumbnails');
-
-      await sut.getOwnedNames(owner.id);
-
-      expect(spy).not.toHaveBeenCalled();
-    });
-
     it('returns empty-album with assetCount=0 and null date range', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, spaceAlbum } = setup();
       const { user: owner } = await ctx.newUser();
       await ctx.newAlbum({ ownerId: owner.id, albumName: 'Empty' });
 
-      const rows = await sut.getOwnedNames(owner.id);
+      const rows = await spaceAlbum.getOwnedNames(owner.id);
 
       expect(rows).toHaveLength(1);
       expect(rows[0].assetCount).toBe(0);
@@ -79,13 +69,13 @@ describe(AlbumRepository.name, () => {
 
   describe('getSharedNames', () => {
     it('returns lightweight projection of albums shared with the user', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, spaceAlbum } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: viewer } = await ctx.newUser();
       const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Shared Trip' });
       await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
 
-      const rows = await sut.getSharedNames(viewer.id);
+      const rows = await spaceAlbum.getSharedNames(viewer.id);
 
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -97,14 +87,14 @@ describe(AlbumRepository.name, () => {
     });
 
     it('includes albums owned-and-shared-out (dedup is downstream responsibility)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, spaceAlbum } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: buddy } = await ctx.newUser();
       const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Beach' });
       await ctx.newAlbumUser({ albumId: album.id, userId: buddy.id });
 
       // Owner's "shared" query returns the album too (they share it out)
-      const ownerShared = await sut.getSharedNames(owner.id);
+      const ownerShared = await spaceAlbum.getSharedNames(owner.id);
       expect(ownerShared.map((r) => r.id)).toContain(album.id);
     });
   });

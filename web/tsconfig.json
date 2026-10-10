@@ -15,6 +15,7 @@
     "target": "es2022",
     "types": ["vitest/globals"]
   },
-  "exclude": ["vite.config.ts"],
+  // person-user.service.ts: unimported upstream file kept byte-identical, imports SDK calls the fork removed (see eslint.config.js).
+  "exclude": ["vite.config.ts", "src/lib/services/person-user.service.ts"],
   "extends": "./.svelte-kit/tsconfig.json"
 }

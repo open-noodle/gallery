@@ -15,6 +15,13 @@ import { PNG } from 'pngjs';
 import { Mock, Mocked, assert, vitest } from 'vitest';
 import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { AssetUploadInterceptor } from 'src/middleware/asset-upload.interceptor.js';
 import { AuthGuard } from 'src/middleware/auth.guard.js';
 import { FileUploadInterceptor } from 'src/middleware/file-upload.interceptor.js';
@@ -254,11 +261,9 @@ export type ServiceOverrides = {
   app: AppRepository;
   asset: AssetRepository;
   assetEdit: AssetEditRepository;
-  assetFavorite: AssetFavoriteRepository;
   assetFile: AssetFileRepository;
   assetJob: AssetJobRepository;
   clusterGroup: ClusterGroupRepository;
-  classification: ClassificationRepository;
   config: ConfigRepository;
   cron: CronRepository;
   crypto: CryptoRepository;
@@ -267,11 +272,6 @@ export type ServiceOverrides = {
   duplicateRepository: DuplicateRepository;
   email: EmailRepository;
   event: EventRepository;
-  faceIdentity: FaceIdentityRepository;
-  faceRepair: FaceRepairRepository;
-  faceRepairScan: FaceRepairScanRepository;
-  faceRepairDecline: FaceRepairDeclineRepository;
-  facePersonVerdict: FacePersonVerdictRepository;
   integrityReport: IntegrityRepository;
   job: JobRepository;
   library: LibraryRepository;
@@ -295,9 +295,7 @@ export type ServiceOverrides = {
   session: SessionRepository;
   sharedLink: SharedLinkRepository;
   sharedLinkAsset: SharedLinkAssetRepository;
-  sharedSpace: SharedSpaceRepository;
   stack: StackRepository;
-  storageMigration: StorageMigrationRepository;
   storage: StorageRepository;
   sync: SyncRepository;
   syncCheckpoint: SyncCheckpointRepository;
@@ -305,13 +303,30 @@ export type ServiceOverrides = {
   tag: TagRepository;
   telemetry: TelemetryRepository;
   trash: TrashRepository;
-  userGroup: UserGroupRepository;
   user: UserRepository;
   versionHistory: VersionHistoryRepository;
   videoStream: VideoStreamRepository;
   view: ViewRepository;
   websocket: WebsocketRepository;
   workflow: WorkflowRepository;
+  // Gallery fork repositories: keep last, in the same order in every positional list
+  assetFavorite: AssetFavoriteRepository;
+  classification: ClassificationRepository;
+  faceIdentity: FaceIdentityRepository;
+  faceRepair: FaceRepairRepository;
+  faceRepairScan: FaceRepairScanRepository;
+  faceRepairDecline: FaceRepairDeclineRepository;
+  facePersonVerdict: FacePersonVerdictRepository;
+  sharedSpace: SharedSpaceRepository;
+  storageMigration: StorageMigrationRepository;
+  userGroup: UserGroupRepository;
+  filterSuggestion: FilterSuggestionRepository;
+  memoryRuleAsset: MemoryRuleAssetRepository;
+  queueMaintenance: QueueMaintenanceRepository;
+  smartFacet: SmartFacetRepository;
+  spaceAlbum: SpaceAlbumRepository;
+  petFace: PetFaceRepository;
+  faceSearch: FaceSearchRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -356,13 +371,10 @@ export const getMocks = () => {
     albumUser: automock(AlbumUserRepository),
     asset: newAssetRepositoryMock(),
     assetEdit: automock(AssetEditRepository),
-    assetFavorite: automock(AssetFavoriteRepository),
     assetFile: automock(AssetFileRepository),
     assetJob: automock(AssetJobRepository),
     clusterGroup: automock(ClusterGroupRepository),
     app: automock(AppRepository, { strict: false }),
-    // eslint-disable-next-line no-sparse-arrays
-    classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
     config: newConfigRepositoryMock(),
     database: databaseMock,
     downloadRepository: automock(DownloadRepository, { strict: false }),
@@ -370,11 +382,6 @@ export const getMocks = () => {
     email: automock(EmailRepository, { args: [loggerMock] }),
     // eslint-disable-next-line no-sparse-arrays
     event: automock(EventRepository, { args: [, , loggerMock], strict: false }),
-    faceIdentity: automock(FaceIdentityRepository, { strict: false }),
-    faceRepair: automock(FaceRepairRepository, { strict: false }),
-    faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
-    faceRepairDecline: automock(FaceRepairDeclineRepository, { strict: false }),
-    facePersonVerdict: automock(FacePersonVerdictRepository, { strict: false }),
     integrityReport: automock(IntegrityRepository, { strict: false }),
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
@@ -399,9 +406,7 @@ export const getMocks = () => {
     session: automock(SessionRepository),
     sharedLink: automock(SharedLinkRepository),
     sharedLinkAsset: automock(SharedLinkAssetRepository),
-    sharedSpace: automock(SharedSpaceRepository),
     stack: automock(StackRepository),
-    storageMigration: automock(StorageMigrationRepository),
     storage: newStorageRepositoryMock(),
     sync: automock(SyncRepository),
     syncCheckpoint: automock(SyncCheckpointRepository),
@@ -411,7 +416,6 @@ export const getMocks = () => {
     tag: automock(TagRepository, { args: [, loggerMock], strict: false }),
     telemetry: newTelemetryRepositoryMock(),
     trash: automock(TrashRepository),
-    userGroup: automock(UserGroupRepository),
     user: automock(UserRepository, { strict: false }),
     versionHistory: automock(VersionHistoryRepository),
     videoStream: automock(VideoStreamRepository, { strict: false }),
@@ -419,6 +423,26 @@ export const getMocks = () => {
     // eslint-disable-next-line no-sparse-arrays
     websocket: automock(WebsocketRepository, { args: [, loggerMock], strict: false }),
     workflow: automock(WorkflowRepository, { strict: true }),
+    // Gallery fork repositories: keep last, in the same order in every positional list
+    assetFavorite: automock(AssetFavoriteRepository),
+    // eslint-disable-next-line no-sparse-arrays
+    classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
+    faceIdentity: automock(FaceIdentityRepository, { strict: false }),
+    faceRepair: automock(FaceRepairRepository, { strict: false }),
+    faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
+    faceRepairDecline: automock(FaceRepairDeclineRepository, { strict: false }),
+    facePersonVerdict: automock(FacePersonVerdictRepository, { strict: false }),
+    sharedSpace: automock(SharedSpaceRepository),
+    storageMigration: automock(StorageMigrationRepository),
+    userGroup: automock(UserGroupRepository),
+    filterSuggestion: automock(FilterSuggestionRepository, { strict: false }),
+    memoryRuleAsset: automock(MemoryRuleAssetRepository, { strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    queueMaintenance: automock(QueueMaintenanceRepository, { args: [, loggerMock], strict: false }),
+    smartFacet: automock(SmartFacetRepository, { strict: false }),
+    spaceAlbum: automock(SpaceAlbumRepository, { strict: false }),
+    petFace: automock(PetFaceRepository, { strict: false }),
+    faceSearch: automock(FaceSearchRepository, { strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -443,12 +467,10 @@ export const newTestService = <T extends BaseService>(
     overrides.app || (mocks.app as As<AppRepository>),
     overrides.asset || (mocks.asset as As<AssetRepository>),
     overrides.assetEdit || (mocks.assetEdit as As<AssetEditRepository>),
-    overrides.assetFavorite || (mocks.assetFavorite as As<AssetFavoriteRepository>),
     overrides.assetFile || (mocks.assetFile as As<AssetFileRepository>),
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),
     overrides.config || (mocks.config as As<ConfigRepository> as ConfigRepository),
-    overrides.classification || (mocks.classification as As<ClassificationRepository>),
     overrides.cron || (mocks.cron as As<CronRepository>),
     overrides.crypto || (mocks.crypto as As<CryptoRepository>),
     overrides.database || (mocks.database as As<DatabaseRepository>),
@@ -456,11 +478,6 @@ export const newTestService = <T extends BaseService>(
     overrides.duplicateRepository || (mocks.duplicateRepository as As<DuplicateRepository>),
     overrides.email || (mocks.email as As<EmailRepository>),
     overrides.event || (mocks.event as As<EventRepository>),
-    overrides.faceIdentity || (mocks.faceIdentity as As<FaceIdentityRepository>),
-    overrides.faceRepair || (mocks.faceRepair as As<FaceRepairRepository>),
-    overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
-    overrides.faceRepairDecline || (mocks.faceRepairDecline as As<FaceRepairDeclineRepository>),
-    overrides.facePersonVerdict || (mocks.facePersonVerdict as As<FacePersonVerdictRepository>),
     overrides.integrityReport || (mocks.integrityReport as As<IntegrityRepository>),
     overrides.job || (mocks.job as As<JobRepository>),
     overrides.library || (mocks.library as As<LibraryRepository>),
@@ -483,9 +500,7 @@ export const newTestService = <T extends BaseService>(
     overrides.session || (mocks.session as As<SessionRepository>),
     overrides.sharedLink || (mocks.sharedLink as As<SharedLinkRepository>),
     overrides.sharedLinkAsset || (mocks.sharedLinkAsset as As<SharedLinkAssetRepository>),
-    overrides.sharedSpace || (mocks.sharedSpace as As<SharedSpaceRepository>),
     overrides.stack || (mocks.stack as As<StackRepository>),
-    overrides.storageMigration || (mocks.storageMigration as As<StorageMigrationRepository>),
     overrides.storage || (mocks.storage as As<StorageRepository>),
     overrides.sync || (mocks.sync as As<SyncRepository>),
     overrides.syncCheckpoint || (mocks.syncCheckpoint as As<SyncCheckpointRepository>),
@@ -493,13 +508,30 @@ export const newTestService = <T extends BaseService>(
     overrides.tag || (mocks.tag as As<TagRepository>),
     overrides.telemetry || (mocks.telemetry as unknown as TelemetryRepository),
     overrides.trash || (mocks.trash as As<TrashRepository>),
-    overrides.userGroup || (mocks.userGroup as As<UserGroupRepository>),
     overrides.user || (mocks.user as As<UserRepository>),
     overrides.versionHistory || (mocks.versionHistory as As<VersionHistoryRepository>),
     overrides.videoStream || (mocks.videoStream as As<VideoStreamRepository>),
     overrides.view || (mocks.view as As<ViewRepository>),
     overrides.websocket || (mocks.websocket as As<WebsocketRepository>),
     overrides.workflow || (mocks.workflow as As<WorkflowRepository>),
+    // Gallery fork repositories: keep last, in the same order in every positional list
+    overrides.assetFavorite || (mocks.assetFavorite as As<AssetFavoriteRepository>),
+    overrides.classification || (mocks.classification as As<ClassificationRepository>),
+    overrides.faceIdentity || (mocks.faceIdentity as As<FaceIdentityRepository>),
+    overrides.faceRepair || (mocks.faceRepair as As<FaceRepairRepository>),
+    overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
+    overrides.faceRepairDecline || (mocks.faceRepairDecline as As<FaceRepairDeclineRepository>),
+    overrides.facePersonVerdict || (mocks.facePersonVerdict as As<FacePersonVerdictRepository>),
+    overrides.sharedSpace || (mocks.sharedSpace as As<SharedSpaceRepository>),
+    overrides.storageMigration || (mocks.storageMigration as As<StorageMigrationRepository>),
+    overrides.userGroup || (mocks.userGroup as As<UserGroupRepository>),
+    overrides.filterSuggestion || (mocks.filterSuggestion as As<FilterSuggestionRepository>),
+    overrides.memoryRuleAsset || (mocks.memoryRuleAsset as As<MemoryRuleAssetRepository>),
+    overrides.queueMaintenance || (mocks.queueMaintenance as As<QueueMaintenanceRepository>),
+    overrides.smartFacet || (mocks.smartFacet as As<SmartFacetRepository>),
+    overrides.spaceAlbum || (mocks.spaceAlbum as As<SpaceAlbumRepository>),
+    overrides.petFace || (mocks.petFace as As<PetFaceRepository>),
+    overrides.faceSearch || (mocks.faceSearch as As<FaceSearchRepository>),
   );
 
   return {

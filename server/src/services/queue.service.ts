@@ -87,7 +87,7 @@ export class QueueService extends BaseService {
       // workers start. Such orphans permanently wedge a concurrency-1 queue with no user-reachable
       // recovery. Never block worker startup on this maintenance step.
       try {
-        await this.jobRepository.reconcileOrphanedActiveJobs();
+        await this.queueMaintenanceRepository.reconcileOrphanedActiveJobs();
       } catch (error) {
         this.logger.warn(`Failed to reconcile orphaned active jobs on bootstrap: ${error}`);
       }
@@ -197,7 +197,7 @@ export class QueueService extends BaseService {
     const [statistics, isPaused, jobTypes] = await Promise.all([
       this.jobRepository.getJobCounts(name),
       this.jobRepository.isPaused(name),
-      includeJobTypes ? this.jobRepository.getJobTypes(name) : [],
+      includeJobTypes ? this.queueMaintenanceRepository.getJobTypes(name) : [],
     ]);
     return { name, isPaused, statistics, ...(jobTypes.length > 0 && { jobTypes }) };
   }

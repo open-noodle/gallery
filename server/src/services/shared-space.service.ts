@@ -2913,8 +2913,8 @@ export class SharedSpaceService extends BaseService {
 
     const prefixes = ['shared-space-face-match', 'space-identity-reconcile-'];
     const removed =
-      (await this.jobRepository.removeFailedJobsByJobIdPrefix(QueueName.PeopleBackfill, prefixes)) +
-      (await this.jobRepository.removeFailedJobsByJobIdPrefix(QueueName.FacialRecognition, prefixes));
+      (await this.queueMaintenanceRepository.removeFailedJobsByJobIdPrefix(QueueName.PeopleBackfill, prefixes)) +
+      (await this.queueMaintenanceRepository.removeFailedJobsByJobIdPrefix(QueueName.FacialRecognition, prefixes));
 
     if (removed > 0) {
       this.logger.log(
@@ -2942,7 +2942,10 @@ export class SharedSpaceService extends BaseService {
     }
 
     const prefixes = ['person-suggestion-scan/', 'space-person-suggestion-scan/'];
-    const removed = await this.jobRepository.removeFailedJobsByJobIdPrefix(QueueName.PeopleBackfill, prefixes);
+    const removed = await this.queueMaintenanceRepository.removeFailedJobsByJobIdPrefix(
+      QueueName.PeopleBackfill,
+      prefixes,
+    );
 
     if (removed > 0) {
       this.logger.log(`Removed ${removed} failed person-suggestion-scan job(s) that were blocking their dedup jobIds`);
@@ -3207,7 +3210,7 @@ export class SharedSpaceService extends BaseService {
       return;
     }
 
-    const matches = await this.searchRepository.searchFaces({
+    const matches = await this.faceSearchRepository.searchFaces({
       userIds: [input.memberUserId],
       embedding: input.spacePerson.embedding,
       maxDistance: input.maxDistance,
@@ -3648,7 +3651,7 @@ export class SharedSpaceService extends BaseService {
     // face-assign run) starts a parallel chain — doubling the work and reviving the
     // removeOnComplete/stalled-recovery orphan race on the shared pass-scoped jobIds.
     const pass = job.pass ?? 1;
-    if (pass === 1 && (await this.jobRepository.hasInFlightDedupChain(job.spaceId))) {
+    if (pass === 1 && (await this.queueMaintenanceRepository.hasInFlightDedupChain(job.spaceId))) {
       this.logger.debug(`Dedup skipped for space ${job.spaceId}: a dedup chain is already running`);
       return JobStatus.Skipped;
     }
