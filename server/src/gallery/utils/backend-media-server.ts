@@ -2,7 +2,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
@@ -140,18 +140,14 @@ export class BackendMediaServer {
   }
 
   /**
-   * The storage backend that owns `key`: disk for an absolute path, built over the owning service's
-   * StorageRepository so disk I/O goes where upstream code (and its specs) expect it; otherwise
-   * whatever StorageService resolves for a relative key.
+   * The storage backend that owns `key`, as StorageService.backendFor decides. An absolute path is read through
+   * the owning service's StorageRepository, so disk I/O goes where upstream code (and its specs) expect it.
    */
   async backendFor(key: string): Promise<StorageBackend> {
-    if (isAbsolute(key)) {
-      // the media location only resolves relative keys, and this backend is only given absolute ones
-      return new DiskStorageBackend('', this.deps.storageRepository);
-    }
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('../../services/storage.service.js');
-    return StorageService.resolveBackendForKey(key);
+    // no media location: this backend only ever receives absolute paths
+    return StorageService.backendFor(key, new DiskStorageBackend('', this.deps.storageRepository));
   }
 
   async getFaceThumbnailSource(assetId: string): Promise<string | null> {

@@ -4,7 +4,7 @@
 // cannot pull another member's trashed asset by flipping the caller-toggleable
 // terminal trash filter (withDeleted / trashedAfter / trashedBefore / isOffline).
 // The caller's OWN (ownerId IN userIds) branch stays unfiltered so own/partner
-// trash search is preserved. Sibling of the fixed albumSharedSpaceScope arm
+// trash search is preserved. Sibling of the fixed albumConfinedToViewer arm
 // (see shared-space-album-scope-sql.medium.spec.ts).
 import { Kysely } from 'kysely';
 import { AssetVisibility } from 'src/enum.js';

@@ -1653,7 +1653,7 @@ export class SharedSpaceService extends BaseService {
       // Album ACCESS is the scope (checked above), never asset ownership: leaving userIds set would
       // hide the album owner's pins from a viewer of a shared album — the issue #656 bug class, which
       // album.service.ts:112-123 calls out by name. albumAccessIsBoundary opts the album branch out of
-      // albumSharedSpaceScope's shared-space re-gate (database.ts:713): album membership is already the
+      // albumConfinedToViewer's shared-space re-gate: album membership is already the
       // boundary here, matching the grid and the old map endpoint — see the comment above.
       userIds: dto.spaceId || dto.albumId ? undefined : [auth.user.id],
       // #763: the favourite overlay resolves against the CALLER, which userIds no longer names on

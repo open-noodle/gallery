@@ -702,9 +702,8 @@ describe(SearchRepository.name, () => {
     });
   });
 
-  // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay, not
-  // the (now-dropped, slice 3) ownership-masked asset.isFavorite column. Only a direct
-  // asset_favorite insert marks the caller's favorite.
+  // #763 slice 1 Task 3: isFavorite must resolve against the per-user asset_favorite overlay, not
+  // the owner's asset.isFavorite column. Only a direct asset_favorite insert marks the caller's favorite.
   describe('isFavorite overlay (#763)', () => {
     it('searchMetadata filters isFavorite from the callers overlay, not asset.isFavorite', async () => {
       const { ctx, sut } = setup();
@@ -1226,8 +1225,7 @@ describe(SearchRepository.name, () => {
       const { asset: sevenD } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: sevenD.id, make: 'Canon', model: 'Canon EOS 7D' });
 
-      // #763: the dropped asset."isFavorite" column is replaced by the per-user overlay. The
-      // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
+      // #763: the narrowing predicate resolves the per-user overlay for userIds[0], so favorite it as `user`.
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: r5.id }).execute();
 
       const models = await suggestions.getCameraModels([user.id], { make: 'Canon', isFavorite: true });
@@ -1461,8 +1459,7 @@ describe(SearchRepository.name, () => {
       const { asset: nikonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: nikonAsset.id, make: 'Nikon', rating: 2 });
 
-      // #763: the dropped asset."isFavorite" column is replaced by the per-user overlay. The
-      // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
+      // #763: the narrowing predicate resolves the per-user overlay for userIds[0], so favorite it as `user`.
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: canonAsset.id }).execute();
 
       const makes = await suggestions.getCameraMakes([user.id], { rating: 4, isFavorite: true });
