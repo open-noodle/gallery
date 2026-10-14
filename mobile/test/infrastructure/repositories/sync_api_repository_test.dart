@@ -344,6 +344,51 @@ void main() {
     });
   });
 
+  test('an undecodable line (a trim AssetEditV1 from an older server) is skipped and the rest still parses', () async {
+    final received = <SyncEvent>[];
+    final streamChangesFuture = streamChanges(
+      (events, _, _) async => received.addAll(events),
+      const SemVer(major: 5, minor: 8, patch: 0),
+    );
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    Map<String, dynamic> edit(String id, String action) => {
+      'id': id,
+      'assetId': 'asset-1',
+      'action': action,
+      'parameters': <String, dynamic>{},
+      'sequence': 0,
+    };
+    responseStreamController.add(
+      utf8.encode(
+        _createJsonLine(SyncEntityType.assetEditV1.toString(), edit('edit-trim', 'trim'), 'ack-trim') +
+            _createJsonLine(SyncEntityType.assetEditV1.toString(), edit('edit-crop', 'crop'), 'ack-crop') +
+            _createJsonLine(SyncEntityType.userDeleteV1.toString(), {'userId': 'user-1'}, 'ack-user'),
+      ),
+    );
+
+    await responseStreamController.close();
+    await expectLater(streamChangesFuture, completes);
+
+    expect(received.map((e) => e.ack), ['ack-crop', 'ack-user']);
+    expect((received.first.data as SyncAssetEditV1).id, 'edit-crop');
+  });
+
+  test('an undecodable line of any other type fails the sync', () async {
+    final failed = expectLater(
+      streamChanges((_, _, _) async {}, const SemVer(major: 5, minor: 8, patch: 0)),
+      throwsA(anything),
+    );
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    responseStreamController.add(
+      utf8.encode(_createJsonLine(SyncEntityType.userDeleteV1.toString(), <String, dynamic>{}, 'ack-user')),
+    );
+    await responseStreamController.close();
+
+    await failed;
+  });
+
   group('#763: AssetFavoritesV1 is requested ONLY behind a server declaration', () {
     // AssetFavoritesV1 post-dates capability signalling (v5.7.0), so like SharedSpaceAlbumFoldersV1
     // it has no version-gate fallback: a server without a declaration (fork 5.2.1–5.6.x) does not

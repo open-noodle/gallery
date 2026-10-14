@@ -368,7 +368,7 @@ describe('/gallery/map/markers', () => {
 
     it('an album asset that also lives in a shared space KEEPS its pin even when the caller has toggled that space out of their own timeline (R4 regression, #656)', async () => {
       // The R4 hole: the album query used to compute timelineSpaceIds from the caller's OWN
-      // showInTimeline preference and feed it into albumSharedSpaceScope as the RBAC gate. Toggling
+      // showInTimeline preference and feed it into albumConfinedToViewer as the RBAC gate. Toggling
       // showInTimeline=false for this space made that gate degenerate to "the asset must be in no
       // shared space at all", dropping spaceAssetId's pin for that caller — even though the album
       // grid kept showing it regardless. Since the fix, album ACCESS (checked above) is the whole
@@ -432,7 +432,7 @@ describe('/gallery/map/markers', () => {
 
     it('albumId NARROWS: an owner asset outside the album is excluded, even though it has a marker', async () => {
       // The over-inclusion direction. Dropping userIds for an album query means the whole safety of
-      // the album branch rests on inAlbums() inside albumSharedSpaceScope — whose first arm admits
+      // the album branch rests on albumMembership() plus albumConfinedToViewer, whose first arm admits
       // ANY asset that is in no shared space at all, for ANY caller. If a future refactor lost the
       // albumIds `$if` in searchAssetBuilder, or the service stopped forwarding albumIds, `?albumId=`
       // would silently widen to every non-space-shared geotagged asset on the instance, and every

@@ -6268,6 +6268,176 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/{id}/trim": {
+      "delete": {
+        "description": "Restores the full-length video.",
+        "operationId": "removeAssetTrim",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Remove the trim of a video",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.edit.delete",
+        "x-immich-state": "Beta"
+      },
+      "get": {
+        "description": "Returns the kept part of a trimmed video and the length of the original. Responds 404 when the video is not trimmed.",
+        "operationId": "getAssetTrim",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetVideoTrimResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve the trim of a video",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.edit.get",
+        "x-immich-state": "Beta"
+      },
+      "put": {
+        "description": "Keeps only the part of the video between startTime and endTime, replacing any earlier trim. The full range removes an earlier trim. The original file is not changed.",
+        "operationId": "updateAssetTrim",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetVideoTrimDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetVideoTrimResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Trim a video",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.edit.create",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}/video/playback": {
       "get": {
         "description": "Streams the video file for the specified asset. This endpoint also supports byte range requests.",
@@ -29082,8 +29252,7 @@
         "enum": [
           "crop",
           "rotate",
-          "mirror",
-          "trim"
+          "mirror"
         ],
         "type": "string"
       },
@@ -29102,12 +29271,9 @@
               },
               {
                 "$ref": "#/components/schemas/MirrorParameters"
-              },
-              {
-                "$ref": "#/components/schemas/TrimParameters"
               }
             ],
-            "description": "List of edit actions to apply (crop, rotate, mirror, or trim)"
+            "description": "List of edit actions to apply (crop, rotate, or mirror)"
           }
         },
         "required": [
@@ -29137,12 +29303,9 @@
               },
               {
                 "$ref": "#/components/schemas/MirrorParameters"
-              },
-              {
-                "$ref": "#/components/schemas/TrimParameters"
               }
             ],
-            "description": "List of edit actions to apply (crop, rotate, mirror, or trim)"
+            "description": "List of edit actions to apply (crop, rotate, or mirror)"
           }
         },
         "required": [
@@ -29187,7 +29350,7 @@
       "AssetEditsCreateDto": {
         "properties": {
           "edits": {
-            "description": "List of edit actions to apply (crop, rotate, mirror, or trim)",
+            "description": "List of edit actions to apply (crop, rotate, or mirror)",
             "items": {
               "$ref": "#/components/schemas/AssetEditActionItemDto"
             },
@@ -30256,6 +30419,55 @@
           "reject"
         ],
         "type": "string"
+      },
+      "AssetVideoTrimDto": {
+        "properties": {
+          "endTime": {
+            "description": "End of the kept part, in seconds from the start of the original video",
+            "format": "double",
+            "minimum": 0,
+            "type": "number"
+          },
+          "startTime": {
+            "description": "Start of the kept part, in seconds from the start of the original video",
+            "format": "double",
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "endTime",
+          "startTime"
+        ],
+        "type": "object"
+      },
+      "AssetVideoTrimResponseDto": {
+        "properties": {
+          "endTime": {
+            "description": "End of the kept part, in seconds from the start of the original video",
+            "format": "double",
+            "minimum": 0,
+            "type": "number"
+          },
+          "originalDuration": {
+            "description": "Length of the untrimmed video, in seconds",
+            "format": "double",
+            "minimum": 0,
+            "type": "number"
+          },
+          "startTime": {
+            "description": "Start of the kept part, in seconds from the start of the original video",
+            "format": "double",
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "endTime",
+          "originalDuration",
+          "startTime"
+        ],
+        "type": "object"
       },
       "AssetVisibility": {
         "description": "Asset visibility",
@@ -45810,27 +46022,6 @@
         },
         "required": [
           "count"
-        ],
-        "type": "object"
-      },
-      "TrimParameters": {
-        "properties": {
-          "endTime": {
-            "description": "End time in seconds",
-            "format": "double",
-            "minimum": 0,
-            "type": "number"
-          },
-          "startTime": {
-            "description": "Start time in seconds",
-            "format": "double",
-            "minimum": 0,
-            "type": "number"
-          }
-        },
-        "required": [
-          "endTime",
-          "startTime"
         ],
         "type": "object"
       },

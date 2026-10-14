@@ -101,51 +101,21 @@ export class SpaceAssetAccess {
           )
           .union(
             this.db
-              .selectFrom('shared_space_album')
-              .innerJoin('album', (join) =>
-                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
-              )
-              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
-              .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
-              .innerJoin('asset', (join) =>
-                join
-                  .onRef('asset.id', '=', 'album_asset.assetId')
-                  .on('asset.deletedAt', 'is', null)
-                  .on('asset.isOffline', '=', false),
-              )
+              .selectFrom('asset')
               .select(['asset.id', 'asset.livePhotoVideoId'])
-              .where('shared_space_member.userId', '=', userId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false)
               .where((eb) => spaceVisibilityGate(eb))
               .where((eb) =>
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
-              ),
-          )
-          .union(
-            this.db
-              .selectFrom('shared_space_album')
-              .innerJoin('album', (join) =>
-                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
               )
-              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
-              // #764/#752 P1-4: cross-owner contributions — the spaceId correlation keeps a contribution
-              // reachable ONLY through the single live-linked space it was contributed via (mirrors
-              // spaceContributedAssetExists; also what revokes access after unlink under D1-b retention).
-              .innerJoin('album_space_asset', (join) =>
-                join
-                  .onRef('album_space_asset.albumId', '=', 'shared_space_album.albumId')
-                  .onRef('album_space_asset.spaceId', '=', 'shared_space_album.spaceId'),
-              )
-              .innerJoin('asset', (join) =>
-                join
-                  .onRef('asset.id', '=', 'album_space_asset.assetId')
-                  .on('asset.deletedAt', 'is', null)
-                  .on('asset.isOffline', '=', false),
-              )
-              .select(['asset.id', 'asset.livePhotoVideoId'])
-              .where('shared_space_member.userId', '=', userId)
-              .where((eb) => spaceVisibilityGate(eb))
+              // A linked album's own rows, or a contribution made through that same space (#764).
               .where((eb) =>
-                eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+                spaceAlbumAssetExists(eb, {
+                  correlateAssetId: 'asset.id',
+                  scope: { memberUserId: userId },
+                  albumTimelineGate: 'none',
+                }),
               ),
           )
           .as('combined'),
@@ -208,53 +178,21 @@ export class SpaceAssetAccess {
           )
           .union(
             this.db
-              .selectFrom('shared_space_album')
-              .innerJoin('album', (join) =>
-                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
-              )
-              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
-              .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
-              .innerJoin('asset', (join) =>
-                join
-                  .onRef('asset.id', '=', 'album_asset.assetId')
-                  .on('asset.deletedAt', 'is', null)
-                  .on('asset.isOffline', '=', false),
-              )
+              .selectFrom('asset')
               .select(['asset.id', 'asset.livePhotoVideoId'])
-              .where('shared_space_member.userId', '=', userId)
-              .where('shared_space_album.spaceId', '=', spaceId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false)
               .where((eb) => spaceVisibilityGate(eb))
               .where((eb) =>
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
-              ),
-          )
-          .union(
-            this.db
-              .selectFrom('shared_space_album')
-              .innerJoin('album', (join) =>
-                join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
               )
-              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
-              // #764/#752 P1-4: cross-owner contributions — the spaceId correlation keeps a contribution
-              // reachable ONLY through the single live-linked space it was contributed via (mirrors
-              // spaceContributedAssetExists; also what revokes access after unlink under D1-b retention).
-              .innerJoin('album_space_asset', (join) =>
-                join
-                  .onRef('album_space_asset.albumId', '=', 'shared_space_album.albumId')
-                  .onRef('album_space_asset.spaceId', '=', 'shared_space_album.spaceId'),
-              )
-              .innerJoin('asset', (join) =>
-                join
-                  .onRef('asset.id', '=', 'album_space_asset.assetId')
-                  .on('asset.deletedAt', 'is', null)
-                  .on('asset.isOffline', '=', false),
-              )
-              .select(['asset.id', 'asset.livePhotoVideoId'])
-              .where('shared_space_member.userId', '=', userId)
-              .where('shared_space_album.spaceId', '=', spaceId)
-              .where((eb) => spaceVisibilityGate(eb))
+              // A linked album's own rows, or a contribution made through that same space (#764).
               .where((eb) =>
-                eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+                spaceAlbumAssetExists(eb, {
+                  correlateAssetId: 'asset.id',
+                  scope: { memberUserId: userId, spaceId },
+                  albumTimelineGate: 'none',
+                }),
               ),
           )
           .as('combined'),

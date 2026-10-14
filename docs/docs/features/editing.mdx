@@ -36,7 +36,8 @@ You can re-open the editor on a trimmed video and adjust the range. The timeline
 
 ### Limitations
 
-- Trimming is not available for videos stored on S3 or other cloud storage.
+- Trimming is not available for videos in external libraries.
+- With **Real-time Transcoding** enabled, a trimmed video plays the trimmed file directly, without quality switching.
 - Cuts are not frame-accurate; the precision depends on keyframe spacing.
 - Crop, rotate and mirror are image-only.
 
@@ -83,7 +84,7 @@ The asset is restored to its original state and the thumbnail updates on its own
 Edits carry through the rest of Gallery:
 
 - Thumbnails update after an edit, with no page refresh.
-- Video playback serves the trimmed version when a trim edit exists.
+- Video playback serves the trimmed version of a trimmed video.
 - The duration shown on a video thumbnail reflects the trimmed length.
 - Album thumbnails use the edited version of an asset when one exists.
 - Person thumbnails show the original, unedited preview, which keeps face recognition accurate.

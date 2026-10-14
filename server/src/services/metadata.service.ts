@@ -5,9 +5,10 @@ import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration, FixedOffsetZone } from 'luxon';
 import { Stats } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, parse } from 'node:path';
+import { join, parse } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf } from 'src/types.js';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { Asset, AssetFile } from 'src/database.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -30,7 +31,6 @@ import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { getAssetFiles } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { mergeTimeZone } from 'src/utils/date.js';
@@ -557,13 +557,13 @@ export class MetadataService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    if (isAbsolute(sidecarPath)) {
+    if (isDiskPath(sidecarPath)) {
       await this.metadataRepository.writeTags(sidecarPath, exif);
     } else {
       // S3 mode: work against a local temp file, then always upload the result to S3.
       // If an existing sidecar is in S3, download it first so we preserve its contents;
       // otherwise exiftool will create a fresh XMP at the temp path.
-      const backend = StorageService.resolveBackendForKey(sidecarPath);
+      const backend = await this.backendMedia.backendFor(sidecarPath);
       const sidecarExists = await backend.exists(sidecarPath);
       let localSidecar: { localPath: string; cleanup: () => Promise<void> };
       if (sidecarExists) {
@@ -774,7 +774,7 @@ export class MetadataService extends BaseService {
     this.logger.debug(`Starting motion photo video extraction for asset ${asset.id}: ${asset.originalPath}`);
 
     const effectiveOriginalPath = localOriginal || asset.originalPath;
-    const isS3Asset = !isAbsolute(asset.originalPath);
+    const isS3Asset = !isDiskPath(asset.originalPath);
 
     try {
       const position = stats.size - length - padding;
@@ -894,7 +894,7 @@ export class MetadataService extends BaseService {
       }
 
       // write extracted motion video to storage
-      if (isAbsolute(motionAsset.originalPath)) {
+      if (isDiskPath(motionAsset.originalPath)) {
         // Disk mode
         const existsOnDisk = await this.storageRepository.checkFileExists(motionAsset.originalPath);
         if (!existsOnDisk) {
@@ -907,7 +907,7 @@ export class MetadataService extends BaseService {
         }
       } else {
         // S3 mode — upload via backend
-        const backend = StorageService.resolveBackendForKey(motionAsset.originalPath);
+        const backend = await this.backendMedia.backendFor(motionAsset.originalPath);
         const exists = await backend.exists(motionAsset.originalPath);
         if (!exists) {
           await backend.put(motionAsset.originalPath, video, { contentType: 'video/mp4' });

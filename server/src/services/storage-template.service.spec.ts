@@ -110,11 +110,11 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.storage.stat).not.toHaveBeenCalled();
     });
 
-    it('should skip S3 assets with relative paths', async () => {
+    it('should leave an S3 asset where it is', async () => {
       const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' }).exif().build();
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
 
-      await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
+      await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.storage.rename).not.toHaveBeenCalled();
       expect(mocks.storage.copyFile).not.toHaveBeenCalled();

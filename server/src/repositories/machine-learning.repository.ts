@@ -336,7 +336,7 @@ export class MachineLearningRepository {
       // Needs StorageService.onBootstrap to have set the backends, which every worker does on
       // AppBootstrap before it runs jobs.
       const { StorageService } = await import('../services/storage.service.js');
-      const fileBuffer = await StorageService.resolveBackendForKey(payload.imagePath).readAll(payload.imagePath);
+      const fileBuffer = await StorageService.backendFor(payload.imagePath).readAll(payload.imagePath);
       formData.append('image', new Blob([new Uint8Array(fileBuffer)]));
     } else if ('text' in payload) {
       formData.append('text', payload.text);

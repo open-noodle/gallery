@@ -828,7 +828,7 @@ export class FilterSuggestionRepository {
           timelineSpaceIds: options.favoriteSpaceIds ?? options.timelineSpaceIds,
         }),
       )
-      // #763: per-caller overlay, not the dropped `asset.isFavorite` column. `userIds[0]` is the
+      // #763: per-caller overlay, not `asset.isFavorite`, which is the owner's. `userIds[0]` is the
       // caller on this path — same reasoning as `buildFilteredAssetIds`'s isFavorite branch.
       .where((eb) => favoriteExistsFor(eb, userIds[0]))
       .limit(1)

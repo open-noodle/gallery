@@ -2049,7 +2049,7 @@ async function phaseVideoTrimS3(): Promise<void> {
   let assetId: string | undefined;
 
   try {
-    // 4s test video, tiny frame size. Must be >= 2s or editAsset rejects the trim.
+    // 4s test video, tiny frame size. Must be >= 2s or the trim endpoint rejects it.
     //
     // -g 10 -keyint_min 10 -sc_threshold 0 puts a keyframe on every second (10fps).
     // MediaRepository.trim runs ffmpeg with `-c copy`, so its seek is keyframe-snapped:
@@ -2071,14 +2071,14 @@ async function phaseVideoTrimS3(): Promise<void> {
     console.log(`  Uploaded asset ${assetId}`);
     await waitForProcessing(token, 120_000);
 
-    // Precondition 1: duration was probed — editAsset rejects the trim without it.
+    // Precondition 1: duration was probed; the trim endpoint rejects the trim without it.
     const assetRows = await queryDb<{ ownerId: string; duration: string | null; originalPath: string }>(
       'SELECT "ownerId", duration, "originalPath" FROM asset WHERE id = $1',
       [assetId],
     );
     assert.ok(assetRows[0], `Asset ${assetId} not found`);
     const { ownerId, originalPath } = assetRows[0];
-    assert.ok(assetRows[0].duration, 'Asset duration was not probed — editAsset would reject the trim');
+    assert.ok(assetRows[0].duration, 'Asset duration was not probed, so the trim endpoint would reject it');
     assert.ok(!originalPath.startsWith('/'), `Expected S3 (relative) originalPath, got ${originalPath}`);
 
     // Precondition 2: a NON-edited EncodedVideo exists in S3.
@@ -2095,11 +2095,8 @@ async function phaseVideoTrimS3(): Promise<void> {
     console.log(`  Precondition OK: transcoded video in S3 at ${nonEditedKey}`);
 
     // Act: trim 1s..3s out of the 4s video.
-    await api('PUT', `/assets/${assetId}/edits`, {
-      token,
-      body: { edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }] },
-    });
-    console.log('  Trim edit submitted');
+    await api('PUT', `/assets/${assetId}/trim`, { token, body: { startTime: 1, endTime: 3 } });
+    console.log('  Trim submitted');
     await waitForProcessing(token, 120_000);
 
     const editedRows = await queryDb<{ path: string; type: string }>(
@@ -2142,9 +2139,10 @@ async function phaseVideoTrimS3(): Promise<void> {
     // stream copy, so ffmpeg snaps to keyframes and the result is close to, not exactly,
     // the requested 2s — which is why handleVideoTrim re-probes the output instead of
     // trusting the requested duration. The window allows one keyframe interval of slack.
-    const trimmedRows = await queryDb<{ duration: string | null }>('SELECT duration FROM asset WHERE id = $1', [
-      assetId,
-    ]);
+    const trimmedRows = await queryDb<{ duration: string | null }>(
+      'SELECT duration FROM asset_video_trim WHERE "assetId" = $1',
+      [assetId],
+    );
     const durationMs = Number(trimmedRows[0].duration);
     assert.ok(
       durationMs >= 1500 && durationMs <= 2600,
@@ -2161,7 +2159,7 @@ async function phaseVideoTrimS3(): Promise<void> {
 
     // Undo: the edited objects must be removed from the bucket.
     const editedKeys = editedRows.map((r) => r.path);
-    await api('DELETE', `/assets/${assetId}/edits`, { token });
+    await api('DELETE', `/assets/${assetId}/trim`, { token });
     await waitForProcessing(token, 120_000);
 
     for (const key of editedKeys) {

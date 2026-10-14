@@ -31,6 +31,7 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -62,14 +63,16 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database.js';
-import { favoriteExistsFor, favoriteExistsForOwner } from 'src/utils/favorite.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { globToPostgresRegex } from 'src/utils/misc.js';
 import { hasFaceIdentities, hasSpacePeople } from 'src/utils/people-filter.js';
 import {
   type TimelineHiddenScope,
   type TimelineRescue,
+  albumMembership,
   hiddenFromOwnTimeline,
+  ownedOrSharedWithViewer,
   spaceAssetPathBranches,
   spaceVisibilityGate,
   timelineHiddenScopeIsEmpty,
@@ -399,29 +402,15 @@ export function withTimeBucketAssetFilters<O>(
           // album/space browse — but flat-gate here too so the album arm never surfaces a trashed
           // asset even if that guard is bypassed.
           .where('asset.deletedAt', 'is', null)
+          // #764: contributions come in only when the service resolved albumSpaceIds (the viewer's
+          // live member-spaces linking this album); album_user shares and departed members resolve none.
           .innerJoin(
-            (eb) => {
-              // #764/#752 P0-2: album content = the owner's album_asset rows ∪ member-gated
-              // cross-owner contributions. The contributed arm is included ONLY when the service
-              // resolved albumSpaceIds (live member-spaces linking this album) — album_user shares,
-              // shared links and departed members resolve to none, so a blind-union leak is
-              // impossible. UNION (not ALL) dedupes a P1-6 coexistence-window pair.
-              const ownerRows = eb
-                .selectFrom('album_asset')
-                .select('album_asset.assetId as assetId')
-                .where('album_asset.albumId', '=', asUuid(options.albumId!));
-              return (
-                options.albumSpaceIds?.length
-                  ? ownerRows.union(
-                      eb
-                        .selectFrom('album_space_asset')
-                        .select('album_space_asset.assetId as assetId')
-                        .where('album_space_asset.albumId', '=', asUuid(options.albumId!))
-                        .where('album_space_asset.spaceId', '=', anyUuid(options.albumSpaceIds!)),
-                    )
-                  : ownerRows
-              ).as('album_members');
-            },
+            (eb) =>
+              albumMembership(
+                eb,
+                [options.albumId!],
+                options.albumSpaceIds?.length ? { spaceIds: options.albumSpaceIds } : undefined,
+              ).as('album_members'),
             (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
           ),
       )
@@ -484,63 +473,33 @@ export function withTimeBucketAssetFilters<O>(
             qb.where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
           ),
       )
-      // #1041 §4: the `!timelineSpaceIds` branch — userIds set, shared spaces off. E12 requires the
-      // subtraction still applies here even with `withSharedSpaces: false`; easy to miss because this
-      // branch never touches a space table. There is no sibling visible-path arm here, so §3's
-      // rescue has to be built INTO the predicate (E12b/E12c) — that is what `visibleSpaceIds` is
-      // for, and it is resolved independently of `withSharedSpaces`.
-      .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
+      // #1041: the caller's own id carries the own-timeline subtraction, never a partner's (see
+      // ownerArmWithHiddenSubtraction). With timeline spaces, §3's rescue is the shared arm the
+      // viewer-scope predicate ORs in; without them (E12: the subtraction still applies with
+      // `withSharedSpaces: false`) there is no sibling arm, so the rescue is built inline from
+      // `visibleSpaceIds`. immich-30739's person-scoped shared-album widening (keyed on `personIds`,
+      // see `viewerId` above) is an independent admission path, so it ORs with the owner arm. The
+      // shared arm's album gate is the viewer's own per-user hide ('personal'), not the space flag.
+      .$if(!!options.userIds, (qb) =>
         qb.where((eb) => {
-          // #1041's owner arm, composed with immich-30739's person-scoped shared-album widening
-          // (fork: keyed on `personIds` — see the `viewerId` parameter above). The two are
-          // INDEPENDENT admission paths, so they OR: an asset reaching the viewer through a shared
-          // album is not withheld by the caller's own hidden-space scope, while the caller's own
-          // rows still carry the subtraction.
-          const ownerArm = ownerArmWithHiddenSubtraction(eb, options, {
-            kind: 'inline',
-            visibleSpaceIds: options.visibleSpaceIds ?? [],
-            viewerId: options.callerId ?? options.userIds![0],
-          });
-          return options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(eb, viewerId)]) : ownerArm;
+          const viewer = options.callerId ?? options.userIds![0];
+          const ownerArm = ownerArmWithHiddenSubtraction(
+            eb,
+            options,
+            options.timelineSpaceIds
+              ? { kind: 'sibling-arm' }
+              : { kind: 'inline', visibleSpaceIds: options.visibleSpaceIds ?? [], viewerId: viewer },
+          );
+          return ownedOrSharedWithViewer(
+            eb,
+            options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(eb, viewerId)]) : ownerArm,
+            options.timelineSpaceIds && {
+              scope: { spaceIds: options.timelineSpaceIds },
+              albumTimelineGate: 'personal',
+              viewerId: viewer,
+            },
+          );
         }),
-      )
-      .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            // Caller's own (and partner) rows follow the resolved top-level visibility; the
-            // caller's own id additionally carries the #1041 subtraction (never the partner's — see
-            // ownerArmWithHiddenSubtraction). §3's rescue is the sibling arm immediately below —
-            // it ORs the same `spaceAssetPathBranches` over the same visible spaces — so the
-            // subtraction here must NOT emit its own copy.
-            options.personIds?.length && viewerId
-              ? eb.or([
-                  ownerArmWithHiddenSubtraction(eb, options, { kind: 'sibling-arm' }),
-                  inSharedAlbum(eb, viewerId),
-                ])
-              : ownerArmWithHiddenSubtraction(eb, options, { kind: 'sibling-arm' }),
-            // Fork RBAC (Fix A): other members' rows are constrained to Archive+Timeline via the
-            // INDEPENDENT gate, so an explicit `visibility=HIDDEN`/`LOCKED` can't surface their
-            // Hidden/Locked in-space assets. Mirrors searchAssetBuilder's timelineSpaceIds arm.
-            //
-            // #1041 §3: this is the personal-timeline "V" (visible-path) term, so its album arm
-            // gates on the VIEWER's own per-user hide ('personal'), not the shared showInTimeline
-            // flag — for both another member's assets reaching the viewer via this space, and the
-            // viewer's own assets (which agree with the ownerArm subtraction above, since both read
-            // the same shared_space_album_hidden rows).
-            eb.and([
-              spaceVisibilityGate(eb),
-              eb.or(
-                spaceAssetPathBranches(eb, {
-                  correlateAssetId: 'asset.id',
-                  correlateLibraryId: 'asset.libraryId',
-                  scope: { spaceIds: options.timelineSpaceIds! },
-                  albumTimelineGate: 'personal',
-                  viewerId: options.callerId ?? options.userIds![0],
-                }),
-              ),
-            ]),
-          ]),
-        ),
       )
       .$if(options.isFavorite !== undefined, (qb) =>
         qb.where((eb) =>
@@ -951,13 +910,21 @@ export class AssetRepository {
       .execute();
   }
 
-  // #763: no isFavoriteForUser projection here — the only caller (asset.service.ts updateAll, via
-  // priorAssets) reads `visibility` only, to snapshot the pre-write value for the #757 transition
-  // helper. The rows never reach mapAsset, so there is nothing to project.
-  @GenerateSql({ params: [[DummyValue.UUID]] })
+  // #763: updateAll maps these rows into on_asset_update, so they carry the trimmed duration and, given
+  // the caller's id, the caller's favorite (asset."isFavorite" is the owner's).
+  @GenerateSql(
+    { params: [[DummyValue.UUID]] },
+    { name: 'with authUserId', params: [[DummyValue.UUID], DummyValue.UUID] },
+  )
   @ChunkedArray()
-  getByIds(ids: string[]) {
-    return this.db.selectFrom('asset').selectAll('asset').where('asset.id', '=', anyUuid(ids)).execute();
+  getByIds(ids: string[], authUserId?: string) {
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .select(projectedDuration)
+      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+      .where('asset.id', '=', anyUuid(ids))
+      .execute();
   }
 
   @GenerateSql(
@@ -970,16 +937,10 @@ export class AssetRepository {
       this.db
         .selectFrom('asset')
         .selectAll('asset')
+        .select(projectedDuration)
         .select(withFacesAndPeople({ viewingUserId }))
         .select(withTags)
         .$call(withExif)
-        // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner) — the
-        // raw asset."isFavorite" column was dropped outright in slice 3, so selectAll('asset') no
-        // longer surfaces one at all; see the matching comment on getById below for the full
-        // rationale (same owner-semantics decision; job.service.ts's
-        // AssetEditReadyV2/AssetUploadReadyV2 payloads are this method's only direct `.isFavorite`
-        // reader, and always send to the asset's OWNER).
-        .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
         // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
         // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
         // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
@@ -1014,39 +975,25 @@ export class AssetRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, 1000, 0] })
   getByAlbumIdWithFaces(albumId: string, spaceId: string, limit = 1000, offset = 0) {
-    return this.db
-      .selectFrom('asset')
-      .innerJoin(
-        (eb) => {
-          // #752 P1-7 / D1-b: link-time face sync must also page retained contributions on
-          // re-link — album_asset alone would skip faces cleaned up while the album was unlinked.
-          // The contributed arm is correlated to the syncing space: contributions are reachable
-          // only through their tether space (mirrors contributionVisibleToMember's albumId+spaceId
-          // gate), so an S2 link-sync never pages an S1-tethered contribution into S2's people.
-          return eb
-            .selectFrom('album_asset')
-            .select('album_asset.assetId as assetId')
-            .where('album_asset.albumId', '=', asUuid(albumId))
-            .union(
-              eb
-                .selectFrom('album_space_asset')
-                .select('album_space_asset.assetId as assetId')
-                .where('album_space_asset.albumId', '=', asUuid(albumId))
-                .where('album_space_asset.spaceId', '=', asUuid(spaceId)),
-            )
-            .as('album_members');
-        },
-        (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
-      )
-      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-      .select('asset.id')
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.isOffline', '=', false)
-      .groupBy('asset.id')
-      .orderBy('asset.id')
-      .limit(limit)
-      .offset(offset)
-      .execute();
+    return (
+      this.db
+        .selectFrom('asset')
+        // #752 P1-7 / D1-b: link-time face sync must also page retained contributions on re-link, and
+        // only those made through the syncing space, so an S2 link-sync never pages an S1 contribution.
+        .innerJoin(
+          (eb) => albumMembership(eb, [albumId], { spaceId }).as('album_members'),
+          (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
+        )
+        .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+        .select('asset.id')
+        .where('asset.deletedAt', 'is', null)
+        .where('asset.isOffline', '=', false)
+        .groupBy('asset.id')
+        .orderBy('asset.id')
+        .limit(limit)
+        .offset(offset)
+        .execute()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
@@ -1075,14 +1022,11 @@ export class AssetRepository {
     return this.db.selectFrom('asset_file').select(['assetId', 'path']).limit(sql.lit(3)).execute();
   }
 
-  // #763 slice 7: `authUserId` is the ACTING user (not necessarily the asset's owner) — the
-  // caller decides whose favorite carries over to the copy. See asset.service.ts `copy`.
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  getForCopy(id: string, authUserId: string) {
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getForCopy(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['id', 'stackId', 'originalPath'])
-      .select((eb) => favoriteExistsFor(eb, authUserId).as('isFavorite'))
+      .select(['id', 'stackId', 'originalPath', 'isFavorite'])
       .select(withFiles)
       .where('id', '=', asUuid(id))
       .limit(1)
@@ -1102,66 +1046,55 @@ export class AssetRepository {
     // reach mapAsset and so have no per-user value to resolve.
     authUserId?: string,
   ) {
-    return (
-      this.db
-        .selectFrom('asset')
-        .selectAll('asset')
-        // #763: `isFavorite` is resolved from the OWNER's overlay row (favoriteExistsForOwner), NOT
-        // the raw asset."isFavorite" column selectAll('asset') would otherwise surface — that column
-        // is a frozen legacy value the overlay write path no longer updates (dropped outright in
-        // slice 3). Projected unconditionally (not gated on authUserId, unlike isFavoriteForUser
-        // below) because every consumer that reads `.isFavorite` directly off this method's result
-        // (job.service.ts's AssetEditReadyV2/AssetUploadReadyV2 payloads) sends its event to the
-        // asset's OWNER, so owner semantics is always correct here — see favoriteExistsForOwner's doc
-        // comment. mapAsset-facing callers (asset.service.ts `get`/`update`) never read this field;
-        // they use isFavoriteForUser instead.
-        .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
-        .where('asset.id', '=', asUuid(id))
-        .$if(!!exifInfo, withExif)
-        .$if(!!faces, (qb) =>
-          qb
-            .select(faces?.person ? withFacesAndPeople({ viewingUserId: faces.viewingUserId! }) : withFaces)
-            .$narrowType<{ faces: NotNull }>(),
-        )
-        .$if(!!library, (qb) => qb.select(withLibrary))
-        .$if(!!owner, (qb) => qb.select(withOwner))
-        .$if(!!smartSearch, withSmartSearch)
-        .$if(!!stack, (qb) =>
-          qb
-            .leftJoin('stack', 'stack.id', 'asset.stackId')
-            .$if(!stack!.assets, (qb) =>
-              qb.select((eb) => eb.fn.toJson(eb.table('stack')).$castTo<Stack | null>().as('stack')),
-            )
-            .$if(!!stack!.assets, (qb) =>
-              qb
-                .leftJoinLateral(
-                  (eb) =>
-                    eb
-                      .selectFrom('asset as stacked')
-                      .selectAll('stack')
-                      .select(
-                        sql<
-                          ShallowDehydrateObject<Selectable<AssetTable>>[]
-                        >`array_agg(to_json(stacked) ORDER BY stacked."fileCreatedAt" ASC)`.as('assets'),
-                      )
-                      .whereRef('stacked.stackId', '=', 'stack.id')
-                      .whereRef('stacked.id', '!=', 'stack.primaryAssetId')
-                      .where('stacked.deletedAt', 'is', null)
-                      .where('stacked.visibility', '=', AssetVisibility.Timeline)
-                      .groupBy('stack.id')
-                      .as('stacked_assets'),
-                  (join) => join.on('stack.id', 'is not', null),
-                )
-                .select((eb) => eb.fn.toJson(eb.table('stacked_assets')).as('stack')),
-            ),
-        )
-        .$if(!!files, (qb) => qb.select(withFiles))
-        .$if(!!tags, (qb) => qb.select(withTags))
-        .$if(!!edits, (qb) => qb.select(withEdits))
-        .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
-        .limit(1)
-        .executeTakeFirst()
-    );
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .select(projectedDuration)
+      .where('asset.id', '=', asUuid(id))
+      .$if(!!exifInfo, withExif)
+      .$if(!!faces, (qb) =>
+        qb
+          .select(faces?.person ? withFacesAndPeople({ viewingUserId: faces.viewingUserId! }) : withFaces)
+          .$narrowType<{ faces: NotNull }>(),
+      )
+      .$if(!!library, (qb) => qb.select(withLibrary))
+      .$if(!!owner, (qb) => qb.select(withOwner))
+      .$if(!!smartSearch, withSmartSearch)
+      .$if(!!stack, (qb) =>
+        qb
+          .leftJoin('stack', 'stack.id', 'asset.stackId')
+          .$if(!stack!.assets, (qb) =>
+            qb.select((eb) => eb.fn.toJson(eb.table('stack')).$castTo<Stack | null>().as('stack')),
+          )
+          .$if(!!stack!.assets, (qb) =>
+            qb
+              .leftJoinLateral(
+                (eb) =>
+                  eb
+                    .selectFrom('asset as stacked')
+                    .selectAll('stack')
+                    .select(
+                      sql<
+                        ShallowDehydrateObject<Selectable<AssetTable>>[]
+                      >`array_agg(to_json(stacked) ORDER BY stacked."fileCreatedAt" ASC)`.as('assets'),
+                    )
+                    .whereRef('stacked.stackId', '=', 'stack.id')
+                    .whereRef('stacked.id', '!=', 'stack.primaryAssetId')
+                    .where('stacked.deletedAt', 'is', null)
+                    .where('stacked.visibility', '=', AssetVisibility.Timeline)
+                    .groupBy('stack.id')
+                    .as('stacked_assets'),
+                (join) => join.on('stack.id', 'is not', null),
+              )
+              .select((eb) => eb.fn.toJson(eb.table('stacked_assets')).as('stack')),
+          ),
+      )
+      .$if(!!files, (qb) => qb.select(withFiles))
+      .$if(!!tags, (qb) => qb.select(withTags))
+      .$if(!!edits, (qb) => qb.select(withEdits))
+      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+      .limit(1)
+      .executeTakeFirst();
   }
 
   @GenerateSql({ params: [[DummyValue.UUID], {}] })
@@ -1189,6 +1122,7 @@ export class AssetRepository {
         .with('asset', (qb) => qb.updateTable('asset').set(asset).where('id', '=', asUuid(asset.id)).returningAll())
         .selectFrom('asset')
         .selectAll('asset')
+        .select(projectedDuration)
         .$call(withExif)
         .$call((qb) => qb.select(withFaces))
         .$call((qb) => qb.select(withEdits))
@@ -1325,13 +1259,7 @@ export class AssetRepository {
       .where('ownerId', '=', asUuid(ownerId))
       .$if(visibility === undefined, withDefaultVisibility)
       .$if(!!visibility, (qb) => qb.where('asset.visibility', '=', visibility!))
-      .$if(isFavorite !== undefined, (qb) =>
-        // #763: `ownerId` doubles as the favoriting user here — the query is already scoped to
-        // `WHERE asset.ownerId = ownerId` below, so this only ever asks "of ownerId's own assets,
-        // how many has ownerId favorited", regardless of which caller (self or an admin viewing
-        // another user's stats, see user-admin.service.ts) triggered the request.
-        qb.where((eb) => (isFavorite ? favoriteExistsFor(eb, ownerId) : eb.not(favoriteExistsFor(eb, ownerId)))),
-      )
+      .$if(isFavorite !== undefined, (qb) => qb.where('isFavorite', '=', isFavorite!))
       .$if(!!isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
       .where('deletedAt', isTrashed ? 'is not' : 'is', null)
       .executeTakeFirstOrThrow();
@@ -1531,7 +1459,7 @@ export class AssetRepository {
           .innerJoin('asset', 'asset.id', 'filtered.id')
           .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
           .select((eb) => [
-            'asset.duration',
+            projectedDuration(eb),
             'asset.id',
             'asset.visibility',
             // The `eb` here is scoped to this `.with('cte', ...)` builder (DB & { filtered: ... }),
@@ -1665,22 +1593,18 @@ export class AssetRepository {
       // timeline. The Timeline-only visibility gate below already covers the space arms' own
       // requirement (archived/hidden/locked space assets never reach the strip).
       //
-      // The branches are built from a detached `expressionBuilder<DB, 'asset'>()` rather than the
+      // The predicate is built on a detached `expressionBuilder<DB, 'asset'>()` rather than the
       // callback's own `eb`: the `cities` CTE widens this query's schema to `DB & { cities }`, which
       // no longer satisfies the shared helpers' `ExpressionBuilder<DB, keyof DB>` parameter. The
-      // emitted SQL is identical — the branches only ever reference `asset.*`.
+      // emitted SQL is identical: the predicate only ever references `asset.*`.
       .where((eb) =>
-        eb.or([
+        ownedOrSharedWithViewer(
+          expressionBuilder<DB, 'asset'>(),
           eb('asset.ownerId', '=', asUuid(ownerId)),
-          ...(timelineSpaceIds?.length
-            ? spaceAssetPathBranches(expressionBuilder<DB, 'asset'>(), {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: timelineSpaceIds },
-                albumTimelineGate: 'space-tab',
-              })
-            : []),
-        ]),
+          timelineSpaceIds?.length
+            ? { scope: { spaceIds: timelineSpaceIds }, albumTimelineGate: 'space-tab' }
+            : undefined,
+        ),
       )
       .where('visibility', '=', AssetVisibility.Timeline)
       .where('type', '=', AssetType.Image)
@@ -1949,13 +1873,7 @@ export class AssetRepository {
   async getForEdit(id: string) {
     return this.db
       .selectFrom('asset')
-      .select([
-        'asset.type',
-        'asset.livePhotoVideoId',
-        'asset.originalPath',
-        'asset.originalFileName',
-        'asset.duration',
-      ])
+      .select(['asset.type', 'asset.livePhotoVideoId', 'asset.originalPath', 'asset.originalFileName'])
       .where('asset.id', '=', id)
       .innerJoin('asset_exif', (join) => join.onRef('asset_exif.assetId', '=', 'asset.id'))
       .select([

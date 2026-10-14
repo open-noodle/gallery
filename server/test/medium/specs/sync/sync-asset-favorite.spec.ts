@@ -246,6 +246,39 @@ describe('§4.3 cross-stream amplification', () => {
     ]);
   });
 
+  it('carries a stock server column write to the stock and Gallery streams of the owner only', async () => {
+    const { auth, user, ctx } = await setup();
+    const { auth: memberAuth } = await ctx.newSyncAuthUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const ownerTypes = [SyncRequestType.AssetsV2, SyncRequestType.AssetFavoritesV1];
+    await ctx.syncAckAll(auth, await ctx.syncStream(auth, ownerTypes));
+    await ctx.assertSyncIsComplete(memberAuth, [SyncRequestType.AssetFavoritesV1]);
+
+    await ctx.database.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
+    const favorited = await ctx.syncStream(auth, ownerTypes);
+    expect(favorited).toEqual([
+      expect.objectContaining({
+        type: SyncEntityType.AssetV2,
+        data: expect.objectContaining({ id: asset.id, isFavorite: true }),
+      }),
+      expect.objectContaining({ type: SyncEntityType.AssetFavoriteV1, data: { assetId: asset.id } }),
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+    await ctx.syncAckAll(auth, favorited);
+
+    await ctx.database.updateTable('asset').set({ isFavorite: false }).where('id', '=', asset.id).execute();
+    const unfavorited = await ctx.syncStream(auth, ownerTypes);
+    expect(unfavorited).toEqual([
+      expect.objectContaining({
+        type: SyncEntityType.AssetV2,
+        data: expect.objectContaining({ id: asset.id, isFavorite: false }),
+      }),
+      expect.objectContaining({ type: SyncEntityType.AssetFavoriteDeleteV1, data: { assetId: asset.id } }),
+      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
+    ]);
+    await ctx.assertSyncIsComplete(memberAuth, [SyncRequestType.AssetFavoritesV1]);
+  });
+
   it('does not bump the asset when the favorite state did not change', async () => {
     const { user, ctx } = await setup();
     const { asset } = await ctx.newAsset({ ownerId: user.id });

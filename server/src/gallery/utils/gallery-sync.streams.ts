@@ -94,7 +94,7 @@ const forkSyncRequestTypes = new Set<SyncRequestType>(GALLERY_SYNC_ORDER);
 
 /**
  * A stock Immich client aborts its whole sync on a value its generated client cannot decode,
- * so fork-only rows (rule memories, trim edits) and pets reach fork-aware clients only.
+ * so fork-only rows (rule memories) and pets reach fork-aware clients only.
  */
 const isForkAwareClient = (dto: SyncStreamDto) => dto.types.some((type) => forkSyncRequestTypes.has(type));
 

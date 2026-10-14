@@ -3,11 +3,11 @@ import { MachineLearningRepository, ModelTask, ModelType } from 'src/repositorie
 import { automock } from 'test/utils.js';
 
 const mockReadAll = vi.fn();
-const mockResolveBackendForKey = vi.fn(() => ({ readAll: mockReadAll }));
+const mockBackendFor = vi.fn(() => ({ readAll: mockReadAll }));
 
 vi.mock('src/services/storage.service', () => ({
   StorageService: {
-    resolveBackendForKey: (...args: unknown[]) => mockResolveBackendForKey(...(args as [])),
+    backendFor: (...args: unknown[]) => mockBackendFor(...(args as [])),
   },
 }));
 
@@ -93,7 +93,7 @@ describe(MachineLearningRepository.name, () => {
 
       await sut.encodeImage('thumbs/user1/ab/cd/preview.webp', clipConfig);
 
-      expect(mockResolveBackendForKey).toHaveBeenCalledWith('thumbs/user1/ab/cd/preview.webp');
+      expect(mockBackendFor).toHaveBeenCalledWith('thumbs/user1/ab/cd/preview.webp');
       expect(mockReadAll).toHaveBeenCalledWith('thumbs/user1/ab/cd/preview.webp');
     });
 
@@ -191,7 +191,7 @@ describe(MachineLearningRepository.name, () => {
       expect(result.imageHeight).toBe(480);
       expect(result.imageWidth).toBe(640);
 
-      expect(mockResolveBackendForKey).toHaveBeenCalledWith('thumbs/user1/face-preview.webp');
+      expect(mockBackendFor).toHaveBeenCalledWith('thumbs/user1/face-preview.webp');
       expect(mockReadAll).toHaveBeenCalledWith('thumbs/user1/face-preview.webp');
 
       const [, options] = mockFetch.mock.calls[0];
@@ -377,7 +377,7 @@ describe(MachineLearningRepository.name, () => {
       });
 
       expect(result.text).toEqual(['hello']);
-      expect(mockResolveBackendForKey).toHaveBeenCalledWith('upload/user1/preview.webp');
+      expect(mockBackendFor).toHaveBeenCalledWith('upload/user1/preview.webp');
       expect(mockReadAll).toHaveBeenCalledWith('upload/user1/preview.webp');
     });
   });

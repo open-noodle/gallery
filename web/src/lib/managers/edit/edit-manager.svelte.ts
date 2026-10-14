@@ -27,6 +27,8 @@ export interface EditToolManager {
   hasChanges: boolean;
   canReset: boolean;
   edits: EditAction[];
+  /** Saves the tool's changes itself instead of through the asset edits endpoint. */
+  save?: (assetId: string) => Promise<unknown>;
 }
 
 export enum EditToolType {
@@ -133,7 +135,7 @@ export class EditManager {
   async applyEdits(): Promise<boolean> {
     this.isApplyingEdits = true;
 
-    const edits = this.selectedTool ? this.selectedTool.manager.edits : [];
+    const edits = this.tools.flatMap((tool) => tool.manager.edits);
     if (!this.currentAsset) {
       return false;
     }
@@ -146,14 +148,17 @@ export class EditManager {
       const timeout = this.currentAsset?.type === AssetTypeEnum.Video ? 30_000 : 10_000;
       const editCompleted = waitForWebsocketEvent('AssetEditReadyV2', (event) => event.asset.id === assetId, timeout);
 
-      await (edits.length === 0
-        ? removeAssetEdits({ id: assetId })
-        : editAsset({
-            id: assetId,
-            assetEditsCreateDto: {
-              edits,
-            },
-          }));
+      const tool = this.selectedTool?.manager;
+      await (tool?.save
+        ? tool.save(assetId)
+        : edits.length === 0
+          ? removeAssetEdits({ id: assetId })
+          : editAsset({
+              id: assetId,
+              assetEditsCreateDto: {
+                edits,
+              },
+            }));
 
       await editCompleted;
 
