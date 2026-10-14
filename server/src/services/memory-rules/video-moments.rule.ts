@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { AssetType } from 'src/enum.js';
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodAsset, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { medianTime, pickEvenlySpaced, recencyBonus } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
@@ -24,7 +24,7 @@ const inDurationBand = (asset: MemoryPeriodAsset): boolean =>
 export class VideoMomentsMemoryRule implements MemoryRule {
   readonly id = 'video_moments';
 
-  constructor(private assetRepository: Pick<AssetRepository, 'getMemoryAssetsForPeriod'>) {}
+  constructor(private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryAssetsForPeriod'>) {}
 
   async evaluate({ ownerId, target }: MemoryRuleContext): Promise<MemoryRuleCandidate[]> {
     if (target.day !== TRIGGER_DAY) {

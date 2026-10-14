@@ -24,6 +24,20 @@ class SyncApiRepository {
     return _api.syncApi.deleteSyncAck(SyncAckDeleteDto(types: Optional.present(types)));
   }
 
+  /// The fork's original shared-space and library request types. Every fork server accepts them;
+  /// a stock Immich server does not.
+  static const _forkSyncTypes = [
+    SyncRequestType.sharedSpacesV1,
+    SyncRequestType.sharedSpaceMembersV1,
+    SyncRequestType.sharedSpaceAssetsV1,
+    SyncRequestType.sharedSpaceAssetExifsV1,
+    SyncRequestType.sharedSpaceToAssetsV1,
+    SyncRequestType.librariesV1,
+    SyncRequestType.libraryAssetsV1,
+    SyncRequestType.libraryAssetExifsV1,
+    SyncRequestType.sharedSpaceLibrariesV1,
+  ];
+
   /// The Phase-2B space-album request types that are safe to send from the `serverVersion >
   /// 5.0.0` fallback below: the original five that every fork server shipping version-gated
   /// space albums accepts, plus the per-member hidden-album rows from #1041, which ride the
@@ -110,25 +124,12 @@ class SyncApiRepository {
           if (serverVersion.supports(.syncAssetOcrV1)) SyncRequestType.assetOcrV1,
           // --- gallery-fork: shared-space + library sync types ---
           //
-          // PR 1 added the server emitters and the mobile dispatch handlers but
-          // never added these types to the mobile's request list, so the sync
-          // stream silently skipped them. PR 2's SpaceDetailPage UI switchover
-          // surfaced the bug because the new Drift-backed timeline depends on
-          // these tables being populated. Without these entries the
-          // shared_space_*, library_* tables stay empty forever.
-          //
-          // These are gallery-fork-only types — a stock Immich server will
-          // reject the request. The mobile build is intended to talk only to
-          // gallery-fork servers.
-          SyncRequestType.sharedSpacesV1,
-          SyncRequestType.sharedSpaceMembersV1,
-          SyncRequestType.sharedSpaceAssetsV1,
-          SyncRequestType.sharedSpaceAssetExifsV1,
-          SyncRequestType.sharedSpaceToAssetsV1,
-          SyncRequestType.librariesV1,
-          SyncRequestType.libraryAssetsV1,
-          SyncRequestType.libraryAssetExifsV1,
-          SyncRequestType.sharedSpaceLibrariesV1,
+          // A stock Immich server 400s the WHOLE /sync/stream request on any of these, so they ride
+          // the same declaration-or-version gate as the legacy space-album types below.
+          if (supportedSyncTypes != null)
+            ...(_forkSyncTypes.where((type) => supportedSyncTypes.contains(type.toJson())))
+          else if (serverVersion > const SemVer(major: 5, minor: 0, patch: 0))
+            ..._forkSyncTypes,
           // --- gallery-fork: shared-space album sync types (Phase 2B) ---
           //
           // mobile-1: gate the legacy 5 request types behind the fork-server version that

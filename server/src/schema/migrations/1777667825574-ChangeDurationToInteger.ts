@@ -14,7 +14,7 @@ const getDurationColumnType = async (db: Kysely<any>) => {
 
 export async function up(db: Kysely<any>): Promise<void> {
   // Gallery users may have already run this migration under its original upstream
-  // timestamp before it was renamed in immich-app/immich#28191.
+  // timestamp before it was renamed in immich-28191.
   if ((await getDurationColumnType(db)) === 'integer') {
     return;
   }

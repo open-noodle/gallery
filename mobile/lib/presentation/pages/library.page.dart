@@ -131,24 +131,24 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _CollectionCards extends StatelessWidget {
+class _CollectionCards extends ConsumerWidget {
   const _CollectionCards();
 
   @override
-  Widget build(BuildContext context) {
-    return const SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: 16),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverToBoxAdapter(
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _SpacesCollectionCard(),
-            _PeopleCollectionCard(),
-            _PlacesCollectionCard(),
-            _LocalAlbumsCollectionCard(),
-            AlbumsCollectionCard(),
-            _MemoriesCollectionCard(),
+            if (ref.watch(serverSupportsSpacesProvider)) const _SpacesCollectionCard(),
+            const _PeopleCollectionCard(),
+            const _PlacesCollectionCard(),
+            const _LocalAlbumsCollectionCard(),
+            const AlbumsCollectionCard(),
+            const _MemoriesCollectionCard(),
           ],
         ),
       ),
@@ -606,6 +606,10 @@ class _QuickAccessButtonList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final partnerSharedWithAsync = ref.watch(sharedWithPartnerProvider);
     final partners = partnerSharedWithAsync.valueOrNull ?? [];
+    final showSpaces = ref.watch(serverSupportsSpacesProvider);
+    const topShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+    );
 
     final items = [
       _QuickAccessItem(

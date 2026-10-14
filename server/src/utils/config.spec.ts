@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaults } from 'src/dtos/config.dto.js';
-import { ConfigRepository } from 'src/repositories/config.repository.js';
-import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import {
   deriveSuggestionBand,
   foldLegacyFaceSuggestionConfig,
-  getConfig,
   migrateLegacyPetDetectionModel,
-} from 'src/utils/config.js';
+} from 'src/gallery/config-migrations.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { getConfig } from 'src/utils/config.js';
 import { mockEnvData, newConfigRepositoryMock } from 'test/repositories/config.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 
