@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { Mocked } from 'vitest';
 import { AssetVisibility, JobName, SourceType } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';

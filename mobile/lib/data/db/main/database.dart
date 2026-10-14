@@ -107,7 +107,11 @@ import 'package:sqlite_async/sqlite_async.dart';
     SettingsEntity,
     AssetOcrEntity,
   ],
-  include: {'package:immich_mobile/data/db/main/query/merged_asset.drift'},
+  include: {
+    'package:immich_mobile/data/db/main/query/merged_asset.drift',
+    // gallery-fork: the main timeline with Space membership.
+    'package:immich_mobile/data/db/main/query/shared_space_timeline.drift',
+  },
   daos: [
     AuthUserRepository,
     BackupRepository,

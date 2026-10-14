@@ -8,7 +8,7 @@ import path from 'node:path';
 // sites to rendering a raw i18n key at a real user).
 
 const REPO_ROOT = path.resolve(process.cwd(), '..');
-const I18N_DIR = path.join(REPO_ROOT, 'i18n');
+const I18N_DIR = path.join(REPO_ROOT, 'i18n', 'gallery', 'merged');
 const WEB_SRC = path.join(REPO_ROOT, 'web/src');
 const MOBILE_LIB = path.join(REPO_ROOT, 'mobile/lib');
 

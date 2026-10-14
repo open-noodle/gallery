@@ -5,8 +5,6 @@ import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { PersonResponseDto } from 'src/dtos/person.dto.js';
 import {
-  FilterSuggestionsRequestDto,
-  FilterSuggestionsResponseDto,
   LargeAssetSearchDto,
   MetadataSearchDto,
   PlacesResponseDto,
@@ -19,12 +17,16 @@ import {
   SearchSuggestionRequestDto,
   SmartSearchDto,
   SmartSearchFacetsDto,
-  SmartSearchFacetsResponseDto,
   StatisticsSearchDto,
-  TagSuggestionRequestDto,
-  TagSuggestionResponseDto,
 } from 'src/dtos/search.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
+import {
+  FilterSuggestionsRequestDto,
+  FilterSuggestionsResponseDto,
+  SmartSearchFacetsResponseDto,
+  TagSuggestionRequestDto,
+  TagSuggestionResponseDto,
+} from 'src/gallery/dtos/search.dto.js';
 import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
 import { SearchService } from 'src/services/search.service.js';
 

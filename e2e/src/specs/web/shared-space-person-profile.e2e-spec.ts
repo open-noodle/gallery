@@ -49,7 +49,10 @@ test.describe('Shared space person in the main People view', () => {
     // the shared_space_person must join the same identity for members to see it under /people.
     const person = await utils.createPerson(admin.accessToken, { name: 'Grandma' });
     const faceId = await utils.createFace({ assetId: asset.id, personGroupId: person.id });
-    const identityResult = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [person.id]);
+    const identityResult = await db.query(
+      `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+      [person.id],
+    );
     const identityId = identityResult.rows[0].identityId as string;
 
     const spacePersonResult = await db.query(
@@ -128,9 +131,10 @@ test.describe('Shared space person in the main People view', () => {
 
       const person = await utils.createPerson(adminLogin.accessToken, { name: 'Suggestion Target' });
       const faceId = await utils.createFace({ assetId: representativeAsset.id, personGroupId: person.id });
-      const identityResult = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
-        person.id,
-      ]);
+      const identityResult = await db.query(
+        `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+        [person.id],
+      );
       const identityId = identityResult.rows[0].identityId as string;
 
       // Wrapped like utils.createSpacePerson: the SharedSpacePersonDedup job hard-deletes a

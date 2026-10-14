@@ -5,8 +5,6 @@ import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { PersonResponseDto, mapPerson } from 'src/dtos/person.dto.js';
 import {
-  FilterSuggestionsRequestDto,
-  FilterSuggestionsResponseDto,
   LargeAssetSearchDto,
   MetadataSearchDto,
   PlacesResponseDto,
@@ -20,15 +18,19 @@ import {
   SearchSuggestionType,
   SmartSearchDto,
   SmartSearchFacetsDto,
-  SmartSearchFacetsResponseDto,
   StatisticsSearchDto,
-  TagSuggestionRequestDto,
-  TagSuggestionResponseDto,
   isFullyAlbumConfined,
   isNewShapeRequest,
   mapPlaces,
 } from 'src/dtos/search.dto.js';
 import { AssetOrder, AssetVisibility, Permission } from 'src/enum.js';
+import {
+  FilterSuggestionsRequestDto,
+  FilterSuggestionsResponseDto,
+  SmartSearchFacetsResponseDto,
+  TagSuggestionRequestDto,
+  TagSuggestionResponseDto,
+} from 'src/gallery/dtos/search.dto.js';
 import { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';

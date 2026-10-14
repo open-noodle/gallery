@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { AssetFileType, AssetVisibility, JobName, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
+import { personType } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
@@ -125,7 +126,7 @@ const faceRow = (ctx: ReturnType<typeof setup>['ctx'], id: string) =>
 const personRow = (ctx: ReturnType<typeof setup>['ctx'], id: string) =>
   ctx.database
     .selectFrom('person')
-    .select(['personGroupId', 'name', 'type'])
+    .select(['personGroupId', 'name', personType().as('type')])
     .where('personGroupId', '=', id)
     .executeTakeFirst();
 

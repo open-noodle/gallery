@@ -1,0 +1,6 @@
+{
+  "background_location_permission_content": "Noodle Gallery bruker tillatelse til posisjon i bakgrunnen for å fortsette å lese navnet på Wi‑Fi-nettverket mens automatisk serverbytte kjører i bakgrunnen. Navnet på Wi‑Fi-nettverket lagres på denne enheten for samsvar, og den nøyaktige enhetsposisjonen din lagres eller deles ikke.",
+  "location_permission_content": "Android krever tillatelse til nøyaktig posisjon slik at Noodle Gallery kan lese navnet på det nåværende Wi‑Fi-nettverket for automatisk serverbytte. Navnet på Wi‑Fi-nettverket lagres på denne enheten for samsvar, og den nøyaktige enhetsposisjonen din lagres eller deles ikke.",
+  "map_location_service_disabled_content": "Noodle Gallery bruker din nøyaktige nåværende posisjon til å sentrere kartet og vise bilder og videoer fra ditt nåværende område. Posisjonstjenester må være aktivert før Noodle Gallery kan få tilgang til denne posisjonen. Den nøyaktige enhetsposisjonen din lagres eller deles ikke. Vil du åpne posisjonsinnstillingene nå?",
+  "map_no_location_permission_content": "Noodle Gallery bruker din nøyaktige nåværende posisjon til å sentrere kartet og vise bilder og videoer fra ditt nåværende område. Den nøyaktige enhetsposisjonen din lagres eller deles ikke. Vil du tillate posisjonstilgang nå?"
+}

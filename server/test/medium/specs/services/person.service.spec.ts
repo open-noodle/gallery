@@ -12,9 +12,10 @@ import {
   SourceType,
   SystemMetadataKey,
 } from 'src/enum.js';
-import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { personIdentityId, personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
@@ -928,7 +929,7 @@ describe(PersonService.name, () => {
 
       const targetIdentity = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', target.personGroupId)
         .executeTakeFirstOrThrow();
 
@@ -1229,7 +1230,9 @@ describe(PersonService.name, () => {
 
       await sut.handleQueueRecognizeFaces({ force: true });
 
-      await expect(ctx.database.selectFrom('person').selectAll().execute()).resolves.toHaveLength(0);
+      await expect(
+        ctx.database.selectFrom('person').selectAll().select(personSidecarColumns()).execute(),
+      ).resolves.toHaveLength(0);
       expect(jobRepo.queueAll).toHaveBeenCalledWith(
         expect.objectContaining([
           { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false, skipSharedSpaceMatch: true } },
@@ -1269,7 +1272,9 @@ describe(PersonService.name, () => {
 
       await sut.handleQueueRecognizeFaces({ force: true, clusterGroupId: user.clusterGroupId });
 
-      await expect(ctx.database.selectFrom('person').selectAll().execute()).resolves.toHaveLength(1);
+      await expect(
+        ctx.database.selectFrom('person').selectAll().select(personSidecarColumns()).execute(),
+      ).resolves.toHaveLength(1);
       expect(jobRepo.queueAll).toHaveBeenCalledWith(
         expect.objectContaining([
           { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false, skipSharedSpaceMatch: true } },

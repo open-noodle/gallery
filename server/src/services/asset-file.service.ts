@@ -42,7 +42,7 @@ export class AssetFileService extends BaseService {
     // the fork stores S3 objects as RELATIVE keys — so building the file response directly
     // from asset_file.path 400s for every file on an S3 install. Disk installs are unaffected and
     // CI has no S3 backend, which is why upstream's shape looked fine here.
-    return this.serveFromBackend(
+    return this.backendMedia.serveFromBackend(
       file.path,
       mimeTypes.lookup(file.path),
       CacheControl.PrivateWithCache,

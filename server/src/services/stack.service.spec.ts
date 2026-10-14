@@ -85,7 +85,7 @@ describe(StackService.name, () => {
       const assetId = newUuid();
       // AssetUpdate passes via space-edit, but the asset is not owned.
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
+      mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
 
       await expect(sut.create(auth, { assetIds: [assetId] })).rejects.toBeInstanceOf(ForbiddenException);
 
@@ -97,7 +97,7 @@ describe(StackService.name, () => {
       const mine = newUuid();
       const theirs = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([mine]));
-      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([theirs]));
+      mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([theirs]));
 
       await expect(sut.create(auth, { assetIds: [mine, theirs] })).rejects.toBeInstanceOf(ForbiddenException);
 

@@ -1,5 +1,6 @@
 import { Kysely, sql } from 'kysely';
 import { DB } from 'src/schema/index.js';
+import { down as restoreLibraryCreateId } from 'src/schema/migrations-gallery/1798200000000-DropLibraryCreateId.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -12,6 +13,10 @@ import { getKyselyDB } from 'test/utils.js';
 // populate library_user at test setup time, we DELETE the table to mimic the
 // post-create-tables-but-pre-backfill moment of a real upgrade, then re-run
 // the backfill SQL and assert the resulting state.
+//
+// Pass 1 reads `library."createId"`, which 1798200000000-DropLibraryCreateId drops afterwards. This
+// file's database therefore runs that migration's down() first, restoring the column (and the trigger
+// that copied it) as they were when 1778300000000 ran.
 
 let defaultDatabase: Kysely<DB>;
 
@@ -38,8 +43,14 @@ const runBackfill = async (db: Kysely<DB>) => {
   `.execute(db);
 };
 
+const libraryCreateId = async (db: Kysely<DB>, libraryId: string) => {
+  const { rows } = await sql<{ createId: string }>`SELECT "createId" FROM library WHERE id = ${libraryId}`.execute(db);
+  return rows[0].createId;
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
+  await restoreLibraryCreateId(defaultDatabase);
 });
 
 describe('library_user migration backfill', () => {
@@ -60,7 +71,7 @@ describe('library_user migration backfill', () => {
       .where('userId', '=', user.id)
       .where('libraryId', '=', library.id)
       .executeTakeFirstOrThrow();
-    expect(row.createId).toBe(library.createId);
+    expect(row.createId).toBe(await libraryCreateId(db, library.id));
     expect(row.createdAt).toEqual(library.createdAt);
   });
 
@@ -92,7 +103,7 @@ describe('library_user migration backfill', () => {
     // Fresh createId, strictly greater than the pre-backfill marker AND the
     // library's original createId. Pass 2 does not propagate library.createId.
     expect(peerRow.createId > backfillStart).toBe(true);
-    expect(peerRow.createId > library.createId).toBe(true);
+    expect(peerRow.createId > (await libraryCreateId(db, library.id))).toBe(true);
   });
 
   it('Pass 2 preserves owner rows via ON CONFLICT DO NOTHING', async () => {
@@ -117,7 +128,7 @@ describe('library_user migration backfill', () => {
       .where('libraryId', '=', library.id)
       .execute();
     expect(rows).toHaveLength(1);
-    expect(rows[0].createId).toBe(library.createId);
+    expect(rows[0].createId).toBe(await libraryCreateId(db, library.id));
     expect(rows[0].createdAt).toEqual(library.createdAt);
   });
 
