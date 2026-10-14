@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { AssetRepository, MemoryPeriodFace } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodFace, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { medianTime, pairCounts, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
@@ -13,7 +13,7 @@ export const ASSET_CAP = 8;
 export class PeopleTogetherMemoryRule implements MemoryRule {
   readonly id = 'people_together';
 
-  constructor(private assetRepository: Pick<AssetRepository, 'getMemoryFacesForPeriod'>) {}
+  constructor(private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryFacesForPeriod'>) {}
 
   async evaluate({ ownerId, target }: MemoryRuleContext): Promise<MemoryRuleCandidate[]> {
     if (target.day !== TRIGGER_DAY) {

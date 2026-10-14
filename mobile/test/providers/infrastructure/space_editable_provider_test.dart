@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
@@ -43,6 +44,7 @@ void main() {
       overrides: [
         sharedSpaceApiRepositoryProvider.overrideWithValue(repo),
         currentUserProvider.overrideWith((ref) => _fixedUser(user)),
+        serverSupportsSpacesProvider.overrideWithValue(true),
       ],
     );
     addTearDown(container.dispose);

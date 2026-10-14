@@ -9,12 +9,18 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/asset_type_mapper.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:openapi/api.dart' hide SearchFilter;
 
 final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<FilterSuggestionsResponseDto, SearchFilter>((
   ref,
   filter,
 ) async {
+  if (!ref.watch(serverSupportsSpacesProvider)) {
+    // A stock Immich server has no facets endpoint; sectionAvailabilityProvider hides the sections
+    // that need it, and everything else already treats an error as "no facets".
+    throw const FilterSuggestionsUnsupportedException();
+  }
   final api = ref.watch(apiServiceProvider).searchApi;
   final localTakenRange = ref.watch(serverLocalTakenRangeProvider);
   final response = await api.getFilterSuggestions(
@@ -46,3 +52,7 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
   }
   return response;
 });
+
+class FilterSuggestionsUnsupportedException implements Exception {
+  const FilterSuggestionsUnsupportedException();
+}

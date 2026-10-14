@@ -13,6 +13,7 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/space_people.page.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
@@ -49,7 +50,10 @@ void main() {
   Future<void> pumpPage(WidgetTester tester, {required Future<List<Person>> Function() people, bool canEdit = true}) =>
       tester.pumpConsumerWidget(
         SpacePeoplePage(spaceId: 'space-1', canEdit: canEdit),
-        overrides: [driftSpacePeopleProvider.overrideWith((ref, key) => people())],
+        overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
+          driftSpacePeopleProvider.overrideWith((ref, key) => people()),
+        ],
       );
 
   testWidgets('renders the space empty state when the space has no people', (tester) async {
@@ -71,6 +75,7 @@ void main() {
     await tester.pumpConsumerWidget(
       const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
       overrides: [
+        serverSupportsSpacesProvider.overrideWithValue(true),
         driftSpacePeopleProvider.overrideWith((ref, key) async {
           calls++;
           if (calls == 1) {
@@ -124,6 +129,7 @@ void main() {
     await tester.pumpConsumerWidget(
       const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
       overrides: [
+        serverSupportsSpacesProvider.overrideWithValue(true),
         driftSpacePeopleProvider.overrideWith(
           (ref, key) async => key.sortBy == PeopleSortBy.photoCount
               ? [_p('zoe', 'Zoe'), _p('alice', 'Alice')]
@@ -181,6 +187,7 @@ void main() {
     await tester.pumpConsumerWidget(
       const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
       overrides: [
+        serverSupportsSpacesProvider.overrideWithValue(true),
         driftSpacePeopleProvider.overrideWith(
           (ref, key) async => switch (key.filterBy) {
             PeopleFilterBy.pets => [_p('rex', 'Rex')],
@@ -215,6 +222,7 @@ void main() {
     await tester.pumpConsumerWidget(
       const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
       overrides: [
+        serverSupportsSpacesProvider.overrideWithValue(true),
         driftSpacePeopleProvider.overrideWith((ref, key) async {
           if (key.filterBy == PeopleFilterBy.pets) {
             petsCalls++;
@@ -251,6 +259,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const SpacePeoplePage(spaceId: 'space-1', canEdit: true),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftSpacePeopleProvider.overrideWith((ref, key) async {
             calls++;
             return [_p('sp1', calls == 1 ? 'Mia' : 'Renamed')];

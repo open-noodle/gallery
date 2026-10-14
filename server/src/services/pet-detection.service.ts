@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
+import type { ArgOf } from 'src/repositories/event.repository.js';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
-import { OnJob } from 'src/decorators.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
 import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum.js';
 import { DetectedPet } from 'src/repositories/machine-learning.repository.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
@@ -11,6 +12,19 @@ import { isPetDetectionEnabled, isPetRecognitionEnabled, isRecognizablePetSpecie
 
 @Injectable()
 export class PetDetectionService extends BaseService {
+  // Chained off JobSuccess (not JobService.onDone) so upstream's follow-up list stays untouched.
+  // Mirrors onDone's gate: only a Success/Skipped thumbnail run for an upload or a notify request.
+  @OnEvent({ name: 'JobSuccess' })
+  async onJobSuccess({ job, response }: ArgOf<'JobSuccess'>) {
+    if (response !== JobStatus.Success && response !== JobStatus.Skipped) {
+      return;
+    }
+    if (job.name !== JobName.AssetGenerateThumbnails || (!job.data.notify && job.data.source !== 'upload')) {
+      return;
+    }
+    await this.jobRepository.queue({ name: JobName.PetDetection, data: job.data });
+  }
+
   @OnJob({ name: JobName.PetDetectionQueueAll, queue: QueueName.PetDetection })
   async handleQueuePetDetection({ force }: JobOf<JobName.PetDetectionQueueAll>): Promise<JobStatus> {
     const { machineLearning } = await this.getConfig({ withCache: false });
@@ -23,7 +37,7 @@ export class PetDetectionService extends BaseService {
       // precisely so detected pets stop coming back, then hit Reset to wipe the ones already
       // there. The confirmation dialog promises that deletion, so the purge must happen even
       // when detection is disabled — only the reprocessing requeue below is gated on it.
-      await this.personRepository.deleteAllPets();
+      await this.petFaceRepository.deleteAllPets();
       // Pets also propagate into shared spaces as their own person rows, so clear those copies
       // too — otherwise the pets linger in every space's People view after a reset.
       await this.sharedSpaceRepository.deleteAllPets();
@@ -59,7 +73,11 @@ export class PetDetectionService extends BaseService {
     }
 
     const asset = await this.assetJobRepository.getForPetDetection(id);
-    if (!asset || !asset.previewFile) {
+    // onJobSuccess queues without re-reading the asset, so one hard-deleted since is skipped, not failed.
+    if (!asset) {
+      return JobStatus.Skipped;
+    }
+    if (!asset.previewFile) {
       return JobStatus.Failed;
     }
 
@@ -174,7 +192,7 @@ export class PetDetectionService extends BaseService {
       let personId = speciesCache.get(pet.label);
 
       if (!personId) {
-        const existing = await this.personRepository.getByOwnerAndSpecies(ownerId, pet.label);
+        const existing = await this.petFaceRepository.getByOwnerAndSpecies(ownerId, pet.label);
         if (existing) {
           personId = existing.personGroupId;
         } else {
@@ -263,7 +281,7 @@ export class PetDetectionService extends BaseService {
     }));
 
     if (entries.length > 0) {
-      await this.personRepository.refreshPetFaces(facesToAdd, embeddingsToAdd);
+      await this.petFaceRepository.refreshPetFaces(facesToAdd, embeddingsToAdd);
     }
 
     const jobs: JobItem[] = entries.map(({ pet, faceId }) => ({

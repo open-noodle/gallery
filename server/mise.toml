@@ -41,21 +41,31 @@ run = "node ./dist/bin/sync-sql.js"
 [tasks."sync-open-api"]
 run = "node ./dist/bin/sync-open-api.js"
 
+# `run` and `revert` go through the server migrator: sql-tools only knows `kysely_migrations`, so it
+# would skip every fork migration on `run` and revert the newest upstream one on `revert`.
 [tasks.migrations]
 env._.path = "./node_modules/.bin"
-run = "sql-tools -u ${DB_URL:-postgres://postgres:postgres@localhost:5432/immich} migrations"
-description = "Run database migration commands (create, generate, run, sync-order, verify-order, ...)"
+run = """sh -c 'export DB_URL="${DB_URL:-postgres://postgres:postgres@localhost:5432/immich}"; \
+case "$1" in run|revert) exec node ./dist/bin/gallery-migrations.js "$1" ;; esac; \
+exec sql-tools -u "$DB_URL" migrations "$@"' migrations"""
+description = "Run database migration commands (create, generate, run, revert, sync-order, verify-order, ...)"
 
 [tasks."migrations-gallery"]
 env._.path = "./node_modules/.bin"
-run = "sql-tools --source-folder src/schema/migrations-gallery -u ${DB_URL:-postgres://postgres:postgres@localhost:5432/immich} migrations"
-description = "Migration ORDER commands scoped to the fork-only migrations-gallery folder"
+run = """sh -c 'export DB_URL="${DB_URL:-postgres://postgres:postgres@localhost:5432/immich}"; \
+case "$1" in run|revert) exec node ./dist/bin/gallery-migrations.js "$1" ;; esac; \
+exec sql-tools --source-folder src/schema/migrations-gallery -u "$DB_URL" migrations "$@"' migrations"""
+description = "Migration ORDER commands scoped to the fork-only migrations-gallery folder (run and revert cover both folders)"
 
 [tasks."schema-drop"]
 run = { task = "migrations query 'DROP schema public cascade; CREATE schema public;'" }
 
 [tasks."schema-reset"]
-run = [{ task = ":schema-drop" }, { task = "migrations run" }]
+# Not `migrations run`: sql-tools only knows `kysely_migrations` and would skip every fork migration.
+run = [
+  { task = ":schema-drop" },
+  "DB_URL=${DB_URL:-postgres://postgres:postgres@localhost:5432/immich} node ./dist/bin/gallery-migrations.js run",
+]
 
 [tasks."email-dev"]
 env._.path = "./node_modules/.bin"

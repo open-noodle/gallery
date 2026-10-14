@@ -118,7 +118,11 @@ Future<void> _pumpInTabShell(WidgetTester tester, {List<Override> overrides = co
       useFallbackTranslations: true,
       assetLoader: const CodegenLoader(),
       child: ProviderScope(
-        overrides: [readonlyModeProvider.overrideWith(_FakeReadonly.new), ...overrides],
+        overrides: [
+          readonlyModeProvider.overrideWith(_FakeReadonly.new),
+          serverSupportsSpacesProvider.overrideWithValue(true),
+          ...overrides,
+        ],
         child: Builder(
           builder: (context) => MaterialApp(
             debugShowCheckedModeBanner: false,

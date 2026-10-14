@@ -38,6 +38,22 @@ Thus, we recommend upgrading all mobile clients before upgrading the server to e
 We do not backport patches to earlier versions. We encourage all users to run the most recent stable release of Gallery.
 Downgrading to an earlier version, even within the same minor version, is not supported.
 
+:::warning Rolling back after the `gallery_migrations` change
+Gallery now records its own database migrations in a separate `gallery_migrations` table. A Gallery release from before that change looks for them in `kysely_migrations`, finds none, and stops on boot with:
+
+```
+relation "storage_migration_log" already exists
+```
+
+The failed boot changes nothing in the database. This only happens when your database has a `gallery_migrations` table and the image you roll back to is older than the release that created it. To start that older image, copy the migration records back first:
+
+```bash
+docker exec immich_postgres psql -U postgres -d immich -c 'INSERT INTO "kysely_migrations" ("name", "timestamp") SELECT "name", "timestamp" FROM "gallery_migrations" ON CONFLICT ("name") DO NOTHING;'
+```
+
+Use your own container name, user and database name if they differ. When you upgrade again, Gallery moves the records back on its own.
+:::
+
 [semver]: https://semver.org/
 
 ## Migrating to VectorChord

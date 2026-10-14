@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { AssetFileType, AssetVisibility, MemoryType } from 'src/enum.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -17,7 +18,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [],
     mock: [LoggingRepository],
   });
-  return { ctx, sut: ctx.get(MemoryRepository) };
+  return { ctx, sut: ctx.get(MemoryRepository), memoryRuleAsset: ctx.get(MemoryRuleAssetRepository) };
 };
 
 const selectMemoryIds = (ctx: ReturnType<typeof setup>['ctx']) =>
@@ -375,7 +376,7 @@ describe(MemoryRepository.name, () => {
 
   describe('hasRuleMemory', () => {
     it('should only match undeleted rule memories for the same owner, ruleId, and dedupeKey', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { user: otherUser } = await ctx.newUser();
 
@@ -421,11 +422,15 @@ describe(MemoryRepository.name, () => {
         .where('id', '=', deletedMemory.id)
         .execute();
 
-      await expect(sut.hasRuleMemory(user.id, 'birthday', 'birthday:person-1:2026-04-23')).resolves.toBe(true);
-      await expect(sut.hasRuleMemory(user.id, 'birthday', 'birthday:person-1:2026-04-25')).resolves.toBe(false);
-      await expect(sut.hasRuleMemory(user.id, 'recent_trip', 'recent_trip:france:paris:2026-04-23')).resolves.toBe(
+      await expect(memoryRuleAsset.hasRuleMemory(user.id, 'birthday', 'birthday:person-1:2026-04-23')).resolves.toBe(
+        true,
+      );
+      await expect(memoryRuleAsset.hasRuleMemory(user.id, 'birthday', 'birthday:person-1:2026-04-25')).resolves.toBe(
         false,
       );
+      await expect(
+        memoryRuleAsset.hasRuleMemory(user.id, 'recent_trip', 'recent_trip:france:paris:2026-04-23'),
+      ).resolves.toBe(false);
     });
   });
 
@@ -433,7 +438,7 @@ describe(MemoryRepository.name, () => {
     const window = { from: new Date('2026-09-01T00:00:00Z'), to: new Date('2026-09-04T23:59:59Z') };
 
     it('R1: includes a memory with a null hideAt', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory } = await ctx.newMemory({
         ownerId: user.id,
@@ -441,23 +446,23 @@ describe(MemoryRepository.name, () => {
         hideAt: null,
       });
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
 
       expect(rows.map(({ id }) => id)).toContain(memory.id);
     });
 
     it('R2: includes a memory with a null showAt', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory } = await ctx.newMemory({ ownerId: user.id, showAt: null, hideAt: null });
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
 
       expect(rows.map(({ id }) => id)).toContain(memory.id);
     });
 
     it('R3/R4: includes memories touching each window boundary', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory: endsAtFrom } = await ctx.newMemory({
         ownerId: user.id,
@@ -470,14 +475,14 @@ describe(MemoryRepository.name, () => {
         hideAt: new Date('2026-09-20T00:00:00Z'),
       });
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
       const ids = rows.map(({ id }) => id);
 
       expect(ids).toEqual(expect.arrayContaining([endsAtFrom.id, startsAtTo.id]));
     });
 
     it('R5: excludes a memory that ended before the window', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory } = await ctx.newMemory({
         ownerId: user.id,
@@ -485,13 +490,13 @@ describe(MemoryRepository.name, () => {
         hideAt: new Date('2026-08-10T00:00:00Z'),
       });
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
 
       expect(rows.map(({ id }) => id)).not.toContain(memory.id);
     });
 
     it('R7: excludes another owner’s memory', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { user: other } = await ctx.newUser();
       const { memory } = await ctx.newMemory({
@@ -500,13 +505,13 @@ describe(MemoryRepository.name, () => {
         hideAt: new Date('2026-09-02T23:59:59Z'),
       });
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
 
       expect(rows.map(({ id }) => id)).not.toContain(memory.id);
     });
 
     it('R10/S8: excludes a trashed memory', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory } = await ctx.newMemory({
         ownerId: user.id,
@@ -522,13 +527,13 @@ describe(MemoryRepository.name, () => {
         .where('id', '=', memory.id)
         .execute();
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
 
       expect(rows.map(({ id }) => id)).not.toContain(memory.id);
     });
 
     it('R8: returns a memory with no assets, with an empty asset list', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory } = await ctx.newMemory({
         ownerId: user.id,
@@ -536,13 +541,13 @@ describe(MemoryRepository.name, () => {
         hideAt: new Date('2026-09-02T23:59:59Z'),
       });
 
-      const rows = await sut.getForOverlapReconcile(user.id, window);
+      const rows = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
 
       expect(rows.find(({ id }) => id === memory.id)?.assets).toEqual([]);
     });
 
     it('R6/R9: returns exactly the assets `search` returns for the same memory', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, sut, memoryRuleAsset } = setup();
       const { user } = await ctx.newUser();
       const { memory } = await ctx.newMemory({
         ownerId: user.id,
@@ -565,7 +570,7 @@ describe(MemoryRepository.name, () => {
         await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
       }
 
-      const reconcile = await sut.getForOverlapReconcile(user.id, window);
+      const reconcile = await memoryRuleAsset.getForOverlapReconcile(user.id, window);
       const searched = await sut.search(user.id, { for: new Date('2026-09-02T12:00:00Z') });
 
       const reconcileIds = reconcile.find(({ id }) => id === memory.id)!.assets.map(({ id }) => id);
@@ -580,23 +585,23 @@ describe(MemoryRepository.name, () => {
 
   describe('getOldestMemoryDate', () => {
     it('returns null when there are no memories', async () => {
-      const { sut } = setup(await getKyselyDB());
-      await expect(sut.getOldestMemoryDate()).resolves.toBeNull();
+      const { memoryRuleAsset } = setup(await getKyselyDB());
+      await expect(memoryRuleAsset.getOldestMemoryDate()).resolves.toBeNull();
     });
 
     it('returns the earliest showAt across all owners', async () => {
       const db = await getKyselyDB();
-      const { ctx, sut } = setup(db);
+      const { ctx, memoryRuleAsset } = setup(db);
       const { user } = await ctx.newUser();
       await ctx.newMemory({ ownerId: user.id, showAt: new Date('2026-05-01T00:00:00Z') });
       await ctx.newMemory({ ownerId: user.id, showAt: new Date('2026-01-01T00:00:00Z') });
 
-      await expect(sut.getOldestMemoryDate()).resolves.toEqual(new Date('2026-01-01T00:00:00Z'));
+      await expect(memoryRuleAsset.getOldestMemoryDate()).resolves.toEqual(new Date('2026-01-01T00:00:00Z'));
     });
 
     it('falls back to createdAt for a memory with a null showAt', async () => {
       const db = await getKyselyDB();
-      const { ctx, sut } = setup(db);
+      const { ctx, memoryRuleAsset } = setup(db);
       const { user } = await ctx.newUser();
       await ctx.newMemory({
         ownerId: user.id,
@@ -604,7 +609,7 @@ describe(MemoryRepository.name, () => {
         createdAt: new Date('2025-12-25T00:00:00Z'),
       });
 
-      await expect(sut.getOldestMemoryDate()).resolves.toEqual(new Date('2025-12-25T00:00:00Z'));
+      await expect(memoryRuleAsset.getOldestMemoryDate()).resolves.toEqual(new Date('2025-12-25T00:00:00Z'));
     });
   });
 

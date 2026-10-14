@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository.js';
+import { MemoryAsset, MemoryLocationCluster } from 'src/gallery/memory-rule-asset.repository.js';
 import {
   BURST_WINDOW_MS,
   HOME_DOMINANCE_RATIO,

@@ -5,6 +5,7 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/utils/option.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' hide SearchFilter;
@@ -43,6 +44,22 @@ void main() {
   });
 
   group('photosFilterSuggestionsProvider', () {
+    test('does not call the fork-only facets endpoint on a stock Immich server', () async {
+      final stock = ProviderContainer(
+        overrides: [
+          apiServiceProvider.overrideWithValue(mockApiService),
+          serverSupportsSpacesProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(stock.dispose);
+
+      await expectLater(
+        stock.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future),
+        throwsA(isA<FilterSuggestionsUnsupportedException>()),
+      );
+      verifyNever(() => mockApiService.searchApi);
+    });
+
     // A non-owner viewer whose visible photos are all shared-space owns no assets, so an
     // owner-scoped facet query returns nothing. Request shared-space content so the facets
     // populate — mirrors the web filter page (map-filter-config.ts withSharedSpaces: true).

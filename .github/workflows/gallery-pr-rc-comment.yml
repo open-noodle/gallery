@@ -299,6 +299,12 @@ jobs:
                 '',
                 'Each push publishes a new numbered tag, so update the image line to move to a newer RC. To roll back, point it at an earlier `rc.<n>` or delete the override and run `docker compose up -d` again.',
                 '',
+                'Rolling back to an image that predates the separate `gallery_migrations` ledger fails on boot unless you first copy the fork migration rows back, e.g. with `docker compose exec database psql -U postgres -d immich`:',
+                '',
+                '```sql',
+                'INSERT INTO "kysely_migrations" ("name", "timestamp") SELECT "name", "timestamp" FROM "gallery_migrations" ON CONFLICT ("name") DO NOTHING;',
+                '```',
+                '',
                 '</details>',
               );
             }

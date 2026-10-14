@@ -1,5 +1,8 @@
 import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetType, AssetVisibility } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -21,10 +24,25 @@ const farEmbedding = `[${Array.from({ length: 512 }, () => '-0.01').join(',')}]`
 const setup = (db?: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
     database: db || defaultDatabase,
-    real: [AssetRepository, SearchRepository, PersonRepository, SharedSpaceRepository, TagRepository],
+    real: [
+      AssetRepository,
+      FilterSuggestionRepository,
+      SearchRepository,
+      FaceSearchRepository,
+      SmartFacetRepository,
+      PersonRepository,
+      SharedSpaceRepository,
+      TagRepository,
+    ],
     mock: [LoggingRepository],
   });
-  return { ctx, sut: ctx.get(SearchRepository) };
+  return {
+    ctx,
+    sut: ctx.get(SearchRepository),
+    facets: ctx.get(SmartFacetRepository),
+    suggestions: ctx.get(FilterSuggestionRepository),
+    faceSearch: ctx.get(FaceSearchRepository),
+  };
 };
 
 const addEmbedding = async (db: Kysely<DB>, assetId: string, embedding = matchingEmbedding) => {
@@ -52,7 +70,7 @@ beforeAll(async () => {
 describe(SearchRepository.name, () => {
   describe('getSmartSearchFacets', () => {
     it('aggregates exact facets from all smart-search candidates and ignores nonmatching embeddings', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { user: otherUser } = await ctx.newUser();
       const { asset: january } = await ctx.newAsset({
@@ -112,7 +130,7 @@ describe(SearchRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
       await ctx.newAssetFace({ assetId: january.id, personGroupId: person.personGroupId });
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0.01,
@@ -137,7 +155,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('applies date filters to total while timeBuckets exclude the date filter group', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: january } = await ctx.newAsset({
         ownerId: user.id,
@@ -152,7 +170,7 @@ describe(SearchRepository.name, () => {
       await addEmbedding(ctx.database, january.id);
       await addEmbedding(ctx.database, february.id);
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0.01,
@@ -168,7 +186,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('uses localDateTime for smart facet time buckets to match timeline buckets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({
         ownerId: user.id,
@@ -177,7 +195,7 @@ describe(SearchRepository.name, () => {
       });
       await addEmbedding(ctx.database, asset.id);
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -187,7 +205,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('uses all embedded accessible assets when maxDistance is disabled', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
 
       for (let index = 0; index < 125; index++) {
@@ -196,7 +214,7 @@ describe(SearchRepository.name, () => {
         await addEmbedding(ctx.database, asset.id, index % 2 === 0 ? matchingEmbedding : farEmbedding);
       }
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -207,7 +225,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('treats rating null as an unrated filter and numeric rating as an inclusive minimum', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: unrated } = await ctx.newAsset({ ownerId: user.id });
       const { asset: ratedThree } = await ctx.newAsset({ ownerId: user.id });
@@ -220,15 +238,15 @@ describe(SearchRepository.name, () => {
       await addEmbedding(ctx.database, ratedFive.id);
 
       await expect(
-        sut.getSmartSearchFacets({ embedding: matchingEmbedding, userIds: [user.id], maxDistance: 0, rating: null }),
+        facets.getSmartSearchFacets({ embedding: matchingEmbedding, userIds: [user.id], maxDistance: 0, rating: null }),
       ).resolves.toMatchObject({ total: 1 });
       await expect(
-        sut.getSmartSearchFacets({ embedding: matchingEmbedding, userIds: [user.id], maxDistance: 0, rating: 4 }),
+        facets.getSmartSearchFacets({ embedding: matchingEmbedding, userIds: [user.id], maxDistance: 0, rating: 4 }),
       ).resolves.toMatchObject({ total: 1, ratings: [3, 5] });
     });
 
     it('applies null country filters to total and dependent city facets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: withoutCountry } = await ctx.newAsset({ ownerId: user.id });
       const { asset: withCountry } = await ctx.newAsset({ ownerId: user.id });
@@ -237,7 +255,7 @@ describe(SearchRepository.name, () => {
       await addEmbedding(ctx.database, withoutCountry.id);
       await addEmbedding(ctx.database, withCountry.id);
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -249,7 +267,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('applies tagIds null as an untagged filter outside the tag facet group', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: untagged } = await ctx.newAsset({ ownerId: user.id });
       const { asset: tagged } = await ctx.newAsset({ ownerId: user.id });
@@ -260,7 +278,7 @@ describe(SearchRepository.name, () => {
       const [travel] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['Travel'] });
       await ctx.newTagAsset({ tagIds: [travel.id], assetIds: [tagged.id] });
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -273,7 +291,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('keeps country/city and make/model dependent facet semantics', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const fixtures = [
         { country: 'Germany', city: 'Berlin', make: 'Sony', model: 'A7' },
@@ -287,7 +305,7 @@ describe(SearchRepository.name, () => {
         await addEmbedding(ctx.database, asset.id);
       }
 
-      const locationResult = await sut.getSmartSearchFacets({
+      const locationResult = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -295,7 +313,7 @@ describe(SearchRepository.name, () => {
         city: 'Berlin',
       });
 
-      const cameraResult = await sut.getSmartSearchFacets({
+      const cameraResult = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -312,10 +330,10 @@ describe(SearchRepository.name, () => {
     });
 
     it('returns empty facets and total 0 when no candidates match', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0.01,
@@ -340,7 +358,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('excludes hidden and deleted asset faces from global people facets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: visibleAsset } = await ctx.newAsset({ ownerId: user.id });
       const { asset: hiddenFaceAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -378,7 +396,7 @@ describe(SearchRepository.name, () => {
       });
       await ctx.newAssetFace({ assetId: hiddenUnnamedAsset.id, personGroupId: hiddenUnnamedPerson.personGroupId });
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         maxDistance: 0,
@@ -395,7 +413,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('returns shared-space person ids when spaceId is set', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: member } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: owner.id });
@@ -423,7 +441,7 @@ describe(SearchRepository.name, () => {
         .values({ personId: sharedPerson.id, assetFaceId: assetFace.id })
         .execute();
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [member.id],
         maxDistance: 0.01,
@@ -440,7 +458,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('excludes hidden and deleted asset faces from shared-space people facets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: member } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -468,7 +486,7 @@ describe(SearchRepository.name, () => {
       await makeSharedPerson('Hidden Space Face', false);
       await makeSharedPerson('Deleted Space Face', true, new Date('2024-01-01T00:00:00.000Z'));
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [member.id],
         maxDistance: 0,
@@ -486,14 +504,14 @@ describe(SearchRepository.name, () => {
     });
 
     it('computes hasFavorites ignoring its own isFavorite filter (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
       await addEmbedding(defaultDatabase, favourite.id);
       const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, plain.id);
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         userIds: [user.id],
         // #763: hasFavorites is per-caller, so the caller has to be named. Without it the facet
         // fail-safes to false (pinned by the sibling test below) rather than answering for whoever
@@ -511,7 +529,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('honours the other active dimensions on the smart-search path (tag) (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
       await addEmbedding(defaultDatabase, favourite.id);
@@ -523,7 +541,7 @@ describe(SearchRepository.name, () => {
 
       // The only favourite carries tag A, so filtering to tag B must report no favourites — the
       // smart-search mirror of the browse-path tag case above.
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         userIds: [user.id],
         embedding: matchingEmbedding,
         tagIds: [tagB.id],
@@ -533,7 +551,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('computes album membership ignoring its own isNotInAlbum filter (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, filed.id);
@@ -542,7 +560,7 @@ describe(SearchRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: user.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         userIds: [user.id],
         embedding: matchingEmbedding,
         isNotInAlbum: true,
@@ -553,7 +571,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('still applies isNotInAlbum to the non-album facets (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: filed.id, make: 'Canon' });
@@ -564,7 +582,7 @@ describe(SearchRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: user.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         userIds: [user.id],
         embedding: matchingEmbedding,
         isNotInAlbum: true,
@@ -575,7 +593,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('still applies isInAlbum to the non-album facets (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: filed.id, make: 'Canon' });
@@ -586,7 +604,7 @@ describe(SearchRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: user.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         userIds: [user.id],
         embedding: matchingEmbedding,
         isInAlbum: true,
@@ -597,7 +615,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports no favourites and mixed album membership on the smart path (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, filed.id);
@@ -606,7 +624,7 @@ describe(SearchRepository.name, () => {
       const { album } = await ctx.newAlbum({ ownerId: user.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
-      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const result = await facets.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(result.total).toBe(2);
       expect(result.hasFavorites).toBe(false);
@@ -615,14 +633,14 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports hasAssetsNotInAlbum false on the smart path when everything is filed (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, asset.id);
       const { album } = await ctx.newAlbum({ ownerId: user.id });
       await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const result = await facets.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(result.total).toBe(1);
       expect(result.hasAssetsInAlbum).toBe(true);
@@ -630,12 +648,12 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports hasAssetsInAlbum false on the smart path when nothing is filed (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await addEmbedding(defaultDatabase, asset.id);
 
-      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const result = await facets.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(result.total).toBe(1);
       expect(result.hasAssetsInAlbum).toBe(false);
@@ -643,7 +661,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports hasFavorites true on the smart path when a favourite is present (#910)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
       await addEmbedding(defaultDatabase, favourite.id);
@@ -652,7 +670,7 @@ describe(SearchRepository.name, () => {
 
       // #763: `callerId` is what makes hasFavorites answerable — see the sibling test below, which
       // pins that omitting it yields false rather than another user's favourite state.
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         userIds: [user.id],
         callerId: user.id,
         embedding: matchingEmbedding,
@@ -671,13 +689,13 @@ describe(SearchRepository.name, () => {
     // reverse regression — resolving the caller from `userIds[0]` would report `true` here, which
     // is another user's favourite state leaking into this viewer's facets.
     it('reports hasFavorites false on the smart path when no caller identity is supplied (#763)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: favourite } = await ctx.newAsset({ ownerId: user.id });
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favourite.id }).execute();
       await addEmbedding(defaultDatabase, favourite.id);
 
-      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const result = await facets.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(result.total).toBe(1);
       expect(result.hasFavorites).toBe(false);
@@ -709,7 +727,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('getSmartSearchFacets scopes isFavorite totals to the callers overlay', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets } = setup();
       const { user } = await ctx.newUser();
       const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
       const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
@@ -717,7 +735,7 @@ describe(SearchRepository.name, () => {
       await addEmbedding(ctx.database, notFavorited.id);
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
 
-      const result = await sut.getSmartSearchFacets({
+      const result = await facets.getSmartSearchFacets({
         embedding: matchingEmbedding,
         userIds: [user.id],
         authUserId: user.id,
@@ -729,7 +747,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('getFilterSuggestions (buildFilteredAssetIds) scopes isFavorite to the callers overlay', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { asset: favorited } = await ctx.newAsset({ ownerId: user.id });
       const { asset: notFavorited } = await ctx.newAsset({ ownerId: user.id });
@@ -737,7 +755,7 @@ describe(SearchRepository.name, () => {
       await ctx.newExif({ assetId: notFavorited.id, country: 'France' });
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
 
-      const result = await sut.getFilterSuggestions([user.id], { isFavorite: true });
+      const result = await suggestions.getFilterSuggestions([user.id], { isFavorite: true });
 
       expect(result.countries).toEqual(['Germany']);
     });
@@ -818,7 +836,7 @@ describe(SearchRepository.name, () => {
 
   describe('getFilterSuggestions', () => {
     it('returns album facets for a viewer who owns none of the shared album assets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: viewer } = await ctx.newUser();
 
@@ -836,7 +854,7 @@ describe(SearchRepository.name, () => {
 
       // A viewer owns none of the album's assets and is in no shared space, so the
       // service calls the repository with the viewer's own id and no timelineSpaceIds.
-      const result = await sut.getFilterSuggestions([viewer.id], { albumId: album.id });
+      const result = await suggestions.getFilterSuggestions([viewer.id], { albumId: album.id });
 
       expect(result.countries).toContain('Germany');
       expect(result.cameraMakes).toContain('Sony');
@@ -845,7 +863,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('follows the not-locked default: includes archived values, excludes locked-only values (LOW #7)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -857,7 +875,7 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, country: 'Spain', make: 'LockedMake' });
 
-      const result = await sut.getFilterSuggestions([user.id], { visibility: 'not-locked' });
+      const result = await suggestions.getFilterSuggestions([user.id], { visibility: 'not-locked' });
 
       expect(result.countries).toEqual(['Germany', 'Norway']);
       expect(result.cameraMakes).toEqual(['ArchivedMake', 'Sony']);
@@ -866,23 +884,23 @@ describe(SearchRepository.name, () => {
     });
 
     it('lets an elevated caller (visibility undefined) see locked-only values too (LOW #7)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, country: 'Spain', make: 'LockedMake' });
 
-      const result = await sut.getFilterSuggestions([user.id], {});
+      const result = await suggestions.getFilterSuggestions([user.id], {});
 
       expect(result.countries).toContain('Spain');
       expect(result.cameraMakes).toContain('LockedMake');
     });
 
     it('returns empty suggestions with no error when there are no matching assets (LOW #7)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
-      const result = await sut.getFilterSuggestions([user.id], { visibility: 'not-locked' });
+      const result = await suggestions.getFilterSuggestions([user.id], { visibility: 'not-locked' });
 
       expect(result).toEqual({
         countries: [],
@@ -899,7 +917,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports every #910 facet false under forceEmptyResult', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       // The favourite is filed (makes hasAssetsInAlbum load-bearing) and a separate plain asset
       // is left unfiled (makes hasAssetsNotInAlbum load-bearing too) — without forceEmptyResult
@@ -909,7 +927,7 @@ describe(SearchRepository.name, () => {
       await ctx.newAlbumAsset({ albumId: album.id, assetId: favourite.id });
       await ctx.newAsset({ ownerId: user.id });
 
-      const result = await sut.getFilterSuggestions([user.id], { forceEmptyResult: true });
+      const result = await suggestions.getFilterSuggestions([user.id], { forceEmptyResult: true });
 
       expect(result.hasFavorites).toBe(false);
       expect(result.hasAssetsInAlbum).toBe(false);
@@ -918,39 +936,39 @@ describe(SearchRepository.name, () => {
 
     describe('hasFavorites (#910)', () => {
       it('is false when the scope has no favourite', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         await ctx.newAsset({ ownerId: user.id });
 
-        const result = await sut.getFilterSuggestions([user.id], {});
+        const result = await suggestions.getFilterSuggestions([user.id], {});
 
         expect(result.hasFavorites).toBe(false);
       });
 
       it('is true when the scope has a favourite', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         await ctx.newAsset({ ownerId: user.id, isFavorite: true });
 
-        const result = await sut.getFilterSuggestions([user.id], {});
+        const result = await suggestions.getFilterSuggestions([user.id], {});
 
         expect(result.hasFavorites).toBe(true);
       });
 
       it('ignores its own isFavorite filter', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         await ctx.newAsset({ ownerId: user.id, isFavorite: true });
         await ctx.newAsset({ ownerId: user.id });
 
         // Filtering to non-favourites must not make the facet claim there are none.
-        const result = await sut.getFilterSuggestions([user.id], { isFavorite: false });
+        const result = await suggestions.getFilterSuggestions([user.id], { isFavorite: false });
 
         expect(result.hasFavorites).toBe(true);
       });
 
       it('honours the other active dimensions', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
         await ctx.newExif({ assetId: favourite.id, make: 'Canon' });
@@ -958,13 +976,13 @@ describe(SearchRepository.name, () => {
         await ctx.newExif({ assetId: plain.id, make: 'Nikon' });
 
         // The only favourite is a Canon, so a Nikon filter must report no favourites.
-        const result = await sut.getFilterSuggestions([user.id], { make: 'Nikon' });
+        const result = await suggestions.getFilterSuggestions([user.id], { make: 'Nikon' });
 
         expect(result.hasFavorites).toBe(false);
       });
 
       it('honours the other active dimensions (tag)', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
         const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
@@ -975,7 +993,7 @@ describe(SearchRepository.name, () => {
         // The only favourite carries tag A, so filtering to tag B must report no favourites. Tags go
         // through a `tag_asset` EXISTS subquery rather than the `asset_exif` join the make case above
         // exercises, so this covers a different code path.
-        const result = await sut.getFilterSuggestions([user.id], { tagIds: [tagB.id] });
+        const result = await suggestions.getFilterSuggestions([user.id], { tagIds: [tagB.id] });
 
         expect(result.hasFavorites).toBe(false);
       });
@@ -985,7 +1003,7 @@ describe(SearchRepository.name, () => {
       // stays narrow here — that is the point: the two lists must be honoured independently, and a
       // single-scope implementation cannot pass both this and the test below it.
       it('reports hasFavorites from favoriteSpaceIds even when the space is outside timelineSpaceIds (#763)', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user: owner } = await ctx.newUser();
         const { user: member } = await ctx.newUser();
         const { asset } = await ctx.newAsset({ ownerId: owner.id });
@@ -997,16 +1015,16 @@ describe(SearchRepository.name, () => {
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
         // The space is hidden from the member's timeline, so it is absent from timelineSpaceIds...
-        const hidden = await sut.getFilterSuggestions([member.id], {});
+        const hidden = await suggestions.getFilterSuggestions([member.id], {});
         expect(hidden.hasFavorites).toBe(false);
 
         // ...but the favourites probe runs over the memberships instead, and still finds it.
-        const widened = await sut.getFilterSuggestions([member.id], { favoriteSpaceIds: [space.id] });
+        const widened = await suggestions.getFilterSuggestions([member.id], { favoriteSpaceIds: [space.id] });
         expect(widened.hasFavorites).toBe(true);
       });
 
       it('sees a shared-space favourite only with timelineSpaceIds (#910)', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user: owner } = await ctx.newUser();
         const { user: member } = await ctx.newUser();
         const { asset } = await ctx.newAsset({ ownerId: owner.id });
@@ -1025,13 +1043,13 @@ describe(SearchRepository.name, () => {
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
         // The member owns nothing. Without the space in scope the favourite is invisible to them...
-        const ownScope = await sut.getFilterSuggestions([member.id], {});
+        const ownScope = await suggestions.getFilterSuggestions([member.id], {});
         expect(ownScope.hasFavorites).toBe(false);
 
         // ...and with it, it is. The two scopes disagree, which is exactly what §4.6 documents:
         // the photos page drops withSharedSpaces when isFavorite is set, so `current` is narrower
         // than `baseline`. Subset, so it can only grey — never wrongly hide.
-        const spaceScope = await sut.getFilterSuggestions([member.id], { timelineSpaceIds: [space.id] });
+        const spaceScope = await suggestions.getFilterSuggestions([member.id], { timelineSpaceIds: [space.id] });
         expect(spaceScope.hasFavorites).toBe(true);
         // Pins the space asset specifically, not merely "scope became non-empty": an over-broad
         // scope (e.g. the timelineSpaceIds arm silently falling through to unfiltered) would leak
@@ -1042,45 +1060,45 @@ describe(SearchRepository.name, () => {
 
     describe('album membership (#910)', () => {
       it('reports not-in-album only when the scope has no albums', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         await ctx.newAsset({ ownerId: user.id });
 
-        const result = await sut.getFilterSuggestions([user.id], {});
+        const result = await suggestions.getFilterSuggestions([user.id], {});
 
         expect(result.hasAssetsInAlbum).toBe(false);
         expect(result.hasAssetsNotInAlbum).toBe(true);
       });
 
       it('reports in-album only when every asset is filed', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         const { album } = await ctx.newAlbum({ ownerId: user.id });
         await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-        const result = await sut.getFilterSuggestions([user.id], {});
+        const result = await suggestions.getFilterSuggestions([user.id], {});
 
         expect(result.hasAssetsInAlbum).toBe(true);
         expect(result.hasAssetsNotInAlbum).toBe(false);
       });
 
       it('reports both when the scope is mixed', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newAsset({ ownerId: user.id });
         const { album } = await ctx.newAlbum({ ownerId: user.id });
         await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
-        const result = await sut.getFilterSuggestions([user.id], {});
+        const result = await suggestions.getFilterSuggestions([user.id], {});
 
         expect(result.hasAssetsInAlbum).toBe(true);
         expect(result.hasAssetsNotInAlbum).toBe(true);
       });
 
       it('ignores its own isNotInAlbum filter', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newAsset({ ownerId: user.id });
@@ -1088,28 +1106,28 @@ describe(SearchRepository.name, () => {
         await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
         // Filtering to un-filed assets must not erase the evidence that filed ones exist.
-        const result = await sut.getFilterSuggestions([user.id], { isNotInAlbum: true });
+        const result = await suggestions.getFilterSuggestions([user.id], { isNotInAlbum: true });
 
         expect(result.hasAssetsInAlbum).toBe(true);
         expect(result.hasAssetsNotInAlbum).toBe(true);
       });
 
       it('reports every asset filed when scoped to one album', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newAsset({ ownerId: user.id });
         const { album } = await ctx.newAlbum({ ownerId: user.id });
         await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-        const result = await sut.getFilterSuggestions([user.id], { albumId: album.id });
+        const result = await suggestions.getFilterSuggestions([user.id], { albumId: album.id });
 
         expect(result.hasAssetsInAlbum).toBe(true);
         expect(result.hasAssetsNotInAlbum).toBe(false);
       });
 
       it('honours the other active dimensions', async () => {
-        const { ctx, sut } = setup();
+        const { ctx, suggestions } = setup();
         const { user } = await ctx.newUser();
         const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newExif({ assetId: filed.id, make: 'Canon' });
@@ -1118,7 +1136,7 @@ describe(SearchRepository.name, () => {
         const { album } = await ctx.newAlbum({ ownerId: user.id });
         await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
 
-        const result = await sut.getFilterSuggestions([user.id], { make: 'Nikon' });
+        const result = await suggestions.getFilterSuggestions([user.id], { make: 'Nikon' });
 
         expect(result.hasAssetsInAlbum).toBe(false);
         expect(result.hasAssetsNotInAlbum).toBe(true);
@@ -1128,7 +1146,7 @@ describe(SearchRepository.name, () => {
 
   describe('getCameraMakes (LOW #7)', () => {
     it('includes archived-only values under not-locked, excludes locked-only values', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1140,7 +1158,7 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, make: 'LockedMake' });
 
-      const makes = await sut.getCameraMakes([user.id], { visibility: 'not-locked' });
+      const makes = await suggestions.getCameraMakes([user.id], { visibility: 'not-locked' });
 
       expect(makes).toEqual(['ArchivedMake', 'Sony']);
     });
@@ -1148,43 +1166,43 @@ describe(SearchRepository.name, () => {
 
   describe('getCameraModels (#858)', () => {
     it('narrows models by an active tag filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { r5 } = await newCanonPair(ctx, user.id);
       const [nature] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['nature'] });
       await ctx.newTagAsset({ tagIds: [nature.id], assetIds: [r5.id] });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', tagIds: [nature.id] });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', tagIds: [nature.id] });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('narrows models by an active person filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { r5 } = await newCanonPair(ctx, user.id);
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
       await ctx.newAssetFace({ assetId: r5.id, personGroupId: person.personGroupId });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', personIds: [person.personGroupId] });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', personIds: [person.personGroupId] });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('narrows models by rating, treating rating as a minimum', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { r5, sevenD } = await newCanonPair(ctx, user.id);
       await ctx.newExif({ assetId: r5.id, rating: 5 });
       await ctx.newExif({ assetId: sevenD.id, rating: 3 });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', rating: 4 });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', rating: 4 });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('narrows models by media type', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: r5 } = await ctx.newAsset({ ownerId: user.id });
@@ -1193,13 +1211,13 @@ describe(SearchRepository.name, () => {
       const { asset: sevenD } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video });
       await ctx.newExif({ assetId: sevenD.id, make: 'Canon', model: 'Canon EOS 7D' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', mediaType: AssetType.Image });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', mediaType: AssetType.Image });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('narrows models by the favourite filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: r5 } = await ctx.newAsset({ ownerId: user.id });
@@ -1212,25 +1230,25 @@ describe(SearchRepository.name, () => {
       // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: r5.id }).execute();
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', isFavorite: true });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', isFavorite: true });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('narrows models by an active location filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { r5, sevenD } = await newCanonPair(ctx, user.id);
       await ctx.newExif({ assetId: r5.id, country: 'Germany' });
       await ctx.newExif({ assetId: sevenD.id, country: 'France' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', country: 'Germany' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', country: 'Germany' });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('narrows models by the active date range', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: r5 } = await ctx.newAsset({
@@ -1247,7 +1265,7 @@ describe(SearchRepository.name, () => {
       });
       await ctx.newExif({ assetId: sevenD.id, make: 'Canon', model: 'Canon EOS 7D' });
 
-      const models = await sut.getCameraModels([user.id], {
+      const models = await suggestions.getCameraModels([user.id], {
         make: 'Canon',
         takenAfter: new Date('2024-01-01T00:00:00.000Z'),
       });
@@ -1256,63 +1274,63 @@ describe(SearchRepository.name, () => {
     });
 
     it('narrows models by the not-in-album filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { sevenD } = await newCanonPair(ctx, user.id);
       await ctx.newAlbum({ ownerId: user.id }, [sevenD.id]);
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', isNotInAlbum: true });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', isNotInAlbum: true });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('still narrows by the parent make', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       await newCanonPair(ctx, user.id);
 
       const { asset: nikon } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: nikon.id, make: 'Nikon', model: 'Nikon Z8' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon' });
 
       expect(models).toEqual(['Canon EOS 7D', 'Canon EOS R5']);
     });
 
     it('still narrows by lens model', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { r5, sevenD } = await newCanonPair(ctx, user.id);
       await ctx.newExif({ assetId: r5.id, lensModel: 'RF 24-70' });
       await ctx.newExif({ assetId: sevenD.id, lensModel: 'EF 50' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', lensModel: 'RF 24-70' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', lensModel: 'RF 24-70' });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('does not self-narrow when a model is already selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       await newCanonPair(ctx, user.id);
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', model: 'Canon EOS R5' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', model: 'Canon EOS R5' });
 
       expect(models).toEqual(['Canon EOS 7D', 'Canon EOS R5']);
     });
 
     it('returns nothing when forceEmptyResult is set', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       await newCanonPair(ctx, user.id);
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', forceEmptyResult: true });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', forceEmptyResult: true });
 
       expect(models).toEqual([]);
     });
 
     it('narrows models by an active face-identity filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { r5 } = await newCanonPair(ctx, user.id);
 
@@ -1328,13 +1346,13 @@ describe(SearchRepository.name, () => {
         .values({ identityId: identity.id, assetFaceId: assetFace.id, source: 'backfill' })
         .execute();
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', identityIds: [identity.id] });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', identityIds: [identity.id] });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('includes archived-only models under not-locked and excludes locked-only models', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: r5 } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
@@ -1346,26 +1364,26 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, make: 'Canon', model: 'Canon EOS 90D' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', visibility: 'not-locked' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', visibility: 'not-locked' });
 
       expect(models).toEqual(['Canon EOS 7D', 'Canon EOS R5']);
       expect(models).not.toContain('Canon EOS 90D');
     });
 
     it('lets an elevated caller (visibility undefined) see locked-only models', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, make: 'Canon', model: 'Canon EOS 90D' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon' });
 
       expect(models).toContain('Canon EOS 90D');
     });
 
     it("never returns another user's models", async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { user: otherUser } = await ctx.newUser();
       await newCanonPair(ctx, user.id);
@@ -1373,42 +1391,42 @@ describe(SearchRepository.name, () => {
       const { asset: otherAsset } = await ctx.newAsset({ ownerId: otherUser.id });
       await ctx.newExif({ assetId: otherAsset.id, make: 'Canon', model: 'Canon EOS 90D' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon' });
 
       expect(models).not.toContain('Canon EOS 90D');
     });
 
     it('excludes trashed assets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       const { sevenD } = await newCanonPair(ctx, user.id);
       await ctx.softDeleteAsset(sevenD.id);
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon' });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
 
     it('returns distinct values sorted ascending', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       await newCanonPair(ctx, user.id);
 
       const { asset: r5b } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: r5b.id, make: 'Canon', model: 'Canon EOS R5' });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon' });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon' });
 
       expect(models).toEqual(['Canon EOS 7D', 'Canon EOS R5']);
     });
 
     it('returns an empty list when the filter set matches nothing, without throwing', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
       await newCanonPair(ctx, user.id);
       const [unused] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['unused'] });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', tagIds: [unused.id] });
+      const models = await suggestions.getCameraModels([user.id], { make: 'Canon', tagIds: [unused.id] });
 
       expect(models).toEqual([]);
     });
@@ -1416,7 +1434,7 @@ describe(SearchRepository.name, () => {
 
   describe('getCameraMakes (#858)', () => {
     it('narrows makes by an active tag filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1428,13 +1446,13 @@ describe(SearchRepository.name, () => {
       const [nature] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['nature'] });
       await ctx.newTagAsset({ tagIds: [nature.id], assetIds: [canonAsset.id] });
 
-      const makes = await sut.getCameraMakes([user.id], { tagIds: [nature.id] });
+      const makes = await suggestions.getCameraMakes([user.id], { tagIds: [nature.id] });
 
       expect(makes).toEqual(['Canon']);
     });
 
     it('narrows makes by rating and the favourite filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1447,13 +1465,13 @@ describe(SearchRepository.name, () => {
       // narrowing predicate resolves it for userIds[0], so favorite it as `user`.
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: canonAsset.id }).execute();
 
-      const makes = await sut.getCameraMakes([user.id], { rating: 4, isFavorite: true });
+      const makes = await suggestions.getCameraMakes([user.id], { rating: 4, isFavorite: true });
 
       expect(makes).toEqual(['Canon']);
     });
 
     it('does not self-narrow when a make is already selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1462,13 +1480,13 @@ describe(SearchRepository.name, () => {
       const { asset: nikonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: nikonAsset.id, make: 'Nikon' });
 
-      const makes = await sut.getCameraMakes([user.id], { make: 'Canon' });
+      const makes = await suggestions.getCameraMakes([user.id], { make: 'Canon' });
 
       expect(makes).toEqual(['Canon', 'Nikon']);
     });
 
     it('still narrows by the sibling model', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1477,25 +1495,25 @@ describe(SearchRepository.name, () => {
       const { asset: nikonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: nikonAsset.id, make: 'Nikon', model: 'Nikon Z8' });
 
-      const makes = await sut.getCameraMakes([user.id], { model: 'Nikon Z8' });
+      const makes = await suggestions.getCameraMakes([user.id], { model: 'Nikon Z8' });
 
       expect(makes).toEqual(['Nikon']);
     });
 
     it('returns nothing when forceEmptyResult is set', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: canonAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: canonAsset.id, make: 'Canon' });
 
-      const makes = await sut.getCameraMakes([user.id], { forceEmptyResult: true });
+      const makes = await suggestions.getCameraMakes([user.id], { forceEmptyResult: true });
 
       expect(makes).toEqual([]);
     });
 
     it('keeps the not-locked visibility semantics', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1507,14 +1525,14 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, make: 'LockedMake' });
 
-      const makes = await sut.getCameraMakes([user.id], { visibility: 'not-locked' });
+      const makes = await suggestions.getCameraMakes([user.id], { visibility: 'not-locked' });
 
       expect(makes).toEqual(['ArchivedMake', 'Sony']);
       expect(makes).not.toContain('LockedMake');
     });
 
     it('returns distinct makes when several assets share a make', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: asset1 } = await ctx.newAsset({ ownerId: user.id });
@@ -1526,7 +1544,7 @@ describe(SearchRepository.name, () => {
       const { asset: asset3 } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: asset3.id, make: 'Canon' });
 
-      const makes = await sut.getCameraMakes([user.id], {});
+      const makes = await suggestions.getCameraMakes([user.id], {});
 
       expect(makes).toEqual(['Canon']);
     });
@@ -1534,7 +1552,7 @@ describe(SearchRepository.name, () => {
 
   describe('getCountries (#858)', () => {
     it('narrows countries by an active tag filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: germanyAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1546,13 +1564,13 @@ describe(SearchRepository.name, () => {
       const [nature] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['nature'] });
       await ctx.newTagAsset({ tagIds: [nature.id], assetIds: [germanyAsset.id] });
 
-      const countries = await sut.getCountries([user.id], { tagIds: [nature.id] });
+      const countries = await suggestions.getCountries([user.id], { tagIds: [nature.id] });
 
       expect(countries).toEqual(['Germany']);
     });
 
     it('does not self-narrow when a country is already selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: germanyAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1561,13 +1579,13 @@ describe(SearchRepository.name, () => {
       const { asset: franceAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: franceAsset.id, country: 'France' });
 
-      const countries = await sut.getCountries([user.id], { country: 'Germany' });
+      const countries = await suggestions.getCountries([user.id], { country: 'Germany' });
 
       expect(countries).toEqual(['France', 'Germany']);
     });
 
     it('does not self-narrow when a city is already selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: berlinAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1576,13 +1594,13 @@ describe(SearchRepository.name, () => {
       const { asset: parisAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: parisAsset.id, country: 'France', city: 'Paris' });
 
-      const countries = await sut.getCountries([user.id], { city: 'Berlin' });
+      const countries = await suggestions.getCountries([user.id], { city: 'Berlin' });
 
       expect(countries).toEqual(['France', 'Germany']);
     });
 
     it('keeps the not-locked visibility semantics', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1594,7 +1612,7 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, country: 'Spain' });
 
-      const countries = await sut.getCountries([user.id], { visibility: 'not-locked' });
+      const countries = await suggestions.getCountries([user.id], { visibility: 'not-locked' });
 
       expect(countries).toEqual(['Austria', 'Germany']);
       expect(countries).not.toContain('Spain');
@@ -1603,7 +1621,7 @@ describe(SearchRepository.name, () => {
 
   describe('getStates (#858)', () => {
     it('narrows states by an active tag filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: berlinAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1615,13 +1633,13 @@ describe(SearchRepository.name, () => {
       const [nature] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['nature'] });
       await ctx.newTagAsset({ tagIds: [nature.id], assetIds: [berlinAsset.id] });
 
-      const states = await sut.getStates([user.id], { tagIds: [nature.id] });
+      const states = await suggestions.getStates([user.id], { tagIds: [nature.id] });
 
       expect(states).toEqual(['Berlin']);
     });
 
     it('still narrows by the parent country', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: berlinAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1630,13 +1648,13 @@ describe(SearchRepository.name, () => {
       const { asset: idfAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: idfAsset.id, country: 'France', state: 'Ile-de-France' });
 
-      const states = await sut.getStates([user.id], { country: 'Germany' });
+      const states = await suggestions.getStates([user.id], { country: 'Germany' });
 
       expect(states).toEqual(['Berlin']);
     });
 
     it('does not self-narrow when a city is already selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: berlinAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1645,13 +1663,13 @@ describe(SearchRepository.name, () => {
       const { asset: munichAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: munichAsset.id, country: 'Germany', state: 'Bavaria', city: 'Munich' });
 
-      const states = await sut.getStates([user.id], { country: 'Germany', city: 'Berlin' });
+      const states = await suggestions.getStates([user.id], { country: 'Germany', city: 'Berlin' });
 
       expect(states).toEqual(['Bavaria', 'Berlin']);
     });
 
     it('keeps the not-locked visibility semantics', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1663,7 +1681,7 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, state: 'LockedState' });
 
-      const states = await sut.getStates([user.id], { visibility: 'not-locked' });
+      const states = await suggestions.getStates([user.id], { visibility: 'not-locked' });
 
       expect(states).toEqual(['ArchivedState', 'Bavaria']);
       expect(states).not.toContain('LockedState');
@@ -1672,7 +1690,7 @@ describe(SearchRepository.name, () => {
 
   describe('getCameraLensModels (#858)', () => {
     it('narrows lens models by an active tag filter', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: rfAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1684,13 +1702,13 @@ describe(SearchRepository.name, () => {
       const [nature] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['nature'] });
       await ctx.newTagAsset({ tagIds: [nature.id], assetIds: [rfAsset.id] });
 
-      const lensModels = await sut.getCameraLensModels([user.id], { tagIds: [nature.id] });
+      const lensModels = await suggestions.getCameraLensModels([user.id], { tagIds: [nature.id] });
 
       expect(lensModels).toEqual(['RF 24-70']);
     });
 
     it('still narrows by make and model', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: r5Asset } = await ctx.newAsset({ ownerId: user.id });
@@ -1699,13 +1717,13 @@ describe(SearchRepository.name, () => {
       const { asset: sevenDAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: sevenDAsset.id, make: 'Canon', model: 'Canon EOS 7D', lensModel: 'EF 50' });
 
-      const lensModels = await sut.getCameraLensModels([user.id], { make: 'Canon', model: 'Canon EOS 7D' });
+      const lensModels = await suggestions.getCameraLensModels([user.id], { make: 'Canon', model: 'Canon EOS 7D' });
 
       expect(lensModels).toEqual(['EF 50']);
     });
 
     it('keeps the not-locked visibility semantics', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1717,7 +1735,7 @@ describe(SearchRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newExif({ assetId: lockedAsset.id, lensModel: 'Locked 50mm' });
 
-      const lensModels = await sut.getCameraLensModels([user.id], { visibility: 'not-locked' });
+      const lensModels = await suggestions.getCameraLensModels([user.id], { visibility: 'not-locked' });
 
       expect(lensModels).toEqual(['Archived 24mm', 'RF 24-70mm']);
       expect(lensModels).not.toContain('Locked 50mm');
@@ -1726,7 +1744,7 @@ describe(SearchRepository.name, () => {
 
   describe('getAccessibleTags (LOW #7)', () => {
     it('includes tags from archived assets under not-locked, excludes locked-only tags', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -1741,7 +1759,7 @@ describe(SearchRepository.name, () => {
       await ctx.newTagAsset({ tagIds: [archivedTag.id], assetIds: [archivedAsset.id] });
       await ctx.newTagAsset({ tagIds: [lockedTag.id], assetIds: [lockedAsset.id] });
 
-      const tags = await sut.getAccessibleTags([user.id], { visibility: 'not-locked' });
+      const tags = await suggestions.getAccessibleTags([user.id], { visibility: 'not-locked' });
 
       expect(tags.map((tag) => tag.value)).toEqual(expect.arrayContaining(['TimelineTag', 'ArchivedTag']));
       expect(tags.map((tag) => tag.value)).not.toContain('LockedTag');
@@ -1846,8 +1864,8 @@ describe(SearchRepository.name, () => {
     });
 
     it('hasPerson:false returns only unassigned faces', async () => {
-      const { sut } = setup();
-      const result = await sut.searchFaces({
+      const { faceSearch } = setup();
+      const result = await faceSearch.searchFaces({
         userIds: [ownerId],
         embedding: faceEmbedding,
         numResults: 10,
@@ -1861,8 +1879,8 @@ describe(SearchRepository.name, () => {
     });
 
     it('hasPerson:true returns only assigned faces (regression)', async () => {
-      const { sut } = setup();
-      const result = await sut.searchFaces({
+      const { faceSearch } = setup();
+      const result = await faceSearch.searchFaces({
         userIds: [ownerId],
         embedding: faceEmbedding,
         numResults: 10,
@@ -1876,8 +1894,8 @@ describe(SearchRepository.name, () => {
     });
 
     it('hasPerson omitted returns both assigned and unassigned', async () => {
-      const { sut } = setup();
-      const result = await sut.searchFaces({
+      const { faceSearch } = setup();
+      const result = await faceSearch.searchFaces({
         userIds: [ownerId],
         embedding: faceEmbedding,
         numResults: 10,
@@ -1889,7 +1907,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('spaceId returns unassigned faces from direct shared assets and linked libraries without owner filtering', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, faceSearch } = setup();
       const { user: spaceOwner } = await ctx.newUser();
       const { user: directOwner } = await ctx.newUser();
       const { user: libraryOwner } = await ctx.newUser();
@@ -1918,7 +1936,7 @@ describe(SearchRepository.name, () => {
         ])
         .execute();
 
-      const result = await sut.searchFaces({
+      const result = await faceSearch.searchFaces({
         spaceId: space.id,
         embedding,
         numResults: 10,
@@ -1932,7 +1950,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('spaceId still respects hasPerson:false by excluding assigned faces', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, faceSearch } = setup();
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -1954,7 +1972,7 @@ describe(SearchRepository.name, () => {
         ])
         .execute();
 
-      const result = await sut.searchFaces({
+      const result = await faceSearch.searchFaces({
         spaceId: space.id,
         embedding,
         numResults: 10,
@@ -1969,10 +1987,10 @@ describe(SearchRepository.name, () => {
     });
 
     it('rejects mixed spaceId and userIds scopes', async () => {
-      const { sut } = setup();
+      const { faceSearch } = setup();
 
       await expect(
-        sut.searchFaces({
+        faceSearch.searchFaces({
           spaceId: ownerId,
           userIds: [ownerId],
           embedding: faceEmbedding,
@@ -1988,7 +2006,7 @@ describe(SearchRepository.name, () => {
   // option; passing it excludes non-reviewable assets. S1.1-S1.3.
   describe('searchFaces visibility option (Slice 1)', () => {
     it('S1.1: with visibility: [archive, timeline], omits a face on a locked asset and returns a control face on a timeline asset', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, faceSearch } = setup();
       const { user } = await ctx.newUser();
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
@@ -2004,7 +2022,7 @@ describe(SearchRepository.name, () => {
         ])
         .execute();
 
-      const result = await sut.searchFaces({
+      const result = await faceSearch.searchFaces({
         userIds: [user.id],
         embedding,
         numResults: 10,
@@ -2018,7 +2036,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('S1.2 (pin): without the visibility option, the locked asset face is still returned (recognition unchanged)', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, faceSearch } = setup();
       const { user } = await ctx.newUser();
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
@@ -2034,7 +2052,7 @@ describe(SearchRepository.name, () => {
         ])
         .execute();
 
-      const result = await sut.searchFaces({
+      const result = await faceSearch.searchFaces({
         userIds: [user.id],
         embedding,
         numResults: 10,
@@ -2047,7 +2065,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('S1.3 (pin): the space branch already gates locked assets out, with a timeline control returned', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, faceSearch } = setup();
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
@@ -2069,7 +2087,7 @@ describe(SearchRepository.name, () => {
       // Deliberately WITHOUT the new `visibility` option — this isolates the PRE-EXISTING space-branch
       // gate (spaceVisibilityGate, applied unconditionally whenever spaceId is set) from the new opt-in
       // option under test elsewhere in this describe block (S1.1/S1.2).
-      const result = await sut.searchFaces({
+      const result = await faceSearch.searchFaces({
         spaceId: space.id,
         embedding,
         numResults: 10,

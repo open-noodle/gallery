@@ -9,11 +9,11 @@ mise //server:migrations generate <migration-name>
 ```
 
 2. Check if the migration file makes sense.
-3. Move the migration file to folder `./server/src/schema/migrations` in your code editor.
+3. Move the migration file to folder `./server/src/schema/migrations-gallery` in your code editor. `./server/src/schema/migrations` holds upstream migrations only.
 4. Run the command
 
 ```bash
-mise //server:migrations sync-order
+mise //server:migrations-gallery sync-order
 ```
 
 The last step adds the migration to the `ORDER` manifest, which records the order migrations run in. It is committed so that two branches adding a migration conflict in git instead of silently merging out of order, which would stop the server from starting for anyone who ran them in the wrong order.
@@ -28,4 +28,4 @@ If you need to undo the most recently applied migration—for example, when deve
 mise //server:migrations revert
 ```
 
-This command rolls back the latest migration and brings the database schema back to its previous state.
+This command rolls back the newest Gallery migration, or the newest upstream migration once no Gallery migration is left, and brings the database schema back to its previous state. Like `mise //server:migrations run`, it goes through the server's own migrator (`server/src/bin/gallery-migrations.ts`, run from `dist/`, so build the server first), because `sql-tools` only knows the `kysely_migrations` ledger and not `gallery_migrations`.

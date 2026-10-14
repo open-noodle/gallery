@@ -21,6 +21,7 @@ import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dar
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/date_time_picker.dart';
@@ -516,7 +517,7 @@ class _AlbumKebabMenu extends ConsumerWidget {
       onCreateSharedLink: isOwner ? onCreateSharedLink : null,
       onShowOptions: onShowOptions,
       // L15: gated to owned albums (mirrors web's isOwned gate on the same affordance).
-      onLinkToSpace: isOwner ? onLinkToSpace : null,
+      onLinkToSpace: isOwner && ref.watch(serverSupportsSpacesProvider) ? onLinkToSpace : null,
     );
   }
 }

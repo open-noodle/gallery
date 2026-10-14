@@ -135,6 +135,11 @@ describe('revert-to-immich.sql', () => {
     expect(guard).toBeLessThan(firstWrite);
   });
 
+  it('drops the fork migration ledger and its lock table', () => {
+    expect(sql).toContain('DROP TABLE IF EXISTS "gallery_migrations";');
+    expect(sql).toContain('DROP TABLE IF EXISTS "gallery_migrations_lock";');
+  });
+
   it('restores asset.isFavorite before dropping asset_favorite', () => {
     // "IF NOT EXISTS" is intentionally tolerated: at the time this revert path was added
     // (slice 0, #763), asset."isFavorite" has NOT yet been dropped from the live schema —
