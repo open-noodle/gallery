@@ -312,8 +312,8 @@ describe(AssetRepository.name, () => {
       const matching = await createTimelineAsset(ctx, user.id, new Date('2024-02-01T12:00:00.000Z'), {
         thumbhash: Buffer.from('favorite'),
       });
-      // #763: isFavorite now filters against the asset_favorite overlay for the caller
-      // (authUserId), not the legacy asset.isFavorite column.
+      // #763: isFavorite filters against the caller's asset_favorite overlay (authUserId), not the
+      // owner's asset.isFavorite column.
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: matching.id }).execute();
       await ctx.newExif({
         assetId: matching.id,

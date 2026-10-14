@@ -89,7 +89,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     // #763: favoriting alone does not bump asset.updateId (asset_favorite is a separate overlay
     // table — see design doc §4.3), so the unrelated column update below stands in for "some
     // metadata changed" to trigger the re-emit; the actual isFavorite value comes from the
-    // overlay insert. asset."isFavorite" no longer exists (dropped in slice 3), hence originalFileName.
+    // overlay insert.
     await defaultDatabase
       .updateTable('asset')
       .set({ originalFileName: 'renamed-for-resync.jpg' })

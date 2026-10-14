@@ -37,8 +37,8 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
         AlbumRepository,
         AssetRepository,
         // #763: the assetFavorite core-plugin action calls AssetService.update() with isFavorite set,
-        // which now routes through AssetFavoriteRepository (asset_favorite is the per-user overlay,
-        // not the legacy asset.isFavorite column). Same wiring reason as SharedSpaceRepository below —
+        // which routes through AssetFavoriteRepository (asset_favorite is the per-user overlay that
+        // asset.isFavorite projects for the owner). Same wiring reason as SharedSpaceRepository below:
         // the plugin-host AssetService is built via BaseService.create(AssetService, this).
         AssetFavoriteRepository,
         CryptoRepository,
@@ -234,8 +234,8 @@ describe('core plugin', () => {
 
       await expect(ctx.sut.handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id })).resolves.toBeUndefined();
 
-      // #763: favorites are a per-user overlay (asset_favorite), not the legacy asset.isFavorite
-      // column — the workflow's synthesized auth acts AS the asset owner, so isFavoriteForUser
+      // #763: favorites are a per-user overlay (asset_favorite); the workflow's synthesized auth acts
+      // AS the asset owner, so isFavoriteForUser
       // resolved for that same owner is the correct place to assert the write landed.
       await expect(ctx.get(AssetRepository).getById(asset.id, {}, user.id)).resolves.toMatchObject({
         isFavoriteForUser: true,
@@ -262,19 +262,17 @@ describe('core plugin', () => {
       });
     });
 
-    // #763 slice 3 pre-drop: workflow.repository.ts's getForAssetV1 (the workflowAssetV1
-    // projection consumed by handleAssetTrigger's read()) must resolve the plugin-facing
-    // `isFavorite` field via favoriteExistsForOwner directly, not the legacy raw column — this
-    // asserts the PROJECTION itself, independent of the assetFavorite plugin action's write path
-    // covered above.
+    // workflow.repository.ts's getForAssetV1 (the workflowAssetV1 projection consumed by
+    // handleAssetTrigger's read()) reads asset.isFavorite, the owner's favorite projected from the
+    // overlay. This asserts the projection itself, independent of the assetFavorite plugin action's
+    // write path covered above.
     it('projects the ASSET OWNER favorite onto workflowAssetV1, not another user favorite', async () => {
       const { user: owner } = await ctx.newUser();
       const { user: other } = await ctx.newUser();
       const { asset: ownerFavorited } = await ctx.newAsset({ ownerId: owner.id });
       const { asset: notOwnerFavorited } = await ctx.newAsset({ ownerId: owner.id });
 
-      // Owner favorites via the per-user overlay only — the legacy asset.isFavorite column is
-      // never touched.
+      // Owner favorites via the per-user overlay only; the trigger projects it onto the column.
       await ctx.get(AssetFavoriteRepository).addAll(owner.id, [ownerFavorited.id]);
       // A DIFFERENT user favorites the other asset — its owner never favorited it.
       await ctx.get(AssetFavoriteRepository).addAll(other.id, [notOwnerFavorited.id]);

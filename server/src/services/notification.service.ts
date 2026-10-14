@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { isAbsolute } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { EmailImageAttachment, JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -26,7 +25,6 @@ import {
 } from 'src/enum.js';
 import { EmailTemplate } from 'src/repositories/email.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { getFilenameExtension } from 'src/utils/file.js';
 import { getExternalDomain } from 'src/utils/misc.js';
 import { isEqualObject } from 'src/utils/object.js';
@@ -173,14 +171,11 @@ export class NotificationService extends BaseService {
 
     const [asset] = await this.assetRepository.getByIdsWithAllRelationsButStacks([assetId], userId);
     if (asset) {
-      // #763: deliberately NOT projecting isFavoriteForUser — `getByIdsWithAllRelationsButStacks`
-      // above is called with no authUserId, and this synthetic `auth` (a partial cast, not a real
-      // AuthDto) exists only for other mapAsset options, not for the overlay. `false` is correct
-      // and matches pre-#763 behavior for this background-notification path.
+      // userId is the owner (MetadataService emits asset.ownerId), so the owner's projection is the recipient's favorite.
       this.websocketRepository.clientSend(
         'on_asset_update',
         userId,
-        mapAsset(asset, { auth: { user: { id: userId } } as AuthDto }),
+        mapAsset({ ...asset, isFavoriteForUser: asset.isFavorite }, { auth: { user: { id: userId } } as AuthDto }),
       );
     }
   }
@@ -441,6 +436,13 @@ export class NotificationService extends BaseService {
       return JobStatus.Skipped;
     }
 
+    // An attachment path may be an S3 key, which the mailer cannot read: stage it locally until the mail is sent.
+    // Job data is a fresh copy per run, so rewriting the paths in place is local to this send.
+    await using staged = new AsyncDisposableStack();
+    for (const attachment of data.imageAttachments ?? []) {
+      attachment.path = staged.use(await this.backendMedia.ensureLocalFile(attachment.path)).localPath;
+    }
+
     const { to, subject, html, text: plain } = data;
     const response = await this.emailRepository.sendEmail({
       to,
@@ -474,16 +476,11 @@ export class NotificationService extends BaseService {
       return;
     }
 
-    const filePath = albumThumbnailFiles[0].path;
-    const filename = `album-thumbnail${getFilenameExtension(filePath)}`;
-
-    // a disk thumbnail is attached by path for the mailer to read; an S3 key has no path to give it
-    if (!isAbsolute(filePath)) {
-      const content = await StorageService.resolveBackendForKey(filePath).readAll(filePath);
-      return { filename, cid: 'album-thumbnail', content };
-    }
-
-    return { filename, cid: 'album-thumbnail', path: filePath };
+    return {
+      filename: `album-thumbnail${getFilenameExtension(albumThumbnailFiles[0].path)}`,
+      path: albumThumbnailFiles[0].path,
+      cid: 'album-thumbnail',
+    };
   }
 
   private async sendAlbumLocalNotification(

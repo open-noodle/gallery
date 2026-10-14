@@ -43,7 +43,7 @@ private async ensureLocalFile(filePath: string): Promise<{ localPath: string; cl
   if (isAbsolute(filePath)) {
     return { localPath: filePath, cleanup: async () => {} };
   }
-  const backend = StorageService.resolveBackendForKey(filePath);
+  const backend = StorageService.backendFor(filePath);
   return backend.downloadToTemp(filePath);
 }
 ```
@@ -118,7 +118,7 @@ if ('imagePath' in payload) {
   if (isAbsolute(payload.imagePath)) {
     fileBuffer = await readFile(payload.imagePath);
   } else {
-    const backend = StorageService.resolveBackendForKey(payload.imagePath);
+    const backend = StorageService.backendFor(payload.imagePath);
     const { stream } = await backend.get(payload.imagePath);
     const chunks: Buffer[] = [];
     for await (const chunk of stream) {

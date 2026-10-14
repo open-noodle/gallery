@@ -15,6 +15,17 @@ with
       inner join lateral (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           exists (
             select
               1 as "exists"
@@ -103,6 +114,17 @@ from
   inner join lateral (
     select
       "asset".*,
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       to_json("asset_exif") as "exifInfo",
       (
         select
@@ -135,6 +157,17 @@ where
   and "asset"."stackId" is null
 group by
   "asset"."duplicateId"
+
+-- DuplicateRepository.hasOtherOwner
+select
+  "id"
+from
+  "asset"
+where
+  "duplicateId" = $1::uuid
+  and "ownerId" != $2::uuid
+limit
+  $3
 
 -- DuplicateRepository.delete
 update "asset"

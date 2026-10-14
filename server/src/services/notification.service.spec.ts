@@ -49,6 +49,15 @@ const configs = {
   }),
 };
 
+// Routes every stored path to a fake backend that stages it at /tmp/a.jpg, as S3 would.
+const stageS3 = async () => {
+  const cleanup = vi.fn().mockResolvedValue(void 0);
+  const backend = { downloadToTemp: vi.fn().mockResolvedValue({ tempPath: '/tmp/a.jpg', cleanup }) };
+  const { StorageService } = await import('src/services/storage.service.js');
+  vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
+  return { backend, cleanup };
+};
+
 describe(NotificationService.name, () => {
   let sut: NotificationService;
   let mocks: ServiceMocks;
@@ -566,6 +575,54 @@ describe(NotificationService.name, () => {
       await expect(sut.handleSendEmail({ html: '', subject: '', text: '', to: '' })).resolves.toBe(JobStatus.Success);
       expect(mocks.email.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ replyTo: 'demo@immich.app' }));
     });
+
+    describe('image attachments', () => {
+      const email = { html: '', subject: '', text: '', to: '' };
+      const s3Attachment = { filename: 'album-thumbnail.jpg', path: 'thumbs/a.jpg', cid: 'album-thumbnail' };
+
+      beforeEach(() => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          notifications: { smtp: { enabled: true, from: 'test@immich.app' } },
+        });
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('hands a disk attachment to the mailer by its own path', async () => {
+        mocks.email.sendEmail.mockResolvedValue({ messageId: '', response: '' });
+        const attachment = { filename: 'album-thumbnail.jpg', path: '/data/thumbs/a.jpg', cid: 'album-thumbnail' };
+
+        await sut.handleSendEmail({ ...email, imageAttachments: [attachment] });
+
+        expect(mocks.email.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ imageAttachments: [attachment] }));
+      });
+
+      it('stages an S3 attachment locally and removes it once the mail is sent', async () => {
+        const { backend, cleanup } = await stageS3();
+        mocks.email.sendEmail.mockImplementation(() => {
+          expect(cleanup).not.toHaveBeenCalled();
+          return Promise.resolve({ messageId: '', response: '' });
+        });
+
+        await sut.handleSendEmail({ ...email, imageAttachments: [s3Attachment] });
+
+        expect(backend.downloadToTemp).toHaveBeenCalledWith('thumbs/a.jpg');
+        expect(mocks.email.sendEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ imageAttachments: [{ ...s3Attachment, path: '/tmp/a.jpg' }] }),
+        );
+        expect(cleanup).toHaveBeenCalledOnce();
+      });
+
+      it('removes a staged S3 attachment when sending fails', async () => {
+        const { cleanup } = await stageS3();
+        mocks.email.sendEmail.mockRejectedValue(new Error('smtp down'));
+
+        await expect(sut.handleSendEmail({ ...email, imageAttachments: [s3Attachment] })).rejects.toThrow('smtp down');
+        expect(cleanup).toHaveBeenCalledOnce();
+      });
+    });
   });
 
   describe('search', () => {
@@ -738,13 +795,17 @@ describe(NotificationService.name, () => {
     });
 
     it('should send on_asset_update event when source is sidecar-write', async () => {
-      const asset = AssetFactory.from().exif().build();
+      const asset = AssetFactory.from({ isFavorite: true }).exif().build();
       mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([asset as any]);
 
       await sut.onAssetMetadataExtracted({ assetId: asset.id, userId: 'user-id', source: 'sidecar-write' });
 
       expect(mocks.asset.getByIdsWithAllRelationsButStacks).toHaveBeenCalledWith([asset.id], 'user-id');
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_asset_update', 'user-id', expect.anything());
+      expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
+        'on_asset_update',
+        'user-id',
+        expect.objectContaining({ isFavorite: true }),
+      );
     });
 
     it('should not send event when asset is not found for sidecar-write', async () => {

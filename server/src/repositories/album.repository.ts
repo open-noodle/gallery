@@ -6,10 +6,11 @@ import { columns } from 'src/database.js';
 import { Chunked, ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserCreateDto, MapAlbumDto } from 'src/dtos/album.dto.js';
 import { AlbumUserRole } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
 import { asUuid, dummy, withDefaultVisibility } from 'src/utils/database.js';
-import { accessibleSpaceAlbums, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import { accessibleSpaceAlbums, albumMembership, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
 export interface AlbumAssetCount {
   albumId: string;
@@ -38,6 +39,28 @@ const withSharedLink = (eb: ExpressionBuilder<DB, 'album'>) =>
   jsonArrayFrom(
     eb.selectFrom('shared_link').selectAll('shared_link').whereRef('shared_link.albumId', '=', 'album.id'),
   ).as('sharedLinks');
+
+const withAssets = (eb: ExpressionBuilder<DB, 'album'>) => {
+  return eb
+    .selectFrom((eb) =>
+      eb
+        .selectFrom('asset')
+        .selectAll('asset')
+        .select(projectedDuration)
+        .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+        .select((eb) =>
+          eb.table('asset_exif').$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>().as('exifInfo'),
+        )
+        .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
+        .whereRef('album_asset.albumId', '=', 'album.id')
+        .where('asset.deletedAt', 'is', null)
+        .$call(withDefaultVisibility)
+        .orderBy('asset.fileCreatedAt', 'desc')
+        .as('asset'),
+    )
+    .select((eb) => eb.fn.jsonAgg('asset').as('assets'))
+    .as('assets');
+};
 
 const isAlbumOwned = (ownerId: string) => (eb: ExpressionBuilder<DB, 'album'>) =>
   eb.exists(
@@ -83,10 +106,10 @@ export class AlbumRepository {
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   getByAssetId(ownerId: string, assetId: string) {
     // A space member must never learn that another member's Hidden/Locked asset sits in a linked
-    // album, so both space-reached arms below carry the space-shareable visibility gate
-    // (Archive/Timeline). The album_user arm is deliberately NOT gated: an album member — including
-    // the owner, who always has an album_user row — keeps seeing "Contained in" for their own
-    // Hidden/Locked assets.
+    // album, so both space-reached paths carry the space-shareable visibility gate (Archive/Timeline):
+    // below for a linked album, inside albumMembership for a contribution. The album_user arm is
+    // deliberately NOT gated: an album member, including the owner (who always has an album_user
+    // row), keeps seeing "Contained in" for their own Hidden/Locked assets.
     const isSpaceShareable = (eb: ExpressionBuilder<DB, 'album'>) =>
       eb.exists(
         eb
@@ -100,54 +123,27 @@ export class AlbumRepository {
       this.db
         .selectFrom('album')
         .selectAll('album')
+        // The asset is in the album as an own row, or as a contribution made through a space the caller
+        // is a member of (a contribution is only reachable through the one space it was made to).
+        .where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom(albumMembership(eb, 'album.id', { memberUserId: ownerId }).as('album_members'))
+              .select(eb.lit(1).as('exists'))
+              .where('album_members.assetId', '=', asUuid(assetId)),
+          ),
+        )
+        // ...and the caller can open the album: a direct share, or a link into a space they can access.
+        // A contribution implies the latter, and is space-shareable by construction.
         .where((eb) =>
           eb.or([
-            // The owner's own `album_asset` row, reached either by a direct album share or by the
-            // album being linked into a space the caller can access.
-            eb.and([
-              eb.exists(
-                eb
-                  .selectFrom('album_asset')
-                  .select(eb.lit(1).as('exists'))
-                  .whereRef('album_asset.albumId', '=', 'album.id')
-                  .where('album_asset.assetId', '=', asUuid(assetId)),
-              ),
-              eb.or([
-                eb.exists(
-                  eb
-                    .selectFrom('album_user')
-                    .whereRef('album_user.albumId', '=', 'album.id')
-                    .where('album_user.userId', '=', ownerId),
-                ),
-                eb.and([eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)), isSpaceShareable(eb)]),
-              ]),
-            ]),
-            // A cross-owner contribution (#764) is only ever reachable through the ONE space it was
-            // contributed to, so membership and the live album↔space link are correlated to that
-            // space — the same scoping `getMetadataForIds` applies to its contributed arm. Written
-            // inline rather than via `spaceContributedAssetExists`, whose subquery correlates on the
-            // asset only: that helper answers "can I reach this asset through any linked album", and
-            // here the question is album-centric ("is THIS album's link to the asset valid for me").
-            eb.and([
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_album')
-                  .innerJoin('album_space_asset', (join) =>
-                    join
-                      .onRef('album_space_asset.albumId', '=', 'shared_space_album.albumId')
-                      .onRef('album_space_asset.spaceId', '=', 'shared_space_album.spaceId'),
-                  )
-                  .innerJoin('shared_space_member', (join) =>
-                    join
-                      .onRef('shared_space_member.spaceId', '=', 'shared_space_album.spaceId')
-                      .on('shared_space_member.userId', '=', asUuid(ownerId)),
-                  )
-                  .select(eb.lit(1).as('exists'))
-                  .whereRef('shared_space_album.albumId', '=', 'album.id')
-                  .where('album_space_asset.assetId', '=', asUuid(assetId)),
-              ),
-              isSpaceShareable(eb),
-            ]),
+            eb.exists(
+              eb
+                .selectFrom('album_user')
+                .whereRef('album_user.albumId', '=', 'album.id')
+                .where('album_user.userId', '=', ownerId),
+            ),
+            eb.and([eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)), isSpaceShareable(eb)]),
           ]),
         )
         // The A1 invariant, covering both arms above — a soft-deleted album is never returned.
@@ -211,41 +207,15 @@ export class AlbumRepository {
       this.db
         .selectFrom('asset')
         .$call(withDefaultVisibility)
+        // #752 P1-5: album metadata counts the same rows the grid shows for the same viewer: own rows
+        // plus the contributions live in a space `forUserId` is a member of (`spaceId` narrows to one).
         .innerJoin(
-          (eb) => {
-            // #752 P1-5: album metadata = owner rows ∪ member-gated contributions, so card counts
-            // and date ranges agree with the grid (P0-2) for the SAME viewer. The contributed arm
-            // requires a LIVE album↔space link (D1-b: retained rows of an unlinked album are inert)
-            // and live membership of `forUserId`. UNION dedupes a P1-6 coexistence-window pair.
-            const ownerRows = eb
-              .selectFrom('album_asset')
-              .select(['album_asset.albumId as albumId', 'album_asset.assetId as assetId'])
-              .where('album_asset.albumId', 'in', ids);
-            return (
-              forUserId
-                ? ownerRows.union(
-                    eb
-                      .selectFrom('album_space_asset')
-                      .innerJoin('shared_space_album', (join) =>
-                        join
-                          .onRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
-                          .onRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId'),
-                      )
-                      .innerJoin('album', (join) =>
-                        join.onRef('album.id', '=', 'album_space_asset.albumId').on('album.deletedAt', 'is', null),
-                      )
-                      .innerJoin('shared_space_member', (join) =>
-                        join
-                          .onRef('shared_space_member.spaceId', '=', 'shared_space_album.spaceId')
-                          .on('shared_space_member.userId', '=', asUuid(forUserId)),
-                      )
-                      .select(['album_space_asset.albumId as albumId', 'album_space_asset.assetId as assetId'])
-                      .where('album_space_asset.albumId', 'in', ids)
-                      .$if(!!spaceId, (qb) => qb.where('shared_space_album.spaceId', '=', asUuid(spaceId!))),
-                  )
-                : ownerRows
-            ).as('album_members');
-          },
+          (eb) =>
+            albumMembership(
+              eb,
+              ids,
+              forUserId ? { memberUserId: forUserId, ...(spaceId && { spaceId }) } : undefined,
+            ).as('album_members'),
           (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
         )
         .select('album_members.albumId as albumId')

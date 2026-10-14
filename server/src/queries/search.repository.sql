@@ -19,7 +19,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -82,7 +92,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -149,8 +169,8 @@ where
             from
               "shared_space_album"
               inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" on "album"."id" = "shared_space_album"."albumId"
-              and "album"."deletedAt" is null
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
             where
               "album_asset"."assetId" = "asset"."id"
               and "shared_space_album"."spaceId" = any ($8::uuid[])
@@ -163,8 +183,8 @@ where
               "shared_space_album"
               inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
               and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" on "album"."id" = "shared_space_album"."albumId"
-              and "album"."deletedAt" is null
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
             where
               "album_space_asset"."assetId" = "asset"."id"
               and "shared_space_album"."spaceId" = any ($10::uuid[])
@@ -215,7 +235,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -275,7 +305,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -337,6 +377,17 @@ from
   (
     select
       "asset".*,
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       exists (
         select
           1 as "exists"
@@ -351,10 +402,22 @@ from
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
       inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
     where
-      (
-        "asset"."ownerId" = any ($2::uuid[])
+      exists (
+        select
+        from
+          "shared_space_person_face"
+          inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "shared_space_person_face"."personId" = $2::uuid
+      )
+      and "asset_exif"."lensModel" = $3
+      and (
+        "asset"."ownerId" = any ($4::uuid[])
         or (
-          "asset"."visibility" in ($3, $4)
+          "asset"."visibility" in ($5, $6)
           and "asset"."deletedAt" is null
           and (
             exists (
@@ -364,7 +427,7 @@ from
                 "shared_space_asset"
               where
                 "shared_space_asset"."assetId" = "asset"."id"
-                and "shared_space_asset"."spaceId" = any ($5::uuid[])
+                and "shared_space_asset"."spaceId" = any ($7::uuid[])
             )
             or exists (
               select
@@ -373,7 +436,7 @@ from
                 "shared_space_library"
               where
                 "shared_space_library"."libraryId" = "asset"."libraryId"
-                and "shared_space_library"."spaceId" = any ($6::uuid[])
+                and "shared_space_library"."spaceId" = any ($8::uuid[])
             )
             or (
               exists (
@@ -382,12 +445,12 @@ from
                 from
                   "shared_space_album"
                   inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                  inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                  and "album"."deletedAt" is null
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
                 where
                   "album_asset"."assetId" = "asset"."id"
-                  and "shared_space_album"."spaceId" = any ($7::uuid[])
-                  and "shared_space_album"."showInTimeline" = $8
+                  and "shared_space_album"."spaceId" = any ($9::uuid[])
+                  and "shared_space_album"."showInTimeline" = $10
               )
               or exists (
                 select
@@ -396,29 +459,17 @@ from
                   "shared_space_album"
                   inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
                   and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                  inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                  and "album"."deletedAt" is null
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
                 where
                   "album_space_asset"."assetId" = "asset"."id"
-                  and "shared_space_album"."spaceId" = any ($9::uuid[])
-                  and "shared_space_album"."showInTimeline" = $10
+                  and "shared_space_album"."spaceId" = any ($11::uuid[])
+                  and "shared_space_album"."showInTimeline" = $12
               )
             )
           )
         )
       )
-      and exists (
-        select
-        from
-          "shared_space_person_face"
-          inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
-        where
-          "asset_face"."assetId" = "asset"."id"
-          and "asset_face"."deletedAt" is null
-          and "asset_face"."isVisible" is true
-          and "shared_space_person_face"."personId" = $11::uuid
-      )
-      and "asset_exif"."lensModel" = $12
       and exists (
         select
           1 as "exists"
@@ -549,61 +600,67 @@ with recursive
       where
         (
           "asset"."ownerId" = any ($1::uuid[])
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_asset"
-            where
-              "shared_space_asset"."assetId" = "asset"."id"
-              and "shared_space_asset"."spaceId" = any ($2::uuid[])
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_library"
-            where
-              "shared_space_library"."libraryId" = "asset"."libraryId"
-              and "shared_space_library"."spaceId" = any ($3::uuid[])
-          )
           or (
-            exists (
-              select
-                1 as "exists"
-              from
-                "shared_space_album"
-                inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                and "album"."deletedAt" is null
-              where
-                "album_asset"."assetId" = "asset"."id"
-                and "shared_space_album"."spaceId" = any ($4::uuid[])
-                and "shared_space_album"."showInTimeline" = $5
-            )
-            or exists (
-              select
-                1 as "exists"
-              from
-                "shared_space_album"
-                inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-                and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                and "album"."deletedAt" is null
-              where
-                "album_space_asset"."assetId" = "asset"."id"
-                and "shared_space_album"."spaceId" = any ($6::uuid[])
-                and "shared_space_album"."showInTimeline" = $7
+            "asset"."visibility" in ($2, $3)
+            and "asset"."deletedAt" is null
+            and (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_asset"
+                where
+                  "shared_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_asset"."spaceId" = any ($4::uuid[])
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_library"
+                where
+                  "shared_space_library"."libraryId" = "asset"."libraryId"
+                  and "shared_space_library"."spaceId" = any ($5::uuid[])
+              )
+              or (
+                exists (
+                  select
+                    1 as "exists"
+                  from
+                    "shared_space_album"
+                    inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                    inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                    and "linked_album"."deletedAt" is null
+                  where
+                    "album_asset"."assetId" = "asset"."id"
+                    and "shared_space_album"."spaceId" = any ($6::uuid[])
+                    and "shared_space_album"."showInTimeline" = $7
+                )
+                or exists (
+                  select
+                    1 as "exists"
+                  from
+                    "shared_space_album"
+                    inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                    and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                    inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                    and "linked_album"."deletedAt" is null
+                  where
+                    "album_space_asset"."assetId" = "asset"."id"
+                    and "shared_space_album"."spaceId" = any ($8::uuid[])
+                    and "shared_space_album"."showInTimeline" = $9
+                )
+              )
             )
           )
         )
-        and "asset"."visibility" = $8
-        and "asset"."type" = $9
+        and "asset"."visibility" = $10
+        and "asset"."type" = $11
         and "asset"."deletedAt" is null
       order by
         "city"
       limit
-        $10
+        $12
     )
     union all
     (
@@ -621,63 +678,69 @@ with recursive
             inner join "asset" on "asset"."id" = "asset_exif"."assetId"
           where
             (
-              "asset"."ownerId" = any ($11::uuid[])
-              or exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_asset"
-                where
-                  "shared_space_asset"."assetId" = "asset"."id"
-                  and "shared_space_asset"."spaceId" = any ($12::uuid[])
-              )
-              or exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_library"
-                where
-                  "shared_space_library"."libraryId" = "asset"."libraryId"
-                  and "shared_space_library"."spaceId" = any ($13::uuid[])
-              )
+              "asset"."ownerId" = any ($13::uuid[])
               or (
-                exists (
-                  select
-                    1 as "exists"
-                  from
-                    "shared_space_album"
-                    inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                    inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                    and "album"."deletedAt" is null
-                  where
-                    "album_asset"."assetId" = "asset"."id"
-                    and "shared_space_album"."spaceId" = any ($14::uuid[])
-                    and "shared_space_album"."showInTimeline" = $15
-                )
-                or exists (
-                  select
-                    1 as "exists"
-                  from
-                    "shared_space_album"
-                    inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-                    and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                    inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                    and "album"."deletedAt" is null
-                  where
-                    "album_space_asset"."assetId" = "asset"."id"
-                    and "shared_space_album"."spaceId" = any ($16::uuid[])
-                    and "shared_space_album"."showInTimeline" = $17
+                "asset"."visibility" in ($14, $15)
+                and "asset"."deletedAt" is null
+                and (
+                  exists (
+                    select
+                      1 as "exists"
+                    from
+                      "shared_space_asset"
+                    where
+                      "shared_space_asset"."assetId" = "asset"."id"
+                      and "shared_space_asset"."spaceId" = any ($16::uuid[])
+                  )
+                  or exists (
+                    select
+                      1 as "exists"
+                    from
+                      "shared_space_library"
+                    where
+                      "shared_space_library"."libraryId" = "asset"."libraryId"
+                      and "shared_space_library"."spaceId" = any ($17::uuid[])
+                  )
+                  or (
+                    exists (
+                      select
+                        1 as "exists"
+                      from
+                        "shared_space_album"
+                        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                        inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                        and "linked_album"."deletedAt" is null
+                      where
+                        "album_asset"."assetId" = "asset"."id"
+                        and "shared_space_album"."spaceId" = any ($18::uuid[])
+                        and "shared_space_album"."showInTimeline" = $19
+                    )
+                    or exists (
+                      select
+                        1 as "exists"
+                      from
+                        "shared_space_album"
+                        inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                        and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                        inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                        and "linked_album"."deletedAt" is null
+                      where
+                        "album_space_asset"."assetId" = "asset"."id"
+                        and "shared_space_album"."spaceId" = any ($20::uuid[])
+                        and "shared_space_album"."showInTimeline" = $21
+                    )
+                  )
                 )
               )
             )
-            and "asset"."visibility" = $18
-            and "asset"."type" = $19
+            and "asset"."visibility" = $22
+            and "asset"."type" = $23
             and "asset"."deletedAt" is null
             and "asset_exif"."city" > "cte"."city"
           order by
             "city"
           limit
-            $20
+            $24
         ) as "l" on true
     )
   )
@@ -691,7 +754,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -730,61 +803,67 @@ with recursive
       where
         (
           "asset"."ownerId" = any ($1::uuid[])
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_asset"
-            where
-              "shared_space_asset"."assetId" = "asset"."id"
-              and "shared_space_asset"."spaceId" = any ($2::uuid[])
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_library"
-            where
-              "shared_space_library"."libraryId" = "asset"."libraryId"
-              and "shared_space_library"."spaceId" = any ($3::uuid[])
-          )
           or (
-            exists (
-              select
-                1 as "exists"
-              from
-                "shared_space_album"
-                inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                and "album"."deletedAt" is null
-              where
-                "album_asset"."assetId" = "asset"."id"
-                and "shared_space_album"."spaceId" = any ($4::uuid[])
-                and "shared_space_album"."showInTimeline" = $5
-            )
-            or exists (
-              select
-                1 as "exists"
-              from
-                "shared_space_album"
-                inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-                and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                and "album"."deletedAt" is null
-              where
-                "album_space_asset"."assetId" = "asset"."id"
-                and "shared_space_album"."spaceId" = any ($6::uuid[])
-                and "shared_space_album"."showInTimeline" = $7
+            "asset"."visibility" in ($2, $3)
+            and "asset"."deletedAt" is null
+            and (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_asset"
+                where
+                  "shared_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_asset"."spaceId" = any ($4::uuid[])
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_library"
+                where
+                  "shared_space_library"."libraryId" = "asset"."libraryId"
+                  and "shared_space_library"."spaceId" = any ($5::uuid[])
+              )
+              or (
+                exists (
+                  select
+                    1 as "exists"
+                  from
+                    "shared_space_album"
+                    inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                    inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                    and "linked_album"."deletedAt" is null
+                  where
+                    "album_asset"."assetId" = "asset"."id"
+                    and "shared_space_album"."spaceId" = any ($6::uuid[])
+                    and "shared_space_album"."showInTimeline" = $7
+                )
+                or exists (
+                  select
+                    1 as "exists"
+                  from
+                    "shared_space_album"
+                    inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                    and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                    inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                    and "linked_album"."deletedAt" is null
+                  where
+                    "album_space_asset"."assetId" = "asset"."id"
+                    and "shared_space_album"."spaceId" = any ($8::uuid[])
+                    and "shared_space_album"."showInTimeline" = $9
+                )
+              )
             )
           )
         )
-        and "asset"."visibility" = $8
-        and "asset"."type" = $9
+        and "asset"."visibility" = $10
+        and "asset"."type" = $11
         and "asset"."deletedAt" is null
       order by
         "city"
       limit
-        $10
+        $12
     )
     union all
     (
@@ -802,63 +881,69 @@ with recursive
             inner join "asset" on "asset"."id" = "asset_exif"."assetId"
           where
             (
-              "asset"."ownerId" = any ($11::uuid[])
-              or exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_asset"
-                where
-                  "shared_space_asset"."assetId" = "asset"."id"
-                  and "shared_space_asset"."spaceId" = any ($12::uuid[])
-              )
-              or exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_library"
-                where
-                  "shared_space_library"."libraryId" = "asset"."libraryId"
-                  and "shared_space_library"."spaceId" = any ($13::uuid[])
-              )
+              "asset"."ownerId" = any ($13::uuid[])
               or (
-                exists (
-                  select
-                    1 as "exists"
-                  from
-                    "shared_space_album"
-                    inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                    inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                    and "album"."deletedAt" is null
-                  where
-                    "album_asset"."assetId" = "asset"."id"
-                    and "shared_space_album"."spaceId" = any ($14::uuid[])
-                    and "shared_space_album"."showInTimeline" = $15
-                )
-                or exists (
-                  select
-                    1 as "exists"
-                  from
-                    "shared_space_album"
-                    inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-                    and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                    inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                    and "album"."deletedAt" is null
-                  where
-                    "album_space_asset"."assetId" = "asset"."id"
-                    and "shared_space_album"."spaceId" = any ($16::uuid[])
-                    and "shared_space_album"."showInTimeline" = $17
+                "asset"."visibility" in ($14, $15)
+                and "asset"."deletedAt" is null
+                and (
+                  exists (
+                    select
+                      1 as "exists"
+                    from
+                      "shared_space_asset"
+                    where
+                      "shared_space_asset"."assetId" = "asset"."id"
+                      and "shared_space_asset"."spaceId" = any ($16::uuid[])
+                  )
+                  or exists (
+                    select
+                      1 as "exists"
+                    from
+                      "shared_space_library"
+                    where
+                      "shared_space_library"."libraryId" = "asset"."libraryId"
+                      and "shared_space_library"."spaceId" = any ($17::uuid[])
+                  )
+                  or (
+                    exists (
+                      select
+                        1 as "exists"
+                      from
+                        "shared_space_album"
+                        inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                        inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                        and "linked_album"."deletedAt" is null
+                      where
+                        "album_asset"."assetId" = "asset"."id"
+                        and "shared_space_album"."spaceId" = any ($18::uuid[])
+                        and "shared_space_album"."showInTimeline" = $19
+                    )
+                    or exists (
+                      select
+                        1 as "exists"
+                      from
+                        "shared_space_album"
+                        inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                        and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                        inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                        and "linked_album"."deletedAt" is null
+                      where
+                        "album_space_asset"."assetId" = "asset"."id"
+                        and "shared_space_album"."spaceId" = any ($20::uuid[])
+                        and "shared_space_album"."showInTimeline" = $21
+                    )
+                  )
                 )
               )
             )
-            and "asset"."visibility" = $18
-            and "asset"."type" = $19
+            and "asset"."visibility" = $22
+            and "asset"."type" = $23
             and "asset"."deletedAt" is null
             and "asset_exif"."city" > "cte"."city"
           order by
             "city"
           limit
-            $20
+            $24
         ) as "l" on true
     )
   )
@@ -872,7 +957,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -898,7 +993,7 @@ select
       "asset_favorite"
     where
       "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $21::uuid
+      and "asset_favorite"."userId" = $25::uuid
   ) as "isFavoriteForUser"
 from
   "asset"
@@ -983,7 +1078,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1030,7 +1135,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1060,10 +1175,17 @@ where
     exists (
       select
       from
-        "album_asset"
+        (
+          select
+            "album_asset"."albumId" as "albumId",
+            "album_asset"."assetId" as "assetId"
+          from
+            "album_asset"
+          where
+            "album_asset"."albumId" = any ($3::uuid[])
+        ) as "album_asset"
       where
         "album_asset"."assetId" = "asset"."id"
-        and "album_asset"."albumId" = any ($3::uuid[])
     )
     or (
       "asset_exif"."city" = $4
@@ -1089,7 +1211,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1136,7 +1268,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1183,7 +1325,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1230,7 +1382,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1277,7 +1439,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1324,7 +1496,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1378,7 +1560,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1407,10 +1599,17 @@ where
   and exists (
     select
     from
-      "album_asset"
+      (
+        select
+          "album_asset"."albumId" as "albumId",
+          "album_asset"."assetId" as "assetId"
+        from
+          "album_asset"
+        where
+          "album_asset"."albumId" = any ($3::uuid[])
+      ) as "album_asset"
     where
       "album_asset"."assetId" = "asset"."id"
-      and "album_asset"."albumId" = any ($3::uuid[])
   )
 order by
   "asset"."fileCreatedAt" desc,
@@ -1431,7 +1630,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1492,7 +1701,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1521,10 +1740,17 @@ where
   and exists (
     select
     from
-      "album_asset"
+      (
+        select
+          "album_asset"."albumId" as "albumId",
+          "album_asset"."assetId" as "assetId"
+        from
+          "album_asset"
+        where
+          "album_asset"."albumId" = any ($3::uuid[])
+      ) as "album_asset"
     where
       "album_asset"."assetId" = "asset"."id"
-      and "album_asset"."albumId" = any ($3::uuid[])
   )
 order by
   "asset"."fileCreatedAt" desc,
@@ -1545,7 +1771,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1600,7 +1836,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1660,7 +1906,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1713,7 +1969,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1767,7 +2033,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1817,7 +2093,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1864,7 +2150,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1914,7 +2210,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1962,7 +2268,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2009,7 +2325,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2037,15 +2363,7 @@ where
     or "asset"."ownerId" = $3
   )
   and (
-    exists (
-      select
-        1 as "exists"
-      from
-        "asset_favorite"
-      where
-        "asset_favorite"."assetId" = "asset"."id"
-        and "asset_favorite"."userId" = $4::uuid
-    )
+    "asset"."isFavorite" = $4
     or exists (
       select
       from
@@ -2076,7 +2394,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2107,24 +2435,23 @@ where
     and "asset"."fileCreatedAt" >= $4
     and (
       (
-        exists (
-          select
-            1 as "exists"
-          from
-            "asset_favorite"
-          where
-            "asset_favorite"."assetId" = "asset"."id"
-            and "asset_favorite"."userId" = $5::uuid
-        )
+        "asset"."isFavorite" = $5
         and "asset"."ownerId" = any ($6::uuid[])
       )
       or exists (
         select
         from
-          "album_asset"
+          (
+            select
+              "album_asset"."albumId" as "albumId",
+              "album_asset"."assetId" as "assetId"
+            from
+              "album_asset"
+            where
+              "album_asset"."albumId" = any ($7::uuid[])
+          ) as "album_asset"
         where
           "album_asset"."assetId" = "asset"."id"
-          and "album_asset"."albumId" = any ($7::uuid[])
       )
     )
   )
@@ -2147,7 +2474,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2174,15 +2511,7 @@ where
     "asset"."visibility" != $2
     or "asset"."ownerId" = $3
   )
-  and exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
-  )
+  and "asset"."isFavorite" = $4
 order by
   "asset"."fileCreatedAt" desc,
   "asset"."id" desc
@@ -2202,7 +2531,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2246,7 +2585,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2273,15 +2622,7 @@ where
     "asset"."visibility" != $2
     or "asset"."ownerId" = $3
   )
-  and exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
-  )
+  and "asset"."isFavorite" = $4
 order by
   random()
 limit
@@ -2301,7 +2642,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2353,7 +2704,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2408,7 +2769,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2491,15 +2862,7 @@ where
     or "asset"."ownerId" = $3
   )
   and (
-    exists (
-      select
-        1 as "exists"
-      from
-        "asset_favorite"
-      where
-        "asset_favorite"."assetId" = "asset"."id"
-        and "asset_favorite"."userId" = $4::uuid
-    )
+    "asset"."isFavorite" = $4
     or not exists (
       select
       from

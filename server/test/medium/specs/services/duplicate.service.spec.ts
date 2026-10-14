@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { BulkIdErrorReason, BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto.js';
-import { AssetStatus, AssetVisibility } from 'src/enum.js';
+import { AssetStatus, AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -29,10 +29,7 @@ const setup = (db?: Kysely<DB>) => {
       AccessRepository,
       AlbumRepository,
       AssetRepository,
-      // gallery-fork (#763): per-user favorites live in their own overlay table, so the keeper's
-      // merged favorite is written by AssetFavoriteRepository.mergeOnto rather than an
-      // asset."isFavorite" column. Real rather than mocked: 'should merge isFavorite into the
-      // keeper' asserts the merged row is readable back through AssetRepository.getById.
+      // Gallery: AssetFavoriteRepository.mergeOnto carries other users' favorites of the trashed copies to the keeper.
       AssetFavoriteRepository,
       ConfigRepository,
       DuplicateRepository,
@@ -340,6 +337,51 @@ describe(DuplicateService.name, () => {
       ]);
 
       await expect(ctx.get(AssetRepository).getById(theirs.id)).resolves.toMatchObject({ deletedAt: null });
+    });
+
+    it("should not write onto another owner's keeper in a group the caller joined", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+
+      const theirs = await newDuplicateAsset(ctx, { ownerId: other.id, duplicateId }, { description: 'theirs' });
+      // PUT /assets lets the caller set any duplicateId on an asset they own, so they can join another owner's group.
+      const mine = await newDuplicateAsset(
+        ctx,
+        { ownerId: user.id, duplicateId, isFavorite: true },
+        { description: 'mine' },
+      );
+      const tag = await newTag(ctx, user.id, 'mine');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [mine.id] });
+      // The caller edits a space holding their copy, so an unchecked resolve would add the keeper to it.
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Editor });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: mine.id, addedById: user.id });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const results = await sut.resolve(auth, {
+        groups: [{ duplicateId, keepAssetIds: [theirs.id], trashAssetIds: [mine.id] }],
+      });
+
+      await expect(
+        ctx.database.selectFrom('shared_space_asset').select('assetId').where('spaceId', '=', space.id).execute(),
+      ).resolves.toEqual([{ assetId: mine.id }]);
+      await expect(ctx.get(AssetRepository).getById(theirs.id, { exifInfo: true, tags: true })).resolves.toMatchObject({
+        isFavorite: false,
+        duplicateId,
+        exifInfo: { description: 'theirs' },
+        tags: [],
+      });
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ deletedAt: null });
+      expect(results).toEqual([
+        {
+          id: duplicateId,
+          success: false,
+          error: BulkIdErrorReason.NO_PERMISSION,
+          errorMessage: 'No permission to update assets',
+        },
+      ]);
     });
 
     it('should resolve several groups in one request', async () => {

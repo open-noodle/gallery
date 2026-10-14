@@ -10,12 +10,13 @@ import {
   PrimaryGeneratedColumn,
   Table,
   type Timestamp,
+  TriggerFunction,
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums.js';
-import { asset_delete_audit, asset_face_update_asset_state, asset_library_delete_audit } from 'src/schema/functions.js';
+import { asset_delete_audit, asset_face_update_asset_state, asset_is_favorite_after_write, asset_library_delete_audit } from 'src/schema/functions.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
 import { StackTable } from 'src/schema/tables/stack.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
@@ -43,6 +44,17 @@ import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
   function: asset_library_delete_audit,
   referencingOldTableAs: 'old',
   when: 'pg_trigger_depth() <= 1',
+})
+// Gallery-fork: a write to "isFavorite" from outside the fork's triggers (a stock Immich server)
+// becomes the owner's asset_favorite row. Row level: transition tables rule out a column list, and a
+// statement trigger would materialise every asset UPDATE.
+@TriggerFunction({
+  name: 'asset_is_favorite_after_write',
+  timing: 'after',
+  actions: ['insert', 'update'],
+  scope: 'row',
+  function: asset_is_favorite_after_write,
+  when: 'pg_trigger_depth() = 0',
 })
 // Checksums must be unique per user and library
 @Index({
@@ -97,6 +109,9 @@ export class AssetTable {
 
   @Column({ type: 'timestamp with time zone' })
   fileModifiedAt!: Timestamp;
+
+  @Column({ type: 'boolean', default: false })
+  isFavorite!: Generated<boolean>;
 
   @Column({ type: 'integer', nullable: true })
   duration!: number | null;

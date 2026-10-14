@@ -1059,17 +1059,7 @@ describe(SearchService.name, () => {
     });
   });
 
-  // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
-  // These are upstream's own V3 tests (immich-30179). Gallery keeps the search endpoints on the
-  // legacy builder and rejects the structured shape, so the service-level cases here exercise a
-  // path that now 400s by design; the reachable contract is covered by the "new shape routing"
-  // describe in src/services/search.service.spec.ts.
-  //
-  // Skipped rather than deleted: V3 itself is carried dormant and byte-compatible with upstream so
-  // its changes keep auto-merging, and these tests are what will validate the builder when we adopt
-  // it. Re-enable in the same change that restores the dispatch.
-  // See specs/2026-07-23-search-v3-coexistence-design.md.
-  describe.skip('new search shape', () => {
+  describe('new search shape', () => {
     it('should filter by an exif field and return a cursor-less single page', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
@@ -1289,6 +1279,51 @@ describe(SearchService.name, () => {
     });
   });
 
+  // Gallery's hooks on the structured search: the same RBAC as the flat search (the viewer-scope oracle compares
+  // the two per actor); these pin the re-gates that oracle does not seed.
+  describe('new search shape: Gallery scope', () => {
+    it("should keep the owner's hidden and trashed album assets from an album viewer", async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { asset: shown } = await ctx.newAsset({ ownerId: owner.id });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { asset: trashed } = await ctx.newAsset({ ownerId: owner.id, deletedAt: new Date() });
+      const { album } = await ctx.newAlbum({ ownerId: owner.id }, [shown.id, hidden.id, trashed.id]);
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
+
+      const response = await sut.searchMetadata(factory.auth({ user: { id: viewer.id } }), {
+        size: 250,
+        filter: { albumIds: { any: [album.id] } },
+      });
+
+      expect(response.assets.items.map(({ id }) => id)).toEqual([shown.id]);
+    });
+
+    it("should widen to a member's spaces without their owner-private assets, and mark only the viewer's favourites", async () => {
+      const { sut, ctx } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      const { asset: shared } = await ctx.newAsset({ ownerId: owner.id, isFavorite: true });
+      const { asset: hidden } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
+      const { asset: trashed } = await ctx.newAsset({ ownerId: owner.id, deletedAt: new Date() });
+      for (const asset of [shared, hidden, trashed]) {
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+      }
+      const auth = factory.auth({ user: { id: member.id } });
+
+      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).resolves.toMatchObject({
+        assets: { items: [] },
+      });
+      const response = await sut.searchMetadata(auth, { size: 250, withSharedSpaces: true, filter: {} });
+      expect(response.assets.items).toEqual([expect.objectContaining({ id: shared.id, isFavorite: false })]);
+      await expect(
+        sut.searchMetadata(auth, { size: 250, withSharedSpaces: true, filter: { isFavorite: { eq: true } } }),
+      ).resolves.toMatchObject({ assets: { items: [] } });
+    });
+  });
   describe('getFilterSuggestions', () => {
     it('should return countries from the user assets', async () => {
       const { sut, ctx } = setup();

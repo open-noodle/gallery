@@ -30,6 +30,7 @@ import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { PersonSidecarFields, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
@@ -241,23 +242,9 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
     return { stack: { ...stack, primaryAssetId: assetIds[0] }, result };
   }
 
-  /**
-   * #763: `asset.isFavorite` is gone — a favorite is an `asset_favorite` row per (user, asset).
-   * Fixtures (upstream's and the fork's) still say `isFavorite: true` to mean "the OWNER has
-   * favorited this", so translate it here rather than rewriting every call site. Keeping the
-   * knob absorbs the idiom for tests that arrive from upstream later, too.
-   */
-  async newAsset(dto: Partial<Insertable<AssetTable>> & { isFavorite?: boolean } = {}) {
-    const { isFavorite, ...assetDto } = dto;
-    const asset = mediumFactory.assetInsert(assetDto);
+  async newAsset(dto: Partial<Insertable<AssetTable>> = {}) {
+    const asset = mediumFactory.assetInsert(dto);
     const result = await this.get(AssetRepository).create(asset);
-    if (isFavorite) {
-      await this.database
-        .insertInto('asset_favorite')
-        .values({ userId: asset.ownerId, assetId: asset.id })
-        .onConflict((oc) => oc.doNothing())
-        .execute();
-    }
     return { asset, result };
   }
 
@@ -714,6 +701,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case StackRepository:
     case SyncRepository:
     case GallerySyncRepository:
+    case VideoTrimRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -807,6 +795,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case SessionRepository:
     case SyncRepository:
     case GallerySyncRepository:
+    case VideoTrimRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -901,6 +890,7 @@ const assetInsert = (asset: Partial<Insertable<AssetTable>> = {}) => {
     type: AssetType.Image,
     originalPath: '/path/to/something.jpg',
     ownerId: 'not-a-valid-uuid',
+    isFavorite: false,
     fileCreatedAt: now,
     fileModifiedAt: now,
     localDateTime: now,

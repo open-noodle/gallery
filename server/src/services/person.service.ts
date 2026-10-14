@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import { isAbsolute } from 'node:path';
 import type { AccessibleIdentityFaceMatch } from 'src/repositories/face-identity.repository.js';
 import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import type { JobItem, JobOf } from 'src/types.js';
@@ -1039,12 +1038,6 @@ export class PersonService extends BaseService {
     const person = await this.personRepository.getByGroupId({ ownerId, personGroupId });
     if (!person) {
       return JobStatus.Failed;
-    }
-
-    if (!person.thumbnailPath || !isAbsolute(person.thumbnailPath)) {
-      // S3 thumbnails live under relative keys and are managed by the S3 backend, not fs.rename.
-      this.logger.debug(`Skipping person file migration for S3 person ${personGroupId}`);
-      return JobStatus.Skipped;
     }
 
     await this.storageCore.movePersonFile(person, PersonPathType.Face);

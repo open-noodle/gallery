@@ -583,5 +583,31 @@ describe(TagRepository.name, () => {
 
       expect(ids).toEqual(expect.arrayContaining([tagA.id, tagB.id]));
     });
+
+    it('GRANT: member sees a tag on a contribution to an album linked to the space, until the album is unlinked', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: contributor } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id, role: SharedSpaceRole.Editor });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'TagContribution' });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      const { asset } = await ctx.newAsset({ ownerId: contributor.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+      const tag = await createTag(ctx, contributor.id, 'contributed-tag');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
+
+      await expect(sut.getAll(member.id).then((r) => r.map((t) => t.id))).resolves.toContain(tag.id);
+
+      await ctx.database
+        .deleteFrom('shared_space_album')
+        .where('spaceId', '=', space.id)
+        .where('albumId', '=', album.id)
+        .execute();
+
+      await expect(sut.getAll(member.id).then((r) => r.map((t) => t.id))).resolves.not.toContain(tag.id);
+    });
   });
 });

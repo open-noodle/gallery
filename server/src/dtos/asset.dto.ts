@@ -10,7 +10,7 @@ const UpdateAssetBaseSchema = z
   .object({
     // #763: deprecated alias for PUT /assets/favorites. Still routes into the SAME service method
     // (AssetService.updateFavorites) as the canonical endpoint, behind this DTO's stricter
-    // Permission.AssetUpdate route guard — see docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §8.1.
+    // Permission.AssetUpdate route guard (see specs/2026-07-20-per-user-favorites-design.md §8.1).
     isFavorite: z
       .boolean()
       .optional()
@@ -190,7 +190,7 @@ const AssetEditableResponseSchema = z
 
 // #763: the canonical write surface for favorites. Gated on Permission.AssetRead (own assets,
 // shared-space assets at ANY role including viewer, shared-album, partner-shared) — see
-// docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §5.1. `ids` is bounded (E28):
+// specs/2026-07-20-per-user-favorites-design.md §5.1. `ids` is bounded (E28):
 // an explicit, documented limit rather than an unbounded statement.
 const AssetFavoriteUpdateSchema = z
   .object({

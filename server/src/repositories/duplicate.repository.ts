@@ -6,6 +6,7 @@ import { columns } from 'src/database.js';
 import { Chunked, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetStatus, AssetType, VectorIndex } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -50,6 +51,7 @@ export class DuplicateRepository {
                 qb
                   .selectFrom('asset_exif')
                   .selectAll('asset')
+                  .select(projectedDuration)
                   .select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser'))
                   .select((eb) =>
                     eb.fn
@@ -127,6 +129,7 @@ export class DuplicateRepository {
           qb
             .selectFrom('asset_exif')
             .selectAll('asset')
+            .select(projectedDuration)
             .select((eb) => eb.fn.toJson('asset_exif').as('exifInfo'))
             .select((eb) =>
               jsonArrayFrom(
@@ -154,6 +157,19 @@ export class DuplicateRepository {
     }
 
     return { duplicateId: result.duplicateId, assets: result.assets };
+  }
+
+  // Unlike get, sees trashed, stacked, hidden, locked and exif-less assets: any of them can rejoin the group later.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async hasOtherOwner(duplicateId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .selectFrom('asset')
+      .select('id')
+      .where('duplicateId', '=', asUuid(duplicateId))
+      .where('ownerId', '!=', asUuid(userId))
+      .limit(1)
+      .executeTakeFirst();
+    return !!result;
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })

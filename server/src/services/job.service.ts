@@ -2,7 +2,6 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JobItem } from 'src/types.js';
 import { OnEvent } from 'src/decorators.js';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
-import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { JobCreateDto } from 'src/dtos/job.dto.js';
 import { AssetType, AssetVisibility, IntegrityReport, JobName, JobStatus, ManualJobName } from 'src/enum.js';
 import { ArgsOf } from 'src/repositories/event.repository.js';
@@ -147,7 +146,7 @@ export class JobService extends BaseService {
         const edits = await this.assetEditRepository.getWithSyncInfo(item.data.id);
 
         if (asset) {
-          const payload = {
+          this.websocketRepository.clientSend('AssetEditReadyV2', asset.ownerId, {
             asset: {
               id: asset.id,
               ownerId: asset.ownerId,
@@ -161,11 +160,7 @@ export class JobService extends BaseService {
               duration: asset.duration,
               type: asset.type,
               deletedAt: asset.deletedAt,
-              // #763: OWNER-scoped — assetRepository.getById/getByIdsWithAllRelationsButStacks
-              // project `isFavorite` from favoriteExistsForOwner (SqlBool), not a plain boolean;
-              // both events here are always sent to the asset's owner, so this IS the correct
-              // value, just needing the same `!!` normalization mapAsset applies elsewhere.
-              isFavorite: !!asset.isFavorite,
+              isFavorite: asset.isFavorite,
               visibility: asset.visibility,
               livePhotoVideoId: asset.livePhotoVideoId,
               stackId: asset.stackId,
@@ -175,14 +170,7 @@ export class JobService extends BaseService {
               isEdited: asset.isEdited,
             },
             edit: edits,
-          };
-          // Stock Immich apps cannot decode trim edits; the sync stream drops them for the same clients.
-          this.websocketRepository.clientSendByClient(
-            'AssetEditReadyV2',
-            asset.ownerId,
-            [payload],
-            [{ ...payload, edit: edits.filter(({ action }) => action !== AssetEditAction.Trim) }],
-          );
+          });
         }
 
         break;
@@ -220,10 +208,12 @@ export class JobService extends BaseService {
           !asset.isExternal &&
           (asset.visibility === AssetVisibility.Timeline || asset.visibility === AssetVisibility.Archive)
         ) {
-          // #763: deliberately NOT projecting isFavoriteForUser — this is a background job with no
-          // auth (the asset came from getByIdsWithAllRelationsButStacks called with no authUserId
-          // above), so `false` is correct and matches pre-#763 behavior for this synthetic path.
-          this.websocketRepository.clientSend('on_upload_success', asset.ownerId, mapAsset(asset));
+          // Sent to the owner only, so the owner's projection is the recipient's favorite.
+          this.websocketRepository.clientSend(
+            'on_upload_success',
+            asset.ownerId,
+            mapAsset({ ...asset, isFavoriteForUser: asset.isFavorite }),
+          );
           if (asset.exifInfo) {
             const exif = asset.exifInfo;
             this.websocketRepository.clientSend('AssetUploadReadyV2', asset.ownerId, {
@@ -241,11 +231,7 @@ export class JobService extends BaseService {
                 duration: asset.duration,
                 type: asset.type,
                 deletedAt: asset.deletedAt,
-                // #763: OWNER-scoped — assetRepository.getById/getByIdsWithAllRelationsButStacks
-                // project `isFavorite` from favoriteExistsForOwner (SqlBool), not a plain boolean;
-                // both events here are always sent to the asset's owner, so this IS the correct
-                // value, just needing the same `!!` normalization mapAsset applies elsewhere.
-                isFavorite: !!asset.isFavorite,
+                isFavorite: asset.isFavorite,
                 visibility: asset.visibility,
                 livePhotoVideoId: asset.livePhotoVideoId,
                 stackId: asset.stackId,

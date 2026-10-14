@@ -4,7 +4,6 @@ import { DateTime, Duration } from 'luxon';
 import { Writable } from 'node:stream';
 import { OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { SyncAckDeleteDto, SyncAckSetDto, SyncStreamDto, syncAlbumV2ToV1 } from 'src/dtos/sync.dto.js';
 import { JobName, MemoryType, QueueName, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
@@ -173,7 +172,7 @@ export class SyncService extends BaseService {
       [SyncRequestType.PartnersV1]: () => this.syncPartnersV1(options, response, checkpointMap),
       [SyncRequestType.AssetsV2]: () => this.syncAssetsV2(options, response, checkpointMap),
       [SyncRequestType.AssetExifsV1]: () => this.syncAssetExifsV1(options, response, checkpointMap),
-      [SyncRequestType.AssetEditsV1]: () => this.syncAssetEditsV1(options, response, checkpointMap, forkAwareClient),
+      [SyncRequestType.AssetEditsV1]: () => this.syncAssetEditsV1(options, response, checkpointMap),
       [SyncRequestType.PartnerAssetsV2]: () => this.syncPartnerAssetsV2(options, response, checkpointMap, session.id),
       [SyncRequestType.AssetMetadataV1]: () => this.syncAssetMetadataV1(options, response, checkpointMap, auth),
       [SyncRequestType.PartnerAssetExifsV1]: () =>
@@ -404,12 +403,7 @@ export class SyncService extends BaseService {
     }
   }
 
-  private async syncAssetEditsV1(
-    options: SyncQueryOptions,
-    response: Writable,
-    checkpointMap: CheckpointMap,
-    isForkAwareClient: boolean,
-  ) {
+  private async syncAssetEditsV1(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
     const deleteType = SyncEntityType.AssetEditDeleteV1;
     const deletes = this.syncRepository.assetEdit.getDeletes({ ...options, ack: checkpointMap[deleteType] });
 
@@ -420,9 +414,6 @@ export class SyncService extends BaseService {
     const upserts = this.syncRepository.assetEdit.getUpserts({ ...options, ack: checkpointMap[upsertType] });
 
     for await (const { updateId, ...data } of upserts) {
-      if (!isForkAwareClient && data.action === AssetEditAction.Trim) {
-        continue;
-      }
       await send(response, { type: upsertType, ids: [updateId], data });
     }
   }

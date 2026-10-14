@@ -5,6 +5,7 @@ import type { ExpressionBuilder, Insertable, Kysely, Updateable } from 'kysely';
 import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { StackTable } from 'src/schema/tables/stack.table.js';
 import { asUuid, withDefaultVisibility } from 'src/utils/database.js';
@@ -25,6 +26,7 @@ const withAssets = (eb: ExpressionBuilder<DB, 'stack'>, withTags = false, authUs
     eb
       .selectFrom('asset')
       .selectAll('asset')
+      .select(projectedDuration)
       .innerJoinLateral(
         (eb) =>
           eb

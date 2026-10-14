@@ -224,8 +224,7 @@ describe(TimelineService.name, () => {
 
       const favorited = await createTimelineAsset(ctx, user.id, new Date('2024-04-02T12:00:00.000Z'));
       await createTimelineAsset(ctx, user.id, new Date('2024-04-03T12:00:00.000Z'));
-      // #763: isFavorite now filters against the asset_favorite overlay for the caller, not the
-      // legacy asset.isFavorite column.
+      // #763: isFavorite filters against the caller's asset_favorite overlay, not the owner's column.
       await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favorited.id }).execute();
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Month, isFavorite: true })).resolves.toEqual([
@@ -269,8 +268,7 @@ describe(TimelineService.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
 
-      // Not favorited: no asset_favorite overlay row seeded (there is no raw column to default
-      // false anymore — dropped in slice 3).
+      // Not favorited: no asset_favorite overlay row seeded.
       await createTimelineAsset(ctx, user.id, new Date('2024-05-01T12:00:00.000Z'));
 
       await expect(sut.getTimeBuckets(auth, { bucketSize: TimeBucketSize.Year, isFavorite: true })).resolves.toEqual(
@@ -529,9 +527,8 @@ describe(TimelineService.name, () => {
         }),
       ]);
 
-      // #763: each owner has favorited only their own asset in the asset_favorite overlay — the
-      // legacy asset.isFavorite column is never set here, so this is exercised purely against the
-      // overlay, same as production once the (currently untouched) write path records a favorite.
+      // #763: each owner has favorited only their own asset in the asset_favorite overlay, the
+      // only table Gallery writes a favorite to.
       await ctx.database
         .insertInto('asset_favorite')
         .values([

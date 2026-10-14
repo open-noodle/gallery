@@ -9,6 +9,7 @@ import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -40,6 +41,7 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
+      DuplicateRepository,
       PersonRepository,
       SharedLinkAssetRepository,
       SharedSpaceRepository,
@@ -253,18 +255,13 @@ describe(AssetService.name, () => {
       expect(stack!.assets.length).toEqual(3);
     });
 
-    // #763 slice 7 (E20): copy carries the ACTING user's own overlay row for the source, not the
-    // raw (now-legacy) asset.isFavorite column — `ctx.newAsset({ isFavorite: true })` only seeds
-    // that column for backfill-style fixtures, so the acting user must ALSO hold a real
-    // asset_favorite row on the source for it to transfer.
-    it('should copy favorite status for the acting user', async () => {
+    it('should copy favorite status', async () => {
       const { sut, ctx } = setup();
-      const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);
+      const assetRepo = ctx.get(AssetRepository);
 
       const { user } = await ctx.newUser();
-      const { asset: oldAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: oldAsset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
       const { asset: newAsset } = await ctx.newAsset({ ownerId: user.id });
-      await assetFavoriteRepo.addAll(user.id, [oldAsset.id]);
 
       await ctx.newExif({ assetId: oldAsset.id, description: 'foo' });
       await ctx.newExif({ assetId: newAsset.id, description: 'bar' });
@@ -272,10 +269,10 @@ describe(AssetService.name, () => {
       const auth = factory.auth({ user: { id: user.id } });
       await sut.copy(auth, { sourceId: oldAsset.id, targetId: newAsset.id });
 
-      await expect(sut.get(auth, newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: true }));
+      await expect(assetRepo.getById(newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: true }));
     });
 
-    it("should not copy another user's favorite of the source (E20)", async () => {
+    it("should not copy another user's favorite of the source", async () => {
       const { sut, ctx } = setup();
       const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);
 
@@ -288,7 +285,7 @@ describe(AssetService.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: newAsset.id, addedById: owner.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: otherUser.id, role: 'viewer' });
 
-      // otherUser favorited the source; owner (the ACTOR performing the copy) did not.
+      // otherUser favorited the source; the owner did not, so the copied column stays false.
       await assetFavoriteRepo.addAll(otherUser.id, [oldAsset.id]);
 
       await ctx.newExif({ assetId: oldAsset.id, description: 'foo' });
@@ -572,6 +569,35 @@ describe(AssetService.name, () => {
   });
 
   describe('updateAll', () => {
+    it("should not join another owner's duplicate group", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+      const { asset: theirs } = await ctx.newAsset({ ownerId: other.id, duplicateId });
+      await ctx.newExif({ assetId: theirs.id, fileSizeInByte: 1000 });
+      const { asset: mine } = await ctx.newAsset({ ownerId: user.id });
+
+      await expect(sut.updateAll(factory.auth({ user }), { ids: [mine.id], duplicateId })).rejects.toThrow(
+        'Duplicate grouping can only join a group of assets you own',
+      );
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ duplicateId: null });
+    });
+
+    it("should not join another owner's duplicate group whose only asset is trashed", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+      await ctx.newAsset({ ownerId: other.id, duplicateId, deletedAt: new Date() });
+      const { asset: mine } = await ctx.newAsset({ ownerId: user.id });
+
+      await expect(sut.updateAll(factory.auth({ user }), { ids: [mine.id], duplicateId })).rejects.toThrow(
+        'Duplicate grouping can only join a group of assets you own',
+      );
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ duplicateId: null });
+    });
+
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queueAll.mockResolvedValue();
