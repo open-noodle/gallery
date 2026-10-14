@@ -1,3 +1,4 @@
+import { galleryAppHeader } from '#lib/gallery/client-header.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
@@ -54,6 +55,8 @@ const websocket: Socket<Events> = io({
   reconnection: true,
   forceNew: true,
   autoConnect: false,
+  // browsers cannot set headers on a websocket upgrade, so the marker travels in the handshake auth payload
+  auth: galleryAppHeader,
 });
 
 export const websocketStore = {

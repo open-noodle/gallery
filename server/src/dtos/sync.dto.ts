@@ -11,10 +11,12 @@ import {
   MemoryTypeSchema,
   SyncEntityType,
   SyncEntityTypeSchema,
+  SyncRequestType,
   SyncRequestTypeSchema,
   UserAvatarColorSchema,
   UserMetadataKeySchema,
 } from 'src/enum.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { isoDatetimeToDate } from 'src/validation.js';
 
 const SyncUserV1Schema = z
@@ -805,13 +807,28 @@ export type SyncItem = {
   [SyncEntityType.SharedSpaceAlbumAssetExifBackfillV1]: SyncAssetExifV1;
 };
 
-// mobile-1: the client version-gates the fork-only SharedSpaceAlbum* request types
-// (sync_api.repository.dart) so it never sends them to a server that predates them — that is the
-// fix for the app-ahead-of-server outage. The server keeps strict enum validation (unknown request
-// types are rejected), preserving the established API contract.
+// Unknown request types are dropped, not rejected: a client newer than this server (a stock Immich app
+// clears upstream's version gates against Gallery's 5.x version) would otherwise lose its whole stream.
+const knownSyncRequestTypes = new Set<unknown>(Object.values(SyncRequestType));
+const syncStreamLogger = LoggingRepository.create('SyncStreamDto');
+const dropUnknownSyncRequestTypes = (types: unknown) => {
+  if (!Array.isArray(types)) {
+    return types;
+  }
+  const unknown = types.filter((type) => typeof type === 'string' && !knownSyncRequestTypes.has(type));
+  if (unknown.length > 0) {
+    syncStreamLogger.debug(`Ignoring unknown sync request types: ${unknown.join(', ')}`);
+  }
+  return types.filter((type) => !unknown.includes(type));
+};
+
 const SyncStreamSchema = z
   .object({
-    types: z.array(SyncRequestTypeSchema).describe('Sync request types'),
+    // nonoptional: z.preprocess alone would drop `types` from the OpenAPI `required` list
+    types: z
+      .preprocess(dropUnknownSyncRequestTypes, z.array(SyncRequestTypeSchema))
+      .nonoptional()
+      .describe('Sync request types'),
     reset: z.boolean().optional().describe('Reset sync state'),
   })
   .meta({ id: 'SyncStreamDto' });
