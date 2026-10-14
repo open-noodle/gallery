@@ -19,7 +19,7 @@ import { getKyselyDB } from 'test/utils.js';
 // this is a LIVE staleness bug, not incidental tsc fallout from the slice-3 column drop.
 //
 // These events are always sent to the asset's OWNER (`this.websocketRepository.clientSend(event,
-// asset.ownerId, ...)`), so the correct semantics are the OWNER's favorite state — exactly what
+// asset.ownerId, ...)` / `clientSendByClient`), so the correct semantics are the OWNER's favorite state, exactly what
 // `favoriteExistsForOwner` (src/utils/favorite.ts) resolves. This spec seeds the OWNER's favorite
 // via the `asset_favorite` overlay ONLY (never the raw column — the app no longer writes it) and
 // asserts the emitted payload reflects it, then asserts a NON-owner's favorite does not leak onto
@@ -58,10 +58,11 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
       data: { id: asset.id },
     });
 
-    expect(ctx.getMock(WebsocketRepository).clientSend).toHaveBeenCalledWith(
+    expect(ctx.getMock(WebsocketRepository).clientSendByClient).toHaveBeenCalledWith(
       'AssetEditReadyV2',
       owner.id,
-      expect.objectContaining({ asset: expect.objectContaining({ isFavorite: true }) }),
+      [expect.objectContaining({ asset: expect.objectContaining({ isFavorite: true }) })],
+      expect.any(Array),
     );
   });
 
@@ -82,10 +83,11 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
       data: { id: asset.id },
     });
 
-    expect(ctx.getMock(WebsocketRepository).clientSend).toHaveBeenCalledWith(
+    expect(ctx.getMock(WebsocketRepository).clientSendByClient).toHaveBeenCalledWith(
       'AssetEditReadyV2',
       owner.id,
-      expect.objectContaining({ asset: expect.objectContaining({ isFavorite: false }) }),
+      [expect.objectContaining({ asset: expect.objectContaining({ isFavorite: false }) })],
+      expect.any(Array),
     );
   });
 });

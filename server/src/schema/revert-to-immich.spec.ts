@@ -31,6 +31,34 @@ for (const file of migrationFiles) {
   }
 }
 
+// Columns and indexes the fork's up() migrations add to UPSTREAM tables (any table migrations-gallery
+// did not create). down() bodies are skipped: they restore upstream schema, e.g. asset."isFavorite".
+const upBody = (content: string) => {
+  const start = content.indexOf('function up(');
+  const end = content.indexOf('function down(');
+  return content.slice(start, end > start ? end : undefined);
+};
+const upstreamColumns = new Set<string>();
+const upstreamIndexes = new Set<string>();
+for (const file of migrationFiles) {
+  const up = upBody(readFileSync(join(migrationsGalleryDir, file), 'utf8'));
+  for (const m of up.matchAll(/ALTER TABLE "?(\w+)"?\s+ADD\s+(?:COLUMN\s+)?(?:IF NOT EXISTS\s+)?"?(\w+)"?/g)) {
+    if (m[2] !== 'CONSTRAINT') {
+      upstreamColumns.add(`${m[1]}.${m[2]}`);
+    }
+  }
+  for (const m of up.matchAll(/alterTable\('(\w+)'\)\s*\.addColumn\('(\w+)'/g)) {
+    upstreamColumns.add(`${m[1]}.${m[2]}`);
+  }
+  for (const m of up.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF NOT EXISTS\s+)?"?(\w+)"?\s+ON\s+"?(\w+)"?/g)) {
+    upstreamIndexes.add(`${m[2]}.${m[1]}`);
+  }
+  for (const m of up.matchAll(/createIndex\('(\w+)'\)\s*\.on\('(\w+)'\)/g)) {
+    upstreamIndexes.add(`${m[2]}.${m[1]}`);
+  }
+}
+const onUpstreamTable = (entry: string) => !createdTables.has(entry.split('.', 1)[0]);
+
 // Every table migrations-gallery CREATEs is a fork table and needs a revert entry.
 // (Was previously narrowed to shared_space* / *_audit, which silently excluded
 // fork tables outside those naming conventions — e.g. asset_favorite. #763)
@@ -59,6 +87,52 @@ describe('revert-to-immich.sql', () => {
   it('lists every migrations-gallery migration in the step-8 kysely_migrations DELETE block', () => {
     const missing = migrationNames.filter((name) => !deleteBlock.includes(`'${name}'`));
     expect(missing).toEqual([]);
+  });
+
+  it('drops every column a fork migration adds to an upstream table', () => {
+    const columns = [...upstreamColumns].filter((entry) => onUpstreamTable(entry));
+    expect(columns.length).toBeGreaterThan(0);
+    const missing = columns.filter((entry) => {
+      const [table, column] = entry.split('.', 2);
+      return !new RegExp(String.raw`ALTER TABLE "${table}"\s+DROP COLUMN IF EXISTS "${column}"`).test(sql);
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it('drops every index a fork migration creates on an upstream table', () => {
+    const indexes = [...upstreamIndexes].filter((entry) => onUpstreamTable(entry));
+    expect(indexes.length).toBeGreaterThan(0);
+    const missing = indexes.filter((entry) => !sql.includes(`DROP INDEX IF EXISTS "${entry.split('.', 2)[1]}"`));
+    expect(missing).toEqual([]);
+  });
+
+  it('runs every data-hygiene step before section 2 drops the fork tables', () => {
+    const section2 = sql.indexOf('DROP TABLE IF EXISTS');
+    const steps = [
+      'Storage Migration to disk',
+      'DELETE FROM "asset_face"',
+      'DELETE FROM "person_group"',
+      `DELETE FROM "memory" WHERE "type" = 'rule'`,
+      'SET "thumbhash" = NULL',
+      `'originalDuration'`,
+      `DELETE FROM "asset_edit" WHERE "action" = 'trim'`,
+      'DELETE FROM "shared_link_asset"',
+      'DELETE FROM "shared_link" sl',
+      'DELETE FROM "system_metadata"',
+      'UPDATE "api_key"',
+    ];
+    for (const step of steps) {
+      const at = sql.indexOf(step);
+      expect(at, step).toBeGreaterThan(-1);
+      expect(at, step).toBeLessThan(section2);
+    }
+  });
+
+  it('checks for S3 keys before any destructive statement', () => {
+    const guard = sql.indexOf('Storage Migration to disk');
+    const firstWrite = sql.search(/^\s*(?:DROP|ALTER|DELETE|UPDATE)\b/m);
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(firstWrite);
   });
 
   it('restores asset.isFavorite before dropping asset_favorite', () => {

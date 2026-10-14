@@ -5,6 +5,7 @@ import { Writable } from 'node:stream';
 import type { SyncAck } from 'src/types.js';
 import { OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
+import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import {
   SyncAckDeleteDto,
   SyncAckSetDto,
@@ -78,6 +79,34 @@ export const send = async <T extends keyof SyncItem, D extends SyncItem[T]>(
 const sendEntityBackfillCompleteAck = async (response: Writable, ackType: SyncEntityType, id: string) => {
   await send(response, { type: SyncEntityType.SyncAckV1, data: {}, ackType, ids: [id, COMPLETE_ID] });
 };
+
+// Request types upstream Immich does not have. A stock Immich client cannot request any of them,
+// and a Gallery app always requests SharedSpacesV1.
+const forkSyncRequestTypes = new Set<SyncRequestType>([
+  SyncRequestType.AssetFavoritesV1,
+  SyncRequestType.SharedSpacesV1,
+  SyncRequestType.SharedSpaceMembersV1,
+  SyncRequestType.SharedSpaceAssetsV1,
+  SyncRequestType.SharedSpaceAssetExifsV1,
+  SyncRequestType.SharedSpaceToAssetsV1,
+  SyncRequestType.LibrariesV1,
+  SyncRequestType.LibraryAssetsV1,
+  SyncRequestType.LibraryAssetExifsV1,
+  SyncRequestType.SharedSpaceLibrariesV1,
+  SyncRequestType.SharedSpaceAlbumsV1,
+  SyncRequestType.SharedSpaceAlbumLinksV1,
+  SyncRequestType.SharedSpaceAlbumFoldersV1,
+  SyncRequestType.SharedSpaceAlbumToAssetsV1,
+  SyncRequestType.SharedSpaceAlbumAssetsV1,
+  SyncRequestType.SharedSpaceAlbumAssetExifsV1,
+  SyncRequestType.SharedSpaceAlbumHiddensV1,
+]);
+
+/**
+ * A stock Immich client aborts its whole sync on a value its generated client cannot decode,
+ * so fork-only rows (rule memories, trim edits) and pets reach fork-aware clients only.
+ */
+export const isForkAwareClient = (dto: SyncStreamDto) => dto.types.some((type) => forkSyncRequestTypes.has(type));
 
 /**
  * Gallery's memory sync policy, shared by every memory stream version and by the memory photo
@@ -277,15 +306,7 @@ export class SyncService extends BaseService {
     const { nowId } = await this.syncCheckpointRepository.getNow();
     const options: SyncQueryOptions = { nowId, userId: auth.user.id };
 
-    // Gallery-fork-only memory types (e.g. rule-based "Smarter" memories) are sent verbatim in
-    // MemoryV1.type, but that field is a *required* enum in upstream Immich's OpenAPI spec whose
-    // only member is `on_this_day` — an unrecognized value there aborts an official Immich
-    // client's whole sync-stream parse, silently disabling background backup (#999). A
-    // gallery-fork client's generated Dart client has no such restriction, and unconditionally
-    // requests at least one gallery-fork-only sync type (SharedSpacesV1) alongside MemoriesV1, so
-    // its presence in the request reliably tells fork-aware clients apart from unmodified
-    // upstream ones, which have no way to request a type their client doesn't know exists.
-    const isForkAwareClient = dto.types.includes(SyncRequestType.SharedSpacesV1);
+    const forkAwareClient = isForkAwareClient(dto);
 
     const handlers: Record<SyncRequestType, () => Promise<void>> = {
       // deprecated handlers
@@ -300,7 +321,7 @@ export class SyncService extends BaseService {
       [SyncRequestType.PartnersV1]: () => this.syncPartnersV1(options, response, checkpointMap),
       [SyncRequestType.AssetsV2]: () => this.syncAssetsV2(options, response, checkpointMap),
       [SyncRequestType.AssetExifsV1]: () => this.syncAssetExifsV1(options, response, checkpointMap),
-      [SyncRequestType.AssetEditsV1]: () => this.syncAssetEditsV1(options, response, checkpointMap),
+      [SyncRequestType.AssetEditsV1]: () => this.syncAssetEditsV1(options, response, checkpointMap, forkAwareClient),
       [SyncRequestType.AssetFavoritesV1]: () => this.syncAssetFavoritesV1(options, response, checkpointMap),
       [SyncRequestType.PartnerAssetsV2]: () => this.syncPartnerAssetsV2(options, response, checkpointMap, session.id),
       [SyncRequestType.AssetMetadataV1]: () => this.syncAssetMetadataV1(options, response, checkpointMap, auth),
@@ -313,17 +334,17 @@ export class SyncService extends BaseService {
       [SyncRequestType.AlbumToAssetsV1]: () => this.syncAlbumToAssetsV1(options, response, checkpointMap, session.id),
       [SyncRequestType.AlbumAssetExifsV1]: () =>
         this.syncAlbumAssetExifsV1(options, response, checkpointMap, session.id),
-      [SyncRequestType.MemoriesV1]: () => this.syncMemoriesV1(options, response, checkpointMap, isForkAwareClient),
-      [SyncRequestType.MemoriesV2]: () => this.syncMemoriesV2(options, response, checkpointMap, isForkAwareClient),
+      [SyncRequestType.MemoriesV1]: () => this.syncMemoriesV1(options, response, checkpointMap, forkAwareClient),
+      [SyncRequestType.MemoriesV2]: () => this.syncMemoriesV2(options, response, checkpointMap, forkAwareClient),
       [SyncRequestType.MemoryToAssetsV1]: () =>
-        this.syncMemoryAssetsV1(options, response, checkpointMap, isForkAwareClient),
+        this.syncMemoryAssetsV1(options, response, checkpointMap, forkAwareClient),
       [SyncRequestType.MemoryToAssetsV2]: () =>
-        this.syncMemoryAssetsV2(options, response, checkpointMap, isForkAwareClient),
+        this.syncMemoryAssetsV2(options, response, checkpointMap, forkAwareClient),
       [SyncRequestType.StacksV1]: () => this.syncStackV1(options, response, checkpointMap),
       [SyncRequestType.PartnerStacksV1]: () => this.syncPartnerStackV1(options, response, checkpointMap, session.id),
-      [SyncRequestType.PeopleV1]: () => this.syncPeopleV1(options, response, checkpointMap),
-      [SyncRequestType.AssetFacesV2]: () => this.syncAssetFacesV2(options, response, checkpointMap),
-      [SyncRequestType.AssetFacesV3]: () => this.syncAssetFacesV3(options, response, checkpointMap),
+      [SyncRequestType.PeopleV1]: () => this.syncPeopleV1(options, response, checkpointMap, forkAwareClient),
+      [SyncRequestType.AssetFacesV2]: () => this.syncAssetFacesV2(options, response, checkpointMap, forkAwareClient),
+      [SyncRequestType.AssetFacesV3]: () => this.syncAssetFacesV3(options, response, checkpointMap, forkAwareClient),
       [SyncRequestType.UserMetadataV1]: () => this.syncUserMetadataV1(options, response, checkpointMap),
       [SyncRequestType.AssetOcrV1]: () => this.syncAssetOcrV1(options, response, checkpointMap, auth),
       // Shared-space sync handlers.
@@ -566,7 +587,12 @@ export class SyncService extends BaseService {
     }
   }
 
-  private async syncAssetEditsV1(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+  private async syncAssetEditsV1(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    isForkAwareClient: boolean,
+  ) {
     const deleteType = SyncEntityType.AssetEditDeleteV1;
     const deletes = this.syncRepository.assetEdit.getDeletes({ ...options, ack: checkpointMap[deleteType] });
 
@@ -577,6 +603,9 @@ export class SyncService extends BaseService {
     const upserts = this.syncRepository.assetEdit.getUpserts({ ...options, ack: checkpointMap[upsertType] });
 
     for await (const { updateId, ...data } of upserts) {
+      if (!isForkAwareClient && data.action === AssetEditAction.Trim) {
+        continue;
+      }
       await send(response, { type: upsertType, ids: [updateId], data });
     }
   }
@@ -2032,7 +2061,12 @@ export class SyncService extends BaseService {
     }
   }
 
-  private async syncPeopleV1(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+  private async syncPeopleV1(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    isForkAwareClient: boolean,
+  ) {
     const deleteType = SyncEntityType.PersonDeleteV1;
     const deletes = this.syncRepository.person.getDeletes({ ...options, ack: checkpointMap[deleteType] });
     for await (const { id, ...data } of deletes) {
@@ -2040,7 +2074,10 @@ export class SyncService extends BaseService {
     }
 
     const upsertType = SyncEntityType.PersonV1;
-    const upserts = this.syncRepository.person.getUpserts({ ...options, ack: checkpointMap[upsertType] });
+    const upserts = this.syncRepository.person.getUpserts(
+      { ...options, ack: checkpointMap[upsertType] },
+      isForkAwareClient,
+    );
     for await (const { updateId, ...data } of upserts) {
       await send(response, { type: upsertType, ids: [updateId], data });
     }
@@ -2053,7 +2090,12 @@ export class SyncService extends BaseService {
   }
 
   // TODO(v5) drop when AssetFacesV2 is removed
-  private async syncAssetFacesV2(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+  private async syncAssetFacesV2(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    isForkAwareClient: boolean,
+  ) {
     const deleteType = SyncEntityType.AssetFaceDeleteV1;
     const deletes = this.syncRepository.assetFace.getDeletesV2({ ...options, ack: checkpointMap[deleteType] });
     for await (const { id, ...data } of deletes) {
@@ -2061,13 +2103,21 @@ export class SyncService extends BaseService {
     }
 
     const upsertType = SyncEntityType.AssetFaceV2;
-    const upserts = this.syncRepository.assetFace.getUpsertsV2({ ...options, ack: checkpointMap[upsertType] });
+    const upserts = this.syncRepository.assetFace.getUpsertsV2(
+      { ...options, ack: checkpointMap[upsertType] },
+      isForkAwareClient,
+    );
     for await (const { updateId, ...data } of upserts) {
       await send(response, { type: upsertType, ids: [updateId], data });
     }
   }
 
-  private async syncAssetFacesV3(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+  private async syncAssetFacesV3(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    isForkAwareClient: boolean,
+  ) {
     const deleteType = SyncEntityType.AssetFaceDeleteV1;
     const deletes = this.syncRepository.assetFace.getDeletesV3({ ...options, ack: checkpointMap[deleteType] });
     for await (const { id, ...data } of deletes) {
@@ -2075,7 +2125,10 @@ export class SyncService extends BaseService {
     }
 
     const upsertType = SyncEntityType.AssetFaceV3;
-    const upserts = this.syncRepository.assetFace.getUpsertsV3({ ...options, ack: checkpointMap[upsertType] });
+    const upserts = this.syncRepository.assetFace.getUpsertsV3(
+      { ...options, ack: checkpointMap[upsertType] },
+      isForkAwareClient,
+    );
     for await (const { updateId, ...data } of upserts) {
       await send(response, { type: upsertType, ids: [updateId], data });
     }

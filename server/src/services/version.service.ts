@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { IncomingHttpHeaders } from 'node:http';
 import { SemVer, diff, intersects, lt } from 'semver';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { VersionCheckMetadata } from 'src/types.js';
-import { serverVersion } from 'src/constants.js';
+import { immichVersion, serverVersion } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ReleaseEventV1, ReleaseType, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import {
@@ -16,6 +17,7 @@ import {
   ReleaseChannel,
   SystemMetadataKey,
 } from 'src/enum.js';
+import { getClientServerVersion } from 'src/gallery/client-version.js';
 import { BaseService } from 'src/services/base.service.js';
 import { handlePromiseError } from 'src/utils/misc.js';
 
@@ -78,8 +80,9 @@ export class VersionService extends BaseService {
     });
   }
 
-  getVersion() {
-    return ServerVersionResponseDto.fromSemVer(serverVersion);
+  /** Without headers (immich-admin) this is the Gallery version. */
+  getVersion(headers?: IncomingHttpHeaders) {
+    return ServerVersionResponseDto.fromSemVer(headers ? getClientServerVersion(headers) : serverVersion);
   }
 
   getVersionHistory() {
@@ -134,7 +137,9 @@ export class VersionService extends BaseService {
         })
       ) {
         this.logger.log(`Found ${releaseVersion}, released at ${new Date(publishedAt).toLocaleString()}`);
-        this.websocketRepository.clientBroadcast('on_new_release', asNotification(newVersionCheck.channel, metadata));
+        this.websocketRepository.clientSendByClient('on_new_release', undefined, [
+          asNotification(newVersionCheck.channel, metadata),
+        ]);
       }
     } catch (error: Error | any) {
       this.logger.warn(`Unable to run version check: ${error}\n${error?.stack}`);
@@ -146,10 +151,11 @@ export class VersionService extends BaseService {
 
   @OnEvent({ name: 'WebsocketConnect' })
   async onWebsocketConnection({ userId }: ArgOf<'WebsocketConnect'>) {
-    this.websocketRepository.clientSend(
+    this.websocketRepository.clientSendByClient(
       'on_server_version',
       userId,
-      ServerVersionResponseDto.fromSemVer(serverVersion),
+      [ServerVersionResponseDto.fromSemVer(serverVersion)],
+      [ServerVersionResponseDto.fromSemVer(immichVersion)],
     );
 
     const { newVersionCheck } = await this.getConfig({ withCache: true });
@@ -159,7 +165,9 @@ export class VersionService extends BaseService {
 
     const metadata = await this.systemMetadataRepository.get(SystemMetadataKey.VersionCheckState);
     if (metadata) {
-      this.websocketRepository.clientSend('on_new_release', userId, asNotification(newVersionCheck.channel, metadata));
+      this.websocketRepository.clientSendByClient('on_new_release', userId, [
+        asNotification(newVersionCheck.channel, metadata),
+      ]);
     }
   }
 }

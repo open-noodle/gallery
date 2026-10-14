@@ -357,11 +357,26 @@ describe('/sync — shared-space streams', () => {
   });
 
   describe('DTO validation', () => {
-    it('rejects a non-enum SyncRequestType value', async () => {
+    it('ignores a non-enum SyncRequestType value and streams the known type', async () => {
+      const space = await utils.createSpace(admin.accessToken, { name: 'Forward Compat Space' });
+      const lines = await syncStream(
+        admin.accessToken,
+        [SyncRequestType.SharedSpacesV1, 'NotARealType' as SyncRequestType],
+        true,
+      );
+      const ids = lines.filter((l) => l.type === 'SharedSpaceV1').map((l) => (l.data as { id: string }).id);
+      expect(ids).toContain(space.id);
+      expect(lines.every((l) => ['SharedSpaceV1', 'SharedSpaceDeleteV1', 'SyncCompleteV1'].includes(l.type))).toBe(
+        true,
+      );
+      await ackAll(admin.accessToken, lines);
+    });
+
+    it('rejects a non-string SyncRequestType element with 400', async () => {
       const { status } = await request(app)
         .post('/sync/stream')
         .set(asBearerAuth(admin.accessToken))
-        .send({ types: ['SharedSpacesV1', 'NotARealType'] });
+        .send({ types: [SyncRequestType.SharedSpacesV1, 42] });
       expect(status).toBe(400);
     });
 
