@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodAsset, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { dominantBy, recencyBonus } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 import { curateTripAssets, findTripStartingOn, inferHome, placeKeyOf } from 'src/services/memory-rules/trip.util.js';
@@ -25,7 +25,7 @@ export class TripAnniversaryMemoryRule implements MemoryRule {
 
   constructor(
     private assetRepository: Pick<
-      AssetRepository,
+      MemoryRuleAssetRepository,
       'getMemoryAssetsForPeriod' | 'getMemoryLocationClusters' | 'getMemoryAssetsForLocation'
     >,
   ) {}

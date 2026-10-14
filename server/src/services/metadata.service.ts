@@ -266,199 +266,189 @@ export class MetadataService extends BaseService {
       return;
     }
 
-    const { localPath: localOriginal, cleanup: cleanupOriginal } = await this.ensureLocalFile(asset.originalPath);
-    try {
-      const { sidecarFile } = getAssetFiles(asset.files);
-      const localSidecar = sidecarFile ? await this.ensureLocalFile(sidecarFile.path) : undefined;
+    await using localOriginal = await this.ensureLocalFile(asset.originalPath);
+    const { sidecarFile } = getAssetFiles(asset.files);
+    await using localSidecar = sidecarFile ? await this.ensureLocalFile(sidecarFile.path) : undefined;
 
-      try {
-        const [exifResult, stats] = await Promise.all([
-          this.getExifTags(asset, localOriginal, localSidecar?.localPath),
-          this.storageRepository.stat(localOriginal),
-        ]);
-        const { tags: exifTags, audio, video, packets, format } = exifResult;
-        this.logger.verbose('Exif Tags', exifTags);
+    const [exifResult, stats] = await Promise.all([
+      this.getExifTags(asset, localOriginal.localPath, localSidecar?.localPath),
+      this.storageRepository.stat(localOriginal.localPath),
+    ]);
+    const { tags: exifTags, audio, video, packets, format } = exifResult;
+    this.logger.verbose('Exif Tags', exifTags);
 
-        const dates = this.getDates(asset, exifTags, stats);
+    const dates = this.getDates(asset, exifTags, stats);
 
-        const { width, height } = this.getImageDimensions(exifTags);
-        let geo: ReverseGeocodeResult = { country: null, state: null, city: null },
-          latitude: number | null = null,
-          longitude: number | null = null;
-        if (this.hasGeo(exifTags)) {
-          latitude = Number(exifTags.GPSLatitude);
-          longitude = Number(exifTags.GPSLongitude);
-          if (reverseGeocoding.enabled) {
-            geo = await this.mapRepository.reverseGeocode({ latitude, longitude });
-          }
-        }
-
-        const tags = this.getTagList(exifTags);
-
-        const exifData: Insertable<AssetExifTable> = {
-          assetId: asset.id,
-
-          // dates
-          dateTimeOriginal: dates.dateTimeOriginal,
-          modifyDate: stats.mtime,
-          timeZone: dates.timeZone,
-
-          // gps
-          latitude,
-          longitude,
-          country: geo.country,
-          state: geo.state,
-          city: geo.city,
-
-          // image/file
-          fileSizeInByte: stats.size,
-          exifImageHeight: validate(height),
-          exifImageWidth: validate(width),
-          orientation: validate(exifTags.Orientation)?.toString() ?? null,
-          projectionType: exifTags.ProjectionType ? exifTags.ProjectionType.toUpperCase() : null,
-          bitsPerSample: this.getBitsPerSample(exifTags),
-          colorspace: exifTags.ColorSpace === undefined ? null : String(exifTags.ColorSpace),
-
-          // camera
-          make:
-            exifTags.Make ??
-            exifTags.Device?.Manufacturer ??
-            exifTags.AndroidMake ??
-            exifTags.DeviceManufacturer ??
-            (exifTags.SamsungModel ? 'Samsung' : null),
-          model:
-            exifTags.Model ??
-            exifTags.Device?.ModelName ??
-            exifTags.AndroidModel ??
-            exifTags.DeviceModelName ??
-            exifTags.Author ??
-            null,
-          fps: video?.frameRate ?? validate(Number(exifTags.VideoFrameRate!)),
-          iso: validate(
-            exifTags.RecommendedExposureIndex ?? exifTags.StandardOutputSensitivity ?? exifTags.ISO,
-          ) as number,
-          exposureTime: exifTags.ExposureTime ?? null,
-          lensModel: getLensModel(exifTags),
-          fNumber: validate(exifTags.FNumber),
-          focalLength: validate(exifTags.FocalLength),
-
-          // comments
-          description: String(exifTags.ImageDescription || exifTags.Description || '').trim(),
-          profileDescription: exifTags.ProfileDescription || null,
-          rating: exifTags.Rating === 0 ? null : validateRange(exifTags.Rating, 1, 5),
-
-          // grouping
-          livePhotoCID: (exifTags.ContentIdentifier || exifTags.MediaGroupUUID) ?? null,
-          autoStackId: this.getAutoStackId(exifTags),
-
-          tags: tags.length > 0 ? tags : null,
-        };
-
-        const audioData =
-          format && audio?.codecName
-            ? {
-                assetId: asset.id,
-                bitrate: audio.bitrate,
-                index: audio.index,
-                profile: audio.profile,
-                codecName: audio.codecName,
-              }
-            : undefined;
-
-        const videoData =
-          format?.formatName && format.formatLongName && video?.codecName && video.timeBase
-            ? {
-                assetId: asset.id,
-                bitrate: video.bitrate,
-                frameCount: video.frameCount,
-                timeBase: video.timeBase,
-                index: video.index,
-                profile: video.profile,
-                level: video.level,
-                colorPrimaries: video.colorPrimaries,
-                colorTransfer: video.colorTransfer,
-                colorMatrix: video.colorMatrix,
-                dvProfile: video.dvProfile,
-                dvLevel: video.dvLevel,
-                dvBlSignalCompatibilityId: video.dvBlSignalCompatibilityId,
-                codecName: video.codecName,
-                formatName: format.formatName,
-                formatLongName: format.formatLongName,
-                pixelFormat: video.pixelFormat,
-              }
-            : undefined;
-
-        const keyframeData =
-          packets && packets.keyframePts.length > 0
-            ? {
-                assetId: asset.id,
-                totalDuration: packets.totalDuration,
-                packetCount: packets.packetCount,
-                outputFrames: packets.outputFrames,
-                pts: packets.keyframePts,
-                accDuration: packets.keyframeAccDuration,
-                ownDuration: packets.keyframeOwnDuration,
-              }
-            : undefined;
-
-        const isSidewards = exifTags.Orientation && this.isOrientationSidewards(exifTags.Orientation);
-        const assetWidth = validate(isSidewards ? height : width);
-        const assetHeight = validate(isSidewards ? width : height);
-
-        const tasks = new Tasks();
-
-        tasks.push(
-          () =>
-            this.assetRepository.update({
-              id: asset.id,
-              duration: this.getDuration(exifTags),
-              localDateTime: dates.localDateTime,
-              fileCreatedAt: dates.dateTimeOriginal ?? undefined,
-              fileModifiedAt: stats.mtime,
-
-              // Keep unedited assets in sync with the file on disk, but don't overwrite edited dimensions.
-              width: !asset.isEdited || asset.width === null ? assetWidth : undefined,
-              height: !asset.isEdited || asset.height === null ? assetHeight : undefined,
-            }),
-          async () => {
-            await this.assetRepository.upsertExif({
-              exif: exifData,
-              audio: audioData,
-              video: videoData,
-              keyframes: keyframeData,
-              lockedPropertiesBehavior: 'skip',
-            });
-            await this.applyTagList(asset);
-          },
-        );
-
-        if (this.isMotionPhoto(asset, exifTags)) {
-          tasks.push(() => this.applyMotionPhotos(asset, exifTags, dates, stats, localOriginal));
-        }
-
-        if (isFaceImportEnabled(metadata) && this.hasTaggedFaces(exifTags)) {
-          tasks.push(() => this.applyTaggedFaces(asset, exifTags));
-        }
-
-        await tasks.all();
-
-        if (exifData.livePhotoCID) {
-          await this.linkLivePhotos(asset, exifData);
-        }
-
-        await this.assetRepository.upsertJobStatus({ assetId: asset.id, metadataExtractedAt: new Date() });
-
-        await this.eventRepository.emit('AssetMetadataExtracted', {
-          assetId: asset.id,
-          userId: asset.ownerId,
-          source: data.source,
-        });
-      } finally {
-        await localSidecar?.cleanup();
+    const { width, height } = this.getImageDimensions(exifTags);
+    let geo: ReverseGeocodeResult = { country: null, state: null, city: null },
+      latitude: number | null = null,
+      longitude: number | null = null;
+    if (this.hasGeo(exifTags)) {
+      latitude = Number(exifTags.GPSLatitude);
+      longitude = Number(exifTags.GPSLongitude);
+      if (reverseGeocoding.enabled) {
+        geo = await this.mapRepository.reverseGeocode({ latitude, longitude });
       }
-    } finally {
-      await cleanupOriginal();
     }
+
+    const tags = this.getTagList(exifTags);
+
+    const exifData: Insertable<AssetExifTable> = {
+      assetId: asset.id,
+
+      // dates
+      dateTimeOriginal: dates.dateTimeOriginal,
+      modifyDate: stats.mtime,
+      timeZone: dates.timeZone,
+
+      // gps
+      latitude,
+      longitude,
+      country: geo.country,
+      state: geo.state,
+      city: geo.city,
+
+      // image/file
+      fileSizeInByte: stats.size,
+      exifImageHeight: validate(height),
+      exifImageWidth: validate(width),
+      orientation: validate(exifTags.Orientation)?.toString() ?? null,
+      projectionType: exifTags.ProjectionType ? exifTags.ProjectionType.toUpperCase() : null,
+      bitsPerSample: this.getBitsPerSample(exifTags),
+      colorspace: exifTags.ColorSpace === undefined ? null : String(exifTags.ColorSpace),
+
+      // camera
+      make:
+        exifTags.Make ??
+        exifTags.Device?.Manufacturer ??
+        exifTags.AndroidMake ??
+        exifTags.DeviceManufacturer ??
+        (exifTags.SamsungModel ? 'Samsung' : null),
+      model:
+        exifTags.Model ??
+        exifTags.Device?.ModelName ??
+        exifTags.AndroidModel ??
+        exifTags.DeviceModelName ??
+        exifTags.Author ??
+        null,
+      fps: video?.frameRate ?? validate(Number(exifTags.VideoFrameRate!)),
+      iso: validate(exifTags.RecommendedExposureIndex ?? exifTags.StandardOutputSensitivity ?? exifTags.ISO) as number,
+      exposureTime: exifTags.ExposureTime ?? null,
+      lensModel: getLensModel(exifTags),
+      fNumber: validate(exifTags.FNumber),
+      focalLength: validate(exifTags.FocalLength),
+
+      // comments
+      description: String(exifTags.ImageDescription || exifTags.Description || '').trim(),
+      profileDescription: exifTags.ProfileDescription || null,
+      rating: exifTags.Rating === 0 ? null : validateRange(exifTags.Rating, 1, 5),
+
+      // grouping
+      livePhotoCID: (exifTags.ContentIdentifier || exifTags.MediaGroupUUID) ?? null,
+      autoStackId: this.getAutoStackId(exifTags),
+
+      tags: tags.length > 0 ? tags : null,
+    };
+
+    const audioData =
+      format && audio?.codecName
+        ? {
+            assetId: asset.id,
+            bitrate: audio.bitrate,
+            index: audio.index,
+            profile: audio.profile,
+            codecName: audio.codecName,
+          }
+        : undefined;
+
+    const videoData =
+      format?.formatName && format.formatLongName && video?.codecName && video?.timeBase
+        ? {
+            assetId: asset.id,
+            bitrate: video.bitrate,
+            frameCount: video.frameCount,
+            timeBase: video.timeBase,
+            index: video.index,
+            profile: video.profile,
+            level: video.level,
+            colorPrimaries: video.colorPrimaries,
+            colorTransfer: video.colorTransfer,
+            colorMatrix: video.colorMatrix,
+            dvProfile: video.dvProfile,
+            dvLevel: video.dvLevel,
+            dvBlSignalCompatibilityId: video.dvBlSignalCompatibilityId,
+            codecName: video.codecName,
+            formatName: format.formatName,
+            formatLongName: format.formatLongName,
+            pixelFormat: video.pixelFormat,
+          }
+        : undefined;
+
+    const keyframeData =
+      packets && packets.keyframePts.length > 0
+        ? {
+            assetId: asset.id,
+            totalDuration: packets.totalDuration,
+            packetCount: packets.packetCount,
+            outputFrames: packets.outputFrames,
+            pts: packets.keyframePts,
+            accDuration: packets.keyframeAccDuration,
+            ownDuration: packets.keyframeOwnDuration,
+          }
+        : undefined;
+
+    const isSidewards = exifTags.Orientation && this.isOrientationSidewards(exifTags.Orientation);
+    const assetWidth = validate(isSidewards ? height : width);
+    const assetHeight = validate(isSidewards ? width : height);
+
+    const tasks = new Tasks();
+
+    tasks.push(
+      () =>
+        this.assetRepository.update({
+          id: asset.id,
+          duration: this.getDuration(exifTags),
+          localDateTime: dates.localDateTime,
+          fileCreatedAt: dates.dateTimeOriginal ?? undefined,
+          fileModifiedAt: stats.mtime,
+
+          // Keep unedited assets in sync with the file on disk, but don't overwrite edited dimensions.
+          width: !asset.isEdited || asset.width === null ? assetWidth : undefined,
+          height: !asset.isEdited || asset.height === null ? assetHeight : undefined,
+        }),
+      async () => {
+        await this.assetRepository.upsertExif({
+          exif: exifData,
+          audio: audioData,
+          video: videoData,
+          keyframes: keyframeData,
+          lockedPropertiesBehavior: 'skip',
+        });
+        await this.applyTagList(asset);
+      },
+    );
+
+    if (this.isMotionPhoto(asset, exifTags)) {
+      tasks.push(() => this.applyMotionPhotos(asset, exifTags, dates, stats, localOriginal.localPath));
+    }
+
+    if (isFaceImportEnabled(metadata) && this.hasTaggedFaces(exifTags)) {
+      tasks.push(() => this.applyTaggedFaces(asset, exifTags));
+    }
+
+    await tasks.all();
+
+    if (exifData.livePhotoCID) {
+      await this.linkLivePhotos(asset, exifData);
+    }
+
+    await this.assetRepository.upsertJobStatus({ assetId: asset.id, metadataExtractedAt: new Date() });
+
+    await this.eventRepository.emit('AssetMetadataExtracted', {
+      assetId: asset.id,
+      userId: asset.ownerId,
+      source: data.source,
+    });
   }
 
   @OnJob({ name: JobName.SidecarQueueAll, queue: QueueName.Sidecar })
@@ -876,8 +866,8 @@ export class MetadataService extends BaseService {
         this.logger.log(`Hid unlinked motion photo video asset (${motionAsset.id})`);
       }
 
-      // motion bypass: route through the same AssetHide handler the other motion paths use so the
-      // #757 space purge fires for a motion video hidden via extraction (asset.service.onAssetHide).
+      // motion bypass: route through the same AssetHide handler the other motion paths use so the #757
+      // space purge fires for a motion video hidden via extraction (AssetVisibilityTransitionService.onAssetHide).
       // M3: emit whenever the motion asset ends up Hidden here — not only on the write that performed
       // the Timeline->Hidden transition — so a re-extract on an already-Hidden motion asset (e.g. a
       // retry after a prior emit failed) still re-affirms the purge. Idempotent tombstones make

@@ -5,12 +5,17 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 class PeopleFilterButton extends ConsumerWidget {
   const PeopleFilterButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Pet detection exists only on a Gallery server; a single "All" entry would be a menu with no choice.
+    if (!ref.watch(serverSupportsSpacesProvider)) {
+      return const SizedBox.shrink();
+    }
     final selected = ref.watch(appConfigProvider.select((config) => config.people.filterBy));
 
     return MenuAnchor(

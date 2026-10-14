@@ -44,6 +44,24 @@ describe(BaseService.name, () => {
       expect(backendCleanup).toHaveBeenCalledOnce();
     });
 
+    it('runs the backend cleanup when an `await using` scope exits, including on error', async () => {
+      const backendCleanup = vi.fn().mockResolvedValue(void 0);
+      const backend = {
+        downloadToTemp: vi.fn().mockResolvedValue({ tempPath: '/tmp/abc.jpg', cleanup: backendCleanup }),
+      };
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+
+      await expect(
+        (async () => {
+          await using local = await (sut as any).ensureLocalFile('upload/user/abc.jpg');
+          expect(local.localPath).toBe('/tmp/abc.jpg');
+          throw new Error('handler failed');
+        })(),
+      ).rejects.toThrow('handler failed');
+      expect(backendCleanup).toHaveBeenCalledOnce();
+    });
+
     it('propagates errors from resolveBackendForKey without leaking cleanup', async () => {
       const { StorageService } = await import('src/services/storage.service.js');
       vi.spyOn(StorageService, 'resolveBackendForKey').mockImplementation(() => {

@@ -150,7 +150,7 @@ Here is what the cleanup script changes:
 - It removes Gallery-only settings rows from `system_metadata` and Gallery-only permissions from API keys.
 - It drops the Gallery-only functions and triggers that reference the dropped tables.
 - It strips the `classification` key out of the `system-config` row in `system_metadata`.
-- It deletes fork migration rows from `kysely_migrations` and `migration_overrides`, so upstream Immich's migrator does not see them as unknown migrations.
+- It drops Gallery's own migration history table, `gallery_migrations`, and deletes fork rows from `kysely_migrations` (where older Gallery versions recorded them) and `migration_overrides`, so upstream Immich's migrator does not see them as unknown migrations.
 - Where needed, it rolls back upstream migrations that Gallery pulled in after the currently supported Immich tag. Gallery may be rebased onto upstream commits newer than the Immich release you switch back to, so the script also removes those migration rows and reverses their schema changes before vanilla Immich starts.
 
 The script header documents each step in detail.

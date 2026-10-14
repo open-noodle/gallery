@@ -390,7 +390,7 @@ export class FaceRepairService extends BaseService {
         return;
       }
       const candidates = await mapWithConcurrency(page, SCAN_SEARCH_CONCURRENCY, async (face) => {
-        const matches = await this.searchRepository.searchFaces({
+        const matches = await this.faceSearchRepository.searchFaces({
           userIds: [face.ownerId],
           embedding: face.embedding,
           maxDistance: options.maxDistance,
