@@ -300,67 +300,6 @@ export class MemoryRepository implements IBulkAsset {
       .execute();
   }
 
-  /**
-   * Memories of one owner whose visible window overlaps `window`, with the asset ids they
-   * actually render. The asset filters MUST stay identical to `search` — floors are measured
-   * over what the card shows, and an asset carrying a hidden person's face is not shown.
-   */
-  @GenerateSql({ params: [DummyValue.UUID, { from: DummyValue.DATE, to: DummyValue.DATE }] })
-  getForOverlapReconcile(ownerId: string, window: { from: Date; to: Date }) {
-    return this.db
-      .selectFrom('memory')
-      .select(['memory.id', 'memory.type', 'memory.data', 'memory.isSaved', 'memory.showAt', 'memory.hideAt'])
-      .select((eb) =>
-        jsonArrayFrom(
-          eb
-            .selectFrom('asset')
-            .select(['asset.id'])
-            .innerJoin('memory_asset', 'asset.id', 'memory_asset.assetId')
-            .whereRef('memory_asset.memoriesId', '=', 'memory.id')
-            .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-            .where('asset.deletedAt', 'is', null)
-            .where((eb) =>
-              eb.not(
-                eb.exists(
-                  eb
-                    .selectFrom('asset_face')
-                    .innerJoin('person', (join) =>
-                      join
-                        .onRef('person.personGroupId', '=', 'asset_face.personGroupId')
-                        .onRef('person.ownerId', '=', 'asset.ownerId'),
-                    )
-                    .select((eb) => eb.val(1).as('one'))
-                    .whereRef('asset_face.assetId', '=', 'asset.id')
-                    .where('person.isHidden', '=', true),
-                ),
-              ),
-            )
-            .orderBy('asset.localDateTime', 'asc'),
-        ).as('assets'),
-      )
-      .where('memory.ownerId', '=', ownerId)
-      .where('memory.deletedAt', 'is', null)
-      .where((eb) => eb.or([eb('memory.showAt', 'is', null), eb('memory.showAt', '<=', window.to)]))
-      .where((eb) => eb.or([eb('memory.hideAt', 'is', null), eb('memory.hideAt', '>=', window.from)]))
-      .orderBy('memory.id')
-      .execute();
-  }
-
-  /**
-   * Earliest day any memory becomes visible, across all owners — the start of the one-off
-   * overlap backfill. `coalesce` mirrors `cleanup`, so a memory with no `showAt` still counts.
-   */
-  @GenerateSql()
-  async getOldestMemoryDate(): Promise<Date | null> {
-    const row = await this.db
-      .selectFrom('memory')
-      .select(sql<Date | null>`min(coalesce("showAt", "createdAt"))`.as('oldest'))
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
-    return row?.oldest ?? null;
-  }
-
   // #1041: same partner-trap-safe shape as `search` above, resolved for the VIEWER (`userId`).
   searchAccessible(
     userId: string,
@@ -468,44 +407,6 @@ export class MemoryRepository implements IBulkAsset {
   @GenerateSql({ params: [DummyValue.UUID] })
   async delete(id: string) {
     await this.db.deleteFrom('memory').where('id', '=', id).execute();
-  }
-
-  /**
-   * Remove the plain `on_this_day` memory a rule memory has just superseded. Scoped to one
-   * owner, one trigger day and one year, and never touches a saved memory.
-   *
-   * Written as an unconditional DELETE ... WHERE rather than a read-then-delete: when the
-   * owner has `on_this_day` disabled, or retention already removed the row, there is simply
-   * nothing to match. That keeps correctness independent of whether the on-this-day loop has
-   * run for the day — it only decides whether this has any effect. (In practice it always
-   * has: the on-this-day loop writes up to 3 days ahead and runs first inside the same lock,
-   * so the row exists before any rule for that day is evaluated.)
-   */
-  @GenerateSql({ params: [{ ownerId: DummyValue.UUID, year: DummyValue.NUMBER, showAt: DummyValue.DATE }] })
-  async deleteOnThisDay({ ownerId, year, showAt }: { ownerId: string; year: number; showAt: Date }) {
-    await this.db
-      .deleteFrom('memory')
-      .where('ownerId', '=', ownerId)
-      .where('type', '=', MemoryType.OnThisDay)
-      .where('isSaved', '=', false)
-      .where('showAt', '=', showAt)
-      .where(sql<string>`memory.data->>'year'`, '=', String(year))
-      .execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.STRING] })
-  async hasRuleMemory(ownerId: string, ruleId: string, dedupeKey: string) {
-    const result = await this.db
-      .selectFrom('memory')
-      .select('id')
-      .where('ownerId', '=', ownerId)
-      .where('type', '=', MemoryType.Rule)
-      .where(sql<string>`memory.data->>'ruleId'`, '=', ruleId)
-      .where(sql<string>`memory.data->>'dedupeKey'`, '=', dedupeKey)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
-    return !!result;
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })

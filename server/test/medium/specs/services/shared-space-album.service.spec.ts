@@ -1,6 +1,9 @@
 import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AlbumUserRole, AssetVisibility, JobName, JobStatus, TimeBucketSize } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -69,13 +72,14 @@ const setupWithFaceMatch = () => {
       ConfigRepository,
       SystemMetadataRepository,
       SearchRepository,
+      FaceSearchRepository,
     ],
-    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
+    mock: [EventRepository, LoggingRepository, JobRepository, QueueMaintenanceRepository, StorageRepository],
   });
   const jobs = result.ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
-  jobs.hasInFlightDedupChain.mockResolvedValue(false);
+  result.ctx.getMock(QueueMaintenanceRepository).hasInFlightDedupChain.mockResolvedValue(false);
   return { ...result, jobs, faceIdentityRepository: result.ctx.get(FaceIdentityRepository) };
 };
 
@@ -1202,7 +1206,7 @@ const setupWithAlbumDelete = () => {
   // AlbumService context — only needs AccessRepository + AlbumRepository to be real.
   const albumResult = newMediumService(AlbumService, {
     database: defaultDatabase,
-    real: [AccessRepository, AlbumRepository, UserRepository],
+    real: [SpaceAlbumRepository, AccessRepository, AlbumRepository, UserRepository],
     mock: [EventRepository, LoggingRepository],
   });
 

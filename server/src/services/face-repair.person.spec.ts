@@ -46,7 +46,7 @@ describe(FaceRepairService.name, () => {
         ],
       });
       expect(planSpy).not.toHaveBeenCalled(); // E9: no recompute
-      expect(mocks.search.searchFaces).not.toHaveBeenCalled(); // E9: no KNN
+      expect(mocks.faceSearch.searchFaces).not.toHaveBeenCalled(); // E9: no KNN
     });
 
     it('filters faces declined since the scan (E3)', async () => {
