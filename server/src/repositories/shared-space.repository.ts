@@ -13,6 +13,7 @@ import {
   SourceType,
   VectorIndex,
 } from 'src/enum.js';
+import { personIdentityId, personIsPet, personSpecies, personType } from 'src/gallery/utils/person-sidecar.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
@@ -189,7 +190,7 @@ export type SpaceFaceAssignment = {
 
 // Slice 3 (spec §6.1): one row per live, visible face on an asset, joined to the space person
 // holding it in THIS space (if any) — never the owner's `person.name`. `isEditorDrawn` (Slice 9,
-// spec §6.6) is derived from `asset_face.createdBy IS NOT NULL` here, not left as the raw column
+// spec §6.6) is derived from the face having an `asset_face_creator` row here, not left as the raw column
 // — nothing above the repository needs to know WHO drew a box, only whether it is deletable.
 export type SpaceAssetFace = {
   id: string;
@@ -3107,9 +3108,10 @@ export class SharedSpaceRepository {
   }): Promise<SpacePersonPersonalThumbnail | undefined> {
     const ownThumbnail = await this.db
       .selectFrom('person')
+      .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
       .select(['person.personGroupId as personId', 'person.thumbnailPath'])
       .where('person.ownerId', '=', input.userId)
-      .where('person.identityId', '=', input.identityId)
+      .where('person_identity.identityId', '=', input.identityId)
       .where('person.thumbnailPath', '!=', '')
       .orderBy('person.updatedAt', 'desc')
       .orderBy('person.personGroupId')
@@ -3121,10 +3123,11 @@ export class SharedSpaceRepository {
 
     return this.db
       .selectFrom('person')
+      .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
       .innerJoin('asset_face', 'asset_face.id', 'person.faceAssetId')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .select(['person.personGroupId as personId', 'person.thumbnailPath'])
-      .where('person.identityId', '=', input.identityId)
+      .where('person_identity.identityId', '=', input.identityId)
       .where('person.thumbnailPath', '!=', '')
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -3166,6 +3169,7 @@ export class SharedSpaceRepository {
 
     const personalCandidates = await this.db
       .selectFrom('person')
+      .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
       .innerJoin('shared_space_member', (join) =>
         join
           .onRef('shared_space_member.userId', '=', 'person.ownerId')
@@ -3192,23 +3196,21 @@ export class SharedSpaceRepository {
         'shared_space_member.role',
         'person.name',
         'person.birthDate',
-        'person.type',
-        'person.species',
+        personType().as('type'),
+        personSpecies().as('species'),
         'person.updatedAt',
       ])
       .select((eb) => [
         eb.fn.count('shared_space_person.id').$castTo<number>().as('supportingFaceCount'),
         isAssetAdderSql.as('isAssetAdder'),
       ])
-      .where('person.identityId', '=', input.identityId)
+      .where('person_identity.identityId', '=', input.identityId)
       .groupBy([
         'person.personGroupId',
         'person.ownerId',
         'shared_space_member.role',
         'person.name',
         'person.birthDate',
-        'person.type',
-        'person.species',
         'person.updatedAt',
         'isAssetAdder',
       ])
@@ -3390,7 +3392,8 @@ export class SharedSpaceRepository {
       .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['person.identityId', 'person.type'])
+      .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+      .select(['person_identity.identityId', personType().as('type')])
       .select((eb) => eb.fn.count('asset_face.id').$castTo<number>().as('supportingFaceCount'))
       .where('shared_space_person_face.personId', '=', spacePersonId)
       .where((eb) =>
@@ -3416,13 +3419,12 @@ export class SharedSpaceRepository {
           }),
         ]),
       )
-      .where('person.identityId', 'is not', null)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where('asset.deletedAt', 'is', null)
       .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-      .$if(!!candidateIdentityIds?.length, (qb) => qb.where('person.identityId', 'in', candidateIdentityIds!))
-      .groupBy(['person.identityId', 'person.type'])
+      .$if(!!candidateIdentityIds?.length, (qb) => qb.where('person_identity.identityId', 'in', candidateIdentityIds!))
+      .groupBy(['person_identity.identityId', personType()])
       .$castTo<SpacePersonIdentityEvidence>()
       .execute();
   }
@@ -4503,7 +4505,7 @@ export class SharedSpaceRepository {
         'asset_face.assetId',
         'asset_face.personGroupId as personId',
         'face_identity_face.identityId',
-        'person.type',
+        personType().as('type'),
         'face_search.embedding',
       ])
       .where('asset_face.assetId', '=', assetId)
@@ -4870,6 +4872,7 @@ export class SharedSpaceRepository {
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .leftJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+      .leftJoin('asset_face_creator', 'asset_face_creator.assetFaceId', 'asset_face.id')
       // Hoisted above the derived join below on purpose: `reviewableAssetVisibility` takes an
       // ExpressionBuilder over `DB` itself, and the aliased subquery widens that to `DB & {
       // space_person }`. Where a predicate sits in the chain has no effect on the SQL.
@@ -4897,7 +4900,7 @@ export class SharedSpaceRepository {
         'asset_face.boundingBoxY2',
         'asset_face.imageWidth',
         'asset_face.imageHeight',
-        'asset_face.createdBy',
+        'asset_face_creator.userId as createdBy',
         'space_person.id as spacePersonId',
         'space_person.name as spacePersonName',
       ])
@@ -4923,12 +4926,12 @@ export class SharedSpaceRepository {
         'asset_face.id',
         'asset_face.assetId',
         'asset_face.personGroupId as personId',
-        'person.identityId',
-        'person.type',
+        personIdentityId().as('identityId'),
+        personType().as('type'),
       ])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
-      .where('person.type', '=', 'pet')
+      .where(personIsPet())
       .execute();
   }
 

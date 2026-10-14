@@ -1,10 +1,11 @@
 import { Kysely } from 'kysely';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
-import { FilterSuggestionsResponseDto, SearchSuggestionType } from 'src/dtos/search.dto.js';
+import { SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AlbumUserRole, AssetOrder, AssetVisibility, SearchOrderField, SharedSpaceRole } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
+import { FilterSuggestionsResponseDto } from 'src/gallery/dtos/search.dto.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';

@@ -10,6 +10,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { format } from 'sql-formatter';
 import { GENERATE_SQL_KEY, GenerateSqlQueries } from 'src/decorators.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { repositories } from 'src/repositories/index.js';
@@ -110,7 +111,7 @@ class SqlGenerator {
     data.push(...(await this.runTargets(instance, Repository.name)));
 
     // nested repositories
-    if (Repository.name === AccessRepository.name || Repository.name === SyncRepository.name) {
+    if ([AccessRepository.name, SyncRepository.name, GallerySyncRepository.name].includes(Repository.name)) {
       // probably a bug that this fails linting?
       // eslint-disable-next-line unicorn/prefer-object-iterable-methods
       for (const key of Object.keys(instance)) {

@@ -88,7 +88,7 @@ without revisiting D1.
 
 ### D2 — Fork config lives in a fork-owned module
 
-Create **`server/src/gallery/config.dto.ts`**, exporting zod fragments and default objects, composed
+Create **`server/src/gallery/dtos/config.dto.ts`**, exporting zod fragments and default objects, composed
 into upstream's `config.dto.ts` at the seams below.
 
 `server/src/gallery/**` is the manifest's declared preferred fork namespace
@@ -166,10 +166,10 @@ Two fork behaviours in this file must survive the port:
 ### Follow-on edits
 
 - `server/src/dtos/model-config.dto.spec.ts` → retarget onto the new module as
-  `server/src/gallery/config.dto.spec.ts`; its current subject no longer exists.
+  `server/src/gallery/dtos/config.dto.spec.ts`; its current subject no longer exists.
 - `server/src/services/classification.service.ts` → swap the `src/config` import for the new path. One
   line; no logic moves.
-- `server/src/gallery/storage-usage.service.ts`, `pet-detection.service.ts`,
+- `server/src/gallery/services/storage-usage.service.ts`, `pet-detection.service.ts`,
   `face-suggestion.service.ts` and `classification.service.ts` read fork config through
   `this.getConfig()` rather than importing the deleted modules. They need **no change** once the
   fields exist in the schema — but they are exactly what breaks if a field is silently dropped.

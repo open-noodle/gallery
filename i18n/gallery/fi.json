@@ -1,0 +1,6 @@
+{
+  "background_location_permission_content": "Noodle Gallery käyttää taustasijaintilupaa jatkaakseen Wi‑Fi-verkon nimen lukemista, kun automaattinen palvelimen vaihto toimii taustalla. Wi‑Fi-verkon nimi tallennetaan tälle laitteelle vastaavuuden tarkistamista varten, eikä laitteen tarkkaa sijaintia tallenneta tai jaeta.",
+  "location_permission_content": "Android edellyttää tarkan sijainnin lupaa, jotta Noodle Gallery voi lukea nykyisen Wi‑Fi-verkon nimen automaattista palvelimen vaihtoa varten. Wi‑Fi-verkon nimi tallennetaan tälle laitteelle vastaavuuden tarkistamista varten, eikä laitteen tarkkaa sijaintia tallenneta tai jaeta.",
+  "map_location_service_disabled_content": "Noodle Gallery käyttää tarkkaa nykyistä sijaintiasi kartan keskittämiseen ja nykyisen alueesi kuvien ja videoiden näyttämiseen. Sijaintipalvelujen on oltava käytössä ennen kuin Noodle Gallery voi käyttää tätä sijaintia. Laitteen tarkkaa sijaintia ei tallenneta tai jaeta. Haluatko avata sijaintiasetukset nyt?",
+  "map_no_location_permission_content": "Noodle Gallery käyttää tarkkaa nykyistä sijaintiasi kartan keskittämiseen ja nykyisen alueesi kuvien ja videoiden näyttämiseen. Laitteen tarkkaa sijaintia ei tallenneta tai jaeta. Haluatko sallia sijainnin käytön nyt?"
+}

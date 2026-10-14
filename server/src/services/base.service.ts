@@ -1,29 +1,23 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import { createReadStream } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
 import sanitize from 'sanitize-filename';
-import type { ClassConstructor, GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
+import type { ClassConstructor } from 'src/types.js';
 import type { LoginDetails } from 'src/services/auth.service.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { FACE_THUMBNAIL_SIZE, SALT_ROUNDS } from 'src/constants.js';
+import { SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
-import { AssetFace, UserAdmin } from 'src/database.js';
+import { UserAdmin } from 'src/database.js';
 import { mapLoginResponse } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
-import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
-import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
-import { computePhysicalUsage } from 'src/gallery/storage-usage.js';
-import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
+import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -105,23 +99,7 @@ import {
   requirePersonAccess,
 } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
-import {
-  ContentDisposition,
-  ImmichFileResponse,
-  ImmichMediaResponse,
-  ImmichRedirectResponse,
-  ImmichStreamResponse,
-  getResponseSignal,
-} from 'src/utils/file.js';
-import { clamp } from 'src/utils/misc.js';
 import { ViewerScopeArgs, ViewerSurface, resolveViewerScope } from 'src/utils/viewer-scope.js';
-
-type FaceThumbnailBounds = {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-};
 
 export const BASE_SERVICE_DEPENDENCIES = [
   LoggingRepository,
@@ -201,6 +179,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   SpaceAlbumRepository,
   PetFaceRepository,
   FaceSearchRepository,
+  GallerySyncRepository,
 ] as const;
 
 @Injectable()
@@ -208,6 +187,7 @@ export class BaseService {
   protected storageCore: StorageCore;
   protected identityMergePropagationService: IdentityMergePropagationService;
   protected faceAssignmentService: FaceAssignmentService;
+  protected backendMedia: BackendMediaServer;
 
   constructor(
     protected logger: LoggingRepository,
@@ -287,6 +267,7 @@ export class BaseService {
     protected spaceAlbumRepository: SpaceAlbumRepository,
     protected petFaceRepository: PetFaceRepository,
     protected faceSearchRepository: FaceSearchRepository,
+    protected gallerySyncRepository: GallerySyncRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -314,6 +295,12 @@ export class BaseService {
       faceRepairDeclineRepository,
       faceRepairRepository,
       personRepository,
+    });
+    this.backendMedia = new BackendMediaServer({
+      assetRepository,
+      mediaRepository,
+      storageRepository,
+      getConfig: (options) => this.getConfig(options),
     });
   }
 
@@ -396,6 +383,7 @@ export class BaseService {
       ctx.spaceAlbumRepository,
       ctx.petFaceRepository,
       ctx.faceSearchRepository,
+      ctx.gallerySyncRepository,
     );
 
     service.logger.setContext(BaseService.name);
@@ -456,280 +444,12 @@ export class BaseService {
     }
   }
 
-  /**
-   * @param options.acceptsRanges set by callers whose route forwards the client's `Range`
-   *        header, so the response may advertise `Accept-Ranges: bytes`.
-   * @param options.range the client's raw `Range` header, when the route forwards one.
-   *        The backend decides whether to honor it: disk serves ranges through express,
-   *        and S3 in redirect mode leaves them to S3 — so it only changes the S3 proxy
-   *        stream path, which previously ignored ranges entirely.
-   */
-  protected async serveFromBackend(
-    filePath: string,
-    contentType: string,
-    cacheControl: CacheControl,
-    fileName?: string,
-    disposition: ContentDisposition = 'inline',
-    options: { range?: string; acceptsRanges?: boolean } = {},
-  ): Promise<ImmichMediaResponse> {
-    const backend = await this.backendFor(filePath);
-    let strategy: ServeStrategy;
-    try {
-      strategy = await backend.getServeStrategy(filePath, {
-        contentType,
-        cacheControl,
-        fileName,
-        disposition,
-        range: options.range,
-        signal: getResponseSignal(),
-      });
-    } catch (error) {
-      if (error instanceof RangeNotSatisfiableError) {
-        throw new HttpException('Requested range not satisfiable', HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
-      }
-      throw error;
-    }
-    const responseDisposition = disposition === 'inline' ? undefined : disposition;
-
-    switch (strategy.type) {
-      case 'file': {
-        return new ImmichFileResponse({
-          path: strategy.path,
-          contentType,
-          cacheControl,
-          fileName,
-          disposition: responseDisposition,
-        });
-      }
-      case 'redirect': {
-        return new ImmichRedirectResponse({
-          url: strategy.url,
-          cacheControl: CacheControl.PrivateWithoutCache,
-        });
-      }
-      case 'stream': {
-        return new ImmichStreamResponse({
-          stream: strategy.stream,
-          contentType,
-          length: strategy.length,
-          contentRange: strategy.contentRange,
-          acceptsRanges: options.acceptsRanges,
-          cacheControl,
-          fileName,
-          disposition: responseDisposition,
-        });
-      }
-    }
-  }
-
-  /**
-   * For assets on S3 backends, download to a local temp file for processing by
-   * tools that require a filesystem path (ffmpeg, exiftool, sharp). Caller is
-   * responsible for catching `downloadToTemp` errors or letting them propagate.
-   *
-   * @param filePath absolute disk path OR S3 relative key (anything that might
-   *                 come from a DB column such as `asset.originalPath`).
-   * @returns { localPath, cleanup } — cleanup is a no-op for disk paths and
-   *          removes the temp file for S3-sourced paths. Declare the result with
-   *          `await using` (disposal runs cleanup), or call cleanup in a `finally` block.
-   */
-  protected async ensureLocalFile(
-    filePath: string,
-  ): Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable> {
-    const backend = await this.backendFor(filePath);
-    const { tempPath, cleanup } = await backend.downloadToTemp(filePath);
-    return { localPath: tempPath, cleanup, [Symbol.asyncDispose]: cleanup };
-  }
-
-  /**
-   * Returns something ffmpeg/ffprobe can read directly: an absolute path as-is,
-   * or a presigned URL for a storage-backend key. Unlike ensureLocalFile this
-   * does NOT download the object, so it is safe to call inside a request handler.
-   */
-  protected async getProbeInput(filePath: string): Promise<string> {
-    const backend = await this.backendFor(filePath);
-    return backend.getReadableUrl(filePath);
-  }
-
-  /**
-   * The storage backend that owns `key`: disk for an absolute path, built over this service's
-   * StorageRepository so disk I/O goes where upstream code (and its specs) expect it; otherwise
-   * whatever StorageService resolves for a relative key.
-   */
-  protected async backendFor(key: string): Promise<StorageBackend> {
-    if (isAbsolute(key)) {
-      // the media location only resolves relative keys, and this backend is only given absolute ones
-      return new DiskStorageBackend('', this.storageRepository);
-    }
-    // lazy import to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('./storage.service.js');
-    return StorageService.resolveBackendForKey(key);
-  }
-
-  protected async getFaceThumbnailSource(assetId: string): Promise<string | null> {
-    const preview = await this.assetRepository.getForThumbnail(assetId, AssetFileType.Preview, false);
-    if (preview.path) {
-      return preview.path;
-    }
-
-    const thumbnail = await this.assetRepository.getForThumbnail(assetId, AssetFileType.Thumbnail, false);
-    return thumbnail.path ?? null;
-  }
-
-  protected async generateFaceThumbnailResponse(face: AssetFace, sourcePath: string): Promise<ImmichMediaResponse> {
-    const { image } = await this.getConfig({ withCache: true });
-    const source = await this.ensureLocalFile(sourcePath);
-    const tempDir = await mkdtemp(join(tmpdir(), 'gallery-face-thumbnail-'));
-    const outputPath = join(tempDir, 'thumbnail.jpeg');
-
-    try {
-      const decoded = await this.mediaRepository.decodeImage(source.localPath, {
-        colorspace: image.colorspace,
-        processInvalidImages: process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true',
-      });
-
-      const thumbnailOptions: GenerateThumbnailOptions = {
-        colorspace: image.colorspace,
-        format: ImageFormat.Jpeg,
-        quality: image.thumbnail.quality,
-        progressive: false,
-        processInvalidImages: false,
-        size: FACE_THUMBNAIL_SIZE,
-        edits: [
-          {
-            action: AssetEditAction.Crop,
-            parameters: this.getFaceThumbnailCrop(
-              {
-                old: { width: face.imageWidth, height: face.imageHeight },
-                new: { width: decoded.info.width, height: decoded.info.height },
-              },
-              {
-                x1: face.boundingBoxX1,
-                y1: face.boundingBoxY1,
-                x2: face.boundingBoxX2,
-                y2: face.boundingBoxY2,
-              },
-            ),
-          },
-        ],
-      };
-
-      await this.mediaRepository.generateThumbnail(decoded, thumbnailOptions, outputPath);
-    } catch (error) {
-      await rm(tempDir, { recursive: true, force: true });
-      throw error;
-    } finally {
-      await source.cleanup();
-    }
-
-    const cleanup = () => {
-      void rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    };
-    const stream = createReadStream(outputPath);
-    stream.once('close', cleanup);
-    stream.once('error', cleanup);
-
-    return new ImmichStreamResponse({
-      stream,
-      contentType: 'image/jpeg',
-      // A face crop is immutable for a given faceId (the bounding box and source preview don't change), so let
-      // the browser cache it (B5). Without this the review grid re-fetched — and the server re-decoded, cropped
-      // and re-encoded — every visible tile on every visit.
-      cacheControl: CacheControl.PrivateWithCache,
-    });
-  }
-
-  private getFaceThumbnailCrop(
-    dims: { old: ImageDimensions; new: ImageDimensions },
-    { x1, y1, x2, y2 }: FaceThumbnailBounds,
-  ): CropParameters {
-    if (
-      !this.hasPositiveDimensions(dims.old) ||
-      !this.hasPositiveDimensions(dims.new) ||
-      [x1, y1, x2, y2].some((value) => !Number.isFinite(value)) ||
-      x2 <= x1 ||
-      y2 <= y1
-    ) {
-      return this.getCenteredFaceThumbnailCrop(dims.new);
-    }
-
-    const clampedX1 = clamp(x1, 0, dims.old.width);
-    const clampedY1 = clamp(y1, 0, dims.old.height);
-    const clampedX2 = clamp(x2, 0, dims.old.width);
-    const clampedY2 = clamp(y2, 0, dims.old.height);
-
-    const widthScale = dims.new.width / dims.old.width;
-    const heightScale = dims.new.height / dims.old.height;
-
-    const halfWidth = (widthScale * (clampedX2 - clampedX1)) / 2;
-    const halfHeight = (heightScale * (clampedY2 - clampedY1)) / 2;
-
-    const middleX = Math.round(widthScale * clampedX1 + halfWidth);
-    const middleY = Math.round(heightScale * clampedY1 + halfHeight);
-    const targetHalfSize = Math.floor(Math.max(halfWidth, halfHeight) * 1.1);
-    const newHalfSize = Math.min(
-      middleX - Math.max(0, middleX - targetHalfSize),
-      middleY - Math.max(0, middleY - targetHalfSize),
-      Math.min(dims.new.width - 1, middleX + targetHalfSize) - middleX,
-      Math.min(dims.new.height - 1, middleY + targetHalfSize) - middleY,
-    );
-
-    const crop = {
-      x: middleX - newHalfSize,
-      y: middleY - newHalfSize,
-      width: newHalfSize * 2,
-      height: newHalfSize * 2,
-    };
-
-    return this.hasValidCrop(crop) ? crop : this.getCenteredFaceThumbnailCrop(dims.new);
-  }
-
-  private hasPositiveDimensions(dimensions: ImageDimensions) {
-    return (
-      Number.isFinite(dimensions.width) &&
-      dimensions.width > 0 &&
-      Number.isFinite(dimensions.height) &&
-      dimensions.height > 0
-    );
-  }
-
-  private hasValidCrop(crop: CropParameters) {
-    return (
-      Number.isFinite(crop.x) &&
-      crop.x >= 0 &&
-      Number.isFinite(crop.y) &&
-      crop.y >= 0 &&
-      Number.isFinite(crop.width) &&
-      crop.width > 0 &&
-      Number.isFinite(crop.height) &&
-      crop.height > 0
-    );
-  }
-
-  private getCenteredFaceThumbnailCrop(dimensions: ImageDimensions): CropParameters {
-    const width = this.toPositiveInteger(dimensions.width, FACE_THUMBNAIL_SIZE);
-    const height = this.toPositiveInteger(dimensions.height, FACE_THUMBNAIL_SIZE);
-    const size = Math.min(width, height);
-
-    return {
-      x: Math.floor((width - size) / 2),
-      y: Math.floor((height - size) / 2),
-      width: size,
-      height: size,
-    };
-  }
-
-  private toPositiveInteger(value: number, fallback: number) {
-    const rounded = Math.floor(value);
-    return Number.isFinite(rounded) && rounded > 0 ? rounded : fallback;
-  }
-
   // Gallery-fork: upstream calls userRepository.syncUsage() directly from its two call sites
   // (user.service.ts handleUserSyncUsage and user-admin.service.ts). The fork routes both through
   // here so a single admin toggle can decide what quotaUsageInBytes means: upstream's originals-only
   // sum, or a physical walk that also counts thumbnails and transcodes. Either way the column holds
   // the figure the admin asked for, so display and quota enforcement need no knowledge of the
-  // setting. The walk's own logic lives in src/gallery/storage-usage.ts.
+  // setting. The walk's own logic lives in src/gallery/utils/storage-usage.ts.
   protected async syncUsage(id?: string): Promise<void> {
     // The walk is expensive — hundreds of thousands of stat calls on a large install — so the
     // default path stays exactly as cheap as upstream's single statement.

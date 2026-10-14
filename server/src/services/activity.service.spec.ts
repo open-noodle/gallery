@@ -65,7 +65,7 @@ describe(ActivityService.name, () => {
       // AlbumRead granted ONLY via the space-linked arm (not owner, not shared album_user).
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
       mocks.activity.search.mockResolvedValue([albumLevel, assetLevel]);
 
       const result = await sut.getAll(AuthFactory.create({ id: userId }), { albumId });
@@ -95,7 +95,7 @@ describe(ActivityService.name, () => {
       // Not owner, but a shared album_user (Viewer+) — participant path wins.
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
       mocks.activity.search.mockResolvedValue([albumLevel]);
 
       const result = await sut.getAll(AuthFactory.create({ id: userId }), { albumId });
@@ -114,7 +114,7 @@ describe(ActivityService.name, () => {
       // access shape as the C1 space-only-reader test above.
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
       mocks.activity.search.mockResolvedValue([comment, like]);
 
       const result = await sut.getAll(AuthFactory.create({ id: userId }), { albumId });
@@ -172,7 +172,7 @@ describe(ActivityService.name, () => {
       // access shape as the C1 space-only-reader test above.
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([albumId]));
       mocks.activity.getStatistics.mockResolvedValue({ comments: 1, likes: 0 });
 
       await sut.getStatistics(AuthFactory.create({ id: userId }), { albumId });

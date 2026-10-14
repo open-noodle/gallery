@@ -1297,12 +1297,12 @@ export class FaceRepairService extends BaseService {
       throw new NotFoundException();
     }
 
-    const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
     if (!sourcePath) {
       throw new NotFoundException();
     }
 
-    return this.generateFaceThumbnailResponse(face, sourcePath);
+    return this.backendMedia.generateFaceThumbnailResponse(face, sourcePath);
   }
 
   // Sibling of getAdminFaceThumbnail: same admin-only, face-keyed, ownership-free resolution, but serves
@@ -1320,14 +1320,14 @@ export class FaceRepairService extends BaseService {
       throw new NotFoundException();
     }
 
-    const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
     if (!sourcePath) {
       throw new NotFoundException();
     }
 
     // serveFromBackend, not a bare ImmichFileResponse: the preview may live in S3, and the content type is
     // read from the file because image.preview.format is configurable (jpeg or webp).
-    return this.serveFromBackend(sourcePath, mimeTypes.lookup(sourcePath), CacheControl.PrivateWithCache);
+    return this.backendMedia.serveFromBackend(sourcePath, mimeTypes.lookup(sourcePath), CacheControl.PrivateWithCache);
   }
 
   private async collectClusterFaceIds(personGroupId: string): Promise<string[]> {
