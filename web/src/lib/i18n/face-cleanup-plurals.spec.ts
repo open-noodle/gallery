@@ -23,7 +23,7 @@ beforeAll(async () => {
   await waitLocale('en');
 });
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n');
+const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
 const en = JSON.parse(fs.readFileSync(path.join(I18N_DIR, 'en.json'), 'utf8')) as { admin: Record<string, string> };
 
 const KEYS = [

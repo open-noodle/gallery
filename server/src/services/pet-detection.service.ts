@@ -152,7 +152,7 @@ export class PetDetectionService extends BaseService {
         });
       }
 
-      await this.assetRepository.upsertJobStatus({ assetId: id, petsDetectedAt: new Date() });
+      await this.petFaceRepository.setPetsDetectedAt(id);
 
       this.logger.debug(`Detected ${pets.length} pet(s) for ${id}`);
       return JobStatus.Success;

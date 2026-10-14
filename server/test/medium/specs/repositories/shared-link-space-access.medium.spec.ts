@@ -8,7 +8,8 @@
  *
  * Assets the link creator DOES own are unaffected by any of that — they were always theirs to share.
  */
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
+import { randomBytes } from 'node:crypto';
 import { AssetVisibility, SharedLinkType, SharedSpaceRole } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -18,6 +19,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService } from 'test/medium.factory.js';
+import { newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
@@ -427,5 +429,101 @@ describe('SharedLinkRepository.get — payload (#1018)', () => {
     const result = await sharedLinkRepo.get(sharer.id, sharedLink.id);
 
     expect(result?.album?.assets.map(({ id }) => id)).toEqual([ownAsset.id]);
+  });
+});
+
+describe('shared_link_space sidecar', () => {
+  it('records the space in shared_link_space and leaves upstream shared_link without a spaceId column', async () => {
+    const { ctx, sharer, space } = await seedSpace();
+    const { sharedLink } = await ctx.newSharedLink({
+      userId: sharer.id,
+      type: SharedLinkType.Individual,
+      spaceId: space.id,
+    });
+    const { sharedLink: plainLink } = await ctx.newSharedLink({ userId: sharer.id, type: SharedLinkType.Individual });
+
+    const rows = await defaultDatabase
+      .selectFrom('shared_link_space')
+      .selectAll()
+      .where('sharedLinkId', 'in', [sharedLink.id, plainLink.id])
+      .execute();
+    expect(rows).toEqual([{ sharedLinkId: sharedLink.id, spaceId: space.id }]);
+
+    const columns = await sql<{ column_name: string }>`
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'shared_link' AND column_name = 'spaceId'
+    `.execute(defaultDatabase);
+    expect(columns.rows).toEqual([]);
+  });
+
+  it('gives the link auth context its space, and none for a plain link', async () => {
+    const { ctx, sharedLinkRepo, sharer, space } = await seedSpace();
+    const { sharedLink } = await ctx.newSharedLink({
+      userId: sharer.id,
+      type: SharedLinkType.Individual,
+      spaceId: space.id,
+    });
+    const { sharedLink: plainLink } = await ctx.newSharedLink({ userId: sharer.id, type: SharedLinkType.Individual });
+
+    await expect(sharedLinkRepo.getByKey(sharedLink.key)).resolves.toMatchObject({ spaceId: space.id });
+    await expect(sharedLinkRepo.getByKey(plainLink.key)).resolves.toMatchObject({ spaceId: null });
+  });
+
+  it("degrades the link to the creator's own assets once the space is deleted", async () => {
+    const { ctx, accessRepo, sharedLinkRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: contributedAsset.id });
+    const { sharedLink } = await ctx.newSharedLink({
+      userId: sharer.id,
+      type: SharedLinkType.Individual,
+      spaceId: space.id,
+      assetIds: [contributedAsset.id, ownAsset.id],
+    });
+
+    await defaultDatabase.deleteFrom('shared_space').where('id', '=', space.id).execute();
+
+    await expect(
+      accessRepo.asset.checkSharedLinkAccess(sharedLink.id, new Set([contributedAsset.id, ownAsset.id])),
+    ).resolves.toEqual(new Set([ownAsset.id]));
+    await expect(sharedLinkRepo.getByKey(sharedLink.key)).resolves.toMatchObject({ spaceId: null });
+    await expect(
+      defaultDatabase.selectFrom('shared_link_space').selectAll().where('sharedLinkId', '=', sharedLink.id).execute(),
+    ).resolves.toEqual([]);
+  });
+
+  it('deletes the sidecar row with the link', async () => {
+    const { ctx, sharedLinkRepo, sharer, space } = await seedSpace();
+    const { sharedLink } = await ctx.newSharedLink({
+      userId: sharer.id,
+      type: SharedLinkType.Individual,
+      spaceId: space.id,
+    });
+
+    await sharedLinkRepo.remove(sharedLink.id);
+
+    await expect(
+      defaultDatabase.selectFrom('shared_link_space').selectAll().where('sharedLinkId', '=', sharedLink.id).execute(),
+    ).resolves.toEqual([]);
+  });
+});
+
+describe('SharedLinkRepository.create', () => {
+  it('does not keep the shared_link row when the shared_link_space write fails', async () => {
+    const { ctx, sharedLinkRepo } = setup();
+    const { user } = await ctx.newUser();
+    const key = randomBytes(32);
+
+    // no such space: the shared_link_space insert fails its FK after the shared_link insert
+    await expect(
+      sharedLinkRepo.create({
+        userId: user.id,
+        type: SharedLinkType.Individual,
+        key,
+        allowUpload: false,
+        spaceId: newUuid(),
+      }),
+    ).rejects.toThrow(/shared_link_space_spaceId_fkey/);
+
+    await expect(
+      defaultDatabase.selectFrom('shared_link').select('id').where('key', '=', key).execute(),
+    ).resolves.toEqual([]);
   });
 });

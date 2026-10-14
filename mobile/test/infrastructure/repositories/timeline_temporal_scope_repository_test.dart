@@ -4,6 +4,7 @@ import 'package:immich_mobile/data/db/main/table/people/asset_face.drift.dart';
 import 'package:immich_mobile/data/db/main/table/people/person.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/exif.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_album_hidden.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/partner.drift.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
@@ -34,7 +35,7 @@ LatLngBounds globeBounds() => LatLngBounds(southwest: const LatLng(-89, -179), n
 
 void main() {
   late MediumRepositoryContext ctx;
-  late TimelineRepository sut;
+  late SharedSpaceTimelineRepository sut;
 
   setUpAll(() async {
     await initializeDateFormatting('en');
@@ -42,7 +43,7 @@ void main() {
 
   setUp(() {
     ctx = MediumRepositoryContext();
-    sut = TimelineRepository(ctx.db);
+    sut = SharedSpaceTimelineRepository(TimelineRepository(ctx.db));
   });
 
   tearDown(() async {
@@ -129,6 +130,45 @@ void main() {
       TimeBucket(date: DateTime(2025, 5), assetCount: 1),
     ]);
     expect(await assetIds(query), ['partner-in', 'current-in']);
+  });
+
+  // The scoped main query must keep every Space path the unscoped spaceMergedAsset/Bucket have:
+  // the album-link leg and the #1041 hide subtraction on the viewer's own assets.
+  test('main() year scope keeps album-linked Space assets and the #1041 owner hide', () async {
+    final viewer = await ctx.newUser(id: 'user-1');
+    final owner = await ctx.newUser(id: 'owner-2');
+    final space = await ctx.newSharedSpace(id: 'space-1', createdById: owner.id);
+    final hiddenSpace = await ctx.newSharedSpace(id: 'space-2', createdById: owner.id);
+    await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id);
+    await ctx.newSharedSpaceMember(spaceId: hiddenSpace.id, userId: viewer.id, showInTimeline: false);
+    final album = await ctx.newSharedSpaceAlbum(id: 'album-1');
+    final hiddenAlbum = await ctx.newSharedSpaceAlbum(id: 'album-2');
+    await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
+    await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: hiddenAlbum.id);
+    await ctx.db
+        .into(ctx.db.sharedSpaceAlbumHiddenEntity)
+        .insert(
+          SharedSpaceAlbumHiddenEntityCompanion.insert(spaceId: space.id, albumId: hiddenAlbum.id, userId: viewer.id),
+        );
+
+    await ctx.newRemoteAsset(id: 'album-in', ownerId: owner.id, createdAt: DateTime(2025, 6, 1, 12));
+    await ctx.newRemoteAsset(id: 'own-in', ownerId: viewer.id, createdAt: DateTime(2025, 5, 1, 12));
+    await ctx.newRemoteAsset(id: 'own-in-hidden-space', ownerId: viewer.id, createdAt: DateTime(2025, 4, 1, 12));
+    await ctx.newRemoteAsset(id: 'own-in-hidden-album', ownerId: viewer.id, createdAt: DateTime(2025, 3, 1, 12));
+    await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: 'album-in');
+    await ctx.insertSharedSpaceAsset(spaceId: hiddenSpace.id, assetId: 'own-in-hidden-space');
+    await ctx.insertSharedSpaceAlbumAsset(albumId: hiddenAlbum.id, assetId: 'own-in-hidden-album');
+
+    const scope = TimelineTemporalScope.year(2025);
+    final scoped = sut.main([viewer.id], viewer.id, GroupAssetsBy.month, temporalScope: scope);
+    final unscoped = sut.main([viewer.id], viewer.id, GroupAssetsBy.month);
+
+    expect(await assetIds(scoped), ['album-in', 'own-in']);
+    expect(await assetIds(scoped), await assetIds(unscoped));
+    expect(await timeBuckets(scoped), [
+      TimeBucket(date: DateTime(2025, 6), assetCount: 1),
+      TimeBucket(date: DateTime(2025, 5), assetCount: 1),
+    ]);
   });
 
   test('main() year scope preserves merged local-only semantics', () async {

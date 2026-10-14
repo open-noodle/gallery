@@ -601,9 +601,9 @@ select
                 1 as "one"
               from
                 "person"
+                inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
               where
                 "person"."personGroupId" = "asset_face"."personGroupId"
-                and "person"."type" = $1
             )
           ) as "isPet"
         from
@@ -636,7 +636,7 @@ from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."id" = $2
+  "asset"."id" = $1
 
 -- AssetJobRepository.getForOcr
 select
@@ -1028,8 +1028,9 @@ select
 from
   "asset"
   inner join "asset_job_status" on "asset_job_status"."assetId" = "asset"."id"
+  left join "asset_job_status_gallery" on "asset_job_status_gallery"."assetId" = "asset"."id"
 where
-  "asset_job_status"."petsDetectedAt" is null
+  "asset_job_status_gallery"."petsDetectedAt" is null
   and "asset"."deletedAt" is null
   and "asset"."visibility" != $1
 

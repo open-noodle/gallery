@@ -24,7 +24,7 @@ void main() {
   final callPattern = RegExp(r"'([a-z0-9_]+)'\.tr?\(");
 
   test('every localisation key referenced in the spaces feature exists in en.json', () {
-    final en = jsonDecode(File('../i18n/en.json').readAsStringSync()) as Map<String, dynamic>;
+    final en = jsonDecode(File('../i18n/gallery/merged/en.json').readAsStringSync()) as Map<String, dynamic>;
 
     final missing = <String, Set<String>>{};
     var scannedFiles = 0;

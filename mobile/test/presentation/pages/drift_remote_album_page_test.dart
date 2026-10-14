@@ -204,7 +204,7 @@ void main() {
         ],
         child: EasyLocalization(
           supportedLocales: const [Locale('en')],
-          path: '../i18n',
+          path: '../i18n/gallery/merged',
           fallbackLocale: const Locale('en'),
           child: MaterialApp(home: withStubRouter(RemoteAlbumPage(album: album))),
         ),

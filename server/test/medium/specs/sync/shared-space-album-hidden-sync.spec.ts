@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole } from 'src/enum.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -22,7 +22,7 @@ const setup = () => {
   return {
     ctx,
     db: defaultDatabase,
-    sut: ctx.get(SyncRepository).sharedSpaceAlbumHidden,
+    sut: new GallerySyncRepository(ctx.database).sharedSpaceAlbumHidden,
     spaceRepo: ctx.get(SharedSpaceRepository),
   };
 };

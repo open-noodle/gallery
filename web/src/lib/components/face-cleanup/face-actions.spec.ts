@@ -23,7 +23,7 @@ import {
 const ALL_IDS: FaceActionId[] = ['owner', 'stay', 'lock', 'other', 'unknown', 'detach', 'keep', 'unmark'];
 const MODES: FaceReviewMode[] = ['guided', 'manual'];
 
-const en = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), '../i18n/en.json'), 'utf8')) as {
+const en = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), '../i18n/gallery/merged/en.json'), 'utf8')) as {
   admin: Record<string, string>;
 };
 

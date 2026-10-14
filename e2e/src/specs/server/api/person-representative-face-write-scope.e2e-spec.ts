@@ -1,11 +1,11 @@
 /**
  * Slice 3 — M2: `PUT /people/:id/representative-face` (`updateRepresentativeFace`) is reachable by
- * anyone with `PersonRead` — which, per `PersonAccess.checkSharedSpaceAccess`, admits ANY shared-space
+ * anyone with `PersonRead` — which, per `GalleryPersonAccess.checkSharedSpaceAccess`, admits ANY shared-space
  * role (Owner, Editor, and Viewer). Before this fix, that meant a space Viewer could mutate the
  * owner's GLOBAL representative face (the People-page cover) for everyone, not just their own view.
  *
  * The fix requires the caller be the person's owner OR an Editor/Owner of a space the person is
- * shared through (checked via `PersonAccess.checkSharedSpaceEditAccess`); a Viewer is denied with a
+ * shared through (checked via `GalleryPersonAccess.checkSharedSpaceEditAccess`); a Viewer is denied with a
  * 403. Owner ∪ Editor — never Viewer-only.
  *
  * `personId` here (owned by `spaceOwner`) has two faces on the space-shared asset

@@ -10,7 +10,8 @@ import 'package:intl/message_format.dart';
 /// Formats the *real* shared `en.json` message, so a key this file names but `en.json` does not
 /// have — or a placeholder no memory rule actually stores — fails here instead of reaching a
 /// user as a raw key.
-final Map<String, dynamic> _en = json.decode(File('../i18n/en.json').readAsStringSync()) as Map<String, dynamic>;
+final Map<String, dynamic> _en =
+    json.decode(File('../i18n/gallery/merged/en.json').readAsStringSync()) as Map<String, dynamic>;
 
 String _translate(String key, {Map<String, Object>? args}) {
   final message = _en[key];

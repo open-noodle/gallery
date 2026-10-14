@@ -12,7 +12,7 @@ import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 // I7  no guard can see that a reworded English value left its nine translations describing the old wording.
 //     A test cannot diff against a value the file no longer holds, so this checks the old shape instead.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n');
+const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
 
 const admin = (code: string): Record<string, string> =>
   (JSON.parse(fs.readFileSync(path.join(I18N_DIR, `${code}.json`), 'utf8')) as { admin: Record<string, string> }).admin;

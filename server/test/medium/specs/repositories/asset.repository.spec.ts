@@ -8,7 +8,7 @@ import {
   SharedSpaceRole,
   TimeBucketSize,
 } from 'src/enum.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';

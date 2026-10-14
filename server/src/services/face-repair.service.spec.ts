@@ -35,7 +35,7 @@ describe(FaceRepairService.name, () => {
   // backend serve — no decode, no sharp, no temp dir. T2.2 and T2.8 are the tests that keep it that way.
   const stubServe = () =>
     vi
-      .spyOn(sut as any, 'serveFromBackend')
+      .spyOn((sut as any).backendMedia, 'serveFromBackend')
       .mockResolvedValue(
         new ImmichFileResponse({ path: '/preview.jpg', contentType: 'image/jpeg', cacheControl: CacheControl.None }),
       );
@@ -45,7 +45,10 @@ describe(FaceRepairService.name, () => {
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1' });
       mocks.person.getFaceByIdIncludingTombstoned.mockResolvedValue(getForAssetFace(face));
       mocks.asset.getForThumbnail.mockResolvedValue({ path: '/preview.jpg' } as any);
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: '/preview.jpg', cleanup: vi.fn() });
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({
+        localPath: '/preview.jpg',
+        cleanup: vi.fn(),
+      });
       mocks.media.decodeImage.mockResolvedValue({
         data: Buffer.from('img'),
         info: { width: 100, height: 100, channels: 3, format: 'jpeg', size: 0, premultiplied: false },
@@ -57,7 +60,7 @@ describe(FaceRepairService.name, () => {
       const result = await sut.getAdminFaceThumbnail('face-1');
 
       expect(mocks.person.getFaceByIdIncludingTombstoned).toHaveBeenCalledWith('face-1');
-      expect(mocks.access.person.checkOwnerAccess).not.toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkOwnerAccess).not.toHaveBeenCalled();
       expect(mocks.media.generateThumbnail).toHaveBeenCalled();
       if (result instanceof ImmichStreamResponse) {
         result.stream.destroy();
@@ -68,7 +71,10 @@ describe(FaceRepairService.name, () => {
       const face = AssetFaceFactory.create({ id: 'face-1', assetId: 'asset-1', deletedAt: new Date() });
       mocks.person.getFaceByIdIncludingTombstoned.mockResolvedValue(getForAssetFace(face));
       mocks.asset.getForThumbnail.mockResolvedValue({ path: '/preview.jpg' } as any);
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: '/preview.jpg', cleanup: vi.fn() });
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({
+        localPath: '/preview.jpg',
+        cleanup: vi.fn(),
+      });
       mocks.media.decodeImage.mockResolvedValue({
         data: Buffer.from('img'),
         info: { width: 100, height: 100, channels: 3, format: 'jpeg', size: 0, premultiplied: false },
@@ -118,7 +124,7 @@ describe(FaceRepairService.name, () => {
       await sut.getAdminFacePreview('face-1');
 
       expect(mocks.person.getFaceByIdOnLiveAsset).toHaveBeenCalledWith('face-1');
-      expect(mocks.access.person.checkOwnerAccess).not.toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkOwnerAccess).not.toHaveBeenCalled();
       expect(mocks.media.generateThumbnail).not.toHaveBeenCalled(); // uncropped: no sharp pass
       expect(mocks.media.decodeImage).not.toHaveBeenCalled();
       expect(serve).toHaveBeenCalledWith('/preview.jpg', 'image/jpeg', CacheControl.PrivateWithCache);

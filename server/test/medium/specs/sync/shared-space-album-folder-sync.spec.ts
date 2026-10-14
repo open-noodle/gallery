@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -90,7 +90,7 @@ const BEFORE_UPDATE_ID = 'ffffffff-ffff-7fff-bfff-ffffffffffff';
 
 const syncSetup = () => {
   const ctx = new SyncTestContext(defaultDatabase);
-  return { ctx, db: defaultDatabase, sut: ctx.get(SyncRepository).sharedSpaceAlbumFolder };
+  return { ctx, db: defaultDatabase, sut: new GallerySyncRepository(ctx.database).sharedSpaceAlbumFolder };
 };
 
 describe('SharedSpaceAlbumFolderSync', () => {
@@ -225,7 +225,7 @@ describe('SharedSpaceAlbumFolderSync', () => {
 
 // ── Handler-level stream tests (Task 4 review-fix) ──────────────────────────
 // Every test above drives SharedSpaceAlbumFolderSync (the repository class) directly, bypassing
-// the actual service handler. `syncSharedSpaceAlbumFoldersV1` in sync.service.ts (~68 lines of
+// the actual service handler. `syncSharedSpaceAlbumFoldersV1` in gallery-sync.streams.ts (~68 lines of
 // checkpoint/backfill plumbing: ack gating on the delete AND upsert arms, the per-space backfill
 // loop, and final wire-shape assembly) therefore had zero coverage of its own. These five tests
 // drive the real handler end to end via `ctx.syncStream()`, modelled on the ctx.syncStream /

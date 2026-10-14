@@ -34,6 +34,9 @@ export type SharedLinkLike = Partial<Selectable<SharedLinkTable>>;
 export type UserLike = Partial<Selectable<UserTable>>;
 export type AssetFaceLike = Partial<Selectable<AssetFaceTable>>;
 export type PersonRow = Selectable<PersonTable> & {
+  identityId: string | null;
+  type: string;
+  species: string | null;
   otherPeople: { sharedById: string; role: PersonUserRole; name: string; birthDate: string | null }[];
   sharedBy: PersonUser[];
   sharedWith: PersonUser[];

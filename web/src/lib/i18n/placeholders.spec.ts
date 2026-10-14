@@ -18,7 +18,7 @@ import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 // every file in I18N_DIR regardless of ownership, which is why mr.json and ms.json were hand-patched to
 // keep the suite green — those patches are reverted now that the scope is correct.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n');
+const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
 
 // Extract the ICU arguments a message actually references.
 //

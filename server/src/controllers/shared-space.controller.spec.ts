@@ -777,7 +777,7 @@ describe(SharedSpaceController.name, () => {
 
   // Slice 6, Task 3 (spec §6.6): DELETE /shared-spaces/:id/faces/:assetFaceId. The decorator
   // carries the SharedSpaceUpdate API-key SCOPE, matching the sibling writes -- the real
-  // authority (Editor role + reachability + createdBy IS NOT NULL) is enforced in the service.
+  // authority (Editor role + reachability + an asset_face_creator row) is enforced in the service.
   describe('DELETE /shared-spaces/:id/faces/:assetFaceId', () => {
     const spaceId = '00000000-0000-4000-8000-000000000001';
     const faceId = '00000000-0000-4000-8000-000000000003';

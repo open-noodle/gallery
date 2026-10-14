@@ -470,7 +470,14 @@ WITH
       'user-person'::text AS "profileType",
       person."personGroupId" AS "profileId",
       NULL::uuid AS "spaceId",
-      person."identityId",
+      (
+        SELECT
+          "person_identity"."identityId"
+        FROM
+          "person_identity"
+        WHERE
+          "person_identity"."personGroupId" = "person"."personGroupId"
+      ) AS "identityId",
       person.name,
       person."isHidden",
       person."updatedAt",
@@ -479,14 +486,28 @@ WITH
       person
     WHERE
       person."ownerId" = $9
-      AND person."identityId" IS NOT NULL
+      AND (
+        SELECT
+          "person_identity"."identityId"
+        FROM
+          "person_identity"
+        WHERE
+          "person_identity"."personGroupId" = "person"."personGroupId"
+      ) IS NOT NULL
       AND EXISTS (
         SELECT
           1
         FROM
           identity_faces
         WHERE
-          identity_faces."identityId" = person."identityId"
+          identity_faces."identityId" = (
+            SELECT
+              "person_identity"."identityId"
+            FROM
+              "person_identity"
+            WHERE
+              "person_identity"."personGroupId" = "person"."personGroupId"
+          )
       )
     UNION ALL
     SELECT

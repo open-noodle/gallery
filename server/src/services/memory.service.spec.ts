@@ -1834,7 +1834,7 @@ describe(MemoryService.name, () => {
       mocks.memory.getAssetIds.mockResolvedValue(new Set());
       // Not the owner, but an editor of a space containing the asset.
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
+      mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
 
       await expect(sut.addAssets(factory.auth(), memory.id, { ids: [assetId] })).resolves.toEqual([
         { error: 'no_permission', id: assetId, success: false },

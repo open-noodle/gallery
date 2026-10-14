@@ -1,5 +1,5 @@
 /**
- * Medium tests for `AccessRepository.asset.checkSpaceEditAccess` — the space-editor
+ * Medium tests for `AccessRepository.spaceAsset.checkSpaceEditAccess` — the space-editor
  * write rule (#734, spec §2).
  *
  * Rule: you may edit an asset if you own it, or if you are Owner/Editor of a space
@@ -146,7 +146,7 @@ describe('checkSpaceEditAccess — the full grant matrix (reach path × actor ro
 
         const expectGranted = (actorRole === 'owner' || actorRole === 'editor') && ownerMembership === 'member';
 
-        const allowed = await accessRepo.asset.checkSpaceEditAccess(actor.id, new Set([assetId]));
+        const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(actor.id, new Set([assetId]));
 
         expect(allowed).toEqual(expectGranted ? new Set([assetId]) : new Set());
       },
@@ -175,7 +175,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     await ctx.newAlbumAsset({ albumId: album.id, assetId: viaAlbum.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([direct.id, viaAlbum.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([direct.id, viaAlbum.id]));
 
     expect(allowed).toEqual(new Set());
   });
@@ -187,7 +187,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
     await trash(asset.id);
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set());
   });
@@ -204,7 +204,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
     await markOffline(asset.id);
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set());
   });
@@ -223,7 +223,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await markOffline(asset.id);
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set());
   });
@@ -236,7 +236,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set([asset.id]));
   });
@@ -252,7 +252,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: still.id });
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([motion.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([motion.id]));
 
     expect(allowed).toEqual(new Set([motion.id]));
   });
@@ -274,7 +274,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set());
   });
@@ -294,7 +294,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set());
   });
@@ -319,7 +319,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     });
     await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
 
     expect(allowed).toEqual(new Set());
   });

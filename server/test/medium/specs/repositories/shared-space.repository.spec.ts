@@ -1,10 +1,11 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceActivityType, SharedSpaceRole, SourceType } from 'src/enum.js';
+import { personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
-import { newMediumService } from 'test/medium.factory.js';
+import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
 import { newEmbedding } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -77,6 +78,7 @@ const createIdentityBackedFace = async (
         result: await ctx.database
           .selectFrom('person')
           .selectAll()
+          .select(personSidecarColumns())
           .where('personGroupId', '=', input.personId)
           .executeTakeFirstOrThrow(),
       }
@@ -92,11 +94,7 @@ const createIdentityBackedFace = async (
   }
 
   if (!person.identityId) {
-    await ctx.database
-      .updateTable('person')
-      .set({ identityId })
-      .where('personGroupId', '=', person.personGroupId)
-      .execute();
+    await updatePersonForTest(ctx.database, person.personGroupId, { identityId });
   }
 
   const { asset } = await ctx.newAsset({
@@ -1618,11 +1616,7 @@ describe(SharedSpaceRepository.name, () => {
         .returningAll()
         .execute();
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      await ctx.database
-        .updateTable('person')
-        .set({ identityId: staleIdentity.id })
-        .where('personGroupId', '=', person.personGroupId)
-        .execute();
+      await updatePersonForTest(ctx.database, person.personGroupId, { identityId: staleIdentity.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
@@ -1852,11 +1846,10 @@ describe(SharedSpaceRepository.name, () => {
           .executeTakeFirstOrThrow();
         const { result: person } = await ctx.newPerson({ ownerId: owner.id, thumbnailPath: '/owner-thumb.jpg' });
         const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-        await ctx.database
-          .updateTable('person')
-          .set({ identityId: identity.id, faceAssetId: assetFace.id })
-          .where('personGroupId', '=', person.personGroupId)
-          .execute();
+        await updatePersonForTest(ctx.database, person.personGroupId, {
+          identityId: identity.id,
+          faceAssetId: assetFace.id,
+        });
 
         const result = await sut.getPersonalThumbnailForSpacePerson({
           userId: viewer.id,
@@ -1881,11 +1874,10 @@ describe(SharedSpaceRepository.name, () => {
           .executeTakeFirstOrThrow();
         const { result: person } = await ctx.newPerson({ ownerId: owner.id, thumbnailPath: '/private-thumb.jpg' });
         const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-        await ctx.database
-          .updateTable('person')
-          .set({ identityId: identity.id, faceAssetId: assetFace.id })
-          .where('personGroupId', '=', person.personGroupId)
-          .execute();
+        await updatePersonForTest(ctx.database, person.personGroupId, {
+          identityId: identity.id,
+          faceAssetId: assetFace.id,
+        });
 
         const result = await sut.getPersonalThumbnailForSpacePerson({
           userId: viewer.id,
@@ -1918,11 +1910,10 @@ describe(SharedSpaceRepository.name, () => {
           assetId: ownerAsset.id,
           personGroupId: ownerPerson.personGroupId,
         });
-        await ctx.database
-          .updateTable('person')
-          .set({ identityId: identity.id, faceAssetId: ownerFace.id })
-          .where('personGroupId', '=', ownerPerson.personGroupId)
-          .execute();
+        await updatePersonForTest(ctx.database, ownerPerson.personGroupId, {
+          identityId: identity.id,
+          faceAssetId: ownerFace.id,
+        });
 
         const { asset: viewerAsset } = await ctx.newAsset({
           ownerId: viewer.id,
@@ -1936,11 +1927,10 @@ describe(SharedSpaceRepository.name, () => {
           assetId: viewerAsset.id,
           personGroupId: viewerPerson.personGroupId,
         });
-        await ctx.database
-          .updateTable('person')
-          .set({ identityId: identity.id, faceAssetId: viewerFace.id })
-          .where('personGroupId', '=', viewerPerson.personGroupId)
-          .execute();
+        await updatePersonForTest(ctx.database, viewerPerson.personGroupId, {
+          identityId: identity.id,
+          faceAssetId: viewerFace.id,
+        });
 
         const result = await sut.getPersonalThumbnailForSpacePerson({
           userId: viewer.id,

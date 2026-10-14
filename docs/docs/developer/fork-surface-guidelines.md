@@ -2,7 +2,8 @@
 
 Put new fork behavior in a Gallery-owned namespace when that is practical:
 
-- server: `server/src/gallery/**`
+- server: `server/src/gallery/**`, laid out like upstream's `server/src`
+  (`controllers/`, `dtos/`, `repositories/`, `services/`, `utils/`)
 - web: `web/src/lib/gallery/**`
 - mobile: `mobile/lib/gallery/**`
 - database migrations: `server/src/schema/migrations-gallery/**`

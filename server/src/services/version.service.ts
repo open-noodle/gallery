@@ -17,7 +17,7 @@ import {
   ReleaseChannel,
   SystemMetadataKey,
 } from 'src/enum.js';
-import { getClientServerVersion } from 'src/gallery/client-version.js';
+import { getClientServerVersion } from 'src/gallery/utils/client-version.js';
 import { BaseService } from 'src/services/base.service.js';
 import { handlePromiseError } from 'src/utils/misc.js';
 

@@ -654,7 +654,7 @@ export class SharedSpaceController {
   }
 
   // Spec §6.6 (Slice 6, Task 3). Same API-key scope as the sibling writes -- the real authority
-  // (Editor role + reachability + createdBy IS NOT NULL, never sourceType) is enforced in the
+  // (Editor role + reachability + an asset_face_creator row, never sourceType) is enforced in the
   // service. Detected faces stay refused; FaceDelete remains owner-only for those.
   @Delete(':id/faces/:assetFaceId')
   @Authenticated({ permission: Permission.SharedSpaceUpdate })

@@ -1,5 +1,5 @@
 import { SystemConfig } from 'src/dtos/config.dto.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { BirthdayMemoryRule } from 'src/services/memory-rules/birthday.rule.js';
