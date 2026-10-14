@@ -134,7 +134,7 @@ void main() {
     await tester.pumpWidget(
       EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: ProviderScope(
           overrides: [timelineServiceProvider.overrideWithValue(timelineService)],
@@ -187,7 +187,7 @@ void main() {
     await tester.pumpWidget(
       EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: ProviderScope(
           overrides: [
@@ -233,7 +233,7 @@ void main() {
     await tester.pumpWidget(
       EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: ProviderScope(
           overrides: [timelineServiceProvider.overrideWithValue(timelineService)],
@@ -273,7 +273,7 @@ void main() {
     await tester.pumpWidget(
       EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: ProviderScope(
           overrides: [
@@ -307,7 +307,7 @@ void main() {
   Widget wrapWithScope(Widget child, {required TimelineService timelineService, List<Override> overrides = const []}) {
     return EasyLocalization(
       supportedLocales: const [Locale('en')],
-      path: '../i18n',
+      path: '../i18n/gallery/merged',
       fallbackLocale: const Locale('en'),
       child: ProviderScope(
         overrides: [

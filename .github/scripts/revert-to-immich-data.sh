@@ -168,8 +168,9 @@ seed() {
   # human person with a face that the revert must keep.
   psql_q "
     WITH g AS (INSERT INTO person_group (\"clusterGroupId\") SELECT \"clusterGroupId\" FROM \"user\" WHERE id = '$owner_id' RETURNING id),
-         p AS (INSERT INTO person (\"ownerId\", \"personGroupId\", name, type, species)
-               SELECT '$owner_id', id, 'Revert Pet', 'pet', 'dog' FROM g RETURNING \"personGroupId\")
+         pp AS (INSERT INTO person_pet (\"personGroupId\", species) SELECT id, 'dog' FROM g),
+         p AS (INSERT INTO person (\"ownerId\", \"personGroupId\", name)
+               SELECT '$owner_id', id, 'Revert Pet' FROM g RETURNING \"personGroupId\")
     INSERT INTO asset_face (\"assetId\", \"personGroupId\") SELECT '$photo_b', \"personGroupId\" FROM p;
     WITH f AS (INSERT INTO asset_face (\"assetId\") VALUES ('$photo_b') RETURNING id)
     INSERT INTO pet_search (\"faceId\", embedding, species)

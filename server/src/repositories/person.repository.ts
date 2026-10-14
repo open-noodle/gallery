@@ -14,6 +14,17 @@ import { AssetFace } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import { PersonUserRole } from 'src/dtos/person.dto.js';
 import { AssetFileType, AssetVisibility, SourceType, UserMetadataKey } from 'src/enum.js';
+import {
+  PersonSidecarFields,
+  clearOrphanPersonIdentity,
+  personIdentityId,
+  personIsPet,
+  personSidecarColumns,
+  personSpecies,
+  personType,
+  setPersonIdentity,
+  writePersonSidecars,
+} from 'src/gallery/utils/person-sidecar.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
@@ -210,6 +221,7 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
       eb
         .selectFrom('person')
         .selectAll('person')
+        .select(personSidecarColumns())
         .whereRef('person.personGroupId', '=', 'asset_face.personGroupId')
         .orderBy(sql`case when "person"."ownerId" = ${viewingUserId} then 0 else 1 end`)
         .limit(1),
@@ -226,7 +238,11 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
  */
 const withPersonAnyOwner = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   jsonObjectFrom(
-    eb.selectFrom('person').selectAll('person').whereRef('person.personGroupId', '=', 'asset_face.personGroupId'),
+    eb
+      .selectFrom('person')
+      .selectAll('person')
+      .select(personSidecarColumns())
+      .whereRef('person.personGroupId', '=', 'asset_face.personGroupId'),
   ).as('person');
 
 const withFaceSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
@@ -267,7 +283,15 @@ export class PersonRepository {
   ): Promise<{ deletedThumbnailPath: string | null; targetNeedsFeatureFaceRepair: boolean }> {
     const people = await db
       .selectFrom('person')
-      .select(['personGroupId', 'name', 'birthDate', 'thumbnailPath', 'color', 'species', 'faceAssetId'])
+      .select([
+        'personGroupId',
+        'name',
+        'birthDate',
+        'thumbnailPath',
+        'color',
+        personSpecies().as('species'),
+        'faceAssetId',
+      ])
       .where('personGroupId', 'in', [input.sourcePersonId, input.targetPersonId])
       .execute();
     const target = people.find((person) => person.personGroupId === input.targetPersonId);
@@ -276,7 +300,9 @@ export class PersonRepository {
       throw new Error('Person profile not found');
     }
 
-    const update: Updateable<PersonTable> = { identityId: input.targetIdentityId };
+    await setPersonIdentity(db, input.targetPersonId, input.targetIdentityId);
+    // Always touches the survivor (bumping updatedAt/updateId), as when identityId lived on person.
+    const update: Updateable<PersonTable> = { name: target.name };
     if (isBlank(target.name) && !isBlank(source.name)) {
       update.name = source.name;
     }
@@ -290,7 +316,8 @@ export class PersonRepository {
     }
 
     if (isBlank(target.species) && !isBlank(source.species)) {
-      update.species = source.species;
+      // only lands when the survivor is a pet: species lives on its person_pet row
+      await writePersonSidecars(db, input.targetPersonId, { species: source.species });
     }
 
     await db.updateTable('person').set(update).where('personGroupId', '=', input.targetPersonId).execute();
@@ -384,11 +411,7 @@ export class PersonRepository {
     },
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<void> {
-    await db
-      .updateTable('person')
-      .set({ identityId: input.identityId })
-      .where('personGroupId', '=', input.personId)
-      .execute();
+    await setPersonIdentity(db, input.personId, input.identityId);
   }
 
   /**
@@ -404,7 +427,7 @@ export class PersonRepository {
    * first (`createGroup`) — the same rule `createWithGroup` enforces for every other person-insert
    * path. A person is addressed by `personGroupId`; there is no standalone `person.id` any more.
    *
-   * The insert races `person_ownerId_identityId_key` (partial unique, `identityId IS NOT NULL`): two
+   * The insert races `person_identity_ownerId_identityId_key`: two
    * editors attaching two faces of the same not-yet-named human concurrently would both miss the
    * initial select. `doNothing` plus a re-select makes the loser adopt the winner's row rather than
    * fail on the duplicate key. The loser's freshly minted `person_group` row is then unreferenced,
@@ -417,9 +440,10 @@ export class PersonRepository {
     const find = () =>
       db
         .selectFrom('person')
-        .select('personGroupId')
-        .where('ownerId', '=', input.ownerId)
-        .where('identityId', '=', input.identityId)
+        .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+        .select('person.personGroupId')
+        .where('person.ownerId', '=', input.ownerId)
+        .where('person_identity.identityId', '=', input.identityId)
         .executeTakeFirst();
 
     const existing = await find();
@@ -434,20 +458,30 @@ export class PersonRepository {
       .returning('id')
       .executeTakeFirstOrThrow();
 
-    const inserted = await db
-      .insertInto('person')
-      .values({
-        ownerId: input.ownerId,
-        personGroupId: group.id,
-        identityId: input.identityId,
-        name: input.name,
-        type: input.type,
-      })
-      .onConflict((oc) => oc.doNothing())
+    // The identity link is written before the person: it carries the (ownerId, identityId) key.
+    await clearOrphanPersonIdentity(db, input.ownerId, input.identityId);
+    const linked = await db
+      .insertInto('person_identity')
+      .values({ personGroupId: group.id, ownerId: input.ownerId, identityId: input.identityId })
+      .onConflict((oc) => oc.columns(['ownerId', 'identityId']).doNothing())
       .returning('personGroupId')
       .executeTakeFirst();
+    if (!linked) {
+      // Lost the race: the winner's person row is visible once its transaction commits.
+      const winner = await find();
+      if (!winner) {
+        throw new Error(`Identity ${input.identityId} is linked for owner ${input.ownerId} but has no person row`);
+      }
+      return winner;
+    }
 
-    return inserted ?? ((await find()) as { personGroupId: string });
+    await db
+      .insertInto('person')
+      .values({ ownerId: input.ownerId, personGroupId: group.id, name: input.name })
+      .execute();
+    await writePersonSidecars(db, group.id, { type: input.type });
+
+    return { personGroupId: group.id };
   }
 
   /**
@@ -613,6 +647,7 @@ export class PersonRepository {
     return this.db
       .selectFrom('person')
       .selectAll('person')
+      .select(personSidecarColumns())
       .$if(!!options.ownerId, (qb) => qb.where('person.ownerId', '=', options.ownerId!))
       .$if(options.thumbnailPath !== undefined, (qb) => qb.where('person.thumbnailPath', '=', options.thumbnailPath!))
       .$if(options.faceAssetId === null, (qb) => qb.where('person.faceAssetId', 'is', null))
@@ -664,7 +699,7 @@ export class PersonRepository {
       .select(['personGroupId', 'name', 'birthDate'])
       .where('ownerId', '=', ownerId)
       .where('isHidden', '=', false)
-      .where('type', '=', 'person')
+      .where((eb) => eb.not(personIsPet()))
       .where('name', '!=', '')
       .where('birthDate', 'is not', null)
       .where(sql`extract(month from "birthDate")`, '=', month)
@@ -693,7 +728,7 @@ export class PersonRepository {
       .innerJoin('asset_face', 'asset_face.personGroupId', 'person.personGroupId')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .where('person.ownerId', '=', ownerId)
-      .where('person.type', '=', 'person')
+      .where((eb) => eb.not(personIsPet()))
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
       .where('asset_face.deletedAt', 'is', null)
@@ -734,6 +769,7 @@ export class PersonRepository {
     const items = await this.db
       .selectFrom('person')
       .selectAll('person')
+      .select(personSidecarColumns())
       .innerJoin('asset_face', 'asset_face.personGroupId', 'person.personGroupId')
       .innerJoin('asset', (join) =>
         join
@@ -755,7 +791,7 @@ export class PersonRepository {
           // photographed once still becomes its own individual), and the Pets view is where you go
           // to name those. The unfiltered view keeps the threshold, so it behaves exactly as before.
           // Grouping is by person.id (the PK), so person.type is functionally dependent here.
-          ...(options?.type === 'pet' ? [eb('person.type', '=', sql.lit('pet'))] : []),
+          ...(options?.type === 'pet' ? [personIsPet()] : []),
           eb(
             (innerEb) => innerEb.fn.count('asset_face.assetId'),
             '>=',
@@ -810,7 +846,7 @@ export class PersonRepository {
           .orderBy('person.personGroupId'),
       )
       .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
-      .$if(!!options?.type, (qb) => qb.where('person.type', '=', options!.type!))
+      .$if(!!options?.type, (qb) => qb.where(personType(), '=', options!.type!))
       // "Pets" means the individuals pet recognition identified, not the per-species buckets the
       // detector alone produces. A bucket has no pet_search row on any of its faces.
       .$if(options?.type === 'pet', (qb) =>
@@ -840,6 +876,7 @@ export class PersonRepository {
     return this.db
       .selectFrom('person')
       .selectAll('person')
+      .select(personSidecarColumns())
       .leftJoin('asset_face', (join) =>
         join
           .onRef('asset_face.personGroupId', '=', 'person.personGroupId')
@@ -929,7 +966,7 @@ export class PersonRepository {
                 .selectFrom('face_identity_face')
                 .select('face_identity_face.assetFaceId')
                 .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
-                .whereRef('face_identity_face.identityId', '=', 'person.identityId'),
+                .where('face_identity_face.identityId', '=', personIdentityId()),
             ),
           ]),
         ),
@@ -949,7 +986,7 @@ export class PersonRepository {
               .selectFrom('face_identity_face')
               .select('face_identity_face.assetFaceId')
               .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
-              .where(sql<SqlBool>`face_identity_face."identityId" IS DISTINCT FROM person."identityId"`),
+              .where(sql<SqlBool>`face_identity_face."identityId" IS DISTINCT FROM ${personIdentityId()}`),
           ),
         ),
       )
@@ -993,7 +1030,7 @@ export class PersonRepository {
                 .selectFrom('face_identity_face')
                 .select('face_identity_face.assetFaceId')
                 .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
-                .whereRef('face_identity_face.identityId', '=', 'person.identityId'),
+                .where('face_identity_face.identityId', '=', personIdentityId()),
             ),
           ]),
         ),
@@ -1013,7 +1050,7 @@ export class PersonRepository {
               .selectFrom('face_identity_face')
               .select('face_identity_face.assetFaceId')
               .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
-              .where(sql<SqlBool>`face_identity_face."identityId" IS DISTINCT FROM person."identityId"`),
+              .where(sql<SqlBool>`face_identity_face."identityId" IS DISTINCT FROM ${personIdentityId()}`),
           ),
         ),
       )
@@ -1086,6 +1123,7 @@ export class PersonRepository {
     return this.db //
       .selectFrom('person')
       .selectAll('person')
+      .select(personSidecarColumns())
       .where('person.personGroupId', '=', personGroupId)
       .where('person.ownerId', '=', ownerId)
       .executeTakeFirst();
@@ -1108,6 +1146,7 @@ export class PersonRepository {
     return this.db //
       .selectFrom('person')
       .selectAll('person')
+      .select(personSidecarColumns())
       .where('person.personGroupId', '=', personGroupId)
       .executeTakeFirst();
   }
@@ -1121,6 +1160,7 @@ export class PersonRepository {
         )
         .selectFrom(['similarity_threshold', 'person'])
         .selectAll('person')
+        .select(personSidecarColumns())
         .where('person.ownerId', '=', userId)
         .where(
           () =>
@@ -1226,7 +1266,7 @@ export class PersonRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset_face"."deletedAt" IS NULL
           AND "asset_face"."isVisible" = true
-          AND (${typeFilter} = '' OR "person"."type" = ${typeFilter})
+          AND (${typeFilter} = '' OR ${personType()} = ${typeFilter})
           AND (
             ${typeFilter} <> 'pet'
             OR EXISTS (
@@ -1236,9 +1276,9 @@ export class PersonRepository {
             )
           )
         -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
-        GROUP BY "person"."ownerId", "person"."personGroupId", "person"."type"
+        GROUP BY "person"."ownerId", "person"."personGroupId"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
-          OR (${typeFilter} = 'pet' AND "person"."type" = 'pet')
+          OR (${typeFilter} = 'pet' AND ${personIsPet()})
           OR COUNT("asset_face"."assetId") >= ${minimumFaceCount}
       )
       SELECT
@@ -1372,8 +1412,23 @@ export class PersonRepository {
     };
   }
 
-  create(person: Insertable<PersonTable>) {
-    return this.db.insertInto('person').values(person).returningAll().executeTakeFirstOrThrow();
+  async create({
+    identityId = null,
+    type = 'person',
+    species = null,
+    ...person
+  }: Insertable<PersonTable> & PersonSidecarFields) {
+    // One transaction, as when type lived on person: a pet whose person_pet write failed would surface as a human.
+    const created = await this.db.transaction().execute(async (trx) => {
+      const row = await trx.insertInto('person').values(person).returningAll().executeTakeFirstOrThrow();
+      await writePersonSidecars(trx, row.personGroupId, {
+        identityId: identityId ?? undefined,
+        type: type === 'pet' ? type : undefined,
+        species: type === 'pet' ? species : undefined,
+      });
+      return row;
+    });
+    return { ...created, identityId, type, species: type === 'pet' ? species : null };
   }
 
   /**
@@ -1384,7 +1439,7 @@ export class PersonRepository {
    * was a standalone primary key — and it is the only sanctioned way to mint a person, so the 1:1
    * invariant cannot be broken by accident at a call site.
    */
-  async createWithGroup(person: Omit<Insertable<PersonTable>, 'personGroupId'>) {
+  async createWithGroup(person: Omit<Insertable<PersonTable>, 'personGroupId'> & PersonSidecarFields) {
     const group = await this.createGroup(person.ownerId);
     return this.create({ ...person, personGroupId: group.id });
   }
@@ -1540,6 +1595,7 @@ export class PersonRepository {
       .where('person.ownerId', '=', person.ownerId)
       .where('person.personGroupId', '=', person.personGroupId)
       .returningAll()
+      .returning(personSidecarColumns())
       .executeTakeFirstOrThrow();
   }
 
@@ -1655,7 +1711,7 @@ export class PersonRepository {
       .select(['person.personGroupId', 'person.ownerId'])
       .where(sql`BTRIM("person"."name")`, '<>', '')
       .where('person.isHidden', '=', false)
-      .where('person.type', '=', 'person')
+      .where((eb) => eb.not(personIsPet()))
       .where((eb) =>
         eb.exists(
           eb
@@ -1771,6 +1827,7 @@ export class PersonRepository {
     return this.db
       .selectFrom('person')
       .selectAll('person')
+      .select(personSidecarColumns())
       .where('person.personGroupId', 'in', personGroupIds)
       .orderBy('person.ownerId')
       .execute();

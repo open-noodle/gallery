@@ -11,6 +11,7 @@ import 'package:immich_mobile/domain/models/sync_event.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/sync_stream.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_api.repository.dart';
@@ -24,6 +25,7 @@ import 'package:openapi/api.dart';
 import '../../api.mocks.dart';
 import '../../fixtures/asset.stub.dart';
 import '../../fixtures/sync_stream.stub.dart';
+import '../../fixtures/user.stub.dart';
 import '../../infrastructure/repository.mock.dart';
 import '../../repository.mocks.dart';
 import '../../service.mocks.dart';
@@ -35,6 +37,30 @@ class _AbortCallbackWrapper {
 }
 
 class _MockAbortCallbackWrapper extends Mock implements _AbortCallbackWrapper {}
+
+/// Records every repository method the service calls, so a test can see whether an entity
+/// type reached any handler at all. Every public method on both repositories returns `Future<void>`.
+class _RecordingSyncStreamRepository implements SyncStreamRepository {
+  final List<Symbol> calls;
+  _RecordingSyncStreamRepository(this.calls);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    calls.add(invocation.memberName);
+    return Future<void>.value();
+  }
+}
+
+class _RecordingGallerySyncStreamRepository implements GallerySyncStreamRepository {
+  final List<Symbol> calls;
+  _RecordingGallerySyncStreamRepository(this.calls);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    calls.add(invocation.memberName);
+    return Future<void>.value();
+  }
+}
 
 /// A /server/features response; [syncRequestTypes] defaults to ABSENT — the shape an
 /// older fork server (no capability signalling) produces.
@@ -64,6 +90,7 @@ ServerFeaturesDto makeServerFeatures({Optional<List<String>?> syncRequestTypes =
 void main() {
   late SyncStreamService sut;
   late SyncStreamRepository mockSyncStreamRepo;
+  late GallerySyncStreamRepository mockGallerySyncStreamRepo;
   late SyncApiRepository mockSyncApiRepo;
   late LocalAssetRepository mockLocalAssetRepo;
   late TrashedLocalAssetRepository mockTrashedLocalAssetRepo;
@@ -98,6 +125,7 @@ void main() {
 
   setUp(() async {
     mockSyncStreamRepo = MockSyncStreamRepository();
+    mockGallerySyncStreamRepo = MockGallerySyncStreamRepository();
     mockSyncApiRepo = MockSyncApiRepository();
     mockLocalAssetRepo = MockLocalAssetRepository();
     mockTrashedLocalAssetRepo = MockTrashedLocalAssetRepository();
@@ -178,49 +206,50 @@ void main() {
     // Shared-space sync handlers — wired in PR 1. Stubbed here so the
     // parameterized dispatch tests can route sharedSpace* events through
     // all 14 case arms without falling into the default arm.
-    when(() => mockSyncStreamRepo.updateSharedSpacesV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpacesV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceMembersV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceMembersV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceAssetExifsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceToAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpacesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpacesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceMembersV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceMembersV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAssetExifsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceToAssetsV1(any())).thenAnswer(successHandler);
     // Library sync handlers — wired in PR 2 Task 33/34. Stubbed here so the
     // dispatch tests can route a libraryV1/libraryDeleteV1 event without
     // falling through to the default case (which would log a warning).
-    when(() => mockSyncStreamRepo.updateLibrariesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateLibrariesV1(any())).thenAnswer(successHandler);
     when(
-      () => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
+      () => mockGallerySyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
     ).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteLibraryAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateLibraryAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteLibraryAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateLibraryAssetExifsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
     // SharedSpaceAlbum sync handlers — Phase 2B Slice B1.
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumLinksV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumLinksV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).thenAnswer(successHandler);
     // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumHiddenV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumHiddenV1(any())).thenAnswer(successHandler);
     // Folder sync handlers — M-2 gap fill.
-    when(() => mockSyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteSharedSpaceAlbumFoldersV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumFoldersV1(any())).thenAnswer(successHandler);
     // Per-user favorites sync handlers (#763).
-    when(() => mockSyncStreamRepo.updateAssetFavoritesV1(any())).thenAnswer(successHandler);
-    when(() => mockSyncStreamRepo.deleteAssetFavoritesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.updateAssetFavoritesV1(any())).thenAnswer(successHandler);
+    when(() => mockGallerySyncStreamRepo.deleteAssetFavoritesV1(any())).thenAnswer(successHandler);
     when(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset()).thenAnswer(successHandler);
 
     sut = SyncStreamService(
       syncApiRepository: mockSyncApiRepo,
       syncStreamRepository: mockSyncStreamRepo,
+      gallerySyncStreamRepository: mockGallerySyncStreamRepo,
       localAssetRepository: mockLocalAssetRepo,
       trashedLocalAssetRepository: mockTrashedLocalAssetRepo,
       assetMediaRepository: mockAssetMediaRepo,
@@ -299,14 +328,14 @@ void main() {
     });
 
     test("syncCompleteV1 triggers pruneAssets (mobile-3)", () async {
-      when(() => mockSyncStreamRepo.pruneAssets()).thenAnswer((_) async {});
+      when(() => mockGallerySyncStreamRepo.pruneAssets()).thenAnswer((_) async {});
       when(() => mockSyncStreamRepo.flushDeferredMemoryAssetsV1()).thenAnswer((_) async {});
 
       await simulateEvents([
         const SyncEvent(type: SyncEntityType.syncCompleteV1, data: 'complete', ack: 'ack-complete'),
       ]);
 
-      verify(() => mockSyncStreamRepo.pruneAssets()).called(1);
+      verify(() => mockGallerySyncStreamRepo.pruneAssets()).called(1);
     });
 
     // Memory -> asset links parked because their asset had not been streamed yet are replayed
@@ -318,7 +347,7 @@ void main() {
       when(() => mockSyncStreamRepo.flushDeferredMemoryAssetsV1()).thenAnswer((_) async {
         calls.add('flush');
       });
-      when(() => mockSyncStreamRepo.pruneAssets()).thenAnswer((_) async {
+      when(() => mockGallerySyncStreamRepo.pruneAssets()).thenAnswer((_) async {
         calls.add('prune');
       });
 
@@ -335,6 +364,7 @@ void main() {
       sut = SyncStreamService(
         syncApiRepository: mockSyncApiRepo,
         syncStreamRepository: mockSyncStreamRepo,
+        gallerySyncStreamRepository: mockGallerySyncStreamRepo,
         localAssetRepository: mockLocalAssetRepo,
         trashedLocalAssetRepository: mockTrashedLocalAssetRepo,
         assetMediaRepository: mockAssetMediaRepo,
@@ -375,6 +405,7 @@ void main() {
       sut = SyncStreamService(
         syncApiRepository: mockSyncApiRepo,
         syncStreamRepository: mockSyncStreamRepo,
+        gallerySyncStreamRepository: mockGallerySyncStreamRepo,
         localAssetRepository: mockLocalAssetRepo,
         trashedLocalAssetRepository: mockTrashedLocalAssetRepo,
         assetMediaRepository: mockAssetMediaRepo,
@@ -516,7 +547,7 @@ void main() {
     group('SyncStreamService - library dispatch arms', () {
       test('libraryV1 → updateLibrariesV1', () async {
         await simulateEvents([SyncStreamStub.libraryV1]);
-        verify(() => mockSyncStreamRepo.updateLibrariesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateLibrariesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['library-v1-ack'])).called(1);
       });
 
@@ -528,7 +559,9 @@ void main() {
         // is essential — we cannot wedge on a missing store) and the
         // repository method is NOT called.
         await simulateEvents([SyncStreamStub.libraryDeleteV1]);
-        verifyNever(() => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')));
+        verifyNever(
+          () => mockGallerySyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
+        );
         // The event is still acked — the dispatch must not wedge when
         // there's no current user. (If you change the contract to wedge,
         // update this assertion.)
@@ -537,49 +570,49 @@ void main() {
 
       test('libraryAssetCreateV1 → updateLibraryAssetsV1', () async {
         await simulateEvents([SyncStreamStub.libraryAssetCreateV1]);
-        verify(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateLibraryAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['lib-asset-create-ack'])).called(1);
       });
 
       test('libraryAssetBackfillV1 → updateLibraryAssetsV1 (same handler as create)', () async {
         await simulateEvents([SyncStreamStub.libraryAssetBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateLibraryAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['lib-asset-backfill-ack'])).called(1);
       });
 
       test('libraryAssetDeleteV1 → deleteLibraryAssetsV1', () async {
         await simulateEvents([SyncStreamStub.libraryAssetDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteLibraryAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteLibraryAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['lib-asset-delete-ack'])).called(1);
       });
 
       test('libraryAssetExifCreateV1 → updateLibraryAssetExifsV1', () async {
         await simulateEvents([SyncStreamStub.libraryAssetExifCreateV1]);
-        verify(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateLibraryAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['lib-asset-exif-create-ack'])).called(1);
       });
 
       test('libraryAssetExifBackfillV1 → updateLibraryAssetExifsV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.libraryAssetExifBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateLibraryAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['lib-asset-exif-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceLibraryV1 → updateSharedSpaceLibrariesV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceLibraryV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceLibrariesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-library-v1-ack'])).called(1);
       });
 
       test('sharedSpaceLibraryBackfillV1 → updateSharedSpaceLibrariesV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceLibraryBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceLibrariesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-library-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceLibraryDeleteV1 → deleteSharedSpaceLibrariesV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceLibraryDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-library-delete-ack'])).called(1);
       });
     });
@@ -587,31 +620,31 @@ void main() {
     group('SyncStreamService - shared space dispatch arms (PR 1 gap fill)', () {
       test('sharedSpaceV1 → updateSharedSpacesV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpacesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpacesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-v1-ack'])).called(1);
       });
 
       test('sharedSpaceDeleteV1 → deleteSharedSpacesV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpacesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpacesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-delete-ack'])).called(1);
       });
 
       test('sharedSpaceMemberV1 → updateSharedSpaceMembersV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceMemberV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceMembersV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceMembersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-member-v1-ack'])).called(1);
       });
 
       test('sharedSpaceMemberBackfillV1 → updateSharedSpaceMembersV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceMemberBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceMembersV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceMembersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-member-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceMemberDeleteV1 → deleteSharedSpaceMembersV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceMemberDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceMembersV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceMembersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['shared-space-member-delete-ack'])).called(1);
       });
     });
@@ -626,110 +659,110 @@ void main() {
     group('SyncStreamService - shared space album dispatch arms', () {
       test('sharedSpaceAlbumV1 → updateSharedSpaceAlbumsV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-v1-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumBackfillV1 → updateSharedSpaceAlbumsV1 (same handler as create)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumDeleteV1 → deleteSharedSpaceAlbumsV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-delete-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumLinkV1 → updateSharedSpaceAlbumLinksV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumLinkV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-link-v1-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumLinkBackfillV1 → updateSharedSpaceAlbumLinksV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumLinkBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumLinksV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-link-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumLinkDeleteV1 → deleteSharedSpaceAlbumLinksV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumLinkDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumLinksV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumLinksV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-link-delete-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumToAssetV1 → updateSharedSpaceAlbumToAssetsV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumToAssetV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-to-asset-v1-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumToAssetBackfillV1 → updateSharedSpaceAlbumToAssetsV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumToAssetBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumToAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-to-asset-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumToAssetDeleteV1 → deleteSharedSpaceAlbumToAssetsV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumToAssetDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumToAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-to-asset-delete-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumAssetCreateV1 → updateSharedSpaceAlbumAssetsV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetCreateV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-asset-create-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumAssetUpdateV1 → updateSharedSpaceAlbumAssetsV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetUpdateV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-asset-update-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumAssetBackfillV1 → updateSharedSpaceAlbumAssetsV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-asset-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumAssetExifCreateV1 → updateSharedSpaceAlbumAssetExifsV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifCreateV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-exif-create-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumAssetExifUpdateV1 → updateSharedSpaceAlbumAssetExifsV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifUpdateV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-exif-update-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumAssetExifBackfillV1 → updateSharedSpaceAlbumAssetExifsV1 (same handler)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumAssetExifBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumAssetExifsV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-exif-backfill-ack'])).called(1);
       });
 
       // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
       test('stores a hidden row from a SharedSpaceAlbumHiddenV1 upsert', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumHiddenV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-hidden-v1-ack'])).called(1);
       });
 
       test('stores a hidden row from a SharedSpaceAlbumHiddenBackfillV1 event', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumHiddenBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumHiddenV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-hidden-backfill-ack'])).called(1);
       });
 
       test('removes the row on SharedSpaceAlbumHiddenDeleteV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumHiddenDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumHiddenV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumHiddenV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-hidden-delete-ack'])).called(1);
       });
 
@@ -739,19 +772,19 @@ void main() {
       // would still pass. Follows the exact pattern above (15/15 other SharedSpaceAlbum* types).
       test('sharedSpaceAlbumFolderV1 → updateSharedSpaceAlbumFoldersV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumFolderV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-folder-v1-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumFolderBackfillV1 → updateSharedSpaceAlbumFoldersV1 (same handler as create)', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumFolderBackfillV1]);
-        verify(() => mockSyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateSharedSpaceAlbumFoldersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-folder-backfill-ack'])).called(1);
       });
 
       test('sharedSpaceAlbumFolderDeleteV1 → deleteSharedSpaceAlbumFoldersV1', () async {
         await simulateEvents([SyncStreamStub.sharedSpaceAlbumFolderDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteSharedSpaceAlbumFoldersV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteSharedSpaceAlbumFoldersV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['sa-album-folder-delete-ack'])).called(1);
       });
     });
@@ -760,13 +793,13 @@ void main() {
     group('SyncStreamService - asset favorites dispatch arms', () {
       test('assetFavoriteV1 → updateAssetFavoritesV1', () async {
         await simulateEvents([SyncStreamStub.assetFavoriteV1]);
-        verify(() => mockSyncStreamRepo.updateAssetFavoritesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.updateAssetFavoritesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['asset-favorite-v1-ack'])).called(1);
       });
 
       test('assetFavoriteDeleteV1 → deleteAssetFavoritesV1', () async {
         await simulateEvents([SyncStreamStub.assetFavoriteDeleteV1]);
-        verify(() => mockSyncStreamRepo.deleteAssetFavoritesV1(any())).called(1);
+        verify(() => mockGallerySyncStreamRepo.deleteAssetFavoritesV1(any())).called(1);
         verify(() => mockSyncApiRepo.ack(['asset-favorite-delete-ack'])).called(1);
       });
     });
@@ -1079,6 +1112,48 @@ void main() {
       ).captured;
       expect(captured, hasLength(2));
       expect(captured[1], {'SharedSpaceAlbumsV1'});
+    });
+  });
+
+  // A fork type without a handler would be acked and silently dropped (the fork map is reached
+  // through `default`, so the compiler no longer checks exhaustiveness). Drive every entity type
+  // the generated client knows through the real dispatch and require it to reach a repository.
+  // This proves reachability only: a handler wired to the wrong repository method still passes.
+  group("SyncStreamService - handler exhaustiveness", () {
+    // Checkpoint events carry no data to store.
+    const intentionallyUnhandled = {SyncEntityType.syncAckV1};
+
+    test("every SyncEntityType reaches a repository method", () async {
+      final calls = <Symbol>[];
+      sut = SyncStreamService(
+        syncApiRepository: mockSyncApiRepo,
+        syncStreamRepository: _RecordingSyncStreamRepository(calls),
+        gallerySyncStreamRepository: _RecordingGallerySyncStreamRepository(calls),
+        localAssetRepository: mockLocalAssetRepo,
+        trashedLocalAssetRepository: mockTrashedLocalAssetRepo,
+        assetMediaRepository: mockAssetMediaRepo,
+        permissionRepository: mockPermissionRepo,
+        api: mockApi,
+        syncMigrationRepository: mockSyncMigrationRepo,
+      );
+      // libraryDeleteV1 skips its sweep without a signed-in user.
+      await Store.put(StoreKey.currentUser, UserStub.admin);
+      addTearDown(() => Store.delete(StoreKey.currentUser));
+      await sut.sync();
+
+      final unhandled = <SyncEntityType>[];
+      for (final type in SyncEntityType.values) {
+        if (intentionallyUnhandled.contains(type)) {
+          continue;
+        }
+        calls.clear();
+        await handleEventsCallback([SyncEvent(type: type, data: Object(), ack: 'ack')], () => false, () {});
+        if (calls.isEmpty) {
+          unhandled.add(type);
+        }
+      }
+
+      expect(unhandled, isEmpty);
     });
   });
 }

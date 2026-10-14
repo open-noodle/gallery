@@ -30,7 +30,7 @@ describe('types', () => {
     expect(linkIndex).toBeLessThan(assetsIndex);
   });
 
-  // Regression guard: the SYNC_TYPES_ORDER comment in sync.service.ts says album folders must land
+  // Regression guard: the GALLERY_SYNC_ORDER comment in gallery-sync.streams.ts says album folders must land
   // before album links so mobile never renders an album flat at the root for one frame and then
   // re-nests it once the folder sync catches up.
   it('should stream shared space album folders before shared space album links', () => {

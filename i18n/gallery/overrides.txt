@@ -1,0 +1,56 @@
+# Upstream keys the Gallery overlay deliberately rewords. On any other collision upstream wins.
+#
+#   <key>            the overlay value wins in each locale that has one; upstream's stays elsewhere
+#   <key> exclusive  same, and upstream's translation is dropped in every other locale (it describes
+#                    the old wording), so those locales fall back to English
+#   en:<hash>        required when gallery/en.json does not reword the key (a translation-only
+#                    override: the overlay keeps its own translations of upstream's English). It pins
+#                    that English, so --check fails when upstream rewords it and the translations go stale.
+#
+# node i18n/gallery/merge.mjs --check fails on stale lines. See specs/2026-10-11-i18n-overlay-design.md.
+
+admin.download_csv en:a4023b89
+admin.integrity_checks_untracked_files_description en:e12d9931
+admin.library_watching_settings en:b128b6ab
+admin.machine_learning_max_recognition_distance_description en:5db533fe
+admin.maintenance_integrity_checksum_mismatch_refresh_job en:d7e013fc
+admin.maintenance_integrity_missing_file_refresh_job en:4571bafc
+admin.maintenance_integrity_untracked_file_refresh_job en:e0592413
+admin.oauth_client_secret_description en:9684339b
+admin.oauth_end_session_url_description en:3bf5def4
+admin.queues en:e4a121b0
+admin.queues_page_description en:b12bdb2d
+admin.release_channel_stable en:90ee3057
+admin.server_public_users_description en:d5760cf9
+admin.template_email_invite_album en:e9304606
+admin.template_email_update_album en:7b180057
+admin.transcoding_max_bitrate_description en:14a89ac5
+admin.transcoding_realtime en:1b8ae0be
+admin.transcoding_realtime_resolutions_description en:26d56159
+admin.transcoding_realtime_video_codecs_description en:61569b61
+background_location_permission_content exclusive
+errors.error_adding_assets_to_album en:1a78b5aa
+errors.error_adding_users_to_album en:cf8abc6b
+errors.error_removing_assets_from_album en:0a555bcb
+errors.failed_to_create_album en:f4f974b7
+errors.unable_to_add_album_users en:cdccfba3
+errors.unable_to_change_album_user_role en:b2f30721
+errors.unable_to_delete_album en:16b10315
+errors.unable_to_remove_album_users en:29a652f6
+errors.unable_to_save_album en:3b55f0df
+errors.unable_to_update_album_cover en:8e68c919
+errors.unable_to_update_album_info en:0ef54d40
+load_more
+location_permission_content exclusive
+login_form_server_empty
+login_form_server_error
+login_has_been_disabled
+manage_people en:64c793d0
+map_location_service_disabled_content exclusive
+map_marker_with_image en:72511fdc
+map_no_location_permission_content exclusive
+memories_current en:e0d1b682
+memories_show_upcoming en:0f87babc
+memories_upcoming en:5f1a2542
+reset_sqlite_error_hint en:0546b1f2
+version_announcement_closing

@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, JobStatus, SourceType, SystemMetadataKey } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
