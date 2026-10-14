@@ -9,7 +9,7 @@
  * owner's Hidden/never-shared faces.
  *
  * `person.id` here (owned by `spaceOwner`) grants the viewer PersonRead only because it has one
- * space-reachable Timeline face (`spaceFaceId`) — see `PersonAccess.checkSharedSpaceAccess` — so that
+ * space-reachable Timeline face (`spaceFaceId`) — see `GalleryPersonAccess.checkSharedSpaceAccess` — so that
  * face is both the access-grant anchor and the sole face the viewer's scoped picker call must return.
  */
 

@@ -1,6 +1,6 @@
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { SyncEntityType } from 'src/enum.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -18,9 +18,10 @@ beforeAll(async () => {
 
 describe('library_user triggers', () => {
   describe('library_after_insert', () => {
-    it('inserts a library_user row for the owner with library.createId', async () => {
+    it('inserts a library_user row for the owner with a createId minted at library creation', async () => {
       const { ctx, db } = setup();
       const { user } = await ctx.newUser();
+      const marker = await sql<{ id: string }>`SELECT immich_uuid_v7() AS id`.execute(db);
       const { library } = await ctx.newLibrary({ ownerId: user.id });
 
       const rows = await db
@@ -31,7 +32,8 @@ describe('library_user triggers', () => {
         .execute();
 
       expect(rows).toHaveLength(1);
-      expect(rows[0].createId).toBe(library.createId);
+      // Past every checkpoint taken before the library existed, so a synced client backfills it.
+      expect(rows[0].createId > marker.rows[0].id).toBe(true);
       expect(rows[0].createdAt).toEqual(library.createdAt);
     });
 
@@ -68,7 +70,7 @@ describe('library_user triggers', () => {
           { name: 'bulk-4', ownerId: user.id, importPaths: ['/import'], exclusionPatterns: [] },
           { name: 'bulk-5', ownerId: user.id, importPaths: ['/import'], exclusionPatterns: [] },
         ])
-        .returning(['id', 'createId', 'createdAt'])
+        .returning(['id', 'createdAt'])
         .execute();
       expect(libraries).toHaveLength(5);
 
@@ -84,15 +86,13 @@ describe('library_user triggers', () => {
         .execute();
       expect(rows).toHaveLength(5);
 
-      // Each library_user row's createId must match its library's createId.
+      // Every library got its owner row.
       const byLibraryId = new Map(rows.map((r) => [r.libraryId, r]));
       for (const lib of libraries) {
-        const userRow = byLibraryId.get(lib.id);
-        expect(userRow).toBeDefined();
-        expect(userRow!.createId).toBe(lib.createId);
+        expect(byLibraryId.get(lib.id)).toBeDefined();
       }
       // All 5 createIds are distinct (pins VOLATILE immich_uuid_v7 per-row
-      // evaluation for both the library INSERT and the trigger's copy).
+      // evaluation of the column default inside the trigger's INSERT).
       const uniqueCreateIds = new Set(rows.map((r) => r.createId));
       expect(uniqueCreateIds.size).toBe(5);
     });
@@ -165,14 +165,13 @@ describe('library_user triggers', () => {
       const { user } = await ctx.newUser();
       const { library } = await ctx.newLibrary({ ownerId: user.id });
 
-      // Owner already has a row from library_after_insert with library.createId.
+      // Owner already has a row from library_after_insert.
       const ownerRowBefore = await db
         .selectFrom('library_user')
         .select(['createId'])
         .where('userId', '=', user.id)
         .where('libraryId', '=', library.id)
         .executeTakeFirstOrThrow();
-      expect(ownerRowBefore.createId).toBe(library.createId);
 
       // Link the library to a space and add a new member. The trigger's
       // INSERT...ON CONFLICT won't touch the owner's existing row, but it
@@ -189,7 +188,7 @@ describe('library_user triggers', () => {
         .where('userId', '=', user.id)
         .where('libraryId', '=', library.id)
         .executeTakeFirstOrThrow();
-      expect(ownerRowAfter.createId).toBe(library.createId);
+      expect(ownerRowAfter.createId).toBe(ownerRowBefore.createId);
 
       // Peer got a row with a fresh createId.
       const peerRow = await db
@@ -198,12 +197,12 @@ describe('library_user triggers', () => {
         .where('userId', '=', peer.id)
         .where('libraryId', '=', library.id)
         .executeTakeFirstOrThrow();
-      expect(peerRow.createId).not.toBe(library.createId);
+      expect(peerRow.createId).not.toBe(ownerRowBefore.createId);
     });
 
     it('LibrarySync.getUpserts re-delivers the library to the new member after the updateId bump', async () => {
       const { ctx, db } = setup();
-      const syncRepo = ctx.get(SyncRepository);
+      const syncRepo = new GallerySyncRepository(ctx.database);
       const { user: owner } = await ctx.newUser();
       const { user: newMember } = await ctx.newUser();
       const { library } = await ctx.newLibrary({ ownerId: owner.id });

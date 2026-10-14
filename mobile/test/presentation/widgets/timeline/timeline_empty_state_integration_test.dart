@@ -138,7 +138,7 @@ Future<TimelineService> _pumpTimeline(
       ],
       child: EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: withStubRouter(
           MaterialApp(
@@ -196,7 +196,7 @@ Future<Completer<SearchResult?>> _pumpSearchingTimeline(WidgetTester tester, Dri
       ],
       child: EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: withStubRouter(
           MaterialApp(

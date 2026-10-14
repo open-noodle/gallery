@@ -41,7 +41,7 @@ export class DownloadRepository {
       // export omits Hidden/Locked rows for everyone, matching the album grid (withDefaultVisibility) and
       // map-markers. An `own OR` here would let the owner download Hidden while the grid hides it.
       .where((eb) => spaceVisibilityGate(eb))
-      // #1048: both album arms mirror `AccessRepository.asset.checkSpaceAccess`, whose album and
+      // #1048: both album arms mirror `AccessRepository.spaceAsset.checkSpaceAccess`, whose album and
       // contributed arms BOTH require `isOffline = false`. The manifest this builds is re-checked
       // asset-by-asset under `AssetDownload` before the zip is streamed, and `requireAccess` is
       // all-or-nothing — so a single offline row here does not merely go missing from the archive,

@@ -468,7 +468,10 @@ describe(SmartInfoService.name, () => {
 
       beforeEach(() => {
         cleanupSpy = vi.fn().mockResolvedValue(void 0);
-        vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: tempPath, cleanup: cleanupSpy });
+        vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({
+          localPath: tempPath,
+          cleanup: cleanupSpy,
+        });
       });
 
       it('passes the local temp path to probe and extractVideoFrames on success', async () => {

@@ -168,7 +168,11 @@ export class UserService extends BaseService {
       throw new NotFoundException();
     }
 
-    return this.serveFromBackend(user.profileImagePath, mimeTypes.lookup(user.profileImagePath), CacheControl.None);
+    return this.backendMedia.serveFromBackend(
+      user.profileImagePath,
+      mimeTypes.lookup(user.profileImagePath),
+      CacheControl.None,
+    );
   }
 
   async getLicense(auth: AuthDto): Promise<LicenseResponseDto> {

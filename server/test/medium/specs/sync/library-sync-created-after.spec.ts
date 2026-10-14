@@ -1,5 +1,5 @@
-import { Kysely } from 'kysely';
-import { SyncRepository, accessibleLibraries } from 'src/repositories/sync.repository.js';
+import { Kysely, sql } from 'kysely';
+import { GallerySyncRepository, accessibleLibraries } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -19,7 +19,7 @@ const NOW_ID = 'ffffffff-ffff-7fff-bfff-ffffffffffff';
 
 const setup = () => {
   const ctx = new SyncTestContext(defaultDatabase);
-  return { ctx, db: defaultDatabase, sut: ctx.get(SyncRepository).library };
+  return { ctx, db: defaultDatabase, sut: new GallerySyncRepository(ctx.database).library };
 };
 
 beforeAll(async () => {
@@ -128,12 +128,13 @@ describe('LibrarySync.getCreatedAfter', () => {
     const { user: owner } = await ctx.newUser();
     const { user: peer } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    // Pre-fix clients stored the since-dropped `library.createId` as their checkpoint: a uuid v7
+    // minted when the library was created.
+    const marker = await sql<{ id: string }>`SELECT immich_uuid_v7() AS id`.execute(db);
+    const preFixCheckpoint = marker.rows[0].id;
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: peer.id });
-
-    // Pre-fix clients stored `library.createId` as their checkpoint.
-    const preFixCheckpoint = library.createId;
 
     const rows = await sut.getCreatedAfter({
       nowId: NOW_ID,

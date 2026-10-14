@@ -2,9 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { chunk, isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import { isAbsolute } from 'node:path';
-import type { ShallowDehydrateObject } from 'kysely';
-import type { AssetFace, AssetFile } from 'src/database.js';
-import type { LinkedSpacePerson } from 'src/repositories/shared-space.repository.js';
+import type { AssetFile } from 'src/database.js';
 import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
@@ -14,9 +12,6 @@ import {
   AssetBulkDeleteDto,
   AssetBulkUpdateDto,
   AssetCopyDto,
-  AssetEditableDto,
-  AssetEditableResponseDto,
-  AssetFavoriteUpdateDto,
   AssetJobName,
   AssetJobsDto,
   AssetMetadataBulkDeleteDto,
@@ -47,7 +42,9 @@ import {
   QueueName,
   SharedSpaceActivityType,
 } from 'src/enum.js';
-import { applyVisibilityTransitionSideEffects } from 'src/gallery/asset-visibility-transition.service.js';
+import { applyVisibilityTransitionSideEffects } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { updateAssetFavorites } from 'src/gallery/services/gallery-asset.service.js';
+import { applyAssetResponseOverlay } from 'src/gallery/utils/asset-response-overlay.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -60,10 +57,9 @@ import {
   onBeforeUnlink,
 } from 'src/utils/asset.util.js';
 import { isDeadlockError, retryOnDeadlock, updateLockedColumns } from 'src/utils/database.js';
-import { asDateTimeString, extractTimeZone } from 'src/utils/date.js';
+import { extractTimeZone } from 'src/utils/date.js';
 import { favoriteViewerId } from 'src/utils/favorite.js';
 import { batched, findOrFail } from 'src/utils/misc.js';
-import { applyResolvedIdentityMetadata } from 'src/utils/person-identity.js';
 import { transformOcrBoundingBox } from 'src/utils/transform.js';
 
 // Bounds how many cross-owner ids logCrossOwnerEdit will resolve a space for, per bulk edit —
@@ -116,162 +112,18 @@ export class AssetService extends BaseService {
     }
 
     if (auth.sharedLink) {
-    } else if (spaceId) {
-      const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
-      if (!member) {
-        throw new ForbiddenException('Not a member of this space');
-      }
-
-      const hasSpaceAccess = await this.accessRepository.asset.checkSpaceAccessForSpace(
-        auth.user.id,
-        spaceId,
-        new Set([id]),
-      );
-      // The response must carry the space it was resolved in whether the caller named the space or
-      // the server inferred it (the `else` branch below sets the same field). Without this, a client
-      // that re-reads WITH `spaceId` gets an asset whose `resolvedSpaceId` is suddenly absent, and
-      // any affordance gated on an effective space id -- `canEditSpacePeople`, which falls back to
-      // `resolvedSpaceId` when the route carries no space -- silently switches itself off. That is
-      // exactly what made the People-row edit controls vanish after a face edit on /photos/:id.
-      data.resolvedSpaceId = spaceId;
-
-      if (hasSpaceAccess.size === 0 || !data.people) {
-        data.people = [];
-      } else {
-        const globalPersonIds = data.people.map((p) => p.id);
-        const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
-          spaceId,
-          globalPersonIds,
-        );
-        this.applySpacePeople(data, spacePersonMap);
-        data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
-      }
-    } else if (data.ownerId === auth.user.id) {
-      // The owner is viewing their own asset with no space context. A name or birthday set in a
-      // shared space is resolved at read time against the face identity and is never written back
-      // to `person` (see PersonService.getById). Without overlaying that resolution here, the raw
-      // person row carries a null birthDate and the asset detail view shows no age.
-      await this.applyResolvedPersonMetadata(auth, data, asset.faces ?? []);
-    } else {
-      // No spaceId — try to find a space containing this asset for this user
-      const spaceForAsset = await this.sharedSpaceRepository.findSpaceForAssetAndUser(id, auth.user.id);
-      if (spaceForAsset) {
-        const globalPersonIds = (data.people || []).map((p) => p.id);
-        const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
-          spaceForAsset.spaceId,
-          globalPersonIds,
-        );
-        this.applySpacePeople(data, spacePersonMap);
-        data.people = (data.people || []).filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
-        data.resolvedSpaceId = spaceForAsset.spaceId;
-      } else {
-        // #796: no space contains this asset for the viewer, so they reach it through an album
-        // share or partner sharing. Read access to the asset carries read access to who is in it —
-        // minus anyone the owner marked hidden, which must not leak off-box.
-        data.people = (data.people || []).filter((person) => !person.isHidden);
-      }
     }
 
-    // #734: resolve editability once, here, where the space context already is. Never in
-    // mapAsset — it has no AuthDto and feeds list endpoints, where this would be N+1.
-    if (!auth.sharedLink) {
-      const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
-      data.canEdit = editable.has(id);
-    }
+    await applyAssetResponseOverlay(
+      {
+        access: this.accessRepository,
+        faceIdentity: this.faceIdentityRepository,
+        sharedSpace: this.sharedSpaceRepository,
+      },
+      { auth, id, spaceId, data, faces: asset.faces ?? [] },
+    );
 
     return data;
-  }
-
-  async getEditable(auth: AuthDto, dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
-    // Deliberately a bare access check, not a second implementation of the rule: this IS
-    // the same call the write will make, so the answer cannot drift from enforcement.
-    const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
-    return { editableAssetIds: [...editable] };
-  }
-
-  private async applyResolvedPersonMetadata(
-    auth: AuthDto,
-    data: AssetResponseDto,
-    faces: ShallowDehydrateObject<AssetFace>[],
-  ) {
-    const people = data.people;
-    if (!people?.length) {
-      return;
-    }
-
-    const identityByPersonId = new Map<string, string>();
-    for (const face of faces) {
-      if (face.person?.personGroupId && face.person.identityId) {
-        identityByPersonId.set(face.person.personGroupId, face.person.identityId);
-      }
-    }
-
-    // Shared with PersonService.getFacesById, the sibling read path the Info panel uses for the
-    // owner — the two have to resolve identically or the age appears on one surface only (#808).
-    await applyResolvedIdentityMetadata({
-      people,
-      identityByPersonId,
-      resolve: (identityId) => this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId),
-    });
-  }
-
-  private applySpacePeople(data: AssetResponseDto, spacePersonMap: Map<string, LinkedSpacePerson>) {
-    for (const person of data.people || []) {
-      const spacePerson = spacePersonMap.get(person.id);
-      if (!spacePerson) {
-        continue;
-      }
-
-      person.spacePersonId = spacePerson.id;
-      person.isHidden = spacePerson.isHidden;
-
-      const name = spacePerson.name;
-      if (name !== undefined) {
-        person.name = name ?? '';
-      }
-
-      person.thumbnailPath = '';
-
-      if (spacePerson.birthDate !== undefined) {
-        person.birthDate = spacePerson.birthDate ?? null;
-      }
-
-      if (spacePerson.updatedAt !== undefined) {
-        person.updatedAt = asDateTimeString(spacePerson.updatedAt);
-      }
-
-      if (spacePerson.type) {
-        person.type = spacePerson.type;
-      }
-    }
-  }
-
-  /**
-   * #763 canonical write surface for per-user favorites (PUT /assets/favorites), also called by
-   * the deprecated `isFavorite` alias on `update`/`updateAll` (§8.1) — the alias keeps its own,
-   * STRICTER Permission.AssetUpdate route guard, so it can only ever be narrower than this method,
-   * never wider. See docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §5.1.
-   */
-  async updateFavorites(auth: AuthDto, dto: AssetFavoriteUpdateDto): Promise<void> {
-    // §5.1: a shared-link session's `auth.user` is the LINK OWNER's identity, not an authenticated
-    // caller (AuthDto.user is non-optional; sharedLink is the optional field that marks this case —
-    // see auth.dto.ts:16,18). Without this explicit guard, an anonymous visitor holding a share link
-    // would create asset_favorite rows attributed to the owner: an unauthenticated write in a real
-    // user's name. No route on this DTO declares `sharedLink: true`, but this guard is deliberately
-    // NOT relied on that route metadata alone — it must hold even if that ever changes.
-    if (auth.sharedLink) {
-      throw new BadRequestException('Shared link sessions cannot set favorites');
-    }
-
-    // The subject is ALWAYS the caller (E4/E7): nothing in AssetFavoriteUpdateDto can name another
-    // user, and elevated session permission (auth.session.hasElevatedPermission) never widens this —
-    // it only ever grants the CALLER extra read access (e.g. their own Locked assets), never lets
-    // them write on someone else's behalf.
-    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: dto.ids });
-
-    await (dto.isFavorite
-      ? this.assetFavoriteRepository.addAll(auth.user.id, dto.ids)
-      : this.assetFavoriteRepository.removeAll(auth.user.id, dto.ids));
   }
 
   async update(auth: AuthDto, id: string, dto: UpdateAssetDto): Promise<AssetResponseDto> {
@@ -321,7 +173,7 @@ export class AssetService extends BaseService {
     // endpoint. Written BEFORE the repository read below so the isFavoriteForUser it projects for
     // the response reflects the caller's own just-written state, not the pre-write value.
     if (isFavorite !== undefined) {
-      await this.updateFavorites(auth, { ids: [id], isFavorite });
+      await updateAssetFavorites(this.accessRepository, this.assetFavoriteRepository, auth, { ids: [id], isFavorite });
     }
 
     // #763: auth.user.id is the CALLER — this endpoint requires Permission.AssetUpdate (never
@@ -414,7 +266,7 @@ export class AssetService extends BaseService {
     // into the plain column write (assetDto below). Routed through the SAME updateFavorites logic
     // as the canonical endpoint, so the alias can never be more permissive.
     if (isFavorite !== undefined) {
-      await this.updateFavorites(auth, { ids, isFavorite });
+      await updateAssetFavorites(this.accessRepository, this.assetFavoriteRepository, auth, { ids, isFavorite });
     }
 
     const assetDto = omitBy({ visibility, duplicateId }, isUndefined);
@@ -589,7 +441,7 @@ export class AssetService extends BaseService {
     // assets guarantee sourceFile.path !== targetSidecarPath.
     const targetSidecarPath = `${targetAsset.originalPath}.xmp`;
 
-    const { localPath, cleanup } = await this.ensureLocalFile(sourceFile.path);
+    const { localPath, cleanup } = await this.backendMedia.ensureLocalFile(sourceFile.path);
     try {
       if (isAbsolute(targetSidecarPath)) {
         this.storageCore.ensureFolders(targetSidecarPath);
@@ -1013,7 +865,7 @@ export class AssetService extends BaseService {
       // this runs inside the request.
       let probeResult: Awaited<ReturnType<typeof this.mediaRepository.probe>>;
       try {
-        probeResult = await this.mediaRepository.probe(await this.getProbeInput(asset.originalPath));
+        probeResult = await this.mediaRepository.probe(await this.backendMedia.getProbeInput(asset.originalPath));
       } catch {
         // Never surface or log the raw ffprobe error: for S3 originals getProbeInput yields a
         // presigned URL (a bearer credential) that ffprobe echoes in its stderr, which would

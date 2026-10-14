@@ -208,14 +208,16 @@ CUDA, OpenVINO, CoreML, and CPU backends via ONNX Runtime.
 
 ### Database Changes
 
-Pet detection extends two existing tables instead of creating new ones:
+Pet detection keeps its data in two Gallery-owned side tables, so the upstream `person` and
+`asset_job_status` tables stay unchanged:
 
-- `person` gained a `type` column (VARCHAR, default `'person'`) to distinguish humans from pets,
-  and a `species` column (VARCHAR, nullable) for the pet label (`'dog'` or `'cat'`).
-- `asset_job_status` gained a `petsDetectedAt` timestamp to track which assets have been
-  processed.
+- `person_pet` has one row per pet (keyed by the person's group), with a `species` column
+  (VARCHAR, nullable) for the pet label (`'dog'` or `'cat'`). A person is a pet when it has a
+  `person_pet` row; the API still reports `type` and `species` on each person.
+- `asset_job_status_gallery` holds the `petsDetectedAt` timestamp that tracks which assets have
+  been processed.
 
-Detected pets are stored as `person` rows with `type = 'pet'`. Each species creates one person
+Detected pets are stored as `person` rows with a `person_pet` row. Each species creates one person
 entry per user (e.g., one "dog" person, one "cat" person), and individual detections are stored
 as `asset_face` rows with bounding box coordinates linked to that person. This reuses the
 existing face/person storage for thumbnails and bounding boxes.

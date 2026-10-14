@@ -3,12 +3,13 @@ import { Kysely } from 'kysely';
 import { Mocked } from 'vitest';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AssetVisibility, JobName, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum.js';
-import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -27,7 +28,7 @@ import { DB } from 'src/schema/index.js';
 import { PersonService } from 'src/services/person.service.js';
 import { SearchService } from 'src/services/search.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
-import { newMediumService } from 'test/medium.factory.js';
+import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
 import { factory, newEmbedding } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -733,7 +734,7 @@ describe('People identity RBAC projection', () => {
     const uploadedPerson = await fx.ctx.database
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['person.personGroupId', 'person.identityId'])
+      .select(['person.personGroupId', personIdentityId().as('identityId')])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
     const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.personGroupId);
@@ -808,7 +809,7 @@ describe('People identity RBAC projection', () => {
     const uploadedPerson = await fx.ctx.database
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['person.personGroupId', 'person.identityId'])
+      .select(['person.personGroupId', personIdentityId().as('identityId')])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
     const uploadedLinks = await fx.ctx.database
@@ -818,8 +819,8 @@ describe('People identity RBAC projection', () => {
       .execute();
     const targetProfiles = await fx.ctx.database
       .selectFrom('person')
-      .select(['personGroupId', 'ownerId', 'identityId'])
-      .where('identityId', '=', targetIdentity.id)
+      .select(['personGroupId', 'ownerId', personIdentityId().as('identityId')])
+      .where(personIdentityId(), '=', targetIdentity.id)
       .orderBy('personGroupId')
       .execute();
 
@@ -859,12 +860,12 @@ describe('People identity RBAC projection', () => {
       const assignedPerson = await fx.ctx.database
         .selectFrom('asset_face')
         .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-        .select(['person.personGroupId as personId', 'person.identityId as identityId'])
+        .select(['person.personGroupId as personId', personIdentityId().as('identityId')])
         .where('asset_face.id', '=', uploadedFaceId)
         .executeTakeFirstOrThrow();
       const memberPeople = await fx.ctx.database
         .selectFrom('person')
-        .select(['personGroupId', 'identityId'])
+        .select(['personGroupId', personIdentityId().as('identityId')])
         .where('ownerId', '=', fx.member.id)
         .orderBy('personGroupId')
         .execute();
@@ -1009,7 +1010,7 @@ describe('People identity RBAC projection', () => {
     // Neither person was merged into the space identity — both keep their own identity untouched.
     const rows = await fx.ctx.database
       .selectFrom('person')
-      .select(['personGroupId', 'identityId'])
+      .select(['personGroupId', personIdentityId().as('identityId')])
       .where('personGroupId', 'in', [a.person.personGroupId, b.person.personGroupId])
       .execute();
     const byId = new Map(rows.map((r) => [r.personGroupId, r.identityId]));
@@ -1225,11 +1226,7 @@ describe('People identity RBAC projection', () => {
       .values({ type: 'person' })
       .returningAll()
       .executeTakeFirstOrThrow();
-    await ctx.database
-      .updateTable('person')
-      .set({ identityId: staleIdentity.id })
-      .where('personGroupId', '=', person.personGroupId)
-      .execute();
+    await updatePersonForTest(ctx.database, person.personGroupId, { identityId: staleIdentity.id });
 
     const spaces = [];
     for (let index = 0; index < 10; index++) {
@@ -1456,7 +1453,7 @@ describe('People identity RBAC projection', () => {
     const uploadedPerson = await ctx.database
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['person.personGroupId', 'person.identityId'])
+      .select(['person.personGroupId', personIdentityId().as('identityId')])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
     const uploaderPeople = await personService.getAll(authFor(uploader), {
@@ -2024,7 +2021,7 @@ describe('People identity RBAC projection', () => {
         .executeTakeFirstOrThrow();
       const memberPersonRow = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', memberPerson.personGroupId)
         .executeTakeFirstOrThrow();
 
@@ -2648,7 +2645,7 @@ describe('People identity RBAC projection', () => {
         .execute();
       const updatedPerson = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', person.personGroupId)
         .executeTakeFirstOrThrow();
 
@@ -3690,7 +3687,7 @@ describe('People identity RBAC projection', () => {
         .executeTakeFirstOrThrow();
       const targetPerson = await fx.ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', fx.actorPerson.personGroupId)
         .executeTakeFirstOrThrow();
 
@@ -3781,11 +3778,7 @@ describe('People identity RBAC projection', () => {
         .returningAll()
         .executeTakeFirstOrThrow();
       const { person: otherOwnerPerson } = await ctx.newPerson({ ownerId: otherOwner.id, name: 'Ada' });
-      await ctx.database
-        .updateTable('person')
-        .set({ identityId: sourceIdentity.id })
-        .where('personGroupId', '=', otherOwnerPerson.personGroupId)
-        .execute();
+      await updatePersonForTest(ctx.database, otherOwnerPerson.personGroupId, { identityId: sourceIdentity.id });
 
       await ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: actor }), {
         target: { type: 'person', id: actorPerson.personGroupId },
@@ -3797,7 +3790,7 @@ describe('People identity RBAC projection', () => {
       // are never gated — not even by the (here, disabled) cross-owner toggle.
       const otherOwnerPersonAfter = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', otherOwnerPerson.personGroupId)
         .executeTakeFirstOrThrow();
       expect(otherOwnerPersonAfter.identityId).toBe(targetIdentity.id);

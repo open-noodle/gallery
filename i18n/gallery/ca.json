@@ -1,0 +1,6 @@
+{
+  "background_location_permission_content": "Noodle Gallery utilitza el permís d’ubicació en segon pla per continuar llegint el nom de la xarxa Wi‑Fi mentre el canvi automàtic de servidor funciona en segon pla. El nom de la xarxa Wi‑Fi es desa en aquest dispositiu per fer la coincidència, i la ubicació precisa del dispositiu no s’emmagatzema ni es comparteix.",
+  "location_permission_content": "Android requereix permís d’ubicació precisa perquè Noodle Gallery pugui llegir el nom de la xarxa Wi‑Fi actual per al canvi automàtic de servidor. El nom de la xarxa Wi‑Fi es desa en aquest dispositiu per fer la coincidència, i la ubicació precisa del dispositiu no s’emmagatzema ni es comparteix.",
+  "map_location_service_disabled_content": "Noodle Gallery utilitza la teva ubicació actual precisa per centrar el mapa i mostrar fotos i vídeos de la teva zona actual. Els serveis d’ubicació han d’estar activats abans que Noodle Gallery pugui accedir a aquesta ubicació. La ubicació precisa del dispositiu no s’emmagatzema ni es comparteix. Vols obrir ara la configuració d’ubicació?",
+  "map_no_location_permission_content": "Noodle Gallery utilitza la teva ubicació actual precisa per centrar el mapa i mostrar fotos i vídeos de la teva zona actual. La ubicació precisa del dispositiu no s’emmagatzema ni es comparteix. Vols permetre ara l’accés a la ubicació?"
+}

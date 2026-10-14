@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // web/src/lib
-const i18nDir = path.resolve(here, '../../../i18n'); // repo-root/i18n
+const i18nDir = path.resolve(here, '../../../i18n/gallery/merged'); // upstream i18n/ plus the Gallery overlay
 
 const LOCALES = ['en', 'de', 'fr', 'it', 'nl', 'es'];
 const REQUIRED_KEYS = ['add_all_search_results', 'preparing_assets', 'spaces_hidden_too_many_assets'];

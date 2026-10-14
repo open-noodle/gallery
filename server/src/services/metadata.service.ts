@@ -266,9 +266,9 @@ export class MetadataService extends BaseService {
       return;
     }
 
-    await using localOriginal = await this.ensureLocalFile(asset.originalPath);
+    await using localOriginal = await this.backendMedia.ensureLocalFile(asset.originalPath);
     const { sidecarFile } = getAssetFiles(asset.files);
-    await using localSidecar = sidecarFile ? await this.ensureLocalFile(sidecarFile.path) : undefined;
+    await using localSidecar = sidecarFile ? await this.backendMedia.ensureLocalFile(sidecarFile.path) : undefined;
 
     const [exifResult, stats] = await Promise.all([
       this.getExifTags(asset, localOriginal.localPath, localSidecar?.localPath),
@@ -471,7 +471,7 @@ export class MetadataService extends BaseService {
 
     let sidecarPath = null;
     for (const candidate of this.getSidecarCandidates(asset)) {
-      const backend = await this.backendFor(candidate);
+      const backend = await this.backendMedia.backendFor(candidate);
       const isExists = await backend.exists(candidate, { readable: true });
       if (!isExists) {
         continue;
@@ -567,7 +567,7 @@ export class MetadataService extends BaseService {
       const sidecarExists = await backend.exists(sidecarPath);
       let localSidecar: { localPath: string; cleanup: () => Promise<void> };
       if (sidecarExists) {
-        localSidecar = await this.ensureLocalFile(sidecarPath);
+        localSidecar = await this.backendMedia.ensureLocalFile(sidecarPath);
       } else {
         const tempPath = join(tmpdir(), `immich-sidecar-${this.cryptoRepository.randomUUID()}.xmp`);
         localSidecar = {

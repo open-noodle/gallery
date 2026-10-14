@@ -231,7 +231,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
     });
 
     it('should skip if pet detection is disabled (default)', async () => {
@@ -239,7 +239,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
     });
 
     it('should skip if the asset was deleted after its thumbnail run', async () => {
@@ -250,7 +250,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
     });
 
     it('should fail if asset has no preview file', async () => {
@@ -265,7 +265,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
     });
 
     it('should skip hidden assets', async () => {
@@ -280,7 +280,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.machineLearning.detectPets).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+      expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
     });
 
     it('behaves exactly like today when pet recognition is disabled: species buckets, no embeddings requested, no recognition jobs queued (5.1 guard)', async () => {
@@ -515,9 +515,7 @@ describe(PetDetectionService.name, () => {
       expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
-      expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ assetId: asset.id, petsDetectedAt: expect.any(Date) }),
-      );
+      expect(mocks.petFace.setPetsDetectedAt).toHaveBeenCalledWith(asset.id);
     });
 
     describe('error handling', () => {
@@ -531,7 +529,7 @@ describe(PetDetectionService.name, () => {
         expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
         expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
-        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
         expect(mocks.event.emit).not.toHaveBeenCalled();
       });
 
@@ -544,7 +542,7 @@ describe(PetDetectionService.name, () => {
 
         expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
-        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
         expect(mocks.event.emit).not.toHaveBeenCalled();
       });
 
@@ -556,7 +554,7 @@ describe(PetDetectionService.name, () => {
         expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
 
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
-        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
         expect(mocks.event.emit).not.toHaveBeenCalled();
       });
     });
@@ -744,9 +742,7 @@ describe(PetDetectionService.name, () => {
         expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
         expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
         expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
-        expect(mocks.asset.upsertJobStatus).toHaveBeenCalledWith(
-          expect.objectContaining({ assetId: asset.id, petsDetectedAt: expect.any(Date) }),
-        );
+        expect(mocks.petFace.setPetsDetectedAt).toHaveBeenCalledWith(asset.id);
       });
 
       it('pin: fails and does not stamp petsDetectedAt when refreshPetFaces rejects', async () => {
@@ -762,7 +758,7 @@ describe(PetDetectionService.name, () => {
 
         expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
 
-        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
       });
 
@@ -819,7 +815,7 @@ describe(PetDetectionService.name, () => {
         expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
         expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
-        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
       });
 
       it('R5.12b mid-flight guard also covers recognition being switched OFF while the ML call was in flight', async () => {
@@ -850,7 +846,7 @@ describe(PetDetectionService.name, () => {
         expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
         expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
         expect(mocks.job.queueAll).not.toHaveBeenCalled();
-        expect(mocks.asset.upsertJobStatus).not.toHaveBeenCalled();
+        expect(mocks.petFace.setPetsDetectedAt).not.toHaveBeenCalled();
       });
     });
   });

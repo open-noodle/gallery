@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { vi } from 'vitest';
 import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -23,7 +23,7 @@ import { PersonService } from 'src/services/person.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { IFacialRecognitionJob } from 'src/types.js';
 import { clearConfigCache } from 'src/utils/config.js';
-import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
+import { MediumTestContext, newMediumService, updatePersonForTest } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -1117,11 +1117,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       expect(faceAfterDelete.personGroupId).toBeNull(); // sanity: the face is genuinely unassigned
 
       const q2 = await newSuggestionAnchoredPerson(ctx, user.id, 'Q');
-      await ctx.database
-        .updateTable('person')
-        .set({ identityId: q1Identity.id })
-        .where('personGroupId', '=', q2.personGroupId)
-        .execute();
+      await updatePersonForTest(ctx.database, q2.personGroupId, { identityId: q1Identity.id });
 
       // Then: a suggestion scan offers F again — it was permanently suppressed before this slice.
       await expect(faceSuggestion.handlePersonSuggestionScan({ id: q2.personGroupId })).resolves.toBe(

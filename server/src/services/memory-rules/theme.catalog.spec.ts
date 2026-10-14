@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { THEMES, themeForMonth } from 'src/services/memory-rules/theme.catalog.js';
 
-/** The shared `i18n/en.json`, read from disk (vitest roots at `server/`): no module alias reaches it. */
-const messageKeys = new Set(Object.keys(JSON.parse(readFileSync('../i18n/en.json', 'utf8'))));
+/** English message keys: upstream `i18n/en.json` plus the Gallery overlay, read from disk (vitest roots at `server/`). */
+const messageKeys = new Set(
+  ['../i18n/en.json', '../i18n/gallery/en.json'].flatMap((file) => Object.keys(JSON.parse(readFileSync(file, 'utf8')))),
+);
 
 describe('THEMES', () => {
   it('has 6 entries', () => {

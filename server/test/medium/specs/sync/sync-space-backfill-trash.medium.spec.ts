@@ -7,7 +7,7 @@
 // rides through). Sync-side sibling of H-1.
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType } from 'src/enum.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -34,7 +34,7 @@ beforeAll(async () => {
 describe('M-2: SharedSpaceAlbumAssetSync — backfill/getCreates exclude trashed; getUpdates still delivers', () => {
   it('getBackfill excludes a trashed album asset (live sibling present)', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
@@ -55,7 +55,7 @@ describe('M-2: SharedSpaceAlbumAssetSync — backfill/getCreates exclude trashed
 
   it('getCreates excludes a trashed album asset for a grant holder', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
@@ -77,7 +77,7 @@ describe('M-2: SharedSpaceAlbumAssetSync — backfill/getCreates exclude trashed
 
   it('getUpdates STILL delivers a trashed album asset (device-purge convergence channel)', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
@@ -104,7 +104,7 @@ describe('M-2: SharedSpaceAlbumAssetSync — backfill/getCreates exclude trashed
 describe('M-2: SharedSpaceAlbumAssetExifSync — backfill excludes trashed EXIF (GPS)', () => {
   it('getBackfill excludes the EXIF of a trashed album asset', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAssetExif;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAssetExif;
     const { user: owner } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
     const { asset: live } = await ctx.newAsset({ ownerId: owner.id });
@@ -128,7 +128,7 @@ describe('M-2: SharedSpaceAlbumAssetExifSync — backfill excludes trashed EXIF 
 describe('M-2: SharedSpaceAssetSync (direct) — backfill excludes trashed', () => {
   it('getBackfill excludes a trashed direct-space asset', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
@@ -173,7 +173,7 @@ const seedLibraryInSpace = async (ctx: SyncTestContext) => {
 describe('M-2: LibraryAssetSync — non-owner backfill excludes trashed; owner keeps their own', () => {
   it('a non-owner member does NOT receive the trashed library asset', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).libraryAsset;
+    const sut = new GallerySyncRepository(ctx.database).libraryAsset;
     const { member, library, live, trashed } = await seedLibraryInSpace(ctx);
 
     const rows = await collect(
@@ -187,7 +187,7 @@ describe('M-2: LibraryAssetSync — non-owner backfill excludes trashed; owner k
 
   it('the owner still receives their OWN trashed library asset (owner branch unfiltered)', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).libraryAsset;
+    const sut = new GallerySyncRepository(ctx.database).libraryAsset;
     const { owner, library, trashed } = await seedLibraryInSpace(ctx);
 
     const rows = await collect(
@@ -220,7 +220,7 @@ const seedContributionInSpace = async (ctx: SyncTestContext) => {
 describe('M-2 (P2-8): contributed arms — backfill/creates exclude trashed; updates still deliver', () => {
   it('ToAsset.getBackfill excludes a trashed contribution (live sibling present)', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumToAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset;
     const { member, album, live, trashed } = await seedContributionInSpace(ctx);
     const rows = await collect(
       sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id),
@@ -232,7 +232,7 @@ describe('M-2 (P2-8): contributed arms — backfill/creates exclude trashed; upd
 
   it('ToAsset.getBackfill album_asset arm also gates trash (line :1690 pin)', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumToAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset;
     const { user: owner } = await ctx.newUser();
     const { album } = await ctx.newAlbum({ ownerId: owner.id });
     const { asset: live } = await ctx.newAsset({ ownerId: owner.id });
@@ -248,7 +248,7 @@ describe('M-2 (P2-8): contributed arms — backfill/creates exclude trashed; upd
 
   it('Asset content sync (getBackfill + getCreates) excludes the trashed contributed asset', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAsset;
     const { member, album, live, trashed } = await seedContributionInSpace(ctx);
     const backfill = await collect(
       sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id),
@@ -262,7 +262,7 @@ describe('M-2 (P2-8): contributed arms — backfill/creates exclude trashed; upd
 
   it('Exif sync getBackfill excludes the trashed contribution’s EXIF', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAssetExif;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAssetExif;
     const { member, album, live, trashed } = await seedContributionInSpace(ctx);
     const rows = await collect(
       sut.getBackfill({ nowId: NOW_ID, beforeUpdateId: BEFORE_UPDATE_ID }, album.id, member.id),
@@ -273,7 +273,7 @@ describe('M-2 (P2-8): contributed arms — backfill/creates exclude trashed; upd
 
   it('Asset content getUpdates STILL delivers the trashed contribution (purge convergence)', async () => {
     const ctx = setup();
-    const sut = ctx.get(SyncRepository).sharedSpaceAlbumAsset;
+    const sut = new GallerySyncRepository(ctx.database).sharedSpaceAlbumAsset;
     const { member, trashed } = await seedContributionInSpace(ctx);
     const rows = await collect(
       sut.getUpdates(

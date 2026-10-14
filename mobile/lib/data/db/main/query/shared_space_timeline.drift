@@ -1,0 +1,333 @@
+import '../table/remote/asset.dart';
+import '../table/remote/stack.dart';
+import '../table/local/asset.dart';
+import '../table/local/album.dart';
+import '../table/local/album_asset.dart';
+-- Imported so Drift's analyzer adds shared_space_* tables to the generated
+-- `readsFrom` set. Without these imports the EXISTS subqueries below still
+-- work, but the .watch() stream won't re-emit when a space membership or
+-- link row changes — so toggling showInTimeline has no visible effect until
+-- the user re-enters the page.
+import '../table/remote/shared_space_asset.dart';
+import '../table/remote/shared_space_library.dart';
+import '../table/remote/shared_space_member.dart';
+import '../table/remote/shared_space_album_asset.dart';
+import '../table/remote/shared_space_album_link.dart';
+import '../table/remote/shared_space_album_hidden.dart';
+
+-- gallery-fork: the main timeline queries (upstream merged_asset.drift) extended with Space
+-- membership and the #1041 hide. TimelineRepository keeps upstream's copy; the app reads these
+-- through SharedSpaceTimelineRepository.main.
+--
+-- A viewer's main timeline is a UNION over three sources:
+--   1. Remote assets owned by the timeline users (self + partners). The
+--      CALLER's own assets (owner_id = current_user_id, a strict subset of
+--      :user_ids which also includes partner ids) are additionally subject
+--      to the #1041 "hide from my timeline" subtraction below — a partner's
+--      assets must never be filtered by the CALLER's own hidden rows
+--      (server-side "partner trap", design doc §6.4), so the owner arm is
+--      SPLIT: partner rows pass through untouched, and only
+--      owner_id = current_user_id carries the subtraction. Correlating the
+--      NOT EXISTS legs to current_user_id is NOT sufficient on its own —
+--      they would still be ANDed against every row in :user_ids (E10).
+--   2. Remote assets shared with the viewer via a space where the viewer
+--      has showInTimeline=true — either directly via shared_space_asset,
+--      transitively via a library linked to the space (shared_space_library),
+--      or transitively via an album linked into the space
+--      (shared_space_album_asset ⋈ shared_space_album_link).
+--      This mirrors the server's TimeBucket query which OR-joins ownerId with
+--      timelineSpaceIds (see `asset.repository.ts` timelineSpaceIds branch).
+--      Only the viewer's own member row is honored — partner memberships do
+--      NOT leak into the viewer's timeline.
+--      The album leg's own gate is the viewer's PERSONAL "hide from my
+--      timeline" preference (shared_space_album_hidden, #1041) — NOT the
+--      shared shared_space_album_link.show_in_timeline flag, which now
+--      governs only the space's own Photos tab (design doc §2, §6.1).
+--   3. Local assets not yet backed up.
+--
+-- #1041 "hide from my timeline" (design doc §3, §6.3): for an asset the
+-- viewer OWNS, it disappears from their own timeline only when EVERY path it
+-- has into a space the viewer belongs to is a path the viewer has hidden —
+-- a space hidden via their own member.show_in_timeline=0, or an album hidden
+-- via their own shared_space_album_hidden row (or the album's space itself
+-- hidden via the member flag). A single VISIBLE path re-admits the asset,
+-- which the sibling OR arms below already provide for free — so the owner
+-- arm only needs to subtract assets that have NO other, visible path.
+spaceMergedAsset(:current_user_id AS TEXT):
+SELECT
+	rae.id as remote_id,
+	(SELECT lae.id FROM local_asset_entity lae WHERE lae.checksum = rae.checksum LIMIT 1) as local_id,
+	rae.name,
+	rae."type",
+	rae.created_at as created_at,
+	rae.updated_at,
+	rae.width,
+	rae.height,
+	rae.duration_ms,
+	rae.is_favorite,
+	rae.thumb_hash,
+	rae.checksum,
+	rae.owner_id,
+	rae.live_photo_video_id,
+	0 as orientation,
+	rae.stack_id,
+	NULL as i_cloud_id,
+	NULL as latitude,
+	NULL as longitude,
+	NULL as adjustmentTime,
+	rae.is_edited,
+	0 as playback_style,
+	rae.uploaded_at
+FROM
+	remote_asset_entity rae
+LEFT JOIN
+	stack_entity se ON rae.stack_id = se.id
+WHERE
+	rae.deleted_at IS NULL
+	AND rae.visibility = 0 -- timeline visibility
+	AND (
+		(
+			-- A partner's asset is never filtered by MY hidden rows: the subtraction below
+			-- belongs to the CALLER alone (design doc §6.4, server E10). Splitting the arm is
+			-- what enforces that; correlating the legs to :current_user_id is not enough,
+			-- because they would still be ANDed against every row in :user_ids.
+			(rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
+			OR (
+				rae.owner_id = :current_user_id
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_asset_entity ssa
+					INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+					WHERE ssa.asset_id = rae.id
+						AND ssm.user_id = :current_user_id
+						AND ssm.show_in_timeline = 0
+				)
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_library_entity ssl
+					INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+					WHERE ssl.library_id = rae.library_id
+						AND ssm.user_id = :current_user_id
+						AND ssm.show_in_timeline = 0
+				)
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_album_asset_entity ssaa
+					INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
+					INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
+					WHERE ssaa.asset_id = rae.id
+						AND ssm.user_id = :current_user_id
+						AND (
+							ssm.show_in_timeline = 0
+							OR EXISTS (
+								SELECT 1 FROM shared_space_album_hidden_entity ssah
+								WHERE ssah.space_id = ssal.space_id
+									AND ssah.album_id = ssal.album_id
+									AND ssah.user_id = :current_user_id
+							)
+						)
+				)
+			)
+		)
+		OR EXISTS (
+			SELECT 1 FROM shared_space_asset_entity ssa
+			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+			WHERE ssa.asset_id = rae.id
+				AND ssm.user_id = :current_user_id
+				AND ssm.show_in_timeline = 1
+		)
+		OR EXISTS (
+			SELECT 1 FROM shared_space_library_entity ssl
+			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+			WHERE ssl.library_id = rae.library_id
+				AND ssm.user_id = :current_user_id
+				AND ssm.show_in_timeline = 1
+		)
+		OR EXISTS (
+			SELECT 1 FROM shared_space_album_asset_entity ssaa
+			INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
+			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
+			WHERE ssaa.asset_id = rae.id
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_album_hidden_entity ssah
+					WHERE ssah.space_id = ssal.space_id
+						AND ssah.album_id = ssal.album_id
+						AND ssah.user_id = :current_user_id
+				)
+				AND ssm.user_id = :current_user_id
+				AND ssm.show_in_timeline = 1
+		)
+	)
+	AND (
+		rae.stack_id IS NULL
+		OR rae.id = se.primary_asset_id
+	)
+
+UNION ALL
+
+SELECT
+	NULL as remote_id,
+	lae.id as local_id,
+	lae.name,
+	lae."type",
+	lae.created_at as created_at,
+	lae.updated_at,
+	lae.width,
+	lae.height,
+	lae.duration_ms,
+	lae.is_favorite,
+	NULL as thumb_hash,
+	lae.checksum,
+	NULL as owner_id,
+	NULL as live_photo_video_id,
+	lae.orientation,
+	NULL as stack_id,
+	lae.i_cloud_id,
+	lae.latitude,
+	lae.longitude,
+	lae.adjustment_time,
+	0 as is_edited,
+	lae.playback_style,
+	NULL as uploaded_at
+FROM
+	local_asset_entity lae
+WHERE NOT EXISTS (
+	SELECT 1 FROM remote_asset_entity rae WHERE rae.checksum = lae.checksum AND rae.owner_id IN :user_ids
+)
+AND EXISTS (
+	SELECT 1 FROM local_album_asset_entity laa
+	INNER JOIN local_album_entity la on laa.album_id = la.id
+	WHERE laa.asset_id = lae.id AND la.backup_selection = 0 -- selected
+)
+AND NOT EXISTS (
+    SELECT 1 FROM local_album_asset_entity laa
+    INNER JOIN local_album_entity la on laa.album_id = la.id
+    WHERE laa.asset_id = lae.id AND la.backup_selection = 2 -- excluded
+)
+ORDER BY created_at DESC
+LIMIT $limit;
+
+spaceMergedBucket(:group_by AS INTEGER, :current_user_id AS TEXT):
+SELECT
+	COUNT(*) as asset_count,
+	bucket_date
+FROM
+(
+	SELECT
+		CASE
+			WHEN :group_by = 0 THEN COALESCE(
+				STRFTIME('%Y-%m-%d', rae.local_date_time),
+				STRFTIME('%Y-%m-%d', rae.created_at, 'localtime')
+			)
+			WHEN :group_by = 1 THEN COALESCE(
+				STRFTIME('%Y-%m', rae.local_date_time),
+				STRFTIME('%Y-%m', rae.created_at, 'localtime')
+			)
+			WHEN :group_by = 4 THEN COALESCE(
+				STRFTIME('%Y', rae.local_date_time),
+				STRFTIME('%Y', rae.created_at, 'localtime')
+			)
+		END as bucket_date
+	FROM
+		remote_asset_entity rae
+	LEFT JOIN
+        stack_entity se ON rae.stack_id = se.id
+	WHERE
+		rae.deleted_at IS NULL
+		AND rae.visibility = 0 -- timeline visibility
+		AND (
+			(
+				-- A partner's asset is never filtered by MY hidden rows: the subtraction below
+				-- belongs to the CALLER alone (design doc §6.4, server E10). Splitting the arm is
+				-- what enforces that; correlating the legs to :current_user_id is not enough,
+				-- because they would still be ANDed against every row in :user_ids.
+				(rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
+				OR (
+					rae.owner_id = :current_user_id
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_asset_entity ssa
+						INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+						WHERE ssa.asset_id = rae.id
+							AND ssm.user_id = :current_user_id
+							AND ssm.show_in_timeline = 0
+					)
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_library_entity ssl
+						INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+						WHERE ssl.library_id = rae.library_id
+							AND ssm.user_id = :current_user_id
+							AND ssm.show_in_timeline = 0
+					)
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_album_asset_entity ssaa
+						INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
+						INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
+						WHERE ssaa.asset_id = rae.id
+							AND ssm.user_id = :current_user_id
+							AND (
+								ssm.show_in_timeline = 0
+								OR EXISTS (
+									SELECT 1 FROM shared_space_album_hidden_entity ssah
+									WHERE ssah.space_id = ssal.space_id
+										AND ssah.album_id = ssal.album_id
+										AND ssah.user_id = :current_user_id
+								)
+							)
+					)
+				)
+			)
+			OR EXISTS (
+				SELECT 1 FROM shared_space_asset_entity ssa
+				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+				WHERE ssa.asset_id = rae.id
+					AND ssm.user_id = :current_user_id
+					AND ssm.show_in_timeline = 1
+			)
+			OR EXISTS (
+				SELECT 1 FROM shared_space_library_entity ssl
+				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+				WHERE ssl.library_id = rae.library_id
+					AND ssm.user_id = :current_user_id
+					AND ssm.show_in_timeline = 1
+			)
+			OR EXISTS (
+				SELECT 1 FROM shared_space_album_asset_entity ssaa
+				INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
+				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
+				WHERE ssaa.asset_id = rae.id
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_album_hidden_entity ssah
+						WHERE ssah.space_id = ssal.space_id
+							AND ssah.album_id = ssal.album_id
+							AND ssah.user_id = :current_user_id
+					)
+					AND ssm.user_id = :current_user_id
+					AND ssm.show_in_timeline = 1
+			)
+		)
+		AND (
+			rae.stack_id IS NULL
+			OR rae.id = se.primary_asset_id
+		)
+	UNION ALL
+	SELECT
+		CASE
+			WHEN :group_by = 0 THEN STRFTIME('%Y-%m-%d', lae.created_at, 'localtime')
+			WHEN :group_by = 1 THEN STRFTIME('%Y-%m', lae.created_at, 'localtime')
+			WHEN :group_by = 4 THEN STRFTIME('%Y', lae.created_at, 'localtime')
+		END as bucket_date
+	FROM
+		local_asset_entity lae
+	WHERE NOT EXISTS (
+		SELECT 1 FROM remote_asset_entity rae WHERE rae.checksum = lae.checksum AND rae.owner_id IN :user_ids
+	)
+	AND EXISTS (
+		SELECT 1 FROM local_album_asset_entity laa
+		INNER JOIN local_album_entity la on laa.album_id = la.id
+		WHERE laa.asset_id = lae.id AND la.backup_selection = 0 -- selected
+	)
+	AND NOT EXISTS (
+		SELECT 1 FROM local_album_asset_entity laa
+		INNER JOIN local_album_entity la on laa.album_id = la.id
+		WHERE laa.asset_id = lae.id AND la.backup_selection = 2 -- excluded
+	)
+)
+GROUP BY bucket_date
+ORDER BY bucket_date DESC;

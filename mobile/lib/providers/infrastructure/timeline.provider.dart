@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
@@ -27,7 +28,7 @@ final timelineServiceProvider = Provider<TimelineService>(
 
 final timelineFactoryProvider = Provider<TimelineFactory>(
   (ref) => TimelineFactory(
-    timelineRepository: ref.watch(driftProvider).timelineRepository,
+    timelineRepository: SharedSpaceTimelineRepository(ref.watch(driftProvider).timelineRepository),
     settingsRepository: ref.watch(settingsProvider),
   ),
 );

@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SyncEntityType } from 'src/enum.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -21,7 +21,7 @@ const ZERO_UPDATE_ID = '00000000-0000-7000-8000-000000000000';
 
 const setup = () => {
   const ctx = new SyncTestContext(defaultDatabase);
-  return { ctx, db: defaultDatabase, sut: ctx.get(SyncRepository).sharedSpaceAlbumAssetExif };
+  return { ctx, db: defaultDatabase, sut: new GallerySyncRepository(ctx.database).sharedSpaceAlbumAssetExif };
 };
 
 beforeAll(async () => {

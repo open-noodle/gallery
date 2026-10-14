@@ -18,7 +18,7 @@ import {
 } from 'src/dtos/server.dto.js';
 import { VersionCheckStateResponseDto } from 'src/dtos/system-metadata.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
-import { GALLERY_CLIENT_VARY } from 'src/gallery/client-version.js';
+import { GALLERY_CLIENT_VARY } from 'src/gallery/utils/client-version.js';
 import { Authenticated } from 'src/middleware/auth.guard.js';
 import { ServerService } from 'src/services/server.service.js';
 import { SystemMetadataService } from 'src/services/system-metadata.service.js';

@@ -30,6 +30,7 @@ jobs:
               - 'open-api/**'
               - 'i18n/en.json'
               - 'native/**'
+              - 'i18n/gallery/en.json'
           force-filters: |
             - '.github/workflows/static_analysis.yml'
           force-events: 'workflow_dispatch,release'

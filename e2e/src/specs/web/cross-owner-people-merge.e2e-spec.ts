@@ -66,11 +66,15 @@ test.describe('Cross-owner people merge', () => {
     // Mint identities: targetPerson -> T, otherOwnerPerson -> S.
     await utils.createFace({ assetId: actorAsset.id, personGroupId: targetPerson.id });
     const otherFace = await utils.createFace({ assetId: otherAsset.id, personGroupId: otherOwnerPerson.id });
-    const otherOwnerRow = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
-      otherOwnerPerson.id,
-    ]);
+    const otherOwnerRow = await db.query(
+      `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+      [otherOwnerPerson.id],
+    );
     const identityS = otherOwnerRow.rows[0].identityId as string;
-    const targetRow = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [targetPerson.id]);
+    const targetRow = await db.query(
+      `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+      [targetPerson.id],
+    );
     const identityT = targetRow.rows[0].identityId as string;
 
     // The other owner ALSO holds a person on identity T. Merging S into T therefore has to merge two of
@@ -79,7 +83,10 @@ test.describe('Cross-owner people merge', () => {
     const otherOwnerDupe = await utils.createPerson(otherOwner.accessToken, { name: 'Ada Other Owner (dupe)' });
     const otherDupeAsset = await utils.createAsset(otherOwner.accessToken);
     await utils.createFace({ assetId: otherDupeAsset.id, personGroupId: otherOwnerDupe.id });
-    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE "personGroupId" = $2`, [identityT, otherOwnerDupe.id]);
+    await db.query(
+      `INSERT INTO "person_identity" ("personGroupId", "ownerId", "identityId") SELECT "personGroupId", "ownerId", $1 FROM "person" WHERE "personGroupId" = $2 ON CONFLICT ("personGroupId") DO UPDATE SET "identityId" = EXCLUDED."identityId"`,
+      [identityT, otherOwnerDupe.id],
+    );
 
     // A space-person in the actor's space carries identity S — repairable by the actor, but S also
     // belongs to the other owner's personal person, which makes the merge cross-owner.

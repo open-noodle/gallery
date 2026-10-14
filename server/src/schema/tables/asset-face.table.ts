@@ -18,7 +18,6 @@ import { asset_face_source_type, asset_visibility_enum } from 'src/schema/enums.
 import { asset_face_audit, asset_face_set_asset_state, updated_at } from 'src/schema/functions.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
-import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table({ name: 'asset_face' })
 @BeforeUpdateTrigger({
@@ -110,10 +109,4 @@ export class AssetFaceTable {
   assetVisibility!: Generated<AssetVisibility>;
 
   @Column({ type: 'timestamp with time zone', nullable: true })
-  assetDeletedAt!: Timestamp | null;
-  // Who drew this box by hand, via the space face-assign endpoint. NULL for every existing row
-  // and for everything the detector produces -- deletability of a hand-drawn box is decided by
-  // this column, never by sourceType (see 2026-08-23-space-editor-face-assignment-design.md §6.6).
-  @ForeignKeyColumn(() => UserTable, { onDelete: 'SET NULL', nullable: true })
-  createdBy!: string | null;
-}
+  assetDeletedAt!: Timestamp | null;}

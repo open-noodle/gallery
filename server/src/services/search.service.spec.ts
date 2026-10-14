@@ -1044,7 +1044,7 @@ describe(SearchService.name, () => {
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
         mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
         mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
-        mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+        mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
         mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
         vi.mocked(sut.resolveViewerScope).mockResolvedValue({ timelineSpaceIds: [spaceId] });
 

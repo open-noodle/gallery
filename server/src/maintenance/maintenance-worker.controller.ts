@@ -29,7 +29,7 @@ import {
 } from 'src/dtos/maintenance.dto.js';
 import { ServerConfigDto, ServerPingResponse, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { ImmichCookie } from 'src/enum.js';
-import { GALLERY_CLIENT_VARY } from 'src/gallery/client-version.js';
+import { GALLERY_CLIENT_VARY } from 'src/gallery/utils/client-version.js';
 import { MaintenanceRoute } from 'src/maintenance/maintenance-auth.guard.js';
 import { MaintenanceWorkerService } from 'src/maintenance/maintenance-worker.service.js';
 import { GetLoginDetails } from 'src/middleware/auth.guard.js';

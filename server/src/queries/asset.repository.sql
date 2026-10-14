@@ -214,7 +214,35 @@ select
           "asset_face"
           left join lateral (
             select
-              "person".*
+              "person".*,
+              (
+                SELECT
+                  "person_identity"."identityId"
+                FROM
+                  "person_identity"
+                WHERE
+                  "person_identity"."personGroupId" = "person"."personGroupId"
+              ) as "identityId",
+              (
+                CASE
+                  WHEN EXISTS (
+                    SELECT
+                    FROM
+                      "person_pet"
+                    WHERE
+                      "person_pet"."personGroupId" = "person"."personGroupId"
+                  ) THEN 'pet'
+                  ELSE 'person'
+                END
+              ) as "type",
+              (
+                SELECT
+                  "person_pet"."species"
+                FROM
+                  "person_pet"
+                WHERE
+                  "person_pet"."personGroupId" = "person"."personGroupId"
+              ) as "species"
             from
               "person"
             where
@@ -283,7 +311,35 @@ select
           "asset_face"
           left join lateral (
             select
-              "person".*
+              "person".*,
+              (
+                SELECT
+                  "person_identity"."identityId"
+                FROM
+                  "person_identity"
+                WHERE
+                  "person_identity"."personGroupId" = "person"."personGroupId"
+              ) as "identityId",
+              (
+                CASE
+                  WHEN EXISTS (
+                    SELECT
+                    FROM
+                      "person_pet"
+                    WHERE
+                      "person_pet"."personGroupId" = "person"."personGroupId"
+                  ) THEN 'pet'
+                  ELSE 'person'
+                END
+              ) as "type",
+              (
+                SELECT
+                  "person_pet"."species"
+                FROM
+                  "person_pet"
+                WHERE
+                  "person_pet"."personGroupId" = "person"."personGroupId"
+              ) as "species"
             from
               "person"
             where

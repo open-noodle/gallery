@@ -22,7 +22,7 @@ export class DiskStorageBackend implements StorageBackend {
     if (isAbsolute(key)) {
       return key;
     }
-    // an absolute-only backend (see BaseService.backendFor): a relative key would resolve against
+    // an absolute-only backend (see BackendMediaServer.backendFor): a relative key would resolve against
     // the cwd, and deletePrefix would then remove whatever it found there
     if (!this.mediaLocation) {
       throw new Error(`Disk backend without a media location cannot resolve relative key ${key}`);

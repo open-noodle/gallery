@@ -1,8 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { AssetVisibility, JobStatus, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -471,7 +472,7 @@ describe('reject/ignore face-level authorization (F8)', () => {
 
       const refreshed = await ctx.database
         .selectFrom('person')
-        .select(['personGroupId', 'identityId'])
+        .select(['personGroupId', personIdentityId().as('identityId')])
         .where('personGroupId', 'in', [annaA.personGroupId, annaB.personGroupId])
         .execute();
       const refreshedAnnaA = refreshed.find((row) => row.personGroupId === annaA.personGroupId);

@@ -53,8 +53,12 @@ done < <(jq -r '.upstream.author_names[]' "$CONFIG")
 # Mirror the whole i18n/ tree into a temp REPO_ROOT and patch the mirror.
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/i18n"
+mkdir -p "$TMP/i18n/gallery"
 cp "$REPO"/i18n/*.json "$TMP/i18n/"
+cp "$REPO"/i18n/gallery/*.json "$REPO"/i18n/gallery/overrides.txt "$REPO"/i18n/gallery/merge.mjs "$TMP/i18n/gallery/"
+# The unbranded bundle (upstream plus the Gallery overlay), for the assertions about source text.
+SRC="$TMP/source"
+node "$REPO/i18n/gallery/merge.mjs" --out "$SRC"
 
 REPO_ROOT="$TMP" patch_i18n >/dev/null
 
@@ -356,7 +360,7 @@ FORK_VOICE_KEYS=(
 # exception — the fork edited i18n/en.json in place (commit 4adfd17eafb) so source
 # and override already agree, and no derivation can see it.
 echo "FORK_VOICE_KEYS covers every override that changed the meaning:"
-derived=$(jq -n --slurpfile s "$REPO/i18n/en.json" --slurpfile o "$REPO/branding/i18n/overrides-en.json" -r '
+derived=$(jq -n --slurpfile s "$SRC/en.json" --slurpfile o "$REPO/branding/i18n/overrides-en.json" -r '
   [$o[0] | paths(scalars)] as $ps
   | [ $ps[] | . as $p | ($s[0] | getpath($p)) as $u | ($o[0] | getpath($p)) as $f
       | select($u != null and ($u | type) == "string")
@@ -419,7 +423,7 @@ echo "No locale offers to sell the fork (CTA keys, all locales):"
 CTA_KEYS=(buy purchase_button_buy_immich)
 cta_gaps=0
 cta_checked=0
-for locale_src in "$REPO"/i18n/*.json; do
+for locale_src in "$SRC"/*.json; do
   lang=$(basename "$locale_src" .json)
   [[ "$lang" == "en" ]] && continue
   for cta_key in "${CTA_KEYS[@]}"; do

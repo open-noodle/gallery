@@ -36,12 +36,6 @@ describe(ClassificationRepository.name, () => {
       const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
       await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
 
-      await ctx.database
-        .updateTable('asset_job_status')
-        .set({ classifiedAt: null })
-        .where('assetId', '=', asset.id)
-        .execute();
-
       const stream = sut.streamUnclassifiedAssets();
       const results: Array<{ id: string; ownerId: string }> = await Array.fromAsync(stream);
 
@@ -64,22 +58,21 @@ describe(ClassificationRepository.name, () => {
       for (const asset of [asset1, asset2]) {
         await ctx.newJobStatus({ assetId: asset.id });
         await ctx.database
-          .updateTable('asset_job_status')
-          .set({ classifiedAt: classifiedDate })
-          .where('assetId', '=', asset.id)
+          .insertInto('asset_job_status_gallery')
+          .values({ assetId: asset.id, classifiedAt: classifiedDate })
           .execute();
       }
 
       await sut.resetClassifiedAt();
 
       const status1 = await ctx.database
-        .selectFrom('asset_job_status')
+        .selectFrom('asset_job_status_gallery')
         .select('classifiedAt')
         .where('assetId', '=', asset1.id)
         .executeTakeFirstOrThrow();
 
       const status2 = await ctx.database
-        .selectFrom('asset_job_status')
+        .selectFrom('asset_job_status_gallery')
         .select('classifiedAt')
         .where('assetId', '=', asset2.id)
         .executeTakeFirstOrThrow();
@@ -96,16 +89,11 @@ describe(ClassificationRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 
       await ctx.newJobStatus({ assetId: asset.id });
-      await ctx.database
-        .updateTable('asset_job_status')
-        .set({ classifiedAt: null })
-        .where('assetId', '=', asset.id)
-        .execute();
 
       await sut.setClassifiedAt(asset.id);
 
       const status = await ctx.database
-        .selectFrom('asset_job_status')
+        .selectFrom('asset_job_status_gallery')
         .select('classifiedAt')
         .where('assetId', '=', asset.id)
         .executeTakeFirstOrThrow();

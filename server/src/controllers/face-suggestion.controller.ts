@@ -25,7 +25,7 @@ export class FaceSuggestionController {
   constructor(private service: FaceSuggestionService) {}
 
   // F21: publishes the permission getFaceSuggestions actually enforces. Deliberately PersonUpdate, not
-  // PersonRead — PersonRead also resolves via access.person.checkSharedSpaceAccess (see
+  // PersonRead — PersonRead also resolves via access.galleryPerson.checkSharedSpaceAccess (see
   // src/utils/access.ts), which would let a space member read the owner's whole-library pending review
   // queue (D6, see the comment on getFaceSuggestions in face-suggestion.service.ts). Do not relax this
   // back to PersonRead to "match" a shared-space caller; the service enforcement is the source of truth

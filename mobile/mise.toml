@@ -183,10 +183,10 @@ run = "flutter run"
 description = "Generate i18n loader"
 hide = true
 run = [
-  "dart run easy_localization:generate -S ../i18n",
+  "dart run easy_localization:generate -S ../i18n/gallery/merged",
   "dart format lib/generated/codegen_loader.g.dart",
 ]
-depends = ["//:open-api-dart"]
+depends = ["//:open-api-dart", "i18n:merge"]
 wait_for = ["//:i18n:format-fix"]
 
 [tasks."i18n:keys"]
@@ -196,6 +196,13 @@ run = [
   "dart run bin/generate_keys.dart",
   "dart format lib/generated/translations.g.dart",
 ]
+depends = ["i18n:merge"]
+wait_for = ["//:i18n:format-fix"]
+
+[tasks."i18n:merge"]
+description = "Merge upstream i18n with the Gallery overlay into i18n/gallery/merged"
+hide = true
+run = "node ../i18n/gallery/merge.mjs"
 wait_for = ["//:i18n:format-fix"]
 
 [tasks."install:ios"]

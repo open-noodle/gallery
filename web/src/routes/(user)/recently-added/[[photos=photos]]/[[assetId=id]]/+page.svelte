@@ -1,20 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
-  import ActiveFiltersBar from '#lib/components/filter-panel/active-filters-bar.svelte';
-  import FilterPanel from '#lib/components/filter-panel/filter-panel.svelte';
-  import FilterToolbar from '#lib/components/filter-panel/filter-toolbar.svelte';
-  import {
-    clearFilters,
-    createFilterState,
-    getActiveFilterCount,
-    loadFilterCollapsed,
-    type FilterPanelConfig,
-    type FilterState,
-  } from '#lib/components/filter-panel/filter-panel.ts';
-  import SmartSearchResults from '#lib/components/search/smart-search-results.svelte';
-  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
   import ArchiveAction from '#lib/components/timeline/actions/ArchiveAction.svelte';
@@ -30,58 +15,18 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '#lib/components/timeline/Timeline.svelte';
   import { AssetAction } from '#lib/constants.ts';
+  import FilteredTimelinePage from '#lib/gallery/filtered-timeline/FilteredTimelinePage.svelte';
+  import { createRecentlyAddedTimeline } from '#lib/gallery/filtered-timeline/recently-added-timeline.svelte.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
-  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
-  import { getTimelineTopVisibleAnchor } from '#lib/managers/timeline-manager/timeline-anchor.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
-  import type {
-    TimelineAsset,
-    TimelineGrouping,
-    TimelineTemporalAnchor,
-  } from '#lib/managers/timeline-manager/types.ts';
-  import {
-    removeSearchResults,
-    selectAllSearchResults,
-    updateSearchResults,
-  } from '#lib/utils/search-result-selection.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
-  import { lang } from '#lib/stores/preferences.store.ts';
   import { type OnLink, type OnUnlink } from '#lib/utils/actions.ts';
   import { openFileUploadDialog } from '#lib/utils/file-uploader.ts';
-  import { withNameCapture } from '#lib/utils/filter-name-capture.ts';
-  import { handlePhotosRemoveFilter } from '#lib/utils/photos-filter-options.ts';
-  import { buildRecentlyAddedFilterConfig } from '#lib/utils/recently-added-filter-config.ts';
-  import {
-    buildRecentlyAddedPickerBucketOptions,
-    buildRecentlyAddedTimelineOptions,
-    shouldShowRecentlyAddedCount,
-  } from '#lib/utils/recently-added-filter-options.ts';
-  import {
-    buildSearchablePageUrl,
-    getSearchablePageFilterState,
-    getSearchablePageState,
-  } from '#lib/utils/searchable-page-search.ts';
-  import {
-    buildSmartSearchFacetKey,
-    buildSmartSearchFacetsParams,
-    mapSmartSearchFacetsToFilterSuggestions,
-  } from '#lib/utils/space-search.ts';
-  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '#lib/utils/timeline-zoom-navigation.ts';
-  import { consumeTypedSearchNamesInto } from '#lib/utils/typed-search/typed-search-name-cache.ts';
-  import {
-    type AssetResponseDto,
-    type AssetVisibility,
-    getTimeBuckets,
-    searchSmartFacets,
-    type SmartSearchFacetsResponseDto,
-  } from '@immich/sdk';
+  import { shouldShowRecentlyAddedCount } from '#lib/utils/recently-added-filter-options.ts';
   import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
-  import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
-  import { SvelteMap } from 'svelte/reactivity';
   import type { PageData } from './$types';
   import { getStackBulkActions } from '#lib/services/stack.service.ts';
 
@@ -92,192 +37,14 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-
-  // Filter state
-  const initialSearchState = getSearchablePageState(page.url);
-  const initialFilterState = getSearchablePageFilterState(page.url);
-  let filters = $state<FilterState>({
-    ...createFilterState(),
-    dateAfter: undefined,
-    dateBefore: undefined,
-    selectedYear: undefined,
-    selectedMonth: undefined,
-    ...initialFilterState,
-    sortOrder: initialSearchState.sortOrder,
-  });
-  let filtersBeforePanelChange: FilterState = {
-    ...createFilterState(),
-    dateAfter: undefined,
-    dateBefore: undefined,
-    selectedYear: undefined,
-    selectedMonth: undefined,
-    ...initialFilterState,
-    sortOrder: initialSearchState.sortOrder,
-  };
-  let timelineGrouping = $state<TimelineGrouping>('day');
-  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
-  let committedQuery = $state(initialSearchState.query);
-  let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}:${page.url.search}`);
-  let isLoading = $state(false);
-  const showSearchResults = $derived(committedQuery.trim().length > 0);
-  // Loaded smart search results. The timeline (and its TimelineManager) is unmounted while
-  // these are showing, so the multi-select toolbar acts on this array instead (#908).
-  let searchResults = $state<AssetResponseDto[]>([]);
-  // Bumped to force a re-run of the search (undo-delete restores the removed assets).
-  let searchReloadToken = $state(0);
-  const options = $derived({
-    ...buildRecentlyAddedTimelineOptions(filters, authManager.user.id),
-    grouping: timelineGrouping,
-  });
-  $effect(() => {
-    filtersBeforePanelChange = filters;
-  });
-  let personNames = new SvelteMap<string, string>();
-  let tagNames = new SvelteMap<string, string>();
-  consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
-  $effect(() => globalSearchManager.registerSearchablePageFilters(() => filters));
-
-  let smartFacets = $state<SmartSearchFacetsResponseDto>();
-  let smartFacetKey = $state('');
-  let smartFacetInFlight:
-    | {
-        key: string;
-        controller: AbortController;
-        promise: Promise<SmartSearchFacetsResponseDto | undefined>;
-      }
-    | undefined;
-
-  // The temporal picker's year/month grid must be built from *taken*-date buckets, because clicking
-  // a year emits takenAfter/takenBefore. `timelineManager` groups by *added* date (orderBy
-  // CreatedAt, the whole point of this view), so its buckets would list upload years that the
-  // resulting predicate then matches against nothing — see `buildRecentlyAddedPickerBucketOptions`.
-  // Browse mode fetches its own bucket set; query mode keeps the smart-search facets, which already
-  // bucket on takenAt.
-  let pickerBuckets = $state<Array<{ timeBucket: string; count: number }>>([]);
-  const pickerBucketOptions = $derived(buildRecentlyAddedPickerBucketOptions(filters, authManager.user.id));
-
-  $effect(() => {
-    // Read the derived options up front so every filter change is tracked as a dependency.
-    const options = pickerBucketOptions;
-    if (showSearchResults) {
-      return;
-    }
-
-    const controller = new AbortController();
-    void getTimeBuckets(options, { signal: controller.signal })
-      .then((buckets) => {
-        pickerBuckets = buckets.map(({ timeBucket, count }) => ({ timeBucket, count }));
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.error('Failed to fetch Recently Added filter buckets:', error);
-        }
-      });
-
-    return () => controller.abort();
-  });
-
-  const smartFacetBuckets = $derived(showSearchResults ? (smartFacets?.timeBuckets ?? []) : pickerBuckets);
-  const smartFacetTotal = $derived(showSearchResults ? smartFacets?.total : undefined);
-
-  // Own + partner scope only — `withSharedSpaces` is hardcoded `false` here (never derived from
-  // `filters`, unlike Photos), matching every other search-path call in this view.
-  async function loadRecentlyAddedSmartFacets(
-    nextFilters: FilterState,
-  ): Promise<SmartSearchFacetsResponseDto | undefined> {
-    const query = committedQuery.trim();
-    if (!query) {
-      return undefined;
-    }
-
-    const key = buildSmartSearchFacetKey({ query, filters: nextFilters, withSharedSpaces: false, language: $lang });
-    if (smartFacets && smartFacetKey === key) {
-      return smartFacets;
-    }
-    if (smartFacetInFlight?.key === key) {
-      return smartFacetInFlight.promise;
-    }
-
-    smartFacetInFlight?.controller.abort();
-    const controller = new AbortController();
-
-    const promise = searchSmartFacets(
-      {
-        smartSearchFacetsDto: buildSmartSearchFacetsParams({
-          query,
-          filters: nextFilters,
-          withSharedSpaces: false,
-          language: $lang,
-        }),
-      },
-      { signal: controller.signal },
-    )
-      .then((result) => {
-        if (smartFacetInFlight?.key === key && !controller.signal.aborted) {
-          smartFacets = result;
-          smartFacetKey = key;
-        }
-        return result;
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.error('Failed to fetch smart search facets:', error);
-        }
-        return smartFacets;
-      })
-      .finally(() => {
-        if (smartFacetInFlight?.key === key) {
-          smartFacetInFlight = undefined;
-        }
-      });
-
-    smartFacetInFlight = { key, controller, promise };
-    return promise;
-  }
-
-  // `getSearchContext` scopes the dependent providers (cities/cameraModels) by the *live* filters —
-  // see the module doc on `buildRecentlyAddedFilterConfig`. The base suggestionsProvider it returns
-  // is used as-is for browse mode; query mode overrides it below with a cached loader so a filter
-  // change that doesn't affect the facet key (e.g. sortOrder) doesn't refetch, and so the raw facets
-  // (total, timeBuckets) are available to the rest of the page, not just the mapped suggestions.
-  const baseFilterConfig = buildRecentlyAddedFilterConfig(() => ({ query: committedQuery, language: $lang, filters }));
-
-  const filterConfig: FilterPanelConfig = withNameCapture(
-    {
-      ...baseFilterConfig,
-      suggestionsProvider: async (nextFilters: FilterState) => {
-        if (!showSearchResults) {
-          return baseFilterConfig.suggestionsProvider!(nextFilters);
-        }
-
-        const facets = await loadRecentlyAddedSmartFacets(nextFilters);
-        if (!facets) {
-          // #910: never resolve with a fabricated empty response — the panel cannot tell it apart from
-          // a genuinely empty library and would hide every section. Rejecting lets the panel keep the
-          // last good facets.
-          throw new Error('smart-search facets unavailable');
-        }
-        return mapSmartSearchFacetsToFilterSuggestions(facets);
-      },
-    },
-    personNames,
-    tagNames,
-  );
-
-  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || showSearchResults);
-
-  // Filter-panel collapse is driven here so a header filter button can reclaim the panel's space.
-  let filterCollapsed = $state(loadFilterCollapsed());
-
-  const count = $derived(showSearchResults ? (smartFacetTotal ?? 0) : (timelineManager?.assetCount ?? 0));
+  const filtered = createRecentlyAddedTimeline(() => timelineManager);
+  const options = $derived(filtered.options);
+  const count = $derived(filtered.resultCount ?? 0);
   const countLabel = $derived(
-    shouldShowRecentlyAddedCount(count, hasActiveFilters) ? $t('items_count', { values: { count } }) : undefined,
+    shouldShowRecentlyAddedCount(count, filtered.hasActiveFilters)
+      ? $t('items_count', { values: { count } })
+      : undefined,
   );
-
-  // Use the timeline's *loaded* result (for the current options) rather than a bare
-  // `assetCount === 0`: clearing a filter that had 0 results would otherwise flip this true
-  // for a tick (stale count, reload pending), unmounting the filter panel and dropping focus.
-  const isTimelineEmpty = $derived(!!timelineManager?.isEmptyForOptions(options) && !hasActiveFilters);
 
   let selectedAssets = $derived(assetMultiSelectManager.assets);
   let isLinkActionAvailable = $derived.by(() => {
@@ -311,249 +78,35 @@
   };
 
   const handleSetVisibility = (assetIds: string[]) => {
-    if (showSearchResults) {
-      removeSearchResults(searchResults, assetIds);
-    } else {
-      timelineManager.removeAssets(assetIds);
-    }
-    assetMultiSelectManager.clear();
+    filtered.onSetVisibility(assetIds);
   };
-
-  // While search results are showing, the timeline is unmounted — bulk actions have to mutate
-  // the result list instead of the TimelineManager (#908).
-  const handleFavorite = (ids: string[], isFavorite: boolean) => {
-    if (showSearchResults) {
-      updateSearchResults(searchResults, ids, (asset) => (asset.isFavorite = isFavorite));
-      return;
-    }
-    timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite));
-  };
-
-  const handleArchive = (ids: string[], visibility: AssetVisibility) => {
-    if (showSearchResults) {
-      updateSearchResults(searchResults, ids, (asset) => (asset.visibility = visibility));
-      return;
-    }
-    timelineManager.update(ids, (asset) => (asset.visibility = visibility));
-  };
-
-  const handleAssetDelete = (assetIds: string[]) => {
-    if (showSearchResults) {
-      removeSearchResults(searchResults, assetIds);
-      return;
-    }
-    timelineManager.removeAssets(assetIds);
-  };
-
-  const handleUndoDelete = (assets: TimelineAsset[]) => {
-    if (showSearchResults) {
-      // Undo hands back TimelineAssets; the results list holds full AssetResponseDtos, so
-      // re-running the search is how they come back.
-      searchReloadToken++;
-      return;
-    }
-    timelineManager.upsertAssets(assets);
-  };
-
-  function clearSearch() {
-    isLoading = false;
-    const nextUrl = buildSearchablePageUrl(page.url, '', filters.sortOrder, filters);
-    if (!nextUrl) {
-      return;
-    }
-    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
-  }
-
-  function syncFilterUrl(nextFilters: FilterState) {
-    const currentSearchState = getSearchablePageState(page.url);
-    // `buildSearchablePageUrl` writes an explicit `sort=` param whenever it is handed a literal
-    // 'asc' | 'desc'; only 'relevance' clears it. `createFilterState()` defaults sortOrder to
-    // 'desc', so passing it straight through would stamp `sort=desc` onto every filter URL the
-    // user never asked for. Convert the *implicit* default to 'relevance' (= "no explicit sort")
-    // and pass through anything the user actually chose. The extra `!committedQuery.trim()` guard
-    // matters once a query is active: `getSearchablePageState` initializes a query's sortOrder to
-    // 'relevance', so any 'desc' seen here while a query is committed is a real, deliberate user
-    // choice (not the implicit default) and must be passed through unconverted. Copied from Photos.
-    const sortOrder =
-      !committedQuery.trim() && nextFilters.sortOrder === 'desc' && !currentSearchState.hasExplicitSort
-        ? 'relevance'
-        : nextFilters.sortOrder;
-    const nextUrl = buildSearchablePageUrl(page.url, committedQuery, sortOrder, nextFilters);
-    if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
-      return;
-    }
-    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
-  }
-
-  function handleFiltersChange(nextFilters: FilterState) {
-    const temporalChanged =
-      nextFilters.dateAfter !== filtersBeforePanelChange.dateAfter ||
-      nextFilters.dateBefore !== filtersBeforePanelChange.dateBefore ||
-      nextFilters.selectedYear !== filtersBeforePanelChange.selectedYear ||
-      nextFilters.selectedMonth !== filtersBeforePanelChange.selectedMonth;
-
-    if (temporalChanged) {
-      temporalAnchor = undefined;
-    }
-
-    syncFilterUrl(nextFilters);
-  }
-
-  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
-    if (assetMultiSelectManager.selectionActive) {
-      return;
-    }
-
-    const result = getTimelineBucketZoomTarget(bucket);
-    if (!result) {
-      return;
-    }
-
-    timelineGrouping = result.grouping;
-    temporalAnchor = result.anchor;
-  }
-
-  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
-    const anchor = getTimelineTopVisibleAnchor(timelineManager);
-    timelineGrouping = grouping;
-    temporalAnchor = anchor;
-  }
-
-  function handleRemoveActiveFilter(type: string, id?: string) {
-    const nextFilters = handlePhotosRemoveFilter(filters, type, id);
-    if (type === 'timeline') {
-      temporalAnchor = undefined;
-    }
-    filters = nextFilters;
-    syncFilterUrl(nextFilters);
-  }
-
-  function handleClearAllFilters() {
-    const nextFilters = clearFilters(filters);
-    temporalAnchor = undefined;
-    filters = nextFilters;
-    if (!committedQuery.trim()) {
-      syncFilterUrl(nextFilters);
-    }
-  }
-
-  $effect(() => {
-    const nextSearchState = getSearchablePageState(page.url);
-    const nextToken = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
-
-    if (nextToken === lastHandledSearchState) {
-      return;
-    }
-
-    const queryChanged = nextSearchState.query !== committedQuery;
-    untrack(() => {
-      // Every filter — including the temporal picker's year/month — round-trips through the URL, so
-      // rebuilding FilterState from the URL alone is lossless. Any URL change (back/forward, a
-      // shared link, or the `?at=` write from closing the asset viewer) re-hydrates the same state.
-      const filterState = getSearchablePageFilterState(page.url);
-      committedQuery = nextSearchState.query;
-      isLoading = false;
-      filters = {
-        ...createFilterState(),
-        ...filterState,
-        sortOrder: nextSearchState.sortOrder,
-      };
-      consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
-      if (queryChanged) {
-        smartFacetInFlight?.controller.abort();
-        smartFacets = undefined;
-        smartFacetKey = '';
-        smartFacetInFlight = undefined;
-      }
-      lastHandledSearchState = nextToken;
-    });
-  });
 </script>
 
-<UserPageLayout
+<FilteredTimelinePage
+  controller={filtered}
+  searchResults={{ isShared: false }}
+  resultCount={false}
+  searchButton={false}
   hideNavbar={assetMultiSelectManager.selectionActive}
   title={data.meta.title}
   description={countLabel}
   scrollbar={false}
 >
-  <div class="flex h-full">
-    {#key showSearchResults ? `recently-added-search-${committedQuery.trim()}:${$lang}` : 'recently-added-browse'}
-      <FilterPanel
-        bind:filters
-        bind:collapsed={filterCollapsed}
-        externalToggle
-        config={filterConfig}
-        timeBuckets={smartFacetBuckets}
-        storageKey="gallery-filter-visible-sections-recently-added"
-        hidden={isTimelineEmpty}
-        {personNames}
-        {tagNames}
-        onFiltersChange={handleFiltersChange}
-      />
-    {/key}
-    <div class="flex flex-1 flex-col overflow-hidden pl-2">
-      {#snippet recentlyAddedFiltersBar()}
-        <ActiveFiltersBar
-          embedded
-          {filters}
-          searchQuery={committedQuery}
-          onClearSearch={clearSearch}
-          {personNames}
-          {tagNames}
-          onRemoveFilter={handleRemoveActiveFilter}
-          onClearAll={handleClearAllFilters}
-        />
-      {/snippet}
-      <FilterToolbar
-        class="mb-2"
-        grouping={timelineGrouping}
-        onGroupingChange={handleTimelineGroupingChange}
-        showGrouping={!showSearchResults && !assetMultiSelectManager.selectionActive}
-        showFilters={hasActiveFilters}
-        filters={recentlyAddedFiltersBar}
-        showFilterButton={filterCollapsed && !isTimelineEmpty && !assetMultiSelectManager.selectionActive}
-        filterActive={getActiveFilterCount(filters) > 0}
-        onExpandFilters={() => (filterCollapsed = false)}
-      />
-      {#if showSearchResults}
-        <SmartSearchResults
-          bind:isLoading
-          bind:results={searchResults}
-          reloadToken={searchReloadToken}
-          searchQuery={committedQuery}
-          {filters}
-          language={$lang}
-          isShared={false}
-          withSharedSpaces={false}
-          total={smartFacetTotal}
-        />
-      {:else}
-        <Timeline
-          enableRouting={true}
-          bind:timelineManager
-          {options}
-          assetInteraction={assetMultiSelectManager}
-          removeAction={AssetAction.ARCHIVE}
-          onEscape={handleEscape}
-          onTimelineBucketActivate={handleTimelineBucketActivate}
-          {temporalAnchor}
-          onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-          grouping={timelineGrouping}
-          onGroupingChange={handleTimelineGroupingChange}
-          withStacked
-        >
-          {#snippet empty()}
-            <EmptyPlaceholder
-              text={$t('no_assets_message')}
-              onClick={() => openFileUploadDialog()}
-              class="mx-auto mt-10"
-            />
-          {/snippet}
-        </Timeline>
-      {/if}
-    </div>
-  </div>
-</UserPageLayout>
+  <Timeline
+    enableRouting={true}
+    bind:timelineManager
+    {options}
+    assetInteraction={assetMultiSelectManager}
+    removeAction={AssetAction.ARCHIVE}
+    onEscape={handleEscape}
+    {...filtered.timelineProps}
+    withStacked
+  >
+    {#snippet empty()}
+      <EmptyPlaceholder text={$t('no_assets_message')} onClick={() => openFileUploadDialog()} class="mx-auto mt-10" />
+    {/snippet}
+  </Timeline>
+</FilteredTimelinePage>
 
 {#if assetMultiSelectManager.selectionActive}
   <AssetSelectControlBar>
@@ -562,26 +115,19 @@
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
 
     <ActionButton action={Actions.CreateSharedLink} />
-    {#if showSearchResults}
-      <SelectAllAssets
-        assetInteraction={assetMultiSelectManager}
-        onSelectAll={() => selectAllSearchResults(searchResults, assetMultiSelectManager)}
-      />
-    {:else}
-      <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
-    {/if}
+    <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} onSelectAll={filtered.onSelectAll} />
     <ActionButton action={Actions.AddToAlbum} />
 
-    <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={handleFavorite} />
+    <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} onFavorite={filtered.onFavorite} />
 
     {#if assetMultiSelectManager.isAllUserOwned}
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem />
-        {#if !showSearchResults}
+        {#if !filtered.showSearchResults}
           <ActionMenuItem action={StackActions.Stack} />
           <ActionMenuItem action={StackActions.Unstack} />
         {/if}
-        {#if !showSearchResults && isLinkActionAvailable}
+        {#if !filtered.showSearchResults && isLinkActionAvailable}
           <LinkLivePhotoAction
             menuItem
             unlink={assetMultiSelectManager.assets.length === 1}
@@ -592,9 +138,9 @@
         <ChangeDate menuItem />
         <ChangeDescription menuItem />
         <ChangeLocation menuItem />
-        <ArchiveAction menuItem onArchive={handleArchive} />
+        <ArchiveAction menuItem onArchive={filtered.onArchive} />
         <ActionMenuItem action={Actions.Tag} />
-        <DeleteAssets menuItem onAssetDelete={handleAssetDelete} onUndoDelete={handleUndoDelete} />
+        <DeleteAssets menuItem onAssetDelete={filtered.onAssetDelete} onUndoDelete={filtered.onUndoDelete} />
         <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
         <hr />
         <ActionMenuItem action={Actions.RegenerateThumbnailJob} />

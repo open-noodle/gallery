@@ -510,7 +510,8 @@ export class AssetJobRepository {
       .$if(!force, (qb) =>
         qb
           .innerJoin('asset_job_status', 'asset_job_status.assetId', 'asset.id')
-          .where('asset_job_status.petsDetectedAt', 'is', null),
+          .leftJoin('asset_job_status_gallery', 'asset_job_status_gallery.assetId', 'asset.id')
+          .where('asset_job_status_gallery.petsDetectedAt', 'is', null),
       )
       .where('asset.deletedAt', 'is', null)
       .where('asset.visibility', '!=', AssetVisibility.Hidden)

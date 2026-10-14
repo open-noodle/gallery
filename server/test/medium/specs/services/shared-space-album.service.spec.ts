@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AlbumUserRole, AssetVisibility, JobName, JobStatus, TimeBucketSize } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -659,14 +659,14 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     const accessRepo = ctx.get(AccessRepository);
 
     // Before removal: a1 is accessible
-    const before = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([a1.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([a1.id]));
     expect(before).toContain(a1.id);
 
     // Remove a1 from the album
     await ctx.get(AlbumRepository).removeAssetIds(album.id, [a1.id]);
 
     // After removal: a1 is no longer accessible
-    const after = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([a1.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([a1.id]));
     expect(after).not.toContain(a1.id);
   });
 
@@ -689,13 +689,13 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     const accessRepo = ctx.get(AccessRepository);
 
     // Confirm accessible before removal
-    const before = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([a2.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([a2.id]));
     expect(before).toContain(a2.id);
 
     // Remove from album — direct path should preserve access
     await ctx.get(AlbumRepository).removeAssetIds(album.id, [a2.id]);
 
-    const after = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([a2.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([a2.id]));
     expect(after).toContain(a2.id);
   });
 
@@ -717,7 +717,7 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     // Confirm link and access exist before deletion
     const linkBefore = await ctx.get(SharedSpaceRepository).hasAlbumLink(space.id, album.id);
     expect(linkBefore).toBe(true);
-    const accessBefore = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
+    const accessBefore = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
     expect(accessBefore).toContain(assetInA.id);
 
     // Hard-delete the album (FK ON DELETE CASCADE removes shared_space_album row)
@@ -728,7 +728,7 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     expect(linkAfter).toBe(false);
 
     // Access should be revoked
-    const accessAfter = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
+    const accessAfter = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
     expect(accessAfter).not.toContain(assetInA.id);
   });
 
@@ -754,7 +754,7 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     const viewerAuth = factory.auth({ user: { id: viewer.id, email: viewer.email } });
 
     // Access and timeline should include the asset before soft-delete
-    const accessBefore = await ctx.get(AccessRepository).asset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
+    const accessBefore = await ctx.get(AccessRepository).spaceAsset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
     expect(accessBefore).toContain(assetInA.id);
 
     const bucketsBefore = await timelineSut.getTimeBuckets(viewerAuth, {
@@ -769,7 +769,7 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     await ctx.softDeleteAsset(assetInA.id);
 
     // Access should be revoked
-    const accessAfter = await ctx.get(AccessRepository).asset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
+    const accessAfter = await ctx.get(AccessRepository).spaceAsset.checkSpaceAccess(viewer.id, new Set([assetInA.id]));
     expect(accessAfter).not.toContain(assetInA.id);
 
     // Asset should no longer appear in timeline
@@ -803,7 +803,7 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     const accessRepo = ctx.get(AccessRepository);
 
     // The motion video should be accessible via the still's livePhotoVideoId
-    const accessedIds = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([motion.id]));
+    const accessedIds = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([motion.id]));
     expect(accessedIds).toContain(motion.id);
   });
 
@@ -832,7 +832,7 @@ describe('SharedSpaceService — space access lifecycle via album branch', () =>
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: directLockedAsset.id });
 
     const accessRepo = ctx.get(AccessRepository);
-    const accessedIds = await accessRepo.asset.checkSpaceAccess(
+    const accessedIds = await accessRepo.spaceAsset.checkSpaceAccess(
       viewer.id,
       new Set([albumLockedAsset.id, directLockedAsset.id]),
     );

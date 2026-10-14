@@ -417,6 +417,10 @@ jobs:
       - name: Format
         run: pnpm format:fix
 
+      # Merge rule self-test, then overlay entries upstream now shadows and overrides.txt lines for keys upstream dropped.
+      - name: Check Gallery overlay
+        run: node --test i18n/gallery/merge.test.mjs && node i18n/gallery/merge.mjs --check
+
       - name: Find file changes
         uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
         id: verify-changed-files

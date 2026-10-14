@@ -102,7 +102,7 @@ Widget _wrap(Widget widget, {List<Override> overrides = const []}) {
     ],
     child: EasyLocalization(
       supportedLocales: const [Locale('en')],
-      path: '../i18n',
+      path: '../i18n/gallery/merged',
       fallbackLocale: const Locale('en'),
       child: MaterialApp(home: Scaffold(body: widget)),
     ),

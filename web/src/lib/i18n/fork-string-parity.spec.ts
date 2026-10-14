@@ -13,7 +13,8 @@ import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 // locale still HAS, and prettier cannot see a missing translation. This is the guard for a fork string
 // disappearing from a locale that previously had it.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n');
+const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
+const OVERLAY_EN = path.resolve(process.cwd(), '../i18n/gallery/en.json');
 
 type Messages = Record<string, string>;
 
@@ -29,43 +30,23 @@ const flatten = (value: Record<string, unknown>, prefix = '', out: Messages = {}
   return out;
 };
 
-const read = (file: string): Messages =>
-  flatten(JSON.parse(fs.readFileSync(path.join(I18N_DIR, file), 'utf8')) as Record<string, unknown>);
+const readFile = (file: string): Messages =>
+  flatten(JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>);
 
-const en = read('en.json');
-const translated = new Map(FORK_LOCALES.map((code) => [code, read(`${code}.json`)]));
-const upstreamOnly = fs
-  .readdirSync(I18N_DIR)
-  .filter((file) => file.endsWith('.json') && file !== 'en.json' && file !== 'package.json')
-  .filter((file) => !FORK_LOCALES.includes(file.replace('.json', '')))
-  .map((file) => read(file));
+const translated = new Map(FORK_LOCALES.map((code) => [code, readFile(path.join(I18N_DIR, `${code}.json`))]));
 
 /**
- * A fork string is one this repo wrote, as opposed to one that came from upstream Immich.
- *
- * Derived rather than hardcoded, so it needs no maintenance as fork features grow: a key qualifies when it is
- * in en.json, at least one of the nine has it, and NO upstream-only locale does. Upstream's Weblate never
- * receives fork keys, so "translated here, unknown to every Weblate locale" identifies them cleanly.
+ * A fork string is one this repo wrote: a key of the overlay's `i18n/gallery/en.json` that at least one of the
+ * nine translates.
  *
  * Deliberately keyed on "at least one" of the nine, never "all nine" — the latter would make the parity
  * assertion below circular and permanently green. It also means a brand-new fork key living only in en.json
  * is not yet a fork string, which is what the project invariant wants: new keys land in en.json alone and get
  * translated in a later pass.
  */
-const keysIn = (all: Messages[]): Set<string> => {
-  const keys = new Set<string>();
-  for (const messages of all) {
-    for (const key of Object.keys(messages)) {
-      keys.add(key);
-    }
-  }
-  return keys;
-};
+const inSomeTranslated = new Set([...translated.values()].flatMap((messages) => Object.keys(messages)));
 
-const inSomeTranslated = keysIn([...translated.values()]);
-const inUpstream = keysIn(upstreamOnly);
-
-const forkStrings = Object.keys(en).filter((key) => inSomeTranslated.has(key) && !inUpstream.has(key));
+const forkStrings = Object.keys(readFile(OVERLAY_EN)).filter((key) => inSomeTranslated.has(key));
 
 describe('i18n fork-string parity', () => {
   // Positive control. If the detection above ever silently matches nothing — a renamed locale, a moved i18n

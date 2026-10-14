@@ -15,13 +15,14 @@ import { PNG } from 'pngjs';
 import { Mock, Mocked, assert, vitest } from 'vitest';
 import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
-import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AssetUploadInterceptor } from 'src/middleware/asset-upload.interceptor.js';
 import { AuthGuard } from 'src/middleware/auth.guard.js';
 import { FileUploadInterceptor } from 'src/middleware/file-upload.interceptor.js';
@@ -333,6 +334,7 @@ export type ServiceOverrides = {
   spaceAlbum: SpaceAlbumRepository;
   petFace: PetFaceRepository;
   faceSearch: FaceSearchRepository;
+  gallerySync: GallerySyncRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -452,6 +454,7 @@ export const getMocks = () => {
     spaceAlbum: automock(SpaceAlbumRepository, { strict: false }),
     petFace: automock(PetFaceRepository, { strict: false }),
     faceSearch: automock(FaceSearchRepository, { strict: false }),
+    gallerySync: automock(GallerySyncRepository),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -544,6 +547,7 @@ export const newTestService = <T extends BaseService>(
     overrides.spaceAlbum || (mocks.spaceAlbum as As<SpaceAlbumRepository>),
     overrides.petFace || (mocks.petFace as As<PetFaceRepository>),
     overrides.faceSearch || (mocks.faceSearch as As<FaceSearchRepository>),
+    overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
   );
 
   return {

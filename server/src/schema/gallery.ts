@@ -1,8 +1,10 @@
 import { AlbumSpaceAssetAuditTable } from 'src/schema/tables/album-space-asset-audit.table.js';
 import { AlbumSpaceAssetTable } from 'src/schema/tables/album-space-asset.table.js';
 import { AssetDuplicateChecksumTable } from 'src/schema/tables/asset-duplicate-checksum.table.js';
+import { AssetFaceCreatorTable } from 'src/schema/tables/asset-face-creator.table.js';
 import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
 import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
+import { AssetJobStatusGalleryTable } from 'src/schema/tables/asset-job-status-gallery.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table.js';
@@ -12,7 +14,10 @@ import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
+import { PersonIdentityTable } from 'src/schema/tables/person-identity.table.js';
+import { PersonPetTable } from 'src/schema/tables/person-pet.table.js';
 import { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
+import { SharedLinkSpaceTable } from 'src/schema/tables/shared-link-space.table.js';
 import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activity.table.js';
 import { SharedSpaceAlbumAssetAuditTable } from 'src/schema/tables/shared-space-album-asset-audit.table.js';
 import { SharedSpaceAlbumAuditTable } from 'src/schema/tables/shared-space-album-audit.table.js';
@@ -45,8 +50,10 @@ export const galleryTables = [
   AlbumSpaceAssetTable,
   AlbumSpaceAssetAuditTable,
   AssetDuplicateChecksumTable,
+  AssetFaceCreatorTable,
   AssetFavoriteTable,
   AssetFavoriteAuditTable,
+  AssetJobStatusGalleryTable,
   FaceIdentityTable,
   FaceIdentityFaceTable,
   FaceRepairDeclineTable,
@@ -56,7 +63,10 @@ export const galleryTables = [
   LibraryUserTable,
   LibraryAssetAuditTable,
   FacePersonVerdictTable,
+  PersonIdentityTable,
+  PersonPetTable,
   PetSearchTable,
+  SharedLinkSpaceTable,
   SharedSpaceTable,
   SharedSpaceAuditTable,
   SharedSpaceMemberTable,
@@ -89,8 +99,10 @@ export interface GalleryDB {
   album_space_asset: AlbumSpaceAssetTable;
   album_space_asset_audit: AlbumSpaceAssetAuditTable;
   asset_duplicate_checksum: AssetDuplicateChecksumTable;
+  asset_face_creator: AssetFaceCreatorTable;
   asset_favorite: AssetFavoriteTable;
   asset_favorite_audit: AssetFavoriteAuditTable;
+  asset_job_status_gallery: AssetJobStatusGalleryTable;
   face_identity: FaceIdentityTable;
   face_identity_face: FaceIdentityFaceTable;
   face_repair_decline: FaceRepairDeclineTable;
@@ -100,7 +112,10 @@ export interface GalleryDB {
   library_user: LibraryUserTable;
   library_asset_audit: LibraryAssetAuditTable;
   face_person_verdict: FacePersonVerdictTable;
+  person_identity: PersonIdentityTable;
+  person_pet: PersonPetTable;
   pet_search: PetSearchTable;
+  shared_link_space: SharedLinkSpaceTable;
   shared_space: SharedSpaceTable;
   shared_space_audit: SharedSpaceAuditTable;
   shared_space_member: SharedSpaceMemberTable;

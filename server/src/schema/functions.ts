@@ -979,18 +979,17 @@ export const asset_favorite_delete_audit = registerFunction({
 // trigger (below) drains it when library_audit rows are emitted.
 
 // Populate library_user for the library owner when a library is created.
-// Explicitly propagates library.createId and library.createdAt rather than
-// letting the defaults generate fresh values — owner rows must share the
-// library's own createId so existing clients' sync checkpoints (which are
-// already past library.createId) don't retrigger a completed backfill.
+// createId takes the column default (immich_uuid_v7()), minted in the same
+// statement as the library row, so it is past every existing sync checkpoint
+// just as the dropped library.createId was (1798200000000-DropLibraryCreateId).
 export const library_after_insert = registerFunction({
   name: 'library_after_insert',
   returnType: 'TRIGGER',
   language: 'PLPGSQL',
   body: `
     BEGIN
-      INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
-      SELECT "ownerId", "id", "createId", "createdAt"
+      INSERT INTO library_user ("userId", "libraryId", "createdAt")
+      SELECT "ownerId", "id", "createdAt"
       FROM inserted_rows
       WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
       ON CONFLICT DO NOTHING;
