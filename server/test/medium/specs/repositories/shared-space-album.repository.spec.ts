@@ -265,7 +265,7 @@ describe('getAlbumAssetCount', () => {
   });
 });
 
-describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
+describe('AccessRepository.spaceAlbum.checkSpaceLinkedAlbumReadAccess', () => {
   it('viewer member is allowed to read a linked album', async () => {
     const { ctx, accessRepo } = setupRead();
     const { user: owner } = await ctx.newUser();
@@ -276,7 +276,7 @@ describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
     const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'ReadAccess-viewer' });
     await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
-    const result = await accessRepo.album.checkSpaceLinkedAlbumReadAccess(viewer.id, new Set([album.id]));
+    const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumReadAccess(viewer.id, new Set([album.id]));
     expect(result.has(album.id)).toBe(true);
   });
 
@@ -290,7 +290,7 @@ describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
     const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'ReadAccess-editor' });
     await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
-    const result = await accessRepo.album.checkSpaceLinkedAlbumReadAccess(editor.id, new Set([album.id]));
+    const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumReadAccess(editor.id, new Set([album.id]));
     expect(result.has(album.id)).toBe(true);
   });
 
@@ -303,7 +303,7 @@ describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
     const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'ReadAccess-nonmember' });
     await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
-    const result = await accessRepo.album.checkSpaceLinkedAlbumReadAccess(nonMember.id, new Set([album.id]));
+    const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumReadAccess(nonMember.id, new Set([album.id]));
     expect(result.has(album.id)).toBe(false);
   });
 
@@ -317,7 +317,7 @@ describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
     // Album B is NOT linked to the space
     const { result: albumB } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'ReadAccess-notlinked' });
 
-    const result = await accessRepo.album.checkSpaceLinkedAlbumReadAccess(viewer.id, new Set([albumB.id]));
+    const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumReadAccess(viewer.id, new Set([albumB.id]));
     expect(result.has(albumB.id)).toBe(false);
   });
 
@@ -333,14 +333,14 @@ describe('AccessRepository.album.checkSpaceLinkedAlbumReadAccess', () => {
     await ctx.newAlbumUser({ albumId: album.id, userId: dual.id, role: AlbumUserRole.Viewer });
     await ctx.get(SharedSpaceRepository).addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
-    const result = await accessRepo.album.checkSpaceLinkedAlbumReadAccess(dual.id, new Set([album.id]));
+    const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumReadAccess(dual.id, new Set([album.id]));
     // DISTINCT ensures the album appears exactly once
     expect([...result]).toHaveLength(1);
     expect(result.has(album.id)).toBe(true);
   });
 });
 
-describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
+describe('AccessRepository.galleryPerson.checkSharedSpaceAccess — album leg', () => {
   it('GRANT — person whose only visible face is on an asset in a linked album is returned', async () => {
     const { ctx, accessRepo } = setupRead();
     const { user: owner } = await ctx.newUser();
@@ -354,7 +354,7 @@ describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
     const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'AlbumFacePerson' });
     await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
-    const result = await accessRepo.person.checkSharedSpaceAccess(member.id, new Set([person.personGroupId]));
+    const result = await accessRepo.galleryPerson.checkSharedSpaceAccess(member.id, new Set([person.personGroupId]));
 
     expect(result.has(person.personGroupId)).toBe(true);
   });
@@ -371,7 +371,7 @@ describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
     const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'DenyAlbumPerson' });
     await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
-    const result = await accessRepo.person.checkSharedSpaceAccess(nonMember.id, new Set([person.personGroupId]));
+    const result = await accessRepo.galleryPerson.checkSharedSpaceAccess(nonMember.id, new Set([person.personGroupId]));
 
     expect(result.has(person.personGroupId)).toBe(false);
   });
@@ -396,12 +396,15 @@ const seedPersonOnSpaceLinkedAlbum = async (ctx: ReturnType<typeof setup>['ctx']
 // Slice 3 — M2: checkSharedSpaceEditAccess mirrors checkSharedSpaceAccess but additionally requires
 // the caller's shared_space_member.role to be Owner or Editor — a Viewer must get an empty set even
 // though checkSharedSpaceAccess (read) grants them.
-describe('AccessRepository.person.checkSharedSpaceEditAccess — album leg (M2)', () => {
+describe('AccessRepository.galleryPerson.checkSharedSpaceEditAccess — album leg (M2)', () => {
   it('GRANT — an Editor of the space is returned', async () => {
     const { ctx, accessRepo } = setupRead();
     const { editor, person } = await seedPersonOnSpaceLinkedAlbum(ctx);
 
-    const result = await accessRepo.person.checkSharedSpaceEditAccess(editor.id, new Set([person.personGroupId]));
+    const result = await accessRepo.galleryPerson.checkSharedSpaceEditAccess(
+      editor.id,
+      new Set([person.personGroupId]),
+    );
 
     expect(result.has(person.personGroupId)).toBe(true);
   });
@@ -410,10 +413,16 @@ describe('AccessRepository.person.checkSharedSpaceEditAccess — album leg (M2)'
     const { ctx, accessRepo } = setupRead();
     const { viewer, person } = await seedPersonOnSpaceLinkedAlbum(ctx);
 
-    const readResult = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
+    const readResult = await accessRepo.galleryPerson.checkSharedSpaceAccess(
+      viewer.id,
+      new Set([person.personGroupId]),
+    );
     expect(readResult.has(person.personGroupId)).toBe(true); // sanity: viewer DOES have read access
 
-    const editResult = await accessRepo.person.checkSharedSpaceEditAccess(viewer.id, new Set([person.personGroupId]));
+    const editResult = await accessRepo.galleryPerson.checkSharedSpaceEditAccess(
+      viewer.id,
+      new Set([person.personGroupId]),
+    );
     expect(editResult.has(person.personGroupId)).toBe(false);
   });
 });

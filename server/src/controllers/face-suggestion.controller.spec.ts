@@ -23,7 +23,7 @@ describe(FaceSuggestionController.name, () => {
     const personId = '00000000-0000-4000-8000-000000000001';
 
     // S10.4/F21: the endpoint published Permission.PersonRead, which admits shared-space members via
-    // access.person.checkSharedSpaceAccess — but getFaceSuggestions enforces PersonUpdate (owner-only,
+    // access.galleryPerson.checkSharedSpaceAccess — but getFaceSuggestions enforces PersonUpdate (owner-only,
     // D6), so a caller scoped exactly to what the spec documents would pass the guard and then 400 at
     // requireAccess. The published permission must match what's enforced.
     it('should publish PersonUpdate, matching the owner-only D6 enforcement in the service', async () => {

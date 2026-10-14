@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
+import { personIdentityId, personSidecarColumns, personType } from 'src/gallery/utils/person-sidecar.js';
 import {
   FaceIdentityRepository,
   type SharedSpaceFaceMatchBackfillTarget,
@@ -8,7 +9,7 @@ import {
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
-import { newMediumService } from 'test/medium.factory.js';
+import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
 import { newEmbedding, newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -189,11 +190,7 @@ const seedBirthdayPermissionWorld = async (ctx: ReturnType<typeof setup>['ctx'],
   // Dave has the SAME person in his own library (same identity) via his own asset, but is not a
   // member of space S and never set a birthday — he must never inherit Bob's space-set birthday.
   const { person: davePerson } = await ctx.newPerson({ ownerId: dave.id, name: 'Ina' });
-  await ctx.database
-    .updateTable('person')
-    .set({ identityId: identity.id })
-    .where('personGroupId', '=', davePerson.personGroupId)
-    .execute();
+  await updatePersonForTest(ctx.database, davePerson.personGroupId, { identityId: identity.id });
   const { asset: daveAsset } = await ctx.newAsset({ ownerId: dave.id, visibility: AssetVisibility.Timeline });
   const { assetFace: daveFace } = await ctx.newAssetFace({
     assetId: daveAsset.id,
@@ -263,6 +260,7 @@ const newLibraryIdentityFace = async (
         person: await ctx.database
           .selectFrom('person')
           .selectAll()
+          .select(personSidecarColumns())
           .where('personGroupId', '=', input.personId)
           .executeTakeFirstOrThrow(),
       }
@@ -291,7 +289,7 @@ const getPersonalIdentityMismatchRows = async (ctx: ReturnType<typeof setup>['ct
     .select([
       'asset_face.id as assetFaceId',
       'asset_face.personGroupId',
-      'person.identityId as personIdentityId',
+      personIdentityId().as('personIdentityId'),
       'face_identity_face.identityId as faceIdentityId',
     ])
     .where('asset_face.id', 'in', assetFaceIds)
@@ -404,11 +402,10 @@ describe(FaceIdentityRepository.name, () => {
       .returningAll()
       .executeTakeFirstOrThrow();
     const { person: targetPerson } = await ctx.newPerson({ ownerId: owner.id });
-    await ctx.database
-      .updateTable('person')
-      .set({ identityId: targetIdentity.id, type: 'person' })
-      .where('personGroupId', '=', targetPerson.personGroupId)
-      .execute();
+    await updatePersonForTest(ctx.database, targetPerson.personGroupId, {
+      identityId: targetIdentity.id,
+      type: 'person',
+    });
 
     // Source: a pet-typed identity that ANOTHER owner holds a pet profile on, so the merge re-points it (survives).
     const sourceIdentity = await ctx.database
@@ -417,11 +414,7 @@ describe(FaceIdentityRepository.name, () => {
       .returningAll()
       .executeTakeFirstOrThrow();
     const { person: petProfile } = await ctx.newPerson({ ownerId: otherOwner.id });
-    await ctx.database
-      .updateTable('person')
-      .set({ identityId: sourceIdentity.id, type: 'pet' })
-      .where('personGroupId', '=', petProfile.personGroupId)
-      .execute();
+    await updatePersonForTest(ctx.database, petProfile.personGroupId, { identityId: sourceIdentity.id, type: 'pet' });
 
     await sut.mergeIdentitiesAfterProfileResolution({
       targetIdentityId: targetIdentity.id,
@@ -431,7 +424,7 @@ describe(FaceIdentityRepository.name, () => {
 
     const reconciled = await ctx.database
       .selectFrom('person')
-      .select(['identityId', 'type'])
+      .select([personIdentityId().as('identityId'), personType().as('type')])
       .where('personGroupId', '=', petProfile.personGroupId)
       .executeTakeFirstOrThrow();
     expect(reconciled.identityId).toBe(targetIdentity.id);
@@ -599,7 +592,7 @@ describe(FaceIdentityRepository.name, () => {
       const [updatedPerson, updatedFaceLink] = await Promise.all([
         ctx.database
           .selectFrom('person')
-          .select(['identityId'])
+          .select([personIdentityId().as('identityId')])
           .where('personGroupId', '=', person.personGroupId)
           .executeTakeFirstOrThrow(),
         ctx.database
@@ -1287,7 +1280,7 @@ describe(FaceIdentityRepository.name, () => {
 
     const updatedPerson = await ctx.database
       .selectFrom('person')
-      .select(['identityId'])
+      .select([personIdentityId().as('identityId')])
       .where('personGroupId', '=', person.personGroupId)
       .executeTakeFirstOrThrow();
 
@@ -1321,14 +1314,14 @@ describe(FaceIdentityRepository.name, () => {
       await sut.backfillPersonalIdentities({ limit: 100 });
       const firstIdentity = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', firstPerson.personGroupId)
         .executeTakeFirstOrThrow();
       await sut.backfillPersonalIdentities({ limit: 100 });
 
       const people = await ctx.database
         .selectFrom('person')
-        .select(['personGroupId', 'identityId'])
+        .select(['personGroupId', personIdentityId().as('identityId')])
         .where('personGroupId', 'in', [firstPerson.personGroupId, secondPerson.personGroupId])
         .orderBy('personGroupId')
         .execute();
@@ -1417,7 +1410,7 @@ describe(FaceIdentityRepository.name, () => {
         .executeTakeFirstOrThrow();
       const sourceProfile = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', sourcePerson.personGroupId)
         .executeTakeFirstOrThrow();
       const pendingTargetRows = await sut.getPendingSharedSpaceFaceMatchBackfillTargets();
@@ -1828,7 +1821,7 @@ describe(FaceIdentityRepository.name, () => {
       await expect(
         ctx.database
           .selectFrom('person')
-          .select('identityId')
+          .select(personIdentityId().as('identityId'))
           .where('personGroupId', '=', person.personGroupId)
           .executeTakeFirstOrThrow(),
       ).resolves.toEqual({ identityId: null });
@@ -4431,7 +4424,7 @@ describe(FaceIdentityRepository.name, () => {
       .execute();
     const sourceProfile = await ctx.database
       .selectFrom('person')
-      .select('identityId')
+      .select(personIdentityId().as('identityId'))
       .where('personGroupId', '=', sourcePerson.personGroupId)
       .executeTakeFirstOrThrow();
     const sourceSpaceProfile = await ctx.database
@@ -4480,7 +4473,7 @@ describe(FaceIdentityRepository.name, () => {
         .select([
           'asset_face.id as assetFaceId',
           'asset_face.personGroupId',
-          'person.identityId as personIdentityId',
+          personIdentityId().as('personIdentityId'),
           'face_identity_face.identityId as faceIdentityId',
         ])
         .where('asset_face.id', '=', sourceFace.id)
@@ -4758,7 +4751,7 @@ describe(FaceIdentityRepository.name, () => {
         .execute();
       const personalProfile = await ctx.database
         .selectFrom('person')
-        .select(['name', 'birthDate', 'identityId'])
+        .select(['name', 'birthDate', personIdentityId().as('identityId')])
         .where('personGroupId', '=', personalPerson.personGroupId)
         .executeTakeFirstOrThrow();
       const spaceProfile = await ctx.database
@@ -4827,7 +4820,7 @@ describe(FaceIdentityRepository.name, () => {
         .executeTakeFirstOrThrow();
       const sourcePersonal = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', personalPerson.personGroupId)
         .executeTakeFirstOrThrow();
       const links = await ctx.database

@@ -2,6 +2,7 @@
 
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/infrastructure/repositories/backup.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/log.repository.dart';
@@ -33,6 +34,8 @@ class MockSettingsRepository extends Mock implements SettingsRepository {}
 class MockLogRepository extends Mock implements LogRepository {}
 
 class MockSyncStreamRepository extends Mock implements SyncStreamRepository {}
+
+class MockGallerySyncStreamRepository extends Mock implements GallerySyncStreamRepository {}
 
 class MockLocalAlbumRepository extends Mock implements LocalAlbumRepository {}
 

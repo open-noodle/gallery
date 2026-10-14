@@ -1,13 +1,14 @@
 import { Kysely, sql } from 'kysely';
 import { AssetFileType, AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum.js';
-import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
+import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
+import { personType } from 'src/gallery/utils/person-sidecar.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
-import { newMediumService } from 'test/medium.factory.js';
-import { newEmbedding } from 'test/small.factory.js';
+import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
+import { newEmbedding, newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
@@ -179,6 +180,20 @@ describe(PersonRepository.name, () => {
         .where('person.personGroupId', '=', group.id)
         .execute();
       expect(people).toEqual([{ ownerId: user1.id }]);
+    });
+
+    it('should not keep the person row when a sidecar write fails', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const group = await sut.createGroup(user.id);
+
+      // no such face_identity: the person_identity insert fails its FK after the person insert
+      await expect(
+        sut.create({ ownerId: user.id, personGroupId: group.id, type: 'pet', identityId: newUuid() }),
+      ).rejects.toThrow(/person_identity_identityId_fkey/);
+
+      const people = await ctx.database.selectFrom('person').where('personGroupId', '=', group.id).execute();
+      expect(people).toEqual([]);
     });
   });
 
@@ -1324,11 +1339,7 @@ describe(PersonRepository.name, () => {
       // A DIFFERENT user's own person shares the same identity (e.g. a merged identity), with a face on
       // that other user's own asset -- never shared into any space the viewer belongs to.
       const { person: otherPerson } = await ctx.newPerson({ ownerId: otherUser.id });
-      await ctx.database
-        .updateTable('person')
-        .set({ identityId: identity.id })
-        .where('personGroupId', '=', otherPerson.personGroupId)
-        .execute();
+      await updatePersonForTest(ctx.database, otherPerson.personGroupId, { identityId: identity.id });
       const { asset: otherAsset } = await ctx.newAsset({ ownerId: otherUser.id, visibility: AssetVisibility.Timeline });
       const { assetFace: otherFace } = await ctx.newAssetFace({
         assetId: otherAsset.id,
@@ -1541,7 +1552,7 @@ describe(PersonRepository.name, () => {
 
       const people = await ctx.database
         .selectFrom('person')
-        .select(['personGroupId', 'type'])
+        .select(['personGroupId', personType().as('type')])
         .where('ownerId', '=', user.id)
         .execute();
       const faces = await ctx.database

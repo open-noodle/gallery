@@ -77,11 +77,10 @@ const setupGlobalFaceIdentityE2E = async (): Promise<GlobalFaceIdentityFixture> 
       [faceA],
     );
     const faceIdentityId = identityResult.rows[0].id as string;
-    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE "personGroupId" IN ($2, $3)`, [
-      faceIdentityId,
-      personA.id,
-      personB.id,
-    ]);
+    await db.query(
+      `INSERT INTO "person_identity" ("personGroupId", "ownerId", "identityId") SELECT "personGroupId", "ownerId", $1 FROM "person" WHERE "personGroupId" IN ($2, $3) ON CONFLICT ("personGroupId") DO UPDATE SET "identityId" = EXCLUDED."identityId"`,
+      [faceIdentityId, personA.id, personB.id],
+    );
     await db.query(
       `INSERT INTO "face_identity_face" ("assetFaceId", "identityId", "source")
        SELECT unnest($1::uuid[]), $2, 'manual'
