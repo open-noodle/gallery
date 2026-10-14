@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
@@ -8,7 +8,7 @@ export class BirthdayMemoryRule implements MemoryRule {
 
   constructor(
     private personRepository: Pick<PersonRepository, 'getBirthdaysForDay'>,
-    private assetRepository: Pick<AssetRepository, 'getMemoryAssetsForPerson'>,
+    private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryAssetsForPerson'>,
   ) {}
 
   async evaluate({ ownerId, target }: MemoryRuleContext): Promise<MemoryRuleCandidate[]> {

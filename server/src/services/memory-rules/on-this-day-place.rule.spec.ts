@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { AssetType } from 'src/enum.js';
-import { MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodAsset } from 'src/gallery/memory-rule-asset.repository.js';
 import { recencyBonus } from 'src/services/memory-rules/curation.util.js';
 import {
   ASSET_CAP,

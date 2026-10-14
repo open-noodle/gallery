@@ -105,6 +105,8 @@ Filtering the timeline in the Immich mobile app means switching to a separate ta
 
 The switch is a small edit to your Docker Compose setup: the image names, and the version variable if you pin one. Your existing database, configuration and media files are fully compatible.
 
+Your Immich must be at v3.3.1 or older (Gallery's current upstream base); see the [switch guide](https://docs.opennoodle.de/guides/switch-to-gallery).
+
 ### Step 1: Back Up Your Database
 
 > [!IMPORTANT]

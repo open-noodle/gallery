@@ -12,6 +12,8 @@ import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
 /// When a user has `SearchFilter.context` set, year counts reflect the rest of
 /// the filter dimensions only (may overstate photos matching the text query).
 /// Acceptable Phase 1 limitation — documented in the PR description.
+/// A stock Immich server also ignores `rating`, `type`, `tagIds`, `personIds`, `country` and
+/// `city` here, so its counts cover the whole library even while a Rating or Media filter is active.
 final timeBucketsProvider = FutureProvider.autoDispose.family<List<BucketLite>, SearchFilter>((ref, filter) async {
   final api = ref.watch(apiServiceProvider).timelineApi;
   final buckets = await api.getTimeBuckets(

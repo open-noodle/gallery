@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { SourceType } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
@@ -52,6 +53,7 @@ const setup = () => {
       FacePersonVerdictRepository,
       FaceIdentityRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       ConfigRepository,
       SystemMetadataRepository,

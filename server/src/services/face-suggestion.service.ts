@@ -3,7 +3,7 @@ import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { PersonFaceSuggestionPageQueryDto, PersonFaceSuggestionPageResponseDto } from 'src/dtos/person.dto.js';
-import { JobName, JobStatus, Permission, QueueName } from 'src/enum.js';
+import { JobName, JobStatus, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { PersonId } from 'src/repositories/person.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { JobItem, type JobOf } from 'src/types.js';
@@ -23,10 +23,10 @@ const PERSON_SUGGESTION_NUM_RESULTS = 100;
  * with it. Mechanical move only: every route path, DTO and job name is unchanged, and the OpenAPI
  * output is byte-identical to before the move (verified by the zero-diff gate in the slice 13 commit).
  *
- * `person.service.ts` keeps only the genuine in-place hooks this engine needs from upstream code
- * paths it cannot own outright: the re-scan queue in `update()`, the backfill-completion queue in
- * `handleFaceIdentityBackfill`, and the bootstrap sweep (`queueInitialFaceSuggestionSweep`,
- * `onConfigValidate`, `onConfigUpdate`).
+ * `person.service.ts` keeps only the in-place hook this engine needs from upstream code it cannot
+ * own outright: the re-scan queue in `update()`. The backfill-completion queue
+ * (`handleFaceIdentityBackfill`) and the bootstrap sweep (`queueInitialFaceSuggestionSweep`,
+ * `onConfigValidate`, `onConfigUpdate`) live in `src/gallery/face-identity-maintenance.service.ts`.
  */
 @Injectable()
 export class FaceSuggestionService extends BaseService {
@@ -239,7 +239,7 @@ export class FaceSuggestionService extends BaseService {
 
     const bestByFace = new Map<string, number>();
     for (const { embedding } of embeddings) {
-      const matches = await this.searchRepository.searchFaces({
+      const matches = await this.faceSearchRepository.searchFaces({
         userIds: [person.ownerId],
         embedding,
         hasPerson: false,
@@ -271,6 +271,30 @@ export class FaceSuggestionService extends BaseService {
 
     const rows = [...bestByFace].map(([assetFaceId, distance]) => ({ personGroupId: id, assetFaceId, distance }));
     await this.facePersonVerdictRepository.upsertPending(rows);
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.FaceSuggestionMaintenance, queue: QueueName.PeopleBackfill })
+  async handleFaceSuggestionMaintenance(): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    if (!isFaceSuggestionEnabled(machineLearning)) {
+      return JobStatus.Skipped;
+    }
+
+    await this.jobRepository.queueAll([
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+    ]);
+
+    // The one-shot boot sweep's marker (FaceIdentityMaintenanceService.queueInitialFaceSuggestionSweep) is
+    // written HERE, not where the job is queued, so it records "a sweep ran" rather than "a sweep was queued".
+    // This job is attempts:1 / removeOnFail:true, so a marker burnt at queue time would survive a run that
+    // failed and vanished. Only the success path may claim the slot — the `Skipped` return above deliberately does not,
+    // so an admin running this by hand while the feature is off doesn't consume the boot sweep. Setting it
+    // on a manual run once the feature IS on is correct and intentional: a full sweep genuinely happened.
+    await this.systemMetadataRepository.set(SystemMetadataKey.FaceSuggestionDefaultOnState, {
+      sweptAt: new Date().toISOString(),
+    });
     return JobStatus.Success;
   }
 
@@ -324,7 +348,7 @@ export class FaceSuggestionService extends BaseService {
 
     const bestByFace = new Map<string, number>();
     for (const { embedding } of embeddings) {
-      const matches = await this.searchRepository.searchFaces({
+      const matches = await this.faceSearchRepository.searchFaces({
         spaceId: person.spaceId,
         embedding,
         hasPerson: false,

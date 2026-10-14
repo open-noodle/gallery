@@ -3,6 +3,12 @@ import { Kysely } from 'kysely';
 import { Mocked } from 'vitest';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AssetVisibility, JobName, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -48,10 +54,13 @@ const setup = (db?: Kysely<DB>) => {
       // handleQueueRecognizeFaces collects orphaned verdicts (Slice 8) — see person.service.spec.ts.
       FacePersonVerdictRepository,
       PersonRepository,
+      FilterSuggestionRepository,
       SearchRepository,
+      FaceSearchRepository,
+      SmartFacetRepository,
       SharedSpaceRepository,
     ],
-    mock: [JobRepository, LoggingRepository, SystemMetadataRepository, UserRepository],
+    mock: [JobRepository, LoggingRepository, QueueMaintenanceRepository, SystemMetadataRepository, UserRepository],
   });
   const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
@@ -66,7 +75,7 @@ const setup = (db?: Kysely<DB>) => {
   const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
-  jobs.hasInFlightDedupChain.mockResolvedValue(false);
+  ctx.getMock(QueueMaintenanceRepository).hasInFlightDedupChain.mockResolvedValue(false);
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository) };
 };
 
@@ -82,16 +91,19 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
       DatabaseRepository,
       FaceIdentityRepository,
       PersonRepository,
+      FilterSuggestionRepository,
       SearchRepository,
+      FaceSearchRepository,
+      SmartFacetRepository,
       SharedSpaceRepository,
       SystemMetadataRepository,
     ],
-    mock: [JobRepository, LoggingRepository],
+    mock: [JobRepository, LoggingRepository, QueueMaintenanceRepository],
   });
   const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
-  jobs.hasInFlightDedupChain.mockResolvedValue(false);
+  ctx.getMock(QueueMaintenanceRepository).hasInFlightDedupChain.mockResolvedValue(false);
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository), jobs };
 };
 
@@ -138,7 +150,10 @@ const setupSearch = (db?: Kysely<DB>) => {
       AccessRepository,
       ConfigRepository,
       FaceIdentityRepository,
+      FilterSuggestionRepository,
       SearchRepository,
+      FaceSearchRepository,
+      SmartFacetRepository,
       SharedSpaceRepository,
       PartnerRepository,
     ],
@@ -2022,7 +2037,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('does not re-queue the backfill job after the repair guard refuses a face (no infinite loop)', async () => {
-    const { ctx, sut, faceIdentityRepository } = setup();
+    const { ctx, faceIdentityRepository } = setup();
     const jobs = ctx.getMock(JobRepository);
     const { user } = await ctx.newUser();
     try {
@@ -2061,7 +2076,7 @@ describe('People identity RBAC projection', () => {
       });
 
       jobs.queue.mockClear();
-      await sut.handleFaceIdentityBackfill({});
+      await ctx.getService(FaceIdentityMaintenanceService).handleFaceIdentityBackfill({});
 
       // Without the realign, the refused face would leave permanent backfill work and handleFaceIdentityBackfill
       // would re-queue itself (continuationId toggle) forever.
@@ -2594,7 +2609,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('identity backfill queues targeted projection jobs and materializes selected-space faces', async () => {
-    const { ctx, sut, faceIdentityRepository } = setup();
+    const { ctx, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
     const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
@@ -2610,7 +2625,7 @@ describe('People identity RBAC projection', () => {
 
       await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(true);
 
-      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+      await ctx.getService(FaceIdentityMaintenanceService).handleFaceIdentityBackfill({ stage: 'person' });
 
       const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
       expect(queuedTargetJobs).toEqual([
@@ -2651,7 +2666,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('identity backfill materializes one selected-space assignment per enabled space for the same photo', async () => {
-    const { ctx, sut, faceIdentityRepository } = setup();
+    const { ctx, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
     const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
@@ -2673,7 +2688,7 @@ describe('People identity RBAC projection', () => {
       await ctx.newSharedSpaceMember({ spaceId: disabledSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: disabledSpace.id, assetId: asset.id, addedById: owner.id });
 
-      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+      await ctx.getService(FaceIdentityMaintenanceService).handleFaceIdentityBackfill({ stage: 'person' });
 
       const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
       const expectedJobs = enabledSpaces
@@ -2707,7 +2722,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('delays page-one projection fanout until the final identity backfill page', async () => {
-    const { ctx, sut, faceIdentityRepository } = setup();
+    const { ctx, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
     const jobs = ctx.getMock(JobRepository);
     await ctx.database.deleteFrom('user').execute();
@@ -2745,7 +2760,9 @@ describe('People identity RBAC projection', () => {
         firstPageAffectedAssets,
       );
 
-      await sut.handleFaceIdentityBackfill({ stage: 'person', cursor: firstPage.nextCursor });
+      await ctx
+        .getService(FaceIdentityMaintenanceService)
+        .handleFaceIdentityBackfill({ stage: 'person', cursor: firstPage.nextCursor });
 
       const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
       expect(queuedTargetJobs).toEqual(
@@ -2774,7 +2791,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('identity backfill materializes once when an asset is both directly added and linked by library', async () => {
-    const { ctx, sut, faceIdentityRepository } = setup();
+    const { ctx, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
     const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
@@ -2792,7 +2809,7 @@ describe('People identity RBAC projection', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
       await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
 
-      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+      await ctx.getService(FaceIdentityMaintenanceService).handleFaceIdentityBackfill({ stage: 'person' });
 
       const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
       expect(queuedTargetJobs).toEqual([
@@ -2876,7 +2893,7 @@ describe('People identity RBAC projection', () => {
   });
 
   it('identity backfill uses targeted projection for EXIF-imported face evidence', async () => {
-    const { ctx, sut, faceIdentityRepository } = setup();
+    const { ctx, faceIdentityRepository } = setup();
     const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
     try {
@@ -2887,7 +2904,7 @@ describe('People identity RBAC projection', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
 
-      await sut.handleFaceIdentityBackfill({ stage: 'person' });
+      await ctx.getService(FaceIdentityMaintenanceService).handleFaceIdentityBackfill({ stage: 'person' });
 
       const queuedTargetJobs = jobs.queueAll.mock.calls.flatMap(([items]) => items);
       expect(queuedTargetJobs).toEqual([
@@ -3529,7 +3546,7 @@ describe('People identity RBAC projection', () => {
       const fx = await setupRepairFixture(SharedSpaceRole.Viewer);
 
       await expect(
-        fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
+        fx.ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: fx.actor }), {
           target: { type: 'person', id: fx.actorPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
@@ -3541,7 +3558,7 @@ describe('People identity RBAC projection', () => {
       async (role) => {
         const fx = await setupRepairFixture(role);
 
-        await fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
+        await fx.ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: fx.actor }), {
           target: { type: 'person', id: fx.actorPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         });
@@ -3577,7 +3594,7 @@ describe('People identity RBAC projection', () => {
         .where('id', '=', fx.spacePerson.id)
         .execute();
 
-      await fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
+      await fx.ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: fx.actor }), {
         target: { type: 'person', id: fx.actorPerson.personGroupId },
         sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
       });
@@ -3697,7 +3714,7 @@ describe('People identity RBAC projection', () => {
       await fx.faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
 
       await expect(
-        fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
+        fx.ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: fx.actor }), {
           target: { type: 'person', id: otherPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
@@ -3709,7 +3726,7 @@ describe('People identity RBAC projection', () => {
       const { user: admin } = await fx.ctx.newUser({ isAdmin: true });
 
       await expect(
-        fx.sut.mergeScopedPeople(factory.auth({ user: admin }), {
+        fx.ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: admin }), {
           target: { type: 'person', id: fx.actorPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
@@ -3726,7 +3743,7 @@ describe('People identity RBAC projection', () => {
     // this now succeeds even with the cross-owner toggle off and even though the actor cannot repair
     // the viewer-only space. The old "inaccessible attached profiles" hard block no longer exists.
     it('re-points another owner’s person and a space profile the actor cannot repair, since neither is collapsed', async () => {
-      const { ctx, sut, faceIdentityRepository } = setup();
+      const { ctx, faceIdentityRepository } = setup();
       const metadata = ctx.getMock(SystemMetadataRepository);
       metadata.get.mockResolvedValue({
         server: { mergePeopleAcrossOwners: false },
@@ -3770,7 +3787,7 @@ describe('People identity RBAC projection', () => {
         .where('personGroupId', '=', otherOwnerPerson.personGroupId)
         .execute();
 
-      await sut.mergeScopedPeople(factory.auth({ user: actor }), {
+      await ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: actor }), {
         target: { type: 'person', id: actorPerson.personGroupId },
         sources: [{ type: 'space-person', id: sourceSpacePerson.id, spaceId: accessibleSpace.id }],
       });
@@ -3850,7 +3867,7 @@ describe('People identity RBAC projection', () => {
       fx: Awaited<ReturnType<typeof setupFanOutSpaceCollapse>>,
       confirmCrossOwner?: boolean,
     ) =>
-      fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
+      fx.ctx.getService(GalleryPeopleService).mergeScopedPeople(factory.auth({ user: fx.actor }), {
         target: { type: 'person', id: fx.actorPerson.personGroupId },
         sources: [{ type: 'space-person', id: fx.sourceSpacePerson.id, spaceId: fx.accessibleSpace.id }],
         ...(confirmCrossOwner && { confirmCrossOwner: true }),

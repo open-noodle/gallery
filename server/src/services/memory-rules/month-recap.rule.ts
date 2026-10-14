@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodAsset, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
@@ -12,7 +12,7 @@ export const VISIBLE_FOR_DAYS = 7;
 export class MonthRecapMemoryRule implements MemoryRule {
   readonly id = 'month_recap';
 
-  constructor(private assetRepository: Pick<AssetRepository, 'getMemoryAssetsForPeriod'>) {}
+  constructor(private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryAssetsForPeriod'>) {}
 
   async evaluate({ ownerId, target }: MemoryRuleContext): Promise<MemoryRuleCandidate[]> {
     if (target.day !== 1) {

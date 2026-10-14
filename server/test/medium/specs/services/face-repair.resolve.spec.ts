@@ -3,6 +3,7 @@ import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { vi } from 'vitest';
 import { JobName, SourceType } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
@@ -40,6 +41,7 @@ const setup = () => {
       FacePersonVerdictRepository,
       FaceIdentityRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       ConfigRepository,
       DatabaseRepository,

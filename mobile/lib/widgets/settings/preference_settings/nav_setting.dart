@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_ui/immich_ui.dart';
 
 /// Switches the middle bottom-nav slot between Spaces (default) and Albums.
@@ -28,6 +29,11 @@ class NavSetting extends HookConsumerWidget {
       valueNotifier.value = showSpaces;
       return null;
     }, [showSpaces]);
+
+    // A stock Immich server has no Spaces slot to switch to.
+    if (!ref.watch(serverSupportsSpacesProvider)) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

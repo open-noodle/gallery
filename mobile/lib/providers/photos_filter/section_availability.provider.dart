@@ -104,6 +104,21 @@ Set<FilterSectionId> availableSections(
   };
 }
 
+/// Sections whose only option source is the fork's facets endpoint.
+const _facetListSections = {
+  FilterSectionId.people,
+  FilterSectionId.places,
+  FilterSectionId.tags,
+  FilterSectionId.camera,
+};
+
+/// What a stock Immich server can offer: no facets endpoint, so the sections that list facet values
+/// are dropped, except one still holding a filter the user must be able to clear.
+Set<FilterSectionId> stockServerSections(SearchFilter filter) => {
+  for (final id in FilterSectionId.values)
+    if (!_facetListSections.contains(id) || hasActiveFilterFor(id, filter)) id,
+};
+
 /// Whether a single facet-gated control (e.g. a toggle switch, as opposed to a whole
 /// [FilterSectionId] section) should render. Same rule as [availableSections]'s `offered`,
 /// generalised down to one boolean facet: never hide a control that clears a filter the user
@@ -176,6 +191,8 @@ final sectionAvailabilityProvider = Provider.autoDispose<Set<FilterSectionId>>((
   // missing information — including when Task 1b's throw fires.
   return facets.maybeWhen(
     data: (data) => availableSections(data, baseline.valueOrNull, filter),
+    error: (error, _) =>
+        error is FilterSuggestionsUnsupportedException ? stockServerSections(filter) : FilterSectionId.values.toSet(),
     orElse: () => FilterSectionId.values.toSet(),
   );
 });

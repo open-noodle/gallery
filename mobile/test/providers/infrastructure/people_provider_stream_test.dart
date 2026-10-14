@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -23,6 +24,7 @@ class _MockApiService extends Mock implements ApiService {}
 void main() {
   setUpAll(() {
     registerFallbackValue(PeopleSortBy.photoCount);
+    registerFallbackValue(PeopleFilterBy.all);
   });
 
   test('the documented Stream.value override shape works', () async {
@@ -128,5 +130,44 @@ void main() {
     await pumpEventQueue(); // deterministic drain, not a sleep
 
     expect(names.last, 'Alicia');
+  });
+
+  group('driftGetAllPeopleWithSharedSpacesProvider filterBy', () {
+    Future<void> expectFilterSent({required bool gallery, required PeopleFilterBy sent}) async {
+      final service = MockPeopleService();
+      when(
+        () => service.getAllPeopleWithSharedSpaces(
+          minFaces: any(named: 'minFaces'),
+          sortBy: any(named: 'sortBy'),
+          filterBy: any(named: 'filterBy'),
+        ),
+      ).thenAnswer((_) async => const <Person>[]);
+      final container = ProviderContainer(
+        overrides: [
+          peopleServiceProvider.overrideWithValue(service),
+          Store.userMetadata.preferences().overrideWith((ref) => Stream.value(null)),
+          serverSupportsSpacesProvider.overrideWithValue(gallery),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(
+        driftGetAllPeopleWithSharedSpacesProvider((sortBy: PeopleSortBy.name, filterBy: PeopleFilterBy.pets)).future,
+      );
+
+      verify(
+        () => service.getAllPeopleWithSharedSpaces(minFaces: 3, sortBy: PeopleSortBy.name, filterBy: sent),
+      ).called(1);
+    }
+
+    test(
+      'passes a persisted Pets choice to a Gallery server',
+      () => expectFilterSent(gallery: true, sent: PeopleFilterBy.pets),
+    );
+
+    test(
+      'drops a persisted Pets choice on a stock Immich server',
+      () => expectFilterSent(gallery: false, sent: PeopleFilterBy.all),
+    );
   });
 }

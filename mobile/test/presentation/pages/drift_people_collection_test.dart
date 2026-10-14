@@ -14,6 +14,7 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/presentation/pages/people_collection.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
@@ -62,6 +63,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => key.sortBy == PeopleSortBy.photoCount
                 ? [_person('zoe', 'Zoe'), _person('alice', 'Alice')]
@@ -89,6 +91,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => switch (key.filterBy) {
               PeopleFilterBy.pets => [_person('rex', 'Rex')],
@@ -116,6 +119,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => [_person('zo', 'Zora'), _person('al', 'Alora'), _person('bo', 'Bob')],
           ),
@@ -141,6 +145,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => [_person('sp', '', spaceId: 'space-1')],
           ),
@@ -156,6 +161,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => [_person('sp', '', spaceId: 'space-1')],
           ),
@@ -171,6 +177,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
           ),
@@ -197,6 +204,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, key) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
           ),
@@ -214,6 +222,7 @@ void main() {
       await tester.pumpConsumerWidget(
         const PeopleCollectionPage(),
         overrides: [
+          serverSupportsSpacesProvider.overrideWithValue(true),
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, key) async => [_person('me', 'Personal Pat')]),
         ],
       );

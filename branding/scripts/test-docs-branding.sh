@@ -52,6 +52,7 @@ ALLOWED_BRAND_FILES=(
   "docs/docs/features/s3-storage.md"
   "docs/docs/guides/smtp-microsoft365.md"
   "docs/docs/guides/switch-back-to-immich.md"
+  "docs/docs/guides/switch-to-gallery.md"
   "docs/docs/install/config-file.md"
   "docs/docs/install/requirements.md"
   "docs/docs/install/unraid.md"

@@ -1,8 +1,11 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, TimeBucketSize } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository, FilterSuggestionsOptions } from 'src/gallery/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
-import { FilterSuggestionsOptions, SearchRepository } from 'src/repositories/search.repository.js';
+import { SearchRepository } from 'src/repositories/search.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -27,7 +30,14 @@ beforeAll(async () => {
 const setup = async () => {
   const { ctx } = newMediumService(BaseService, {
     database: defaultDatabase,
-    real: [AssetRepository, SearchRepository, SharedSpaceRepository],
+    real: [
+      AssetRepository,
+      FilterSuggestionRepository,
+      SearchRepository,
+      FaceSearchRepository,
+      SharedSpaceRepository,
+      SmartFacetRepository,
+    ],
     mock: [LoggingRepository],
   });
   const { user } = await ctx.newUser();
@@ -93,7 +103,9 @@ const setup = async () => {
 
   const auth = factory.auth({ user: { id: user.id } });
   const assetRepository = ctx.get(AssetRepository);
+  const filterSuggestionRepository = ctx.get(FilterSuggestionRepository);
   const searchRepository = ctx.get(SearchRepository);
+  const smartFacetRepository = ctx.get(SmartFacetRepository);
   const sharedSpaceRepository = ctx.get(SharedSpaceRepository);
 
   const surfaces = {
@@ -109,7 +121,7 @@ const setup = async () => {
       return assets.flat();
     },
     suggestions: async (filter: AssetFilter) => {
-      const rows = await searchRepository['buildFilteredAssetIds'](
+      const rows = await filterSuggestionRepository['buildFilteredAssetIds'](
         [user.id],
         filter as FilterSuggestionsOptions,
       ).execute();
@@ -155,7 +167,7 @@ const setup = async () => {
   };
 
   const facetTotal = async (filter: AssetFilter) => {
-    const { total } = await searchRepository.getSmartSearchFacets({
+    const { total } = await smartFacetRepository.getSmartSearchFacets({
       embedding,
       userIds: [user.id],
       ...filter,

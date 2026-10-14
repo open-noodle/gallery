@@ -1,4 +1,4 @@
-import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodAsset, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { dominantBy, recencyBonus, sampleAssetsAcrossGroups } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 import { placeKeyOf } from 'src/services/memory-rules/trip.util.js';
@@ -66,7 +66,7 @@ interface ContributingYear {
 export class OnThisDayPlaceMemoryRule implements MemoryRule {
   readonly id = 'on_this_day_place';
 
-  constructor(private assetRepository: Pick<AssetRepository, 'getMemoryAssetsForPeriod'>) {}
+  constructor(private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryAssetsForPeriod'>) {}
 
   async evaluate({ ownerId, target }: MemoryRuleContext): Promise<MemoryRuleCandidate[]> {
     const assets = await this.assetRepository.getMemoryAssetsForPeriod(ownerId, {

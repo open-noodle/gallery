@@ -1,6 +1,8 @@
 import { Kysely } from 'kysely';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetFileType, AssetVisibility, JobName, JobStatus, SharedSpaceRole, SystemMetadataKey } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -62,7 +64,9 @@ const setup = (db?: Kysely<DB>) => {
       DatabaseRepository,
       FaceIdentityRepository,
       PersonRepository,
+      PetFaceRepository,
       SearchRepository,
+      FaceSearchRepository,
       SharedSpaceRepository,
       SystemMetadataRepository,
     ],
@@ -244,10 +248,10 @@ describe('PetRecognitionService.handlePetRecognition (medium)', () => {
   });
 });
 
-describe('PersonRepository.deleteAllPets (medium)', () => {
+describe('PetFaceRepository.deleteAllPets (medium)', () => {
   it('deletes an unassigned pet face identified only by its pet_search row (R1.1)', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
 
     // Recognition wrote this face + embedding, but it was never clustered into a person, so the
@@ -259,7 +263,7 @@ describe('PersonRepository.deleteAllPets (medium)', () => {
       .values({ faceId: unassignedFace.id, embedding: axisEmbedding('first') })
       .execute();
 
-    await personRepository.deleteAllPets();
+    await petFaceRepository.deleteAllPets();
 
     const faceRows = await ctx.database
       .selectFrom('asset_face')
@@ -278,7 +282,7 @@ describe('PersonRepository.deleteAllPets (medium)', () => {
 
   it('pin: deletes an assigned pet face, its person and its pet_search row (R1.2)', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
 
     const { person: petPerson } = await ctx.newPerson({ ownerId: user.id, type: 'pet', species: 'dog' });
@@ -292,7 +296,7 @@ describe('PersonRepository.deleteAllPets (medium)', () => {
       .values({ faceId: petFace.id, embedding: axisEmbedding('first') })
       .execute();
 
-    await personRepository.deleteAllPets();
+    await petFaceRepository.deleteAllPets();
 
     expect(
       await ctx.database
@@ -311,7 +315,7 @@ describe('PersonRepository.deleteAllPets (medium)', () => {
 
   it('pin: leaves a human person, face and face_search row untouched (R1.3)', async () => {
     const { ctx } = setup();
-    const personRepository = ctx.get(PersonRepository);
+    const petFaceRepository = ctx.get(PetFaceRepository);
     const { user } = await ctx.newUser();
 
     const { person: humanPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Human' });
@@ -325,7 +329,7 @@ describe('PersonRepository.deleteAllPets (medium)', () => {
       .values({ faceId: humanFace.id, embedding: axisEmbedding('second') })
       .execute();
 
-    await personRepository.deleteAllPets();
+    await petFaceRepository.deleteAllPets();
 
     const personRow = await ctx.database
       .selectFrom('person')
@@ -864,7 +868,9 @@ const setupDetection = (db?: Kysely<DB>) => {
       DatabaseRepository,
       FaceIdentityRepository,
       PersonRepository,
+      PetFaceRepository,
       SearchRepository,
+      FaceSearchRepository,
       SharedSpaceRepository,
       SystemMetadataRepository,
     ],

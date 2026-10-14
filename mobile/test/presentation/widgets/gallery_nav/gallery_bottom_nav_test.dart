@@ -75,6 +75,7 @@ const _portraitMq = MediaQueryData(size: Size(400, 900));
 /// `no_leading_underscores_for_local_identifiers` only covers locals.
 List<Override> _navOverrides({required bool showSpaces}) => [
   appConfigProvider.overrideWithValue(AppConfig(nav: NavConfig(showSpaces: showSpaces))),
+  serverSupportsSpacesProvider.overrideWithValue(true),
 ];
 
 Widget _wrap(Widget child, {List<Override> overrides = const [], MediaQueryData? mq}) {

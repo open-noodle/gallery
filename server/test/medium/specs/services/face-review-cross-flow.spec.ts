@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { vi } from 'vitest';
 import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -77,6 +78,7 @@ const setupRepair = () => {
       FaceRepairDeclineRepository,
       FacePersonVerdictRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       FaceIdentityRepository,
       ConfigRepository,
@@ -103,6 +105,7 @@ const setupPerson = () => {
       FacePersonVerdictRepository,
       PersonRepository,
       SearchRepository,
+      FaceSearchRepository,
       SharedSpaceRepository,
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
@@ -645,7 +648,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
   it('leak 2 — a detached "not a face" is never re-proposed by a suggestion scan', async () => {
     const { sut: repair, ctx } = setupRepair();
     const { user } = await ctx.newUser();
-    const searchRepo = ctx.get(SearchRepository);
+    const searchRepo = ctx.get(FaceSearchRepository);
 
     const { person: anna } = await buildCluster(ctx, user.id, axisEmbedding('second'), 5, 'Anna');
     const [face] = await leakFacesInto(ctx, user.id, anna, axisEmbedding('second'), 1);

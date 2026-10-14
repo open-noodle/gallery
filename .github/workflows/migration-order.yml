@@ -73,7 +73,7 @@ jobs:
 
       # The fork's own migrations-gallery/ folder is checked for consistency only, NOT append-only.
       # Gallery migrations use hand-picked round timestamps and the server runs with
-      # allowUnorderedMigrations: true (see DatabaseRepository.createMigrator), so a feature branch
+      # allowUnorderedMigrations: true (see createGalleryMigrator in gallery-migration-ledger.ts), so a feature branch
       # landing with a lower timestamp than one merged meanwhile is safe here — unlike upstream,
       # which only allows unordered migrations in dev. Consistency still forces two branches that
       # both add a gallery migration to conflict in git on ORDER's tail, which is the point.
