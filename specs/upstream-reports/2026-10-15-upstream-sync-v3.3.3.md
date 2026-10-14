@@ -92,4 +92,25 @@ the fork depends on.
 
 ## Remote CI
 
-To be filled in after the full dispatch on the pushed test branch.
+All ten dispatched workflows green on `3aadeaa4a08` (branch `rebase/upstream-rolling-v3.3.3`):
+
+| Workflow                            | Run         | Attempt | Note                                                                                                                                                                |
+| ----------------------------------- | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Test                                | 38651196516 | 2       | attempt 1: GHCR rate limit (medium, e2e) and a runner shutdown (Lint Web)                                                                                           |
+| Docker                              | 38651249909 | 2       | attempt 1: GHCR 429 pulling `base-server-dev`                                                                                                                       |
+| Static Code Analysis                | 38651031818 | 1       |                                                                                                                                                                     |
+| Gallery Build Mobile                | 38651086315 | 1       | iOS + Android                                                                                                                                                       |
+| Gallery Mobile Smoke                | 38651140147 | 1       |                                                                                                                                                                     |
+| Gallery ML Smoke                    | 38651363418 | 1       |                                                                                                                                                                     |
+| Gallery Rebase Smoke                | 38651304344 | 2       | attempt 1: GHCR rate limit                                                                                                                                          |
+| Storage Migration Tests             | 38651425602 | 2       | attempt 1: GHCR rate limit                                                                                                                                          |
+| Storage Migration E2E               | 38651483105 | 1       |                                                                                                                                                                     |
+| Gallery Revert-to-Immich Validation | 38651537635 | 2       | attempt 1: GHCR rate limit; boots stock `immich-server:v3.3.3`. Dispatch tests the `:main` server image, a valid stand-in since this cycle changes no server source |
+
+Every first-attempt failure died pulling an image before any test ran (`toomanyrequests … 44000/minute`), even with
+the dispatches 30 s apart; the reruns were spaced 150 s apart. No code fix was needed.
+
+## Landing
+
+Not landed. `main` is backed up as `main-backup-2026-10-15` and left untouched; the branch is ready to be
+force-pushed once the maintainer decides to.
