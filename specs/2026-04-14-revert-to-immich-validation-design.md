@@ -175,6 +175,11 @@ pre` (see below). On success, `docker stop server && docker rm server`
    `allowUnorderedMigrations: true`, so interleaved timestamps work against
    the pre-seeded upstream rows). `wait_for_server gallery`, stop, rm.
 10. **Sanity check that Gallery actually ran** —
+
+    > Superseded in part: Gallery builds since the ledger split record fork migrations in `gallery_migrations`,
+    > not `kysely_migrations` (`server/src/schema/gallery-migration-ledger.ts`). The workflow queries whichever
+    > ledger exists, and `scripts/revert-to-immich.sql` step 8 also drops `gallery_migrations`.
+
     ```bash
     # The '%SharedSpace%' pattern is coupled to the current set of fork
     # migration filenames in server/src/schema/migrations-gallery/. If a

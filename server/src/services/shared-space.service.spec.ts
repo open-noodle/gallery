@@ -199,7 +199,9 @@ const setupStrictReconciliationFixture = (
       },
     ]) as any,
   );
-  mocks.search.searchFaces.mockResolvedValue([{ id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 }]);
+  mocks.faceSearch.searchFaces.mockResolvedValue([
+    { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
+  ]);
   mocks.person.getByGroupIdOnly.mockResolvedValue(
     factory.person({
       personGroupId: 'local-person-1',
@@ -3697,7 +3699,7 @@ describe(SharedSpaceService.name, () => {
           embedding: '[1,2,3]',
         },
       ]);
-      mocks.search.searchFaces.mockResolvedValue([
+      mocks.faceSearch.searchFaces.mockResolvedValue([
         { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValue(
@@ -3713,7 +3715,7 @@ describe(SharedSpaceService.name, () => {
         sut.handleSharedSpaceIdentityReconciliation({ spaceId: space.id, userId: 'member-1' }),
       ).resolves.toBe(JobStatus.Success);
 
-      expect(mocks.search.searchFaces).toHaveBeenCalledWith(
+      expect(mocks.faceSearch.searchFaces).toHaveBeenCalledWith(
         expect.objectContaining({
           userIds: ['member-1'],
           embedding: '[1,2,3]',
@@ -3749,13 +3751,13 @@ describe(SharedSpaceService.name, () => {
         sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'removed-member' }),
       ).resolves.toBe(JobStatus.Success);
 
-      expect(mocks.search.searchFaces).not.toHaveBeenCalled();
+      expect(mocks.faceSearch.searchFaces).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
     });
 
     it('should skip automatic merge when two local candidates match within threshold', async () => {
       setupStrictReconciliationFixture(mocks);
-      mocks.search.searchFaces.mockResolvedValue([
+      mocks.faceSearch.searchFaces.mockResolvedValue([
         { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
         { id: 'local-face-2', personGroupId: 'local-person-2', distance: 0.21 },
       ]);
@@ -3786,7 +3788,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
 
-      expect(mocks.search.searchFaces).not.toHaveBeenCalled();
+      expect(mocks.faceSearch.searchFaces).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.mergeIdentities).not.toHaveBeenCalled();
     });
 
@@ -3950,7 +3952,7 @@ describe(SharedSpaceService.name, () => {
           },
         ],
       });
-      mocks.search.searchFaces.mockResolvedValue([
+      mocks.faceSearch.searchFaces.mockResolvedValue([
         { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
       ]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'local-identity', type: 'person' } as any);
@@ -5366,15 +5368,15 @@ describe(SharedSpaceService.name, () => {
   describe('onBootstrap', () => {
     it('clears blocked failed face jobs from both pipeline queues and kicks identity maintenance', async () => {
       mocks.systemMetadata.get.mockResolvedValue(null);
-      mocks.job.removeFailedJobsByJobIdPrefix.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+      mocks.queueMaintenance.removeFailedJobsByJobIdPrefix.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
 
       await sut.onBootstrap();
 
-      expect(mocks.job.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.PeopleBackfill, [
+      expect(mocks.queueMaintenance.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.PeopleBackfill, [
         'shared-space-face-match',
         'space-identity-reconcile-',
       ]);
-      expect(mocks.job.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.FacialRecognition, [
+      expect(mocks.queueMaintenance.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.FacialRecognition, [
         'shared-space-face-match',
         'space-identity-reconcile-',
       ]);
@@ -5386,7 +5388,7 @@ describe(SharedSpaceService.name, () => {
 
     it('does not kick identity maintenance when no blocked jobs were removed', async () => {
       mocks.systemMetadata.get.mockResolvedValue(null);
-      mocks.job.removeFailedJobsByJobIdPrefix.mockResolvedValue(0);
+      mocks.queueMaintenance.removeFailedJobsByJobIdPrefix.mockResolvedValue(0);
 
       await sut.onBootstrap();
 
@@ -5401,7 +5403,7 @@ describe(SharedSpaceService.name, () => {
 
       await sut.onBootstrap();
 
-      expect(mocks.job.removeFailedJobsByJobIdPrefix).not.toHaveBeenCalled();
+      expect(mocks.queueMaintenance.removeFailedJobsByJobIdPrefix).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
     });
@@ -5423,11 +5425,11 @@ describe(SharedSpaceService.name, () => {
             key === SystemMetadataKey.SharedSpaceFaceJobCleanupState ? { cleanedAt: '2026-07-25T00:00:00.000Z' } : null,
           ),
         );
-        mocks.job.removeFailedJobsByJobIdPrefix.mockResolvedValue(2);
+        mocks.queueMaintenance.removeFailedJobsByJobIdPrefix.mockResolvedValue(2);
 
         await sut.onBootstrap();
 
-        expect(mocks.job.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.PeopleBackfill, [
+        expect(mocks.queueMaintenance.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.PeopleBackfill, [
           'person-suggestion-scan/',
           'space-person-suggestion-scan/',
         ]);
@@ -5443,10 +5445,10 @@ describe(SharedSpaceService.name, () => {
 
         await sut.onBootstrap();
 
-        expect(mocks.job.removeFailedJobsByJobIdPrefix).not.toHaveBeenCalledWith(QueueName.PeopleBackfill, [
-          'person-suggestion-scan/',
-          'space-person-suggestion-scan/',
-        ]);
+        expect(mocks.queueMaintenance.removeFailedJobsByJobIdPrefix).not.toHaveBeenCalledWith(
+          QueueName.PeopleBackfill,
+          ['person-suggestion-scan/', 'space-person-suggestion-scan/'],
+        );
         expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
           SystemMetadataKey.PersonSuggestionScanJobCleanupState,
           expect.anything(),
@@ -12124,7 +12126,7 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([]);
-      mocks.job.hasInFlightDedupChain.mockResolvedValue(true);
+      mocks.queueMaintenance.hasInFlightDedupChain.mockResolvedValue(true);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
 
@@ -12141,7 +12143,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([]);
       // A follow-up IS the running chain; gating it would stall dedup forever.
-      mocks.job.hasInFlightDedupChain.mockResolvedValue(true);
+      mocks.queueMaintenance.hasInFlightDedupChain.mockResolvedValue(true);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId, pass: 2 });
 

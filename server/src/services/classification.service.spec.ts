@@ -57,6 +57,28 @@ describe(ClassificationService.name, () => {
     expect(sut).toBeDefined();
   });
 
+  describe('onJobSuccess', () => {
+    it('queues classification after smart search succeeds or skips', async () => {
+      for (const response of [JobStatus.Success, JobStatus.Skipped]) {
+        await sut.onJobSuccess({
+          job: { name: JobName.SmartSearch, data: { id: 'asset-1', source: 'upload' } },
+          response,
+        });
+      }
+      expect(mocks.job.queue).toHaveBeenCalledTimes(2);
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassify, data: { id: 'asset-1' } });
+    });
+
+    it('does nothing for a failed smart search or another job', async () => {
+      await sut.onJobSuccess({
+        job: { name: JobName.SmartSearch, data: { id: 'asset-1' } },
+        response: JobStatus.Failed,
+      });
+      await sut.onJobSuccess({ job: { name: JobName.Ocr, data: { id: 'asset-1' } }, response: JobStatus.Success });
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+  });
+
   describe('handleClassify', () => {
     it('should return Failed when asset not found', async () => {
       mocks.asset.getById.mockResolvedValue(void 0);

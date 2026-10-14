@@ -15,6 +15,13 @@ import { mapLoginResponse } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
 import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { computePhysicalUsage } from 'src/gallery/storage-usage.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -126,13 +133,11 @@ export const BASE_SERVICE_DEPENDENCIES = [
   AppRepository,
   AssetRepository,
   AssetEditRepository,
-  AssetFavoriteRepository,
   AssetFileRepository,
   AssetJobRepository,
   AuthChallengeRepository,
   ClusterGroupRepository,
   ConfigRepository,
-  ClassificationRepository,
   CronRepository,
   CryptoRepository,
   DatabaseRepository,
@@ -140,11 +145,6 @@ export const BASE_SERVICE_DEPENDENCIES = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
-  FaceIdentityRepository,
-  FaceRepairRepository,
-  FaceRepairScanRepository,
-  FaceRepairDeclineRepository,
-  FacePersonVerdictRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
@@ -168,9 +168,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   SessionRepository,
   SharedLinkRepository,
   SharedLinkAssetRepository,
-  SharedSpaceRepository,
   StackRepository,
-  StorageMigrationRepository,
   StorageRepository,
   SyncRepository,
   SyncCheckpointRepository,
@@ -178,7 +176,6 @@ export const BASE_SERVICE_DEPENDENCIES = [
   TagRepository,
   TelemetryRepository,
   TrashRepository,
-  UserGroupRepository,
   UserRepository,
   VersionHistoryRepository,
   VideoStreamRepository,
@@ -186,6 +183,24 @@ export const BASE_SERVICE_DEPENDENCIES = [
   WebAuthnRepository,
   WebsocketRepository,
   WorkflowRepository,
+  // Gallery fork repositories: keep last, in the same order in every positional list
+  AssetFavoriteRepository,
+  ClassificationRepository,
+  FaceIdentityRepository,
+  FaceRepairRepository,
+  FaceRepairScanRepository,
+  FaceRepairDeclineRepository,
+  FacePersonVerdictRepository,
+  SharedSpaceRepository,
+  StorageMigrationRepository,
+  UserGroupRepository,
+  FilterSuggestionRepository,
+  MemoryRuleAssetRepository,
+  QueueMaintenanceRepository,
+  SmartFacetRepository,
+  SpaceAlbumRepository,
+  PetFaceRepository,
+  FaceSearchRepository,
 ] as const;
 
 @Injectable()
@@ -204,13 +219,11 @@ export class BaseService {
     protected appRepository: AppRepository,
     protected assetRepository: AssetRepository,
     protected assetEditRepository: AssetEditRepository,
-    protected assetFavoriteRepository: AssetFavoriteRepository,
     protected assetFileRepository: AssetFileRepository,
     protected assetJobRepository: AssetJobRepository,
     protected authChallengeRepository: AuthChallengeRepository,
     protected clusterGroupRepository: ClusterGroupRepository,
     protected configRepository: ConfigRepository,
-    protected classificationRepository: ClassificationRepository,
     protected cronRepository: CronRepository,
     protected cryptoRepository: CryptoRepository,
     protected databaseRepository: DatabaseRepository,
@@ -218,11 +231,6 @@ export class BaseService {
     protected duplicateRepository: DuplicateRepository,
     protected emailRepository: EmailRepository,
     protected eventRepository: EventRepository,
-    protected faceIdentityRepository: FaceIdentityRepository,
-    protected faceRepairRepository: FaceRepairRepository,
-    protected faceRepairScanRepository: FaceRepairScanRepository,
-    protected faceRepairDeclineRepository: FaceRepairDeclineRepository,
-    protected facePersonVerdictRepository: FacePersonVerdictRepository,
     protected integrityRepository: IntegrityRepository,
     protected jobRepository: JobRepository,
     protected libraryRepository: LibraryRepository,
@@ -246,9 +254,7 @@ export class BaseService {
     protected sessionRepository: SessionRepository,
     protected sharedLinkRepository: SharedLinkRepository,
     protected sharedLinkAssetRepository: SharedLinkAssetRepository,
-    protected sharedSpaceRepository: SharedSpaceRepository,
     protected stackRepository: StackRepository,
-    protected storageMigrationRepository: StorageMigrationRepository,
     protected storageRepository: StorageRepository,
     protected syncRepository: SyncRepository,
     protected syncCheckpointRepository: SyncCheckpointRepository,
@@ -256,7 +262,6 @@ export class BaseService {
     protected tagRepository: TagRepository,
     protected telemetryRepository: TelemetryRepository,
     protected trashRepository: TrashRepository,
-    protected userGroupRepository: UserGroupRepository,
     protected userRepository: UserRepository,
     protected versionRepository: VersionHistoryRepository,
     protected videoStreamRepository: VideoStreamRepository,
@@ -264,6 +269,24 @@ export class BaseService {
     protected webAuthnRepository: WebAuthnRepository,
     protected websocketRepository: WebsocketRepository,
     protected workflowRepository: WorkflowRepository,
+    // Gallery fork repositories: keep last, in the same order in every positional list
+    protected assetFavoriteRepository: AssetFavoriteRepository,
+    protected classificationRepository: ClassificationRepository,
+    protected faceIdentityRepository: FaceIdentityRepository,
+    protected faceRepairRepository: FaceRepairRepository,
+    protected faceRepairScanRepository: FaceRepairScanRepository,
+    protected faceRepairDeclineRepository: FaceRepairDeclineRepository,
+    protected facePersonVerdictRepository: FacePersonVerdictRepository,
+    protected sharedSpaceRepository: SharedSpaceRepository,
+    protected storageMigrationRepository: StorageMigrationRepository,
+    protected userGroupRepository: UserGroupRepository,
+    protected filterSuggestionRepository: FilterSuggestionRepository,
+    protected memoryRuleAssetRepository: MemoryRuleAssetRepository,
+    protected queueMaintenanceRepository: QueueMaintenanceRepository,
+    protected smartFacetRepository: SmartFacetRepository,
+    protected spaceAlbumRepository: SpaceAlbumRepository,
+    protected petFaceRepository: PetFaceRepository,
+    protected faceSearchRepository: FaceSearchRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -305,13 +328,11 @@ export class BaseService {
       ctx.appRepository,
       ctx.assetRepository,
       ctx.assetEditRepository,
-      ctx.assetFavoriteRepository,
       ctx.assetFileRepository,
       ctx.assetJobRepository,
       ctx.authChallengeRepository,
       ctx.clusterGroupRepository,
       ctx.configRepository,
-      ctx.classificationRepository,
       ctx.cronRepository,
       ctx.cryptoRepository,
       ctx.databaseRepository,
@@ -319,11 +340,6 @@ export class BaseService {
       ctx.duplicateRepository,
       ctx.emailRepository,
       ctx.eventRepository,
-      ctx.faceIdentityRepository,
-      ctx.faceRepairRepository,
-      ctx.faceRepairScanRepository,
-      ctx.faceRepairDeclineRepository,
-      ctx.facePersonVerdictRepository,
       ctx.integrityRepository,
       ctx.jobRepository,
       ctx.libraryRepository,
@@ -347,9 +363,7 @@ export class BaseService {
       ctx.sessionRepository,
       ctx.sharedLinkRepository,
       ctx.sharedLinkAssetRepository,
-      ctx.sharedSpaceRepository,
       ctx.stackRepository,
-      ctx.storageMigrationRepository,
       ctx.storageRepository,
       ctx.syncRepository,
       ctx.syncCheckpointRepository,
@@ -357,7 +371,6 @@ export class BaseService {
       ctx.tagRepository,
       ctx.telemetryRepository,
       ctx.trashRepository,
-      ctx.userGroupRepository,
       ctx.userRepository,
       ctx.versionRepository,
       ctx.videoStreamRepository,
@@ -365,6 +378,24 @@ export class BaseService {
       ctx.webAuthnRepository,
       ctx.websocketRepository,
       ctx.workflowRepository,
+      // Gallery fork repositories: keep last, in the same order in every positional list
+      ctx.assetFavoriteRepository,
+      ctx.classificationRepository,
+      ctx.faceIdentityRepository,
+      ctx.faceRepairRepository,
+      ctx.faceRepairScanRepository,
+      ctx.faceRepairDeclineRepository,
+      ctx.facePersonVerdictRepository,
+      ctx.sharedSpaceRepository,
+      ctx.storageMigrationRepository,
+      ctx.userGroupRepository,
+      ctx.filterSuggestionRepository,
+      ctx.memoryRuleAssetRepository,
+      ctx.queueMaintenanceRepository,
+      ctx.smartFacetRepository,
+      ctx.spaceAlbumRepository,
+      ctx.petFaceRepository,
+      ctx.faceSearchRepository,
     );
 
     service.logger.setContext(BaseService.name);
@@ -499,13 +530,15 @@ export class BaseService {
    * @param filePath absolute disk path OR S3 relative key (anything that might
    *                 come from a DB column such as `asset.originalPath`).
    * @returns { localPath, cleanup } — cleanup is a no-op for disk paths and
-   *          removes the temp file for S3-sourced paths. Always call cleanup
-   *          in a `finally` block.
+   *          removes the temp file for S3-sourced paths. Declare the result with
+   *          `await using` (disposal runs cleanup), or call cleanup in a `finally` block.
    */
-  protected async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
+  protected async ensureLocalFile(
+    filePath: string,
+  ): Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable> {
     const backend = await this.backendFor(filePath);
     const { tempPath, cleanup } = await backend.downloadToTemp(filePath);
-    return { localPath: tempPath, cleanup };
+    return { localPath: tempPath, cleanup, [Symbol.asyncDispose]: cleanup };
   }
 
   /**
