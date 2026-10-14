@@ -20,7 +20,7 @@
 --     system_metadata's system-config row — that key is stripped too)
 --   * Pet detection results: every pet, its faces and its embeddings
 --   * Rule memories (Immich only knows on-this-day and birthday memories)
---   * Video trims: the original duration comes back and the trimmed copy is
+--   * Video trims: the full-length video comes back and the trimmed copy is
 --     no longer referenced
 --   * Other members' photos in links shared from a space, album links to
 --     albums the creator neither owns nor edits, and asset links left empty
@@ -148,14 +148,33 @@ END $$;
 -- rows cascade.
 DELETE FROM "memory" WHERE "type" = 'rule';
 
--- Video trims. Immich only edits images: it would show the trimmed duration and
--- the trimmed thumbnails over the full-length original. Restore the original
--- duration (stored in seconds in the edit), then drop the edited files the trim
--- produced and the edit itself. A trim cannot be combined with an image edit,
--- so every edited file of a trimmed asset came from the trim. The trimmed video
--- and thumbnails stay on disk as unreferenced files. The trim also replaced the
+-- Video trims. Immich only edits images: it would show the trimmed thumbnails
+-- over the full-length original. Drop the edited files the trim produced and
+-- the trim itself. A trim cannot be combined with an image edit, so every
+-- edited file of a trimmed asset came from the trim. The trimmed video and
+-- thumbnails stay on disk as unreferenced files. The trim also replaced the
 -- thumbhash with the trimmed frame's; clearing it makes Immich's nightly
 -- missing-thumbnails job regenerate it from the original.
+--
+-- Current Gallery keeps trims in asset_video_trim, and asset.duration is
+-- already the original's. Clear isEdited too, so Immich asks for the original
+-- thumbnails.
+DO $$
+BEGIN
+  IF to_regclass('public.asset_video_trim') IS NOT NULL THEN
+    UPDATE "asset"
+       SET "thumbhash" = NULL, "isEdited" = false
+      FROM "asset_video_trim"
+     WHERE "asset_video_trim"."assetId" = "asset"."id";
+    DELETE FROM "asset_file"
+     WHERE "isEdited"
+       AND "assetId" IN (SELECT "assetId" FROM "asset_video_trim");
+  END IF;
+END
+$$;
+-- Gallery before 1798900000000 kept trims in asset_edit and the trimmed length
+-- in asset.duration: restore the original duration (stored in seconds in the
+-- edit). Deleting the edit clears isEdited through asset_edit_delete.
 UPDATE "asset"
    SET "thumbhash" = NULL
   FROM "asset_edit"
@@ -270,6 +289,10 @@ UPDATE "api_key" k
 DROP TRIGGER IF EXISTS "library_after_insert" ON "library";
 DROP TRIGGER IF EXISTS "asset_library_delete_audit" ON "asset";
 DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
+-- The reverse favorite-projection trigger names asset_favorite in its body, which Postgres does not
+-- track as a dependency: section 2's DROP TABLE asset_favorite CASCADE leaves it in place, and every
+-- asset write on stock Immich would then fail with "relation asset_favorite does not exist".
+DROP TRIGGER IF EXISTS "asset_is_favorite_after_write" ON "asset";
 
 -- -----------------------------------------------------------------------------
 -- 1b. Restore upstream columns Gallery removed.
@@ -281,10 +304,9 @@ DROP TRIGGER IF EXISTS "album_soft_delete_shared_space_album" ON "album";
 -- LOSSY: favorites belonging to non-owners (space members who favorited someone
 -- else's photo) have nowhere to live in plain Immich and are discarded.
 --
--- IF NOT EXISTS: slice 3 (1794100000000-DropAssetIsFavoriteColumn) has now dropped
--- asset."isFavorite" from the live schema, but a Gallery DB that has not yet applied that
--- migration still has the column, and a bare ADD COLUMN would fail with "column already exists"
--- against it. IF NOT EXISTS keeps the script correct in both states.
+-- 1798800000000-RestoreAssetIsFavoriteProjection brought the column back as the owner's projection of
+-- the overlay, so on a current database this block changes nothing. It stays for databases last booted
+-- by a release between 1794100000000-DropAssetIsFavoriteColumn and that migration, which have no column.
 -- -----------------------------------------------------------------------------
 ALTER TABLE "asset" ADD COLUMN IF NOT EXISTS "isFavorite" boolean NOT NULL DEFAULT false;
 
@@ -299,7 +321,8 @@ BEGIN
        SET "isFavorite" = true
       FROM asset_favorite f
      WHERE f."assetId" = "asset"."id"
-       AND f."userId"  = "asset"."ownerId";
+       AND f."userId"  = "asset"."ownerId"
+       AND NOT "asset"."isFavorite";
   END IF;
 END $$;
 
@@ -380,6 +403,9 @@ DROP TABLE IF EXISTS "asset_favorite" CASCADE;
 -- Gallery job stamps (pet detection, classification) beside asset_job_status.
 DROP TABLE IF EXISTS "asset_job_status_gallery" CASCADE;
 
+-- Video trims, cleaned up in step 1 above.
+DROP TABLE IF EXISTS "asset_video_trim" CASCADE;
+
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
 --
@@ -412,6 +438,9 @@ DROP FUNCTION IF EXISTS shared_space_album_folder_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS album_soft_delete_shared_space_album() CASCADE;
 DROP FUNCTION IF EXISTS album_space_asset_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS asset_favorite_delete_audit() CASCADE;
+DROP FUNCTION IF EXISTS asset_favorite_after_insert() CASCADE;
+DROP FUNCTION IF EXISTS asset_favorite_after_delete() CASCADE;
+DROP FUNCTION IF EXISTS asset_is_favorite_after_write() CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 4. Drop Gallery-added columns from Immich-native tables.
@@ -493,6 +522,9 @@ DELETE FROM "migration_overrides"
    'function_album_soft_delete_shared_space_album',
    'function_album_space_asset_delete_audit',
    'function_asset_favorite_delete_audit',
+   'function_asset_favorite_after_insert',
+   'function_asset_favorite_after_delete',
+   'function_asset_is_favorite_after_write',
    'index_asset_face_personId_idx',
    'index_face_identity_representativeFaceId_idx',
    'index_person_identityId_idx',
@@ -548,7 +580,10 @@ DELETE FROM "migration_overrides"
    'trigger_shared_space_updatedAt',
    'trigger_user_group_updatedAt',
    'trigger_shared_space_album_folder_updatedAt',
-   'trigger_asset_favorite_delete_audit'
+   'trigger_asset_favorite_delete_audit',
+   'trigger_asset_favorite_after_insert',
+   'trigger_asset_favorite_after_delete',
+   'trigger_asset_is_favorite_after_write'
  );
 
 -- -----------------------------------------------------------------------------
@@ -762,6 +797,8 @@ DELETE FROM "kysely_migrations"
   '1798500000000-AddAssetJobStatusGalleryTable',
   '1798600000000-AddPersonIdentityTable',
   '1798700000000-AddPersonPetTable',
+  '1798800000000-RestoreAssetIsFavoriteProjection',
+  '1798900000000-MoveVideoTrimToSidecar',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -805,6 +842,7 @@ DO $$
 DECLARE
   fork_tables_left int;
   fork_rows_left int;
+  fork_triggers_left int;
 BEGIN
   -- Pattern list deliberately excludes '%AddPersonNameTrigramIndex%'
   -- because upstream Immich has a migration with that same basename
@@ -871,12 +909,23 @@ BEGIN
        'pet_search',
        'asset_favorite_audit', 'asset_favorite',
        'asset_job_status_gallery',
+       'asset_video_trim',
        'person_identity',
        'person_pet',
        'gallery_migrations', 'gallery_migrations_lock'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;
+  END IF;
+
+  SELECT count(*) INTO fork_triggers_left
+    FROM pg_trigger
+   WHERE tgname IN (
+       'asset_library_delete_audit', 'asset_is_favorite_after_write',
+       'library_after_insert', 'album_soft_delete_shared_space_album'
+     );
+  IF fork_triggers_left > 0 THEN
+    RAISE EXCEPTION 'revert-to-immich: % Gallery trigger(s) still present on Immich tables after cleanup, aborting.', fork_triggers_left;
   END IF;
   RAISE NOTICE 'revert-to-immich: cleanup finished. Switch your image to ghcr.io/immich-app/immich-server and start the stack.';
 END $$;

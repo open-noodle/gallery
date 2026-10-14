@@ -1,5 +1,7 @@
 # S3 Storage Backend Design
 
+Superseded 2026-10: the resolver below is now `StorageService.backendFor` (`server/src/services/storage.service.ts`); `resolveBackend` and `storage-backend.provider.ts` are gone.
+
 ## Overview
 
 Add S3-compatible object storage as an alternative to local disk for storing media files (originals, thumbnails, encoded video, sidecars). The system supports both backends simultaneously — old assets remain on disk, new assets go to whichever backend is configured. This is a write-path switch, not a migration tool.

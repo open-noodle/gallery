@@ -2,13 +2,14 @@
 // Exercises spaceAlbumAssetExists / spaceAssetPathBranches against a real DB over
 // every access-path combination and edge case (spec §3.2).
 import { Kysely } from 'kysely';
-import { SharedSpaceRole } from 'src/enum.js';
+import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import {
   type AlbumTimelineGate,
   type SpaceScope,
+  albumMembership,
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceDirectAssetExists,
@@ -337,5 +338,85 @@ describe('spaceAssetPathBranches — the three-path OR', () => {
       )
       .execute();
     expect(rows.filter((r) => r.id === s.viaAll.id)).toHaveLength(1);
+  });
+});
+
+const seedContributions = async (ctx: Ctx) => {
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  const { space: otherSpace } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+  const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'A' });
+  const { result: sibling } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'B' });
+  await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+  await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: sibling.id });
+  await ctx.newSharedSpaceAlbum({ spaceId: otherSpace.id, albumId: album.id });
+
+  const { asset: own } = await ctx.newAsset({ ownerId: owner.id });
+  const { asset: contributed } = await ctx.newAsset({ ownerId: member.id });
+  const { asset: viaOtherSpace } = await ctx.newAsset({ ownerId: member.id });
+  const { asset: hidden } = await ctx.newAsset({ ownerId: member.id, visibility: AssetVisibility.Hidden });
+  const { asset: inSibling } = await ctx.newAsset({ ownerId: member.id });
+  await ctx.newAlbumAsset({ albumId: album.id, assetId: own.id });
+  await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+  await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: viaOtherSpace.id, spaceId: otherSpace.id });
+  await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: hidden.id, spaceId: space.id });
+  await ctx.newAlbumSpaceAsset({ albumId: sibling.id, assetId: inSibling.id, spaceId: space.id });
+  return { owner, member, space, otherSpace, album, sibling, own, contributed, viaOtherSpace, hidden, inSibling };
+};
+
+const members = (albumIds: string[], via?: SpaceScope) =>
+  db
+    .selectFrom((eb) => albumMembership(eb, albumIds, via).as('m'))
+    .select(['m.albumId', 'm.assetId'])
+    .execute()
+    .then((rows) => new Set(rows.map((row) => row.assetId)));
+
+describe('albumMembership: own rows plus live contributions', () => {
+  it('reads album_asset alone without a scope, and adds only contributions made through the scoped space', async () => {
+    const { ctx } = setup();
+    const s = await seedContributions(ctx);
+
+    expect(await members([s.album.id])).toEqual(new Set([s.own.id]));
+    // the hidden contribution is never shareable, the other space's contribution is not in scope
+    expect(await members([s.album.id], { spaceIds: [s.space.id] })).toEqual(new Set([s.own.id, s.contributed.id]));
+    expect(await members([s.album.id], { memberUserId: s.member.id })).toEqual(new Set([s.own.id, s.contributed.id]));
+    expect(await members([s.album.id], { memberUserId: s.member.id, spaceId: s.otherSpace.id })).toEqual(
+      new Set([s.own.id]),
+    );
+  });
+
+  it('drops a contribution once its album is unlinked from the space', async () => {
+    const { ctx } = setup();
+    const s = await seedContributions(ctx);
+    await db
+      .deleteFrom('shared_space_album')
+      .where('spaceId', '=', s.space.id)
+      .where('albumId', '=', s.album.id)
+      .execute();
+
+    expect(await members([s.album.id], { spaceIds: [s.space.id] })).toEqual(new Set([s.own.id]));
+  });
+
+  it('correlates on an outer album row, so a sibling album never borrows its contributions', async () => {
+    const { ctx } = setup();
+    const s = await seedContributions(ctx);
+
+    const rows = await db
+      .selectFrom('album')
+      .select('album.id')
+      .where('album.id', 'in', [s.album.id, s.sibling.id])
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom(albumMembership(eb, 'album.id', { spaceId: s.space.id }).as('m'))
+            .select('m.assetId')
+            .where('m.assetId', '=', s.contributed.id),
+        ),
+      )
+      .execute();
+
+    expect(rows.map((row) => row.id)).toEqual([s.album.id]);
   });
 });

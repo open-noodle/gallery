@@ -54,7 +54,13 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { hasAllPeople, hasAnyPeople } from 'src/utils/people-filter.js';
 import { fromChecksum } from 'src/utils/request.js';
-import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import {
+  albumConfinedToViewer,
+  albumMembership,
+  ownedOrSharedWithViewer,
+  spaceAssetPathBranches,
+  spaceVisibilityGate,
+} from 'src/utils/shared-space-album-scope.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 
 export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyConfig => {
@@ -391,55 +397,22 @@ export function inSharedAlbum(userId: string, assetId: 'asset.id' | 'asset_face.
 export function inAlbums<O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   albumIds: string[],
-  // #764: when the viewer has live member-spaces (timelineSpaceIds, resolved from
-  // getSpaceIdsForTimeline), cross-owner contributions (`album_space_asset`) tethered to one of those
-  // spaces count as album membership too. Gating on timelineSpaceIds — not raw album membership — is
-  // the live-membership check: an album owner who has LEFT the space passes AlbumRead on their own
-  // album but has no timelineSpaceId for it, so contributions are excluded (no permanent-grant leak).
+  // #764: contributions count as album membership only through the viewer's live member-spaces
+  // (timelineSpaceIds, from getSpaceIdsForTimeline). An album owner who LEFT the space still passes
+  // AlbumRead on their own album but has no timelineSpaceId for it, so contributions are excluded.
   timelineSpaceIds?: string[],
 ) {
-  const includeContributions = !!timelineSpaceIds && timelineSpaceIds.length > 0;
   return qb.innerJoin(
     (eb) =>
       eb
-        .selectFrom((inner) => {
-          const albumAssetMembers = inner
-            .selectFrom('album_asset')
-            .select(['album_asset.assetId as assetId', 'album_asset.albumId as albumId'])
-            .where('album_asset.albumId', '=', anyUuid(albumIds!));
-          return (
-            includeContributions
-              ? albumAssetMembers.unionAll(
-                  inner
-                    .selectFrom('album_space_asset')
-                    .select(['album_space_asset.assetId as assetId', 'album_space_asset.albumId as albumId'])
-                    .where('album_space_asset.albumId', '=', anyUuid(albumIds!))
-                    .where('album_space_asset.spaceId', '=', anyUuid(timelineSpaceIds!))
-                    // Task 9 (D1-b residue): timelineSpaceIds only proves the searcher has a live SPACE
-                    // membership — it does not prove this album is still LINKED to that space. A
-                    // contribution row survives an unlink (D1-b tombstoning applies to other read arms,
-                    // not this row), so without this gate a live member searching with an album filter
-                    // still matched a retained contribution of an UNLINKED album, which then 403s on
-                    // thumbnail (checkAccess routes through the live-link-gated spaceContributedAssetExists).
-                    // Mirrors contributionVisibleToMember (sync.repository.ts) / spaceContributedAssetExists
-                    // (shared-space-album-scope.ts): require a live shared_space_album correlated on BOTH
-                    // albumId AND spaceId.
-                    .where((wb) =>
-                      wb.exists(
-                        wb
-                          .selectFrom('shared_space_album')
-                          .whereRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
-                          .whereRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId')
-                          .select(wb.lit(1).as('one')),
-                      ),
-                    ),
-                )
-              : albumAssetMembers
-          ).as('album_members');
-        })
-        .select('album_members.assetId')
-        .groupBy('album_members.assetId')
-        .having((eb) => eb.fn.count('album_members.albumId').distinct(), '=', albumIds.length)
+        .selectFrom(
+          albumMembership(eb, albumIds, timelineSpaceIds?.length ? { spaceIds: timelineSpaceIds } : undefined).as(
+            'album_asset',
+          ),
+        )
+        .select('assetId')
+        .groupBy('assetId')
+        .having((eb) => eb.fn.count('albumId').distinct(), '=', albumIds.length)
         .as('has_album'),
     (join) => join.onRef('has_album.assetId', '=', 'asset.id'),
   );
@@ -566,81 +539,10 @@ export function withEdits(eb: ExpressionBuilder<DB, 'asset'>): AliasedEditAction
   ).as('edits') as AliasedEditActions;
 }
 
-/**
- * Fork RBAC gate for album-scoped search. Upstream (immich #29352) grants
- * album-scoped searchMetadata access via album.read and leaves userIds unset,
- * which switches off the owner/space scoping in searchAssetBuilder. Re-gate so
- * shared-space content reached through an album is only visible to searchers who
- * can access it via space membership + timeline visibility (timelineSpaceIds).
- * Plain (non-shared-space) album assets stay visible per upstream album access.
- *
- * NOTE (L2 reverted): a Slice-6 change flattened this to a single
- * `spaceVisibilityGate` on the theory that the anti-join + `timelineSpaceIds`
- * re-admission was pure over-restriction vs the album grid. That was WRONG — the
- * `timelineSpaceIds`/showInTimeline gate is LOAD-BEARING: a space member who has
- * hidden a space from their timeline (showInTimeline=false) must not see that
- * space's directly-/library-linked content via album-scoped search or
- * suggestions. Flattening it re-admitted hidden-space content and broke the
- * People-identity RBAC projection tests (`people-identity-rbac.spec.ts`,
- * "album scope excludes ... while the space is hidden from timeline"). Restored
- * the anti-join + timelineSpaceIds arms; H1's `deletedAt IS NULL` (trashed
- * exclusion) is kept on every branch.
- */
-export function albumSharedSpaceScope<O>(qb: SelectQueryBuilder<DB, 'asset', O>, timelineSpaceIds?: string[]) {
-  return qb.where((eb) =>
-    eb.or([
-      eb.and([
-        // Fork RBAC (Slice 1 / security-1): the plain-album branch (assets NOT reached via a
-        // direct shared_space_asset / shared_space_library) had no visibility gate, so a Hidden or
-        // Locked asset reachable only through a linked album leaked to album searchers. Gate it flat
-        // (Archive+Timeline, no owner exception) to match the album grid's withDefaultVisibility.
-        spaceVisibilityGate(eb),
-        // Fork RBAC (Slice 1 / H1): album-granted search must never surface the owner's trashed
-        // assets, even when the caller flips withDeleted via trashedAfter/trashedBefore/isOffline.
-        eb('asset.deletedAt', 'is', null),
-        eb.not(eb.exists(eb.selectFrom('shared_space_asset').whereRef('shared_space_asset.assetId', '=', 'asset.id'))),
-        eb.not(
-          eb.exists(
-            eb.selectFrom('shared_space_library').whereRef('shared_space_library.libraryId', '=', 'asset.libraryId'),
-          ),
-        ),
-      ]),
-      ...(timelineSpaceIds
-        ? [
-            // Space-linked assets via direct asset membership: gate on Archive + Timeline
-            // (matches the album view's withDefaultVisibility; Hidden/Locked must not
-            // surface for viewers who are not the asset owner) + not-deleted (H1).
-            eb.and([
-              spaceVisibilityGate(eb),
-              eb('asset.deletedAt', 'is', null),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_asset')
-                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                  .where('shared_space_asset.spaceId', '=', anyUuid(timelineSpaceIds)),
-              ),
-            ]),
-            // Space-linked assets via library membership: same Archive + Timeline + not-deleted gate.
-            eb.and([
-              spaceVisibilityGate(eb),
-              eb('asset.deletedAt', 'is', null),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_library')
-                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                  .where('shared_space_library.spaceId', '=', anyUuid(timelineSpaceIds)),
-              ),
-            ]),
-          ]
-        : []),
-    ]),
-  );
-}
-
 const joinDeduplicationPlugin = new DeduplicateJoinsPlugin();
 /** TODO: This should only be used for search-related queries, not as a general purpose query builder */
-// fork's live search path — carries the owner/space RBAC gate. All fork search call-sites use this,
-// NOT the dormant V3 searchAssetBuilder below. See the search V3 coexistence spec.
+// The flat (legacy) search path, carrying the owner/space RBAC gate. Structured (V3) requests run
+// upstream's searchAssetBuilder below with Gallery's scope hooks. See the search V3 coexistence spec.
 export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearchBuilderOptions) {
   options.withDeleted ||= !!(options.trashedAfter || options.trashedBefore || options.isOffline);
 
@@ -704,7 +606,7 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
             eb.or([
               ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
               // Fork RBAC (H-1): the other-members branch must ALSO exclude trashed assets, mirroring
-              // albumSharedSpaceScope. Without this, a member (incl. a read-only Viewer) can pull another
+              // albumConfinedToViewer. Without this, a member (incl. a read-only Viewer) can pull another
               // member's trashed asset by flipping withDeleted — directly or implicitly via
               // trashedAfter/trashedBefore/isOffline (see :676) — because the terminal deletedAt filter
               // (:850) is caller-skippable. The ownerId branch stays unfiltered so a caller keeps
@@ -714,36 +616,11 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           ]),
         ),
       )
-      .$if(!!options.timelineSpaceIds && !!options.userIds, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            // Caller's own (and partner) rows follow the resolved visibility applied above.
-            eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-            // Other space members' rows are Archive+Timeline (Slice 10 aligns search with browse;
-            // elevation is per-owner, Hidden/Locked never surface for other members).
-            eb.and([
-              spaceVisibilityGate(eb),
-              // Fork RBAC (H-1): not-trashed on the other-members branch too (the ownerId branch above is
-              // left unfiltered). Mirrors the spaceId arm and albumSharedSpaceScope; never rely on the
-              // caller-skippable terminal deletedAt filter (:850).
-              eb('asset.deletedAt', 'is', null),
-              eb.or(
-                spaceAssetPathBranches(eb, {
-                  correlateAssetId: 'asset.id',
-                  correlateLibraryId: 'asset.libraryId',
-                  scope: { spaceIds: options.timelineSpaceIds! },
-                  albumTimelineGate: 'space-tab',
-                }),
-              ),
-            ]),
-          ]),
-        ),
-      )
       // albumAccessIsBoundary opts an album query OUT of this re-gate for a caller whose album ACCESS
       // check is already the boundary (see the option's doc comment in search.repository.ts, and the
       // call site in shared-space.service.ts getFilteredMapMarkers — issue #656).
       .$if(!!options.albumIds?.length && !options.userIds && !options.albumAccessIsBoundary, (qb) =>
-        albumSharedSpaceScope(qb, options.timelineSpaceIds),
+        qb.where((eb) => albumConfinedToViewer(eb, options.timelineSpaceIds)),
       )
       .$if(!!(options.personIds?.length || options.identityIds?.length || options.spacePersonIds?.length), (qb) =>
         options.personMatchAny ? hasAnyPeople(qb, options) : hasAllPeople(qb, options),
@@ -805,8 +682,18 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       .$if(!!options.checksum, (qb) => qb.where('asset.checksum', '=', options.checksum!))
       .$if(!!options.id, (qb) => qb.where('asset.id', '=', asUuid(options.id!)))
       .$if(!!options.libraryId, (qb) => qb.where('asset.libraryId', '=', asUuid(options.libraryId!)))
-      .$if(!!options.userIds && !options.spaceId && !options.timelineSpaceIds, (qb) =>
-        qb.where('asset.ownerId', '=', anyUuid(options.userIds!)),
+      // A space-confined search (spaceId, no timeline spaces) scopes ownership in its own arm above.
+      .$if(!!options.userIds && (!options.spaceId || !!options.timelineSpaceIds), (qb) =>
+        qb.where((eb) =>
+          ownedOrSharedWithViewer(
+            eb,
+            eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+            options.timelineSpaceIds && {
+              scope: { spaceIds: options.timelineSpaceIds },
+              albumTimelineGate: 'space-tab',
+            },
+          ),
+        ),
       )
       .$if(!!options.encodedVideoPath, (qb) =>
         qb
@@ -929,8 +816,13 @@ function idsPredicates(
   return predicates;
 }
 
-function albumIdsPredicates(eb: AssetExpressionBuilder, filter?: IdsFilter) {
-  const matching = (ids: string[]) => albumAssets(eb).where('album_asset.albumId', '=', anyUuid(ids));
+function albumIdsPredicates(eb: AssetExpressionBuilder, filter?: IdsFilter, albumSpaceIds?: string[]) {
+  const matching = (ids: string[]) =>
+    eb
+      .selectFrom(
+        albumMembership(eb, ids, albumSpaceIds?.length ? { spaceIds: albumSpaceIds } : undefined).as('album_asset'),
+      )
+      .whereRef('album_asset.assetId', '=', 'asset.id');
   return idsPredicates(eb, filter, {
     matchesAny: (ids) => eb.exists(matching(ids)),
     matchesAll: (ids) =>
@@ -1078,21 +970,23 @@ function existsPredicates(
 
 // predicates are collected as expressions rather than chained `where` calls so the same
 // helpers can build each `or` branch, which must compose into eb.and/eb.or
-function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch, authUserId?: string) {
+// Favourites are per user (asset_favorite); `asset.isFavorite` is the owner's, upstream's default.
+function favoritePredicate(eb: AssetExpressionBuilder, eq: boolean, favoriteUserId?: string) {
+  if (!favoriteUserId) {
+    return eb('asset.isFavorite', '=', eq);
+  }
+  const favorite = favoriteExistsFor(eb, favoriteUserId);
+  return eq ? favorite : eb.not(favorite);
+}
+
+function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch, scope: AssetSearchScope) {
   const { encodedVideoPath } = branch;
   return [
     ...comparisonPredicates(eb, 'asset.id', branch.id),
     ...comparisonPredicates(eb, 'asset.libraryId', branch.libraryId),
     ...comparisonPredicates(eb, 'asset.type', branch.type),
     ...comparisonPredicates(eb, 'asset.visibility', branch.visibility),
-    // #763: favorites are a per-user overlay (asset_favorite) — the raw `asset.isFavorite` column
-    // this used to compare against was dropped in slice 3. Resolved for the CALLER, mirroring
-    // searchAssetBuilderLegacy's isFavorite arm above. V3 is dormant in the fork (see the
-    // coexistence spec), so `authUserId` has no live caller yet; whoever wires V3 to an endpoint
-    // must thread it, exactly as the legacy path already does.
-    ...(branch.isFavorite
-      ? [branch.isFavorite.eq ? favoriteExistsFor(eb, authUserId!) : eb.not(favoriteExistsFor(eb, authUserId!))]
-      : []),
+    ...(branch.isFavorite ? [favoritePredicate(eb, branch.isFavorite.eq, scope.favoriteUserId)] : []),
     ...(branch.isOffline ? [eb('asset.isOffline', '=', branch.isOffline.eq)] : []),
     ...(branch.isMotion ? [eb('asset.livePhotoVideoId', branch.isMotion.eq ? 'is not' : 'is', null)] : []),
     ...existsPredicates(eb, branch.isEncoded, () => encodedVideoFiles(eb)),
@@ -1126,7 +1020,7 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
     ...comparisonPredicates(eb, 'asset.createdAt', branch.createdAt),
     ...comparisonPredicates(eb, 'asset.updatedAt', branch.updatedAt),
     ...comparisonPredicates(eb, 'asset.deletedAt', branch.trashedAt),
-    ...albumIdsPredicates(eb, branch.albumIds),
+    ...albumIdsPredicates(eb, branch.albumIds, scope.albumSpaceIds),
     ...personIdsPredicates(eb, branch.personIds),
     ...tagIdsPredicates(eb, branch.tagIds),
     ...checksumPredicates(eb, branch.checksum),
@@ -1142,17 +1036,14 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
   ];
 }
 
-// ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
-// Not wired to any controller/service. The fork's live search uses searchAssetBuilderLegacy
-// (above), which carries the owner/space RBAC gate. Do not call this V3 builder from fork code.
-// Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
-//
 // ordering is deliberately left to the caller so aggregate-only consumers (counts, stats)
 // can compose the same filters without stripping an order by
 export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuilderV3Options, scope: AssetSearchScope) {
   const filter = options.filter ?? {};
   const branches = filter.or ?? [];
-  const ownershipPredicate = (eb: AssetExpressionBuilder) => eb('asset.ownerId', '=', anyUuid(scope.userIds));
+  const ownershipPredicate =
+    scope.ownershipPredicate ?? ((eb: AssetExpressionBuilder) => eb('asset.ownerId', '=', anyUuid(scope.userIds)));
+  const confinedPredicate = scope.albumConfinedPredicate;
   // search universe: own+partner assets unless album-confined, which searches the albums instead;
   // ownership lands nowhere (top level confined), per unconfined branch, or hoisted globally
   const topConfined = isAlbumConfined(filter);
@@ -1168,6 +1059,7 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
       .$if(!!options.withExif, (qb) => qb.select(selectExifInfo))
       .$if(scopeGlobally, (qb) => qb.where(ownershipPredicate))
+      .$if(topConfined && !!confinedPredicate, (qb) => qb.where(confinedPredicate!))
       .where((eb) =>
         eb.or([eb('asset.visibility', '!=', AssetVisibility.Locked), eb('asset.ownerId', '=', scope.lockedOwnerId)]),
       )
@@ -1176,14 +1068,15 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       )
       .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
       .where((eb) => {
-        const predicates = branchPredicates(eb, filter, options.authUserId);
+        const predicates = branchPredicates(eb, filter, scope);
         if (branches.length > 0) {
           predicates.push(
             eb.or(
               branches.map((branch) =>
                 eb.and([
-                  ...branchPredicates(eb, branch, options.authUserId),
+                  ...branchPredicates(eb, branch, scope),
                   ...(scopePerBranch && !isAlbumConfined(branch) ? [ownershipPredicate(eb)] : []),
+                  ...(scopePerBranch && isAlbumConfined(branch) && confinedPredicate ? [confinedPredicate(eb)] : []),
                 ]),
               ),
             ),
