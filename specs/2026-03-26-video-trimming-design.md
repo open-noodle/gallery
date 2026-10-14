@@ -14,6 +14,26 @@ Add video trimming as the first video editing capability in Gallery. Extends the
 - **Trim as editor tool** — new `EditToolType.Trim` inside the existing editor, not a separate action. Same save/cancel/undo flow as image transforms.
 - **Local storage only** — S3-backed videos excluded for v1 to avoid download/upload complexity.
 
+**Revised (2026-10-11): trim is no longer an edit action.** A stock Immich server on a Gallery database
+read the trimmed length from `asset.duration` and played the full-length file, and every trim kept
+`editing.dto.ts`, the edit sync stream and the `AssetEditReadyV2` payload forked. Owner decision: trim
+gets its own endpoint. Sections 1 and 5 below describe the original design; what replaced them:
+
+- Storage: `asset_video_trim` (`assetId` primary key, `startTime`, `endTime` in seconds, `duration` in
+  ms, the probed length of the trimmed file, null until the job ran). `asset.duration` holds the
+  original's length again. Migration `1798900000000-MoveVideoTrimToSidecar` moves existing trims
+  and restores the original duration.
+- API: `GET`, `PUT` and `DELETE /assets/{id}/trim` (`GalleryAssetController`, same permissions as the
+  edit routes). `PUT` sets `asset.isEdited`, because the trimmed thumbnails are the edited ones;
+  `DELETE` clears it. Both queue `AssetEditThumbnailGeneration`, so clients still wait for
+  `AssetEditReadyV2`.
+- Projection: Gallery serves the trimmed file from `/video/playback` to every client, stock apps
+  included, so every client-facing read projects `coalesce(asset_video_trim.duration, asset.duration)`
+  (`src/gallery/utils/projected-duration.ts`). Trims never reach the edit sync stream, so there is nothing to
+  hide from stock clients.
+- Real-time transcoding (HLS) transcodes the original, so Gallery web plays a trimmed video from the
+  trimmed file instead (`VideoNativeViewer`).
+
 ## 1. Backend: Data Model
 
 ### EditAction Enum

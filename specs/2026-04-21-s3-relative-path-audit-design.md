@@ -4,7 +4,7 @@
 
 Gallery supports disk and S3 storage backends simultaneously. On S3, asset and file paths stored in the database are relative keys (e.g. `upload/<uuid>/a4/c2/<uuid>.MP4`). Code that passes these directly to local-FS or local-process operations (`fs.*`, `fluent-ffmpeg`, `exiftool-vendored`, `sharp`) resolves them against the process CWD and fails with `ENOENT`.
 
-The repository already has an `ensureLocalFile(path)` helper that branches on `isAbsolute` — returning the path unchanged for disk, and `{ localPath: tempPath, cleanup }` via `StorageService.resolveBackendForKey(key).downloadToTemp(key)` for S3. Today it is duplicated verbatim in:
+The repository already has an `ensureLocalFile(path)` helper that branches on `isAbsolute`, returning the path unchanged for disk, and `{ localPath: tempPath, cleanup }` via `StorageService.backendFor(key).downloadToTemp(key)` for S3. Today it is duplicated verbatim in:
 
 - `server/src/services/media.service.ts:80`
 - `server/src/services/metadata.service.ts:184`
@@ -30,7 +30,7 @@ Trigger: `copyAssetProperties({ sidecar: true })`. Asset-duplicate/copy operatio
 ## Bugs explicitly out of scope
 
 - Orphan S3 cleanup on user delete (`user.service.ts:286`); tracked separately.
-- S3 coverage for ML calls (face detection, OCR, pet detection, image CLIP encoding). Already S3-aware via `MachineLearningRepository.getFormData` at `server/src/repositories/machine-learning.repository.ts:315-327`, which branches on `isAbsolute(imagePath)` and streams via `StorageService.resolveBackendForKey(...).get(...)`.
+- S3 coverage for ML calls (face detection, OCR, pet detection, image CLIP encoding). Already S3-aware via `MachineLearningRepository.getFormData` at `server/src/repositories/machine-learning.repository.ts:315-327`, which branches on `isAbsolute(imagePath)` and streams via `StorageService.backendFor(...).get(...)`.
 - `withLocalFile(fn)` ergonomics refactor. Keeping the current `{ localPath, cleanup }` shape.
 - Renaming `storage-migration-tests.yml` to reflect broader S3 coverage.
 - S3 download-hang on bulk selection (separate bug class — resource management, not path handling). Hypothesis: `download.service.ts` opens all S3 `Readable` streams upfront via `await backend.get(...)` in a sequential loop, leaving 149/150 sockets idle-but-held while `archiver` consumes one at a time, exhausting the S3 client socket pool and starving `serveMode: 'proxy'` thumbnail requests. Tracked in its own design (next iteration).
@@ -62,7 +62,7 @@ In `copySidecar` (asset.service.ts:313):
 
 - Remove the `storageRepository.unlink(targetFile.path)` call. The existing `targetFile.path`, when present, equals `${targetAsset.originalPath}.xmp` (because that's how metadata.service.ts:488 writes it), which is the same key the new copy writes to. `fs.copyFile` (disk) and `backend.put` (S3) both overwrite. Dropping the unlink is behaviorally equivalent to the old `unlink + copyFile` sequence and strictly safer on partial failure (no window where the asset is sidecar-less).
 - Wrap `sourceFile.path` via `ensureLocalFile`.
-- Branch once on the destination: `isAbsolute(targetSidecarPath)` → `storageCore.ensureFolders(target)` + `storageRepository.copyFile(localPath, target)`; otherwise → `StorageService.resolveBackendForKey(target).put(target, createReadStream(localPath), { contentType: 'application/xml' })`.
+- Branch once on the destination: `isAbsolute(targetSidecarPath)` → `storageCore.ensureFolders(target)` + `storageRepository.copyFile(localPath, target)`; otherwise → `StorageService.backendFor(target).put(target, createReadStream(localPath), { contentType: 'application/xml' })`.
 - Cleanup in `finally`.
 - `upsertFile({ path: targetSidecarPath })` and queue `AssetExtractMetadata` unchanged.
 
@@ -74,8 +74,8 @@ Rationale for always routing through a local temp on S3→S3 (same backend): sid
 
 - `server/src/services/base.service.spec.ts` — new coverage for `ensureLocalFile`:
   - Absolute path returns passthrough with no-op cleanup.
-  - Relative path calls `StorageService.resolveBackendForKey(key).downloadToTemp(key)` and returns its `{ tempPath, cleanup }`; invoking the returned cleanup triggers the backend-side cleanup.
-  - `StorageService.resolveBackendForKey` throws for an unknown backend prefix → error propagates, no cleanup leaked (nothing was captured yet).
+  - Relative path calls `StorageService.backendFor(key).downloadToTemp(key)` and returns its `{ tempPath, cleanup }`; invoking the returned cleanup triggers the backend-side cleanup.
+  - `downloadToTemp` throws (missing object, S3 error) → error propagates, no cleanup leaked (nothing was captured yet).
   - `downloadToTemp` throws after the backend resolves → error propagates, no cleanup leaked.
 - `server/src/services/smart-info.service.spec.ts` — extend the `handleEncodeClip` video case:
   - Relative `originalPath` → `ensureLocalFile` invoked; `probe` and `extractVideoFrames` receive the local temp path; cleanup called on the success path.

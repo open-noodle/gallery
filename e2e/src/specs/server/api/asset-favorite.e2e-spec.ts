@@ -9,8 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // #763 slice 2 — canonical PUT /assets/favorites + the deprecated PUT /assets/:id / PUT /assets
 // `isFavorite` alias.
 //
-// See docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §5.1, §8.1 and
-// docs/superpowers/plans/2026-07-20-per-user-favorites-slice-2.md Task 2.
+// See specs/2026-07-20-per-user-favorites-design.md §5.1 and §8.1.
 //
 // Favorites are per (user, asset): the canonical endpoint gates on Permission.AssetRead, which
 // resolves own assets, shared-space assets at ANY role including viewer, shared-album assets, and
@@ -253,7 +252,7 @@ describe('PUT /assets/favorites (#763 per-user favorites)', () => {
 // relationship (space membership, album share, partner share). Losing access must hide the
 // favorite from listings and from the individual asset read (§8.1's 400-not-403 convention),
 // but must NEVER delete the row: regaining access re-derives the same isFavorite=true with no
-// new write. See docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §5.2.
+// new write. See specs/2026-07-20-per-user-favorites-design.md §5.2.
 //
 // Uses only its own fresh users (dave/erin/frank/grace) — the describe above is order-dependent
 // on alice/bob/carol and must not be touched.

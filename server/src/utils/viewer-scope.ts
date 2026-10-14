@@ -3,13 +3,24 @@
 // how person-filter tokens resolve. Services ask once per request with the surface they serve; every
 // per-surface difference is a row in `surfaceRule` below, not a comment at a call site. Sits above
 // `shared-space-album-scope.ts`, which turns these ids into SQL.
-import { Kysely, Transaction } from 'kysely';
+import { BadRequestException } from '@nestjs/common';
+import { Kysely, SqlBool, Transaction, sql } from 'kysely';
+import type { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
+import { SearchFilter } from 'src/dtos/search.dto.js';
 import { AssetVisibility } from 'src/enum.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
-import { TimelineHiddenScope, timelineHiddenScopeIsEmpty } from 'src/utils/shared-space-album-scope.js';
+import { anyUuid } from 'src/utils/database.js';
+import { favoriteViewerId, rejectSharedLinkFavoriteFilter } from 'src/utils/favorite.js';
+import { collectFilterIds } from 'src/utils/search-filter.js';
+import {
+  TimelineHiddenScope,
+  albumConfinedToViewer,
+  ownedOrSharedWithViewer,
+  timelineHiddenScopeIsEmpty,
+} from 'src/utils/shared-space-album-scope.js';
 
 /**
  * - `timeline`: time buckets (personal timeline, Trash/Archive/Favorites, album and space browse) and
@@ -243,4 +254,71 @@ export const resolveViewerScope = async <S extends ViewerSurface>(
   }
 
   return scope as ViewerScopeFor<S>;
+};
+
+/** The Gallery flat fields a structured (search V3) request may carry next to `filter`. */
+export type StructuredSearchRequest = {
+  filter?: SearchFilter;
+  withSharedSpaces?: boolean;
+  spaceId?: string;
+  spacePersonIds?: string[];
+  ownerId?: string;
+  isInAlbum?: boolean;
+};
+
+/**
+ * The viewer-scope request for a structured search. `withSharedSpaces` is the only Gallery flat field with a
+ * structured meaning; the others have no structured form, so they are rejected rather than ignored, which would
+ * answer with a wider set than was asked for.
+ */
+export const structuredSearchViewerRequest = (dto: StructuredSearchRequest, albumIds: string[]): ViewerScopeRequest => {
+  if (dto.spaceId || dto.spacePersonIds?.length || dto.ownerId || dto.isInAlbum !== undefined) {
+    throw new BadRequestException('spaceId, spacePersonIds, ownerId and isInAlbum need the flat search fields');
+  }
+  const filter = dto.filter ?? {};
+  return {
+    withSharedSpaces: dto.withSharedSpaces,
+    albumIds,
+    personIds: collectFilterIds(filter, 'personIds'),
+    favoriteScoped: filter.isFavorite?.eq === true,
+  };
+};
+
+/**
+ * Gallery's hooks on upstream's structured-search scope, from the resolved viewer scope. They give search V3 the
+ * flat search's rules: the universe is the viewer and partners plus, on a `withSharedSpaces` request, what their
+ * timeline spaces share with them; album-confined parts get the album re-gate and count contributions made through
+ * those spaces; `isFavorite` is the caller's own favourite. A person filter the viewer may not use empties the
+ * result, and a shared link may not filter by favourite, as on the flat search.
+ */
+export const searchScopeV3 = (
+  auth: AuthDto,
+  dto: StructuredSearchRequest,
+  viewer: ViewerScope,
+  userIds: string[],
+): Pick<AssetSearchScope, 'ownershipPredicate' | 'albumConfinedPredicate' | 'albumSpaceIds' | 'favoriteUserId'> => {
+  const filter = dto.filter ?? {};
+  rejectSharedLinkFavoriteFilter(
+    auth,
+    [filter, ...(filter.or ?? [])].find((branch) => branch.isFavorite)?.isFavorite?.eq,
+  );
+  const favoriteUserId = favoriteViewerId(auth);
+
+  if (viewer.forceEmptyResult) {
+    const nothing = () => sql<SqlBool>`false`;
+    return { ownershipPredicate: nothing, albumConfinedPredicate: nothing, favoriteUserId };
+  }
+
+  const spaceIds = viewer.timelineSpaceIds;
+  return {
+    ownershipPredicate: (eb) =>
+      ownedOrSharedWithViewer(
+        eb,
+        eb('asset.ownerId', '=', anyUuid(userIds)),
+        dto.withSharedSpaces && spaceIds ? { scope: { spaceIds }, albumTimelineGate: 'space-tab' } : undefined,
+      ),
+    albumConfinedPredicate: (eb) => albumConfinedToViewer(eb, spaceIds),
+    albumSpaceIds: spaceIds,
+    favoriteUserId,
+  };
 };

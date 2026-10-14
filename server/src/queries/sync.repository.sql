@@ -70,7 +70,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -112,7 +122,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -156,7 +176,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -438,30 +468,32 @@ select
   "asset"."localDateTime",
   "asset"."type",
   "asset"."deletedAt",
+  "asset"."isFavorite",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
   "asset"."width",
   "asset"."height",
   "asset"."isEdited",
-  exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $1::uuid
-  ) as "isFavorite",
   "asset"."updateId"
 from
   "asset" as "asset"
 where
-  "asset"."updateId" < $2
-  and "asset"."updateId" > $3
-  and "ownerId" = $4
+  "asset"."updateId" < $1
+  and "asset"."updateId" > $2
+  and "ownerId" = $3
 order by
   "asset"."updateId" asc
 
@@ -918,7 +950,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -979,7 +1021,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",

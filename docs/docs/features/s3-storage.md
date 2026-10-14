@@ -404,7 +404,7 @@ The **file path format decides the backend**:
 - **Absolute paths** such as `/usr/src/app/upload/library/user/file.jpg` are legacy disk files and route to the disk backend.
 - **Relative paths** such as `library/user/file.jpg` are S3 files and route to the S3 backend.
 
-So no database schema change was needed. The existing `originalPath`, `path`, `thumbnailPath`, and `profileImagePath` columns store either format, and `resolveBackendForKey()` dispatches to the correct backend at runtime. Both backends are always active; `IMMICH_STORAGE_BACKEND` only controls where **new writes** go.
+So no database schema change was needed. The existing `originalPath`, `path`, `thumbnailPath`, and `profileImagePath` columns store either format, and `StorageService.backendFor()` dispatches to the correct backend at runtime. Both backends are always active; `IMMICH_STORAGE_BACKEND` only controls where **new writes** go.
 
 ### Serve Modes
 

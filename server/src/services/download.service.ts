@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { isAbsolute, parse } from 'node:path';
+import { parse } from 'node:path';
 import { Readable } from 'node:stream';
 import sanitize from 'sanitize-filename';
 import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { type AuthDto, isEditedOnly } from 'src/dtos/auth.dto.js';
 import {
@@ -14,7 +15,6 @@ import {
 import { Permission } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getPreferences } from 'src/utils/preferences.js';
@@ -181,7 +181,7 @@ export class DownloadService extends BaseService {
 
       let filePath = edited && editedPath ? editedPath : originalPath;
 
-      if (isAbsolute(filePath)) {
+      if (isDiskPath(filePath)) {
         // Disk asset — resolve symlinks and add by path
         try {
           filePath = await this.storageRepository.realpath(filePath);
@@ -193,7 +193,7 @@ export class DownloadService extends BaseService {
         // S3 asset — open socket lazily when archiver starts consuming this entry.
         // All N sockets would open concurrently if we awaited backend.get() here;
         // archiver is sequential (concurrency 1) so only 1 socket is ever needed at once.
-        const backend = StorageService.resolveBackendForKey(filePath);
+        const backend = await this.backendMedia.backendFor(filePath);
         const lazy = new LazyS3Readable(backend, filePath);
         lazies.push(lazy);
         zip.addFile(lazy, filename);

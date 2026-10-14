@@ -18,7 +18,7 @@ export async function down(db: Kysely<any>): Promise<void> {
   // Quoted camelCase identifiers are required — unquoted identifiers fold to lowercase and this
   // update would fail against the generated schema. Only the OWNER's favorite backfills, matching
   // the raw column's pre-#763 semantics (it could only ever be true for the asset's owner) — see
-  // src/utils/favorite.ts favoriteExistsForOwner's doc comment for the same reasoning.
+  // the header comment of src/utils/favorite.ts for the same reasoning.
   await sql`
     UPDATE "asset"
        SET "isFavorite" = true

@@ -36,25 +36,48 @@ The mobile app is typically compatible with the current and prior major version.
 Thus, we recommend upgrading all mobile clients before upgrading the server to ensure compatibility.
 
 We do not backport patches to earlier versions. We encourage all users to run the most recent stable release of Gallery.
-Downgrading to an earlier version, even within the same minor version, is not supported.
-
-:::warning Rolling back after the `gallery_migrations` change
-Gallery now records its own database migrations in a separate `gallery_migrations` table. A Gallery release from before that change looks for them in `kysely_migrations`, finds none, and stops on boot with:
-
-```
-relation "storage_migration_log" already exists
-```
-
-The failed boot changes nothing in the database. This only happens when your database has a `gallery_migrations` table and the image you roll back to is older than the release that created it. To start that older image, copy the migration records back first:
-
-```bash
-docker exec immich_postgres psql -U postgres -d immich -c 'INSERT INTO "kysely_migrations" ("name", "timestamp") SELECT "name", "timestamp" FROM "gallery_migrations" ON CONFLICT ("name") DO NOTHING;'
-```
-
-Use your own container name, user and database name if they differ. When you upgrade again, Gallery moves the records back on its own.
-:::
+Downgrading is not supported in general: an earlier release does not know the database changes a later one made. To go back to an earlier Gallery release anyway, follow [Rolling back to an earlier release](#rolling-back-to-an-earlier-release).
 
 [semver]: https://semver.org/
+
+## Rolling back to an earlier release
+
+An earlier Gallery release refuses to start on a database that has Gallery migrations it does not ship. Undo those migrations first, with the release you are leaving, which is the one that knows how to undo them. Each step moves its data back to where the earlier release keeps it, so nothing the earlier release can show is lost. Data for features the earlier release does not have goes with the step that undoes them: going back to a 5.7 release drops favorites set by anyone other than the asset's owner, and the record of who added each face. The procedure was tested going back to `v5.8.0-rc.1` and upgrading again; going back to 5.7 was not tested.
+
+1. Back up your database.
+2. Stop the stack with `docker compose down`, and keep the current image in your compose file for now.
+3. Find the newest Gallery migration the earlier release ships, for example for `v5.8.0-rc.1`:
+
+   ```bash
+   docker run --rm --entrypoint ls ghcr.io/open-noodle/gallery-server:v5.8.0-rc.1 /usr/src/app/server/dist/schema/migrations-gallery
+   ```
+
+4. List the Gallery migrations your database has, newest first:
+
+   ```bash
+   docker compose up -d database
+   docker compose exec database psql -U postgres -d immich -c 'SELECT "name" FROM "gallery_migrations" ORDER BY "name" DESC LIMIT 20;'
+   ```
+
+5. Undo the newest Gallery migration with the current image, and repeat until the newest name left is the one from step 3. Each run logs `Reverted migration "<name>"`. Do not run it once more: when no Gallery migration is left to undo, it undoes one of the base database migrations Gallery shares with its upstream project.
+
+   ```bash
+   docker compose run --rm immich-server "node server/dist/bin/gallery-migrations.js revert"
+   ```
+
+   This command does not go through the image's start script, so it does not read `*_FILE` secrets. If your compose file passes the database password or URL that way, add `-e DB_PASSWORD=<password>` (or `-e DB_URL=<url>`) to the `run` command.
+
+6. Releases before the separate `gallery_migrations` table (all of 5.7 and the 5.8 release candidates) look for their migration records in `kysely_migrations`. For those, copy the records back:
+
+   ```bash
+   docker compose exec database psql -U postgres -d immich -c 'INSERT INTO "kysely_migrations" ("name", "timestamp") SELECT "name", "timestamp" FROM "gallery_migrations" ON CONFLICT ("name") DO NOTHING;'
+   ```
+
+   Without this step the earlier release stops on boot with `relation "storage_migration_log" already exists`. The failed boot changes nothing in the database.
+
+7. Switch the image to the earlier release and start the stack.
+
+Use your own container, user and database names if they differ. When you upgrade again, Gallery moves the records back and runs the undone migrations again.
 
 ## Migrating to VectorChord
 

@@ -82,7 +82,7 @@ video ones is covered there. That gap is the hole #671 came through, and closing
 
 The serving side is backend-aware: `playbackVideo` selects the edited `EncodedVideo` row
 (`orderBy asset_file.isEdited desc` in `AssetRepository.getForVideo`) and passes the path to `serveFromBackend` →
-`StorageService.resolveBackendForKey`. Storing a relative key is sufficient; no changes to playback or download.
+`StorageService.backendFor`. Storing a relative key is sufficient; no changes to playback or download.
 
 Realtime HLS ([#741](https://github.com/open-noodle/gallery/issues/741)) reads `asset.originalPath` only
 (`transcoding.service.ts:227`) and never consults the `EncodedVideo` rows, so this work neither triggers nor
@@ -159,7 +159,7 @@ protected async getProbeInput(filePath: string): Promise<string> {
     return filePath;
   }
   const { StorageService } = await import('./storage.service.js');
-  return StorageService.resolveBackendForKey(filePath).getReadableUrl(filePath);
+  return StorageService.backendFor(filePath).getReadableUrl(filePath);
 }
 ```
 
@@ -288,7 +288,7 @@ is cleaned by the caller's `finally` in `handleAssetEditThumbnailGeneration`.
   `persistFile` takes its `!writeBackend` branch. Load-bearing — do not "fix" it by constructing a
   `DiskStorageBackend`.
 - S3 mode in `media.service.spec.ts` is simulated by spying `StorageService.getWriteBackend` to return a fake backend
-  (any object that is not a `DiskStorageBackend` takes the S3 branch), plus a `resolveBackendForKey` stub whose
+  (any object that is not a `DiskStorageBackend` takes the S3 branch), plus a `backendFor` stub whose
   `downloadToTemp` backs `ensureLocalFile`.
 - **The media location under unit tests is `/data`**, set at import time by
   `server/test/repositories/storage.repository.mock.ts:47`. So `/data/library/x.mp4` is an Immich path,
@@ -410,7 +410,7 @@ read `localPath` directly. No `ensureLocalFile`, no behaviour change, and the ph
 
 **(b) Delete the edited encoded video on undo.** Add `AssetRepository.getEditedEncodedVideo(assetId)` returning the
 row's `{ id, path }`, and in the video-undo branch delete that row and queue a `FileDelete` for its path.
-`FileDelete` already resolves disk paths and S3 keys through `StorageService.resolveBackendForKey`.
+`FileDelete` already resolves disk paths and S3 keys through `StorageService.backendFor`.
 
 - **B1 (RED)** Even when an asset's `files` contain a non-edited `EncodedVideo` (which production never produces, but
   a unit test can construct), `mediaRepository.trim` receives the **original**, not the encoded video's path.

@@ -11,19 +11,10 @@ import { JobService } from 'src/services/job.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
-// #763 (Task 1 review finding): job.service.ts's AssetEditReadyV2 / AssetUploadReadyV2 websocket
-// payloads are built by hand (not via mapAsset) from `assetRepository.getById` /
-// `getByIdsWithAllRelationsButStacks` called with NO authUserId, and mapped `isFavorite:
-// asset.isFavorite` off the raw `selectAll('asset')` row. The overlay write path (updateFavorites,
-// slice 1) never touches that raw column, so these two events went stale the moment #763 shipped —
-// this is a LIVE staleness bug, not incidental tsc fallout from the slice-3 column drop.
-//
-// These events are always sent to the asset's OWNER (`this.websocketRepository.clientSend(event,
-// asset.ownerId, ...)` / `clientSendByClient`), so the correct semantics are the OWNER's favorite state, exactly what
-// `favoriteExistsForOwner` (src/utils/favorite.ts) resolves. This spec seeds the OWNER's favorite
-// via the `asset_favorite` overlay ONLY (never the raw column — the app no longer writes it) and
-// asserts the emitted payload reflects it, then asserts a NON-owner's favorite does not leak onto
-// the owner-scoped payload.
+// job.service.ts's AssetEditReadyV2 / AssetUploadReadyV2 websocket payloads are built by hand (not via
+// mapAsset) and always sent to the asset's OWNER, so their `isFavorite` is asset."isFavorite", the owner's
+// favorite projected from the asset_favorite overlay. These cases seed the overlay only, as Gallery writes
+// it, and check the payload follows the owner's row and ignores another user's.
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
@@ -39,7 +30,7 @@ beforeAll(async () => {
 }, 30_000);
 
 describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
-  it('resolves isFavorite from the OWNER overlay row, not the raw asset column', async () => {
+  it('reports the OWNER overlay row projected onto asset.isFavorite', async () => {
     const { sut, ctx } = setup();
     ctx.getMock(JobRepository).run.mockResolvedValue(JobStatus.Success);
     ctx.getMock(EventRepository).emit.mockResolvedValue(undefined as never);
@@ -47,10 +38,7 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
     const { user: owner } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: owner.id });
 
-    // Seed the OWNER's favorite via the overlay ONLY — mirrors how the app writes favorites
-    // post-#763 (updateFavorites routes through AssetFavoriteRepository, never asset.isFavorite).
-    // mediumFactory.assetInsert still defaults the raw column to false, so this row diverges from
-    // the raw column exactly the way a real post-#763 favorite does.
+    // Seed the OWNER's favorite via the overlay only, as updateFavorites does.
     await ctx.database.insertInto('asset_favorite').values({ userId: owner.id, assetId: asset.id }).execute();
 
     await sut.onJobRun(QueueName.ThumbnailGeneration, {
@@ -58,11 +46,10 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
       data: { id: asset.id },
     });
 
-    expect(ctx.getMock(WebsocketRepository).clientSendByClient).toHaveBeenCalledWith(
+    expect(ctx.getMock(WebsocketRepository).clientSend).toHaveBeenCalledWith(
       'AssetEditReadyV2',
       owner.id,
-      [expect.objectContaining({ asset: expect.objectContaining({ isFavorite: true }) })],
-      expect.any(Array),
+      expect.objectContaining({ asset: expect.objectContaining({ isFavorite: true }) }),
     );
   });
 
@@ -83,11 +70,10 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
       data: { id: asset.id },
     });
 
-    expect(ctx.getMock(WebsocketRepository).clientSendByClient).toHaveBeenCalledWith(
+    expect(ctx.getMock(WebsocketRepository).clientSend).toHaveBeenCalledWith(
       'AssetEditReadyV2',
       owner.id,
-      [expect.objectContaining({ asset: expect.objectContaining({ isFavorite: false }) })],
-      expect.any(Array),
+      expect.objectContaining({ asset: expect.objectContaining({ isFavorite: false }) }),
     );
   });
 });

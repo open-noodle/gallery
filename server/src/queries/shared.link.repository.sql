@@ -10,6 +10,17 @@ select
       (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           to_json("exifInfo") as "exifInfo"
         from
           "shared_link_asset"
@@ -95,8 +106,8 @@ select
                     from
                       "shared_space_album"
                       inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                      and "album"."deletedAt" is null
+                      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                      and "linked_album"."deletedAt" is null
                     where
                       "album_asset"."assetId" = "asset"."id"
                       and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
@@ -108,8 +119,8 @@ select
                       "shared_space_album"
                       inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
                       and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                      and "album"."deletedAt" is null
+                      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                      and "linked_album"."deletedAt" is null
                     where
                       "album_space_asset"."assetId" = "asset"."id"
                       and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
@@ -167,6 +178,7 @@ from
       "album"
       left join lateral (
         select
+          "album_asset"."albumId" as "albumId",
           "album_asset"."assetId" as "assetId"
         from
           "album_asset"
@@ -174,30 +186,37 @@ from
           "album_asset"."albumId" = "album"."id"
         union
         select
+          "album_space_asset"."albumId" as "albumId",
           "album_space_asset"."assetId" as "assetId"
         from
-          "album_space_asset"
-          inner join "shared_space_album" on "shared_space_album"."albumId" = "album_space_asset"."albumId"
-          and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
           inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
         where
-          "asset"."visibility" in ($5, $6)
+          "shared_space_member"."userId" = $5::uuid
+          and "shared_space_member"."role" in ($6, $7)
+          and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+          and "asset"."visibility" in ($8, $9)
           and "album_space_asset"."albumId" = "album"."id"
-          and "album_space_asset"."spaceId" = "shared_link_space"."spaceId"
-          and exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_member"
-            where
-              "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
-              and "shared_space_member"."userId" = "shared_link"."userId"
-              and "shared_space_member"."role" in ($7, $8)
-          )
-      ) as "album_members" on true
+      ) as "album_asset" on true
       left join lateral (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           to_json("exifInfo") as "exifInfo"
         from
           "asset"
@@ -239,7 +258,7 @@ from
               "asset_exif"."assetId" = "asset"."id"
           ) as "exifInfo" on true
         where
-          "album_members"."assetId" = "asset"."id"
+          "album_asset"."assetId" = "asset"."id"
           and "asset"."deletedAt" is null
         order by
           "asset"."fileCreatedAt" asc
@@ -249,10 +268,10 @@ from
       and "album"."deletedAt" is null
   ) as "album" on true
 where
-  "shared_link"."id" = $9
-  and "shared_link"."userId" = $10
+  "shared_link"."id" = $10
+  and "shared_link"."userId" = $11
   and (
-    "shared_link"."type" = $11
+    "shared_link"."type" = $12
     or "album"."id" is not null
   )
 order by
@@ -267,7 +286,18 @@ select
     from
       (
         select
-          "asset".*
+          "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration"
         from
           "shared_link_asset"
           inner join "asset" on "asset"."id" = "shared_link_asset"."assetId"
@@ -315,8 +345,8 @@ select
                     from
                       "shared_space_album"
                       inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                      and "album"."deletedAt" is null
+                      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                      and "linked_album"."deletedAt" is null
                     where
                       "album_asset"."assetId" = "asset"."id"
                       and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
@@ -328,8 +358,8 @@ select
                       "shared_space_album"
                       inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
                       and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                      inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                      and "album"."deletedAt" is null
+                      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                      and "linked_album"."deletedAt" is null
                     where
                       "album_space_asset"."assetId" = "asset"."id"
                       and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
@@ -498,7 +528,18 @@ from
   left join "shared_link_asset" on "shared_link_asset"."sharedLinkId" = "shared_link"."id"
   left join lateral (
     select
-      "asset".*
+      "asset".*,
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration"
     from
       "asset"
       inner join lateral (

@@ -411,9 +411,9 @@ a slice is not done while a row in it is unasserted.
 | E16b | `isFavorite: **false**` + either cross-user scope                     | Also works — the guard trips on `false` too today, so both arms must be asserted                                 | 4     |
 | E17  | Deprecated `UpdateAssetDto.isFavorite` from an owner                  | Writes the caller's own row; identical result to the canonical endpoint                                          | 2     |
 | E18  | Deprecated alias from a space **viewer**                              | Still 403 — the alias is strictly narrower and must never widen access                                           | 2     |
-| E19  | Upload with `isFavorite: true`                                        | Creates the uploader's row (uploader is always the owner)                                                        | 7     |
-| E20  | Asset copy with `favorite: true`                                      | Copies the **acting user's** row only, not every user's                                                          | 7     |
-| E21  | Duplicate merge                                                       | Union of all source assets' rows onto the keeper, **per user**, before sources CASCADE                           | 7     |
+| E19  | Upload with `isFavorite: true`                                        | Creates the uploader's row: upstream's create writes the column, the reverse trigger mirrors it                  | 7     |
+| E20  | Asset copy with `favorite: true`                                      | Copies the owner's favorite only (`AssetCopy` is owner-only, so the acting user is the owner)                    | 7     |
+| E21  | Duplicate merge                                                       | Union of all source assets' rows onto the keeper, **per user**: the owner's through upstream's column merge      | 7     |
 | E22  | Statistics `isFavorite: true`                                         | Counts only the caller's rows                                                                                    | 1     |
 | E23  | Map markers `isFavorite: true`                                        | Only caller's favorites; cross-space markers now included                                                        | 4     |
 | E24  | Timeline bucket parallel array                                        | `isFavorite[]` aligns 1:1 with the bucket's asset order for the caller                                           | 1     |
@@ -464,6 +464,29 @@ Recorded so `/impl-loop` does not relitigate them.
 | Platforms                 | Server + web + mobile atomically                          | Staged: a window where the sync stream and server disagree about what `isFavorite` means                            |
 | Write API                 | Dedicated endpoint **+ deprecated alias**                 | Alias-free: breaks third-party API consumers. Guard-relaxation-only: one missed field is privilege escalation       |
 | Sibling actions           | Favorite only; pattern documented (§11.1)                 | All three: archive drags in trash/visibility semantics                                                              |
+
+**Revised (2026-10-11): the column is back as a trigger-maintained owner projection.** A stock Immich
+server on a Gallery database read every owner favorite as false, because the column was gone. Migration
+`1798800000000-RestoreAssetIsFavoriteProjection` restores `asset."isFavorite"` with upstream's meaning,
+the owner's favorite. The overlay stays the source of truth: forward triggers on `asset_favorite` copy
+the owner's row onto the column, which also bumps `asset.updateId` for stock clients, and a reverse
+trigger on `asset` turns any column write into the owner's overlay row. Gallery code never writes the
+column; upstream's owner-only write paths do (upload create, copy, duplicate resolve, kept as upstream
+text because the writer is provably the owner), and the reverse trigger mirrors them. Paths a non-owner
+can reach (`AssetUpdate`, which space editors hold) write the caller's overlay row instead. This is not
+the rejected dual-write cache: every write lands in both through the triggers, so the two cannot drift. Upstream code that is pinned to the owner (owner asset sync, the
+owner's job payloads, workflow assets, asset statistics) reads the column again; every cross-owner
+surface keeps `favoriteExistsFor(viewer)`. `src/utils/favorite-grep-gate.spec.ts` holds that line.
+
+Two constraints come with the triggers. The forward pair fires only at trigger depth 0, so no other
+trigger may write `asset_favorite` (it would leave the column stale); the grep gate checks that only
+the reverse trigger body does. And the two directions take their locks in opposite order: a Gallery
+favorite toggle locks `asset_favorite` then `asset`, a stock column write locks `asset` then
+`asset_favorite`. If a Gallery server and a stock Immich server run on the same database at the same
+time and toggle the same owner asset at the same moment, Postgres can report a deadlock and abort one
+of the two writes. The surviving state is consistent and the aborted request can be retried. Gallery
+traffic alone takes the column-first order only in upstream's owner-only writes, so it can deadlock only
+when a copy or duplicate resolve races the owner's favorite toggle of the same asset.
 
 ### 8.1 On the deprecated alias
 
@@ -948,8 +971,8 @@ misses test lints); `flutter test` green on Flutter 3.41.7.
 
 - _Given_ an upload with `isFavorite: true`, _When_ it completes, _Then_ the **uploader's** row
   exists. (E19)
-- _Given_ an asset copy with `favorite: true`, _When_ it completes, _Then_ the **acting user's**
-  row is copied — not every user's. (E20)
+- _Given_ an asset copy with `favorite: true`, _When_ it completes, _Then_ the owner's favorite is
+  copied, not every user's. (E20)
 - _Given_ a duplicate merge where two users favorited different source assets, _When_ it
   completes, _Then_ the keeper carries **both** users' rows. (E21)
 - _Given_ a favorited asset is trashed then restored, _Then_ the favorite survives. (E14)

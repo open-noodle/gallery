@@ -375,7 +375,7 @@ describe(DownloadService.name, () => {
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
       const mockBackend = { get: vitest.fn() };
-      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+      vitest.spyOn(StorageService, 'backendFor').mockReturnValue(mockBackend as any);
 
       await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
 
@@ -411,7 +411,7 @@ describe(DownloadService.name, () => {
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
       const mockBackend = { get: vitest.fn() };
-      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+      vitest.spyOn(StorageService, 'backendFor').mockReturnValue(mockBackend as any);
 
       const { abort } = await sut.downloadArchive(authStub.admin, {
         assetIds: [s3Asset1.id, s3Asset2.id],
@@ -443,7 +443,7 @@ describe(DownloadService.name, () => {
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
       const mockBackend = { get: vitest.fn() };
-      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+      vitest.spyOn(StorageService, 'backendFor').mockReturnValue(mockBackend as any);
 
       const { abort } = await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
 
@@ -497,7 +497,7 @@ describe(DownloadService.name, () => {
       mocks.storage.realpath.mockResolvedValue('/data/library/disk.jpg');
 
       const mockBackend = { get: vitest.fn() };
-      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+      vitest.spyOn(StorageService, 'backendFor').mockReturnValue(mockBackend as any);
 
       await sut.downloadArchive(authStub.admin, { assetIds: [diskAsset.id, s3Asset.id] });
 
@@ -536,7 +536,7 @@ describe(DownloadService.name, () => {
 
       const fetchError = new Error('S3 connection refused');
       const mockBackend = { get: vitest.fn().mockRejectedValue(fetchError) };
-      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+      vitest.spyOn(StorageService, 'backendFor').mockReturnValue(mockBackend as any);
 
       await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
 
@@ -574,7 +574,7 @@ describe(DownloadService.name, () => {
 
       const s3Stream = new Readable({ read() {} });
       const mockBackend = { get: vitest.fn().mockResolvedValue({ stream: s3Stream }) };
-      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+      vitest.spyOn(StorageService, 'backendFor').mockReturnValue(mockBackend as any);
 
       await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
 

@@ -363,13 +363,16 @@ describe(MediaService.name, () => {
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
     });
 
-    it('should skip S3 assets with relative paths', async () => {
+    it('should leave the files of an S3 asset where they are', async () => {
       const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' })
         .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
         .build();
+      for (const file of asset.files) {
+        file.path = `thumbs/user/ab/cd/${file.type}.jpeg`;
+      }
       mocks.assetJob.getForMigrationJob.mockResolvedValue(asset);
 
-      await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
+      await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
@@ -1662,12 +1665,10 @@ describe(MediaService.name, () => {
       expect(mocks.asset.update).toHaveBeenCalledWith(expect.objectContaining({ thumbhash: thumbhashBuffer }));
     });
 
-    it('should trim video when edits contain Trim action', async () => {
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-        .build();
+    it('should trim a video that has a trim', async () => {
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -1683,10 +1684,10 @@ describe(MediaService.name, () => {
     it('always trims the original, even if an encoded video row is present', async () => {
       const asset = AssetFactory.from({ type: AssetType.Video })
         .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
         .files([{ type: AssetFileType.EncodedVideo, isEdited: false, path: 'encoded-video/owner/ab/cd/video.mp4' }])
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -1701,12 +1702,10 @@ describe(MediaService.name, () => {
       expect(mocks.media.trim).toHaveBeenCalledWith(asset.originalPath, expect.any(String), 5, 20);
     });
 
-    it('should update asset duration after trimming', async () => {
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-        .build();
+    it('should record the trimmed duration after trimming', async () => {
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 19.5 },
@@ -1716,15 +1715,13 @@ describe(MediaService.name, () => {
 
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      expect(mocks.asset.update).toHaveBeenCalledWith(expect.objectContaining({ id: asset.id, duration: 19_500 }));
+      expect(mocks.videoTrim.setDuration).toHaveBeenCalledWith(asset.id, 19_500);
     });
 
     it('should generate thumbnails from extracted frame after trim', async () => {
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 10 } as any })
-        .build();
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 0, endTime: 10 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 10 },
@@ -1743,11 +1740,9 @@ describe(MediaService.name, () => {
     });
 
     it('should return failed when trim ffmpeg errors', async () => {
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-        .build();
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
       mocks.media.trim.mockRejectedValue(new Error('FFmpeg error'));
 
       const result = await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
@@ -1759,11 +1754,9 @@ describe(MediaService.name, () => {
       // Rapid re-trims race: the second job overwrites `{id}_edited.mp4` while the
       // first may still read it, and the first job's temp-frame cleanup deletes the
       // frame the second just extracted (issue #743 item 2).
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 3 } as any })
-        .build();
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 1, endTime: 3 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 2 },
@@ -1800,11 +1793,9 @@ describe(MediaService.name, () => {
       // The in-process lock does not cover overlapping trims in different worker
       // processes — with a fixed frame name, one job's temp-frame cleanup unlinks
       // the frame another job is still reading (issue #743 item 2).
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 3 } as any })
-        .build();
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 1, endTime: 3 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 2 },
@@ -1823,11 +1814,9 @@ describe(MediaService.name, () => {
       // ffmpeg writing `{id}_edited.mp4` in place lets a concurrent reader (probe /
       // frame extraction in another worker process) see a partial file; an atomic
       // rename means readers only ever open a complete video (issue #743 item 2).
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 3 } as any })
-        .build();
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 1, endTime: 3 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 2 },
@@ -1842,11 +1831,9 @@ describe(MediaService.name, () => {
     });
 
     it('cleans up the trimmed video when a post-trim step fails', async () => {
-      const asset = AssetFactory.from({ type: AssetType.Video })
-        .exif()
-        .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-        .build();
+      const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+      mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
       mocks.media.probe.mockResolvedValue({
         ...videoInfoStub.noAudioStreams,
         format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -1937,11 +1924,9 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -1968,11 +1953,9 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -1991,11 +1974,9 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -2016,11 +1997,9 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -2042,10 +2021,7 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         const editedKey = StorageCore.getRelativeEditedEncodedVideoPath(asset as any);
         const withExistingEdit = {
           ...getForGenerateThumbnail(asset),
@@ -2060,6 +2036,7 @@ describe(MediaService.name, () => {
           ],
         };
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(withExistingEdit as any);
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -2083,11 +2060,9 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('data')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -2122,11 +2097,9 @@ describe(MediaService.name, () => {
         vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('data')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },
@@ -2158,11 +2131,9 @@ describe(MediaService.name, () => {
       it('keeps disk-mode trim paths absolute and uploads nothing (regression guard)', async () => {
         // No getWriteBackend spy: StorageService.diskBackend is undefined in this spec file,
         // so persistFile takes its disk branch. Nothing here may become a relative key.
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },

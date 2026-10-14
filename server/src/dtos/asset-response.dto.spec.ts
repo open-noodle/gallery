@@ -39,9 +39,7 @@ describe('mapAsset — per-user favorite (#763)', () => {
     expect(result.isFavorite).toBe(false);
   });
 
-  // #763 slice 3: the global asset."isFavorite" column mapAsset used to guard against leaking
-  // (owner's raw flag reaching non-owners / anonymous callers) has been dropped outright — the
-  // leak this guarded against is now structurally impossible, since there is no raw column left
-  // to fall back to. The fail-safe-false coverage above (row without isFavoriteForUser) and the
-  // grep gate (favorite-grep-gate.spec.ts) cover the same intent going forward.
+  // #763: mapAsset never reads asset."isFavorite" (the owner's favorite), so the owner's flag cannot
+  // reach non-owners or anonymous callers. The fail-safe-false coverage above (row without
+  // isFavoriteForUser) and favorite-grep-gate.spec.ts cover it.
 });

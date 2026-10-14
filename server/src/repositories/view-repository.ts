@@ -2,13 +2,14 @@ import { InjectKysely } from 'nestjs-kysely';
 import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid, withExif } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
   type TimelineHiddenScope,
   hiddenFromOwnTimeline,
-  spaceAssetPathBranches,
+  ownedOrSharedWithViewer,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
 
@@ -54,6 +55,7 @@ export class ViewRepository {
       this.db
         .selectFrom('asset')
         .selectAll('asset')
+        .select(projectedDuration)
         .$call(withExif)
         // #763: userId doubles as the caller here (this repository has only one user concept — no
         // owner/caller split like the shared-space browse paths), so it's also the right id to
@@ -110,15 +112,10 @@ export class ViewRepository {
       ? eb.and([eb('asset.ownerId', '=', asUuid(userId)), subtraction])
       : eb('asset.ownerId', '=', asUuid(userId));
 
-    return eb.or([
-      ownerTerm,
-      ...spaceAssetPathBranches(eb, {
-        correlateAssetId: 'asset.id',
-        correlateLibraryId: 'asset.libraryId',
-        scope: visibleSpaceIds ? { spaceIds: visibleSpaceIds } : { memberUserId: userId },
-        albumTimelineGate: 'personal',
-        viewerId: userId,
-      }),
-    ]);
+    return ownedOrSharedWithViewer(eb, ownerTerm, {
+      scope: visibleSpaceIds ? { spaceIds: visibleSpaceIds } : { memberUserId: userId },
+      albumTimelineGate: 'personal',
+      viewerId: userId,
+    });
   }
 }

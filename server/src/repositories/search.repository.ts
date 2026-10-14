@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  type Expression,
   type ExpressionBuilder,
   type Kysely,
   type OrderByDirection,
@@ -16,6 +17,7 @@ import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchFilter, SearchOrder } from 'src/dtos/search.dto.js';
 import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -34,7 +36,7 @@ import {
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { without } from 'src/utils/filter-suggestions.js';
 import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
+import { ownedOrSharedWithViewer } from 'src/utils/shared-space-album-scope.js';
 
 export interface SearchAssetIdOptions {
   checksum?: Buffer;
@@ -123,7 +125,7 @@ export interface SearchEmbeddingOptions {
   embedding: string;
   /**
    * Owner scoping. Optional — and left unset on purpose under an `albumIds` scope, where the
-   * caller's AlbumRead check is the access boundary and `albumSharedSpaceScope` re-gates the rows
+   * caller's AlbumRead check is the access boundary and `albumConfinedToViewer` re-gates the rows
    * (the same shape `searchMetadata` has always used). Matches `SearchUserIdOptions.userIds`.
    */
   userIds?: string[];
@@ -155,7 +157,7 @@ export interface SearchTagOptions {
 export interface SearchAlbumOptions {
   albumIds?: string[];
   /**
-   * Opts an `albumIds` query OUT of `albumSharedSpaceScope` (database.ts:608), for a caller whose
+   * Opts an `albumIds` query OUT of `albumConfinedToViewer`, for a caller whose
    * album ACCESS check (e.g. Permission.AlbumRead) is already the access boundary — matching the
    * album grid and the pre-fork `GET /albums/{id}/map-markers` endpoint (issue #656). Defaults to
    * false/absent, which preserves the existing shared-space re-gate for album-scoped
@@ -222,16 +224,19 @@ export interface AssetSearchScope {
   lockedOwnerId: string;
   /** whose version of the people to select, required when selecting faces or people */
   viewingUserId?: string;
+  // Gallery hooks: each one unset means upstream behaviour (see searchScopeV3 in src/utils/viewer-scope.ts).
+  /** The search universe (default: `asset.ownerId = any(userIds)`). */
+  ownershipPredicate?: (eb: ExpressionBuilder<DB, 'asset' | 'asset_exif'>) => Expression<SqlBool>;
+  /** Re-gates the album-confined parts, where upstream applies no ownership (default: none). */
+  albumConfinedPredicate?: (eb: ExpressionBuilder<DB, 'asset' | 'asset_exif'>) => Expression<SqlBool>;
+  /** `albumIds` also matches the live contributions made through these spaces (default: `album_asset` only). */
+  albumSpaceIds?: string[];
+  /** Whose favourites `isFavorite` filters and returns (default: the owner's `asset.isFavorite`). */
+  favoriteUserId?: string;
 }
 
 export interface AssetSearchBuilderV3Options {
   filter?: SearchFilter;
-  /**
-   * #763: the CALLER's id, used to resolve `filter.isFavorite` against the per-user
-   * `asset_favorite` overlay (the raw `asset.isFavorite` column is gone). Mirrors
-   * `AssetSearchBuilderOptions.authUserId` on the legacy path. Never client-controlled.
-   */
-  authUserId?: string;
   withExif?: boolean;
   withFaces?: boolean;
   withPeople?: boolean;
@@ -481,6 +486,7 @@ export class SearchRepository {
       ratingIsMinimum: true,
     })
       .selectAll('asset')
+      .select(projectedDuration)
       // #763: project the per-user overlay onto the rows feeding mapAsset via searchSmart's
       // mapResponse. Flows through both the 'cte' (candidates.selectAll()) and 'simple' outer
       // query paths below since both select every column baseQuery projects.
@@ -734,17 +740,13 @@ export class SearchRepository {
     // predicate only ever references `asset.*`, so the emitted SQL is unaffected.
     const viewerScope = () => {
       const eb = expressionBuilder<DB, 'asset'>();
-      return eb.or([
+      return ownedOrSharedWithViewer(
+        eb,
         eb('asset.ownerId', '=', anyUuid(userIds)),
-        ...(timelineSpaceIds?.length
-          ? spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { spaceIds: timelineSpaceIds },
-              albumTimelineGate: 'space-tab',
-            })
-          : []),
-      ]);
+        timelineSpaceIds?.length
+          ? { scope: { spaceIds: timelineSpaceIds }, albumTimelineGate: 'space-tab' }
+          : undefined,
+      );
     };
 
     return (
@@ -873,14 +875,13 @@ export class SearchRepository {
   }
 
   // TODO(v4): drop the V3 suffix once the legacy methods are removed
-  // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
-  // Not wired to any controller/service. The fork's live search runs on the legacy path
-  // (searchAssetBuilderLegacy). Do not call these V3 methods from fork code.
-  // Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
   @GenerateSql(...searchMetadataV3Examples)
   async searchMetadataV3(pagination: PaginationOptions, options: AssetSearchBuilderV3Options, scope: AssetSearchScope) {
     const items = await withSearchOrder(searchAssetBuilder(this.db, options, scope), options.order)
       .select(columns.searchAsset)
+      .$if(!!scope.favoriteUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, scope.favoriteUserId!).as('isFavoriteForUser')),
+      )
       .limit(pagination.take + 1)
       .offset(pagination.skip ?? 0)
       .execute();
@@ -896,6 +897,9 @@ export class SearchRepository {
   ): Promise<MapAsset[]> {
     return searchAssetBuilder(this.db, options, scope)
       .select(columns.searchAsset)
+      .$if(!!scope.favoriteUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, scope.favoriteUserId!).as('isFavoriteForUser')),
+      )
       .orderBy(sql`random()`)
       .limit(size)
       .execute();
@@ -912,6 +916,9 @@ export class SearchRepository {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
       const items = await searchAssetBuilder(trx, options, scope)
         .select(columns.searchAsset)
+        .$if(!!scope.favoriteUserId, (qb) =>
+          qb.select((eb) => favoriteExistsFor(eb, scope.favoriteUserId!).as('isFavoriteForUser')),
+        )
         .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
         .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
         .orderBy('asset.id', 'asc')

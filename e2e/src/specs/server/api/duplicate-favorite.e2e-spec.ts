@@ -4,25 +4,14 @@ import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-// #763 slice 7 (E21): duplicate-merge must preserve every user's favorites, not just the owner's.
+// #763 (E21): duplicate-merge must preserve every user's favorites, not just the owner's.
 //
 // Duplicate *detection* is owner-scoped (`duplicate.repository.ts` filters `asset.ownerId`), so
-// every asset in a duplicate group shares one owner — here, `ctx.spaceOwner`. But OTHER users can
-// favorite those same assets via space access (#763 slice 2 gates favoriting on
-// Permission.AssetRead, which a space viewer already has). The old code merged favorites with
-// `assets.some((asset) => asset.isFavorite)` — a boolean OR over the raw, owner-only column — so it
-// could only ever express the owner's own favorite and silently dropped everyone else's.
-// `AssetFavoriteRepository.mergeOnto` (a per-user UNION, `INSERT ... SELECT DISTINCT ... ON
-// CONFLICT DO NOTHING`) fixes that. See docs/superpowers/specs/2026-07-20-per-user-favorites-design.md
-// §6 (E21) and docs/superpowers/plans/2026-07-20-per-user-favorites-slice-7.md Task 2.
-//
-// NOTE: this file lives alongside the legacy `e2e/src/api/specs/duplicate.e2e-spec.ts`, which is
-// NOT picked up by any vitest `include` glob (dead since upstream's `refactor: e2e (#7703)` moved
-// every other file's include pattern to `src/specs/server/**` and left this one behind) and whose
-// assertions target a now-stale `/duplicates/resolve` response shape (`{status, results:[{status,
-// reason}]}` instead of the current `BulkIdResponseDto[]`, i.e. `[{id, success, error?}]`). Reviving
-// that file is a separate, pre-existing gap outside this slice's scope — flagged here rather than
-// fixed, so this new coverage isn't silently lost in the same way.
+// every asset in a duplicate group shares one owner, here `ctx.spaceOwner`. Other users can
+// favorite those assets through a space. The owner's favorite merges through upstream's
+// `assets.some((asset) => asset.isFavorite)` column write, which the reverse trigger mirrors to the
+// owner's overlay row; `AssetFavoriteRepository.mergeOnto` carries everyone else's. See
+// specs/2026-07-20-per-user-favorites-design.md (E21).
 
 const putFavorites = (token: string, ids: string[], isFavorite: boolean) =>
   request(app).put('/assets/favorites').set(asBearerAuth(token)).send({ ids, isFavorite });

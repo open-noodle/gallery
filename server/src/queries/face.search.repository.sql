@@ -74,8 +74,8 @@ with
             from
               "shared_space_album"
               inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" on "album"."id" = "shared_space_album"."albumId"
-              and "album"."deletedAt" is null
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
             where
               "album_asset"."assetId" = "asset"."id"
               and "shared_space_album"."spaceId" = $4::uuid
@@ -87,8 +87,8 @@ with
               "shared_space_album"
               inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
               and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" on "album"."id" = "shared_space_album"."albumId"
-              and "album"."deletedAt" is null
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
             where
               "album_space_asset"."assetId" = "asset"."id"
               and "shared_space_album"."spaceId" = $5::uuid

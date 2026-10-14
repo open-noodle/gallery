@@ -31,7 +31,10 @@ vi.mock('kysely', async () => {
 import {
   album_soft_delete_shared_space_album,
   album_space_asset_delete_audit,
+  asset_favorite_after_delete,
+  asset_favorite_after_insert,
   asset_favorite_delete_audit,
+  asset_is_favorite_after_write,
   library_after_insert,
   shared_space_album_folder_delete_audit,
   shared_space_album_hidden_delete_audit,
@@ -50,6 +53,7 @@ import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/17
 import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable.js';
 import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables.js';
 import { up as upDropLibraryCreateId } from 'src/schema/migrations-gallery/1798200000000-DropLibraryCreateId.js';
+import { up as upRestoreAssetIsFavorite } from 'src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.js';
 
 describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parity', () => {
   beforeEach(() => {
@@ -387,4 +391,34 @@ describe('1798200000000-DropLibraryCreateId override parity', () => {
     };
     expect(overrideValue.sql).toBe(library_after_insert.expression);
   });
+});
+
+describe('1798800000000-RestoreAssetIsFavoriteProjection override parity', () => {
+  beforeEach(() => {
+    capturedSql.length = 0;
+  });
+
+  it.each([asset_favorite_after_insert, asset_favorite_after_delete, asset_is_favorite_after_write])(
+    'executes and overrides $name with DDL byte-identical to functions.ts',
+    async (fn) => {
+      await upRestoreAssetIsFavorite({} as any);
+
+      expect(findSql('the CREATE FUNCTION', (s) => s.startsWith(`CREATE OR REPLACE FUNCTION ${fn.name}()`))).toBe(
+        fn.expression,
+      );
+      const override = findSql('the function override row', (s) => s.includes(`VALUES ('function_${fn.name}'`));
+      expect(parseOverrideValue(override).sql).toBe(fn.expression);
+    },
+  );
+
+  it.each(['asset_favorite_after_insert', 'asset_favorite_after_delete', 'asset_is_favorite_after_write'])(
+    'stores a trigger override row byte-identical to the %s trigger it executes',
+    async (name) => {
+      await upRestoreAssetIsFavorite({} as any);
+
+      const executed = findSql('the CREATE TRIGGER', (s) => s.startsWith(`CREATE OR REPLACE TRIGGER "${name}"`));
+      const override = findSql('the trigger override row', (s) => s.includes(`VALUES ('trigger_${name}'`));
+      expect(parseOverrideValue(override).sql).toBe(executed);
+    },
+  );
 });

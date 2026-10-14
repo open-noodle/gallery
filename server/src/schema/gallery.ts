@@ -5,6 +5,7 @@ import { AssetFaceCreatorTable } from 'src/schema/tables/asset-face-creator.tabl
 import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
 import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import { AssetJobStatusGalleryTable } from 'src/schema/tables/asset-job-status-gallery.table.js';
+import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table.js';
@@ -54,6 +55,7 @@ export const galleryTables = [
   AssetFavoriteTable,
   AssetFavoriteAuditTable,
   AssetJobStatusGalleryTable,
+  AssetVideoTrimTable,
   FaceIdentityTable,
   FaceIdentityFaceTable,
   FaceRepairDeclineTable,
@@ -103,6 +105,7 @@ export interface GalleryDB {
   asset_favorite: AssetFavoriteTable;
   asset_favorite_audit: AssetFavoriteAuditTable;
   asset_job_status_gallery: AssetJobStatusGalleryTable;
+  asset_video_trim: AssetVideoTrimTable;
   face_identity: FaceIdentityTable;
   face_identity_face: FaceIdentityFaceTable;
   face_repair_decline: FaceRepairDeclineTable;

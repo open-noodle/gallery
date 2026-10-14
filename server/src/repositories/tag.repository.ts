@@ -16,7 +16,7 @@ import { DB } from 'src/schema/index.js';
 import { TagAssetTable } from 'src/schema/tables/tag-asset.table.js';
 import { TagTable } from 'src/schema/tables/tag.table.js';
 import { asUuid } from 'src/utils/database.js';
-import { spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import { sharedWithViewer } from 'src/utils/shared-space-album-scope.js';
 
 @Injectable()
 export class TagRepository {
@@ -77,53 +77,17 @@ export class TagRepository {
       .execute();
   }
 
-  // The tag explorer lists tags for assets a user can actually see: their own tags,
-  // plus tags on any asset reachable through a shared space they are a member of —
-  // either added to the space directly or via a library linked to the space. Mirrors
-  // the access rules in AccessRepository/ViewRepository so non-admin space members are
-  // not stuck with an empty tag tree (issue #647).
+  // The tag explorer lists tags for assets a user can actually see: their own tags, plus tags on any
+  // asset shared with them through a space they are a member of (issue #647).
   private ownedOrSpaceAccessible(eb: ExpressionBuilder<DB, 'tag'>, userId: string) {
     return eb.or([
       eb('tag.userId', '=', asUuid(userId)),
-      // Direct-asset arm: asset must be space-shareable (Archive or Timeline); Hidden/Locked never surface.
       eb.exists(
         eb
           .selectFrom('tag_asset')
           .innerJoin('asset', 'asset.id', 'tag_asset.assetId')
-          .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset.id')
-          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
           .whereRef('tag_asset.tagId', '=', 'tag.id')
-          .where('asset.deletedAt', 'is', null)
-          .where('shared_space_member.userId', '=', asUuid(userId))
-          .where(spaceVisibilityGate(eb as any)),
-      ),
-      // Library arm: same visibility gate.
-      eb.exists(
-        eb
-          .selectFrom('tag_asset')
-          .innerJoin('asset', 'asset.id', 'tag_asset.assetId')
-          .innerJoin('shared_space_library', 'shared_space_library.libraryId', 'asset.libraryId')
-          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
-          .whereRef('tag_asset.tagId', '=', 'tag.id')
-          .where('asset.deletedAt', 'is', null)
-          .where('shared_space_member.userId', '=', asUuid(userId))
-          .where(spaceVisibilityGate(eb as any)),
-      ),
-      // Album arm: same visibility gate.
-      eb.exists(
-        eb
-          .selectFrom('tag_asset')
-          .innerJoin('asset', 'asset.id', 'tag_asset.assetId')
-          .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
-          .innerJoin('shared_space_album', 'shared_space_album.albumId', 'album_asset.albumId')
-          .innerJoin('album', (j) =>
-            j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
-          )
-          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
-          .whereRef('tag_asset.tagId', '=', 'tag.id')
-          .where('asset.deletedAt', 'is', null)
-          .where('shared_space_member.userId', '=', asUuid(userId))
-          .where(spaceVisibilityGate(eb as any)),
+          .where((eb) => sharedWithViewer(eb, { scope: { memberUserId: userId }, albumTimelineGate: 'none' })),
       ),
     ]);
   }

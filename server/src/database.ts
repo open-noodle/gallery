@@ -15,6 +15,7 @@ import {
   UserAvatarColor,
   UserStatus,
 } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
@@ -446,10 +447,8 @@ export const columns = {
     'asset.height',
     'asset.isEdited',
   ],
-  // #763: isFavorite is intentionally NOT listed here — the search/city repository methods that
-  // use this list project it separately via favoriteExistsFor(eb, options.authUserId), the
-  // per-user asset_favorite overlay resolved for the CALLER, instead of the raw asset column
-  // (which was dropped in slice 3). Same pattern as syncAsset / workflowAssetV1 below.
+  // #763: no isFavorite: the column is the owner's favorite, and search spans other users' assets.
+  // Callers project the caller's own via favoriteExistsFor(eb, options.authUserId).
   searchAsset: [
     'asset.id',
     'asset.updateId',
@@ -460,7 +459,7 @@ export const columns = {
     'asset.checksum',
     'asset.checksumAlgorithm',
     'asset.duplicateId',
-    'asset.duration',
+    projectedDuration,
     'asset.fileCreatedAt',
     'asset.fileModifiedAt',
     'asset.isExternal',
@@ -500,12 +499,10 @@ export const columns = {
     'asset.originalPath',
     'asset.originalFileName',
     'asset.isOffline',
-    // #763: isFavorite is intentionally NOT listed here — the sole consumer, workflow.repository.ts's
-    // getForAssetV1, projects it separately via favoriteExistsForOwner(eb), the per-user asset_favorite
-    // overlay resolved for the asset's OWNER (background workflow jobs have no auth user — see
-    // favorite.ts's doc comment for the owner-semantics rationale).
+    'asset.isFavorite',
     'asset.isExternal',
     'asset.isEdited',
+    'asset.isFavorite',
   ],
   assetFiles: ['asset_file.id', 'asset_file.path', 'asset_file.type', 'asset_file.isEdited'],
   assetFilesForThumbnail: [
@@ -558,9 +555,6 @@ export const columns = {
     'plugin_method.allowedHosts',
     'plugin_method.uiHints',
   ],
-  // #763: isFavorite is intentionally NOT listed here — AssetSync.getUpserts (sync.repository.ts)
-  // projects it separately via favoriteExistsFor(eb, userId), the per-user asset_favorite overlay,
-  // instead of this raw asset column (same pattern as syncLibraryAsset below).
   syncAsset: [
     'asset.id',
     'asset.ownerId',
@@ -573,8 +567,9 @@ export const columns = {
     'asset.localDateTime',
     'asset.type',
     'asset.deletedAt',
+    'asset.isFavorite',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -595,7 +590,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -616,7 +611,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -637,7 +632,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -662,7 +657,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',

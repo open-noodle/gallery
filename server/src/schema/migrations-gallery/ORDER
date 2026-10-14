@@ -74,3 +74,5 @@
 1798500000000-AddAssetJobStatusGalleryTable
 1798600000000-AddPersonIdentityTable
 1798700000000-AddPersonPetTable
+1798800000000-RestoreAssetIsFavoriteProjection
+1798900000000-MoveVideoTrimToSidecar

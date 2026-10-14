@@ -16,10 +16,12 @@ import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -80,6 +82,7 @@ export const galleryRepositories = [
   PetFaceRepository,
   FaceSearchRepository,
   GallerySyncRepository,
+  VideoTrimRepository,
 ];
 
 export const galleryServices = [
@@ -91,6 +94,7 @@ export const galleryServices = [
   FaceSuggestionService,
   GalleryAssetService,
   GalleryPeopleService,
+  GalleryPluginService,
   LibraryManifestService,
   PetDetectionService,
   PetRecognitionService,

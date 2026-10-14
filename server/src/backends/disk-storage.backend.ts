@@ -7,6 +7,13 @@ import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/stor
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 
 /**
+ * A stored path that names a disk file: absolute, in upstream's layout. A relative key belongs to the configured
+ * storage backend (S3, or the media location when S3 is off). StorageService.backendFor decides on it; sites
+ * that run upstream's own disk code for disk files test it too.
+ */
+export const isDiskPath = (key: string) => isAbsolute(key);
+
+/**
  * exists / readAll / delete go through StorageRepository: they replace direct StorageRepository
  * calls in upstream code paths, which keeps those paths (and the specs that mock the repository)
  * unchanged for disk files.
@@ -18,8 +25,7 @@ export class DiskStorageBackend implements StorageBackend {
   ) {}
 
   private resolvePath(key: string): string {
-    // Absolute paths are legacy disk assets — return as-is
-    if (isAbsolute(key)) {
+    if (isDiskPath(key)) {
       return key;
     }
     // an absolute-only backend (see BackendMediaServer.backendFor): a relative key would resolve against
