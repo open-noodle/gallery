@@ -14,6 +14,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { platform } from 'node:os';
 import { join, resolve } from 'node:path';
 import yaml from 'yaml';
+import { version } from '../package.json';
 
 export interface BaseOptions {
   configDirectory: string;
@@ -89,7 +90,8 @@ export const connect = async (url: string, key: string) => {
     // noop
   }
 
-  init({ baseUrl: url, apiKey: key });
+  // marks a Gallery client, so the server reports the Gallery version rather than its upstream base
+  init({ baseUrl: url, apiKey: key, headers: { 'x-gallery-app': version } });
 
   const [error] = await withError(getMyUser());
   if (error) {

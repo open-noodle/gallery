@@ -50,4 +50,18 @@ describe(ServerController.name, () => {
       expect(body).toEqual({ smartSearchHealthy: false });
     });
   });
+
+  describe('GET /server/version', () => {
+    it('passes the client headers to the service and varies the response on them', async () => {
+      versionService.getVersion.mockReturnValue({ major: 3, minor: 3, patch: 1, prerelease: null });
+      const { status, headers } = await request(ctx.getHttpServer())
+        .get('/server/version')
+        .set('User-Agent', 'immich-android/3.3.1');
+      expect(status).toBe(200);
+      expect(headers.vary).toContain('User-Agent, X-Gallery-App');
+      expect(versionService.getVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ 'user-agent': 'immich-android/3.3.1' }),
+      );
+    });
+  });
 });
