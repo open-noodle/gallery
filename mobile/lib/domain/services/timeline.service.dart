@@ -42,7 +42,7 @@ enum TimelineOrigin {
 }
 
 class TimelineFactory {
-  final TimelineRepository _timelineRepository;
+  final SharedSpaceTimelineRepository _timelineRepository;
   final SettingsRepository _settingsRepository;
 
   const TimelineFactory({required this._timelineRepository, required this._settingsRepository});
@@ -154,7 +154,7 @@ class TimelineFactory {
   /// Timeline for a Space-shared person, restricted to the [assetIds] the server resolved for
   /// that person. Used instead of [person] when the viewer does not own the person: the local
   /// sync DB is owner-scoped, so the person's face→person links never sync and [person] would
-  /// be empty. See [TimelineRepository.sharedSpacePerson].
+  /// be empty. See [SharedSpaceTimelineRepository.sharedSpacePerson].
   TimelineService sharedSpacePerson(
     List<String> assetIds, {
     GroupAssetsBy? groupBy,

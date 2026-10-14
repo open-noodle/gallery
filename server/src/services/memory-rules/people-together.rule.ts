@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { MemoryPeriodFace, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { MemoryPeriodFace, MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { medianTime, pairCounts, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 

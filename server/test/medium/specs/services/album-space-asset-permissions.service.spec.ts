@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, JobName, Permission } from 'src/enum.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';

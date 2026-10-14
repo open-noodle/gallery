@@ -1,12 +1,12 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { MemoryAsset, MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { CHAPTER_MAX_SPAN_DAYS, Chapter, DayCount, densestChapter } from 'src/services/memory-rules/chapter.util.js';
 import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 
 export const TRIGGER_DAY = 13;
-/** Fallback when `memories.personThrowbackDormancyMonths` is absent (see `gallery/config.dto.ts`). */
+/** Fallback when `memories.personThrowbackDormancyMonths` is absent (see `gallery/dtos/config.dto.ts`). */
 export const DEFAULT_DORMANCY_MONTHS = 6;
 export const MIN_TOTAL_ASSETS = 10;
 export const MIN_CHAPTER_ASSETS = 6;

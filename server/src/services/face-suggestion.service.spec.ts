@@ -644,7 +644,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('denies a non-owner with no state change (edge 18 absence)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // not the owner
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set()); // not the owner
 
       await expect(
         sut.getFaceSuggestions(AuthFactory.create(), 'person-1', { page: 1, size: 50 }),
@@ -654,8 +654,8 @@ describe(FaceSuggestionService.name, () => {
 
     it('refuses a space member (non-owner) — suggestions are owner-only (D6)', async () => {
       // Space member: NOT the owner, but space-reachable (would pass PersonRead).
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set(['person-1']));
 
       await expect(sut.getFaceSuggestions(AuthFactory.create(), 'person-1', { page: 1, size: 10 })).rejects.toThrow(
         BadRequestException,
@@ -664,7 +664,7 @@ describe(FaceSuggestionService.name, () => {
     });
 
     it('refuses an admin who is not the owner — PersonUpdate has no admin carve-out (D6)', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
 
       await expect(
         sut.getFaceSuggestions(AuthFactory.create({ isAdmin: true }), 'person-1', { page: 1, size: 10 }),
@@ -674,7 +674,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('returns total + mapped items for the owner', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.facePersonVerdict.getPendingForPerson.mockResolvedValue({
         total: 1,
         items: [
@@ -735,7 +735,7 @@ describe(FaceSuggestionService.name, () => {
           },
         },
       });
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
 
       const res = await sut.getFaceSuggestions(AuthFactory.create(), 'person-1', { page: 1, size: 50 });
 
@@ -750,7 +750,7 @@ describe(FaceSuggestionService.name, () => {
           facialRecognition: { enabled: true, maxDistance: 0.5, suggestions: { enabled: false, maxDistance: 0.7 } },
         },
       });
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
 
       await expect(sut.getFaceSuggestions(authStub.admin, 'person-1', { page: 1, size: 10 })).resolves.toEqual({
         total: 0,
@@ -782,7 +782,7 @@ describe(FaceSuggestionService.name, () => {
     });
 
     it('denies a non-owner with NO state change (edge 18 absence)', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // not owner
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set()); // not owner
 
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
         BadRequestException,
@@ -800,7 +800,7 @@ describe(FaceSuggestionService.name, () => {
     it('denies a face the caller does not own, even though the person is owned, with NO state change', async () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId])); // person ownership OK
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId])); // person ownership OK
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set()); // face NOT owned by the caller
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getByGroupId.mockResolvedValue(person);
@@ -820,7 +820,7 @@ describe(FaceSuggestionService.name, () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
       person.faceAssetId = null; // no feature photo yet — triggers createNewFeaturePhoto
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
@@ -855,7 +855,7 @@ describe(FaceSuggestionService.name, () => {
     it('is idempotent when the row is already confirmed/rejected/ignored but person+face still exist → 204 (false), no reassign', async () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       // Slice 9: person/face are now read BEFORE the transaction opens (claimPending — and the rest of the
       // write chain — must run inside the trx, and these two lookups have no trx-aware repo method), so
@@ -871,7 +871,7 @@ describe(FaceSuggestionService.name, () => {
     });
 
     it('a CASCADE-deleted person or face → 400 (owner-only precedence, edges 9, 10)', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // person row gone
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set()); // person row gone
 
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
         BadRequestException,
@@ -895,7 +895,7 @@ describe(FaceSuggestionService.name, () => {
       // S11.7: the feature-disabled short-circuit is a no-op -> false (204).
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).resolves.toBe(false);
 
-      expect(mocks.access.person.checkOwnerAccess).not.toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkOwnerAccess).not.toHaveBeenCalled();
       expect(mocks.access.person.checkFaceOwnerAccess).not.toHaveBeenCalled();
       expect(mocks.person.getByGroupIdOnly).not.toHaveBeenCalled();
       expect(mocks.person.getFaceById).not.toHaveBeenCalled();
@@ -907,17 +907,17 @@ describe(FaceSuggestionService.name, () => {
       // observed on the next call — clear it explicitly, same as a fresh test's systemMetadata mock does.
       clearConfigCache();
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set()); // still denies — but PROVES it ran
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set()); // still denies — but PROVES it ran
       await expect(sut.confirmFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalled();
     });
   });
 
   describe('rejectFaceSuggestion / ignoreFaceSuggestion / dismissFaceSuggestion', () => {
     it('denies a non-owner for reject and ignore with NO state change (edge 18 absence)', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
 
       await expect(sut.rejectFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
         BadRequestException,
@@ -935,7 +935,7 @@ describe(FaceSuggestionService.name, () => {
     // (identity-merge-propagation.service.ts), so an assetFaceId the caller does not own must be refused before
     // any row is written.
     it('S4.1: rejectFaceSuggestion throws BadRequestException when checkFaceOwnerAccess returns empty, and never calls markRejected', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1'])); // person ownership OK
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1'])); // person ownership OK
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set()); // face NOT owned by the caller
 
       await expect(sut.rejectFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
@@ -947,7 +947,7 @@ describe(FaceSuggestionService.name, () => {
     // S4.2: same gate on ignore and on dismiss (which delegates to reject, so it inherits the gate rather than
     // duplicating it).
     it('S4.2: ignoreFaceSuggestion and dismissFaceSuggestion throw BadRequestException when checkFaceOwnerAccess returns empty, and never write a verdict', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set());
 
       await expect(sut.ignoreFaceSuggestion(AuthFactory.create(), 'person-1', 'face-1')).rejects.toBeInstanceOf(
@@ -965,14 +965,14 @@ describe(FaceSuggestionService.name, () => {
     // this describe) to prove the assertion can actually fail.
     it('S4.3: the owner path passes both the person and face ownership checks and still calls markRejected', async () => {
       const authUser = AuthFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
       mocks.facePersonVerdict.markRejected.mockResolvedValue(1);
 
       // S11.7: markRejected affecting a row -> true (200).
       await expect(sut.rejectFaceSuggestion(authUser, 'person-1', 'face-1')).resolves.toBe(true);
 
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(authUser.user.id, new Set(['person-1']));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(authUser.user.id, new Set(['person-1']));
       expect(mocks.access.person.checkFaceOwnerAccess).toHaveBeenCalledWith(authUser.user.id, new Set(['face-1']));
       expect(mocks.facePersonVerdict.markRejected).toHaveBeenCalledWith('person-1', 'face-1', {
         identityId: 'identity-1',
@@ -983,7 +983,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('reject flips the row to rejected and never assigns or reassigns the face', async () => {
       const authUser = AuthFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
       mocks.facePersonVerdict.markRejected.mockResolvedValue(1);
 
@@ -1001,7 +1001,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('ignore flips the row to ignored and never assigns or reassigns the face', async () => {
       const authUser = AuthFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
       mocks.facePersonVerdict.markIgnored.mockResolvedValue(1);
 
@@ -1019,7 +1019,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('reject and ignore no-op stale or already-resolved rows and never assigns or reassigns the face', async () => {
       const authUser = AuthFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
       mocks.facePersonVerdict.markRejected.mockResolvedValue(0);
       mocks.facePersonVerdict.markIgnored.mockResolvedValue(0);
@@ -1045,7 +1045,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('dismiss remains a compatibility wrapper around reject', async () => {
       const authUser = AuthFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set(['face-1']));
       mocks.facePersonVerdict.markRejected.mockResolvedValue(1);
 
