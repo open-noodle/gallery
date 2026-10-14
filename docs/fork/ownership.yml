@@ -479,6 +479,14 @@ features:
         - server/src/schema/migrations-gallery/1794100000000-DropAssetIsFavoriteColumn.ts
         - server/src/schema/migrations-gallery/1796000000000-AddAssetFaceCreatedBy.ts
         - server/src/schema/migrations-gallery/1797000000000-AddAssetLocalDateTimeIndex.ts
+        - server/src/schema/migrations-gallery/1798000000000-AddSharedLinkSpaceTable.ts
+        - server/src/schema/migrations-gallery/1798100000000-AddAssetFaceCreatorTable.ts
+        - server/src/schema/migrations-gallery/1798200000000-DropLibraryCreateId.ts
+        - server/src/schema/migrations-gallery/1798500000000-AddAssetJobStatusGalleryTable.ts
+        - server/src/schema/migrations-gallery/1798600000000-AddPersonIdentityTable.ts
+        - server/src/schema/migrations-gallery/1798700000000-AddPersonPetTable.ts
+        - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
+        - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
