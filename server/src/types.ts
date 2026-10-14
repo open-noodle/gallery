@@ -360,9 +360,8 @@ export interface ISharedSpaceAlbumGrantReconcileJob extends IBaseJob {
 
 export type EmailImageAttachment = {
   filename: string;
+  path: string;
   cid: string;
-  path?: string;
-  content?: Buffer;
 };
 
 export interface IEmailJob {

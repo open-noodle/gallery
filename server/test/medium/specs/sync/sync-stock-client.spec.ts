@@ -1,13 +1,12 @@
 import { Kysely } from 'kysely';
-import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetType, SyncEntityType, SyncRequestType } from 'src/enum.js';
-import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
+import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
-// A stock Immich client cannot decode a `trim` edit, and has no notion of pets, so a Gallery server
-// hides both from any request that carries no fork-only sync type.
+// A stock Immich client has no notion of pets, so a Gallery server hides them from any request that carries no
+// fork-only sync type. Trims are not edits on the wire: every client gets the trimmed duration of the file it plays.
 
 let defaultDatabase: Kysely<DB>;
 
@@ -26,34 +25,26 @@ beforeAll(async () => {
 });
 
 describe('stock Immich client gating', () => {
-  it('should not send a trim edit to a stock client, and should send it to a Gallery client', async () => {
+  it('should send a trimmed video with its trimmed duration and no edit to stock and Gallery clients alike', async () => {
     const { auth, ctx } = await setup();
-    const { asset: video } = await ctx.newAsset({ ownerId: auth.user.id, type: AssetType.Video });
-    const { asset: image } = await ctx.newAsset({ ownerId: auth.user.id });
-    const assetEditRepo = ctx.get(AssetEditRepository);
-    await assetEditRepo.replaceAll(video.id, [
-      { action: AssetEditAction.Trim, parameters: { startTime: 1, endTime: 2, originalDuration: 10 } as any },
-    ]);
-    await assetEditRepo.replaceAll(image.id, [
-      { action: AssetEditAction.Crop, parameters: { x: 0, y: 0, width: 10, height: 10 } },
-    ]);
+    const { asset: video } = await ctx.newAsset({ ownerId: auth.user.id, type: AssetType.Video, duration: 10_000 });
+    const videoTrimRepo = ctx.get(VideoTrimRepository);
+    await videoTrimRepo.upsert(video.id, 1, 5);
+    await videoTrimRepo.setDuration(video.id, 4000);
 
-    const stock = await ctx.syncStream(auth, [SyncRequestType.AssetEditsV1]);
-    expect(stock).toEqual([
-      expect.objectContaining({
-        type: SyncEntityType.AssetEditV1,
-        data: expect.objectContaining({ assetId: image.id }),
-      }),
-      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
-    ]);
-
-    const gallery = await ctx.syncStream(auth, galleryClient(SyncRequestType.AssetEditsV1));
-    expect(gallery.filter(({ type }) => type === SyncEntityType.AssetEditV1).map(({ data }) => data)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ assetId: video.id, action: AssetEditAction.Trim }),
-        expect.objectContaining({ assetId: image.id, action: AssetEditAction.Crop }),
-      ]),
-    );
+    for (const types of [
+      [SyncRequestType.AssetsV2, SyncRequestType.AssetEditsV1],
+      [...galleryClient(SyncRequestType.AssetsV2), SyncRequestType.AssetEditsV1],
+    ]) {
+      const response = await ctx.syncStream(auth, types);
+      expect(response.filter(({ type }) => type === SyncEntityType.AssetEditV1)).toEqual([]);
+      expect(response).toContainEqual(
+        expect.objectContaining({
+          type: SyncEntityType.AssetV2,
+          data: expect.objectContaining({ id: video.id, duration: 4000, isEdited: true }),
+        }),
+      );
+    }
   });
 
   it('should not send pet people or their faces to a stock client, and should send them to a Gallery client', async () => {

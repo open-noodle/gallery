@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
  * An album detail page runs its page-aware search scoped to the album it is showing. Server-side
  * that made `albumIds` an ACCESS BOUNDARY on the smart path, matching what `/search/metadata` has
  * always done: check `AlbumRead` up front, then leave the owner-scoping `userIds` unset so
- * `albumSharedSpaceScope` re-gates the rows. Previously smart search kept `userIds`, so searching a
+ * `albumConfinedToViewer` re-gates the rows. Previously smart search kept `userIds`, so searching a
  * shared album returned only your own photos beside a grid that had just shown everyone's.
  *
  * WHAT IS TESTABLE HERE, and why these assertions look indirect:

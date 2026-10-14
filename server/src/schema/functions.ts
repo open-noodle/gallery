@@ -971,6 +971,61 @@ export const asset_favorite_delete_audit = registerFunction({
     END`,
 });
 
+// --- gallery-fork: asset."isFavorite" as the owner's projection of asset_favorite ---
+//
+// asset_favorite holds every user's favorites; asset."isFavorite" mirrors the owner's row so a stock
+// Immich server on this database sees owner favorites. The forward pair copies overlay changes onto
+// the column, the reverse trigger copies column writes (a stock server) back into the overlay. All of
+// them fire only for statements run at depth 0, so neither direction echoes the other; nothing else writes
+// asset_favorite from inside a trigger, and a cascade from deleting an asset or user leaves nothing to project.
+// The reverse trigger tests OLD/NEW in its body, not in WHEN: sql-tools reads trigger conditions with
+// pg_get_expr, which fails on OLD/NEW references, and that would break every schema drift check. OLD is
+// NULL on INSERT, so its fields read as NULL there.
+export const asset_favorite_after_insert = registerFunction({
+  name: 'asset_favorite_after_insert',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      UPDATE asset SET "isFavorite" = true
+      FROM inserted_rows
+      WHERE asset.id = inserted_rows."assetId"
+        AND asset."ownerId" = inserted_rows."userId"
+        AND NOT asset."isFavorite";
+      RETURN NULL;
+    END`,
+});
+
+export const asset_favorite_after_delete = registerFunction({
+  name: 'asset_favorite_after_delete',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      UPDATE asset SET "isFavorite" = false
+      FROM deleted_rows
+      WHERE asset.id = deleted_rows."assetId"
+        AND asset."ownerId" = deleted_rows."userId"
+        AND asset."isFavorite";
+      RETURN NULL;
+    END`,
+});
+
+export const asset_is_favorite_after_write = registerFunction({
+  name: 'asset_is_favorite_after_write',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      IF NEW."isFavorite" AND OLD."isFavorite" IS NOT TRUE THEN
+        INSERT INTO asset_favorite ("userId", "assetId") VALUES (NEW."ownerId", NEW.id) ON CONFLICT DO NOTHING;
+      ELSIF OLD."isFavorite" AND NOT NEW."isFavorite" THEN
+        DELETE FROM asset_favorite WHERE "userId" = NEW."ownerId" AND "assetId" = NEW.id;
+      END IF;
+      RETURN NULL;
+    END`,
+});
+
 // --- gallery-fork: library_user create-side trigger functions ---
 //
 // See specs/2026-04-11-library-user-access-backfill-design.md for the

@@ -1,6 +1,6 @@
 # Switching from Immich to Gallery
 
-Gallery runs on your existing Immich database, media and configuration. You change two image names, and on first start Gallery adds its own tables and columns. Your photos and videos stay where they are.
+Gallery runs on your existing Immich database, media and configuration. You change two image names, and on first start Gallery adds its own tables, plus database functions, triggers and indexes. It adds no columns to Immich's tables. Your photos and videos stay where they are.
 
 ## Check your Immich version first
 

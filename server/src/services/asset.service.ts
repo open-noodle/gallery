@@ -1,11 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { chunk, isUndefined, omitBy } from 'lodash-es';
+import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
-import { isAbsolute } from 'node:path';
 import type { AssetFile } from 'src/database.js';
 import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
-import { StorageCore } from 'src/cores/storage.core.js';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetResponseDto, SanitizedAssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import {
@@ -28,7 +27,6 @@ import {
   type AssetEditActionItem,
   AssetEditsCreateDto,
   AssetEditsResponseDto,
-  type TrimParameters,
 } from 'src/dtos/editing.dto.js';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto.js';
 import {
@@ -40,13 +38,12 @@ import {
   JobStatus,
   Permission,
   QueueName,
-  SharedSpaceActivityType,
 } from 'src/enum.js';
 import { applyVisibilityTransitionSideEffects } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { updateAssetFavorites } from 'src/gallery/services/gallery-asset.service.js';
 import { applyAssetResponseOverlay } from 'src/gallery/utils/asset-response-overlay.js';
+import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
 import {
   getAssetFiles,
@@ -61,15 +58,6 @@ import { extractTimeZone } from 'src/utils/date.js';
 import { favoriteViewerId } from 'src/utils/favorite.js';
 import { batched, findOrFail } from 'src/utils/misc.js';
 import { transformOcrBoundingBox } from 'src/utils/transform.js';
-
-// Bounds how many cross-owner ids logCrossOwnerEdit will resolve a space for, per bulk edit —
-// it does NOT bound how many assets a user may edit. A bulk edit can carry an id list large
-// enough that resolving a space (a two-subquery UNION join) for every cross-owner id would fan
-// one request out into tens of thousands of heavy queries; logCrossOwnerEdit is best-effort
-// activity-feed attribution whose failure is already swallowed, so it is the one place in this
-// feature safe to degrade under a huge selection. Never apply this constant to AssetBulkUpdateDto
-// or to POST /assets/editable — both must answer for the user's whole selection.
-const MAX_ATTRIBUTION_ASSETS = 500;
 
 @Injectable()
 export class AssetService extends BaseService {
@@ -221,7 +209,7 @@ export class AssetService extends BaseService {
     // tell the space that someone favorited a member's photo.
     const { isFavorite: _isFavorite, ...edits } = dto;
     if (dto.visibility === undefined && Object.values(edits).some((value) => value !== undefined)) {
-      await this.logCrossOwnerEdit(auth, [id]);
+      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
 
     return this.get(auth, id) as Promise<AssetResponseDto>;
@@ -260,6 +248,12 @@ export class AssetService extends BaseService {
       if (ownedIds.size !== new Set(ids).size) {
         throw new ForbiddenException('Visibility and duplicate grouping can only be changed on assets you own');
       }
+    }
+
+    // A duplicateId is visible on any asset the caller can read. Joining another owner's group would block that owner's
+    // resolve (their list never shows our asset) and let ours reach their keeper.
+    if (duplicateId && (await this.duplicateRepository.hasOtherOwner(duplicateId, auth.user.id))) {
+      throw new ForbiddenException('Duplicate grouping can only join a group of assets you own');
     }
 
     // #763: isFavorite is the deprecated alias for PUT /assets/favorites (§8.1) — it no longer goes
@@ -333,7 +327,7 @@ export class AssetService extends BaseService {
     if (shouldWriteSidecar) {
       await this.jobRepository.queueAll(ids.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
     } else {
-      const assets = await this.assetRepository.getByIds(ids);
+      const assets = await this.assetRepository.getByIds(ids, auth.user.id);
       for (const asset of assets) {
         this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
       }
@@ -348,7 +342,7 @@ export class AssetService extends BaseService {
     // #763: a favorite-only write is the caller's private state, not an edit — see update().
     const { ids: _ids, isFavorite: _isFavorite, ...edits } = dto;
     if (visibility === undefined && Object.values(edits).some((value) => value !== undefined)) {
-      await this.logCrossOwnerEdit(auth, ids);
+      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, ids);
     }
   }
 
@@ -365,10 +359,8 @@ export class AssetService extends BaseService {
     }: AssetCopyDto,
   ) {
     await this.requireAccess({ auth, permission: Permission.AssetCopy, ids: [sourceId, targetId] });
-    // #763 (E20): `getForCopy`'s `isFavorite` is the ACTING user's overlay row, not the owner's —
-    // see asset.repository.ts. Copy carries only that, never every user who favorited the source.
-    const sourceAsset = await this.assetRepository.getForCopy(sourceId, auth.user.id);
-    const targetAsset = await this.assetRepository.getForCopy(targetId, auth.user.id);
+    const sourceAsset = await this.assetRepository.getForCopy(sourceId);
+    const targetAsset = await this.assetRepository.getForCopy(targetId);
 
     if (!sourceAsset || !targetAsset) {
       throw new BadRequestException('Both assets must exist');
@@ -391,14 +383,7 @@ export class AssetService extends BaseService {
     }
 
     if (favorite) {
-      // Semantic sharpening (#763, E20), not a translation of the old column-update: the old
-      // code copied the source asset's GLOBAL isFavorite column; this copies the ACTING user's
-      // own favorite of the source onto the target, mirroring the old "set to whatever the
-      // source's value is" overwrite behaviour but scoped to auth.user.id only. Another user who
-      // also favorited the source is untouched — they never had a say in this copy.
-      await (sourceAsset.isFavorite
-        ? this.assetFavoriteRepository.addAll(auth.user.id, [targetId])
-        : this.assetFavoriteRepository.removeAll(auth.user.id, [targetId]));
+      await this.assetRepository.update({ id: targetId, isFavorite: sourceAsset.isFavorite });
     }
 
     if (sidecar) {
@@ -443,11 +428,11 @@ export class AssetService extends BaseService {
 
     const { localPath, cleanup } = await this.backendMedia.ensureLocalFile(sourceFile.path);
     try {
-      if (isAbsolute(targetSidecarPath)) {
+      if (isDiskPath(targetSidecarPath)) {
         this.storageCore.ensureFolders(targetSidecarPath);
         await this.storageRepository.copyFile(localPath, targetSidecarPath);
       } else {
-        const backend = StorageService.resolveBackendForKey(targetSidecarPath);
+        const backend = await this.backendMedia.backendFor(targetSidecarPath);
         const stream = this.storageRepository.createPlainReadStream(localPath);
         await backend.put(targetSidecarPath, stream, { contentType: 'application/xml' });
       }
@@ -703,72 +688,6 @@ export class AssetService extends BaseService {
     return findOrFail(() => this.assetRepository.getById(id), 'Asset');
   }
 
-  /**
-   * #734: record an edit made by someone who is not the asset owner, so the owner can see
-   * what changed and who changed it. Owner self-edits — nearly all editing — log nothing,
-   * which is what keeps this low-volume.
-   *
-   * Grouped by resolved space, one row per space: a bulk edit can span several spaces, and
-   * attributing all of it to whichever space resolved first would be wrong. Assets that
-   * resolve to no space contribute no row.
-   *
-   * Never throws. Attribution is secondary to the edit that triggered it.
-   */
-  private async logCrossOwnerEdit(auth: AuthDto, assetIds: string[]): Promise<void> {
-    // assetIds arrives here via a zod-validated DTO, so it's already guaranteed to be a real
-    // array — this check is defence in depth at the helper boundary, not a suspicion that the
-    // DTO lies. It also matters for static analysis: it's what makes the chunking below
-    // provably bounded rather than relying on a `.length` that isn't necessarily an array's own.
-    if (!Array.isArray(assetIds)) {
-      return;
-    }
-
-    try {
-      // Which of these does the caller own? AssetDelete is the pure owner arm — the same
-      // trick rbac-3 uses at :220-223. Deliberately NOT a getByIds fetch: findSpaceForAssetAndUser
-      // takes an asset id, so the owner id itself is never needed, and a bulk edit should not pay
-      // for a full asset read just to decide whether to write an activity row.
-      const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: assetIds });
-      const crossOwnerIds = assetIds.filter((id) => !ownedIds.has(id));
-      if (crossOwnerIds.length === 0) {
-        return;
-      }
-
-      // findSpaceForAssetAndUser is a UNION of two three-join subqueries; a large cross-owner bulk
-      // edit is this feature's headline case, so resolving one id at a time, sequentially, would add
-      // a serial-latency term proportional to the batch size. Chunk into bounded-concurrency batches
-      // instead of firing all of them at once (connection-pool safety) or one at a time (latency).
-      const truncated = crossOwnerIds.length > MAX_ATTRIBUTION_ASSETS;
-      const sampledIds = crossOwnerIds.slice(0, MAX_ATTRIBUTION_ASSETS);
-      const bySpace = new Map<string, string[]>();
-      for (const batch of chunk(sampledIds, 10)) {
-        const spaces = await Promise.all(
-          batch.map((assetId) => this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)),
-        );
-        for (const [index, space] of spaces.entries()) {
-          if (!space) {
-            continue;
-          }
-          const assetId = batch[index];
-          const ids = bySpace.get(space.spaceId) ?? [];
-          ids.push(assetId);
-          bySpace.set(space.spaceId, ids);
-        }
-      }
-
-      for (const [spaceId, ids] of bySpace) {
-        await this.sharedSpaceRepository.logActivity({
-          spaceId,
-          userId: auth.user.id,
-          type: SharedSpaceActivityType.AssetEdit,
-          data: { count: ids.length, assetIds: ids.slice(0, 4), ...(truncated && { truncated: true }) },
-        });
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to log cross-owner edit activity: ${error}`);
-    }
-  }
-
   private async updateExif(dto: {
     id: string;
     description?: string;
@@ -833,119 +752,50 @@ export class AssetService extends BaseService {
       throw new BadRequestException('Asset not found');
     }
 
-    const edits = dto.edits as AssetEditActionItem[];
-    const hasTrim = edits.some((e) => e.action === AssetEditAction.Trim);
-    const hasSpatial = edits.some((e) =>
-      [AssetEditAction.Crop, AssetEditAction.Rotate, AssetEditAction.Mirror].includes(e.action),
-    );
-
-    // Reject mixed spatial + trim edits
-    if (hasTrim && hasSpatial) {
-      throw new BadRequestException('Cannot combine trim with spatial edits');
+    if (asset.type !== AssetType.Image) {
+      throw new BadRequestException('Only images can be edited');
     }
 
-    if (hasTrim) {
-      // Video trim validation
-      if (asset.type !== AssetType.Video) {
-        throw new BadRequestException('Trim is only supported for video assets');
+    if (asset.livePhotoVideoId) {
+      throw new BadRequestException('Editing live photos is not supported');
+    }
+
+    if (isPanorama(asset)) {
+      throw new BadRequestException('Editing panorama images is not supported');
+    }
+
+    if (asset.originalPath?.toLowerCase().endsWith('.gif')) {
+      throw new BadRequestException('Editing GIF images is not supported');
+    }
+
+    if (asset.originalPath?.toLowerCase().endsWith('.svg')) {
+      throw new BadRequestException('Editing SVG images is not supported');
+    }
+
+    // check that crop parameters will not go out of bounds
+    const { width: assetWidth, height: assetHeight } = getDimensions(asset);
+
+    if (!assetWidth || !assetHeight) {
+      throw new BadRequestException('Asset dimensions are not available for editing');
+    }
+
+    const edits = dto.edits as AssetEditActionItem[];
+    const crop = edits.find((e) => e.action === AssetEditAction.Crop);
+    if (crop) {
+      if (edits[0].action !== AssetEditAction.Crop) {
+        throw new BadRequestException('Crop action must be the first edit action');
       }
 
-      if (asset.livePhotoVideoId) {
-        throw new BadRequestException('Trimming live photos is not supported');
-      }
-
-      // Block external-library videos: absolute paths outside the media location.
-      // S3-backed originals are relative keys, resolved through the storage backend.
-      if (isAbsolute(asset.originalPath) && !StorageCore.isImmichPath(asset.originalPath)) {
-        throw new BadRequestException('Video trimming is not available for external library videos');
-      }
-
-      // Audio-only file check. getProbeInput hands ffprobe an absolute path (disk) or a
-      // presigned URL (S3) — it does NOT download the video, which matters here because
-      // this runs inside the request.
-      let probeResult: Awaited<ReturnType<typeof this.mediaRepository.probe>>;
-      try {
-        probeResult = await this.mediaRepository.probe(await this.backendMedia.getProbeInput(asset.originalPath));
-      } catch {
-        // Never surface or log the raw ffprobe error: for S3 originals getProbeInput yields a
-        // presigned URL (a bearer credential) that ffprobe echoes in its stderr, which would
-        // otherwise leak into error logs. Log only the asset id.
-        this.logger.error(`Failed to probe video for trim (asset ${id})`);
-        throw new BadRequestException('Unable to read video for trimming');
-      }
-      if (!probeResult.videoStreams || probeResult.videoStreams.length === 0) {
-        throw new BadRequestException('Cannot trim audio-only files');
-      }
-
-      // When re-trimming, asset.duration reflects the previous trim.
-      // Use originalDuration from the existing trim edit if available.
-      const existingEdits = await this.assetEditRepository.getAll(id);
-      const existingTrim = existingEdits.find((e) => e.action === AssetEditAction.Trim);
-      const existingOriginalDuration = existingTrim
-        ? (existingTrim.parameters as TrimParameters & { originalDuration?: number }).originalDuration
-        : undefined;
-
-      const durationSeconds = existingOriginalDuration ?? (asset.duration === null ? null : asset.duration / 1000);
-      if (durationSeconds === null || durationSeconds <= 0) {
-        throw new BadRequestException('Video duration is not available');
-      }
-
-      // Very short video check (against original duration)
-      if (durationSeconds < 2) {
-        throw new BadRequestException('Video is too short to trim (minimum 2 seconds)');
-      }
-
-      const trim = edits.find((e) => e.action === AssetEditAction.Trim)!;
-      const { startTime, endTime } = trim.parameters as TrimParameters;
-
-      if (endTime > durationSeconds) {
-        throw new BadRequestException('End time exceeds video duration');
-      }
-
-      if (startTime === 0 && endTime >= durationSeconds && !existingTrim) {
-        throw new BadRequestException('Trim must actually remove content');
-      }
-
-      // Enrich with originalDuration before storing (preserve original, not current trimmed)
-      (trim.parameters as TrimParameters & { originalDuration: number }).originalDuration = durationSeconds;
-    } else {
-      // Existing image validation
-      if (asset.type !== AssetType.Image) {
-        throw new BadRequestException('Only images can be edited');
-      }
-
-      if (asset.livePhotoVideoId) {
-        throw new BadRequestException('Editing live photos is not supported');
-      }
-
-      if (isPanorama(asset)) {
-        throw new BadRequestException('Editing panorama images is not supported');
-      }
-
-      if (asset.originalPath?.toLowerCase().endsWith('.gif')) {
-        throw new BadRequestException('Editing GIF images is not supported');
-      }
-
-      if (asset.originalPath?.toLowerCase().endsWith('.svg')) {
-        throw new BadRequestException('Editing SVG images is not supported');
-      }
-
-      // Crop bounds validation
+      // check that crop parameters will not go out of bounds
       const { width: assetWidth, height: assetHeight } = getDimensions(asset);
+
       if (!assetWidth || !assetHeight) {
         throw new BadRequestException('Asset dimensions are not available for editing');
       }
 
-      const crop = edits.find((e) => e.action === AssetEditAction.Crop);
-      if (crop) {
-        if (edits[0].action !== AssetEditAction.Crop) {
-          throw new BadRequestException('Crop action must be the first edit action');
-        }
-
-        const { x, y, width, height } = crop.parameters;
-        if (x + width > assetWidth || y + height > assetHeight) {
-          throw new BadRequestException('Crop parameters are out of bounds');
-        }
+      const { x, y, width, height } = crop.parameters;
+      if (x + width > assetWidth || y + height > assetHeight) {
+        throw new BadRequestException('Crop parameters are out of bounds');
       }
     }
 
@@ -953,8 +803,9 @@ export class AssetService extends BaseService {
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
     // #734: after the write succeeds — a rejected write must log nothing.
-    await this.logCrossOwnerEdit(auth, [id]);
+    await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
 
+    // Return the asset and its applied edits
     return {
       assetId: id,
       edits: newEdits,
@@ -969,21 +820,10 @@ export class AssetService extends BaseService {
       throw new BadRequestException('Asset not found');
     }
 
-    // Read existing edits to check for trim (need originalDuration for restore)
-    const existingEdits = await this.assetEditRepository.getAll(id);
-    const trimEdit = existingEdits.find((e) => e.action === AssetEditAction.Trim);
-    if (trimEdit) {
-      const params = trimEdit.parameters as TrimParameters & { originalDuration?: number };
-      if (params.originalDuration) {
-        const restoredDuration = Math.round(params.originalDuration * 1000);
-        await this.assetRepository.update({ id, duration: restoredDuration });
-      }
-    }
-
     await this.assetEditRepository.replaceAll(id, []);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
     // #734: after the write succeeds — a rejected write must log nothing.
-    await this.logCrossOwnerEdit(auth, [id]);
+    await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
   }
 }

@@ -33,11 +33,11 @@ describe(BaseService.name, () => {
         downloadToTemp: vi.fn().mockResolvedValue({ tempPath: '/tmp/abc.jpg', cleanup: backendCleanup }),
       };
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
 
       const result = await (sut as any).backendMedia.ensureLocalFile('upload/user/abc.jpg');
 
-      expect(StorageService.resolveBackendForKey).toHaveBeenCalledWith('upload/user/abc.jpg');
+      expect(StorageService.backendFor).toHaveBeenCalledWith('upload/user/abc.jpg', expect.anything());
       expect(backend.downloadToTemp).toHaveBeenCalledWith('upload/user/abc.jpg');
       expect(result.localPath).toBe('/tmp/abc.jpg');
       await result.cleanup();
@@ -50,7 +50,7 @@ describe(BaseService.name, () => {
         downloadToTemp: vi.fn().mockResolvedValue({ tempPath: '/tmp/abc.jpg', cleanup: backendCleanup }),
       };
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
 
       await expect(
         (async () => {
@@ -62,9 +62,9 @@ describe(BaseService.name, () => {
       expect(backendCleanup).toHaveBeenCalledOnce();
     });
 
-    it('propagates errors from resolveBackendForKey without leaking cleanup', async () => {
+    it('propagates errors from backendFor without leaking cleanup', async () => {
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockImplementation(() => {
+      vi.spyOn(StorageService, 'backendFor').mockImplementation(() => {
         throw new Error('unknown backend');
       });
 
@@ -74,7 +74,7 @@ describe(BaseService.name, () => {
     it('propagates errors from downloadToTemp without leaking cleanup', async () => {
       const backend = { downloadToTemp: vi.fn().mockRejectedValue(new Error('S3 unavailable')) };
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
 
       await expect((sut as any).backendMedia.ensureLocalFile('upload/user/abc.jpg')).rejects.toThrow('S3 unavailable');
     });
@@ -84,7 +84,7 @@ describe(BaseService.name, () => {
     it('hands the backend the signal of the response it is serving', async () => {
       const backend = { getServeStrategy: vi.fn().mockResolvedValue({ type: 'redirect', url: 'https://s3/key' }) };
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
       const res = Object.assign(new EventEmitter(), { set: vi.fn(), redirect: vi.fn() }) as any;
 
       await sendFile(

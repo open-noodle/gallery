@@ -21,6 +21,38 @@ Assets you uploaded through Gallery are preserved, as long as they exist in Immi
 **The right answer is to restore the `pg_dump` you took before switching to Gallery.** Use this script only if you skipped that step.
 :::
 
+## Trying Immich first
+
+Upstream Immich also starts on a Gallery database without the cleanup script. You can use that to try Immich for a while and then go back to Gallery with nothing lost. Gallery's automated tests run this round trip and check that the data is intact afterwards.
+
+1. Back up your database as in [step 1](#1-back-up-your-database).
+2. Open **Administration > Job Queues** and wait until no queue has active or waiting jobs. Stop the Gallery containers as in [step 2](#2-stop-the-gallery-stack), including the Redis flush.
+3. Turn off Gallery's workflow plugin. Immich cannot load it and does not start while it is on:
+
+   ```bash
+   docker exec immich_postgres psql -U postgres -d immich \
+     -c "UPDATE plugin SET enabled = false WHERE name = 'gallery-core';"
+   ```
+
+   Do not delete the plugin instead: that also deletes every workflow step that uses a Gallery action.
+
+4. Switch the image to Immich as in [step 5](#5-switch-your-compose-file-to-upstream-immich) and start the stack. Set `IMMICH_VERSION` to exactly the Immich release Gallery is built on, currently `v3.3.1` (`upstream.version` in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json)), not a floating tag such as `v3`. A newer Immich runs its own database migrations, and Gallery then refuses to start on that database until you restore the backup from step 1.
+
+Immich shows each user their own photos and videos, with their own favorites. A trimmed video plays at full length and shows its full duration, but its thumbnail is still taken from the trimmed part. Immich's schema check warns about Gallery's database functions and about Gallery's rows in `migration_overrides` (for functions, triggers and indexes); those warnings are expected here.
+
+Never run Gallery and Immich on the same database at the same time. If both change the favorite on the same photo at the same moment, the database can stop one of the two changes with a deadlock error.
+
+To go back to Gallery, wait until Immich's job queues are empty, stop Immich, flush Redis again, turn the plugin back on with `UPDATE plugin SET enabled = true WHERE name = 'gallery-core';`, switch the image back to Gallery and start the stack. Favorites you changed in Immich carry over.
+
+If you forget to turn the plugin back on, every workflow with a Gallery action fails with `No loaded plugin found for <uuid>` in the server log. Gallery also logs a warning at startup that the `gallery-core` plugin is disabled, with the SQL that turns it back on.
+
+To stay on Immich, you still have to run the cleanup script below. Without it, these problems remain, and they also apply while you try Immich:
+
+- Share links made from a space keep showing other members' photos, even after those members leave the space.
+- Files stored in S3 do not load.
+- The Immich mobile app stops syncing when it receives a rule memory, which it cannot read.
+- Pets show up as people.
+
 ## Before you start
 
 ### Move files out of S3
@@ -101,7 +133,7 @@ Notes:
 
 ## 5. Switch your compose file to upstream Immich
 
-Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin a version close to the Immich release Gallery was last rebased from. You can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`.
+Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin the Immich release Gallery is built on, currently `v3.3.1`. You can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`. After the cleanup script has run, a newer Immich release also works.
 
 ```yaml title="docker-compose.yml"
 services:
@@ -123,7 +155,7 @@ Remove any Gallery-only environment variables from your `.env` file, such as `IM
 ```yaml title=".env"
 #IMMICH_VERSION=v5
 // highlight-next-line
-IMMICH_VERSION=v3
+IMMICH_VERSION=v3.3.1
 ```
 
 ## 6. Start the stack
@@ -139,12 +171,12 @@ Watch the server log. A successful boot ends with the usual Immich startup banne
 
 Here is what the cleanup script changes:
 
-- It drops the Gallery-only tables `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`, `asset_favorite`, `asset_favorite_audit`, `face_person_verdict`, `shared_link_space`, `asset_face_creator`, `person_identity`, `person_pet` and `asset_job_status_gallery`. The last five hold data that older Gallery releases kept in extra columns on Immich tables: which space a share link came from, who drew a face, a person's face identity, which people are pets, and the pet detection and classification progress of each asset.
+- It drops the Gallery-only tables `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`, `asset_favorite`, `asset_favorite_audit`, `asset_video_trim`, `face_person_verdict`, `shared_link_space`, `asset_face_creator`, `person_identity`, `person_pet` and `asset_job_status_gallery`. The last five hold data that older Gallery releases kept in extra columns on Immich tables: which space a share link came from, who drew a face, a person's face identity, which people are pets, and the pet detection and classification progress of each asset.
 - On a database last run by an older Gallery release, it also drops the columns that release added to Immich tables: `person.type`, `person.species`, `person.identityId`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt`, `library.createId`, `shared_link.spaceId` and `asset_face.createdBy`. Current releases add no columns to Immich tables, only indexes and triggers, which the script also drops.
-- It restores `asset.isFavorite`, an upstream Immich column Gallery moved into the `asset_favorite` overlay so each space member can favorite independently, before dropping `asset_favorite`, and backfills it from the overlay, but only for the asset's owner. Favorites belonging to anyone else (for example, a shared-space viewer who favorited another member's photo) have no equivalent in plain Immich's single-favorite-flag model and are discarded. Your own favorites on your own assets are preserved.
+- It keeps `asset.isFavorite`, the upstream Immich column that holds each owner's favorites, and drops `asset_favorite`, the overlay Gallery uses so each space member can favorite independently. On a database last run by a Gallery release that had removed the column, it first restores the column and fills it from the overlay, for the asset's owner only. Favorites belonging to anyone else (for example, a shared-space viewer who favorited another member's photo) have no equivalent in plain Immich's single-favorite-flag model and are discarded. Your own favorites on your own assets are preserved.
 - It deletes pets: their people, the faces detected on them and their recognition data. Without this they would show up as people.
 - It deletes rule memories, which the Immich mobile app cannot read.
-- It undoes video trims: the original duration comes back, and the trim and its trimmed video and thumbnails are no longer referenced. Those files stay on disk. The blurred placeholder Immich shows while a thumbnail loads is cleared and rebuilt from the original by the nightly missing thumbnails task.
+- It undoes video trims: the full-length video comes back, and the trim and its trimmed video and thumbnails are no longer referenced. On a database last run by an older Gallery release, which stored the trimmed length as the video's duration, it also restores the original duration. Those files stay on disk. The blurred placeholder Immich shows while a thumbnail loads is cleared and rebuilt from the original by the nightly missing thumbnails task.
 - It removes from share links every photo the link creator could not share in plain Immich. The creator keeps their own photos, and a partner's photos only while that partner still shares with them, the partner's account is not deleted, and the photo is not archived or locked. Gallery hid the other photos once they left the space; Immich would keep showing them. Links left with no photos are deleted.
 - It deletes album links made from a space to albums the link creator neither owns nor was added to as an editor, the same rule Immich uses for sharing an album. Being a member of the space is not enough: Immich does not know about spaces. Album links made outside a space are kept.
 - It removes Gallery-only settings rows from `system_metadata` and Gallery-only permissions from API keys.

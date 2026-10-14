@@ -1,15 +1,27 @@
-import { AfterDeleteTrigger, CreateDateColumn, ForeignKeyColumn, Table, Timestamp } from '@immich/sql-tools';
+import {
+  AfterDeleteTrigger,
+  AfterInsertTrigger,
+  CreateDateColumn,
+  ForeignKeyColumn,
+  Table,
+  Timestamp,
+} from '@immich/sql-tools';
 import type { Generated } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn } from 'src/decorators.js';
-import { asset_favorite_delete_audit } from 'src/schema/functions.js';
+import {
+  asset_favorite_after_delete,
+  asset_favorite_after_insert,
+  asset_favorite_delete_audit,
+} from 'src/schema/functions.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 
 // Per-user favorites overlay (#763). A favorite is a fact about (user, asset), never about an
-// asset alone — see docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §3.
+// asset alone: see specs/2026-07-20-per-user-favorites-design.md §3.
 // Carries its own createId/updateId watermarks (+ asset_favorite_audit) because favorites are a
-// separately-synced entity: a favorite write must NOT bump the owner's asset.updateId, which
-// would re-sync that asset to every space member (§4.3).
+// separately-synced entity. Only the owner's row reaches the asset: the after-insert/after-delete
+// triggers project it onto asset."isFavorite", whose updatedAt trigger bumps asset.updateId, so stock
+// clients re-sync the owner's favorite. Another user's favorite never touches the asset row (§4.3).
 //
 // PK is (userId, assetId), deliberately userId-leading — the dominant query is "my favorites".
 @Table('asset_favorite')
@@ -19,6 +31,20 @@ import { UserTable } from 'src/schema/tables/user.table.js';
   scope: 'statement',
   function: asset_favorite_delete_audit,
   referencingOldTableAs: 'old',
+})
+@AfterInsertTrigger({
+  name: 'asset_favorite_after_insert',
+  scope: 'statement',
+  function: asset_favorite_after_insert,
+  referencingNewTableAs: 'inserted_rows',
+  when: 'pg_trigger_depth() = 0',
+})
+@AfterDeleteTrigger({
+  name: 'asset_favorite_after_delete',
+  scope: 'statement',
+  function: asset_favorite_after_delete,
+  referencingOldTableAs: 'deleted_rows',
+  when: 'pg_trigger_depth() = 0',
 })
 export class AssetFavoriteTable {
   // index: false — userId is the leading column of the composite PK, so its btree already serves

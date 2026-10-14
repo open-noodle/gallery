@@ -248,7 +248,20 @@ class SyncApiRepository {
         continue;
       }
 
-      data.add(SyncEvent(type: type, data: converter(dataJson), ack: ack));
+      // A Gallery server older than the trim endpoint sends trims as `AssetEditV1` rows whose action this client's
+      // enum no longer has; skipping that line keeps the rest of the stream syncing. Any other line fails as upstream.
+      final Object event;
+      try {
+        event = converter(dataJson);
+      } catch (error) {
+        if (type != SyncEntityType.assetEditV1) {
+          rethrow;
+        }
+        final id = dataJson is Map ? dataJson['id'] : null;
+        _logger.warning("Skipping undecodable $type line (id: $id): $error");
+        continue;
+      }
+      data.add(SyncEvent(type: type, data: event, ack: ack));
     }
 
     return data;

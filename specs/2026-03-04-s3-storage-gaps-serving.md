@@ -36,7 +36,7 @@ protected async serveFromBackend(
   cacheControl: CacheControl,
   fileName?: string,
 ): Promise<ImmichMediaResponse> {
-  const backend = StorageService.resolveBackendForKey(filePath);
+  const backend = StorageService.backendFor(filePath);
   const strategy = await backend.getServeStrategy(filePath, contentType);
 
   switch (strategy.type) {
@@ -375,7 +375,7 @@ private async getAlbumThumbnailAttachment(album: {
   const filename = `album-thumbnail${getFilenameExtension(filePath)}`;
 
   if (!isAbsolute(filePath)) {
-    const backend = StorageService.resolveBackendForKey(filePath);
+    const backend = StorageService.backendFor(filePath);
     const { stream } = await backend.get(filePath);
     const chunks: Buffer[] = [];
     for await (const chunk of stream) {

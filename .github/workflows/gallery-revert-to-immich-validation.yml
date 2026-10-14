@@ -3,7 +3,9 @@ name: Gallery Revert-to-Immich Validation
 # Nightly end-to-end check that scripts/revert-to-immich.sql actually does
 # what it claims: takes a Gallery-migrated database and resets it to a state
 # where upstream Immich boots cleanly, with no schema drift warnings and no
-# stale kysely_migration rows.
+# stale kysely_migration rows. Before the revert, the same database goes
+# through a trial boot of stock Immich without the script and back to
+# Gallery, as the switch-back guide describes.
 #
 # See specs/2026-04-14-revert-to-immich-validation-design.md for the
 # full design, the pass-criterion rationale, and the review history.
@@ -31,6 +33,31 @@ on:
       - 'server/src/services/sync.service.ts'
       - 'server/src/repositories/sync.repository.ts'
       - 'server/src/dtos/sync.dto.ts'
+      # The seed phase trims a video through the PR's server.
+      - 'server/src/gallery/dtos/video-trim*'
+      - 'server/src/gallery/repositories/video-trim*'
+      - 'server/src/gallery/controllers/gallery-asset.*'
+      - 'server/src/gallery/services/gallery-asset.*'
+      - 'server/src/gallery/utils/projected-duration.ts'
+      - 'server/src/services/media.service.ts'
+      # The stock round trip reads owner favorites, durations and files on stock Immich and reloads
+      # Gallery's plugin when Gallery comes back.
+      - 'server/src/schema/tables/**'
+      - 'server/src/schema/functions.ts'
+      - 'server/src/database.ts'
+      - 'server/src/services/asset.service.ts'
+      - 'server/src/repositories/asset.repository.ts'
+      - 'server/src/repositories/asset-favorite.repository.ts'
+      - 'server/src/services/asset-media.service.ts'
+      - 'server/src/dtos/asset-response.dto.ts'
+      - 'server/src/utils/database.ts'
+      - 'server/src/utils/favorite.ts'
+      - 'server/src/services/storage.service.ts'
+      - 'server/src/backends/**'
+      - 'server/src/gallery/utils/backend-media-server.ts'
+      - 'server/src/cores/storage.core.ts'
+      - 'server/src/services/workflow-execution.service.ts'
+      - 'packages/plugin-gallery/**'
       - '.github/workflows/gallery-revert-to-immich-validation.yml'
       - '.github/scripts/revert-to-immich-data.sh'
 
@@ -407,6 +434,32 @@ jobs:
           stop_server
 
           ############################################################
+          # Step 9.5: stock Immich on the live Gallery database, then back
+          #
+          # No revert script: the trial boot the switch-back guide allows.
+          # Stock must boot with Gallery's plugin disabled and Redis
+          # flushed, serve the owner, and leave Gallery intact.
+          ############################################################
+
+          # A failed round-trip check is reported after the revert assertions, so one night shows both.
+          roundtrip=0
+          .github/scripts/revert-to-immich-data.sh stock-prepare
+          boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" stock
+          if ! wait_for_geodata_init stock; then exit 1; fi
+          extract_drift > /tmp/drift-stock.txt
+          .github/scripts/revert-to-immich-data.sh stock-assert /tmp/drift-stock.txt /tmp/drift-baseline.txt \
+            scripts/revert-to-immich.sql || roundtrip=1
+          stop_server
+
+          .github/scripts/revert-to-immich-data.sh gallery-prepare
+          boot_server "$GALLERY_IMAGE" gallery-return
+          if ! wait_for_geodata_init gallery-return; then exit 1; fi
+          .github/scripts/revert-to-immich-data.sh gallery-assert || roundtrip=1
+          stop_server
+          # The guide flushes Redis before the revert (its step 2), so Immich runs no job Gallery queued.
+          docker exec redis valkey-cli FLUSHALL >/dev/null
+
+          ############################################################
           # Step 10: sanity check that Gallery actually ran
           ############################################################
 
@@ -493,6 +546,10 @@ jobs:
 
           .github/scripts/revert-to-immich-data.sh assert
 
+          if [ "$roundtrip" != 0 ]; then
+            echo "::error::The stock round trip (step 9.5) failed; its errors are above."
+            exit 1
+          fi
           echo "::notice::revert-to-immich validation PASSED"
 
       - name: Cleanup

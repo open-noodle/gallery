@@ -14,6 +14,7 @@ import type { IBulkAsset } from 'src/types.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemorySearchDto } from 'src/dtos/memory.dto.js';
 import { AssetFileType, AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
@@ -190,6 +191,7 @@ export class MemoryRepository implements IBulkAsset {
           eb
             .selectFrom('asset')
             .selectAll('asset')
+            .select(projectedDuration)
             .innerJoin('memory_asset', 'asset.id', 'memory_asset.assetId')
             .whereRef('memory_asset.memoriesId', '=', 'memory.id')
             .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
@@ -314,6 +316,7 @@ export class MemoryRepository implements IBulkAsset {
             eb
               .selectFrom('asset')
               .selectAll('asset')
+              .select(projectedDuration)
               .innerJoin('memory_asset', 'asset.id', 'memory_asset.assetId')
               .whereRef('memory_asset.memoriesId', '=', 'memory.id')
               .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
@@ -462,6 +465,7 @@ export class MemoryRepository implements IBulkAsset {
           eb
             .selectFrom('asset')
             .selectAll('asset')
+            .select(projectedDuration)
             .innerJoin('memory_asset', 'asset.id', 'memory_asset.assetId')
             .whereRef('memory_asset.memoriesId', '=', 'memory.id')
             .orderBy('asset.localDateTime', 'asc')

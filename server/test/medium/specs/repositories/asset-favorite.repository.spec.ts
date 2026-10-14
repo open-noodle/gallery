@@ -7,10 +7,8 @@ import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
-// #763 slice 0 laid the schema foundation (`asset_favorite` / `asset_favorite_audit`), exercised
-// below directly via the Kysely DB handle. Slice 2 (this file's `AssetFavoriteRepository` describe
-// block, see docs/superpowers/plans/2026-07-20-per-user-favorites-slice-2.md Task 1) adds the
-// repository that Task 2's write path calls.
+// The `asset_favorite` / `asset_favorite_audit` schema is exercised directly through the Kysely handle; the
+// `AssetFavoriteRepository` describe block covers the repository the write path calls.
 
 let defaultDatabase: Kysely<DB>;
 
@@ -201,12 +199,8 @@ describe('asset_favorite schema', () => {
     expect(auditRows.map((row) => row.userId).toSorted()).toEqual([userA.id, userB.id].toSorted());
   });
 
-  // #763 slice 3: the two "backfills from asset.isFavorite" tests that lived here exercised
-  // 1794000000000-AddAssetFavoriteTables's up() backfill SQL against a live DB — that only made
-  // sense while asset."isFavorite" still existed (slices 0-2). Slice 3
-  // (1794100000000-DropAssetIsFavoriteColumn) has now dropped the column outright, so there is no
-  // live schema left to run that historical backfill query against; the migration file itself
-  // (and its own historical correctness) is unaffected and untouched.
+  // The backfills from asset."isFavorite" into the overlay and back are covered by
+  // test/medium/specs/migrations/asset-is-favorite-projection.migration.spec.ts.
 });
 
 describe('favoriteExistsFor', () => {

@@ -1,7 +1,7 @@
 import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import type { MessageFormatter } from 'svelte-i18n';
-import { EditManager } from '$lib/managers/edit/edit-manager.svelte';
+import { EditManager, EditToolType } from '$lib/managers/edit/edit-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { getFormatter } from '$lib/utils/i18n';
 import { assetFactory } from '@test-data/factories/asset-factory';
@@ -110,6 +110,26 @@ describe('EditManager', () => {
       expect(result).toBe(true);
       expect(removeAssetEdits).toHaveBeenCalledWith({ id: asset.id });
       expect(editAsset).not.toHaveBeenCalled();
+    });
+
+    it('should save through the selected tool when it saves itself, and skip the edits endpoints', async () => {
+      const asset = assetFactory.build();
+      vi.mocked(getAssetInfo).mockResolvedValue(assetFactory.build({ id: asset.id }));
+      const save = vi.fn().mockResolvedValue(undefined);
+      editManager.selectedTool = {
+        type: EditToolType.Trim,
+        icon: '',
+        component: {} as never,
+        manager: { ...editManager.tools[1].manager, edits: [], save },
+      };
+
+      editManager.currentAsset = asset;
+      const result = await editManager.applyEdits();
+
+      expect(result).toBe(true);
+      expect(save).toHaveBeenCalledWith(asset.id);
+      expect(editAsset).not.toHaveBeenCalled();
+      expect(removeAssetEdits).not.toHaveBeenCalled();
     });
 
     it('should return false and show error toast on failure', async () => {

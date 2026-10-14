@@ -1,8 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { beforeEach, vitest } from 'vitest';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
-import { AssetOrder, AssetType, AssetVisibility, SearchOrderField } from 'src/enum.js';
+import { AssetOrder, AssetType, AssetVisibility } from 'src/enum.js';
 import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
 import { SearchService } from 'src/services/search.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
@@ -600,59 +600,136 @@ describe(SearchService.name, () => {
   });
 
   describe('new shape routing', () => {
-    // Gallery keeps the four search endpoints on the legacy builder while upstream's V3 stays
-    // dormant, and REJECTS the structured shape rather than falling through to legacy: the legacy
-    // path ignores `filter` entirely, so a fallthrough would answer with a WIDER set than was asked
-    // for. Rationale and switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md.
-    //
-    // Upstream's own tests for this describe exercise the V3 routing; they are replaced rather than
-    // deleted so a rebase that restores upstream's dispatch conflicts here visibly.
-    const rejected = new BadRequestException(
-      'Structured search (filter/orderBy/cursor) is not supported on this server. Use the flat search fields.',
-    );
-
-    it('rejects a structured request on every search endpoint', async () => {
+    it('should route a filter request to the V3 search and a flat request to the legacy search', async () => {
       const auth = AuthFactory.create();
 
-      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).rejects.toThrowError(rejected);
-      await expect(sut.searchStatistics(auth, { filter: {} })).rejects.toThrowError(rejected);
-      await expect(sut.searchRandom(auth, { size: 250, filter: {} })).rejects.toThrowError(rejected);
-      await expect(sut.searchSmart(auth, { size: 100, filter: {}, query: 'test' })).rejects.toThrowError(rejected);
+      mocks.search.searchMetadataV3.mockResolvedValue({ hasNextPage: false, items: [] });
+      await sut.searchMetadata(auth, { size: 250, filter: {} });
+      expect(mocks.search.searchMetadataV3).toHaveBeenCalled();
+      expect(mocks.search.searchMetadata).not.toHaveBeenCalled();
+
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+      await sut.searchMetadata(auth, { size: 250, city: 'Oslo' });
+      expect(mocks.search.searchMetadata).toHaveBeenCalled();
     });
 
-    it('rejects every new-shape field, not just filter', async () => {
+    it('should route statistics, random, and smart filter requests to their V3 search', async () => {
       const auth = AuthFactory.create();
 
-      await expect(sut.searchMetadata(auth, { size: 250, cursor: 'abc' })).rejects.toThrowError(rejected);
+      mocks.search.searchStatisticsV3.mockResolvedValue({ total: 0 });
+      await expect(sut.searchStatistics(auth, { filter: {} })).resolves.toEqual({ total: 0 });
+
+      mocks.search.searchRandomV3.mockResolvedValue([]);
+      await expect(sut.searchRandom(auth, { size: 250, filter: {} })).resolves.toEqual([]);
+
+      mocks.search.searchSmartV3.mockResolvedValue({ hasNextPage: false, items: [] });
+      mocks.machineLearning.encodeText.mockResolvedValue('[1, 2, 3]');
+      await sut.searchSmart(auth, { size: 100, filter: {}, query: 'test' });
+      expect(mocks.search.searchSmartV3).toHaveBeenCalledWith(
+        { take: 100 },
+        expect.objectContaining({ embedding: '[1, 2, 3]' }),
+        expect.objectContaining({ lockedOwnerId: expect.any(String) }),
+      );
+    });
+
+    it('should reject an invalid cursor', async () => {
+      await expect(sut.searchMetadata(AuthFactory.create(), { size: 250, cursor: '???' })).rejects.toThrowError(
+        new BadRequestException('Invalid cursor'),
+      );
+    });
+
+    it('should reject an unelevated session whose filter could match locked assets', async () => {
+      const filter = { visibility: { in: [AssetVisibility.Locked, AssetVisibility.Timeline] } };
+      await expect(sut.searchMetadata(AuthFactory.create(), { size: 250, filter })).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it('should reject a shared link whose filter is not confined to albums everywhere', async () => {
+      const auth = AuthFactory.from().sharedLink().build();
+      const albumId = newUuid();
+
+      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).rejects.toThrowError(
+        new BadRequestException('Shared link access is only allowed in combination with an albumIds filter'),
+      );
+
       await expect(
         sut.searchMetadata(auth, {
           size: 250,
-          orderBy: { field: SearchOrderField.FileCreatedAt, direction: AssetOrder.Desc },
+          filter: { or: [{ albumIds: { any: [albumId] } }, { city: { eq: 'Oslo' } }] },
         }),
-      ).rejects.toThrowError(rejected);
+      ).rejects.toThrowError(
+        new BadRequestException('Shared link access is only allowed in combination with an albumIds filter'),
+      );
     });
 
-    it('never reaches the dormant V3 repository methods', async () => {
+    it('should allow a shared link when every branch is confined to a covered album', async () => {
+      const auth = AuthFactory.from().sharedLink().build();
+      const albumId = newUuid();
+
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
+      mocks.search.searchMetadataV3.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await expect(
+        sut.searchMetadata(auth, { size: 250, filter: { or: [{ albumIds: { any: [albumId] } }] } }),
+      ).resolves.toBeDefined();
+      expect(mocks.search.searchMetadataV3).toHaveBeenCalled();
+    });
+  });
+
+  describe('new shape: Gallery scope', () => {
+    it('should resolve the viewer scope from withSharedSpaces and the filter', async () => {
       const auth = AuthFactory.create();
+      const albumId = newUuid();
+      const personId = newUuid();
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
+      mocks.search.searchMetadataV3.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).rejects.toThrow();
-      await expect(sut.searchStatistics(auth, { filter: {} })).rejects.toThrow();
-      await expect(sut.searchRandom(auth, { size: 250, filter: {} })).rejects.toThrow();
-      await expect(sut.searchSmart(auth, { size: 100, filter: {}, query: 'test' })).rejects.toThrow();
+      await sut.searchMetadata(auth, {
+        size: 250,
+        withSharedSpaces: true,
+        filter: { isFavorite: { eq: true }, personIds: { any: [personId] }, or: [{ albumIds: { any: [albumId] } }] },
+      });
 
+      expect(sut.resolveViewerScope).toHaveBeenCalledWith(auth, 'search', {
+        withSharedSpaces: true,
+        albumIds: [albumId],
+        personIds: [personId],
+        favoriteScoped: true,
+      });
+      expect(mocks.search.searchMetadataV3).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ favoriteUserId: auth.user.id, ownershipPredicate: expect.any(Function) }),
+      );
+    });
+
+    it('should reject the Gallery flat filters that have no structured form', async () => {
+      const auth = AuthFactory.create();
+      for (const flat of [
+        { spaceId: newUuid() },
+        { spacePersonIds: [newUuid()] },
+        { ownerId: newUuid() },
+        { isInAlbum: true },
+      ]) {
+        await expect(sut.searchMetadata(auth, { size: 250, filter: {}, ...flat })).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+      }
       expect(mocks.search.searchMetadataV3).not.toHaveBeenCalled();
-      expect(mocks.search.searchStatisticsV3).not.toHaveBeenCalled();
-      expect(mocks.search.searchRandomV3).not.toHaveBeenCalled();
-      expect(mocks.search.searchSmartV3).not.toHaveBeenCalled();
     });
 
-    it('still routes a flat request to the legacy search', async () => {
-      const auth = AuthFactory.create();
-      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+    it('should reject a favorite filter from a shared link', async () => {
+      const auth = AuthFactory.from().sharedLink().build();
+      const albumId = newUuid();
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
 
-      await sut.searchMetadata(auth, { size: 250, city: 'Oslo' });
-
-      expect(mocks.search.searchMetadata).toHaveBeenCalled();
+      await expect(
+        sut.searchMetadata(auth, {
+          size: 250,
+          filter: { or: [{ albumIds: { any: [albumId] }, isFavorite: { eq: false } }] },
+        }),
+      ).rejects.toThrowError(new BadRequestException('Shared link sessions cannot filter by favorite'));
       expect(mocks.search.searchMetadataV3).not.toHaveBeenCalled();
     });
   });
@@ -878,8 +955,8 @@ describe(SearchService.name, () => {
     // ACCESS (timeline.service resolves albumSpaceIds from plain membership) and shows every
     // member's photos; query mode kept the owner-scoping `userIds`, so the same album searched
     // returned only the caller's own assets beside a grid that had just shown everyone's.
-    // searchMetadata already resolves this the right way — access check instead of userIds, letting
-    // `albumSharedSpaceScope` re-gate — and searchSmart now matches it.
+    // searchMetadata already resolves this the right way (access check instead of userIds, letting
+    // `albumConfinedToViewer` re-gate), and searchSmart now matches it.
     describe('album access (albumIds)', () => {
       it('checks album read access when albumIds is provided', async () => {
         const albumId = newUuid();

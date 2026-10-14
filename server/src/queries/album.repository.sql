@@ -61,7 +61,38 @@ select
         where
           "shared_link"."albumId" = "album"."id"
       ) as agg
-  ) as "sharedLinks"
+  ) as "sharedLinks",
+  (
+    select
+      json_agg("asset") as "assets"
+    from
+      (
+        select
+          "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
+          "asset_exif" as "exifInfo"
+        from
+          "asset"
+          left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+          inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
+        where
+          "album_asset"."albumId" = "album"."id"
+          and "asset"."deletedAt" is null
+          and "asset"."visibility" in ('archive', 'timeline')
+        order by
+          "asset"."fileCreatedAt" desc
+      ) as "asset"
+  ) as "assets"
 from
   "album"
 where
@@ -111,76 +142,71 @@ select
 from
   "album"
 where
-  (
-    (
-      exists (
+  exists (
+    select
+      1 as "exists"
+    from
+      (
         select
-          1 as "exists"
+          "album_asset"."albumId" as "albumId",
+          "album_asset"."assetId" as "assetId"
         from
           "album_asset"
         where
           "album_asset"."albumId" = "album"."id"
-          and "album_asset"."assetId" = $2::uuid
-      )
-      and (
-        exists (
-          select
-          from
-            "album_user"
-          where
-            "album_user"."albumId" = "album"."id"
-            and "album_user"."userId" = $3
-        )
-        or (
-          "album"."id" in (
-            select
-              "shared_space_album"."albumId" as "id"
-            from
-              "shared_space_album"
-              inner join "album" on "album"."id" = "shared_space_album"."albumId"
-            where
-              "album"."deletedAt" is null
-              and "shared_space_album"."spaceId" in (
-                select
-                  "shared_space"."id"
-                from
-                  "shared_space"
-                where
-                  "shared_space"."createdById" = $4
-                union
-                select
-                  "shared_space_member"."spaceId" as "id"
-                from
-                  "shared_space_member"
-                where
-                  "shared_space_member"."userId" = $5
-              )
-          )
-          and exists (
-            select
-              1 as "exists"
-            from
-              "asset"
-            where
-              "asset"."id" = $6::uuid
-              and "asset"."visibility" in ($7, $8)
-          )
-        )
-      )
-    )
-    or (
-      exists (
+        union
         select
-          1 as "exists"
+          "album_space_asset"."albumId" as "albumId",
+          "album_space_asset"."assetId" as "assetId"
         from
           "shared_space_album"
           inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
           and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-          and "shared_space_member"."userId" = $9::uuid
+          inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
         where
-          "shared_space_album"."albumId" = "album"."id"
-          and "album_space_asset"."assetId" = $10::uuid
+          "shared_space_member"."userId" = $2::uuid
+          and "asset"."visibility" in ($3, $4)
+          and "album_space_asset"."albumId" = "album"."id"
+      ) as "album_members"
+    where
+      "album_members"."assetId" = $5::uuid
+  )
+  and (
+    exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and "album_user"."userId" = $6
+    )
+    or (
+      "album"."id" in (
+        select
+          "shared_space_album"."albumId" as "id"
+        from
+          "shared_space_album"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+        where
+          "album"."deletedAt" is null
+          and "shared_space_album"."spaceId" in (
+            select
+              "shared_space"."id"
+            from
+              "shared_space"
+            where
+              "shared_space"."createdById" = $7
+            union
+            select
+              "shared_space_member"."spaceId" as "id"
+            from
+              "shared_space_member"
+            where
+              "shared_space_member"."userId" = $8
+          )
       )
       and exists (
         select
@@ -188,8 +214,8 @@ where
         from
           "asset"
         where
-          "asset"."id" = $11::uuid
-          and "asset"."visibility" in ($12, $13)
+          "asset"."id" = $9::uuid
+          and "asset"."visibility" in ($10, $11)
       )
     )
   )
@@ -236,7 +262,7 @@ from
     from
       "album_asset"
     where
-      "album_asset"."albumId" in ($1)
+      "album_asset"."albumId" = any ($1::uuid[])
   ) as "album_members" on "album_members"."assetId" = "asset"."id"
 where
   "asset"."visibility" in ('archive', 'timeline')
@@ -264,21 +290,23 @@ from
     from
       "album_asset"
     where
-      "album_asset"."albumId" in ($1)
+      "album_asset"."albumId" = any ($1::uuid[])
     union
     select
       "album_space_asset"."albumId" as "albumId",
       "album_space_asset"."assetId" as "assetId"
     from
-      "album_space_asset"
-      inner join "shared_space_album" on "shared_space_album"."albumId" = "album_space_asset"."albumId"
-      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
-      inner join "album" on "album"."id" = "album_space_asset"."albumId"
-      and "album"."deletedAt" is null
+      "shared_space_album"
+      inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+      and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+      and "linked_album"."deletedAt" is null
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-      and "shared_space_member"."userId" = $2::uuid
+      inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
     where
-      "album_space_asset"."albumId" in ($3)
+      "shared_space_member"."userId" = $2::uuid
+      and "asset"."visibility" in ($3, $4)
+      and "album_space_asset"."albumId" = any ($5::uuid[])
   ) as "album_members" on "album_members"."assetId" = "asset"."id"
 where
   "asset"."visibility" in ('archive', 'timeline')
@@ -502,7 +530,38 @@ select
           "album_user"."role",
           "user"."name" asc
       ) as agg
-  ) as "albumUsers"
+  ) as "albumUsers",
+  (
+    select
+      json_agg("asset") as "assets"
+    from
+      (
+        select
+          "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
+          "asset_exif" as "exifInfo"
+        from
+          "asset"
+          left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+          inner join "album_asset" on "album_asset"."assetId" = "asset"."id"
+        where
+          "album_asset"."albumId" = "album"."id"
+          and "asset"."deletedAt" is null
+          and "asset"."visibility" in ('archive', 'timeline')
+        order by
+          "asset"."fileCreatedAt" desc
+      ) as "asset"
+  ) as "assets"
 from
   "album"
 

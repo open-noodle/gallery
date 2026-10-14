@@ -13551,7 +13551,7 @@ describe(SharedSpaceService.name, () => {
         expect.objectContaining({
           albumIds: [albumId],
           // The whole point: with userIds unset, searchAssetBuilder takes its album branch
-          // (`albumIds && !userIds` -> albumSharedSpaceScope, database.ts:713). Owner-scoping an album
+          // (`albumIds && !userIds` -> albumConfinedToViewer). Owner-scoping an album
           // query hides the album owner's pins from a viewer of a shared album — issue #656.
           userIds: undefined,
         }),
@@ -13561,7 +13561,7 @@ describe(SharedSpaceService.name, () => {
     // The album map matches the album grid (issue #656 follow-up): album ACCESS (AlbumRead) is the
     // whole boundary for an album query, so it must NOT be re-gated by the caller's shared-space
     // timeline preference. Before this fix, an album query computed timelineSpaceIds and
-    // searchAssetBuilder fed it into albumSharedSpaceScope, so a shared album asset lost its pin
+    // searchAssetBuilder fed it into albumConfinedToViewer, so a shared album asset lost its pin
     // whenever the caller wasn't a member of that space, or had simply toggled it out of their
     // timeline — even though the grid kept showing it. Now the album branch opts out entirely via
     // albumAccessIsBoundary, so getSpaceIdsForTimeline is never even called for an album query.
@@ -13598,7 +13598,7 @@ describe(SharedSpaceService.name, () => {
     });
 
     // spaceId ∩ albumId is unsatisfiable by construction (see the decision note above): the space scope
-    // demands membership in shared_space_asset, albumSharedSpaceScope (timelineSpaceIds unset under a
+    // demands membership in shared_space_asset, albumConfinedToViewer (timelineSpaceIds unset under a
     // spaceId query) demands the opposite. Fail loudly instead of returning a silently empty map.
     //
     // Both access checks are armed to SUCCEED here so that the guard under test is the only thing that

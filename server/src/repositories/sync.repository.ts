@@ -379,18 +379,12 @@ class AssetSync extends BaseSync {
     return this.auditCleanup('asset_audit', daysAgo);
   }
 
-  // #763: the syncing user IS the owner here (getDeletes/getUpserts both filter `ownerId =
-  // options.userId`), so favoriteExistsFor resolves the same rows the old `asset.isFavorite`
-  // column read — no behavior change post-backfill, just the source of truth moving to the
-  // per-user overlay like every other asset-payload stream in this file.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getUpserts(options: SyncQueryOptions) {
-    const userId = options.userId;
     return this.upsertQuery('asset', options)
       .select(columns.syncAsset)
-      .select((eb) => favoriteExistsFor(eb, userId).as('isFavorite'))
       .select('asset.updateId')
-      .where('ownerId', '=', userId)
+      .where('ownerId', '=', options.userId)
       .stream();
   }
 }

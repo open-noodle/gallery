@@ -203,12 +203,10 @@ describe('PUT /assets/copy', () => {
     expect((after.body as { isFavorite: boolean }).isFavorite).toBe(false);
   });
 
-  // #763 slice 7 (E20): favorite carries the ACTING user's overlay row, never every user who
-  // favorited the source. `other` gains read access to both assets via a shared space (viewer
-  // role is enough under Permission.AssetRead, per #763 slice 2) purely so they can favorite the
-  // source and later read the target back — `other` still can't call PUT /assets/copy itself,
-  // since Permission.AssetCopy stays owner-only (asset.service.spec.ts already pins that).
-  it("copies only the ACTING user's favorite of the source, not another user's (E20)", async () => {
+  // Copy writes upstream's owner column, which the reverse trigger mirrors to the owner's overlay row.
+  // Permission.AssetCopy is owner-only, so the acting user is the owner. `other` reads both assets
+  // through a space only so they can favorite the source and read the target back.
+  it("copies only the owner's favorite of the source, not another user's (E20)", async () => {
     const [sourceId, targetId] = await createOwnerPair();
 
     const space = await utils.createSpace(owner.accessToken, { name: 't26-copy-favorite-space' });

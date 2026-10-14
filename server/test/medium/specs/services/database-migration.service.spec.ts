@@ -287,6 +287,22 @@ describe('Database Migration Scenarios', { timeout: 60_000 }, () => {
       expect(rows[0].exists).toBe(false);
     }));
 
+  // Scenario C7: a newer Gallery recorded a fork migration this build does not ship (a rollback that skipped the revert).
+  it('should refuse a database migrated by a newer Gallery and point at the rollback procedure', () =>
+    withDatabase('migration_test_newer_gallery', async (db) => {
+      await createRepo(db).runMigrations();
+      await sql`INSERT INTO "gallery_migrations" ("name", "timestamp") VALUES ('1899999999999-FromANewerGallery', '0')`.execute(
+        db,
+      );
+      const before = [await ledger(db, 'kysely_migrations'), await ledger(db, 'gallery_migrations')];
+
+      await expect(createRepo(db).runMigrations()).rejects.toThrow(
+        `Gallery migration "1899999999999-FromANewerGallery" was recorded by a newer Gallery release than ${serverVersion}. ` +
+          `Undo it with that release first: https://docs.opennoodle.de/install/upgrading#rolling-back-to-an-earlier-release.`,
+      );
+      expect([await ledger(db, 'kysely_migrations'), await ledger(db, 'gallery_migrations')]).toEqual(before);
+    }));
+
   // Scenario D: Rollback reverts the newest fork migration first and leaves upstream's ledger alone
   it('should revert the last fork migration first', () =>
     withDatabase('migration_test_rollback', async (db) => {

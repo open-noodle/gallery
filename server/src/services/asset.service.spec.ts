@@ -1195,6 +1195,30 @@ describe(AssetService.name, () => {
       expect(mocks.asset.updateAll).not.toHaveBeenCalled();
     });
 
+    it("rejects joining another owner's duplicate group", async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.duplicateRepository.hasOtherOwner.mockResolvedValue(true);
+
+      await expect(sut.updateAll(auth, { ids: ['asset-1'], duplicateId: 'group-1' })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(mocks.duplicateRepository.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
+    });
+
+    it('joins a duplicate group that holds only assets the caller owns', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.duplicateRepository.hasOtherOwner.mockResolvedValue(false);
+
+      await sut.updateAll(auth, { ids: ['asset-1'], duplicateId: 'group-1' });
+
+      expect(mocks.duplicateRepository.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-1'], { duplicateId: 'group-1' });
+    });
+
     // #763: the deprecated isFavorite alias writes only the caller's own overlay row, so a space editor
     // favoriting a member's asset is allowed — and, being private state, it is not logged as an edit.
     it('lets a space editor favorite a non-owned asset via the alias without logging a cross-owner edit (#763)', async () => {
@@ -1225,6 +1249,7 @@ describe(AssetService.name, () => {
       });
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
       expect(mocks.websocket.clientSend).toHaveBeenCalledTimes(2);
+      expect(mocks.asset.getByIds).toHaveBeenLastCalledWith([asset1.id, asset2.id], auth.user.id);
     });
 
     it('should not update Assets table if no relevant fields are provided', async () => {
@@ -2284,44 +2309,7 @@ describe(AssetService.name, () => {
         sourceAssetId: sourceId,
         targetAssetId: targetId,
       });
-      // #763 (E20): getForCopy's isFavorite is the ACTING user's own overlay row (see
-      // asset.repository.ts), so the copy writes only auth.user.id's row for the target.
-      expect(mocks.asset.getForCopy).toHaveBeenCalledWith(sourceId, authStub.admin.user.id);
-      expect(mocks.asset.getForCopy).toHaveBeenCalledWith(targetId, authStub.admin.user.id);
-      expect(mocks.assetFavorite.addAll).toHaveBeenCalledWith(authStub.admin.user.id, [targetId]);
-      expect(mocks.assetFavorite.removeAll).not.toHaveBeenCalled();
-      expect(mocks.asset.update).not.toHaveBeenCalled();
-    });
-
-    it('should clear the target favorite when the acting user did not favorite the source', async () => {
-      // #763 (E20): favorite:true (the default) still means "copy the status", including a
-      // false status — mirrors the old column-overwrite semantics, just scoped to the actor.
-      const sourceId = newUuid();
-      const targetId = newUuid();
-      const sourceAsset = {
-        id: sourceId,
-        stackId: null,
-        isFavorite: false,
-        files: [],
-        originalPath: '/data/source.jpg',
-      };
-      const targetAsset = {
-        id: targetId,
-        stackId: null,
-        isFavorite: true,
-        files: [],
-        originalPath: '/data/target.jpg',
-      };
-
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sourceId, targetId]));
-      mocks.asset.getForCopy.mockResolvedValueOnce(sourceAsset);
-      mocks.asset.getForCopy.mockResolvedValueOnce(targetAsset);
-      mocks.sharedLinkAsset.copySharedLinks.mockResolvedValue(void 0 as any);
-
-      await sut.copy(authStub.admin, { sourceId, targetId });
-
-      expect(mocks.assetFavorite.removeAll).toHaveBeenCalledWith(authStub.admin.user.id, [targetId]);
-      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
+      expect(mocks.asset.update).toHaveBeenCalledWith({ id: targetId, isFavorite: true });
     });
 
     it('should skip albums copy when albums flag is false', async () => {
@@ -2404,8 +2392,7 @@ describe(AssetService.name, () => {
 
       await sut.copy(authStub.admin, { sourceId, targetId, favorite: false });
 
-      expect(mocks.assetFavorite.addAll).not.toHaveBeenCalled();
-      expect(mocks.assetFavorite.removeAll).not.toHaveBeenCalled();
+      expect(mocks.asset.update).not.toHaveBeenCalled();
     });
   });
 
@@ -2434,7 +2421,7 @@ describe(AssetService.name, () => {
     it('disk → S3: uploads via backend.put', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({ sourceAsset: { files: [diskSource] }, targetAsset: s3TargetAsset });
 
@@ -2455,7 +2442,7 @@ describe(AssetService.name, () => {
     it('S3 → S3: downloads source then uploads to target', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: s3TargetAsset });
 
@@ -2471,7 +2458,7 @@ describe(AssetService.name, () => {
       const target = { ...s3TargetAsset, files: [existingTarget] };
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       const sourceStream = Readable.from(['<xml/>']);
       mocks.storage.createPlainReadStream.mockReturnValue(sourceStream);
@@ -2491,7 +2478,7 @@ describe(AssetService.name, () => {
     it('succeeds when target has no existing sidecar (files: []) — disk→S3 variant', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({
         sourceAsset: { files: [diskSource] },
@@ -2504,7 +2491,7 @@ describe(AssetService.name, () => {
     it('succeeds when targetAsset.files is undefined (not just empty)', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({
         sourceAsset: { files: [s3Source] },
@@ -2528,7 +2515,7 @@ describe(AssetService.name, () => {
     it('calls cleanup when backend.put fails', async () => {
       const backendPut = vi.fn().mockRejectedValue(new Error('S3 down'));
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await expect(
         (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: s3TargetAsset }),
@@ -2612,7 +2599,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/video.mp4',
         originalFileName: 'video.mp4',
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -2634,7 +2620,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: newUuid(),
         originalPath: '/data/image.jpg',
         originalFileName: 'image.jpg',
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -2656,7 +2641,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/pano.jpg',
         originalFileName: 'pano.jpg',
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -2678,7 +2662,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/image.gif',
         originalFileName: 'image.gif',
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -2700,7 +2683,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/image.svg',
         originalFileName: 'image.svg',
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -2722,7 +2704,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/image.jpg',
         originalFileName: 'image.jpg',
-        duration: null,
         exifImageWidth: null,
         exifImageHeight: null,
         orientation: null,
@@ -2744,7 +2725,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/image.jpg',
         originalFileName: 'image.jpg',
-        duration: null,
         exifImageWidth: 100,
         exifImageHeight: 100,
         orientation: null,
@@ -2767,7 +2747,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/image.jpg',
         originalFileName: 'image.jpg',
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -2800,7 +2779,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: '/data/image.jpg',
         originalFileName: 'image.jpg',
-        duration: null,
         exifImageWidth: 100,
         exifImageHeight: 100,
         orientation: null,
@@ -2811,426 +2789,6 @@ describe(AssetService.name, () => {
       const result = await sut.editAsset(authStub.admin, assetId, { edits: editActions as any });
 
       expect(result).toEqual({ assetId, edits: returnedEdits });
-    });
-
-    it('should accept trim on video assets', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [{}],
-        format: {},
-      } as any);
-      mocks.assetEdit.replaceAll.mockResolvedValue([]);
-
-      await sut.editAsset(authStub.admin, assetId, {
-        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-      });
-
-      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
-    });
-
-    it('should allow re-trimming wider than current trimmed duration using originalDuration', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      // Current duration is the trimmed duration (10s), not the original (30s)
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 10_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [{}],
-        format: {},
-      } as any);
-      // Existing trim edit has originalDuration of 30s
-      mocks.assetEdit.getAll.mockResolvedValue([
-        {
-          id: 'edit-1',
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 10, endTime: 20, originalDuration: 30 },
-        },
-      ] as any);
-      mocks.assetEdit.replaceAll.mockResolvedValue([]);
-
-      // Re-trim to 5-25 (wider than current 10s duration, but within original 30s)
-      await sut.editAsset(authStub.admin, assetId, {
-        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-      });
-
-      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
-    });
-
-    it('should reject trim on image assets', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Image,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/photo.jpg',
-        originalFileName: 'photo.jpg',
-        duration: null,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 10 } }],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('should reject trim with endTime exceeding duration', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [{}],
-        format: {},
-      } as any);
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 60 } }],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('should reject mixed spatial and trim edits', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [
-            { action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } },
-            { action: AssetEditAction.Rotate, parameters: { angle: 90 } },
-          ],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('should accept trim on S3-backed videos and probe via a presigned url', async () => {
-      const assetId = newUuid();
-      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
-      const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
-
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: 'upload/admin/ab/cd/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      } as any);
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.assetEdit.replaceAll.mockResolvedValue([] as any);
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{}],
-        audioStreams: [{}],
-        format: {},
-      } as any);
-
-      await sut.editAsset(authStub.admin, assetId, {
-        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-      });
-
-      expect(getReadableUrl).toHaveBeenCalledWith('upload/admin/ab/cd/video.mp4');
-      expect(mocks.media.probe).toHaveBeenCalledWith('https://bucket.s3/key?X-Amz-Signature=abc');
-      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.AssetEditThumbnailGeneration,
-        data: { id: assetId },
-      });
-
-      vi.restoreAllMocks();
-    });
-
-    it('surfaces a generic error, never the presigned url, when the probe fails', async () => {
-      const assetId = newUuid();
-      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=SECRET');
-      const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
-
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: 'upload/admin/ab/cd/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      } as any);
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      // ffprobe echoes the input (the presigned url, with its signature) in its error message.
-      mocks.media.probe.mockRejectedValue(new Error('https://bucket.s3/key?X-Amz-Signature=SECRET: Invalid data'));
-
-      const error = await sut
-        .editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-        })
-        .catch((error_: unknown) => error_);
-
-      expect(error).toBeInstanceOf(BadRequestException);
-      expect((error as Error).message).not.toContain('X-Amz-Signature');
-
-      vi.restoreAllMocks();
-    });
-
-    it('should reject trim on external library videos', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/mnt/external/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      } as any);
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-        }),
-      ).rejects.toThrow('Video trimming is not available for external library videos');
-    });
-
-    it('should reject trim on audio-only S3 files', async () => {
-      const assetId = newUuid();
-      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
-      const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
-
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: 'upload/admin/ab/cd/audio.m4a',
-        originalFileName: 'audio.m4a',
-        duration: 180_000,
-        exifImageWidth: null,
-        exifImageHeight: null,
-        orientation: null,
-        projectionType: null,
-      } as any);
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.media.probe.mockResolvedValue({ videoStreams: [], audioStreams: [{}], format: {} } as any);
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 10, endTime: 60 } }],
-        }),
-      ).rejects.toThrow('Cannot trim audio-only files');
-
-      vi.restoreAllMocks();
-    });
-
-    it('should probe disk-backed videos by absolute path, without presigning', async () => {
-      const assetId = newUuid();
-      const { StorageService } = await import('src/services/storage.service.js');
-      const resolveSpy = vi.spyOn(StorageService, 'resolveBackendForKey');
-
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      } as any);
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.assetEdit.replaceAll.mockResolvedValue([] as any);
-      mocks.media.probe.mockResolvedValue({ videoStreams: [{}], audioStreams: [{}], format: {} } as any);
-
-      await sut.editAsset(authStub.admin, assetId, {
-        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-      });
-
-      expect(mocks.media.probe).toHaveBeenCalledWith('/data/library/video.mp4');
-      expect(resolveSpy).not.toHaveBeenCalled();
-
-      vi.restoreAllMocks();
-    });
-
-    it('should reject trim on audio-only files', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/audio.mp3',
-        originalFileName: 'audio.mp3',
-        duration: 180_000,
-        exifImageWidth: null,
-        exifImageHeight: null,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [],
-        audioStreams: [{}],
-        format: {},
-      } as any);
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 10, endTime: 60 } }],
-        }),
-      ).rejects.toThrow('Cannot trim audio-only files');
-    });
-
-    it('should reject trim on very short videos', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 1500,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [],
-        format: {},
-      } as any);
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 1 } }],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('should reject full-duration trim (no-op)', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.assetEdit.getAll.mockResolvedValue([]);
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 30_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [],
-        format: {},
-      } as any);
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 30 } }],
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('should allow full-duration trim when undoing an existing trim', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      // Existing trim with originalDuration — user is dragging handles back to full range
-      mocks.assetEdit.getAll.mockResolvedValue([
-        {
-          id: 'edit-1',
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 10, endTime: 20, originalDuration: 30 },
-        },
-      ] as any);
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: 10_000,
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [{}],
-        format: {},
-      } as any);
-      mocks.assetEdit.replaceAll.mockResolvedValue([]);
-
-      // Full-range trim (start=0, end=originalDuration) should succeed when undoing
-      await sut.editAsset(authStub.admin, assetId, {
-        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 30 } }],
-      });
-
-      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
     });
   });
 
@@ -3251,7 +2809,6 @@ describe(AssetService.name, () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
-      mocks.assetEdit.getAll.mockResolvedValue([]);
       mocks.assetEdit.replaceAll.mockResolvedValue([]);
 
       await sut.removeAssetEdits(authStub.admin, asset.id);
@@ -3261,62 +2818,6 @@ describe(AssetService.name, () => {
         name: JobName.AssetEditThumbnailGeneration,
         data: { id: asset.id },
       });
-    });
-
-    it('should restore original duration when removing trim edits', async () => {
-      const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset as any);
-      mocks.assetEdit.getAll.mockResolvedValue([
-        {
-          id: newUuid(),
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 5, endTime: 25, originalDuration: 30 } as any,
-        },
-      ]);
-      mocks.assetEdit.replaceAll.mockResolvedValue([]);
-
-      await sut.removeAssetEdits(authStub.admin, asset.id);
-
-      expect(mocks.asset.update).toHaveBeenCalledWith({
-        id: asset.id,
-        duration: 30_000,
-      });
-      expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, []);
-    });
-
-    it('should handle missing originalDuration gracefully on undo', async () => {
-      const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset as any);
-      mocks.assetEdit.getAll.mockResolvedValue([
-        {
-          id: newUuid(),
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 5, endTime: 25 },
-        },
-      ]);
-      mocks.assetEdit.replaceAll.mockResolvedValue([]);
-
-      await sut.removeAssetEdits(authStub.admin, asset.id);
-
-      // Should not crash, should not update duration
-      expect(mocks.asset.update).not.toHaveBeenCalled();
-      expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, []);
-    });
-
-    it('should not update duration when removing non-trim edits', async () => {
-      const asset = AssetFactory.create();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset as any);
-      mocks.assetEdit.getAll.mockResolvedValue([
-        { id: newUuid(), action: AssetEditAction.Rotate, parameters: { angle: 90 } },
-      ]);
-      mocks.assetEdit.replaceAll.mockResolvedValue([]);
-
-      await sut.removeAssetEdits(authStub.admin, asset.id);
-
-      expect(mocks.asset.update).not.toHaveBeenCalled();
     });
   });
 
@@ -3345,7 +2846,6 @@ describe(AssetService.name, () => {
         livePhotoVideoId: null,
         originalPath: asset.originalPath,
         originalFileName: asset.originalFileName,
-        duration: null,
         exifImageWidth: 1920,
         exifImageHeight: 1080,
         orientation: null,
@@ -3566,7 +3066,7 @@ describe(AssetService.name, () => {
 
     it('S-52: caps space resolution at MAX_ATTRIBUTION_ASSETS cross-owner ids and marks the row truncated', async () => {
       const auth = AuthFactory.create();
-      // Mirrors MAX_ATTRIBUTION_ASSETS in asset.service.ts — this pins the cap's VALUE together
+      // Mirrors MAX_ATTRIBUTION_ASSETS in gallery/utils/cross-owner-edit.ts: this pins the cap's VALUE together
       // with its enforcement, so a change to the constant must update this test too.
       const CAP = 500;
       const ids = Array.from({ length: CAP + 1 }, () => newUuid());
