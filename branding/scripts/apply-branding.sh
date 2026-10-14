@@ -999,7 +999,9 @@ patch_versions() {
     if [[ -f "$pkg" ]]; then
       local tmp
       tmp=$(mktemp)
-      jq --arg v "$FORK_VERSION" '.version = $v' "$pkg" > "$tmp"
+      # Keep the upstream base (the source version) as immichVersion: the server reports it to stock
+      # Immich clients (server/src/gallery/client-version.ts). `//=` keeps a second run idempotent.
+      jq --arg v "$FORK_VERSION" '.immichVersion //= .version | .version = $v' "$pkg" > "$tmp"
       chmod 644 "$tmp"
       mv "$tmp" "$pkg"
       echo "  Patched $(realpath --relative-to="$REPO_ROOT" "$pkg")"

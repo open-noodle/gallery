@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JobItem } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
+import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { JobCreateDto } from 'src/dtos/job.dto.js';
 import {
   AssetType,
@@ -180,7 +181,7 @@ export class JobService extends BaseService {
         const edits = await this.assetEditRepository.getWithSyncInfo(item.data.id);
 
         if (asset) {
-          this.websocketRepository.clientSend('AssetEditReadyV2', asset.ownerId, {
+          const payload = {
             asset: {
               id: asset.id,
               ownerId: asset.ownerId,
@@ -208,7 +209,14 @@ export class JobService extends BaseService {
               isEdited: asset.isEdited,
             },
             edit: edits,
-          });
+          };
+          // Stock Immich apps cannot decode trim edits; the sync stream drops them for the same clients.
+          this.websocketRepository.clientSendByClient(
+            'AssetEditReadyV2',
+            asset.ownerId,
+            [payload],
+            [{ ...payload, edit: edits.filter(({ action }) => action !== AssetEditAction.Trim) }],
+          );
         }
 
         break;

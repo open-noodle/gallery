@@ -497,10 +497,36 @@ describe(JobService.name, () => {
 
       expect(mocks.asset.getById).toHaveBeenCalledWith(assetId);
       expect(mocks.assetEdit.getWithSyncInfo).toHaveBeenCalledWith(assetId);
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('AssetEditReadyV2', ownerId, {
-        asset: expect.objectContaining({ id: assetId, ownerId }),
-        edit: edits,
+      const payload = { asset: expect.objectContaining({ id: assetId, ownerId }), edit: edits };
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith(
+        'AssetEditReadyV2',
+        ownerId,
+        [payload],
+        [payload],
+      );
+    });
+
+    it('should send trim edits to Gallery clients only', async () => {
+      mocks.job.run.mockResolvedValue(JobStatus.Success);
+      const assetId = newUuid();
+      const ownerId = newUuid();
+      const rotate = { action: 'rotate', parameters: { angle: 90 } };
+      const trim = { action: 'trim', parameters: { startTime: 1, endTime: 2 } };
+
+      mocks.asset.getById.mockResolvedValue({ id: assetId, ownerId, checksum: Buffer.from('abc123') } as any);
+      mocks.assetEdit.getWithSyncInfo.mockResolvedValue([rotate, trim] as any);
+
+      await sut.onJobRun(QueueName.ThumbnailGeneration, {
+        name: JobName.AssetEditThumbnailGeneration,
+        data: { id: assetId },
       });
+
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith(
+        'AssetEditReadyV2',
+        ownerId,
+        [expect.objectContaining({ edit: [rotate, trim] })],
+        [expect.objectContaining({ edit: [rotate] })],
+      );
     });
 
     it('should handle asset with thumbhash', async () => {
@@ -538,15 +564,18 @@ describe(JobService.name, () => {
         data: { id: assetId },
       });
 
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith(
         'AssetEditReadyV2',
         ownerId,
-        expect.objectContaining({
-          asset: expect.objectContaining({
-            id: assetId,
-            thumbhash: expect.any(String),
+        [
+          expect.objectContaining({
+            asset: expect.objectContaining({
+              id: assetId,
+              thumbhash: expect.any(String),
+            }),
           }),
-        }),
+        ],
+        expect.any(Array),
       );
     });
 
@@ -563,7 +592,7 @@ describe(JobService.name, () => {
       });
 
       expect(mocks.asset.getById).toHaveBeenCalledWith(assetId);
-      expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
+      expect(mocks.websocket.clientSendByClient).not.toHaveBeenCalled();
     });
   });
 

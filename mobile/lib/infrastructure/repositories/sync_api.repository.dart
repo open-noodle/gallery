@@ -142,12 +142,12 @@ class SyncApiRepository {
           // is the last release WITHOUT space-albums; the feature (and its original five
           // enum values) ship in the next release, so gate on strictly-after-5.0.0, which
           // also admits the feature's release-candidates. See slice-5 plan §0.1 for the
-          // full evidence and the release-time reconciliation note. There is no
-          // complementary server-side defense: a slice-5 filter that dropped unknown
-          // request types was later reverted, so an older/skewed server's
-          // SyncRequestTypeSchema still 400s the WHOLE /sync/stream request on any
-          // unrecognized type. This client-side version gate is therefore the ONLY
-          // protection — every future gallery-fork-only request type MUST be gated the
+          // full evidence and the release-time reconciliation note.
+          // Servers from the unknown-type filter in server/src/dtos/sync.dto.ts onward DROP request
+          // types they do not know instead of rejecting the request, but every deployed server older
+          // than that still 400s the WHOLE /sync/stream request on any unrecognized type, so this
+          // client-side version gate remains the protection for those servers. Every future
+          // gallery-fork-only request type MUST be gated the
           // same way. CAVEAT: that was true only until capability signalling shipped — see
           // the M14 paragraph immediately below, which supersedes this instruction for any
           // request type introduced afterward. Do NOT add a new type to
@@ -174,8 +174,9 @@ class SyncApiRepository {
           // #763 per-user favorites stream. AssetFavoritesV1 was introduced AFTER capability
           // signalling shipped (v5.7.0), so — exactly like SharedSpaceAlbumFoldersV1 above — it
           // is sent ONLY behind an explicit server declaration, never on a version fallback: no
-          // pre-declaration server (fork 5.2.1–5.6.x) can accept it, and an unknown enum value
-          // 400s the WHOLE /sync/stream request. A null declaration therefore sends nothing here.
+          // pre-declaration server (fork 5.2.1–5.6.x) can accept it, and a pre-filter server 400s
+          // the WHOLE /sync/stream request on an unknown value. A null declaration therefore sends
+          // nothing here.
           // Membership is tested with `toJson()`, matching the space-album filter above — the
           // generated enum has no `.value`.
           if (supportedSyncTypes != null)

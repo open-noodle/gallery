@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
+  Headers,
   Next,
   Param,
   Post,
@@ -13,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
+import type { IncomingHttpHeaders } from 'node:http';
 import type { DatabaseBackupController as _DatabaseBackupController } from 'src/controllers/database-backup.controller.js';
 import type { ServerController as _ServerController } from 'src/controllers/server.controller.js';
 import type { LoginDetails } from 'src/services/auth.service.js';
@@ -26,6 +29,7 @@ import {
 } from 'src/dtos/maintenance.dto.js';
 import { ServerConfigDto, ServerPingResponse, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { ImmichCookie } from 'src/enum.js';
+import { GALLERY_CLIENT_VARY } from 'src/gallery/client-version.js';
 import { MaintenanceRoute } from 'src/maintenance/maintenance-auth.guard.js';
 import { MaintenanceWorkerService } from 'src/maintenance/maintenance-worker.service.js';
 import { GetLoginDetails } from 'src/middleware/auth.guard.js';
@@ -57,8 +61,9 @@ export class MaintenanceWorkerController {
   }
 
   @Get('server/version')
-  getServerVersion(): ServerVersionResponseDto {
-    return this.service.getVersion();
+  @Header('Vary', GALLERY_CLIENT_VARY)
+  getServerVersion(@Headers() headers: IncomingHttpHeaders): ServerVersionResponseDto {
+    return this.service.getVersion(headers);
   }
 
   /**

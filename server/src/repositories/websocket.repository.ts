@@ -12,6 +12,7 @@ import { AuthDto } from 'src/dtos/auth.dto.js';
 import { NotificationDto } from 'src/dtos/notification.dto.js';
 import { ReleaseEventV1, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { SyncAssetEditV1, SyncAssetExifV1, SyncAssetV2 } from 'src/dtos/sync.dto.js';
+import { STOCK_CLIENT_ROOM, isGalleryClient, stockClientRoom } from 'src/gallery/client-version.js';
 import { type AppRestartEvent, type ArgsOf, EventRepository } from 'src/repositories/event.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { handlePromiseError } from 'src/utils/misc.js';
@@ -90,6 +91,10 @@ export class WebsocketRepository implements OnGatewayConnection, OnGatewayDiscon
       if (auth.session) {
         await client.join(auth.session.id);
       }
+      if (!isGalleryClient(client.handshake.headers, client.handshake.auth)) {
+        const rooms = auth.session ? [auth.user.id, auth.session.id] : [auth.user.id];
+        await client.join([STOCK_CLIENT_ROOM, ...rooms.map((room) => stockClientRoom(room))]);
+      }
       await this.eventRepository.emit('WebsocketConnect', { userId: auth.user.id });
     } catch (error: Error | any) {
       this.logger.error(`Websocket connection error: ${error}`, error?.stack);
@@ -109,6 +114,20 @@ export class WebsocketRepository implements OnGatewayConnection, OnGatewayDiscon
 
   clientBroadcast<T extends keyof ClientEventMap>(event: T, ...data: ClientEventMap[T]) {
     this.server?.emit(event, ...data);
+  }
+
+  /** Sends `gallery` to Gallery clients in `room` (all when omitted) and `stock` to stock Immich clients, if given. */
+  clientSendByClient<T extends keyof ClientEventMap>(
+    event: T,
+    room: string | undefined,
+    gallery: ClientEventMap[T],
+    stock?: ClientEventMap[T],
+  ) {
+    const gallerySockets = this.server?.except(STOCK_CLIENT_ROOM);
+    (room ? gallerySockets?.to(room) : gallerySockets)?.emit(event, ...gallery);
+    if (stock) {
+      this.server?.to(stockClientRoom(room)).emit(event, ...stock);
+    }
   }
 
   serverSend<T extends ServerEvents>(event: T, ...args: ArgsOf<T>): void {

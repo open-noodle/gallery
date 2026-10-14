@@ -5,7 +5,6 @@ import { jwtVerify } from 'jose';
 import { readFileSync } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
 import type { MaintenanceModeState } from 'src/types.js';
-import { serverVersion } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import {
   MaintenanceAuthDto,
@@ -15,6 +14,7 @@ import {
 } from 'src/dtos/maintenance.dto.js';
 import { ServerConfigDto, ServerPingResponse, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { DatabaseLock, ImmichCookie, MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
+import { getClientServerVersion } from 'src/gallery/client-version.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
@@ -117,8 +117,8 @@ export class MaintenanceWorkerService {
   /**
    * {@link _VersionService.getVersion}
    */
-  getVersion() {
-    return ServerVersionResponseDto.fromSemVer(serverVersion);
+  getVersion(headers: IncomingHttpHeaders) {
+    return ServerVersionResponseDto.fromSemVer(getClientServerVersion(headers));
   }
 
   ping(): ServerPingResponse {
