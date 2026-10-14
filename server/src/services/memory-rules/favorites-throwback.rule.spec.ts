@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { AssetType } from 'src/enum.js';
-import { MemoryPeriodAsset } from 'src/repositories/asset.repository.js';
+import { MemoryPeriodAsset } from 'src/gallery/memory-rule-asset.repository.js';
 import { FavoritesThrowbackMemoryRule } from 'src/services/memory-rules/favorites-throwback.rule.js';
 
 const target = DateTime.fromISO('2026-07-15', { zone: 'utc' });

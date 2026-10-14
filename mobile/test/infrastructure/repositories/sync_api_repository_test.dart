@@ -113,9 +113,6 @@ void main() {
     test('v5.0.0 (last pre-feature release): EXCLUDES all 5 album types', () async {
       final types = await capturedRequestTypes(const SemVer(major: 5, minor: 0, patch: 0));
       expect(albumTypes.any(types.contains), isFalse, reason: 'v5.0.0 has no SharedSpaceAlbum enum values');
-      // Unconditional fork types are unaffected.
-      expect(types, contains('SharedSpacesV1'));
-      expect(types, contains('SharedSpaceLibrariesV1'));
     });
 
     test('old upstream-numbered fork server (3.0.1): EXCLUDES all 5 album types (fail-safe to old)', () async {
@@ -382,6 +379,49 @@ void main() {
         supportedSyncTypes: {'AssetsV1', 'SharedSpaceAlbumFoldersV1'},
       );
       expect(types, isNot(contains('AssetFavoritesV1')), reason: 'the declaration is authoritative in both directions');
+    });
+  });
+
+  group('fork shared-space and library request types ride the declaration-or-version gate', () {
+    const forkTypes = <String>[
+      'SharedSpacesV1',
+      'SharedSpaceMembersV1',
+      'SharedSpaceAssetsV1',
+      'SharedSpaceAssetExifsV1',
+      'SharedSpaceToAssetsV1',
+      'LibrariesV1',
+      'LibraryAssetsV1',
+      'LibraryAssetExifsV1',
+      'SharedSpaceLibrariesV1',
+    ];
+
+    test('stock Immich server (no declaration, upstream version): sends no fork type', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 3, minor: 3, patch: 1));
+      expect(types.where(forkTypes.contains), isEmpty);
+      expect(types.where((t) => t.startsWith('SharedSpace') || t.startsWith('Librar')), isEmpty);
+      expect(types, containsAll(['AuthUsersV1', 'AssetsV2', 'AlbumsV2', 'PeopleV1']));
+    });
+
+    test('fork server predating capability signalling (no declaration, 5.6.0): sends every fork type', () async {
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 6, patch: 0));
+      expect(types, containsAll(forkTypes));
+    });
+
+    test('a full declaration sends every fork type, whatever the reported version', () async {
+      final everything = SyncRequestType.values.map((t) => t.toJson()).toSet();
+      final types = await capturedRequestTypes(
+        const SemVer(major: 3, minor: 3, patch: 1),
+        supportedSyncTypes: everything,
+      );
+      expect(types, containsAll(forkTypes));
+    });
+
+    test('a declaration without the fork types sends none of them, even above the version gate', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 6, minor: 0, patch: 0),
+        supportedSyncTypes: {'AssetsV1', 'AlbumsV2'},
+      );
+      expect(types.where(forkTypes.contains), isEmpty);
     });
   });
 

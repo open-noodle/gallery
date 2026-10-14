@@ -12,6 +12,9 @@ import {
   SourceType,
   SystemMetadataKey,
 } from 'src/enum.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
+import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
@@ -151,6 +154,7 @@ const setupRecognition = (db?: Kysely<DB>) => {
       FaceIdentityRepository,
       PersonRepository,
       SearchRepository,
+      FaceSearchRepository,
       SharedSpaceRepository,
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
@@ -956,7 +960,7 @@ describe(PersonService.name, () => {
     });
 
     it('repairs previously merged faces when people identity maintenance runs', async () => {
-      const { sut, ctx } = setup();
+      const { ctx } = setup();
       const assetRepo = ctx.get(AssetRepository);
       const faceIdentityRepo = ctx.get(FaceIdentityRepository);
       const jobMock = ctx.getMock(JobRepository);
@@ -997,7 +1001,9 @@ describe(PersonService.name, () => {
       expect(bucketsBeforeRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(1);
 
       jobMock.queue.mockResolvedValue();
-      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+      await expect(
+        ctx.getService(FaceIdentityMaintenanceService).handleFaceIdentityBackfill({ stage: 'person' }),
+      ).resolves.toBe(JobStatus.Success);
 
       const sourceLink = await ctx.database
         .selectFrom('face_identity_face')
@@ -2101,23 +2107,27 @@ describe(PersonService.name, () => {
   // per-face thumbnail route, so this is a metadata leak, but it is the same rule.
   describe('getFacesForPicker locked-folder visibility', () => {
     it('omits faces on locked assets from a non-elevated owner', async () => {
-      const { sut, ctx } = setup();
+      const { ctx } = setup();
       const { user, person, timelineAsset } = await seedPersonAcrossVisibilities(ctx);
 
-      const result = await sut.getFacesForPicker(factory.auth({ user: { id: user.id } }), person.personGroupId, {
-        page: 1,
-        size: 50,
-      });
+      const result = await ctx
+        .getService(GalleryPeopleService)
+        .getFacesForPicker(factory.auth({ user: { id: user.id } }), person.personGroupId, {
+          page: 1,
+          size: 50,
+        });
 
       expect(result.faces.map((face) => face.assetId)).toEqual([timelineAsset.id]);
     });
 
     it('includes faces on locked assets for an elevated owner', async () => {
-      const { sut, ctx } = setup();
+      const { ctx } = setup();
       const { user, person, timelineAsset, lockedAsset } = await seedPersonAcrossVisibilities(ctx);
 
       const auth = factory.auth({ user: { id: user.id }, session: { hasElevatedPermission: true } });
-      const result = await sut.getFacesForPicker(auth, person.personGroupId, { page: 1, size: 50 });
+      const result = await ctx
+        .getService(GalleryPeopleService)
+        .getFacesForPicker(auth, person.personGroupId, { page: 1, size: 50 });
 
       expect(result.faces.map((face) => face.assetId).toSorted()).toEqual(
         [timelineAsset.id, lockedAsset.id].toSorted(),

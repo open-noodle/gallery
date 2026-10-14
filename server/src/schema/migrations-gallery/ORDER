@@ -9,7 +9,6 @@
 1772810000000-AddSharedSpaceActivityTable
 1772815000000-AddThumbnailCropYToSharedSpace
 1772820000000-AddSharedSpaceFaceRecognition
-1773846750001-AddPersonNameTrigramIndex
 1774215658876-AddSharedSpaceLibraryTable
 1774300000000-CreateUserGroupTables
 1775000000000-AddPetsEnabledToSharedSpace

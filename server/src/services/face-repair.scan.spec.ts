@@ -99,7 +99,7 @@ describe(FaceRepairService.name, () => {
       // Let buildRepairPlan run for real — mock its underlying repos so one candidate flows through.
       // A single-face page (< SCAN_PAGE_SIZE) ends the keyset scan after one page.
       mocks.faceRepair.getEligibleFacePage.mockResolvedValue(singleFacePage());
-      mocks.search.searchFaces.mockResolvedValue([]);
+      mocks.faceSearch.searchFaces.mockResolvedValue([]);
 
       await sut.runScan('scan-1');
 
