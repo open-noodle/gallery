@@ -58,7 +58,7 @@ describe('branding target paths', () => {
     });
   }
 
-  // M8 — the branch is rebased onto upstream Immich v3.3.1, so
+  // M8 — the branch is rebased onto upstream Immich v3.3.3, so
   // `branding/config.json` upstream.version is bumped to match. The
   // gallery-revert-to-immich-validation workflow boots the Gallery image
   // against `ghcr.io/immich-app/immich-server:v${upstream.version}`, so this
@@ -78,10 +78,12 @@ describe('branding target paths', () => {
   // AddPersonUserTableSharedBySharedWithConstraint all ship in v3.3.0 (100 files,
   // identical to this branch's), so their reversals and kysely_migrations deletes left.
   // The 3.3.0→3.3.1 bump removes none: v3.3.1 carries no `server/src/schema/`
-  // change, so neither direction of the coverage detector moves.
+  // change, so neither direction of the coverage detector moves. The 3.3.1→3.3.3
+  // bump removes none either: v3.3.2 and v3.3.3 carry no `server/src/schema/` change
+  // (a mobile fix, two base-image bumps and a people-query rewrite).
   //
   // Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.3.1 (base is immich v3.3.1)', () => {
-    expect(CONFIG.upstream.version).toBe('3.3.1');
+  it('M8: config.json upstream.version is 3.3.3 (base is immich v3.3.3)', () => {
+    expect(CONFIG.upstream.version).toBe('3.3.3');
   });
 });
