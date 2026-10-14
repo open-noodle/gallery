@@ -1,7 +1,8 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
+import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
-import { SYNC_TYPES_ORDER, SyncService, send } from 'src/services/sync.service.js';
+import { SYNC_TYPES_ORDER, SyncService, isForkAwareClient, send } from 'src/services/sync.service.js';
 import { ClientDisconnectedError } from 'src/utils/response.js';
 import { serialize, toAck } from 'src/utils/sync.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
@@ -211,6 +212,55 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
 const stockClient = (...types: SyncRequestType[]) => types;
 const galleryClient = (...types: SyncRequestType[]) => [...types, SyncRequestType.SharedSpacesV1];
 
+describe(isForkAwareClient.name, () => {
+  // upstream Immich v3.3.1's SyncRequestType: everything a stock client can send
+  const upstreamTypes = [
+    'AlbumsV1',
+    'AlbumsV2',
+    'AlbumUsersV1',
+    'AlbumToAssetsV1',
+    'AlbumAssetsV1',
+    'AlbumAssetsV2',
+    'AlbumAssetExifsV1',
+    'AssetsV1',
+    'AssetsV2',
+    'AssetExifsV1',
+    'AssetEditsV1',
+    'AssetMetadataV1',
+    'AssetOcrV1',
+    'AuthUsersV1',
+    'AuthUsersV2',
+    'MemoriesV1',
+    'MemoriesV2',
+    'MemoryToAssetsV1',
+    'MemoryToAssetsV2',
+    'PartnersV1',
+    'PartnerAssetsV1',
+    'PartnerAssetsV2',
+    'PartnerAssetExifsV1',
+    'PartnerStacksV1',
+    'StacksV1',
+    'UsersV1',
+    'PeopleV1',
+    'AssetFacesV1',
+    'AssetFacesV2',
+    'AssetFacesV3',
+    'UserMetadataV1',
+  ] as SyncRequestType[];
+
+  it('should be false for a request made only of upstream types', () => {
+    expect(isForkAwareClient({ types: upstreamTypes })).toBe(false);
+  });
+
+  it('should be true when any fork-only type is requested', () => {
+    const forkTypes = Object.values(SyncRequestType).filter((type) => !upstreamTypes.includes(type));
+    expect(forkTypes.length).toBeGreaterThan(0);
+    for (const type of forkTypes) {
+      expect(isForkAwareClient({ types: [SyncRequestType.AssetsV2, type] })).toBe(true);
+    }
+  });
+});
+
 describe(SyncService.name, () => {
   let sut: SyncService;
   let mocks: ServiceMocks;
@@ -244,6 +294,16 @@ describe(SyncService.name, () => {
     return parseChunks(chunks)
       .filter((m: any) => m.type === entityType)
       .map((m: any) => m.data.type);
+  };
+
+  // Streams `types` and returns the messages of `entityType`.
+  const streamTypes = async (types: SyncRequestType[], entityType: SyncEntityType) => {
+    const { writable, chunks } = makeWritable();
+    mocks.session.isPendingSyncReset.mockResolvedValue(false);
+    mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+    mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+    await sut.stream(authStub.user1, writable, { types });
+    return parseChunks(chunks).filter((m: any) => m.type === entityType);
   };
 
   it('should exist', () => {
@@ -779,6 +839,45 @@ describe(SyncService.name, () => {
         // upstream's on_this_day-only and unscoped link queries must not serve either version
         expect(syncSubs.memoryToAsset.getUpsertsV1).not.toHaveBeenCalled();
         expect(syncSubs.memoryToAsset.getUpserts).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('stock Immich client gating', () => {
+      it('should send trim edits to a Gallery client only, and edit deletes to both', async () => {
+        for (const [types, expected] of [
+          [stockClient(SyncRequestType.AssetEditsV1), [AssetEditAction.Crop]],
+          [galleryClient(SyncRequestType.AssetEditsV1), [AssetEditAction.Crop, AssetEditAction.Trim]],
+        ] as const) {
+          syncSubs.assetEdit.getDeletes.mockReturnValue(makeStream([{ id: newUuid(), editId: 'e0' }]));
+          syncSubs.assetEdit.getUpserts.mockReturnValue(
+            makeStream([
+              { updateId: newUuid(), id: 'e1', assetId: 'a1', action: AssetEditAction.Crop },
+              { updateId: newUuid(), id: 'e2', assetId: 'a2', action: AssetEditAction.Trim },
+            ]),
+          );
+
+          const upserts = await streamTypes([...types], SyncEntityType.AssetEditV1);
+          expect(upserts.map((m: any) => m.data.action)).toEqual(expected);
+          syncSubs.assetEdit.getDeletes.mockReturnValue(makeStream([{ id: newUuid(), editId: 'e0' }]));
+          expect(await streamTypes([...types], SyncEntityType.AssetEditDeleteV1)).toHaveLength(1);
+        }
+      });
+
+      it('should ask for pet people and faces only for a Gallery client', async () => {
+        for (const [types, withPets] of [
+          [stockClient(SyncRequestType.PeopleV1, SyncRequestType.AssetFacesV2, SyncRequestType.AssetFacesV3), false],
+          [galleryClient(SyncRequestType.PeopleV1, SyncRequestType.AssetFacesV2, SyncRequestType.AssetFacesV3), true],
+        ] as const) {
+          syncSubs.person.getUpserts.mockClear();
+          syncSubs.assetFace.getUpsertsV2.mockClear();
+          syncSubs.assetFace.getUpsertsV3.mockClear();
+
+          await streamTypes([...types], SyncEntityType.PersonV1);
+
+          expect(syncSubs.person.getUpserts).toHaveBeenCalledWith(expect.anything(), withPets);
+          expect(syncSubs.assetFace.getUpsertsV2).toHaveBeenCalledWith(expect.anything(), withPets);
+          expect(syncSubs.assetFace.getUpsertsV3).toHaveBeenCalledWith(expect.anything(), withPets);
+        }
       });
     });
 

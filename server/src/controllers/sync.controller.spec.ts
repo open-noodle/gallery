@@ -28,7 +28,7 @@ describe(SyncController.name, () => {
     it('should require sync request type enums', async () => {
       const { status, body } = await request(ctx.getHttpServer())
         .post('/sync/stream')
-        .send({ types: ['invalid'] });
+        .send({ types: [42] });
       expect(status).toBe(400);
       expect(body).toEqual(
         errorDto.validationError([

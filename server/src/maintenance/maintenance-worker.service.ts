@@ -7,7 +7,7 @@ import { jwtVerify } from 'jose';
 import { readFileSync } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
 import { basename } from 'node:path';
-import { serverVersion } from 'src/constants.js';
+import type { MaintenanceModeState } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import {
   MaintenanceAuthDto,
@@ -17,6 +17,7 @@ import {
 } from 'src/dtos/maintenance.dto.js';
 import { ServerConfigDto, ServerPingResponse, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { DatabaseLock, ImmichCookie, MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
+import { getClientServerVersion } from 'src/gallery/client-version.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
@@ -31,13 +32,14 @@ import { type BaseService as _BaseService } from 'src/services/base.service.js';
 import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { type ServerService as _ServerService } from 'src/services/server.service.js';
 import { type VersionService as _VersionService } from 'src/services/version.service.js';
-import type { MaintenanceModeState } from 'src/types.js';
 import { getConfig } from 'src/utils/config.js';
 import { createMaintenanceLoginUrl, detectPriorInstall } from 'src/utils/maintenance.js';
 import { getExternalDomain } from 'src/utils/misc.js';
 import { detectMediaLocation } from 'src/utils/storage.js';
 
-/** This service is available inside of maintenance mode to manage maintenance mode */
+/**
+ * This service is available inside of maintenance mode to manage maintenance mode
+ */
 @Injectable()
 export class MaintenanceWorkerService {
   #secret: string | null = null;
@@ -85,19 +87,18 @@ export class MaintenanceWorkerService {
 
     await this.logSecret();
 
-    this.moduleRef.get(YuccaService, { strict: false }).setDatabaseHooks({
-      tagName: 'yucca.v1.immichBackupFileName',
-      dump: (signal) => this.databaseBackupService.createDatabaseBackup('', signal),
-      cleanup: () => this.databaseBackupService.cleanupDatabaseBackups(),
-      restore: (fileName) => this.databaseBackupService.restoreDatabaseBackup(basename(fileName)),
-    });
+    if (await this.databaseRepository.tryLock(DatabaseLock.FutoBackupsModuleConfig)) {
+      this.moduleRef.get(YuccaService, { strict: false }).acquireLock();
+    }
 
     if (state.action) {
       void this.runAction(state.action);
     }
   }
 
-  /** {@link _BaseService.configRepos} */
+  /**
+   * {@link _BaseService.configRepos}
+   */
   private get configRepos() {
     return {
       configRepo: this.configRepository,
@@ -106,28 +107,36 @@ export class MaintenanceWorkerService {
     };
   }
 
-  /** {@link _BaseService.prototype.getConfig} */
+  /**
+   * {@link _BaseService.prototype.getConfig}
+   */
   private getConfig(options: { withCache: boolean }) {
     return getConfig(this.configRepos, options);
   }
 
-  /** {@link _ServerService.getSystemConfig} */
+  /**
+   * {@link _ServerService.getSystemConfig}
+   */
   getSystemConfig() {
     return {
       maintenanceMode: true,
     } as ServerConfigDto;
   }
 
-  /** {@link _VersionService.getVersion} */
-  getVersion() {
-    return ServerVersionResponseDto.fromSemVer(serverVersion);
+  /**
+   * {@link _VersionService.getVersion}
+   */
+  getVersion(headers: IncomingHttpHeaders) {
+    return ServerVersionResponseDto.fromSemVer(getClientServerVersion(headers));
   }
 
   ping(): ServerPingResponse {
     return { res: 'pong' };
   }
 
-  /** {@link _ApiService.ssr} */
+  /**
+   * {@link _ApiService.ssr}
+   */
   ssr(excludePaths: string[]) {
     const { resourcePaths } = this.configRepository.getEnv();
 

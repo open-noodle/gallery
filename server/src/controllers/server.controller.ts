@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Headers, HttpCode, HttpStatus, Put } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiTags } from '@nestjs/swagger';
+import type { IncomingHttpHeaders } from 'node:http';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { LicenseKeyDto, LicenseResponseDto } from 'src/dtos/license.dto.js';
 import {
@@ -17,6 +18,7 @@ import {
 } from 'src/dtos/server.dto.js';
 import { VersionCheckStateResponseDto } from 'src/dtos/system-metadata.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
+import { GALLERY_CLIENT_VARY } from 'src/gallery/client-version.js';
 import { Authenticated } from 'src/middleware/auth.guard.js';
 import { ServerService } from 'src/services/server.service.js';
 import { SystemMetadataService } from 'src/services/system-metadata.service.js';
@@ -93,8 +95,9 @@ export class ServerController {
     description: 'Retrieve the current server version in semantic versioning (semver) format.',
     history: new HistoryBuilder().added('v1').beta('v1').stable('v2'),
   })
-  getServerVersion(): ServerVersionResponseDto {
-    return this.versionService.getVersion();
+  @Header('Vary', GALLERY_CLIENT_VARY)
+  getServerVersion(@Headers() headers: IncomingHttpHeaders): ServerVersionResponseDto {
+    return this.versionService.getVersion(headers);
   }
 
   @Get('version-history')

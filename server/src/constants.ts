@@ -61,8 +61,10 @@ export const IWorker = 'IWorker';
 
 const basePath = dirname(import.meta.filename);
 const packageFile = join(basePath, '..', 'package.json');
-const { version } = JSON.parse(readFileSync(packageFile, 'utf8'));
+// apply-branding stamps the Gallery version into `version` and keeps the upstream base as `immichVersion`.
+const { version, immichVersion: baseVersion = version } = JSON.parse(readFileSync(packageFile, 'utf8'));
 export const serverVersion = new SemVer(version);
+export const immichVersion = new SemVer(baseVersion);
 
 export const citiesFile = 'cities500.txt';
 export const reverseGeocodeMaxDistance = 25_000;

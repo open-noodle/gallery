@@ -457,6 +457,17 @@ for notification_svc in \
   fi
 done
 
+# Stock Immich clients are told the upstream base version (server/src/gallery/client-version.ts reads
+# immichVersion, falling back to version on an unstamped build); it must match the base the fork is on.
+base_version=$(jq -r '.immichVersion // .version' "$REPO_ROOT/server/package.json")
+expected_base=$(jq -r '.upstream.version' "$CONFIG")
+if [[ "$base_version" == "$expected_base" ]]; then
+  echo "  OK: server/package.json reports base version $base_version to stock clients"
+else
+  echo "  WARN: server/package.json base version '$base_version' != config.json upstream.version '$expected_base'"
+  EXIT_CODE=1
+fi
+
 echo "--- Checking mobile image assets ---"
 if ! bash "$SCRIPT_DIR/verify-mobile-assets.sh"; then
   EXIT_CODE=1

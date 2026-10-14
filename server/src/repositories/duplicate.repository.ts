@@ -10,6 +10,7 @@ import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { anyUuid, asUuid, withDefaultVisibility } from 'src/utils/database.js';
+import { favoriteExistsFor } from 'src/utils/favorite.js';
 
 // Maximum number of candidate duplicates to return from vector search
 const DUPLICATE_SEARCH_LIMIT = 64;
@@ -49,6 +50,7 @@ export class DuplicateRepository {
                 qb
                   .selectFrom('asset_exif')
                   .selectAll('asset')
+                  .select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser'))
                   .select((eb) =>
                     eb.fn
                       .toJson('asset_exif')
