@@ -7,8 +7,8 @@ import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-// Coverage for the non-trim half of /assets/:id/edits — `video-trim.e2e-spec.ts`
-// already covers the trim path. T25 pins crop / rotate / mirror behavior plus
+// Coverage for /assets/:id/edits. Trims have their own endpoint, covered by
+// `video-trim.e2e-spec.ts`. T25 pins crop / rotate / mirror behavior plus
 // the shared GET / DELETE / validation surface.
 //
 // Service shape (asset.service.ts:603-755):

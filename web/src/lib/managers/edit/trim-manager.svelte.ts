@@ -1,5 +1,5 @@
-import type { AssetResponseDto } from '@immich/sdk';
-import type { EditAction, EditActions, EditToolManager } from '$lib/managers/edit/edit-manager.svelte';
+import { getAssetTrim, isHttpError, removeAssetTrim, updateAssetTrim, type AssetResponseDto } from '@immich/sdk';
+import type { EditAction, EditToolManager } from '$lib/managers/edit/edit-manager.svelte';
 
 export class TrimManager implements EditToolManager {
   startTime = $state(0);
@@ -19,41 +19,34 @@ export class TrimManager implements EditToolManager {
   private videoElement: HTMLVideoElement | undefined;
   private cleanupListeners: (() => void) | undefined;
 
-  edits: EditAction[] = $derived.by(() => {
-    if (!this.hasChanges) {
-      return [];
-    }
-    return [
-      {
-        action: 'trim' as const,
-        parameters: {
-          startTime: this.startTime,
-          endTime: this.endTime,
-        },
-      },
-    ] as EditAction[];
-  });
+  // A trim is not an asset edit: save() stores it through the trim endpoint.
+  edits: EditAction[] = [];
 
-  onActivate(asset: AssetResponseDto, edits: EditActions): Promise<void> {
+  async onActivate(asset: AssetResponseDto): Promise<void> {
     this.duration = this.parseDuration(asset.duration);
     this.startTime = 0;
     this.endTime = this.duration;
     this.hasChanges = false;
 
-    // Restore existing trim edits if any
-    const existingTrim = edits.find((e) => e.action === 'trim');
-    if (existingTrim) {
-      const params = existingTrim.parameters as { startTime: number; endTime: number; originalDuration?: number };
-      // Use originalDuration so the timeline shows the full video range, not the trimmed range
-      if (params.originalDuration && params.originalDuration > this.duration) {
-        this.duration = params.originalDuration;
-        this.endTime = this.duration;
+    const trim = await getAssetTrim({ id: asset.id }).catch((error: unknown) => {
+      if (isHttpError(error) && error.status === 404) {
+        return;
       }
-      this.startTime = params.startTime;
-      this.endTime = params.endTime;
+      throw error;
+    });
+    if (trim) {
+      // asset.duration is the trimmed length; the timeline spans the original so the trim can be widened again.
+      this.duration = trim.originalDuration;
+      this.startTime = trim.startTime;
+      this.endTime = trim.endTime;
       this.hasChanges = true;
     }
-    return Promise.resolve();
+  }
+
+  save(assetId: string) {
+    return this.hasChanges
+      ? updateAssetTrim({ id: assetId, assetVideoTrimDto: { startTime: this.startTime, endTime: this.endTime } })
+      : removeAssetTrim({ id: assetId });
   }
 
   onDeactivate(): void {

@@ -1,6 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
-import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
 import { SYNC_TYPES_ORDER, SyncService } from 'src/services/sync.service.js';
@@ -847,26 +846,6 @@ describe(SyncService.name, () => {
     });
 
     describe('stock Immich client gating', () => {
-      it('should send trim edits to a Gallery client only, and edit deletes to both', async () => {
-        for (const [types, expected] of [
-          [stockClient(SyncRequestType.AssetEditsV1), [AssetEditAction.Crop]],
-          [galleryClient(SyncRequestType.AssetEditsV1), [AssetEditAction.Crop, AssetEditAction.Trim]],
-        ] as const) {
-          syncSubs.assetEdit.getDeletes.mockReturnValue(makeStream([{ id: newUuid(), editId: 'e0' }]));
-          syncSubs.assetEdit.getUpserts.mockReturnValue(
-            makeStream([
-              { updateId: newUuid(), id: 'e1', assetId: 'a1', action: AssetEditAction.Crop },
-              { updateId: newUuid(), id: 'e2', assetId: 'a2', action: AssetEditAction.Trim },
-            ]),
-          );
-
-          const upserts = await streamTypes([...types], SyncEntityType.AssetEditV1);
-          expect(upserts.map((m: any) => m.data.action)).toEqual(expected);
-          syncSubs.assetEdit.getDeletes.mockReturnValue(makeStream([{ id: newUuid(), editId: 'e0' }]));
-          expect(await streamTypes([...types], SyncEntityType.AssetEditDeleteV1)).toHaveLength(1);
-        }
-      });
-
       it('should ask for pet people and faces only for a Gallery client', async () => {
         for (const [types, withPets] of [
           [stockClient(SyncRequestType.PeopleV1, SyncRequestType.AssetFacesV2, SyncRequestType.AssetFacesV3), false],

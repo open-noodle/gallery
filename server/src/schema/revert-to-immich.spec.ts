@@ -40,6 +40,7 @@ const upBody = (content: string) => {
 };
 const upstreamColumns = new Set<string>();
 const upstreamIndexes = new Set<string>();
+const upstreamTriggers = new Set<string>();
 for (const file of migrationFiles) {
   const up = upBody(readFileSync(join(migrationsGalleryDir, file), 'utf8'));
   for (const m of up.matchAll(/ALTER TABLE "?(\w+)"?\s+ADD\s+(?:COLUMN\s+)?(?:IF NOT EXISTS\s+)?"?(\w+)"?/g)) {
@@ -56,7 +57,13 @@ for (const file of migrationFiles) {
   for (const m of up.matchAll(/createIndex\('(\w+)'\)\s*\.on\('(\w+)'\)/g)) {
     upstreamIndexes.add(`${m[2]}.${m[1]}`);
   }
+  for (const m of up.matchAll(/CREATE OR REPLACE TRIGGER "(\w+)"\s+(?:AFTER|BEFORE) [A-Z ]+? ON "(\w+)"/g)) {
+    upstreamTriggers.add(`${m[2]}.${m[1]}`);
+  }
 }
+// Upstream columns a fork migration put back after an earlier fork migration dropped them. They are
+// upstream schema again, so the revert keeps them: asset.isFavorite carries the owner's favorites.
+const restoredUpstreamColumns = new Set(['asset.isFavorite']);
 const onUpstreamTable = (entry: string) => !createdTables.has(entry.split('.', 1)[0]);
 
 // Every table migrations-gallery CREATEs is a fork table and needs a revert entry.
@@ -90,7 +97,9 @@ describe('revert-to-immich.sql', () => {
   });
 
   it('drops every column a fork migration adds to an upstream table', () => {
-    const columns = [...upstreamColumns].filter((entry) => onUpstreamTable(entry));
+    const columns = [...upstreamColumns].filter(
+      (entry) => onUpstreamTable(entry) && !restoredUpstreamColumns.has(entry),
+    );
     expect(columns.length).toBeGreaterThan(0);
     const missing = columns.filter((entry) => {
       const [table, column] = entry.split('.', 2);
@@ -114,6 +123,7 @@ describe('revert-to-immich.sql', () => {
       'DELETE FROM "person_group"',
       `DELETE FROM "memory" WHERE "type" = 'rule'`,
       'SET "thumbhash" = NULL',
+      'FROM "asset_video_trim"',
       `'originalDuration'`,
       `DELETE FROM "asset_edit" WHERE "action" = 'trim'`,
       'DELETE FROM "shared_link_asset"',
@@ -140,11 +150,28 @@ describe('revert-to-immich.sql', () => {
     expect(sql).toContain('DROP TABLE IF EXISTS "gallery_migrations_lock";');
   });
 
+  it('keeps every restored upstream column', () => {
+    for (const entry of restoredUpstreamColumns) {
+      const [table, column] = entry.split('.', 2);
+      expect(sql).not.toMatch(new RegExp(String.raw`ALTER TABLE "${table}"\s+DROP COLUMN IF EXISTS "${column}"`));
+    }
+  });
+
+  it('drops every trigger a fork migration creates on an upstream table, before section 2', () => {
+    const triggers = [...upstreamTriggers].filter((entry) => onUpstreamTable(entry));
+    expect(triggers).toContain('asset.asset_is_favorite_after_write');
+    const section2 = sql.indexOf('DROP TABLE IF EXISTS');
+    for (const entry of triggers) {
+      const [table, trigger] = entry.split('.', 2);
+      const at = sql.indexOf(`DROP TRIGGER IF EXISTS "${trigger}" ON "${table}";`);
+      expect(at, entry).toBeGreaterThan(-1);
+      expect(at, entry).toBeLessThan(section2);
+      expect(guardBlock, entry).toContain(`'${trigger}'`);
+    }
+  });
+
   it('restores asset.isFavorite before dropping asset_favorite', () => {
-    // "IF NOT EXISTS" is intentionally tolerated: at the time this revert path was added
-    // (slice 0, #763), asset."isFavorite" has NOT yet been dropped from the live schema —
-    // that happens in a future slice 3 — so a bare ADD COLUMN would fail with "column
-    // already exists" against every Gallery DB until that slice ships.
+    // IF NOT EXISTS: databases last booted between the column drop and its restore have no column.
     const addColumn = sql.search(/ADD COLUMN(?: IF NOT EXISTS)? "isFavorite"/);
     const backfill = sql.indexOf('FROM asset_favorite');
     const dropTable = sql.indexOf('DROP TABLE IF EXISTS "asset_favorite"');

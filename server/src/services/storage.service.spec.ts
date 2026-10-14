@@ -1,3 +1,5 @@
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { JobStatus, SystemMetadataKey } from 'src/enum.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
@@ -491,6 +493,48 @@ describe(StorageService.name, () => {
       expect(mocks.storage.createFile).not.toHaveBeenCalled();
       // Should not update system flags since nothing changed
       expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(SystemMetadataKey.SystemFlags, expect.anything());
+    });
+  });
+
+  describe('backendFor', () => {
+    let disk: DiskStorageBackend;
+    let s3: S3StorageBackend;
+
+    beforeEach(() => {
+      disk = new DiskStorageBackend('/data', mocks.storage as any);
+      s3 = new S3StorageBackend({
+        bucket: 'bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 60,
+        serveMode: 'redirect',
+      });
+      StorageService['diskBackend'] = disk;
+    });
+
+    afterEach(() => {
+      StorageService['s3Backend'] = undefined;
+    });
+
+    it('reads a disk path from disk even when S3 is configured', () => {
+      StorageService['s3Backend'] = s3;
+      expect(StorageService.backendFor('/data/upload/user/a.jpg')).toBe(disk);
+    });
+
+    it('reads a disk path through the backend the caller passes', () => {
+      StorageService['s3Backend'] = s3;
+      const callerDisk = new DiskStorageBackend('', mocks.storage as any);
+      expect(StorageService.backendFor('/data/upload/user/a.jpg', callerDisk)).toBe(callerDisk);
+    });
+
+    it('sends a relative key to S3 when S3 is configured', () => {
+      StorageService['s3Backend'] = s3;
+      expect(StorageService.backendFor('upload/user/a.jpg')).toBe(s3);
+    });
+
+    it('resolves a relative key under the media location when S3 is off', async () => {
+      const backend = StorageService.backendFor('upload/user/a.jpg', new DiskStorageBackend('', mocks.storage as any));
+      expect(backend).toBe(disk);
+      await expect(backend.getReadableUrl('upload/user/a.jpg')).resolves.toBe('/data/upload/user/a.jpg');
     });
   });
 

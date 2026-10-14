@@ -559,7 +559,7 @@ describe(UserService.name, () => {
         profileImagePath: '',
         profileChangedAt: expect.any(Date),
       });
-      // FileDelete handler uses resolveBackendForKey to route relative paths to S3
+      // FileDelete handler uses backendFor to route relative paths to S3
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
         data: { files: [s3Path] },
