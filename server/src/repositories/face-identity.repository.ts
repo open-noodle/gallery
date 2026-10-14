@@ -5,6 +5,13 @@ import type { PeopleFaceStatistics, PersonStatistics } from 'src/repositories/pe
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { PeopleResponseDto, PersonResponseDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
 import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum.js';
+import {
+  clearOrphanPersonIdentities,
+  personIdentityId,
+  personSpecies,
+  personType,
+  setPersonIdentity,
+} from 'src/gallery/utils/person-sidecar.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
@@ -313,7 +320,7 @@ export class FaceIdentityRepository {
     if (ownPersonTokenIds.size > 0) {
       const rows = await this.db
         .selectFrom('person')
-        .select(['personGroupId', 'identityId'])
+        .select(['personGroupId', personIdentityId().as('identityId')])
         .where('ownerId', '=', input.userId)
         .where('personGroupId', 'in', [...ownPersonTokenIds])
         .execute();
@@ -443,8 +450,9 @@ export class FaceIdentityRepository {
             AND NOT EXISTS (
               SELECT 1
               FROM person existing_person
+              INNER JOIN person_identity ON person_identity."personGroupId" = existing_person."personGroupId"
               WHERE existing_person."ownerId" = ${input.userId}
-                AND existing_person."identityId" = shared_space_person."identityId"
+                AND person_identity."identityId" = shared_space_person."identityId"
             )
             ${
               input.excludeIdentityId
@@ -480,7 +488,7 @@ export class FaceIdentityRepository {
           EXISTS (
             SELECT 1
             FROM person
-            WHERE person."identityId" IS NULL
+            WHERE ${personIdentityId()} IS NULL
           )
           OR EXISTS (
             SELECT 1
@@ -503,7 +511,7 @@ export class FaceIdentityRepository {
               AND asset_face."deletedAt" IS NULL
               AND asset_face."isVisible" = true
               AND asset."deletedAt" IS NULL
-              AND person."identityId" IS DISTINCT FROM face_identity_face."identityId"
+              AND ${personIdentityId()} IS DISTINCT FROM face_identity_face."identityId"
           )
         ) AS "hasPersonalIdentityWork",
         EXISTS (
@@ -559,7 +567,7 @@ export class FaceIdentityRepository {
           asset.id AS "assetId",
           asset_face.id AS "assetFaceId",
           face_identity_face."identityId",
-          COALESCE(person.type, 'person') AS type
+          ${personType()} AS type
         FROM shared_space_asset
         INNER JOIN shared_space ON shared_space.id = shared_space_asset."spaceId"
         INNER JOIN asset ON asset.id = shared_space_asset."assetId"
@@ -582,7 +590,7 @@ export class FaceIdentityRepository {
           asset.id AS "assetId",
           asset_face.id AS "assetFaceId",
           face_identity_face."identityId",
-          COALESCE(person.type, 'person') AS type
+          ${personType()} AS type
         FROM shared_space_library
         INNER JOIN shared_space ON shared_space.id = shared_space_library."spaceId"
         INNER JOIN asset ON asset."libraryId" = shared_space_library."libraryId"
@@ -605,7 +613,7 @@ export class FaceIdentityRepository {
           asset.id AS "assetId",
           asset_face.id AS "assetFaceId",
           face_identity_face."identityId",
-          COALESCE(person.type, 'person') AS type
+          ${personType()} AS type
         FROM shared_space_album
         INNER JOIN shared_space ON shared_space.id = shared_space_album."spaceId"
         INNER JOIN album ON album.id = shared_space_album."albumId" AND album."deletedAt" IS NULL
@@ -631,7 +639,7 @@ export class FaceIdentityRepository {
           asset.id AS "assetId",
           asset_face.id AS "assetFaceId",
           face_identity_face."identityId",
-          COALESCE(person.type, 'person') AS type
+          ${personType()} AS type
         FROM shared_space_album
         INNER JOIN shared_space ON shared_space.id = shared_space_album."spaceId"
         INNER JOIN album ON album.id = shared_space_album."albumId" AND album."deletedAt" IS NULL
@@ -1023,11 +1031,11 @@ export class FaceIdentityRepository {
         GROUP BY accessible_faces."identityId"
       ),
       accessible_profiles AS (
-        SELECT person."identityId", person."isHidden", person.name, person.type
+        SELECT ${personIdentityId()} AS "identityId", person."isHidden", person.name, ${personType()} AS type
         FROM person
         WHERE person."ownerId" = ${userId}
-          AND person."identityId" IS NOT NULL
-          AND EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId")
+          AND ${personIdentityId()} IS NOT NULL
+          AND EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = ${personIdentityId()})
         UNION ALL
         SELECT
           shared_space_person."identityId",
@@ -1130,11 +1138,11 @@ export class FaceIdentityRepository {
         GROUP BY accessible_faces."identityId"
       ),
       accessible_profiles AS (
-        SELECT person."identityId", person."isHidden", person.name, person.type
+        SELECT ${personIdentityId()} AS "identityId", person."isHidden", person.name, ${personType()} AS type
         FROM person
         WHERE person."ownerId" = ${userId}
-          AND person."identityId" IS NOT NULL
-          AND EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId")
+          AND ${personIdentityId()} IS NOT NULL
+          AND EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = ${personIdentityId()})
         UNION ALL
         SELECT
           shared_space_person."identityId",
@@ -1354,15 +1362,14 @@ export class FaceIdentityRepository {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await (
-        profileRef.type === 'person'
-          ? trx.updateTable('person').set({ identityId: identity.id }).where('personGroupId', '=', profileRef.id)
-          : trx
-              .updateTable('shared_space_person')
-              .set({ identityId: identity.id })
-              .where('id', '=', profileRef.id)
-              .where('spaceId', '=', profileRef.spaceId!)
-      ).execute();
+      await (profileRef.type === 'person'
+        ? setPersonIdentity(trx, profileRef.id, identity.id)
+        : trx
+            .updateTable('shared_space_person')
+            .set({ identityId: identity.id })
+            .where('id', '=', profileRef.id)
+            .where('spaceId', '=', profileRef.spaceId!)
+            .execute());
 
       const faceIds = await this.getScopedProfileFaceIds(profileRef, trx);
       if (faceIds.length > 0) {
@@ -1423,7 +1430,12 @@ export class FaceIdentityRepository {
       if (ref.type === 'person') {
         const row = await db
           .selectFrom('person')
-          .select(['person.personGroupId', 'person.ownerId', 'person.identityId', 'person.type'])
+          .select([
+            'person.personGroupId',
+            'person.ownerId',
+            personIdentityId().as('identityId'),
+            personType().as('type'),
+          ])
           .where('person.personGroupId', '=', ref.id)
           .where('person.ownerId', '=', actorUserId)
           .executeTakeFirst();
@@ -1487,10 +1499,11 @@ export class FaceIdentityRepository {
     if (ref.type === 'person') {
       const row = await this.db
         .selectFrom('person')
-        .innerJoin('face_identity', 'face_identity.id', 'person.identityId')
+        .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+        .innerJoin('face_identity', 'face_identity.id', 'person_identity.identityId')
         .select([
           'person.personGroupId',
-          'person.identityId',
+          'person_identity.identityId',
           'person.faceAssetId as representativeFaceId',
           'face_identity.type as identityType',
         ])
@@ -1553,10 +1566,11 @@ export class FaceIdentityRepository {
     if (profileRef.type === 'person') {
       const row = await db
         .selectFrom('person')
-        .innerJoin('face_identity', 'face_identity.id', 'person.identityId')
+        .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+        .innerJoin('face_identity', 'face_identity.id', 'person_identity.identityId')
         .select([
           'person.personGroupId',
-          'person.identityId',
+          'person_identity.identityId',
           'person.faceAssetId as representativeFaceId',
           'face_identity.type as identityType',
         ])
@@ -1795,24 +1809,24 @@ export class FaceIdentityRepository {
       ),
       accessible_profiles AS (
         SELECT
-          person."identityId",
+          ${personIdentityId()} AS "identityId",
           person.name,
           person."isHidden",
           person."isFavorite",
           person."updatedAt",
           person."personGroupId" AS "profileId",
-          person.type,
+          ${personType()} AS type,
           0 AS "profileRank"
         FROM person
         WHERE person."ownerId" = ${input.userId}
-          AND person."identityId" IS NOT NULL
+          AND ${personIdentityId()} IS NOT NULL
           AND EXISTS (
-            SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId"
+            SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = ${personIdentityId()}
           )
-          AND (${typeFilter} = '' OR person.type = ${typeFilter})
+          AND (${typeFilter} = '' OR ${personType()} = ${typeFilter})
           AND (
             ${typeFilter} <> 'pet'
-            OR person."identityId" IN (SELECT "identityId" FROM embedded_pet_identities)
+            OR ${personIdentityId()} IN (SELECT "identityId" FROM embedded_pet_identities)
           )
         UNION ALL
         SELECT
@@ -2050,7 +2064,7 @@ export class FaceIdentityRepository {
           'user-person'::text AS "profileType",
           person."personGroupId" AS "profileId",
           NULL::uuid AS "spaceId",
-          person."identityId",
+          ${personIdentityId()} AS "identityId",
           person.name,
           person."birthDate",
           CASE WHEN person."birthDate" IS NOT NULL THEN 'manual' ELSE 'none' END AS "birthDateSource",
@@ -2060,11 +2074,11 @@ export class FaceIdentityRepository {
           person."isFavorite",
           person.color,
           person."updatedAt",
-          person.type,
-          person.species,
+          ${personType()} AS type,
+          ${personSpecies()} AS species,
           0 AS "profileRank"
         FROM person
-        INNER JOIN requested_identities ON requested_identities."identityId" = person."identityId"
+        INNER JOIN requested_identities ON requested_identities."identityId" = ${personIdentityId()}
         WHERE person."ownerId" = ${input.userId}
           AND (${input.withHidden}::boolean OR person."isHidden" = false)
         UNION ALL
@@ -2206,7 +2220,7 @@ export class FaceIdentityRepository {
     const ensure = async (runner: Kysely<DB> | Transaction<DB>) => {
       const person = await runner
         .selectFrom('person')
-        .select(['personGroupId', 'identityId', 'type', 'faceAssetId'])
+        .select(['personGroupId', personIdentityId().as('identityId'), personType().as('type'), 'faceAssetId'])
         .where('personGroupId', '=', personId)
         .executeTakeFirstOrThrow();
 
@@ -2227,11 +2241,7 @@ export class FaceIdentityRepository {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await runner
-        .updateTable('person')
-        .set({ identityId: identity.id })
-        .where('personGroupId', '=', person.personGroupId)
-        .execute();
+      await setPersonIdentity(runner, person.personGroupId, identity.id);
 
       return identity;
     };
@@ -2247,22 +2257,25 @@ export class FaceIdentityRepository {
     const profiles: MergePropagationProfile[] = [];
 
     if (personIds.length > 0 || identityIds.length > 0) {
-      let query = db.selectFrom('person').select(({ selectFrom }) => [
-        'person.personGroupId',
-        'person.ownerId',
-        'person.identityId',
-        'person.type',
-        'person.name',
-        selectFrom('asset_face')
-          .select(sql<number>`count(*)::int`.as('faceCount'))
-          .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
-          .as('faceCount'),
-      ]);
+      let query = db
+        .selectFrom('person')
+        .leftJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+        .select(({ selectFrom }) => [
+          'person.personGroupId',
+          'person.ownerId',
+          'person_identity.identityId',
+          personType().as('type'),
+          'person.name',
+          selectFrom('asset_face')
+            .select(sql<number>`count(*)::int`.as('faceCount'))
+            .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
+            .as('faceCount'),
+        ]);
 
       query =
         personIds.length > 0
           ? query.where('person.personGroupId', 'in', personIds)
-          : query.where('person.identityId', 'in', identityIds);
+          : query.where('person_identity.identityId', 'in', identityIds);
 
       const people = await query.execute();
       profiles.push(
@@ -2482,7 +2495,7 @@ export class FaceIdentityRepository {
     for (let index = 0; index < personIds.length; index += 1000) {
       const rows = await this.db
         .selectFrom('person')
-        .select(['personGroupId', 'identityId'])
+        .select(['personGroupId', personIdentityId().as('identityId')])
         .where('personGroupId', 'in', personIds.slice(index, index + 1000))
         .execute();
       for (const row of rows) {
@@ -2704,9 +2717,10 @@ export class FaceIdentityRepository {
       .where(({ not, exists, selectFrom, ref }) =>
         not(
           exists(
-            selectFrom('person')
+            selectFrom('person_identity')
+              .innerJoin('person', 'person.personGroupId', 'person_identity.personGroupId')
               .select(sql`1`.as('one'))
-              .whereRef('person.identityId', '=', ref('face_identity.id')),
+              .whereRef('person_identity.identityId', '=', ref('face_identity.id')),
           ),
         ),
       )
@@ -2734,7 +2748,7 @@ export class FaceIdentityRepository {
   async backfillPersonalIdentities(input: { cursor?: string; limit: number }): Promise<BackfillResult> {
     const people = await this.db
       .selectFrom('person')
-      .select(['personGroupId', 'ownerId', 'identityId'])
+      .select(['personGroupId', 'ownerId', personIdentityId().as('identityId')])
       .$if(!!input.cursor, (qb) => qb.where('personGroupId', '>', input.cursor!))
       .orderBy('personGroupId')
       .limit(input.limit + 1)
@@ -2988,10 +3002,11 @@ export class FaceIdentityRepository {
   private getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
     return this.db
       .selectFrom('person')
-      .select(['personGroupId'])
-      .where('ownerId', '=', ownerId)
-      .where('identityId', '=', identityId)
-      .$if(!!excludePersonId, (qb) => qb.where('personGroupId', '!=', excludePersonId!))
+      .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+      .select(['person.personGroupId'])
+      .where('person.ownerId', '=', ownerId)
+      .where('person_identity.identityId', '=', identityId)
+      .$if(!!excludePersonId, (qb) => qb.where('person.personGroupId', '!=', excludePersonId!))
       .executeTakeFirst();
   }
 
@@ -3377,17 +3392,18 @@ export class FaceIdentityRepository {
         .where('identityId', 'in', mergeableSourceIdentityIds)
         .execute();
 
+      await clearOrphanPersonIdentities(trx, [...mergeableSourceIdentityIds, input.targetIdentityId]);
       await trx
-        .updateTable('person')
+        .updateTable('person_identity')
         .set({ identityId: input.targetIdentityId })
         .where('identityId', 'in', mergeableSourceIdentityIds)
         .where(({ not, exists, selectFrom, ref }) =>
           not(
             exists(
-              selectFrom('person as target_person')
+              selectFrom('person_identity as target_identity')
                 .select(sql`1`.as('one'))
-                .where('target_person.identityId', '=', input.targetIdentityId)
-                .whereRef('target_person.ownerId', '=', ref('person.ownerId')),
+                .where('target_identity.identityId', '=', input.targetIdentityId)
+                .whereRef('target_identity.ownerId', '=', ref('person_identity.ownerId')),
             ),
           ),
         )
@@ -3415,7 +3431,9 @@ export class FaceIdentityRepository {
 
       const deletable = await trx
         .selectFrom('face_identity')
-        .leftJoin('person', 'person.identityId', 'face_identity.id')
+        // clearOrphanPersonIdentities above leaves only live people's links to these identities
+        .leftJoin('person_identity', 'person_identity.identityId', 'face_identity.id')
+        .leftJoin('person', 'person.personGroupId', 'person_identity.personGroupId')
         .leftJoin('shared_space_person', 'shared_space_person.identityId', 'face_identity.id')
         .leftJoin('face_identity_face', 'face_identity_face.identityId', 'face_identity.id')
         .select('face_identity.id')
@@ -3486,8 +3504,9 @@ export class FaceIdentityRepository {
       .where('identityId', 'in', sourceIdentityIds)
       .execute();
 
+    await clearOrphanPersonIdentities(db, [...sourceIdentityIds, input.targetIdentityId]);
     await db
-      .updateTable('person')
+      .updateTable('person_identity')
       .set({ identityId: input.targetIdentityId })
       .where('identityId', 'in', sourceIdentityIds)
       .execute();
@@ -3502,12 +3521,41 @@ export class FaceIdentityRepository {
     // carry that type, so a re-pointed pet profile does not keep type='pet' while pointing at a person identity —
     // a mismatch the automatic dedup/matching queries (which filter on type) would misread (#733 review). The
     // type-inequality guard keeps this a no-op for the common same-type merge.
-    await db
-      .updateTable('person')
-      .set({ type: targetIdentity.type })
-      .where('identityId', '=', input.targetIdentityId)
-      .where('type', '!=', targetIdentity.type)
-      .execute();
+    // A person's type is its person_pet row.
+    const retyped =
+      targetIdentity.type === 'pet'
+        ? await db
+            .insertInto('person_pet')
+            .columns(['personGroupId'])
+            .expression((eb) =>
+              eb
+                .selectFrom('person_identity')
+                .innerJoin('person', 'person.personGroupId', 'person_identity.personGroupId')
+                .select('person_identity.personGroupId')
+                .where('person_identity.identityId', '=', input.targetIdentityId),
+            )
+            .onConflict((oc) => oc.doNothing())
+            .returning('personGroupId')
+            .execute()
+        : await db
+            .deleteFrom('person_pet')
+            .where('personGroupId', 'in', (eb) =>
+              eb.selectFrom('person_identity').select('personGroupId').where('identityId', '=', input.targetIdentityId),
+            )
+            .returning('personGroupId')
+            .execute();
+    if (retyped.length > 0) {
+      // touch the retyped people so sync re-delivers them, as the in-place person.type update did
+      await db
+        .updateTable('person')
+        .set((eb) => ({ name: eb.ref('person.name') }))
+        .where(
+          'personGroupId',
+          'in',
+          retyped.map(({ personGroupId }) => personGroupId),
+        )
+        .execute();
+    }
     await db
       .updateTable('shared_space_person')
       .set({ type: targetIdentity.type })
@@ -3520,7 +3568,9 @@ export class FaceIdentityRepository {
 
     const deletable = await db
       .selectFrom('face_identity')
-      .leftJoin('person', 'person.identityId', 'face_identity.id')
+      // clearOrphanPersonIdentities above leaves only live people's links to these identities
+      .leftJoin('person_identity', 'person_identity.identityId', 'face_identity.id')
+      .leftJoin('person', 'person.personGroupId', 'person_identity.personGroupId')
       .leftJoin('shared_space_person', 'shared_space_person.identityId', 'face_identity.id')
       .leftJoin('face_identity_face', 'face_identity_face.identityId', 'face_identity.id')
       .select('face_identity.id')
@@ -3603,14 +3653,16 @@ export class FaceIdentityRepository {
 
     const [personalConflicts, spaceConflicts] = await Promise.all([
       db
-        .selectFrom('person as source_person')
-        .innerJoin('person as target_person', (join) =>
+        .selectFrom('person_identity as source_identity')
+        .innerJoin('person as source_person', 'source_person.personGroupId', 'source_identity.personGroupId')
+        .innerJoin('person_identity as target_identity', (join) =>
           join
-            .onRef('target_person.ownerId', '=', 'source_person.ownerId')
-            .on('target_person.identityId', '=', input.targetIdentityId),
+            .onRef('target_identity.ownerId', '=', 'source_identity.ownerId')
+            .on('target_identity.identityId', '=', input.targetIdentityId),
         )
+        .innerJoin('person as target_person', 'target_person.personGroupId', 'target_identity.personGroupId')
         .select('source_person.personGroupId')
-        .where('source_person.identityId', 'in', sourceIdentityIds)
+        .where('source_identity.identityId', 'in', sourceIdentityIds)
         .execute(),
       db
         .selectFrom('shared_space_person as source_person')

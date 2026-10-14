@@ -51,7 +51,9 @@ import { describe, expect, it } from 'vitest';
 // Server root — vitest runs with cwd at server/ (matches face-identity-query-shape.spec.ts).
 const SERVER_ROOT = process.cwd();
 
-const REPO_DIR = 'src/repositories';
+// src/gallery holds the fork repositories (and the fork access classes) moved out of src/repositories;
+// both trees are walked recursively so a space read added in any subfolder is caught.
+const REPO_DIRS = ['src/repositories', 'src/gallery'];
 const EXTRA_FILES = ['src/utils/database.ts'];
 
 // Fork-owned space-scope helpers. A call to any of these IS a space read (they
@@ -69,9 +71,11 @@ const SPACE_READ_MARKER = new RegExp(`${SPACE_HELPER.source}|${SPACE_TABLE.sourc
 // Derive the file set: every repository + utils/database.ts that contains a
 // space-read marker. Glob, do not hardcode — a new leaky file is auto-included.
 const deriveScopingFiles = (): string[] => {
-  const repoFiles = readdirSync(join(SERVER_ROOT, REPO_DIR))
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
-    .map((f) => `${REPO_DIR}/${f}`);
+  const repoFiles = REPO_DIRS.flatMap((dir) =>
+    readdirSync(join(SERVER_ROOT, dir), { recursive: true, encoding: 'utf8' })
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
+      .map((f) => `${dir}/${f}`),
+  );
   return [...repoFiles, ...EXTRA_FILES].filter((file) =>
     SPACE_READ_MARKER.test(readFileSync(join(SERVER_ROOT, file), 'utf8')),
   );
@@ -370,25 +374,27 @@ const VIS_ALLOWLIST: Record<string, string> = {
   // — Sync scope helper: accessibleLibraries builds a UNION of library ids (owned +
   //   space-linked) used as a subquery scope. It returns library ids, never asset rows;
   //   the asset streams that USE it (LibraryAssetSync/ExifSync) carry the visibility gate.
-  'sync.repository.ts::accessibleLibraries': 'returns library ids only (UNION of owned + space-linked), not asset rows',
+  'gallery-sync.repository.ts::accessibleLibraries':
+    'returns library ids only (UNION of owned + space-linked), not asset rows',
 
   // — SharedSpaceSync.getUpserts streams SHARED_SPACE_SYNC_COLUMNS (space name/settings
   //   metadata) scoped by accessibleSpaces — space rows, NOT asset rows. The per-asset
   //   space streams (SharedSpaceAssetSync etc.) carry the visibility gate separately.
-  'sync.repository.ts::getUpserts':
+  'gallery-sync.repository.ts::getUpserts':
     'sync stream of shared_space metadata columns (accessibleSpaces-scoped), not asset rows',
-  // — Every getDeletes in sync.repository.ts is the same shape: auditQuery() over a
+  // — Every getDeletes in gallery-sync.repository.ts is the same shape: auditQuery() over a
   //   shared_space*_audit tombstone table selecting ids only (id/spaceId plus the deleted
   //   row's own id), scoped by accessibleSpaces so a member is told only about spaces they
   //   can see. Tombstones carry no asset content, so no visibility gate applies; the asset
   //   streams that DO serve rows carry theirs separately. Listed explicitly because these
   //   arms used to pass only by sitting within VIS_WINDOW of a neighbouring gated stream —
   //   proximity that any later insertion between the classes silently removes.
-  'sync.repository.ts::getDeletes': 'audit-table tombstone stream (ids only, accessibleSpaces-scoped), not asset rows',
+  'gallery-sync.repository.ts::getDeletes':
+    'audit-table tombstone stream (ids only, accessibleSpaces-scoped), not asset rows',
   // LibrarySync.getCreatedAfter streams library_user access-GRANT rows (libraryId,
   // createId) scoped by accessibleLibraries — a per-user grant ledger, not asset
   // rows. The library asset streams (LibraryAssetSync/ExifSync) carry the gate.
-  'sync.repository.ts::getCreatedAfter':
+  'gallery-sync.repository.ts::getCreatedAfter':
     'streams library_user access-grant metadata (accessibleLibraries-scoped), not asset rows',
 
   // #752 P1-5: album metadata (assetCount/date-range) unions album_asset with member-gated
@@ -404,7 +410,7 @@ const VIS_ALLOWLIST: Record<string, string> = {
   // Task 9 (D1-b residue): the contributed (`album_space_asset`) arm's live-link gate — a
   // correlated EXISTS against shared_space_album (albumId + spaceId) proving the album is still
   // linked to the space the contribution was made through, mirroring contributionVisibleToMember
-  // (sync.repository.ts) / spaceContributedAssetExists. Pure link-existence check — same reasoning
+  // (gallery-sync.repository.ts) / spaceContributedAssetExists. Pure link-existence check — same reasoning
   // as hasLibraryLink / getAssetIdsWithoutOtherSpacePath above — no asset content is read here.
   // Asset visibility for the matched rows is enforced elsewhere (same as the rest of inAlbums,
   // which was never gate-scanned before this arm's shared_space_album reference existed).

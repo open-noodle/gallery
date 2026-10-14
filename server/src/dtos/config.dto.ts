@@ -45,7 +45,7 @@ import {
   galleryMachineLearningDefaults,
   galleryServerDefaults,
   galleryTopLevelDefaults,
-} from 'src/gallery/config.dto.js';
+} from 'src/gallery/dtos/config.dto.js';
 
 const { Admin, User, Public } = ConfigVisibility;
 

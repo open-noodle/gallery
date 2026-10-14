@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
+import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
@@ -11,7 +12,7 @@ import { FaceIdentityFaceSource } from 'src/schema/tables/face-identity-face.tab
 import { BaseService } from 'src/services/base.service.js';
 import { IdentityMergePropagationService, MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import { asDateString } from 'src/utils/date.js';
-import { newMediumService } from 'test/medium.factory.js';
+import { newMediumService, updatePersonForTest } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
@@ -50,11 +51,7 @@ const setPersonIdentity = async (
   db: Kysely<DB>,
   input: { personId: string; identityId: string | null; faceAssetId?: string | null },
 ) => {
-  await db
-    .updateTable('person')
-    .set({ identityId: input.identityId, faceAssetId: input.faceAssetId })
-    .where('personGroupId', '=', input.personId)
-    .execute();
+  await updatePersonForTest(db, input.personId, { identityId: input.identityId, faceAssetId: input.faceAssetId });
 };
 
 const createPersonProfile = async (
@@ -113,7 +110,7 @@ const createIdentityLinkedFace = async (
 const getPeople = (db: Kysely<DB>, ids: string[]) => {
   return db
     .selectFrom('person')
-    .select(['personGroupId', 'identityId'])
+    .select(['personGroupId', personIdentityId().as('identityId')])
     .where('personGroupId', 'in', ids)
     .orderBy('personGroupId')
     .execute();

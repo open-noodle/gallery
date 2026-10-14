@@ -4,8 +4,6 @@ import { Place } from 'src/database.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { AlbumResponseSchema } from 'src/dtos/album.dto.js';
 import { AssetResponseSchema } from 'src/dtos/asset-response.dto.js';
-import { ScopedPrimaryProfileSchema } from 'src/dtos/person.dto.js';
-import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto.js';
 import {
   AssetOrder,
   AssetOrderSchema,
@@ -14,7 +12,16 @@ import {
   SearchOrderField,
   SearchOrderFieldSchema,
 } from 'src/enum.js';
-import { IsNotSiblingOf, boundedTextFilter, isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation.js';
+import {
+  GalleryMetadataSearchExtension,
+  GallerySearchFilterExtension,
+  GallerySearchPeopleExtension,
+  GallerySearchSuggestionExtension,
+  GallerySmartSearchExtension,
+  GalleryStatisticsSearchExtension,
+  withGallerySuggestionScope,
+} from 'src/gallery/dtos/search.dto.js';
+import { isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation.js';
 
 const ADDED_V3_2 = new HistoryBuilder().added('v3.2.0').getExtensions();
 
@@ -24,13 +31,7 @@ const DEPRECATED_FLAT_FIELD = {
   deprecated: true,
 };
 
-const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
-const ScopedPersonTokenSchema = z
-  .string()
-  .regex(new RegExp(`^(?:${UUID_PATTERN}|person:${UUID_PATTERN}|space-person:${UUID_PATTERN})$`))
-  .describe('Legacy person ID or scoped identity filter token');
-
-const BaseSearchSchema = z.object({
+const UpstreamBaseSearchSchema = z.object({
   libraryId: z.uuidv4().nullish().describe('Library ID to filter by').meta(DEPRECATED_FLAT_FIELD),
   type: AssetTypeSchema.optional().meta(DEPRECATED_FLAT_FIELD),
   isEncoded: z.boolean().optional().describe('Filter by encoded status').meta(DEPRECATED_FLAT_FIELD),
@@ -44,27 +45,16 @@ const BaseSearchSchema = z.object({
   updatedAfter: isoDatetimeToDate.optional().describe('Filter by update date (after)').meta(DEPRECATED_FLAT_FIELD),
   trashedBefore: isoDatetimeToDate.optional().describe('Filter by trash date (before)').meta(DEPRECATED_FLAT_FIELD),
   trashedAfter: isoDatetimeToDate.optional().describe('Filter by trash date (after)').meta(DEPRECATED_FLAT_FIELD),
-  takenBefore: isoDatetimeToDate
-    .optional()
-    .describe('Filter by taken date: before this local date and time (exclusive)')
-    .meta(DEPRECATED_FLAT_FIELD),
-  takenAfter: isoDatetimeToDate
-    .optional()
-    .describe('Filter by taken date: on or after this local date and time (inclusive)')
-    .meta(DEPRECATED_FLAT_FIELD),
+  takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)').meta(DEPRECATED_FLAT_FIELD),
+  takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)').meta(DEPRECATED_FLAT_FIELD),
   city: z.string().nullable().optional().describe('Filter by city name').meta(DEPRECATED_FLAT_FIELD),
   state: z.string().nullable().optional().describe('Filter by state/province name').meta(DEPRECATED_FLAT_FIELD),
   country: z.string().nullable().optional().describe('Filter by country name').meta(DEPRECATED_FLAT_FIELD),
   make: z.string().nullable().optional().describe('Filter by camera make').meta(DEPRECATED_FLAT_FIELD),
   model: z.string().nullable().optional().describe('Filter by camera model').meta(DEPRECATED_FLAT_FIELD),
   lensModel: z.string().nullable().optional().describe('Filter by lens model').meta(DEPRECATED_FLAT_FIELD),
-  ownerId: z
-    .uuidv4()
-    .optional()
-    .describe('Filter by asset owner (contributor). Narrows within the current scope; never widens it.'),
   isNotInAlbum: z.boolean().optional().describe('Filter assets not in any album').meta(DEPRECATED_FLAT_FIELD),
-  isInAlbum: z.boolean().optional().describe('Filter assets in at least one album'),
-  personIds: z.array(ScopedPersonTokenSchema).optional().describe('Filter by person IDs').meta(DEPRECATED_FLAT_FIELD),
+  personIds: z.array(z.uuidv4()).optional().describe('Filter by person IDs').meta(DEPRECATED_FLAT_FIELD),
   tagIds: z.array(z.uuidv4()).nullish().describe('Filter by tag IDs').meta(DEPRECATED_FLAT_FIELD),
   albumIds: z.array(z.uuidv4()).optional().describe('Filter by album IDs').meta(DEPRECATED_FLAT_FIELD),
   rating: z
@@ -83,13 +73,9 @@ const BaseSearchSchema = z.object({
         .getExtensions(),
       deprecated: true,
     }),
-  ocr: boundedTextFilter().optional().describe('Filter by OCR text content').meta(DEPRECATED_FLAT_FIELD),
-  // Fork field: no V3 `filter` equivalent exists, so it is NOT marked DEPRECATED_FLAT_FIELD —
-  // that meta advertises a structured replacement, and there is none for shared spaces.
-  spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
-  spacePersonIds: z.array(z.uuidv4()).optional().describe('Shared space person IDs to filter by'),
-  withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+  ocr: z.string().optional().describe('Filter by OCR text content').meta(DEPRECATED_FLAT_FIELD),
 });
+const BaseSearchSchema = UpstreamBaseSearchSchema.extend(GallerySearchFilterExtension);
 
 const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
   withDeleted: z.boolean().optional().describe('Include deleted assets').meta(DEPRECATED_FLAT_FIELD),
@@ -110,10 +96,10 @@ const SearchPlacesSchema = z
 
 const SearchPeopleSchema = z
   .object({
-    name: z.string().min(1).describe('Person name to search for'),
+    name: z.string().describe('Person name to search for'),
     withHidden: stringToBool.optional().describe('Include hidden people'),
-    withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
   })
+  .extend(GallerySearchPeopleExtension)
   .meta({ id: 'SearchPeopleDto' });
 
 const PlacesResponseSchema = z
@@ -142,244 +128,21 @@ const SearchSuggestionTypeSchema = z
 
 const SearchSuggestionRequestBaseSchema = z.object({
   type: SearchSuggestionTypeSchema,
-  albumId: z.uuidv4().optional().describe('Scope suggestions to a specific album'),
   country: z.string().optional().describe('Filter by country'),
-  city: z.string().optional().describe('Filter by city'),
   state: z.string().optional().describe('Filter by state/province'),
-  personIds: z
-    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
-    .optional()
-    .describe('Filter by person IDs'),
-  tagIds: z
-    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
-    .optional()
-    .describe('Filter by tag IDs'),
-  rating: z.coerce.number().int().min(1).max(5).optional().describe('Filter by rating (1-5)'),
-  isFavorite: stringToBool.optional().describe('Filter by favorites'),
-  isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
-  isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
-  // Contributor filter, not an ownership scope: it narrows within whatever scope the request
-  // already resolved (see FilterSuggestionFilterOptions.ownerId). Without a field here the
-  // ZodValidationPipe would silently strip it and the suggestion lists would not narrow.
-  ownerId: z.uuidv4().optional().describe('Filter by asset owner (contributor)'),
-  mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
-  takenAfter: isoDatetimeToDate
-    .optional()
-    .describe('Filter suggestions by taken date: on or after this local date and time (inclusive)'),
-  takenBefore: isoDatetimeToDate
-    .optional()
-    .describe('Filter suggestions by taken date: before this local date and time (exclusive)'),
-  spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
-  withSharedSpaces: stringToBool.optional().describe('Include suggestions from shared spaces the user is a member of'),
   includeNull: stringToBool
     .optional()
     .describe('Include null values in suggestions')
     .meta(new HistoryBuilder().added('v1.111.0').stable('v2').getExtensions()),
+  ...GallerySearchSuggestionExtension,
 });
 
-const SearchSuggestionRequestSchema = SearchSuggestionRequestBaseSchema.pipe(
-  IsNotSiblingOf(SearchSuggestionRequestBaseSchema, 'albumId', ['spaceId']),
-)
-  .pipe(IsNotSiblingOf(SearchSuggestionRequestBaseSchema, 'albumId', ['withSharedSpaces']))
-  .meta({ id: 'SearchSuggestionRequestDto' });
-
-const TagSuggestionRequestSchema = z
-  .object({
-    spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
-    withSharedSpaces: stringToBool
-      .optional()
-      .describe('Include suggestions from shared spaces the user is a member of'),
-    takenAfter: isoDatetimeToDate
-      .optional()
-      .describe('Filter suggestions by taken date: on or after this local date and time (inclusive)'),
-    takenBefore: isoDatetimeToDate
-      .optional()
-      .describe('Filter suggestions by taken date: before this local date and time (exclusive)'),
-  })
-  .meta({ id: 'TagSuggestionRequestDto' });
-
-const TagSuggestionResponseSchema = z
-  .object({
-    id: z.string().describe('Tag ID'),
-    value: z.string().describe('Tag value/name'),
-  })
-  .meta({ id: 'TagSuggestionResponseDto' });
-
-const FilterSuggestionsPersonSchema = z
-  .object({
-    id: z.string().describe('Person ID'),
-    name: z.string().describe('Person name'),
-    primaryProfile: ScopedPrimaryProfileSchema.optional().describe('Accessible profile used for thumbnails'),
-  })
-  .meta({ id: 'FilterSuggestionsPersonDto' });
-
-const FilterSuggestionsTagSchema = z
-  .object({
-    id: z.string().describe('Tag ID'),
-    value: z.string().describe('Tag value/name'),
-  })
-  .meta({ id: 'FilterSuggestionsTagDto' });
-
-const FilterSuggestionsResponseSchema = z
-  .object({
-    countries: z.array(z.string()).describe('Available countries'),
-    cameraMakes: z.array(z.string()).describe('Available camera makes'),
-    tags: z.array(FilterSuggestionsTagSchema).describe('Available tags'),
-    people: z.array(FilterSuggestionsPersonSchema).describe('Available people (named, non-hidden, with thumbnails)'),
-    ratings: z.array(z.int()).describe('Available ratings'),
-    mediaTypes: z.array(z.string()).describe('Available media types'),
-    hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered set'),
-    hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
-    hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
-    hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
-  })
-  .meta({ id: 'FilterSuggestionsResponseDto' });
-
-const SmartSearchFacetsResponseSchema = z
-  .object({
-    total: z.int().nonnegative().describe('Exact count after applying all active smart-search filters'),
-    timeBuckets: z
-      .array(TimeBucketsResponseSchema)
-      .describe('Available monthly buckets for the smart-search result set'),
-    countries: z.array(z.string()).describe('Available countries'),
-    cities: z.array(z.string()).describe('Available cities for the current smart-search country scope'),
-    cameraMakes: z.array(z.string()).describe('Available camera makes'),
-    cameraModels: z.array(z.string()).describe('Available camera models for the current smart-search make scope'),
-    tags: z.array(FilterSuggestionsTagSchema).describe('Available tags'),
-    people: z.array(FilterSuggestionsPersonSchema).describe('Available people'),
-    ratings: z.array(z.int()).describe('Available ratings'),
-    mediaTypes: z.array(AssetTypeSchema).describe('Available media types'),
-    hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered smart-search set'),
-    hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
-    hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
-    hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
-  })
-  .meta({ id: 'SmartSearchFacetsResponseDto' });
-
-const FilterSuggestionsRequestBaseSchema = z.object({
-  personIds: z
-    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
-    .optional()
-    .describe('Filter by person IDs'),
-  country: z.string().optional().describe('Filter by country'),
-  state: z.string().optional().describe('Filter by state/province'),
-  city: z.string().optional().describe('Filter by city'),
-  make: z.string().optional().describe('Filter by camera make'),
-  model: z.string().optional().describe('Filter by camera model'),
-  lensModel: z.string().optional().describe('Filter by lens model'),
-  // See SearchSuggestionRequestBaseSchema.ownerId — a narrowing contributor filter, never a scope.
-  ownerId: z.uuidv4().optional().describe('Filter by asset owner (contributor)'),
-  tagIds: z
-    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
-    .optional()
-    .describe('Filter by tag IDs'),
-  rating: z.coerce.number().int().min(1).max(5).optional().describe('Filter by rating (1-5)'),
-  mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
-  isFavorite: stringToBool.optional().describe('Filter by favorites'),
-  isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
-  isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
-  takenAfter: isoDatetimeToDate
-    .optional()
-    .describe('Filter by taken date: on or after this local date and time (inclusive)'),
-  takenBefore: isoDatetimeToDate
-    .optional()
-    .describe('Filter by taken date: before this local date and time (exclusive)'),
-  albumId: z.uuidv4().optional().describe('Scope to a specific album'),
-  spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
-  withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
+const SearchSuggestionRequestSchema = withGallerySuggestionScope(SearchSuggestionRequestBaseSchema).meta({
+  id: 'SearchSuggestionRequestDto',
 });
-
-const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
-  IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['spaceId']),
-)
-  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
-  .meta({ id: 'FilterSuggestionsRequestDto' });
-
-export function mapPlaces(place: Place): PlacesResponseDto {
-  return {
-    name: place.name,
-    latitude: place.latitude,
-    longitude: place.longitude,
-    admin1name: place.admin1Name ?? undefined,
-    admin2name: place.admin2Name ?? undefined,
-  };
-}
-
-const SearchFacetCountResponseSchema = z
-  .object({
-    count: z.int().min(0).describe('Number of assets with this facet value'),
-    value: z.string().describe('Facet value'),
-  })
-  .meta({ id: 'SearchFacetCountResponseDto' });
-
-const SearchFacetResponseSchema = z
-  .object({
-    fieldName: z.string().describe('Facet field name'),
-    counts: z.array(SearchFacetCountResponseSchema),
-  })
-  .meta({ id: 'SearchFacetResponseDto' });
-
-const SearchAlbumResponseSchema = z
-  .object({
-    total: z.int().min(0).describe('Total number of matching albums'),
-    count: z.int().min(0).describe('Number of albums in this page'),
-    items: z.array(AlbumResponseSchema),
-    facets: z.array(SearchFacetResponseSchema),
-  })
-  .meta({ id: 'SearchAlbumResponseDto' });
-
-const SearchAssetResponseSchema = z
-  .object({
-    total: z
-      .int()
-      .min(0)
-      .describe('Total number of matching assets')
-      .meta(new HistoryBuilder().deprecated('v3.0.0').getExtensions()),
-    count: z.int().min(0).describe('Number of assets in this page'),
-    items: z.array(AssetResponseSchema),
-    facets: z.array(SearchFacetResponseSchema),
-    nextPage: z.string().nullable().describe('Next page token'),
-    // immich-30179: emitted by the (dormant) V3 path's mapResponse. Kept on the schema so the
-    // V3 methods still type-check while they stay unreachable.
-    nextCursor: z.string().nullable().optional().describe('Opaque cursor for the next page'),
-  })
-  .meta({ id: 'SearchAssetResponseDto' });
-
-const SearchResponseSchema = z
-  .object({
-    albums: SearchAlbumResponseSchema,
-    assets: SearchAssetResponseSchema,
-  })
-  .meta({ id: 'SearchResponseDto' });
-
-export class SearchResponseDto extends createZodDto(SearchResponseSchema) {}
-
-const SearchStatisticsResponseSchema = z
-  .object({
-    total: z.int().describe('Total number of matching assets'),
-  })
-  .meta({ id: 'SearchStatisticsResponseDto' });
-
-export class SearchStatisticsResponseDto extends createZodDto(SearchStatisticsResponseSchema) {}
-
-const SearchExploreItemSchema = z
-  .object({
-    value: z.string().describe('Explore value'),
-    data: AssetResponseSchema,
-  })
-  .meta({ id: 'SearchExploreItem' });
-
-const SearchExploreResponseSchema = z
-  .object({
-    fieldName: z.string().describe('Explore field name'),
-    items: z.array(SearchExploreItemSchema),
-  })
-  .meta({ id: 'SearchExploreResponseDto' });
-
-export class SearchExploreResponseDto extends createZodDto(SearchExploreResponseSchema) {}
 
 // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
 // Not wired to any controller/service. The fork's live search runs on the legacy
@@ -621,15 +384,9 @@ const RandomSearchSchema = withShapeExclusivity(RandomSearchBaseSchema).meta({ i
 const MetadataSearchSchema = withShapeExclusivity(
   RandomSearchBaseSchema.extend({
     id: z.uuidv4().optional().describe('Filter by asset ID').meta(DEPRECATED_FLAT_FIELD),
-    description: boundedTextFilter(z.string().trim())
-      .optional()
-      .describe('Filter by description text')
-      .meta(DEPRECATED_FLAT_FIELD),
+    description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
     checksum: z.string().optional().describe('Filter by file checksum').meta(DEPRECATED_FLAT_FIELD),
-    originalFileName: boundedTextFilter(z.string().trim())
-      .optional()
-      .describe('Filter by original file name')
-      .meta(DEPRECATED_FLAT_FIELD),
+    originalFileName: z.string().trim().optional().describe('Filter by original file name').meta(DEPRECATED_FLAT_FIELD),
     originalPath: z.string().optional().describe('Filter by original file path').meta(DEPRECATED_FLAT_FIELD),
     previewPath: z.string().optional().describe('Filter by preview file path').meta(DEPRECATED_FLAT_FIELD),
     thumbnailPath: z.string().optional().describe('Filter by thumbnail file path').meta(DEPRECATED_FLAT_FIELD),
@@ -638,17 +395,14 @@ const MetadataSearchSchema = withShapeExclusivity(
     page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
     orderBy: SearchOrderSchema.optional().meta(ADDED_V3_2),
     cursor: cursorField,
-  }),
+  }).extend(GalleryMetadataSearchExtension),
 ).meta({ id: 'MetadataSearchDto' });
 
 const StatisticsSearchSchema = withShapeExclusivity(
   BaseSearchSchema.extend({
-    description: boundedTextFilter(z.string().trim())
-      .optional()
-      .describe('Filter by description text')
-      .meta(DEPRECATED_FLAT_FIELD),
+    description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
     filter: filterField,
-  }),
+  }).extend(GalleryStatisticsSearchExtension),
 ).meta({ id: 'StatisticsSearchDto' });
 
 const SmartSearchSchema = withShapeExclusivity(
@@ -658,16 +412,13 @@ const SmartSearchSchema = withShapeExclusivity(
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
-    // Fork fields. Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3
-    // replacement, and neither of these has one (`order` here means relevance-vs-date on smart
-    // search; `withSharedSpaces` has no V3 equivalent at all).
-    order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
-    // POST body, so a real boolean — stringToBool is for the query-string suggestion DTOs.
-    withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
     filter: filterField,
+    ...GallerySmartSearchExtension,
   }),
 ).meta({ id: 'SmartSearchDto' });
 
+// gallery-fork: fork-only schema kept inline because it picks from BaseSearchSchema, and
+// gallery/dtos/search.dto.ts is a leaf that cannot import back from this file.
 const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   type: true,
   isFavorite: true,
@@ -698,22 +449,96 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   })
   .meta({ id: 'SmartSearchFacetsDto' });
 
-// Declared last: every schema these wrap must exist at class-evaluation time, and the fork's
-// suggestion/facet schemas are interleaved with upstream's V3 block further down.
 export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
 export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}
 export class MetadataSearchDto extends createZodDto(MetadataSearchSchema) {}
 export class StatisticsSearchDto extends createZodDto(StatisticsSearchSchema) {}
 export class SmartSearchDto extends createZodDto(SmartSearchSchema) {}
 export class SmartSearchFacetsDto extends createZodDto(SmartSearchFacetsSchema) {}
-export class SmartSearchFacetsResponseDto extends createZodDto(SmartSearchFacetsResponseSchema) {}
 export class SearchPlacesDto extends createZodDto(SearchPlacesSchema) {}
 export class SearchPeopleDto extends createZodDto(SearchPeopleSchema) {}
 export class PlacesResponseDto extends createZodDto(PlacesResponseSchema) {}
 export class SearchSuggestionRequestDto extends createZodDto(SearchSuggestionRequestSchema) {}
-export class TagSuggestionRequestDto extends createZodDto(TagSuggestionRequestSchema) {}
-export class TagSuggestionResponseDto extends createZodDto(TagSuggestionResponseSchema) {}
-export class FilterSuggestionsPersonDto extends createZodDto(FilterSuggestionsPersonSchema) {}
-export class FilterSuggestionsTagDto extends createZodDto(FilterSuggestionsTagSchema) {}
-export class FilterSuggestionsResponseDto extends createZodDto(FilterSuggestionsResponseSchema) {}
-export class FilterSuggestionsRequestDto extends createZodDto(FilterSuggestionsRequestSchema) {}
+
+export function mapPlaces(place: Place): PlacesResponseDto {
+  return {
+    name: place.name,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    admin1name: place.admin1Name ?? undefined,
+    admin2name: place.admin2Name ?? undefined,
+  };
+}
+
+const SearchFacetCountResponseSchema = z
+  .object({
+    count: z.int().min(0).describe('Number of assets with this facet value'),
+    value: z.string().describe('Facet value'),
+  })
+  .meta({ id: 'SearchFacetCountResponseDto' });
+
+const SearchFacetResponseSchema = z
+  .object({
+    fieldName: z.string().describe('Facet field name'),
+    counts: z.array(SearchFacetCountResponseSchema),
+  })
+  .meta({ id: 'SearchFacetResponseDto' });
+
+const SearchAlbumResponseSchema = z
+  .object({
+    total: z.int().min(0).describe('Total number of matching albums'),
+    count: z.int().min(0).describe('Number of albums in this page'),
+    items: z.array(AlbumResponseSchema),
+    facets: z.array(SearchFacetResponseSchema),
+  })
+  .meta({ id: 'SearchAlbumResponseDto' });
+
+const SearchAssetResponseSchema = z
+  .object({
+    total: z
+      .int()
+      .min(0)
+      .describe('Total number of matching assets')
+      .meta(new HistoryBuilder().deprecated('v3.0.0').getExtensions()),
+    count: z.int().min(0).describe('Number of assets in this page'),
+    items: z.array(AssetResponseSchema),
+    facets: z.array(SearchFacetResponseSchema),
+    nextPage: z.string().nullable().describe('Next page token'),
+    // immich-30179: emitted by the (dormant) V3 path's mapResponse. Kept on the schema so the
+    // V3 methods still type-check while they stay unreachable.
+    nextCursor: z.string().nullable().optional().describe('Opaque cursor for the next page'),
+  })
+  .meta({ id: 'SearchAssetResponseDto' });
+
+const SearchResponseSchema = z
+  .object({
+    albums: SearchAlbumResponseSchema,
+    assets: SearchAssetResponseSchema,
+  })
+  .meta({ id: 'SearchResponseDto' });
+
+export class SearchResponseDto extends createZodDto(SearchResponseSchema) {}
+
+const SearchStatisticsResponseSchema = z
+  .object({
+    total: z.int().describe('Total number of matching assets'),
+  })
+  .meta({ id: 'SearchStatisticsResponseDto' });
+
+export class SearchStatisticsResponseDto extends createZodDto(SearchStatisticsResponseSchema) {}
+
+const SearchExploreItemSchema = z
+  .object({
+    value: z.string().describe('Explore value'),
+    data: AssetResponseSchema,
+  })
+  .meta({ id: 'SearchExploreItem' });
+
+const SearchExploreResponseSchema = z
+  .object({
+    fieldName: z.string().describe('Explore field name'),
+    items: z.array(SearchExploreItemSchema),
+  })
+  .meta({ id: 'SearchExploreResponseDto' });
+
+export class SearchExploreResponseDto extends createZodDto(SearchExploreResponseSchema) {}

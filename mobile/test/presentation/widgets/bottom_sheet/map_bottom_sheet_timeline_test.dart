@@ -122,7 +122,7 @@ Future<_Harness> _pumpMapTimeline(
       // which null-derefs without the widget in the tree.
       child: EasyLocalization(
         supportedLocales: const [Locale('en')],
-        path: '../i18n',
+        path: '../i18n/gallery/merged',
         fallbackLocale: const Locale('en'),
         child: MaterialApp(home: withStubRouter(const MapBottomSheetTimeline())),
       ),

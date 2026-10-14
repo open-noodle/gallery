@@ -1,5 +1,5 @@
 /**
- * Medium tests for `AccessRepository.asset.checkSpaceAccess` — visibility filter (Slice 3).
+ * Medium tests for `AccessRepository.spaceAsset.checkSpaceAccess` — visibility filter (Slice 3).
  *
  * Security requirement: space-membership asset access via any path (direct /
  * library / album) must only expose assets whose visibility is `Timeline` or
@@ -73,7 +73,7 @@ describe('checkSpaceAccess — direct path visibility gate', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId });
     }
 
-    const result = await accessRepo.asset.checkSpaceAccess(
+    const result = await accessRepo.spaceAsset.checkSpaceAccess(
       viewer.id,
       new Set([timeline.id, archive.id, hidden.id, locked.id]),
     );
@@ -97,7 +97,7 @@ describe('checkSpaceAccess — direct path visibility gate', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
     // Before flip: readable
-    const before = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(before.has(asset.id)).toBe(true);
 
     // Flip to Locked (the shared_space_asset row remains)
@@ -108,7 +108,7 @@ describe('checkSpaceAccess — direct path visibility gate', () => {
       .execute();
 
     // After flip: blocked despite the surviving space row
-    const after = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(after.has(asset.id)).toBe(false);
   });
 
@@ -133,7 +133,7 @@ describe('checkSpaceAccess — direct path visibility gate', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: parent.id });
 
     // Ask for the video ID — the only route is via the Locked parent's livePhotoVideoId
-    const result = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([video.id]));
+    const result = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([video.id]));
     expect(result.has(video.id)).toBe(false);
   });
 
@@ -156,7 +156,7 @@ describe('checkSpaceAccess — direct path visibility gate', () => {
 
     // checkSpaceAccess excludes Locked even for the owner — the owner's OWN read
     // comes from checkOwnerAccess (hasElevatedPermission), not from checkSpaceAccess.
-    const spaceResult = await accessRepo.asset.checkSpaceAccess(owner.id, new Set([locked.id]));
+    const spaceResult = await accessRepo.spaceAsset.checkSpaceAccess(owner.id, new Set([locked.id]));
     expect(spaceResult.has(locked.id)).toBe(false);
 
     // checkOwnerAccess with elevation grants it (confirming the real path is untouched)
@@ -202,7 +202,7 @@ describe('checkSpaceAccess — library path visibility gate', () => {
       visibility: AssetVisibility.Locked,
     });
 
-    const result = await accessRepo.asset.checkSpaceAccess(
+    const result = await accessRepo.spaceAsset.checkSpaceAccess(
       viewer.id,
       new Set([timeline.id, archive.id, hidden.id, locked.id]),
     );
@@ -231,7 +231,7 @@ describe('checkSpaceAccess — library path visibility gate', () => {
       isOffline: true,
     });
 
-    const result = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([offlineTimeline.id]));
+    const result = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([offlineTimeline.id]));
     expect(result.has(offlineTimeline.id)).toBe(false);
   });
 });
@@ -261,7 +261,7 @@ describe('checkSpaceAccess — album path visibility gate', () => {
       await ctx.newAlbumAsset({ albumId: album.id, assetId });
     }
 
-    const result = await accessRepo.asset.checkSpaceAccess(
+    const result = await accessRepo.spaceAsset.checkSpaceAccess(
       viewer.id,
       new Set([timeline.id, archive.id, hidden.id, locked.id]),
     );
@@ -287,14 +287,14 @@ describe('checkSpaceAccess — album path visibility gate', () => {
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
     // Before soft-delete: asset reachable
-    const before = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(before.has(asset.id)).toBe(true);
 
     // Soft-delete the album
     await ctx.softDeleteAlbum(album.id);
 
     // After: excluded even though asset.visibility = Timeline
-    const after = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(after.has(asset.id)).toBe(false);
   });
 
@@ -312,7 +312,7 @@ describe('checkSpaceAccess — album path visibility gate', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-    const before = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(before.has(asset.id)).toBe(true);
 
     await defaultDatabase
@@ -321,7 +321,7 @@ describe('checkSpaceAccess — album path visibility gate', () => {
       .where('id', '=', asset.id)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(after.has(asset.id)).toBe(false);
   });
 });
@@ -348,7 +348,7 @@ describe('checkSpaceAccessForSpace — visibility gate', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId });
     }
 
-    const result = await accessRepo.asset.checkSpaceAccessForSpace(
+    const result = await accessRepo.spaceAsset.checkSpaceAccessForSpace(
       viewer.id,
       space.id,
       new Set([timeline.id, archive.id, hidden.id, locked.id]),
@@ -377,7 +377,7 @@ describe('checkSpaceAccessForSpace — visibility gate', () => {
 
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: parent.id });
 
-    const result = await accessRepo.asset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([video.id]));
+    const result = await accessRepo.spaceAsset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([video.id]));
     expect(result.has(video.id)).toBe(false);
   });
 
@@ -403,7 +403,7 @@ describe('checkSpaceAccessForSpace — visibility gate', () => {
       visibility: AssetVisibility.Hidden,
     });
 
-    const result = await accessRepo.asset.checkSpaceAccessForSpace(
+    const result = await accessRepo.spaceAsset.checkSpaceAccessForSpace(
       viewer.id,
       space.id,
       new Set([timeline.id, hidden.id]),
@@ -430,7 +430,7 @@ describe('checkSpaceAccessForSpace — visibility gate', () => {
     await ctx.newAlbumAsset({ albumId: album.id, assetId: timeline.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: locked.id });
 
-    const result = await accessRepo.asset.checkSpaceAccessForSpace(
+    const result = await accessRepo.spaceAsset.checkSpaceAccessForSpace(
       viewer.id,
       space.id,
       new Set([timeline.id, locked.id]),
@@ -451,7 +451,7 @@ describe('checkSpaceAccessForSpace — visibility gate', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-    const before = await accessRepo.asset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([asset.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([asset.id]));
     expect(before.has(asset.id)).toBe(true);
 
     await defaultDatabase
@@ -460,7 +460,7 @@ describe('checkSpaceAccessForSpace — visibility gate', () => {
       .where('id', '=', asset.id)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([asset.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([asset.id]));
     expect(after.has(asset.id)).toBe(false);
   });
 });
@@ -493,7 +493,7 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId });
     }
 
-    const result = await accessRepo.asset.checkSpaceEditAccess(
+    const result = await accessRepo.spaceAsset.checkSpaceEditAccess(
       editor.id,
       new Set([timeline.id, archive.id, hidden.id, locked.id]),
     );
@@ -515,7 +515,7 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
     const { asset: timeline } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: timeline.id });
 
-    const result = await accessRepo.asset.checkSpaceEditAccess(viewer.id, new Set([timeline.id]));
+    const result = await accessRepo.spaceAsset.checkSpaceEditAccess(viewer.id, new Set([timeline.id]));
 
     expect(result.has(timeline.id)).toBe(false);
   });
@@ -536,7 +536,7 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
     });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: parent.id });
 
-    const result = await accessRepo.asset.checkSpaceEditAccess(editor.id, new Set([video.id]));
+    const result = await accessRepo.spaceAsset.checkSpaceEditAccess(editor.id, new Set([video.id]));
     expect(result.has(video.id)).toBe(false);
   });
 
@@ -574,7 +574,7 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
       visibility: AssetVisibility.Locked,
     });
 
-    const result = await accessRepo.asset.checkSpaceEditAccess(
+    const result = await accessRepo.spaceAsset.checkSpaceEditAccess(
       editor.id,
       new Set([timeline.id, archive.id, hidden.id, locked.id]),
     );
@@ -596,7 +596,7 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-    const before = await accessRepo.asset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
     expect(before.has(asset.id)).toBe(true);
 
     await defaultDatabase
@@ -605,7 +605,7 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
       .where('id', '=', asset.id)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
     expect(after.has(asset.id)).toBe(false);
   });
 });
@@ -622,24 +622,24 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
 describe('checkSharedSpaceAccess (PersonRead) — visibility widening (rbac-7)', () => {
   it('GRANTS PersonRead for a person whose only space face is on an Archived asset (was denied)', async () => {
     const { accessRepo, viewer, person } = await seedPersonOnSpaceAsset(AssetVisibility.Archive);
-    const result = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
+    const result = await accessRepo.galleryPerson.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
     expect(result.has(person.personGroupId)).toBe(true);
   });
 
   it('grants PersonRead on a Timeline asset (positive control, regression)', async () => {
     const { accessRepo, viewer, person } = await seedPersonOnSpaceAsset(AssetVisibility.Timeline);
-    const result = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
+    const result = await accessRepo.galleryPerson.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
     expect(result.has(person.personGroupId)).toBe(true);
   });
 
   it('never grants PersonRead when the person only appears on Hidden or Locked space assets', async () => {
     const hiddenCase = await seedPersonOnSpaceAsset(AssetVisibility.Hidden);
     const lockedCase = await seedPersonOnSpaceAsset(AssetVisibility.Locked);
-    const hiddenResult = await hiddenCase.accessRepo.person.checkSharedSpaceAccess(
+    const hiddenResult = await hiddenCase.accessRepo.galleryPerson.checkSharedSpaceAccess(
       hiddenCase.viewer.id,
       new Set([hiddenCase.person.personGroupId]),
     );
-    const lockedResult = await lockedCase.accessRepo.person.checkSharedSpaceAccess(
+    const lockedResult = await lockedCase.accessRepo.galleryPerson.checkSharedSpaceAccess(
       lockedCase.viewer.id,
       new Set([lockedCase.person.personGroupId]),
     );
@@ -708,7 +708,7 @@ describe('P1-4: contributed-only assets — checkSpaceAccess / checkSpaceAccessF
   it('member reaches a contributed-only asset (fixes thumbnail/original/download 403)', async () => {
     const { ctx, accessRepo } = setup();
     const s = await seedContributionOnly(ctx);
-    const allowed = await accessRepo.asset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
     expect(allowed.has(s.asset.id)).toBe(true);
   });
 
@@ -716,7 +716,7 @@ describe('P1-4: contributed-only assets — checkSpaceAccess / checkSpaceAccessF
     const { ctx, accessRepo } = setup();
     const s = await seedContributionOnly(ctx);
     const { user: stranger } = await ctx.newUser();
-    const allowed = await accessRepo.asset.checkSpaceAccess(stranger.id, new Set([s.asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceAccess(stranger.id, new Set([s.asset.id]));
     expect(allowed.size).toBe(0);
   });
 
@@ -724,7 +724,7 @@ describe('P1-4: contributed-only assets — checkSpaceAccess / checkSpaceAccessF
     const { ctx, accessRepo } = setup();
     const s = await seedContributionOnly(ctx);
     await ctx.get(SharedSpaceRepository).removeAlbum(s.space.id, s.album.id);
-    const allowed = await accessRepo.asset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
     expect(allowed.size).toBe(0);
   });
 
@@ -736,14 +736,14 @@ describe('P1-4: contributed-only assets — checkSpaceAccess / checkSpaceAccessF
       .set({ visibility: AssetVisibility.Hidden })
       .where('id', '=', s.asset.id)
       .execute();
-    const hiddenResult = await accessRepo.asset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
+    const hiddenResult = await accessRepo.spaceAsset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
     expect(hiddenResult.size).toBe(0);
     await defaultDatabase
       .updateTable('asset')
       .set({ visibility: AssetVisibility.Timeline, deletedAt: new Date() })
       .where('id', '=', s.asset.id)
       .execute();
-    const trashedResult = await accessRepo.asset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
+    const trashedResult = await accessRepo.spaceAsset.checkSpaceAccess(s.member.id, new Set([s.asset.id]));
     expect(trashedResult.size).toBe(0);
   });
 
@@ -752,9 +752,17 @@ describe('P1-4: contributed-only assets — checkSpaceAccess / checkSpaceAccessF
     const s = await seedContributionOnly(ctx);
     const { space: other } = await ctx.newSharedSpace({ createdById: s.owner.id });
     await ctx.newSharedSpaceMember({ spaceId: other.id, userId: s.member.id, role: SharedSpaceRole.Viewer });
-    const wrongSpace = await accessRepo.asset.checkSpaceAccessForSpace(s.member.id, other.id, new Set([s.asset.id]));
+    const wrongSpace = await accessRepo.spaceAsset.checkSpaceAccessForSpace(
+      s.member.id,
+      other.id,
+      new Set([s.asset.id]),
+    );
     expect(wrongSpace.size).toBe(0);
-    const rightSpace = await accessRepo.asset.checkSpaceAccessForSpace(s.member.id, s.space.id, new Set([s.asset.id]));
+    const rightSpace = await accessRepo.spaceAsset.checkSpaceAccessForSpace(
+      s.member.id,
+      s.space.id,
+      new Set([s.asset.id]),
+    );
     expect(rightSpace.has(s.asset.id)).toBe(true);
   });
 });
@@ -791,7 +799,7 @@ describe('checkSpaceAccess — external-library assets via a space album (offlin
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
 
-    const allowed = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(allowed.has(asset.id)).toBe(true);
   });
 
@@ -814,7 +822,7 @@ describe('checkSpaceAccess — external-library assets via a space album (offlin
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await markOffline(asset.id);
 
-    const allowed = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(allowed.has(asset.id)).toBe(false);
   });
 
@@ -836,11 +844,11 @@ describe('checkSpaceAccess — external-library assets via a space album (offlin
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
 
-    const online = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const online = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(online.has(asset.id)).toBe(true);
 
     await markOffline(asset.id);
-    const offline = await accessRepo.asset.checkSpaceAccess(viewer.id, new Set([asset.id]));
+    const offline = await accessRepo.spaceAsset.checkSpaceAccess(viewer.id, new Set([asset.id]));
     expect(offline.has(asset.id)).toBe(false);
   });
 
@@ -863,7 +871,7 @@ describe('checkSpaceAccess — external-library assets via a space album (offlin
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await markOffline(asset.id);
 
-    const allowed = await accessRepo.asset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([asset.id]));
+    const allowed = await accessRepo.spaceAsset.checkSpaceAccessForSpace(viewer.id, space.id, new Set([asset.id]));
     expect(allowed.has(asset.id)).toBe(false);
   });
 
@@ -907,7 +915,7 @@ describe('C6 partner × space-linked visibility invariant', () => {
     const { accessRepo, partner, asset } = await seedPartnerAndSpaceAsset(AssetVisibility.Locked);
 
     const partnerResult = await accessRepo.asset.checkPartnerAccess(partner.id, new Set([asset.id]));
-    const spaceResult = await accessRepo.asset.checkSpaceAccess(partner.id, new Set([asset.id]));
+    const spaceResult = await accessRepo.spaceAsset.checkSpaceAccess(partner.id, new Set([asset.id]));
 
     expect(partnerResult.has(asset.id)).toBe(false);
     expect(spaceResult.has(asset.id)).toBe(false);
@@ -917,7 +925,7 @@ describe('C6 partner × space-linked visibility invariant', () => {
     const { accessRepo, partner, asset } = await seedPartnerAndSpaceAsset(AssetVisibility.Hidden);
 
     const partnerResult = await accessRepo.asset.checkPartnerAccess(partner.id, new Set([asset.id]));
-    const spaceResult = await accessRepo.asset.checkSpaceAccess(partner.id, new Set([asset.id]));
+    const spaceResult = await accessRepo.spaceAsset.checkSpaceAccess(partner.id, new Set([asset.id]));
 
     expect(partnerResult.has(asset.id)).toBe(true);
     expect(spaceResult.has(asset.id)).toBe(false); // space strips Hidden
@@ -927,7 +935,7 @@ describe('C6 partner × space-linked visibility invariant', () => {
     const { accessRepo, partner, asset } = await seedPartnerAndSpaceAsset(AssetVisibility.Archive);
 
     const partnerResult = await accessRepo.asset.checkPartnerAccess(partner.id, new Set([asset.id]));
-    const spaceResult = await accessRepo.asset.checkSpaceAccess(partner.id, new Set([asset.id]));
+    const spaceResult = await accessRepo.spaceAsset.checkSpaceAccess(partner.id, new Set([asset.id]));
 
     expect(spaceResult.has(asset.id)).toBe(true);
     expect(partnerResult.has(asset.id)).toBe(false);
@@ -937,7 +945,7 @@ describe('C6 partner × space-linked visibility invariant', () => {
     const { accessRepo, partner, asset } = await seedPartnerAndSpaceAsset(AssetVisibility.Timeline);
 
     const partnerResult = await accessRepo.asset.checkPartnerAccess(partner.id, new Set([asset.id]));
-    const spaceResult = await accessRepo.asset.checkSpaceAccess(partner.id, new Set([asset.id]));
+    const spaceResult = await accessRepo.spaceAsset.checkSpaceAccess(partner.id, new Set([asset.id]));
 
     expect(partnerResult.has(asset.id)).toBe(true);
     expect(spaceResult.has(asset.id)).toBe(true);

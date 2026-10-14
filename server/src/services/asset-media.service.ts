@@ -202,7 +202,7 @@ export class AssetMediaService extends BaseService {
 
     const path = editedPath ?? originalPath!;
 
-    return this.serveFromBackend(
+    return this.backendMedia.serveFromBackend(
       path,
       mimeTypes.lookup(path),
       CacheControl.PrivateWithCache,
@@ -245,7 +245,7 @@ export class AssetMediaService extends BaseService {
     const fileNameBase = isMetadataHidden(auth) ? id : getFileNameWithoutExtension(originalFileName);
     const fileName = `${fileNameBase}_${size}${getFilenameExtension(path)}`;
 
-    return this.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache, fileName);
+    return this.backendMedia.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache, fileName);
   }
 
   async playbackVideo(auth: AuthDto, id: string, range?: string): Promise<ImmichMediaResponse> {
@@ -259,7 +259,7 @@ export class AssetMediaService extends BaseService {
 
     const filepath = asset.encodedVideoPath || asset.originalPath;
 
-    return this.serveFromBackend(
+    return this.backendMedia.serveFromBackend(
       filepath,
       mimeTypes.lookup(filepath),
       CacheControl.PrivateWithCache,

@@ -46,7 +46,7 @@ describe(TranscodingService.name, () => {
     // no-op cleanup); on S3 it downloads to a temp file. Fixtures use bare relative
     // filenames, so passthrough keeps the existing command/seek suites green.
     ensureLocalFileSpy = vi
-      .spyOn(sut as unknown as WithEnsureLocalFile, 'ensureLocalFile')
+      .spyOn(sut['backendMedia'] as unknown as WithEnsureLocalFile, 'ensureLocalFile')
       .mockImplementation((filePath: string) => Promise.resolve({ localPath: filePath, cleanup: inputCleanup }));
   });
 

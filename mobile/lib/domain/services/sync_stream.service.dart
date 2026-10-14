@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/sync_event.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_api.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_migration.repository.dart';
@@ -34,6 +35,7 @@ class SyncStreamService {
 
   final SyncApiRepository _syncApiRepository;
   final SyncStreamRepository _syncStreamRepository;
+  final GallerySyncStreamRepository _gallerySyncStreamRepository;
   final LocalAssetRepository _localAssetRepository;
   final TrashedLocalAssetRepository _trashedLocalAssetRepository;
   final AssetMediaRepository _assetMediaRepository;
@@ -45,6 +47,7 @@ class SyncStreamService {
   SyncStreamService({
     required this._syncApiRepository,
     required this._syncStreamRepository,
+    required this._gallerySyncStreamRepository,
     required this._localAssetRepository,
     required this._trashedLocalAssetRepository,
     required this._assetMediaRepository,
@@ -53,6 +56,11 @@ class SyncStreamService {
     required this._api,
     this._cancellation,
   });
+
+  late final _galleryHandlers = gallerySyncHandlers(
+    _gallerySyncStreamRepository,
+    currentUserId: () => Store.tryGet(StoreKey.currentUser)?.id,
+  );
 
   bool get isCancelled => _cancellation?.isCompleted ?? false;
 
@@ -313,7 +321,7 @@ class SyncStreamService {
         // pruning afterwards keeps the existing semantics (a link to an unreachable asset is
         // cascade-removed along with the asset).
         await _syncStreamRepository.flushDeferredMemoryAssetsV1();
-        return _syncStreamRepository.pruneAssets();
+        return _gallerySyncStreamRepository.pruneAssets();
       // Request to reset the client state. Clear everything related to remote entities
       case SyncEntityType.syncResetV1:
         return _syncStreamRepository.reset();
@@ -356,102 +364,17 @@ class SyncStreamService {
         return _syncStreamRepository.updateAssetOcrV1(data.cast());
       case SyncEntityType.assetOcrDeleteV1:
         return _syncStreamRepository.deleteAssetOcrV1(data.cast());
-      // --- gallery-fork: shared-space sync dispatch ---
-      case SyncEntityType.sharedSpaceV1:
-        return _syncStreamRepository.updateSharedSpacesV1(data.cast());
-      case SyncEntityType.sharedSpaceDeleteV1:
-        return _syncStreamRepository.deleteSharedSpacesV1(data.cast());
-      case SyncEntityType.sharedSpaceMemberV1:
-        return _syncStreamRepository.updateSharedSpaceMembersV1(data.cast());
-      case SyncEntityType.sharedSpaceMemberBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceMembersV1(data.cast());
-      case SyncEntityType.sharedSpaceMemberDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceMembersV1(data.cast());
-      case SyncEntityType.sharedSpaceAssetCreateV1:
-      case SyncEntityType.sharedSpaceAssetUpdateV1:
-      case SyncEntityType.sharedSpaceAssetBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAssetsV1(data.cast());
-      case SyncEntityType.sharedSpaceAssetExifCreateV1:
-      case SyncEntityType.sharedSpaceAssetExifUpdateV1:
-      case SyncEntityType.sharedSpaceAssetExifBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAssetExifsV1(data.cast());
-      case SyncEntityType.sharedSpaceToAssetV1:
-      case SyncEntityType.sharedSpaceToAssetBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceToAssetsV1(data.cast());
-      case SyncEntityType.sharedSpaceToAssetDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceToAssetsV1(data.cast());
-      // --- gallery-fork: library sync dispatch ---
-      case SyncEntityType.libraryV1:
-        return _syncStreamRepository.updateLibrariesV1(data.cast());
-      case SyncEntityType.libraryDeleteV1:
-        // Read the current user id at dispatch time so the repository stays
-        // free of a Store dependency — see comment on deleteLibrariesV1.
-        final currentUserId = Store.tryGet(StoreKey.currentUser)?.id;
-        if (currentUserId == null) {
-          _logger.warning('LibraryDeleteV1 received without a current user id — skipping sweep');
+      // gallery-fork: every fork entity type dispatches through the Gallery handler map. The
+      // batch is still acked afterwards, so a type in neither place loses its data until a full
+      // reset; log it loudly. The exhaustiveness test in sync_stream_service_test.dart keeps
+      // this branch unreachable for every SyncEntityType the generated client knows.
+      default:
+        final handler = _galleryHandlers[type];
+        if (handler == null) {
+          _logger.warning("No sync handler for $type, ${data.length} events skipped");
           return;
         }
-        return _syncStreamRepository.deleteLibrariesV1(data.cast(), currentUserId: currentUserId);
-      case SyncEntityType.libraryAssetCreateV1:
-      case SyncEntityType.libraryAssetBackfillV1:
-        return _syncStreamRepository.updateLibraryAssetsV1(data.cast());
-      case SyncEntityType.libraryAssetDeleteV1:
-        return _syncStreamRepository.deleteLibraryAssetsV1(data.cast());
-      case SyncEntityType.libraryAssetExifCreateV1:
-      case SyncEntityType.libraryAssetExifBackfillV1:
-        return _syncStreamRepository.updateLibraryAssetExifsV1(data.cast());
-      case SyncEntityType.sharedSpaceLibraryV1:
-      case SyncEntityType.sharedSpaceLibraryBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceLibrariesV1(data.cast());
-      case SyncEntityType.sharedSpaceLibraryDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceLibrariesV1(data.cast());
-      // --- gallery-fork: SharedSpaceAlbum dispatch (Phase 2B) ---
-      case SyncEntityType.sharedSpaceAlbumV1:
-      case SyncEntityType.sharedSpaceAlbumBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumsV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceAlbumsV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumLinkV1:
-      case SyncEntityType.sharedSpaceAlbumLinkBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumLinksV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumLinkDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceAlbumLinksV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumFolderV1:
-      case SyncEntityType.sharedSpaceAlbumFolderBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumFoldersV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumFolderDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceAlbumFoldersV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumToAssetV1:
-      case SyncEntityType.sharedSpaceAlbumToAssetBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumToAssetsV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumToAssetDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceAlbumToAssetsV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumAssetCreateV1:
-      case SyncEntityType.sharedSpaceAlbumAssetUpdateV1:
-      case SyncEntityType.sharedSpaceAlbumAssetBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumAssetsV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumAssetExifCreateV1:
-      case SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1:
-      case SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumAssetExifsV1(data.cast());
-      // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
-      case SyncEntityType.sharedSpaceAlbumHiddenV1:
-      case SyncEntityType.sharedSpaceAlbumHiddenBackfillV1:
-        return _syncStreamRepository.updateSharedSpaceAlbumHiddenV1(data.cast());
-      case SyncEntityType.sharedSpaceAlbumHiddenDeleteV1:
-        return _syncStreamRepository.deleteSharedSpaceAlbumHiddenV1(data.cast());
-      // --- gallery-fork: per-user favorites sync dispatch (#763) ---
-      case SyncEntityType.assetFavoriteV1:
-        return _syncStreamRepository.updateAssetFavoritesV1(data.cast());
-      case SyncEntityType.assetFavoriteDeleteV1:
-        return _syncStreamRepository.deleteAssetFavoritesV1(data.cast());
-      // Forward-compat: openapi-generator v7.24 emits SyncEntityType as a real
-      // exhaustive Dart enum, so upstream dropped the `default:` arm here (it is
-      // now unreachable and trips `unreachable_switch_default`). The plan's
-      // Task 18 regression contract — a new server-side SyncEntityType must NOT
-      // throw and must not stall the stream — is still enforced one layer up by
-      // the null-check in sync_api.repository.dart's _kResponseMap lookup, which
-      // logs and skips unknown types at the parsing layer.
+        return handler(data);
     }
   }
 

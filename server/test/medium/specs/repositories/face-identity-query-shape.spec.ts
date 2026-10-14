@@ -27,7 +27,7 @@ const collectIdentityQueryText = () => {
   const files = [
     join(process.cwd(), 'src/repositories/face-identity.repository.ts'),
     join(process.cwd(), 'src/repositories/search.repository.ts'),
-    join(process.cwd(), 'src/gallery/filter-suggestion.repository.ts'),
+    join(process.cwd(), 'src/gallery/repositories/filter-suggestion.repository.ts'),
     join(process.cwd(), 'src/queries/face.identity.repository.sql'),
   ].filter((path) => existsSync(path));
 

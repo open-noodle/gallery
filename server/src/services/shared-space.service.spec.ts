@@ -2780,7 +2780,7 @@ describe(SharedSpaceService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([ownedAssetId]));
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
-      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set());
+      mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set());
 
       await expect(sut.addAssets(auth, spaceId, { assetIds: [ownedAssetId, foreignAssetId] })).rejects.toThrow();
 
@@ -2798,7 +2798,7 @@ describe(SharedSpaceService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([albumOnlyAssetId]));
-      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([albumOnlyAssetId]));
+      mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([albumOnlyAssetId]));
 
       await expect(sut.addAssets(auth, spaceId, { assetIds: [albumOnlyAssetId] })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -2807,7 +2807,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
       // AssetShare must NOT consult the album/space READ arms — those are the escalation surface.
       expect(mocks.access.asset.checkAlbumAccess).not.toHaveBeenCalled();
-      expect(mocks.access.asset.checkSpaceAccess).not.toHaveBeenCalled();
+      expect(mocks.access.spaceAsset.checkSpaceAccess).not.toHaveBeenCalled();
     });
 
     it('allows an editor to add a partner-shared asset (AssetShare includes partner) (rbac-2)', async () => {
@@ -3034,7 +3034,7 @@ describe(SharedSpaceService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([childId]));
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
-      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set());
+      mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set());
 
       await expect(sut.addAssets(auth, spaceId, { assetIds: [childId] })).rejects.toThrow();
 
@@ -7018,7 +7018,7 @@ describe(SharedSpaceService.name, () => {
         personId: newUuid(),
         thumbnailPath: '/personal.jpg',
       });
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: '/preview.jpg', cleanup });
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({ localPath: '/preview.jpg', cleanup });
       mocks.media.decodeImage.mockResolvedValue({
         data: Buffer.from('decoded-image'),
         info: { width: 250, height: 250, channels: 3 },
@@ -7068,7 +7068,7 @@ describe(SharedSpaceService.name, () => {
       mocks.asset.getForThumbnail.mockResolvedValue({
         path: '/path/to/asset/preview.jpg',
       } as any);
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({
         localPath: '/tmp/preview.jpg',
         cleanup,
       });
@@ -7140,7 +7140,7 @@ describe(SharedSpaceService.name, () => {
       mocks.asset.getForThumbnail.mockResolvedValue({
         path: '/path/to/asset/preview.jpg',
       } as any);
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({
         localPath: '/tmp/preview.jpg',
         cleanup,
       });
@@ -7218,7 +7218,7 @@ describe(SharedSpaceService.name, () => {
       mocks.asset.getForThumbnail
         .mockResolvedValueOnce({ path: null } as any)
         .mockResolvedValueOnce({ path: '/path/to/asset/thumbnail.jpg' } as any);
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({
         localPath: '/tmp/thumbnail.jpg',
         cleanup,
       });

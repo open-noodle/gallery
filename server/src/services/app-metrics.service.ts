@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
 import { OnEvent } from 'src/decorators.js';
 import { ImmichWorker } from 'src/enum.js';
-import { QueueMaintenanceRepository, QueueTelemetryMetrics } from 'src/gallery/queue-maintenance.repository.js';
+import {
+  QueueMaintenanceRepository,
+  QueueTelemetryMetrics,
+} from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { AppMetricsRepository, AppMetricsSnapshot } from 'src/repositories/app-metrics.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';

@@ -7,8 +7,8 @@
 import { Kysely, sql } from 'kysely';
 import { VECTOR_INDEX_TABLES } from 'src/constants.js';
 import { VectorIndex } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';
@@ -559,7 +559,7 @@ describe('PetFaceRepository.getLatestPetDate (medium)', () => {
     const petsDetectedAt = new Date();
     petsDetectedAt.setHours(18, 0, 0, 0);
     await ctx.database
-      .insertInto('asset_job_status')
+      .insertInto('asset_job_status_gallery')
       .values({ assetId: asset.id, petsDetectedAt })
       .onConflict((oc) => oc.column('assetId').doUpdateSet({ petsDetectedAt }))
       .execute();

@@ -1,8 +1,11 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, TimeBucketSize } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository, FilterSuggestionsOptions } from 'src/gallery/filter-suggestion.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import {
+  FilterSuggestionRepository,
+  FilterSuggestionsOptions,
+} from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { AssetRepository, TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';

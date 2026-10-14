@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -19,7 +19,7 @@ const BEFORE_UPDATE_ID = 'ffffffff-ffff-7fff-bfff-ffffffffffff';
 
 const setup = () => {
   const ctx = new SyncTestContext(defaultDatabase);
-  return { ctx, db: defaultDatabase, sut: ctx.get(SyncRepository).sharedSpaceAlbumToAsset };
+  return { ctx, db: defaultDatabase, sut: new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset };
 };
 
 beforeAll(async () => {
@@ -555,7 +555,7 @@ describe('SharedSpaceAlbumToAssetSync — unlink revocation + re-link re-deliver
     expect(row).toBeDefined();
     // Over-revocation guard: only s1's link was removed — the album stays linked via s2, so
     // the whole-album drop must NOT reach m. Mirrors the album-level assert in the next test.
-    const albumSync = ctx.get(SyncRepository).sharedSpaceAlbum;
+    const albumSync = new GallerySyncRepository(ctx.database).sharedSpaceAlbum;
     const albumDeletes = await drain(albumSync.getDeletes({ nowId: NOW_ID, userId: m.id }));
     expect(JSON.stringify(albumDeletes)).not.toContain(album.id);
   });
@@ -583,7 +583,7 @@ describe('SharedSpaceAlbumToAssetSync — unlink revocation + re-link re-deliver
     expect(edgeDeletes.some((r) => r.albumId === album.id)).toBe(false);
     // Album-metadata sync delivers the whole-album drop via the (gated) grant tombstone. Adjust
     // the sut property + delete-row shape to mirror sync-shared-space-album.spec.ts.
-    const albumSync = ctx.get(SyncRepository).sharedSpaceAlbum;
+    const albumSync = new GallerySyncRepository(ctx.database).sharedSpaceAlbum;
     const albumDeletes = await drain(albumSync.getDeletes({ nowId: NOW_ID, userId: m.id }));
     expect(JSON.stringify(albumDeletes)).toContain(album.id);
   });

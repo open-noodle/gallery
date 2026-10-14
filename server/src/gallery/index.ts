@@ -6,18 +6,21 @@ import { LibraryManifestController } from 'src/controllers/library-manifest.cont
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
-import { AssetVisibilityTransitionService } from 'src/gallery/asset-visibility-transition.service.js';
-import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { GalleryPeopleController } from 'src/gallery/gallery-people.controller.js';
-import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
-import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
-import { StorageUsageService } from 'src/gallery/storage-usage.service.js';
+import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
+import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
+import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
@@ -48,6 +51,7 @@ export const galleryControllers = [
   ClassificationController,
   FaceRepairAdminController,
   FaceSuggestionController,
+  GalleryAssetController,
   GalleryMapController,
   GalleryPeopleController,
   LibraryManifestController,
@@ -75,6 +79,7 @@ export const galleryRepositories = [
   SpaceAlbumRepository,
   PetFaceRepository,
   FaceSearchRepository,
+  GallerySyncRepository,
 ];
 
 export const galleryServices = [
@@ -84,6 +89,7 @@ export const galleryServices = [
   FaceIdentityMaintenanceService,
   FaceRepairService,
   FaceSuggestionService,
+  GalleryAssetService,
   GalleryPeopleService,
   LibraryManifestService,
   PetDetectionService,

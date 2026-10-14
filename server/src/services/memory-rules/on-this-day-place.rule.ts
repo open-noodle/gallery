@@ -1,4 +1,4 @@
-import { MemoryPeriodAsset, MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
+import { MemoryPeriodAsset, MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { dominantBy, recencyBonus, sampleAssetsAcrossGroups } from 'src/services/memory-rules/curation.util.js';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface.js';
 import { placeKeyOf } from 'src/services/memory-rules/trip.util.js';

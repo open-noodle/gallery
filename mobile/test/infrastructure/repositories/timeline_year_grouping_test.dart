@@ -10,7 +10,7 @@ import '../../medium/repository_context.dart';
 
 void main() {
   late MediumRepositoryContext ctx;
-  late TimelineRepository sut;
+  late SharedSpaceTimelineRepository sut;
 
   setUpAll(() async {
     await initializeDateFormatting('en');
@@ -18,7 +18,7 @@ void main() {
 
   setUp(() {
     ctx = MediumRepositoryContext();
-    sut = TimelineRepository(ctx.db);
+    sut = SharedSpaceTimelineRepository(TimelineRepository(ctx.db));
   });
 
   tearDown(() async {

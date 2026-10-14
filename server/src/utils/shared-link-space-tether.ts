@@ -1,7 +1,7 @@
 // Fork-owned predicates for the #1018 shared-link space tether.
 //
-// A share link created from inside a shared space records that space on `shared_link.spaceId`. That
-// column is what lets the link serve photos its creator does not own — and it is deliberately NOT a
+// A share link created from inside a shared space records that space in `shared_link_space`. That
+// row is what lets the link serve photos its creator does not own — and it is deliberately NOT a
 // grant. Nothing is frozen at creation time: every read re-derives the non-owned half from live
 // space state, exactly as `album_space_asset` contributions are re-derived everywhere else in the
 // fork ("visibility is re-derived from live space membership + the live album↔space link on every
@@ -13,9 +13,11 @@
 //   2. the asset is still visible in that space through one of its paths (direct add, linked
 //      library, linked album, or a cross-owner contribution).
 //
-// Deleting the space nulls `spaceId` (`ON DELETE SET NULL`), which makes both false and degrades the
-// link to the creator's own assets rather than breaking it. Encoding this once here means the access
+// Deleting the space deletes the `shared_link_space` row (`ON DELETE CASCADE`), which makes both false
+// and degrades the link to the creator's own assets rather than breaking it. Encoding this once here means the access
 // gate and the link payload can never drift apart and start disagreeing about what a link shows.
+//
+// Every caller must LEFT JOIN `shared_link_space` on `shared_link.id`; a missing join fails the query.
 import { Expression, ExpressionBuilder, SqlBool } from 'kysely';
 import { SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
@@ -41,7 +43,7 @@ export const sharedLinkCreatorCanPublish = (eb: ExpressionBuilder<DB, keyof DB>)
     eb
       .selectFrom('shared_space_member')
       .select(eb.lit(1).as('exists'))
-      .whereRef('shared_space_member.spaceId', '=', 'shared_link.spaceId')
+      .whereRef('shared_space_member.spaceId', '=', 'shared_link_space.spaceId')
       .whereRef('shared_space_member.userId', '=', 'shared_link.userId')
       .where('shared_space_member.role', 'in', sharedLinkPublisherRoles),
   );
@@ -52,14 +54,14 @@ export const sharedLinkCreatorCanPublish = (eb: ExpressionBuilder<DB, keyof DB>)
  */
 export const sharedLinkSpaceTether = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
   eb.and([
-    eb('shared_link.spaceId', 'is not', null),
+    eb('shared_link_space.spaceId', 'is not', null),
     sharedLinkCreatorCanPublish(eb),
     spaceVisibilityGate(eb, 'asset.visibility'),
     eb.or(
       spaceAssetPathBranches(eb, {
         correlateAssetId: 'asset.id',
         correlateLibraryId: 'asset.libraryId',
-        scope: { spaceIdRef: 'shared_link.spaceId' },
+        scope: { spaceIdRef: 'shared_link_space.spaceId' },
         albumTimelineGate: 'none',
       }),
     ),

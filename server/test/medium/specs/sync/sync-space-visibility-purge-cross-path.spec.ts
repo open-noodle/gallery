@@ -17,7 +17,7 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
-import { AssetVisibilityTransitionService } from 'src/gallery/asset-visibility-transition.service.js';
+import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';

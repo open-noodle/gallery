@@ -21,6 +21,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetVisibility, SourceType } from 'src/enum.js';
+import { personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -307,6 +308,7 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
     const landedOn = await defaultDatabase
       .selectFrom('person')
       .selectAll()
+      .select(personSidecarColumns())
       .where('personGroupId', '=', face.personGroupId!)
       .executeTakeFirstOrThrow();
     expect(landedOn.ownerId).toBe(bob.id);
@@ -318,6 +320,7 @@ describe('the owner-named override re-points the face for everyone (F-36 revised
     const person = await defaultDatabase
       .selectFrom('person')
       .selectAll()
+      .select(personSidecarColumns())
       .where('personGroupId', '=', bobPerson.personGroupId)
       .executeTakeFirstOrThrow();
     expect(person.name).toBe('Dad');
@@ -476,7 +479,12 @@ describe('an identity-less space person named like the owner person reuses it (ย
       .where('id', '=', faceId)
       .executeTakeFirstOrThrow();
     expect(face.personGroupId).toBe(bobPerson.personGroupId);
-    const bobPeople = await defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute();
+    const bobPeople = await defaultDatabase
+      .selectFrom('person')
+      .selectAll()
+      .select(personSidecarColumns())
+      .where('ownerId', '=', bob.id)
+      .execute();
     expect(bobPeople).toHaveLength(1);
     const updated = await defaultDatabase
       .selectFrom('shared_space_person')
@@ -634,7 +642,7 @@ describe('getAssetFacesForSpace', () => {
   });
 
   // Slice 9, Task 1 (spec ยง6.6): `isEditorDrawn` is the client's only signal for whether the
-  // delete-box affordance applies -- derived from `asset_face.createdBy IS NOT NULL`, never
+  // delete-box affordance applies -- derived from the face having an `asset_face_creator` row, never
   // `sourceType` (see deleteSpaceAssetFace's doc comment for why sourceType cannot tell the two
   // apart). Both rows share the same fixture setup so a difference can only be explained by
   // `createdBy`, not by something else about the face.
@@ -652,6 +660,37 @@ describe('getAssetFacesForSpace', () => {
     const detected = faces.find((face) => face.id === detectedFaceId);
     expect(drawn).toMatchObject({ isEditorDrawn: true });
     expect(detected).toMatchObject({ isEditorDrawn: false });
+  });
+
+  // asset_face_creator: deleting the user who drew a box drops their creator row (the old column was
+  // SET NULL), so the face stops being editor-drawn; it is never attributed to anyone else.
+  it('stops reporting a box as editor-drawn once the user who drew it is deleted', async () => {
+    const { ctx, verdictRepo } = setup();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId, createdBy: anna.id });
+    await expect(verdictRepo.getFaceCreatedBy(faceId)).resolves.toBe(anna.id);
+
+    await defaultDatabase.deleteFrom('user').where('id', '=', anna.id).execute();
+
+    await expect(verdictRepo.getFaceCreatedBy(faceId)).resolves.toBeNull();
+    const faces = await spaceRepo.getAssetFacesForSpace(space.id, assetId);
+    expect(faces.find((face) => face.id === faceId)).toMatchObject({ isEditorDrawn: false });
+  });
+
+  it('reports undefined for a face that does not exist and drops the creator row with the face', async () => {
+    const { ctx, verdictRepo } = setup();
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId, createdBy: anna.id });
+
+    await defaultDatabase.deleteFrom('asset_face').where('id', '=', faceId).execute();
+
+    await expect(verdictRepo.getFaceCreatedBy(faceId)).resolves.toBeUndefined();
+    await expect(
+      defaultDatabase.selectFrom('asset_face_creator').selectAll().where('assetFaceId', '=', faceId).execute(),
+    ).resolves.toEqual([]);
   });
 
   // #992 field report: a face named in TWO spaces came back TWICE from this read -- one row per
@@ -1095,7 +1134,12 @@ describe('attach propagates to the owner, but only for the attached identity (F-
       .executeTakeFirstOrThrow();
     expect(faceBefore.personGroupId).toBeNull();
     await expect(
-      defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute(),
+      defaultDatabase
+        .selectFrom('person')
+        .selectAll()
+        .select(personSidecarColumns())
+        .where('ownerId', '=', bob.id)
+        .execute(),
     ).resolves.toEqual([]);
 
     await expect(sut.attachFaceToSpacePerson(auth, space.id, person.id, faceId)).resolves.toBe(true);
@@ -1109,7 +1153,12 @@ describe('attach propagates to the owner, but only for the attached identity (F-
 
     // Bob had never named this human, so the propagation had to CREATE the person, carrying Anna's
     // name across -- and the face must point at exactly that new row, not merely at "some" person.
-    const bobPeople = await defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute();
+    const bobPeople = await defaultDatabase
+      .selectFrom('person')
+      .selectAll()
+      .select(personSidecarColumns())
+      .where('ownerId', '=', bob.id)
+      .execute();
     expect(bobPeople).toHaveLength(1);
     expect(bobPeople[0].name).toBe('Aurelia');
     expect(faceAfter.personGroupId).toBe(bobPeople[0].personGroupId);
@@ -1239,11 +1288,17 @@ describe('createSpaceAssetFace', () => {
     // library
     // carrying her name -- this used to assert null.
     expect(face.sourceType).toBe(SourceType.Manual);
-    expect(face.createdBy).toBe(anna.id);
+    const creator = await defaultDatabase
+      .selectFrom('asset_face_creator')
+      .select('userId')
+      .where('assetFaceId', '=', result.id)
+      .executeTakeFirstOrThrow();
+    expect(creator.userId).toBe(anna.id);
     expect(face.personGroupId).not.toBeNull();
     const ownerPerson = await defaultDatabase
       .selectFrom('person')
       .selectAll()
+      .select(personSidecarColumns())
       .where('personGroupId', '=', face.personGroupId!)
       .executeTakeFirstOrThrow();
     expect(ownerPerson.ownerId).toBe(bob.id);
@@ -1547,11 +1602,11 @@ describe('deleteSpaceAssetFace', () => {
 
     // Non-vacuous baseline: this really is a detected face, not editor-drawn.
     const seeded = await defaultDatabase
-      .selectFrom('asset_face')
-      .select(['createdBy'])
-      .where('id', '=', faceId)
-      .executeTakeFirstOrThrow();
-    expect(seeded.createdBy).toBeNull();
+      .selectFrom('asset_face_creator')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .executeTakeFirst();
+    expect(seeded).toBeUndefined();
 
     await expect(sut.deleteSpaceAssetFace(auth, space.id, faceId)).rejects.toThrow(BadRequestException);
 

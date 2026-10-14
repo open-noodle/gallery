@@ -74,7 +74,14 @@ where
           and "neg"."status" in ($9, $10)
           and (
             "neg"."personGroupId" = $11
-            or "neg"."identityId" = "person"."identityId"
+            or "neg"."identityId" = (
+              SELECT
+                "person_identity"."identityId"
+              FROM
+                "person_identity"
+              WHERE
+                "person_identity"."personGroupId" = "person"."personGroupId"
+            )
           )
       )
   )
@@ -340,14 +347,27 @@ where
 -- FacePersonVerdictRepository.getPendingForPerson
 select
   "person"."personGroupId",
-  "person"."identityId"
+  (
+    SELECT
+      "person_identity"."identityId"
+    FROM
+      "person_identity"
+    WHERE
+      "person_identity"."personGroupId" = "person"."personGroupId"
+  ) as "identityId"
 from
   "person"
 where
   "person"."personGroupId" = $1
   and BTRIM("person"."name") <> $2
   and "person"."isHidden" = $3
-  and "person"."type" = $4
+  and not EXISTS (
+    SELECT
+    FROM
+      "person_pet"
+    WHERE
+      "person_pet"."personGroupId" = "person"."personGroupId"
+  )
 
 -- FacePersonVerdictRepository.getPendingForSpacePerson
 select
@@ -588,7 +608,14 @@ where
 -- FacePersonVerdictRepository.getFaceOwnerLink
 select
   "asset_face"."personGroupId" as "personGroupId",
-  "person"."identityId" as "identityId",
+  (
+    SELECT
+      "person_identity"."identityId"
+    FROM
+      "person_identity"
+    WHERE
+      "person_identity"."personGroupId" = "person"."personGroupId"
+  ) as "identityId",
   "person"."name" as "ownerPersonName",
   "asset"."ownerId" as "assetOwnerId",
   exists (

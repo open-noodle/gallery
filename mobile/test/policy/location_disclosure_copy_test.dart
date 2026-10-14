@@ -20,7 +20,7 @@ void main() {
   }
 
   Iterable<MapEntry<String, Map<String, dynamic>>> loadAllTranslationFiles() {
-    return Directory('../i18n')
+    return Directory('../i18n/gallery/merged')
         .listSync()
         .whereType<File>()
         .where((file) => file.path.endsWith('.json'))

@@ -1,4 +1,4 @@
-// Reactivity regression tests for TimelineRepository.sharedSpace.
+// Reactivity regression tests for SharedSpaceTimelineRepository.sharedSpace.
 //
 // The bug we're guarding against: a `.watch()` stream whose query references
 // a table only via an `isInQuery` / EXISTS subquery can silently fail to
@@ -47,7 +47,7 @@ Future<void> _waitFor(bool Function() predicate, {Duration timeout = const Durat
 
 void main() {
   late Drift db;
-  late TimelineRepository sut;
+  late SharedSpaceTimelineRepository sut;
 
   setUpAll(() async {
     // truncateDate() uses intl's DateFormat which requires locale data.
@@ -56,7 +56,7 @@ void main() {
 
   setUp(() {
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    sut = TimelineRepository(db);
+    sut = SharedSpaceTimelineRepository(TimelineRepository(db));
   });
 
   tearDown(() async {
@@ -140,7 +140,7 @@ void main() {
     return sut.video(userIds, currentUserId, GroupAssetsBy.day).assetSource(0, 100);
   }
 
-  group('TimelineRepository.video() visibility matrix', () {
+  group('SharedSpaceTimelineRepository.video() visibility matrix', () {
     test('1. owner asset visible', () async {
       await insertUser('viewer');
       await insertVideo('a1', 'viewer');
@@ -450,7 +450,7 @@ void main() {
     });
   });
 
-  group('TimelineRepository.place()', () {
+  group('SharedSpaceTimelineRepository.place()', () {
     Future<void> insertExif(String assetId, String? city) =>
         db.into(db.remoteExifEntity).insert(RemoteExifEntityCompanion.insert(assetId: assetId, city: Value(city)));
 
@@ -536,7 +536,7 @@ void main() {
     });
   });
 
-  group('TimelineRepository.map() bucket sheet', () {
+  group('SharedSpaceTimelineRepository.map() bucket sheet', () {
     LatLngBounds globeBounds() => LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
 
     LatLngBounds europeBounds() => LatLngBounds(southwest: const LatLng(35, -10), northeast: const LatLng(70, 40));
@@ -1045,7 +1045,7 @@ void main() {
     isEdited: false,
   );
 
-  group('TimelineRepository.fromAssetStream() grouped buckets', () {
+  group('SharedSpaceTimelineRepository.fromAssetStream() grouped buckets', () {
     // Four test assets spanning three months / two years (all in local time).
     late List<BaseAsset> assets;
 
@@ -1268,7 +1268,7 @@ void main() {
     });
   });
 
-  group('TimelineRepository.sharedSpacePerson()', () {
+  group('SharedSpaceTimelineRepository.sharedSpacePerson()', () {
     // Parity gap sibling of #727 (per-photo faces) and #737 (People page): a Space-shared
     // person's DETAIL timeline.
     //
@@ -1324,7 +1324,7 @@ void main() {
     });
   });
 
-  group('TimelineRepository.sharedSpacePerson() archive inclusion (L12)', () {
+  group('SharedSpaceTimelineRepository.sharedSpacePerson() archive inclusion (L12)', () {
     // The space-person timeline's visibility filter historically allowed only
     // AssetVisibility.timeline, the 7th site commit 9185ff58e2 missed when it fixed the
     // other 6 (video/place/map/sharedSpace watch+get). The server (getPersonAssetIds)

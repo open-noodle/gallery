@@ -1,0 +1,6 @@
+{
+  "background_location_permission_content": "Noodle Gallery izmanto fona atrašanās vietas atļauju, lai turpinātu nolasīt Wi-Fi tīkla nosaukumu, kamēr automātiskā servera pārslēgšana darbojas fonā. Wi-Fi tīkla nosaukums tiek saglabāts šajā ierīcē salīdzināšanai; precīzā ierīces atrašanās vieta netiek glabāta vai kopīgota.",
+  "location_permission_content": "Android pieprasa precīzas atrašanās vietas atļauju, lai Noodle Gallery varētu nolasīt pašreizējā Wi‑Fi tīkla nosaukumu automātiskai servera pārslēgšanai. Wi‑Fi tīkla nosaukums tiek saglabāts šajā ierīcē salīdzināšanai, un precīza ierīces atrašanās vieta netiek glabāta vai kopīgota.",
+  "map_location_service_disabled_content": "Noodle Gallery izmanto jūsu precīzo pašreizējo atrašanās vietu, lai centrētu karti un rādītu fotoattēlus un videoklipus no jūsu pašreizējās apkārtnes. Atrašanās vietas pakalpojumiem jābūt iespējotiem, pirms Noodle Gallery var piekļūt šai atrašanās vietai. Precīza ierīces atrašanās vieta netiek glabāta vai kopīgota. Vai vēlaties tagad atvērt atrašanās vietas iestatījumus?",
+  "map_no_location_permission_content": "Noodle Gallery izmanto jūsu precīzo pašreizējo atrašanās vietu, lai centrētu karti un rādītu fotoattēlus un videoklipus no jūsu pašreizējās apkārtnes. Precīza ierīces atrašanās vieta netiek glabāta vai kopīgota. Vai vēlaties tagad atļaut piekļuvi atrašanās vietai?"
+}

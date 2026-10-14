@@ -32,6 +32,7 @@ import {
   album_soft_delete_shared_space_album,
   album_space_asset_delete_audit,
   asset_favorite_delete_audit,
+  library_after_insert,
   shared_space_album_folder_delete_audit,
   shared_space_album_hidden_delete_audit,
   shared_space_member_after_insert_album,
@@ -48,6 +49,7 @@ import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000
 import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden.js';
 import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable.js';
 import { up as upAddAssetFavoriteTables } from 'src/schema/migrations-gallery/1794000000000-AddAssetFavoriteTables.js';
+import { up as upDropLibraryCreateId } from 'src/schema/migrations-gallery/1798200000000-DropLibraryCreateId.js';
 
 describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parity', () => {
   beforeEach(() => {
@@ -362,5 +364,27 @@ describe('1793000000000-AddSharedSpaceAlbumHidden override parity', () => {
     expect(executedTriggerDdl).toContain('REFERENCING OLD TABLE AS "old"');
     expect(executedTriggerDdl).toContain('FOR EACH STATEMENT');
     expect(executedTriggerDdl).not.toContain('WHEN (');
+  });
+});
+
+// This migration REPLACED library_after_insert's body (it no longer copies the dropped library.createId).
+describe('1798200000000-DropLibraryCreateId override parity', () => {
+  beforeEach(() => {
+    capturedSql.length = 0;
+  });
+
+  it('executes and overrides the function with DDL byte-identical to functions.ts', async () => {
+    await upDropLibraryCreateId({} as any);
+
+    const [executedFunctionDdl, functionOverrideUpdate] = capturedSql;
+
+    expect(executedFunctionDdl).toBe(library_after_insert.expression);
+
+    const overrideValue = JSON.parse(functionOverrideUpdate.match(/SET "value" = '(.+)'::jsonb/s)![1]) as {
+      type: string;
+      name: string;
+      sql: string;
+    };
+    expect(overrideValue.sql).toBe(library_after_insert.expression);
   });
 });

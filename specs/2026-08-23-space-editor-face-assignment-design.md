@@ -432,6 +432,12 @@ actor is Owner/Editor.
 This needs a fork migration in `server/src/schema/migrations-gallery/` with a round timestamp, per
 CLAUDE.md.
 
+**Superseded storage (2026-10-11):** the fact now lives in the fork sidecar `asset_face_creator`
+(`assetFaceId` primary key, `userId` FK to `user` with `ON DELETE CASCADE`), added by migration
+`1798100000000`, which moved the existing values and dropped `asset_face.createdBy`. The rule is
+unchanged: a face is editor-drawn iff it has an `asset_face_creator` row, and everywhere this
+document says `createdBy` read that row.
+
 **Why not the two cheaper-looking routes**, both of which are wrong:
 
 - Gating on `sourceType === Manual` would let a space editor delete boxes **the owner drew by hand**.

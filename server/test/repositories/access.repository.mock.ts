@@ -30,9 +30,6 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
       checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
       checkAlbumAccess: vitest.fn().mockResolvedValue(new Set()),
       checkPartnerAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkSpaceAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkSpaceAccessForSpace: vitest.fn().mockResolvedValue(new Set()),
-      checkSpaceEditAccess: vitest.fn().mockResolvedValue(new Set()),
       checkSharedLinkAccess: vitest.fn().mockResolvedValue(new Set()),
     },
 
@@ -44,8 +41,6 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
       checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
       checkSharedAlbumAccess: vitest.fn().mockResolvedValue(new Set()),
       checkSharedLinkAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkSpaceLinkedAlbumAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkSpaceLinkedAlbumReadAccess: vitest.fn().mockResolvedValue(new Set()),
     },
 
     authDevice: {
@@ -67,10 +62,6 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
     person: {
       checkAccess: vitest.fn().mockResolvedValue(new Set()),
       checkFaceOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkSharedSpaceAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkSharedSpaceEditAccess: vitest.fn().mockResolvedValue(new Set()),
-      checkUnlockedThumbnailAccess: vitest.fn().mockResolvedValue(new Set()),
     },
 
     partner: {
@@ -83,10 +74,6 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
 
     session: {
       checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
-    },
-
-    sharedSpace: {
-      checkMemberAccess: vitest.fn().mockResolvedValue(new Set()),
     },
 
     stack: {
@@ -103,6 +90,28 @@ export const newAccessRepositoryMock = (): IAccessRepositoryMock => {
 
     workflow: {
       checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
+    },
+
+    spaceAlbum: {
+      checkSpaceLinkedAlbumAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkSpaceLinkedAlbumReadAccess: vitest.fn().mockResolvedValue(new Set()),
+    },
+
+    spaceAsset: {
+      checkSpaceAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkSpaceAccessForSpace: vitest.fn().mockResolvedValue(new Set()),
+      checkSpaceEditAccess: vitest.fn().mockResolvedValue(new Set()),
+    },
+
+    galleryPerson: {
+      checkOwnerAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkSharedSpaceAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkSharedSpaceEditAccess: vitest.fn().mockResolvedValue(new Set()),
+      checkUnlockedThumbnailAccess: vitest.fn().mockResolvedValue(new Set()),
+    },
+
+    sharedSpace: {
+      checkMemberAccess: vitest.fn().mockResolvedValue(new Set()),
     },
   };
 };

@@ -36,7 +36,7 @@ The microservices worker checks for identity backfill work on `AppBootstrap`.
 
 It queues `FaceIdentityBackfill` when any of these are true:
 
-- a `person` row has no `identityId`;
+- a `person` row has no `person_identity` link;
 - a visible, non-deleted assigned face is missing a `face_identity_face` link;
 - a legacy `shared_space_person` can be resolved to exactly one identity without creating a duplicate identity inside the same space.
 

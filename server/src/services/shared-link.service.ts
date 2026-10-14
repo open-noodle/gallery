@@ -109,7 +109,7 @@ export class SharedLinkService extends BaseService {
           // linked library, linked album, cross-owner contribution). Deliberately NOT unioned
           // with `AssetShare`: a link that claims to come from a space must contain only that
           // space's assets, or the tether on the read side would have nothing to re-derive.
-          const allowed = await this.accessRepository.asset.checkSpaceAccessForSpace(
+          const allowed = await this.accessRepository.spaceAsset.checkSpaceAccessForSpace(
             auth.user.id,
             dto.spaceId,
             new Set(dto.assetIds),

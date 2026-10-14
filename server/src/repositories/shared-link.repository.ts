@@ -85,6 +85,7 @@ export class SharedLinkRepository {
   get(userId: string, id: string) {
     return this.db
       .selectFrom('shared_link')
+      .leftJoin('shared_link_space', 'shared_link_space.sharedLinkId', 'shared_link.id')
       .selectAll('shared_link')
       .select((eb) =>
         jsonArrayFrom(
@@ -98,7 +99,7 @@ export class SharedLinkRepository {
           withSharedLinkAlbum(eb)
             // #1018: album contents = the album's own rows ∪ the cross-owner contributions (#764)
             // made to the space this link was created from. LATERAL so the contributed arm can
-            // correlate to `shared_link.spaceId`; a link with no space matches no contribution and
+            // correlate to `shared_link_space.spaceId`; a link with no space matches no contribution and
             // this collapses back to the pre-#1018 `album_asset` join. UNION (not ALL) dedupes an
             // asset that is both an album row and a retained contribution.
             .leftJoinLateral(
@@ -122,7 +123,8 @@ export class SharedLinkRepository {
                       .where((eb) => spaceVisibilityGate(eb))
                       .select('album_space_asset.assetId as assetId')
                       .whereRef('album_space_asset.albumId', '=', 'album.id')
-                      .whereRef('album_space_asset.spaceId', '=', 'shared_link.spaceId')
+                      // `shared_link_space` is joined by the outer query, outside this builder's typed scope.
+                      .whereRef('album_space_asset.spaceId', '=', sql.ref('shared_link_space.spaceId'))
                       .where((eb) => sharedLinkCreatorCanPublish(asBaseEb(eb))),
                   )
                   .as('album_members'),
@@ -170,6 +172,7 @@ export class SharedLinkRepository {
   getAll({ userId, id, albumId }: SharedLinkSearchOptions) {
     return this.db
       .selectFrom('shared_link')
+      .leftJoin('shared_link_space', 'shared_link_space.sharedLinkId', 'shared_link.id')
       .selectAll('shared_link')
       .select((eb) => jsonArrayFrom(withSharedAssets(eb).limit(1)).as('assets'))
       .where('shared_link.userId', '=', userId)
@@ -199,12 +202,13 @@ export class SharedLinkRepository {
     return this.db
       .selectFrom('shared_link')
       .leftJoin('album', 'album.id', 'shared_link.albumId')
+      .leftJoin('shared_link_space', 'shared_link_space.sharedLinkId', 'shared_link.id')
       .where('album.deletedAt', 'is', null)
       .select((eb) => [
         'shared_link.id',
         'shared_link.userId',
         'shared_link.albumId',
-        'shared_link.spaceId',
+        'shared_link_space.spaceId',
         'shared_link.expiresAt',
         'shared_link.showExif',
         'shared_link.allowUpload',
@@ -217,19 +221,29 @@ export class SharedLinkRepository {
       .where((eb) => eb.or([eb('shared_link.type', '=', SharedLinkType.Individual), eb('album.id', 'is not', null)]));
   }
 
-  async create(entity: Insertable<SharedLinkTable> & { assetIds?: string[] }) {
-    const { id } = await this.db
-      .insertInto('shared_link')
-      .values(omit(entity, 'assetIds'))
-      .returningAll()
-      .executeTakeFirstOrThrow();
+  async create(entity: Insertable<SharedLinkTable> & { assetIds?: string[]; spaceId?: string | null }) {
+    // gallery-fork: one transaction, so a failed shared_link_space write cannot leave a space link behind
+    // that serves only the creator's assets.
+    const { id } = await this.db.transaction().execute(async (trx) => {
+      const link = await trx
+        .insertInto('shared_link')
+        .values(omit(entity, 'assetIds', 'spaceId'))
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
-    if (entity.assetIds && entity.assetIds.length > 0) {
-      await this.db
-        .insertInto('shared_link_asset')
-        .values(entity.assetIds!.map((assetId) => ({ assetId, sharedLinkId: id })))
-        .execute();
-    }
+      if (entity.spaceId) {
+        await trx.insertInto('shared_link_space').values({ sharedLinkId: link.id, spaceId: entity.spaceId }).execute();
+      }
+
+      if (entity.assetIds && entity.assetIds.length > 0) {
+        await trx
+          .insertInto('shared_link_asset')
+          .values(entity.assetIds!.map((assetId) => ({ assetId, sharedLinkId: link.id })))
+          .execute();
+      }
+
+      return link;
+    });
 
     return this.getSharedLinks(id);
   }

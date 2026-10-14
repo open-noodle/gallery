@@ -1,0 +1,6 @@
+{
+  "background_location_permission_content": "Noodle Gallery menggunakan izin lokasi latar belakang untuk terus membaca nama jaringan Wi‑Fi saat pengalihan server otomatis berjalan di latar belakang. Nama jaringan Wi‑Fi disimpan di perangkat ini untuk pencocokan, dan lokasi presisi perangkat Anda tidak disimpan atau dibagikan.",
+  "location_permission_content": "Android memerlukan izin lokasi presisi agar Noodle Gallery dapat membaca nama jaringan Wi‑Fi saat ini untuk pengalihan server otomatis. Nama jaringan Wi‑Fi disimpan di perangkat ini untuk pencocokan, dan lokasi presisi perangkat Anda tidak disimpan atau dibagikan.",
+  "map_location_service_disabled_content": "Noodle Gallery menggunakan lokasi presisi Anda saat ini untuk memusatkan peta dan menampilkan foto serta video dari area Anda saat ini. Layanan lokasi harus diaktifkan sebelum Noodle Gallery dapat mengakses lokasi ini. Lokasi presisi perangkat Anda tidak disimpan atau dibagikan. Apakah Anda ingin membuka pengaturan lokasi sekarang?",
+  "map_no_location_permission_content": "Noodle Gallery menggunakan lokasi presisi Anda saat ini untuk memusatkan peta dan menampilkan foto serta video dari area Anda saat ini. Lokasi presisi perangkat Anda tidak disimpan atau dibagikan. Apakah Anda ingin mengizinkan akses lokasi sekarang?"
+}

@@ -13,6 +13,7 @@ const makeDb = (rows: Record<string, Array<Record<string, unknown>>>) => {
       queries.push(query);
 
       const builder = {
+        leftJoin: vi.fn(() => builder),
         select: vi.fn((selection: unknown) => {
           if (typeof selection === 'function') {
             selection({
@@ -160,7 +161,7 @@ describe(FaceIdentityRepository.name, () => {
         },
       ]);
       expect(queries).toMatchObject([
-        { table: 'person', where: ['person.identityId', 'in', ['identity-1']] },
+        { table: 'person', where: ['person_identity.identityId', 'in', ['identity-1']] },
         { table: 'shared_space_person', where: ['shared_space_person.identityId', 'in', ['identity-1']] },
       ]);
     });

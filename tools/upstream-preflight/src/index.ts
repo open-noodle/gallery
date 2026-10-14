@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import { runCiInvariantAudits } from './audits/ci-invariants';
 import { runCommitAutolinkAudit } from './audits/commit-autolinks';
 import { runMobileDriftAudit } from './audits/mobile-drift';
+import { runUpstreamFkKeyAudit } from './audits/upstream-fk-keys';
 import { runPatchAudits } from './audits/patches';
 import {
   parseQueryBlocks,
@@ -235,6 +236,11 @@ function renderPreflightForContext(
       ),
       ...runCiInvariantAudits(context.manifest, repoRoot()),
       ...runPatchAudits(context.manifest, repoRoot()),
+      runUpstreamFkKeyAudit(
+        `${context.manifest.metadata.upstream_remote}/${context.manifest.metadata.upstream_branch}`,
+        context.upstreamRange.files,
+        repoRoot(),
+      ),
     ],
     extensionHotspots: collectExtensionHotspots(
       context.manifest,

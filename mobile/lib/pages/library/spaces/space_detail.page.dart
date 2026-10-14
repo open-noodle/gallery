@@ -27,7 +27,7 @@ import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
 import 'package:openapi/api.dart';
 
 // The space timeline is served directly by the Drift
-// sharedSpace() query (see TimelineRepository.sharedSpace), so this page
+// sharedSpace() query (see SharedSpaceTimelineRepository.sharedSpace), so this page
 // no longer fetches assets over the network. Metadata + member list still
 // load from the API because they are not yet mirrored in Drift.
 

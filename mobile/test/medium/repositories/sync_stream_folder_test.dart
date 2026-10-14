@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
 import 'package:openapi/api.dart';
 
@@ -7,10 +8,12 @@ import '../repository_context.dart';
 void main() {
   late MediumRepositoryContext ctx;
   late SyncStreamRepository repo;
+  late GallerySyncStreamRepository gallery;
 
   setUp(() {
     ctx = MediumRepositoryContext();
     repo = SyncStreamRepository(ctx.db);
+    gallery = GallerySyncStreamRepository(ctx.db);
   });
   tearDown(() => ctx.dispose());
 
@@ -25,7 +28,7 @@ void main() {
       final user = await ctx.newUser();
       final space = await ctx.newSharedSpace(createdById: user.id);
 
-      await repo.updateSharedSpaceAlbumFoldersV1([
+      await gallery.updateSharedSpaceAlbumFoldersV1([
         SyncSharedSpaceAlbumFolderV1(
           id: 'f1',
           spaceId: space.id,
@@ -37,7 +40,7 @@ void main() {
       ]);
       expect(await folderRows(), hasLength(1));
 
-      await repo.updateSharedSpaceAlbumFoldersV1([
+      await gallery.updateSharedSpaceAlbumFoldersV1([
         SyncSharedSpaceAlbumFolderV1(
           id: 'f1',
           spaceId: space.id,
@@ -60,7 +63,7 @@ void main() {
       final user = await ctx.newUser();
       final space = await ctx.newSharedSpace(createdById: user.id);
 
-      await repo.updateSharedSpaceAlbumFoldersV1([
+      await gallery.updateSharedSpaceAlbumFoldersV1([
         SyncSharedSpaceAlbumFolderV1(
           id: 'child',
           spaceId: space.id,
@@ -85,7 +88,7 @@ void main() {
       await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Trips');
       await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f2', name: 'Family');
 
-      await repo.deleteSharedSpaceAlbumFoldersV1([SyncSharedSpaceAlbumFolderDeleteV1(folderId: 'f1')]);
+      await gallery.deleteSharedSpaceAlbumFoldersV1([SyncSharedSpaceAlbumFolderDeleteV1(folderId: 'f1')]);
 
       final rows = await folderRows();
       expect(rows.map((r) => r['id']), ['f2']);
@@ -99,7 +102,7 @@ void main() {
       final space = await ctx.newSharedSpace(createdById: user.id);
       final album = await ctx.newSharedSpaceAlbum(name: 'Rome');
 
-      await repo.updateSharedSpaceAlbumLinksV1([
+      await gallery.updateSharedSpaceAlbumLinksV1([
         SyncSharedSpaceAlbumLinkV1(
           spaceId: space.id,
           albumId: album.id,

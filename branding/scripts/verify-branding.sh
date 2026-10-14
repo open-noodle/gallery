@@ -457,7 +457,7 @@ for notification_svc in \
   fi
 done
 
-# Stock Immich clients are told the upstream base version (server/src/gallery/client-version.ts reads
+# Stock Immich clients are told the upstream base version (server/src/gallery/utils/client-version.ts reads
 # immichVersion, falling back to version on an unstamped build); it must match the base the fork is on.
 base_version=$(jq -r '.immichVersion // .version' "$REPO_ROOT/server/package.json")
 expected_base=$(jq -r '.upstream.version' "$CONFIG")

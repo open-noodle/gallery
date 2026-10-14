@@ -685,9 +685,7 @@ describe('Photos page search URL state', () => {
     await waitFor(() => {
       expect(screen.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'undefined');
     });
-    expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
-      expect.objectContaining({ rating: undefined, personIds: undefined, isFavorite: undefined }),
-    );
+    expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith({ withSharedSpaces: true });
   });
 
   it('offers no baseline in query mode, and leaves the page facets alone (#910)', async () => {

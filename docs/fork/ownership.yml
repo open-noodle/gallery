@@ -16,6 +16,8 @@ fork_surface:
       - server/src/gallery/**
     web:
       - web/src/lib/gallery/**
+      # the i18n overlay; web and mobile both read it, i18n/*.json stay upstream's
+      - i18n/gallery/**
     mobile:
       - mobile/lib/gallery/**
     database:
@@ -133,7 +135,8 @@ features:
       - server/src/services/storage-migration.service.ts
       - server/src/controllers/storage-migration.controller.ts
       - server/src/backends/s3-storage.backend.ts
-      - server/src/gallery/storage-usage*.ts
+      - server/src/gallery/services/storage-usage.service*.ts
+      - server/src/gallery/utils/storage-usage*.ts
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
       - web/src/lib/managers/import-manager.svelte.ts
@@ -330,8 +333,8 @@ features:
       - scripts/spec-citation-check.sh
       - scripts/upstream-review-pr.sh
       - Template/**
-      - server/src/gallery/client-version*.ts
-      - server/src/gallery/stock-client-socket.spec.ts
+      - server/src/gallery/utils/client-version*.ts
+      - server/src/gallery/repositories/stock-client-socket.spec.ts
       - web/src/lib/gallery/client-header*.ts
       - mobile/lib/gallery/gallery_app_header.dart
       - mobile/test/gallery/gallery_app_header_test.dart

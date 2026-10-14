@@ -12,7 +12,7 @@ import { AuthDto } from 'src/dtos/auth.dto.js';
 import { NotificationDto } from 'src/dtos/notification.dto.js';
 import { ReleaseEventV1, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { SyncAssetEditV1, SyncAssetExifV1, SyncAssetV2 } from 'src/dtos/sync.dto.js';
-import { STOCK_CLIENT_ROOM, isGalleryClient, stockClientRoom } from 'src/gallery/client-version.js';
+import { STOCK_CLIENT_ROOM, isGalleryClient, stockClientRoom } from 'src/gallery/utils/client-version.js';
 import { type AppRestartEvent, type ArgsOf, EventRepository } from 'src/repositories/event.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { handlePromiseError } from 'src/utils/misc.js';

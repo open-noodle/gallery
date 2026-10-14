@@ -225,7 +225,7 @@ export class TranscodingService extends BaseService {
     // seek/variant restarts); on disk this is a passthrough. Cleaned up in onSessionEnd.
     let localInputPath: string;
     try {
-      session.input ??= this.ensureLocalFile(asset.originalPath);
+      session.input ??= this.backendMedia.ensureLocalFile(asset.originalPath);
       ({ localPath: localInputPath } = await session.input);
     } catch (error: any) {
       this.logger.error(

@@ -546,9 +546,7 @@ describe('Spaces page search URL state', () => {
     await waitFor(() => {
       expect(screen.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'undefined');
     });
-    expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
-      expect.objectContaining({ spaceId: 'space-1', rating: undefined, isFavorite: undefined }),
-    );
+    expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith({ spaceId: 'space-1' });
   });
 
   it('offers no baseline in query mode, and leaves the space facets alone (#910)', async () => {

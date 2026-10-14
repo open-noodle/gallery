@@ -8,9 +8,9 @@ import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { v4 } from 'uuid';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -197,7 +197,7 @@ describe('LibraryAssetSync — library visibility purge (space members, not owne
       .returning('id')
       .executeTakeFirstOrThrow();
 
-    await ctx.get(SyncRepository).libraryAsset.cleanupAuditTable(31);
+    await new GallerySyncRepository(ctx.database).libraryAsset.cleanupAuditTable(31);
 
     const remainingSpaceLibrary = await ctx.database.selectFrom(libraryAuditTable).select('id').execute();
     const remainingSpaceLibraryIds = remainingSpaceLibrary.map((r) => r.id);

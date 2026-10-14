@@ -54,7 +54,7 @@ void main() {
   }) {
     return EasyLocalization(
       supportedLocales: supportedLocales,
-      path: '../i18n',
+      path: '../i18n/gallery/merged',
       fallbackLocale: const Locale('en'),
       startLocale: locale,
       child: MaterialApp(
