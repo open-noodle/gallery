@@ -292,6 +292,30 @@ sufficient.** The drift grep in step 13 completes the pass criterion; see
 the "Pass criterion" section for why the ping alone would silently
 green-light a broken revert script.
 
+## Stock round trip before the revert (step 9.5, added 2026-10)
+
+Since `asset.isFavorite` is the owner's projection again and trims live in `asset_video_trim`, stock
+Immich boots on a live Gallery database. Step 9.5 proves the guide's "Trying Immich first" section on
+the seeded database, then the revert runs on that same database:
+
+- `stock-prepare`: flush Redis, `UPDATE plugin SET enabled = false` for `gallery-core`. Disabled, not
+  deleted: `plugin_method` and `workflow_step` cascade from it, so a delete loses every workflow step
+  that uses a Gallery action. Gallery does not re-enable its plugin on boot: upstream's `upsert` never
+  touches `enabled` and no upstream code overrides an admin's disable, so the guide carries the
+  re-enable step instead of a fork hunk in the plugin import.
+- `stock-assert`: stock `schema-check` beyond the fresh-install baseline lists only `FunctionDrop` (Gallery's
+  trigger functions) and `OverrideDrop` (Gallery's `migration_overrides` rows for functions, triggers and indexes). Upstream's
+  drift options ignore extra tables (with their constraints) and extra columns, indexes or triggers,
+  and no migration is reported because fork migrations live in `gallery_migrations`. The stock API serves
+  the owner's asset and time bucket with the owner's favorites, and the trimmed video with its original
+  duration; a favorite is toggled there. Queued jobs: stock's `JobRepository.run` logs `Skipping unknown job` for a
+  fork job name in a queue it serves and drops it; a job in a Gallery-only queue (`classification`) has no
+  stock worker and stays queued. Both are asserted.
+- `gallery-prepare` / `gallery-assert`: flush, re-enable, boot Gallery; the space, the member's favorites,
+  the trim, pets, the rule memory, the plugin row (same id) and its workflow step survive, the stock
+  favorite arrived, and a new upload runs the workflow into the space.
+- Redis is flushed again before the revert, as the guide's step 2 says.
+
 ## Failure modes and their signals
 
 | Scenario                                              | Where it fires      | How it surfaces                                                        |

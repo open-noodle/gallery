@@ -60,7 +60,7 @@ const EXTRA_FILES = ['src/utils/database.ts'];
 // encode the direct/library/album access path). Detected as bare identifiers so a
 // call, spread, or import all count.
 const SPACE_HELPER =
-  /\b(spaceAssetPathBranches|spaceAlbumAssetExists|spaceAlbumAssetExistsSql|spaceContributedAssetExists|spaceDirectAssetExists|spaceLibraryAssetExists|accessibleSpaces|accessibleSpaceAlbums|accessibleLibraries)\b/;
+  /\b(spaceAssetPathBranches|spaceAlbumAssetExists|spaceAlbumAssetExistsSql|spaceContributedAssetExists|spaceDirectAssetExists|spaceLibraryAssetExists|accessibleSpaces|accessibleSpaceAlbums|accessibleLibraries|sharedWithViewer|ownedOrSharedWithViewer|albumConfinedToViewer|albumMembership|spaceLinkedAlbumIds)\b/;
 
 // The raw join tables. A reference to any of these is also a space read.
 const SPACE_TABLE = /\bshared_space_(asset|library|album)\b/;
@@ -104,9 +104,9 @@ const NON_DECL = new Set([
   // Bare calls to the fork's own gate/scope helpers, e.g. `spaceVisibilityGate(eb),` as the
   // first array element of an `eb.and([...])` conjunct. DECL cannot distinguish a call site
   // from a declaration (both look like `identifier(`), so without this exclusion the backward
-  // scan in enclosingFn stops at the call instead of continuing to the real enclosing function
-  // (e.g. albumSharedSpaceScope) — misattributing the enclosing fn and defeating its allowlist
-  // entry (Slice 1 / security-1 regression).
+  // scan in enclosingFn stops at the call instead of continuing to the real enclosing function,
+  // misattributing the enclosing fn and defeating its allowlist entry (Slice 1 / security-1
+  // regression).
   'spaceVisibilityGate',
   // Same reason: `spaceAlbumAssetExists(eb, {` / `spaceContributedAssetExists(eb, {` as the first
   // token of a wrapped `.where((eb) => eb.not(...))` arm would otherwise be read as a declaration,
@@ -163,7 +163,7 @@ const key = (file: string, fn: string) => `${shortName(file)}::${fn}`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ALBUM_MARKER =
-  /shared_space_album|spaceAlbumAssetExists|spaceAssetPathBranches|spaceAlbumAssetExistsSql|accessibleSpaceAlbums/;
+  /shared_space_album|spaceAlbumAssetExists|spaceAssetPathBranches|spaceAlbumAssetExistsSql|accessibleSpaceAlbums|spaceLinkedAlbumIds/;
 const LIBRARY_REF = /\bshared_space_library\b/;
 const WINDOW = 45;
 
@@ -177,9 +177,6 @@ const BENIGN_LINE = [
 // Enclosing functions that legitimately reference shared_space_library WITHOUT an
 // album arm. Keyed by `<file>::<function>`. Every entry needs a real reason.
 const ALBUM_ALLOWLIST: Record<string, string> = {
-  // Album-ABSENCE gate (keeps plain non-space album assets visible) — references
-  // asset/library absence by design, never an album access arm.
-  'database.ts::albumSharedSpaceScope': 'album-absence gate, not an album access arm',
   // GET /shared-spaces/:id/map-markers unions direct+library only. Visibility-gated
   // (visibleSpaceAssetVisibilities) so no leak — but album-linked markers are absent.
   // Pre-existing album-completeness gap, tracked separately; NOT a visibility hole.
@@ -267,8 +264,10 @@ describe('space-album scope guard: every library scoping arm has album coverage'
 //     defined as `eb(column, 'in', spaceVisibleAssetVisibilities)` — the same set, under a name that
 //     says why the face-review surfaces need it (no Locked-folder crop reaches a reviewer, because
 //     neither the suggestion queue nor the cleanup console re-authenticates).
+//   - sharedWithViewer / ownedOrSharedWithViewer / albumConfinedToViewer / albumMembership: the viewer-scope
+//     helpers apply spaceVisibilityGate to their space arms themselves.
 const VIS_GATE_MARKER =
-  /spaceVisibilityGate|spaceVisibleAssetVisibilities|visibleSpaceAssetVisibilities|reviewableAssetVisibility|peopleAssetVisibilities|visibilityFilter|AssetVisibility\.(Timeline|Archive)|SHARED_SPACE_LIBRARY_SYNC_COLUMNS|SHARED_SPACE_ALBUM_SYNC_COLUMNS/;
+  /sharedWithViewer|ownedOrSharedWithViewer|albumConfinedToViewer|albumMembership|spaceVisibilityGate|spaceVisibleAssetVisibilities|visibleSpaceAssetVisibilities|reviewableAssetVisibility|peopleAssetVisibilities|visibilityFilter|AssetVisibility\.(Timeline|Archive)|SHARED_SPACE_LIBRARY_SYNC_COLUMNS|SHARED_SPACE_ALBUM_SYNC_COLUMNS/;
 
 // Lines that reference a space marker but are NOT an asset-read scoping arm.
 const VIS_BENIGN_LINE = [
@@ -396,26 +395,6 @@ const VIS_ALLOWLIST: Record<string, string> = {
   // rows. The library asset streams (LibraryAssetSync/ExifSync) carry the gate.
   'gallery-sync.repository.ts::getCreatedAfter':
     'streams library_user access-grant metadata (accessibleLibraries-scoped), not asset rows',
-
-  // #752 P1-5: album metadata (assetCount/date-range) unions album_asset with member-gated
-  // album_space_asset contributions (join through shared_space_album ⋈ shared_space_member). The
-  // outer query IS visibility-gated — `.$call(withDefaultVisibility)` on the top-level `asset`
-  // selectFrom (Timeline/Archive only, applied uniformly to owner and contributed rows alike) —
-  // but the textual VIS_GATE_MARKER scan doesn't recognize `withDefaultVisibility` by name (it's
-  // the file-local default-visibility helper, not a space-specific gate identifier). Pinned by
-  // timeline-album-contributions.medium.spec.ts (Hidden/trashed contributions vanish from counts).
-  'album.repository.ts::getMetadataForIds':
-    'gated via withDefaultVisibility ($call-ed on the outer asset query); scanner does not recognize this helper name',
-
-  // Task 9 (D1-b residue): the contributed (`album_space_asset`) arm's live-link gate — a
-  // correlated EXISTS against shared_space_album (albumId + spaceId) proving the album is still
-  // linked to the space the contribution was made through, mirroring contributionVisibleToMember
-  // (gallery-sync.repository.ts) / spaceContributedAssetExists. Pure link-existence check — same reasoning
-  // as hasLibraryLink / getAssetIdsWithoutOtherSpacePath above — no asset content is read here.
-  // Asset visibility for the matched rows is enforced elsewhere (same as the rest of inAlbums,
-  // which was never gate-scanned before this arm's shared_space_album reference existed).
-  'database.ts::inAlbums':
-    'live-link EXISTS(shared_space_album) correlated on albumId+spaceId; link-existence check, no asset content (Task 9)',
 };
 
 const VIS_WINDOW = 50;

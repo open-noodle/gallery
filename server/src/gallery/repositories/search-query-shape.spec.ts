@@ -698,7 +698,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('searchAssetBuilder album-scoped branch gates space assets on Archive+Timeline visibility', () => {
-      // albumSharedSpaceScope is activated when albumIds is set and userIds is absent.
+      // albumConfinedToViewer is activated when albumIds is set and userIds is absent.
       // Without the fix, the space asset/library EXISTS arms have no visibility predicate.
       const sql = buildAssetSearchSql({
         albumIds: ['11111111-1111-1111-1111-111111111111'],
@@ -712,7 +712,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('searchAssetBuilder plain-album branch (no timelineSpaceIds) gates on Archive+Timeline visibility (security-1)', () => {
-      // albumSharedSpaceScope's FIRST OR-branch (plain non-shared-space album assets) had NO
+      // albumConfinedToViewer's FIRST OR-branch (plain non-shared-space album assets) had NO
       // visibility gate, so a Hidden asset reachable only via a linked album leaked. With ONLY
       // albumIds set (no timelineSpaceIds, no userIds) that branch is the sole album predicate —
       // it must now carry the flat visibility gate.
@@ -727,10 +727,10 @@ describe(SearchRepository.name, () => {
   describe('searchAssetBuilder album shared-space scope (albumAccessIsBoundary)', () => {
     // Default OFF is load-bearing: SearchService's album-scoped search (search.service.ts:142-153)
     // relies on searchAssetBuilder re-gating album results by shared-space timeline visibility
-    // (albumSharedSpaceScope, database.ts:600-607) whenever albumAccessIsBoundary is absent. If a
+    // (albumConfinedToViewer) whenever albumAccessIsBoundary is absent. If a
     // future change ever flips this default, album-scoped search would leak a shared-space asset's
     // content to a caller who lost (or never had) space access — guard against that regression here.
-    it('applies albumSharedSpaceScope by default for an album-scoped query (search re-gate stays intact)', () => {
+    it('applies albumConfinedToViewer by default for an album-scoped query (search re-gate stays intact)', () => {
       const sql = buildAssetSearchSql({ albumIds: ['11111111-1111-1111-1111-111111111111'] });
 
       expect(sql).toContain('"shared_space_asset"');
@@ -739,7 +739,7 @@ describe(SearchRepository.name, () => {
 
     // The opt-out (shared-space.service.ts getFilteredMapMarkers, issue #656): album ACCESS is
     // already the boundary for the album map, so it must not re-gate by shared-space visibility.
-    it('skips albumSharedSpaceScope when albumAccessIsBoundary is set', () => {
+    it('skips albumConfinedToViewer when albumAccessIsBoundary is set', () => {
       const sql = buildAssetSearchSql({
         albumIds: ['11111111-1111-1111-1111-111111111111'],
         albumAccessIsBoundary: true,

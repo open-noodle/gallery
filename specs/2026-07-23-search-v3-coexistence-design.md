@@ -1,7 +1,7 @@
 # Search V3 Coexistence — Design
 
 **Date:** 2026-07-23
-**Status:** Approved, pending implementation
+**Status:** Superseded on 2026-10-11: V3 is adopted (see the last section)
 **Context:** Rolling upstream rebase `rebase/upstream-rolling-v3.0.3`, batch 46 (upstream `#28686`).
 
 ## Problem
@@ -224,3 +224,33 @@ The mechanical steps above still stand. The real cost is not the call sites, it 
 the shared-space arms have to be re-expressed per branch, and the album-confined shortcut has to be
 re-gated per branch. Budget it as design work plus re-proving the `security-1` cases, not as a
 translation. Deleting this section's guard (the invariant and the tests) belongs in that same change.
+
+---
+
+## 2026-10-11: V3 adopted with four scope hooks
+
+Owner decision: stay as close to the Immich v3.3.1 base as possible, so Gallery runs upstream's V3 code
+instead of rejecting it. The four endpoints dispatch to V3 exactly as upstream does, the 400 and the
+`search-v3-not-dispatched` invariant are gone, and upstream's routing tests and its medium V3 tests run again.
+
+V3 gets the flat search's RBAC through four optional fields on upstream's `AssetSearchScope`. Each one unset
+means upstream behaviour:
+
+| Hook | Default (upstream) | Gallery value (`searchScopeV3`, `src/utils/viewer-scope.ts`) |
+| --- | --- | --- |
+| `ownershipPredicate` | `asset.ownerId = any(userIds)` | `ownedOrSharedWithViewer`: own and partners, plus on a `withSharedSpaces` request the shareable, untrashed rows of the viewer's timeline spaces |
+| `albumConfinedPredicate` | none (album access is the whole scope) | `albumConfinedToViewer`: shareable, untrashed, and no content of a space hidden from the viewer's timeline |
+| `albumSpaceIds` | `albumIds` reads `album_asset` | `albumIds` also counts live contributions made through the viewer's timeline spaces |
+| `favoriteUserId` | `asset.isFavorite` (the owner's) | the caller's `asset_favorite` row, also projected as each result's `isFavorite` |
+
+The service resolves the viewer scope once per request (`withSharedSpaces`, the filter's album and person ids,
+`favoriteScoped` for a top-level favourite filter). A person id the viewer may not use empties the result, a shared
+link may not filter by favourite, and `spaceId`, `spacePersonIds`, `ownerId` and `isInAlbum` are rejected next to
+`filter` because V3 has no structured form for them yet.
+
+`test/medium/specs/utils/rbac-oracle.medium.spec.ts` runs twelve V3 variants next to the flat ones. The metadata id
+sets and favourite marks match the flat search for every actor, with one upstream difference: V3 has no implicit
+trash exclusion, so the owner and partners see their own trashed assets unless the filter says
+`trashedAt: { eq: null }`. Other members' trash never comes through the space arm. The statistics and random
+variants differ from the flat ones where the flat endpoints never applied album access (they ignore it and use the
+caller's universe); V3 applies the same confinement and access check as metadata.

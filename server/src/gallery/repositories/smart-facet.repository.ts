@@ -438,7 +438,7 @@ export class SmartFacetRepository {
 
   private async getSmartFacetHasFavorites(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<boolean> {
     // #763: "is the Favourites section worth offering" is a per-CALLER question — probe the
-    // caller's `asset_favorite` overlay, not the dropped `asset.isFavorite` column.
+    // caller's `asset_favorite` overlay, not `asset.isFavorite`, which projects only the owner's favorite.
     //
     // The caller is `authUserId`/`callerId` — two names for the same value (`auth.user.id`, set by
     // SearchService.resolveSmartSearch), one from this path's search-builder options and one from

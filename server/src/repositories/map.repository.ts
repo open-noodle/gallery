@@ -15,8 +15,9 @@ import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { NaturalEarthCountriesTable } from 'src/schema/tables/natural-earth-countries.table.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
-  spaceAlbumAssetExists,
-  spaceAssetPathBranches,
+  type ViewerSpaces,
+  ownedOrSharedWithViewer,
+  sharedWithViewer,
   spaceVisibilityGate,
 } from 'src/utils/shared-space-album-scope.js';
 
@@ -124,24 +125,16 @@ export class MapRepository {
       .$if(fileCreatedBefore !== undefined, (q) => q.where('fileCreatedAt', '<=', fileCreatedBefore!))
       .where((eb) => {
         const expression: Expression<SqlBool>[] = [];
+        const spaces: ViewerSpaces | undefined = timelineSpaceIds?.length
+          ? { scope: { spaceIds: timelineSpaceIds }, albumTimelineGate: 'space-tab' }
+          : undefined;
 
         if (ownerIds.length > 0) {
           expression.push(eb('ownerId', 'in', ownerIds));
         }
 
         if (albumIds.length > 0) {
-          const albumScope: Expression<SqlBool>[] = [eb('ownerId', 'in', ownerIds)];
-          if (timelineSpaceIds?.length) {
-            albumScope.push(
-              ...spaceAssetPathBranches(eb, {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: timelineSpaceIds },
-                albumTimelineGate: 'space-tab',
-              }),
-            );
-          }
-
+          // An album asset still has to be one the viewer owns or sees through a timeline space.
           expression.push(
             eb.and([
               eb.exists((eb) =>
@@ -150,40 +143,13 @@ export class MapRepository {
                   .whereRef('asset.id', '=', 'album_asset.assetId')
                   .where('album_asset.albumId', 'in', albumIds),
               ),
-              eb.or(albumScope),
+              ownedOrSharedWithViewer(eb, eb('ownerId', 'in', ownerIds), spaces),
             ]),
           );
         }
 
-        if (timelineSpaceIds && timelineSpaceIds.length > 0) {
-          expression.push(
-            eb.and([
-              eb('asset.visibility', '=', AssetVisibility.Timeline),
-              eb.exists((eb) =>
-                eb
-                  .selectFrom('shared_space_asset')
-                  .whereRef('asset.id', '=', 'shared_space_asset.assetId')
-                  .where('shared_space_asset.spaceId', 'in', timelineSpaceIds),
-              ),
-            ]),
-            eb.and([
-              eb('asset.visibility', '=', AssetVisibility.Timeline),
-              eb.exists((eb) =>
-                eb
-                  .selectFrom('shared_space_library')
-                  .whereRef('asset.libraryId', '=', 'shared_space_library.libraryId')
-                  .where('shared_space_library.spaceId', 'in', timelineSpaceIds),
-              ),
-            ]),
-            eb.and([
-              eb('asset.visibility', '=', AssetVisibility.Timeline),
-              spaceAlbumAssetExists(eb, {
-                correlateAssetId: 'asset.id',
-                scope: { spaceIds: timelineSpaceIds },
-                albumTimelineGate: 'space-tab',
-              }),
-            ]),
-          );
+        if (spaces) {
+          expression.push(sharedWithViewer(eb, spaces));
         }
 
         return eb.or(expression);

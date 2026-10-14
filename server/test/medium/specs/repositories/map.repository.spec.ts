@@ -293,9 +293,8 @@ describe(MapRepository.name, () => {
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
 
-    // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay,
-    // not the ownership-masked asset.isFavorite column. asset.isFavorite is left at its default
-    // (false) on both assets; only a direct asset_favorite insert marks the caller's favorite.
+    // #763 slice 1 Task 3: isFavorite must resolve against the caller's asset_favorite overlay, not
+    // the owner's asset.isFavorite column. Only a direct asset_favorite insert marks the caller's favorite.
     it('filters isFavorite from the callers overlay, not asset.isFavorite (#763)', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();

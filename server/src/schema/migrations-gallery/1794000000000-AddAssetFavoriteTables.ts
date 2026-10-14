@@ -1,7 +1,7 @@
 import { Kysely, sql } from 'kysely';
 
 // Per-user favorites overlay (#763). A favorite is a fact about (user, asset), never about an
-// asset alone — see docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §4, §4.1, §4.3.
+// asset alone: see specs/2026-07-20-per-user-favorites-design.md §4, §4.1, §4.3.
 //
 // 1. `asset_favorite` — composite PK (userId, assetId), both FKs CASCADE, plus createId/updateId
 //    sync watermarks. No update trigger: rows are only ever inserted or deleted, never mutated in

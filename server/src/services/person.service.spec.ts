@@ -1169,26 +1169,26 @@ describe(PersonService.name, () => {
       await expect(sut.handlePersonMigration(PersonFactory.create())).resolves.toBe(JobStatus.Failed);
     });
 
-    it('should skip persons with relative S3 thumbnail paths', async () => {
+    it('should leave a relative S3 thumbnail where it is', async () => {
       const person = PersonFactory.create({ thumbnailPath: 'thumbs/user/ab/cd/person.jpeg' });
       mocks.person.getByGroupId.mockResolvedValue(person);
 
       await expect(
         sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
-      ).resolves.toBe(JobStatus.Skipped);
+      ).resolves.toBe(JobStatus.Success);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
       expect(mocks.storage.rename).not.toHaveBeenCalled();
     });
 
-    it('should skip persons with empty thumbnail paths', async () => {
+    it('should move nothing for a person without a thumbnail', async () => {
       const person = PersonFactory.create({ thumbnailPath: '' });
       mocks.person.getByGroupId.mockResolvedValue(person);
 
       await expect(
         sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
-      ).resolves.toBe(JobStatus.Skipped);
+      ).resolves.toBe(JobStatus.Success);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();

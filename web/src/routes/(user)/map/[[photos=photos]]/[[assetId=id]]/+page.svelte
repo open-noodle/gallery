@@ -93,7 +93,7 @@
   // Unlike the album page, the map KEEPS an albumId filter — /map?albumId=X is a legitimate scope
   // (that is what the server-side album-access fix in this slice exists for) — EXCEPT when the map is
   // already scoped to a space. Space ∩ album is unsatisfiable (the space scope demands the asset be
-  // in the space; albumSharedSpaceScope, run with no timelineSpaceIds under a spaceId query, demands
+  // in the space; albumConfinedToViewer, run with no timelineSpaceIds under a spaceId query, demands
   // it be in no space at all) and the server 400s it. Dropping it here means a hand-typed
   // /map?spaceId=S&albumId=A degrades to the space map instead of erroring.
   const hydrateMapFilters = (url: URL): FilterState => {
