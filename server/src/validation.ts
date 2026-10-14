@@ -1,5 +1,4 @@
-import { FileValidator, Injectable, applyDecorators } from '@nestjs/common';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { FileValidator, Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { createZodDto } from 'nestjs-zod';
 import sanitize from 'sanitize-filename';
@@ -279,86 +278,6 @@ export function emptyStringToNull<T extends z.ZodType>(schema: T) {
   return z.preprocess((val) => (val === '' ? null : val), schema);
 }
 
-/**
- * Zod transform that sanitises a string as a filename (strips path separators and
- * reserved names). Apply via `.pipe(sanitizeFilename)` on a string schema.
- */
-export const sanitizeFilename = z.string().transform((value) => sanitize(value));
-
-/*
- * Fork-only decorator stubs.
- *
- * Some fork DTOs were built on class-validator before upstream migrated to
- * zod and have not been converted yet. These stubs preserve the import
- * surface of `src/validation` so that those DTOs compile; they intentionally
- * provide no runtime validation. The DTO files themselves still need to be
- * zod-converted in a follow-up task.
- */
-
-export interface OptionalOptions {
-  nullable?: boolean;
-  emptyToNull?: boolean;
-}
-
-export const Optional = (_options?: OptionalOptions): PropertyDecorator => {
-  return applyDecorators(ApiPropertyOptional());
-};
-
-type UUIDOptions = { optional?: boolean; each?: boolean; nullable?: boolean; description?: string };
-export const ValidateUUID = (options?: UUIDOptions): PropertyDecorator => {
-  const { optional = false, each = false, description } = options ?? {};
-  return applyDecorators(
-    optional
-      ? ApiPropertyOptional({ format: 'uuid', isArray: each, description })
-      : ApiProperty({ format: 'uuid', isArray: each, description }),
-  );
-};
-
-type BooleanOptions = OptionalOptions & { optional?: boolean; description?: string };
-export const ValidateBoolean = (options?: BooleanOptions): PropertyDecorator => {
-  const { optional = false, description } = options ?? {};
-  return applyDecorators(
-    optional ? ApiPropertyOptional({ type: Boolean, description }) : ApiProperty({ type: Boolean, description }),
-  );
-};
-
-type DateOptions = OptionalOptions & { optional?: boolean; format?: 'date' | 'date-time'; description?: string };
-export const ValidateDate = (options?: DateOptions): PropertyDecorator => {
-  const { optional = false, format = 'date-time', description } = options ?? {};
-  return applyDecorators(
-    optional ? ApiPropertyOptional({ format, description }) : ApiProperty({ format, description }),
-  );
-};
-
-type EnumOptions<T> = {
-  enum: T;
-  name: string;
-  each?: boolean;
-  optional?: boolean;
-  nullable?: boolean;
-  default?: T[keyof T];
-  description?: string;
-};
-export const ValidateEnum = <T extends object>(options: EnumOptions<T>): PropertyDecorator => {
-  const { enum: value, name, each, optional, default: defaultValue, description } = options;
-  const apiProperty = { enumName: name, enum: value, isArray: each, default: defaultValue, description };
-  return applyDecorators(optional ? ApiPropertyOptional(apiProperty) : ApiProperty(apiProperty));
-};
-
-export const IsAxisAlignedRotation = (): PropertyDecorator => {
-  return applyDecorators(ApiProperty({ enum: [0, 90, 180, 270] }));
-};
-
-export const IsUniqueEditActions = (): PropertyDecorator => {
-  return applyDecorators();
-};
-
-export const IsGreaterThanProperty = (_property: string): PropertyDecorator => {
-  return applyDecorators();
-};
-
-export const IsGreaterThanOrEqualTo = (_property: string): PropertyDecorator => {
-  return applyDecorators();
-};
+export const sanitizeFilename = z.string().transform((val) => sanitize(val));
 
 export const uniqueIds = z.array(z.uuid()).refine((ids) => ids.length === new Set(ids).size, 'Items must be unique');

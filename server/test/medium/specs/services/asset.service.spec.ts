@@ -404,8 +404,9 @@ describe(AssetService.name, () => {
 
       await sut.handleAssetDeletion({ id: asset1.id, deleteOnDisk: true });
 
-      // new primary asset is picked
-      await expect(ctx.get(StackRepository).getById(stack.id)).resolves.toMatchObject({ primaryAssetId: asset2.id });
+      // new primary asset is picked from the survivors; the lookup does not order them
+      const updated = await ctx.get(StackRepository).getById(stack.id);
+      expect([asset2.id, asset3.id]).toContain(updated?.primaryAssetId);
     });
 
     it('should delete a stacked primary asset (3 trashed assets)', async () => {

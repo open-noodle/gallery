@@ -386,7 +386,7 @@ export class SearchService extends BaseService {
     });
     const tResolved = performance.now();
 
-    const result = await this.searchRepository.getSmartSearchFacets(options);
+    const result = await this.smartFacetRepository.getSmartSearchFacets(options);
     const tDb = performance.now();
 
     if (searchTimingEnabled) {
@@ -455,7 +455,7 @@ export class SearchService extends BaseService {
     const userIds = await this.getUserIdsToSearch(auth);
 
     const scope = await this.resolveViewerScope(auth, 'search', dto);
-    return this.searchRepository.getAccessibleTags(userIds, { ...dto, ...scope });
+    return this.filterSuggestionRepository.getAccessibleTags(userIds, { ...dto, ...scope });
   }
 
   async getFilterSuggestions(auth: AuthDto, dto: FilterSuggestionsRequestDto): Promise<FilterSuggestionsResponseDto> {
@@ -484,7 +484,7 @@ export class SearchService extends BaseService {
       ...dto,
       ...(await this.resolveViewerScope(auth, 'search', { ...dto, withFavoriteSpaces: true })),
     };
-    return await this.searchRepository.getFilterSuggestions(userIds, resolvedDto);
+    return await this.filterSuggestionRepository.getFilterSuggestions(userIds, resolvedDto);
   }
 
   private getSuggestions(
@@ -493,22 +493,22 @@ export class SearchService extends BaseService {
   ): Promise<Array<string | null>> {
     switch (dto.type) {
       case SearchSuggestionType.COUNTRY: {
-        return this.searchRepository.getCountries(userIds, dto);
+        return this.filterSuggestionRepository.getCountries(userIds, dto);
       }
       case SearchSuggestionType.STATE: {
-        return this.searchRepository.getStates(userIds, dto);
+        return this.filterSuggestionRepository.getStates(userIds, dto);
       }
       case SearchSuggestionType.CITY: {
-        return this.searchRepository.getCities(userIds, dto);
+        return this.filterSuggestionRepository.getCities(userIds, dto);
       }
       case SearchSuggestionType.CAMERA_MAKE: {
-        return this.searchRepository.getCameraMakes(userIds, dto);
+        return this.filterSuggestionRepository.getCameraMakes(userIds, dto);
       }
       case SearchSuggestionType.CAMERA_MODEL: {
-        return this.searchRepository.getCameraModels(userIds, dto);
+        return this.filterSuggestionRepository.getCameraModels(userIds, dto);
       }
       case SearchSuggestionType.CAMERA_LENS_MODEL: {
-        return this.searchRepository.getCameraLensModels(userIds, dto);
+        return this.filterSuggestionRepository.getCameraLensModels(userIds, dto);
       }
       default: {
         return Promise.resolve([]);

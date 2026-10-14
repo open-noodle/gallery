@@ -73,7 +73,8 @@ final driftGetAllPeopleWithSharedSpacesProvider =
       return service.getAllPeopleWithSharedSpaces(
         minFaces: prefs?.minimumFaces ?? 3,
         sortBy: key.sortBy,
-        filterBy: key.filterBy,
+        // A stock Immich server ignores the pets filter, so a persisted Pets choice must not reach it.
+        filterBy: ref.watch(serverSupportsSpacesProvider) ? key.filterBy : PeopleFilterBy.all,
       );
     });
 

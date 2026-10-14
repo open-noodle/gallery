@@ -1,5 +1,5 @@
 import { SystemConfig } from 'src/dtos/config.dto.js';
-import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { BirthdayMemoryRule } from 'src/services/memory-rules/birthday.rule.js';
@@ -19,7 +19,7 @@ import { VideoMomentsMemoryRule } from 'src/services/memory-rules/video-moments.
 
 export interface MemoryRuleDeps {
   personRepository: PersonRepository;
-  assetRepository: AssetRepository;
+  memoryRuleAssetRepository: MemoryRuleAssetRepository;
   memoryRepository: MemoryRepository;
   themeSearchPort: ThemeSearchPort;
   /**
@@ -31,20 +31,20 @@ export interface MemoryRuleDeps {
 
 /** per rule-kind key, how to construct its MemoryRule */
 const RULE_FACTORIES: Record<string, (deps: MemoryRuleDeps) => MemoryRule> = {
-  birthday: (deps) => new BirthdayMemoryRule(deps.personRepository, deps.assetRepository),
-  recent_trip: (deps) => new RecentTripMemoryRule(deps.assetRepository, deps.memoryRepository),
-  month_recap: (deps) => new MonthRecapMemoryRule(deps.assetRepository),
-  favorites_throwback: (deps) => new FavoritesThrowbackMemoryRule(deps.assetRepository),
-  on_this_day_place: (deps) => new OnThisDayPlaceMemoryRule(deps.assetRepository),
-  season_recap: (deps) => new SeasonRecapMemoryRule(deps.assetRepository),
-  people_together: (deps) => new PeopleTogetherMemoryRule(deps.assetRepository),
-  video_moments: (deps) => new VideoMomentsMemoryRule(deps.assetRepository),
-  trip_anniversary: (deps) => new TripAnniversaryMemoryRule(deps.assetRepository),
+  birthday: (deps) => new BirthdayMemoryRule(deps.personRepository, deps.memoryRuleAssetRepository),
+  recent_trip: (deps) => new RecentTripMemoryRule(deps.memoryRuleAssetRepository, deps.memoryRepository),
+  month_recap: (deps) => new MonthRecapMemoryRule(deps.memoryRuleAssetRepository),
+  favorites_throwback: (deps) => new FavoritesThrowbackMemoryRule(deps.memoryRuleAssetRepository),
+  on_this_day_place: (deps) => new OnThisDayPlaceMemoryRule(deps.memoryRuleAssetRepository),
+  season_recap: (deps) => new SeasonRecapMemoryRule(deps.memoryRuleAssetRepository),
+  people_together: (deps) => new PeopleTogetherMemoryRule(deps.memoryRuleAssetRepository),
+  video_moments: (deps) => new VideoMomentsMemoryRule(deps.memoryRuleAssetRepository),
+  trip_anniversary: (deps) => new TripAnniversaryMemoryRule(deps.memoryRuleAssetRepository),
   themed: (deps) => new ThemedMemoryRule(deps.themeSearchPort),
   person_throwback: (deps) =>
     new PersonThrowbackMemoryRule(
       deps.personRepository,
-      deps.assetRepository,
+      deps.memoryRuleAssetRepository,
       deps.memories?.personThrowbackDormancyMonths ?? DEFAULT_DORMANCY_MONTHS,
     ),
 };

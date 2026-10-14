@@ -24,8 +24,8 @@ export class LibraryManifestService extends BaseService {
 
     const assetIds = pageRows.map((row) => row.id);
     const [ownedAlbums, albumMemberships] = await Promise.all([
-      this.albumRepository.getOwnedNames(id),
-      this.albumRepository.getOwnedAlbumIdsForAssets(id, assetIds),
+      this.spaceAlbumRepository.getOwnedNames(id),
+      this.spaceAlbumRepository.getOwnedAlbumIdsForAssets(id, assetIds),
     ]);
     const albumIdsByAsset = new Map(albumMemberships.map((m) => [m.assetId, m.albumIds]));
 

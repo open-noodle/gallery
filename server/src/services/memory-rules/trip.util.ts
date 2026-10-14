@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { MemoryAsset, MemoryLocationCluster } from 'src/repositories/asset.repository.js';
+import { MemoryAsset, MemoryLocationCluster } from 'src/gallery/memory-rule-asset.repository.js';
 import { pickEvenlySpaced } from 'src/services/memory-rules/curation.util.js';
 
 export const BURST_WINDOW_MS = 2 * 60 * 1000;

@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { JobName } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
@@ -36,6 +37,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [
       FaceRepairRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       FaceRepairDeclineRepository,
       FacePersonVerdictRepository,
@@ -471,6 +473,7 @@ const setupRepair = (db?: Kysely<DB>) => {
     real: [
       FaceRepairRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       FaceIdentityRepository,
       FaceRepairDeclineRepository,
@@ -843,6 +846,7 @@ const setupRunRepair = (db?: Kysely<DB>) => {
     real: [
       FaceRepairRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       FaceIdentityRepository,
       ConfigRepository,
@@ -1223,6 +1227,7 @@ const setupDecline = (db?: Kysely<DB>) => {
       FaceRepairRepository,
       FaceRepairScanRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       FaceRepairDeclineRepository,
       FacePersonVerdictRepository,

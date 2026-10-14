@@ -33,9 +33,9 @@ describe(AlbumService.name, () => {
     // #764 cross-owner contribution defaults: no denied asset is contributable / already contributed
     // unless a test opts in, so add/remove behave exactly as before for the non-space cases.
     mocks.sharedSpace.getContributableAssetSpaces.mockResolvedValue([]);
-    mocks.album.getContributedAssetIds.mockResolvedValue(new Set());
-    mocks.album.addContributedAssets.mockResolvedValue();
-    mocks.album.removeContributedAssetIds.mockResolvedValue();
+    mocks.spaceAlbum.getContributedAssetIds.mockResolvedValue(new Set());
+    mocks.spaceAlbum.addContributedAssets.mockResolvedValue();
+    mocks.spaceAlbum.removeContributedAssetIds.mockResolvedValue();
   });
 
   it('should work', () => {
@@ -44,7 +44,7 @@ describe(AlbumService.name, () => {
 
   describe('getNames', () => {
     it('returns owned + shared albums in one list', async () => {
-      mocks.album.getOwnedNames.mockResolvedValue([
+      mocks.spaceAlbum.getOwnedNames.mockResolvedValue([
         {
           id: 'a1',
           albumName: 'Owned',
@@ -54,7 +54,7 @@ describe(AlbumService.name, () => {
           endDate: null,
         },
       ] as any);
-      mocks.album.getSharedNames.mockResolvedValue([
+      mocks.spaceAlbum.getSharedNames.mockResolvedValue([
         {
           id: 'a2',
           albumName: 'Shared',
@@ -69,13 +69,13 @@ describe(AlbumService.name, () => {
 
       expect(result).toHaveLength(2);
       expect(result.map((a) => a.id).toSorted()).toEqual(['a1', 'a2']);
-      expect(mocks.album.getOwnedNames).toHaveBeenCalledWith(authStub.admin.user.id);
-      expect(mocks.album.getSharedNames).toHaveBeenCalledWith(authStub.admin.user.id);
+      expect(mocks.spaceAlbum.getOwnedNames).toHaveBeenCalledWith(authStub.admin.user.id);
+      expect(mocks.spaceAlbum.getSharedNames).toHaveBeenCalledWith(authStub.admin.user.id);
     });
 
     it('does NOT call updateThumbnails', async () => {
-      mocks.album.getOwnedNames.mockResolvedValue([]);
-      mocks.album.getSharedNames.mockResolvedValue([]);
+      mocks.spaceAlbum.getOwnedNames.mockResolvedValue([]);
+      mocks.spaceAlbum.getSharedNames.mockResolvedValue([]);
 
       await sut.getNames(authStub.admin);
 
@@ -83,7 +83,7 @@ describe(AlbumService.name, () => {
     });
 
     it('hardcodes shared=false on owned records and shared=true on shared records', async () => {
-      mocks.album.getOwnedNames.mockResolvedValue([
+      mocks.spaceAlbum.getOwnedNames.mockResolvedValue([
         {
           id: 'a1',
           albumName: 'Owned',
@@ -93,7 +93,7 @@ describe(AlbumService.name, () => {
           endDate: null,
         },
       ] as any);
-      mocks.album.getSharedNames.mockResolvedValue([
+      mocks.spaceAlbum.getSharedNames.mockResolvedValue([
         {
           id: 'a2',
           albumName: 'Shared',

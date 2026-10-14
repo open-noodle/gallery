@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { Mocked } from 'vitest';
 import { AssetVisibility, JobName, SourceType } from 'src/enum.js';
+import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -62,6 +63,7 @@ const setupRepair = (db: Kysely<DB>) => {
       FaceRepairDeclineRepository,
       FacePersonVerdictRepository,
       SearchRepository,
+      FaceSearchRepository,
       PersonRepository,
       FaceIdentityRepository,
       ConfigRepository,
@@ -89,6 +91,7 @@ const setupPerson = (db: Kysely<DB>) => {
       FaceIdentityRepository,
       PersonRepository,
       SearchRepository,
+      FaceSearchRepository,
       SharedSpaceRepository,
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],

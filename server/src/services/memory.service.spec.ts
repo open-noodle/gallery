@@ -101,14 +101,18 @@ describe(MemoryService.name, () => {
     ({ sut, mocks } = newTestService(MemoryService));
     mocks.memory.search.mockResolvedValue([]);
     mocks.memory.searchAccessible.mockResolvedValue([]);
-    mocks.memory.deleteOnThisDay.mockResolvedValue(void 0);
+    mocks.memoryRuleAsset.deleteOnThisDay.mockResolvedValue(void 0);
+    mocks.memoryRuleAsset.getMemoryAssetsForPeriod.mockResolvedValue([]);
+    mocks.memoryRuleAsset.getMemoryFacesForPeriod.mockResolvedValue([]);
+    mocks.memoryRuleAsset.getMemoryPersonDailyCounts.mockResolvedValue([]);
+    mocks.memoryRuleAsset.getMemoryAssetsForPersonWindow.mockResolvedValue([]);
     mocks.user.getMetadata.mockResolvedValue([]);
     // Without these, every `onMemoriesCreate` test outside the `reconcileMemoryOverlap` /
     // `overlap backfill` describe blocks hits an unstubbed mock, `rows.length` throws a
     // TypeError inside the reconcile try/catch, and the whole reconcile+backfill code path runs
     // dead (see F3). Stubbing to a no-op here keeps that path live everywhere.
-    mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
-    mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
+    mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([]);
+    mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(null);
     // #1041: memory reads resolve the viewer's scope; default to "nothing hidden, no visible spaces".
     vi.spyOn(sut, 'resolveViewerScope').mockResolvedValue({ hiddenScope: nothingHidden, visibleSpaceIds: [] });
   });
@@ -201,7 +205,7 @@ describe(MemoryService.name, () => {
       mocks.person.getBirthdaysForDay.mockResolvedValue([
         { personGroupId: 'person-1', name: 'Alice', birthDate: new Date('1990-04-23T00:00:00Z') },
       ]);
-      mocks.asset.getMemoryAssetsForPerson.mockResolvedValue([
+      mocks.memoryRuleAsset.getMemoryAssetsForPerson.mockResolvedValue([
         { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
         { id: 'a-2024-1', localDateTime: new Date('2024-04-01T12:00:00Z') },
         { id: 'a-2023-1', localDateTime: new Date('2023-04-01T12:00:00Z') },
@@ -209,7 +213,7 @@ describe(MemoryService.name, () => {
         { id: 'a-2021-1', localDateTime: new Date('2021-04-01T12:00:00Z') },
         { id: 'a-2020-1', localDateTime: new Date('2020-04-01T12:00:00Z') },
       ]);
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
       mocks.memory.create.mockResolvedValue(
         MemoryFactory.create({
           ownerId: user.id,
@@ -261,12 +265,12 @@ describe(MemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.asset.getMemoryLocationClusters.mockResolvedValue([]);
+      mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
       expect(mocks.person.getBirthdaysForDay).not.toHaveBeenCalled();
-      expect(mocks.asset.getMemoryLocationClusters).toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -293,7 +297,7 @@ describe(MemoryService.name, () => {
       await sut.onMemoriesCreate();
 
       expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
-      expect(mocks.asset.getMemoryLocationClusters).not.toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -319,7 +323,7 @@ describe(MemoryService.name, () => {
       await sut.onMemoriesCreate();
 
       expect(mocks.person.getBirthdaysForDay).not.toHaveBeenCalled();
-      expect(mocks.asset.getMemoryLocationClusters).not.toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
       expect(mocks.memory.create).not.toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -362,7 +366,10 @@ describe(MemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.memory.hasRuleMemory.mockResolvedValueOnce(false).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      mocks.memoryRuleAsset.hasRuleMemory
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
       mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
       const failingRule = { id: 'broken', evaluate: vi.fn().mockRejectedValue(new Error('boom')) };
@@ -401,7 +408,7 @@ describe(MemoryService.name, () => {
       await sut.onMemoriesCreate();
 
       expect(mocks.memory.create).toHaveBeenCalledTimes(2);
-      expect(mocks.memory.hasRuleMemory.mock.calls).toEqual([
+      expect(mocks.memoryRuleAsset.hasRuleMemory.mock.calls).toEqual([
         [user.id, 'birthday', 'k-1'],
         [user.id, 'birthday', 'k-2'],
         [user.id, 'birthday', 'k-3'],
@@ -423,7 +430,7 @@ describe(MemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
       mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
       const rule = {
@@ -457,7 +464,7 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.create).toHaveBeenCalledTimes(2);
       // Every year the candidate declared is removed, and only those years — the second
       // candidate declared none, so it removes nothing. All on the one trigger day.
-      expect(mocks.memory.deleteOnThisDay.mock.calls).toEqual([
+      expect(mocks.memoryRuleAsset.deleteOnThisDay.mock.calls).toEqual([
         [{ ownerId: user.id, year: 2021, showAt: new Date('2026-04-23T00:00:00.000Z') }],
         [{ ownerId: user.id, year: 2023, showAt: new Date('2026-04-23T00:00:00.000Z') }],
       ]);
@@ -477,7 +484,7 @@ describe(MemoryService.name, () => {
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       // The rule memory already exists from an earlier run, so the candidate is skipped.
-      mocks.memory.hasRuleMemory.mockResolvedValue(true);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(true);
 
       const rule = {
         id: 'on_this_day_place',
@@ -499,7 +506,7 @@ describe(MemoryService.name, () => {
       await sut.onMemoriesCreate();
 
       expect(mocks.memory.create).not.toHaveBeenCalled();
-      expect(mocks.memory.deleteOnThisDay).not.toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.deleteOnThisDay).not.toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -517,7 +524,7 @@ describe(MemoryService.name, () => {
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       // every slot but one is already taken by memories still visible today
       mocks.memory.search.mockResolvedValue(visibleRuleMemories(user.id, '2026-04-23T00:00:00Z', RULE_DAILY_LIMIT - 1));
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
       mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
       const scoringRule = {
@@ -569,7 +576,7 @@ describe(MemoryService.name, () => {
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       // every slot but one is already taken by memories still visible today
       mocks.memory.search.mockResolvedValue(visibleRuleMemories(user.id, '2026-04-24T00:00:00Z', RULE_DAILY_LIMIT - 1));
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
       mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
       const birthdayRule = {
@@ -691,15 +698,15 @@ describe(MemoryService.name, () => {
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       mocks.person.getBirthdaysForDay.mockResolvedValue([]);
-      mocks.asset.getMemoryLocationClusters.mockResolvedValue([]);
+      mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
       // birthday rule runs only for userA; recent-trip runs for both
       expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
       expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledWith(userA.id, expect.anything());
-      expect(mocks.asset.getMemoryLocationClusters).toHaveBeenCalledWith(userA.id, expect.anything());
-      expect(mocks.asset.getMemoryLocationClusters).toHaveBeenCalledWith(userB.id, expect.anything());
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userA.id, expect.anything());
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userB.id, expect.anything());
 
       vi.useRealTimers();
     });
@@ -722,7 +729,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.asset.getMemoryLocationClusters).not.toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
       expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -775,7 +782,7 @@ describe(MemoryService.name, () => {
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       mocks.memory.search.mockResolvedValue([]);
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
       mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
       const rule = {
@@ -814,7 +821,7 @@ describe(MemoryService.name, () => {
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       mocks.memory.search.mockResolvedValue([]);
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
       mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
       const recapRule = {
@@ -872,12 +879,12 @@ describe(MemoryService.name, () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(day('2026-09-01T12:00:00Z'));
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([]);
       mocks.memory.removeAssetIds.mockResolvedValue(void 0);
       mocks.memory.delete.mockResolvedValue(void 0);
       // Unused until Task 6 adds the backfill; stubbed now so these tests still pass then.
       // `MemoriesState.overlapBackfilledAt` does not exist yet — it must NOT appear above.
-      mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
+      mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(null);
     });
 
     afterEach(() => {
@@ -893,7 +900,7 @@ describe(MemoryService.name, () => {
 
     it('strips the lower-scoring memory rather than the higher one', async () => {
       const shared = 'shared-0';
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'season', assets: [shared, ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
         overlapRow({ id: 'month', assets: [shared, ...ids('m', 9)], data: { ruleId: 'month_recap', score: 110 } }),
       ] as any);
@@ -907,7 +914,7 @@ describe(MemoryService.name, () => {
 
     it('deletes an on_this_day card left under its floor', async () => {
       const shared = ids('x', 2);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'season',
           assets: [...shared, ...ids('s', 10)],
@@ -924,7 +931,7 @@ describe(MemoryService.name, () => {
 
     it('S1: does not force apart memories whose windows never overlap', async () => {
       const shared = ids('x', 10);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'first',
           assets: shared,
@@ -950,7 +957,7 @@ describe(MemoryService.name, () => {
     it('S2: strips a multi-day memory once, unioned across every day it is visible', async () => {
       const shared = ids('x', 2);
       const spanning = { hideAt: day('2026-09-04T23:59:59Z') };
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'season',
           assets: [...shared, ...ids('s', 10)],
@@ -975,7 +982,7 @@ describe(MemoryService.name, () => {
     it('S3: deletes a memory once even when it is visible on several days', async () => {
       const shared = ids('x', 2);
       const spanning = { hideAt: day('2026-09-04T23:59:59Z') };
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'season',
           assets: [...shared, ...ids('s', 10)],
@@ -992,7 +999,7 @@ describe(MemoryService.name, () => {
 
     it('S4: reaches a look-ahead on_this_day written three days ahead', async () => {
       const shared = ids('x', 2);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'season',
           assets: [...shared, ...ids('s', 10)],
@@ -1024,7 +1031,7 @@ describe(MemoryService.name, () => {
       stubMetadata();
 
       const shared = 'shared-0';
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'season', assets: [shared, ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
         overlapRow({ id: 'month', assets: [shared, ...ids('m', 9)], data: { ruleId: 'month_recap', score: 110 } }),
       ] as any);
@@ -1039,7 +1046,7 @@ describe(MemoryService.name, () => {
     });
 
     it('S7: never deletes or strips a saved memory, and lets it claim first', async () => {
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'saved', assets: ['a'], isSaved: true, type: MemoryType.OnThisDay, data: { year: 2025 } }),
         overlapRow({ id: 'rule', assets: ['a', ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
       ] as any);
@@ -1051,7 +1058,7 @@ describe(MemoryService.name, () => {
     });
 
     it('S7b: never touches an API-created memory with no showAt/hideAt', async () => {
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'manual',
           assets: ['a'],
@@ -1070,7 +1077,7 @@ describe(MemoryService.name, () => {
     });
 
     it('S7c: never deletes a rule memory whose ruleId is no longer in the registry', async () => {
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'orphan', assets: [], data: { ruleId: 'a_rule_we_deleted', score: 500 } }),
       ] as any);
 
@@ -1085,7 +1092,7 @@ describe(MemoryService.name, () => {
     // outcome (which memory gets stripped) rather than being masked by an under-floor delete.
     it('pins claim order: a rule memory claims ahead of on_this_day', async () => {
       const shared = ids('x', 2);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'season',
           assets: [...shared, ...ids('s', 10)],
@@ -1117,7 +1124,7 @@ describe(MemoryService.name, () => {
     // strips `good`, exactly backwards from the intended "non-numeric sorts as 0" behaviour.
     it('F4: a non-numeric score sorts as 0, below every scored rule memory', async () => {
       const shared = 'shared-0';
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'bad',
           assets: [shared, ...ids('bad-only-', 2)],
@@ -1141,7 +1148,7 @@ describe(MemoryService.name, () => {
 
     it('S9: deletes a memory whose assets are all archived, trashed or hidden', async () => {
       // The repository query already filtered them out, so the service simply sees an empty list.
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'empty', assets: [], data: { ruleId: 'month_recap', score: 110 } }),
       ] as any);
 
@@ -1151,7 +1158,7 @@ describe(MemoryService.name, () => {
     });
 
     it('S10: makes no writes on a second run over already-reconciled memories', async () => {
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'season', assets: ids('s', 12), data: { ruleId: 'season_recap', score: 130 } }),
         overlapRow({ id: 'month', assets: ids('m', 10), data: { ruleId: 'month_recap', score: 110 } }),
       ] as any);
@@ -1163,7 +1170,7 @@ describe(MemoryService.name, () => {
     });
 
     it('S11: logs and continues when reconciliation fails for one user', async () => {
-      mocks.memory.getForOverlapReconcile.mockRejectedValue(new Error('boom'));
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockRejectedValue(new Error('boom'));
 
       await expect(runJob()).resolves.not.toThrow();
 
@@ -1179,20 +1186,20 @@ describe(MemoryService.name, () => {
       const second = factory.userAdmin();
       mocks.user.getList.mockResolvedValue([first, second]);
       stubMetadata();
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'season', assets: ids('s', 12), data: { ruleId: 'season_recap', score: 130 } }),
       ] as any);
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledWith(first.id, expect.anything());
-      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledWith(second.id, expect.anything());
+      expect(mocks.memoryRuleAsset.getForOverlapReconcile).toHaveBeenCalledWith(first.id, expect.anything());
+      expect(mocks.memoryRuleAsset.getForOverlapReconcile).toHaveBeenCalledWith(second.id, expect.anything());
       // The same rows came back for both owners and neither stripped the other.
       expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
     });
 
     it('S13: is a no-op when a superseded on_this_day card is already gone', async () => {
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({ id: 'place', assets: ids('p', 5), data: { ruleId: 'on_this_day_place', score: 120 } }),
       ] as any);
 
@@ -1218,7 +1225,7 @@ describe(MemoryService.name, () => {
       stubMetadata();
 
       const shared = ids('x', 2);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         // Clears its own floor (8) on its own if it were allowed to claim: shared(2) + own(6) = 8.
         overlapRow({ id: 'month', assets: [...shared, ...ids('m', 6)], data: { ruleId: 'month_recap', score: 119 } }),
         // Floor 3; without the shared pair it would drop to 2 and be deleted under the bug.
@@ -1246,7 +1253,7 @@ describe(MemoryService.name, () => {
       // same photos as that day's on_this_day card. Unhandled, the birthday row has no type key,
       // counts as visible, ranks as unmanaged (highest claim priority) and strips them.
       const shared = ids('x', 2);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'birthday',
           assets: [...shared, ...ids('b', 3)],
@@ -1270,7 +1277,7 @@ describe(MemoryService.name, () => {
 
     it('F1c: a saved birthday row is dropped too', async () => {
       const shared = ids('x', 2);
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
           id: 'birthday',
           assets: [...shared, ...ids('b', 3)],
@@ -1297,7 +1304,7 @@ describe(MemoryService.name, () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-09-03T12:00:00Z'));
-      mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([]);
       mocks.memory.removeAssetIds.mockResolvedValue(void 0);
       mocks.memory.delete.mockResolvedValue(void 0);
     });
@@ -1307,12 +1314,12 @@ describe(MemoryService.name, () => {
     });
 
     it('B1: walks from the oldest memory to today and records the cursor', async () => {
-      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-09-01T00:00:00Z'));
+      mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(new Date('2026-09-01T00:00:00Z'));
 
       await runWithState({});
 
       // 1st, 2nd, 3rd of September for the backfill, plus the nightly window pass.
-      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(4);
+      expect(mocks.memoryRuleAsset.getForOverlapReconcile).toHaveBeenCalledTimes(4);
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
         SystemMetadataKey.MemoriesState,
         expect.objectContaining({ overlapBackfilledAt: expect.stringContaining('2026-09-03') }),
@@ -1324,13 +1331,13 @@ describe(MemoryService.name, () => {
     // advances past the recorded cursor, the guard fails, and the backfill runs its cheap
     // one-day catch-up slice (`cursor+1 .. today`) again — see B3 and spec §6.9.
     it('B2: does no backfill work when the cursor has already reached today (same UTC day)', async () => {
-      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
+      mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
 
       await runWithState({ overlapBackfilledAt: '2026-09-03T00:00:00.000Z' });
 
       // Only the nightly window pass — the backfill short-circuits before even querying.
-      expect(mocks.memory.getOldestMemoryDate).not.toHaveBeenCalled();
-      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(1);
+      expect(mocks.memoryRuleAsset.getOldestMemoryDate).not.toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.getForOverlapReconcile).toHaveBeenCalledTimes(1);
     });
 
     it('guards the cursor in UTC regardless of the host timezone', async () => {
@@ -1341,29 +1348,29 @@ describe(MemoryService.name, () => {
       const originalZone = Settings.defaultZone;
       Settings.defaultZone = 'America/New_York';
       try {
-        mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
+        mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
 
         await runWithState({ overlapBackfilledAt: '2026-09-03T00:00:00.000Z' });
 
         // Same as B2: the guard must still short-circuit before querying, even though the host
         // (and now Luxon's default) zone is west of UTC.
-        expect(mocks.memory.getOldestMemoryDate).not.toHaveBeenCalled();
+        expect(mocks.memoryRuleAsset.getOldestMemoryDate).not.toHaveBeenCalled();
       } finally {
         Settings.defaultZone = originalZone;
       }
     });
 
     it('B3: resumes from the recorded cursor rather than restarting', async () => {
-      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
+      mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
 
       await runWithState({ overlapBackfilledAt: '2026-09-02T00:00:00.000Z' });
 
       // Only the 3rd remains, plus the nightly window pass.
-      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(2);
+      expect(mocks.memoryRuleAsset.getForOverlapReconcile).toHaveBeenCalledTimes(2);
     });
 
     it('B4/B6: records completion without walking when there are no memories at all', async () => {
-      mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
+      mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(null);
 
       await runWithState({});
 
@@ -1372,13 +1379,13 @@ describe(MemoryService.name, () => {
         expect.objectContaining({ overlapBackfilledAt: expect.any(String) }),
       );
       // Only the nightly window pass.
-      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(1);
+      expect(mocks.memoryRuleAsset.getForOverlapReconcile).toHaveBeenCalledTimes(1);
     });
 
     it('B5: runs the backfill before the nightly window pass', async () => {
-      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-09-03T00:00:00Z'));
+      mocks.memoryRuleAsset.getOldestMemoryDate.mockResolvedValue(new Date('2026-09-03T00:00:00Z'));
       const windows: { from: Date; to: Date }[] = [];
-      mocks.memory.getForOverlapReconcile.mockImplementation((_ownerId: string, window: any) => {
+      mocks.memoryRuleAsset.getForOverlapReconcile.mockImplementation((_ownerId: string, window: any) => {
         windows.push(window);
         return Promise.resolve([]);
       });

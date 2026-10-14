@@ -110,6 +110,17 @@ export class ClassificationService extends BaseService {
     }
   }
 
+  // Chained off JobSuccess (not JobService.onDone) so upstream's follow-up list stays untouched.
+  @OnEvent({ name: 'JobSuccess' })
+  async onJobSuccess({ job, response }: ArgOf<'JobSuccess'>) {
+    if (response !== JobStatus.Success && response !== JobStatus.Skipped) {
+      return;
+    }
+    if (job.name === JobName.SmartSearch) {
+      await this.jobRepository.queue({ name: JobName.AssetClassify, data: { id: job.data.id } });
+    }
+  }
+
   @OnJob({ name: JobName.AssetClassifyQueueAll, queue: QueueName.Classification })
   async handleClassifyQueueAll({ force }: JobOf<JobName.AssetClassifyQueueAll>): Promise<JobStatus> {
     const { classification } = await this.getConfig({ withCache: true });

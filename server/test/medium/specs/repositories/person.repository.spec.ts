@@ -1,5 +1,6 @@
 import { Kysely, sql } from 'kysely';
 import { AssetFileType, AssetVisibility, SharedSpaceRole, SourceType } from 'src/enum.js';
+import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
@@ -1523,7 +1524,8 @@ describe(PersonRepository.name, () => {
 
   describe('deleteAllPets', () => {
     it('deletes pet people and their faces while preserving human people and faces', async () => {
-      const { ctx, sut } = setup();
+      const { ctx } = setup();
+      const sut = ctx.get(PetFaceRepository);
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 

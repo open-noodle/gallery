@@ -8,6 +8,7 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/section_availability.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/utils/option.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' hide SearchFilter;
@@ -357,5 +358,34 @@ void main() {
 
       expect(available, FilterSectionId.values.toSet());
     });
+
+    test('drops the facet-list sections on a stock Immich server without requesting facets', () async {
+      final container = ProviderContainer(
+        overrides: [
+          apiServiceProvider.overrideWithValue(mockApiService),
+          serverSupportsSpacesProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(container.dispose);
+      await expectLater(
+        container.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future),
+        throwsA(isA<FilterSuggestionsUnsupportedException>()),
+      );
+
+      expect(container.read(sectionAvailabilityProvider), {
+        FilterSectionId.when,
+        FilterSectionId.rating,
+        FilterSectionId.media,
+        FilterSectionId.toggles,
+      });
+      verifyNever(() => mockApiService.searchApi);
+    });
+  });
+
+  test('stockServerSections keeps a facet-list section that holds an active filter', () {
+    final available = stockServerSections(SearchFilter.empty().copyWith(people: {aPerson}));
+
+    expect(available.contains(FilterSectionId.people), isTrue);
+    expect(available.contains(FilterSectionId.places), isFalse);
   });
 }
