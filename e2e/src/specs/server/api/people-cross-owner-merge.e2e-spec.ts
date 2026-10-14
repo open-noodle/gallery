@@ -88,12 +88,14 @@ const setupCrossOwnerMerge = async (options: { withCollapse: boolean }): Promise
     utils.createFace({ assetId: otherAsset.id, personGroupId: otherOwnerPerson.id }),
   ]);
 
-  const targetIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
-    targetPerson.id,
-  ]);
-  const sourceIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
-    otherOwnerPerson.id,
-  ]);
+  const targetIdentityRow = await db.query(
+    `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+    [targetPerson.id],
+  );
+  const sourceIdentityRow = await db.query(
+    `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+    [otherOwnerPerson.id],
+  );
   const identityT = targetIdentityRow.rows[0].identityId as string;
   const identityS = sourceIdentityRow.rows[0].identityId as string;
 
@@ -119,7 +121,10 @@ const setupCrossOwnerMerge = async (options: { withCollapse: boolean }): Promise
     const secondPerson = await utils.createPerson(otherOwner.accessToken, { name: 'Ada Other Owner (dupe)' });
     const secondAsset = await utils.createAsset(otherOwner.accessToken);
     await utils.createFace({ assetId: secondAsset.id, personGroupId: secondPerson.id });
-    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE "personGroupId" = $2`, [identityT, secondPerson.id]);
+    await db.query(
+      `INSERT INTO "person_identity" ("personGroupId", "ownerId", "identityId") SELECT "personGroupId", "ownerId", $1 FROM "person" WHERE "personGroupId" = $2 ON CONFLICT ("personGroupId") DO UPDATE SET "identityId" = EXCLUDED."identityId"`,
+      [identityT, secondPerson.id],
+    );
     otherOwnerSecondPersonId = secondPerson.id;
   }
 
@@ -167,7 +172,7 @@ describe('/people/same-person cross-owner merge (#733)', () => {
     const otherOwnerPeople = async () => {
       const db = await utils.connectDatabase();
       const { rows } = await db.query(
-        `SELECT "personGroupId" AS id, name, "identityId" FROM "person" WHERE "ownerId" = $1 ORDER BY name`,
+        `SELECT "personGroupId" AS id, name, "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "person"."ownerId" = $1 ORDER BY name`,
         [fx.otherOwner.userId],
       );
       return rows as { id: string; name: string; identityId: string }[];
@@ -247,7 +252,10 @@ describe('/people/same-person cross-owner merge (#733)', () => {
       expect(remaining).toHaveLength(1);
 
       const db = await utils.connectDatabase();
-      const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [remaining[0]]);
+      const { rows } = await db.query(
+        `SELECT "identityId" FROM "person" LEFT JOIN "person_identity" USING ("personGroupId") WHERE "personGroupId" = $1`,
+        [remaining[0]],
+      );
       expect(rows[0].identityId).toBe(fx.identityT);
     });
   });

@@ -191,7 +191,7 @@ export class StorageService extends BaseService {
       }
 
       try {
-        const backend = await this.backendFor(file);
+        const backend = await this.backendMedia.backendFor(file);
         await backend.delete(file);
       } catch (error: any) {
         this.logger.warn('Unable to remove file', error);

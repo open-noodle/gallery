@@ -2336,8 +2336,8 @@ export class SharedSpaceService extends BaseService {
    * misplaces boxes).
    *
    * The created face gets `personId = NULL` (never the owner's), `sourceType = Manual`, and
-   * `createdBy = auth.user.id` — the column §6.6 uses to decide whether the editor may later
-   * delete it, never `sourceType` (see that section's doc comment for why). It is then attached
+   * an `asset_face_creator` row for `auth.user.id` — the record §6.6 uses to decide whether the
+   * editor may later delete it, never `sourceType` (see that section's doc comment for why). It is then attached
    * to the target space person through `linkFaceToSpacePerson`, always with `writeIdentity:
    * true`: a face this call just created cannot already belong to one of the owner's own people
    * (§6.3.1), so the identity-skip override case never applies here.
@@ -2397,10 +2397,10 @@ export class SharedSpaceService extends BaseService {
           boundingBoxY1,
           boundingBoxY2,
           sourceType: SourceType.Manual,
-          createdBy: auth.user.id,
         },
         trx,
       );
+      await this.facePersonVerdictRepository.addFaceCreator(faceId, auth.user.id, trx);
 
       await this.linkFaceToSpacePerson(trx, person, faceId, { writeIdentity: true });
       return faceId;
@@ -2416,7 +2416,7 @@ export class SharedSpaceService extends BaseService {
       imageHeight,
       spacePersonId: person.id,
       spacePersonName: person.name,
-      // This call is the only writer of a face with createdBy set to the caller (§6.5) — always
+      // This call is the only writer of an asset_face_creator row (§6.5) — always
       // editor-drawn, never a detection.
       isEditorDrawn: true,
     };
@@ -2425,11 +2425,11 @@ export class SharedSpaceService extends BaseService {
   /**
    * Spec §6.6 (Slice 6, Task 3): delete a face box an EDITOR of this space drew (§6.5).
    *
-   * Deletable iff `asset_face.createdBy IS NOT NULL` AND the face is reachable in a space where
+   * Deletable iff the face has an `asset_face_creator` row AND the face is reachable in a space where
    * the actor is Owner/Editor — NEVER `sourceType`. `PersonService.createFace` already writes
    * `SourceType.Manual` for an OWNER-drawn box too, so gating on `sourceType === Manual` would let
    * a space editor delete boxes the owner drew by hand — the exact regression this whole design
-   * exists to avoid. A detected face (`createdBy IS NULL`) is refused: `FaceDelete` stays
+   * exists to avoid. A detected face (no creator row) is refused: `FaceDelete` stays
    * owner-only for those.
    *
    * Hard-deletes the row. `shared_space_person_face` and `face_identity_face` both cascade away
@@ -2627,12 +2627,12 @@ export class SharedSpaceService extends BaseService {
         throw new NotFoundException();
       }
 
-      const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+      const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
       if (!sourcePath) {
         throw new NotFoundException();
       }
 
-      return this.generateFaceThumbnailResponse(face, sourcePath);
+      return this.backendMedia.generateFaceThumbnailResponse(face, sourcePath);
     }
 
     if (person.identityId) {
@@ -2643,7 +2643,7 @@ export class SharedSpaceService extends BaseService {
       });
 
       if (personalThumbnail) {
-        return this.serveFromBackend(
+        return this.backendMedia.serveFromBackend(
           personalThumbnail.thumbnailPath,
           mimeTypes.lookup(personalThumbnail.thumbnailPath),
           CacheControl.PrivateWithoutCache,
@@ -2670,12 +2670,12 @@ export class SharedSpaceService extends BaseService {
       throw new NotFoundException();
     }
 
-    const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
     if (!sourcePath) {
       throw new NotFoundException();
     }
 
-    return this.generateFaceThumbnailResponse(face, sourcePath);
+    return this.backendMedia.generateFaceThumbnailResponse(face, sourcePath);
   }
 
   async getSpacePersonFaceThumbnail(
@@ -2694,12 +2694,12 @@ export class SharedSpaceService extends BaseService {
       throw new NotFoundException();
     }
 
-    const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+    const sourcePath = await this.backendMedia.getFaceThumbnailSource(face.assetId);
     if (!sourcePath) {
       throw new NotFoundException();
     }
 
-    return this.generateFaceThumbnailResponse(face, sourcePath);
+    return this.backendMedia.generateFaceThumbnailResponse(face, sourcePath);
   }
 
   async updateSpacePerson(

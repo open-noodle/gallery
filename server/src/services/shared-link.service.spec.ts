@@ -341,12 +341,12 @@ describe(SharedLinkService.name, () => {
           .asset(asset, (builder) => builder.exif())
           .build();
         mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
-        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+        mocks.access.spaceAsset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
         mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
 
         await sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [asset.id], spaceId });
 
-        expect(mocks.access.asset.checkSpaceAccessForSpace).toHaveBeenCalledWith(
+        expect(mocks.access.spaceAsset.checkSpaceAccessForSpace).toHaveBeenCalledWith(
           authStub.admin.user.id,
           spaceId,
           new Set([asset.id]),
@@ -357,7 +357,7 @@ describe(SharedLinkService.name, () => {
       it('should not consult the owner-only share permission when a space is given', async () => {
         const asset = AssetFactory.create();
         mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
-        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+        mocks.access.spaceAsset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
         mocks.sharedLink.create.mockResolvedValue(getForSharedLink(SharedLinkFactory.create()));
 
         await sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [asset.id], spaceId });
@@ -368,30 +368,30 @@ describe(SharedLinkService.name, () => {
       it('should reject a space viewer before looking the assets up', async () => {
         mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
         // Deliberately permissive — the role gate, not the asset lookup, has to be what rejects.
-        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([assetId]));
+        mocks.access.spaceAsset.checkSpaceAccessForSpace.mockResolvedValue(new Set([assetId]));
 
         await expect(
           sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [assetId], spaceId }),
         ).rejects.toBeInstanceOf(BadRequestException);
-        expect(mocks.access.asset.checkSpaceAccessForSpace).not.toHaveBeenCalled();
+        expect(mocks.access.spaceAsset.checkSpaceAccessForSpace).not.toHaveBeenCalled();
         expect(mocks.sharedLink.create).not.toHaveBeenCalled();
       });
 
       it('should reject a non-member before looking the assets up', async () => {
         mocks.sharedSpace.getMember.mockResolvedValue(undefined as never);
-        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([assetId]));
+        mocks.access.spaceAsset.checkSpaceAccessForSpace.mockResolvedValue(new Set([assetId]));
 
         await expect(
           sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [assetId], spaceId }),
         ).rejects.toBeInstanceOf(BadRequestException);
-        expect(mocks.access.asset.checkSpaceAccessForSpace).not.toHaveBeenCalled();
+        expect(mocks.access.spaceAsset.checkSpaceAccessForSpace).not.toHaveBeenCalled();
         expect(mocks.sharedLink.create).not.toHaveBeenCalled();
       });
 
       it('should reject an asset that is not visible in the space', async () => {
         const [inSpace, outsideSpace] = [newUuid(), newUuid()];
         mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Owner } as any);
-        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([inSpace]));
+        mocks.access.spaceAsset.checkSpaceAccessForSpace.mockResolvedValue(new Set([inSpace]));
 
         await expect(
           sut.create(authStub.admin, {

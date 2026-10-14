@@ -1,0 +1,6 @@
+{
+  "background_location_permission_content": "Noodle Gallery koristi dopuštenje za lokaciju u pozadini kako bi nastavio čitati naziv Wi‑Fi mreže dok automatsko prebacivanje poslužitelja radi u pozadini. Naziv Wi‑Fi mreže sprema se na ovom uređaju radi podudaranja, a precizna lokacija uređaja ne pohranjuje se niti dijeli.",
+  "location_permission_content": "Android zahtijeva dopuštenje za preciznu lokaciju kako bi Noodle Gallery mogao pročitati naziv trenutačne Wi‑Fi mreže za automatsko prebacivanje poslužitelja. Naziv Wi‑Fi mreže sprema se na ovom uređaju radi podudaranja, a precizna lokacija uređaja ne pohranjuje se niti dijeli.",
+  "map_location_service_disabled_content": "Noodle Gallery koristi vašu preciznu trenutačnu lokaciju za centriranje karte i prikaz fotografija i videozapisa iz vašeg trenutačnog područja. Lokacijske usluge moraju biti omogućene prije nego što Noodle Gallery može pristupiti toj lokaciji. Precizna lokacija uređaja ne pohranjuje se niti dijeli. Želite li sada otvoriti postavke lokacije?",
+  "map_no_location_permission_content": "Noodle Gallery koristi vašu preciznu trenutačnu lokaciju za centriranje karte i prikaz fotografija i videozapisa iz vašeg trenutačnog područja. Precizna lokacija uređaja ne pohranjuje se niti dijeli. Želite li sada dopustiti pristup lokaciji?"
+}

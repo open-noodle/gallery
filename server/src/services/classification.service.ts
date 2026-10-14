@@ -5,7 +5,7 @@ import { OnEvent, OnJob } from 'src/decorators.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { type SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
-import { type ClassificationFaceExclusion } from 'src/gallery/config.dto.js';
+import { type ClassificationFaceExclusion } from 'src/gallery/dtos/config.dto.js';
 import { type ClassificationFaceSummary } from 'src/repositories/classification.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { isFacialRecognitionEnabled } from 'src/utils/misc.js';

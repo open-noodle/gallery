@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { AssetVisibility } from 'src/enum.js';
+import { personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 
@@ -53,17 +54,25 @@ export class ClassificationRepository {
 
   async resetClassifiedAt() {
     await this.db
-      .updateTable('asset_job_status')
+      .updateTable('asset_job_status_gallery')
       .set({ classifiedAt: null })
       .where('classifiedAt', 'is not', null)
       .execute();
   }
 
   async setClassifiedAt(assetId: string) {
+    const classifiedAt = new Date().toISOString();
     await this.db
-      .updateTable('asset_job_status')
-      .set({ classifiedAt: new Date().toISOString() })
-      .where('assetId', '=', assetId)
+      .insertInto('asset_job_status_gallery')
+      .columns(['assetId', 'classifiedAt'])
+      // insert-select: an asset deleted mid-job inserts nothing instead of failing the FK
+      .expression((eb) =>
+        eb
+          .selectFrom('asset')
+          .select((s) => [s.ref('asset.id').as('assetId'), s.val(classifiedAt).as('classifiedAt')])
+          .where('asset.id', '=', assetId),
+      )
+      .onConflict((oc) => oc.column('assetId').doUpdateSet({ classifiedAt }))
       .execute();
   }
 
@@ -82,7 +91,7 @@ export class ClassificationRepository {
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where('asset_face.personGroupId', 'is not', null)
-      .where('person.type', '=', 'person')
+      .where((eb) => eb.not(personIsPet()))
       .executeTakeFirst();
 
     return {
@@ -97,8 +106,9 @@ export class ClassificationRepository {
       .selectFrom('asset_job_status as ajs')
       .innerJoin('asset as a', 'a.id', 'ajs.assetId')
       .innerJoin('smart_search as ss', 'ss.assetId', 'a.id')
+      .leftJoin('asset_job_status_gallery as ajsg', 'ajsg.assetId', 'a.id')
       .select(['a.id', 'a.ownerId'])
-      .where('ajs.classifiedAt', 'is', null)
+      .where('ajsg.classifiedAt', 'is', null)
       .stream();
   }
 }

@@ -1,0 +1,1063 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`checkAccess oracle > activity.create 1`] = `
+{
+  "albumViewer": [
+    "ownAlbum",
+  ],
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > activity.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > activity.read 1`] = `{}`;
+
+exports[`checkAccess oracle > activity.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > activity.update 1`] = `{}`;
+
+exports[`checkAccess oracle > adminAuth.unlinkAll 1`] = `{}`;
+
+exports[`checkAccess oracle > adminConfig.read 1`] = `{}`;
+
+exports[`checkAccess oracle > adminConfig.update 1`] = `{}`;
+
+exports[`checkAccess oracle > adminSession.read 1`] = `{}`;
+
+exports[`checkAccess oracle > adminUser.create 1`] = `{}`;
+
+exports[`checkAccess oracle > adminUser.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > adminUser.read 1`] = `{}`;
+
+exports[`checkAccess oracle > adminUser.update 1`] = `{}`;
+
+exports[`checkAccess oracle > album.create 1`] = `{}`;
+
+exports[`checkAccess oracle > album.delete 1`] = `
+{
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > album.download 1`] = `
+{
+  "albumLink": [
+    "ownAlbum",
+  ],
+  "albumViewer": [
+    "ownAlbum",
+  ],
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+  "spaceAlbumLink": [
+    "spaceAlbum",
+  ],
+  "spaceEditor": [
+    "spaceAlbum",
+  ],
+  "spaceViewer": [
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > album.read 1`] = `
+{
+  "albumLink": [
+    "ownAlbum",
+  ],
+  "albumViewer": [
+    "ownAlbum",
+  ],
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+  "spaceAlbumLink": [
+    "spaceAlbum",
+  ],
+  "spaceEditor": [
+    "spaceAlbum",
+  ],
+  "spaceViewer": [
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > album.share 1`] = `
+{
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > album.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > album.update 1`] = `
+{
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > albumAsset.create 1`] = `
+{
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+  "spaceEditor": [
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > albumAsset.delete 1`] = `
+{
+  "owner": [
+    "ownAlbum",
+    "spaceAlbum",
+  ],
+  "spaceEditor": [
+    "spaceAlbum",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > albumUser.create 1`] = `{}`;
+
+exports[`checkAccess oracle > albumUser.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > albumUser.update 1`] = `{}`;
+
+exports[`checkAccess oracle > all 1`] = `{}`;
+
+exports[`checkAccess oracle > apiKey.create 1`] = `{}`;
+
+exports[`checkAccess oracle > apiKey.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > apiKey.read 1`] = `{}`;
+
+exports[`checkAccess oracle > apiKey.rotate 1`] = `{}`;
+
+exports[`checkAccess oracle > apiKey.update 1`] = `{}`;
+
+exports[`checkAccess oracle > archive.read 1`] = `
+{
+  "albumViewer": [
+    "albumViewer",
+  ],
+  "owner": [
+    "owner",
+  ],
+  "partner": [
+    "partner",
+  ],
+  "spaceEditor": [
+    "spaceEditor",
+  ],
+  "spaceViewer": [
+    "spaceViewer",
+  ],
+  "stranger": [
+    "stranger",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.copy 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "contributedAsset",
+    "editorAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.delete 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "contributedAsset",
+    "editorAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.derive 1`] = `{}`;
+
+exports[`checkAccess oracle > asset.download 1`] = `
+{
+  "albumLink": [
+    "ownAsset",
+  ],
+  "albumViewer": [
+    "ownAsset",
+  ],
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "partner": [
+    "albumSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceAlbumLink": [
+    "albumSpaceAsset",
+    "contributedAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+  "spaceLink": [
+    "editorAsset",
+    "spaceAsset",
+  ],
+  "spaceViewer": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.edit.create 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.edit.delete 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.edit.get 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.read 1`] = `
+{
+  "albumLink": [
+    "ownAsset",
+  ],
+  "albumViewer": [
+    "ownAsset",
+  ],
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "partner": [
+    "albumSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceAlbumLink": [
+    "albumSpaceAsset",
+    "contributedAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+  "spaceLink": [
+    "editorAsset",
+    "spaceAsset",
+  ],
+  "spaceViewer": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.share 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "partner": [
+    "albumSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "contributedAsset",
+    "editorAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > asset.update 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.upload 1`] = `
+{
+  "albumViewer": [
+    "albumViewer",
+  ],
+  "owner": [
+    "owner",
+  ],
+  "partner": [
+    "partner",
+  ],
+  "spaceEditor": [
+    "spaceEditor",
+  ],
+  "spaceLink": [
+    "albumFace",
+    "albumLink",
+    "albumPerson",
+    "albumSpaceAsset",
+    "albumViewer",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "libraryFace",
+    "libraryPerson",
+    "lockedSpaceAsset",
+    "memory",
+    "ownAlbum",
+    "ownAsset",
+    "owner",
+    "partner",
+    "privateFace",
+    "privatePerson",
+    "session",
+    "space",
+    "spaceAlbum",
+    "spaceAlbumLink",
+    "spaceAsset",
+    "spaceEditor",
+    "spaceFace",
+    "spaceLink",
+    "spacePerson",
+    "spaceViewer",
+    "stack",
+    "stackAsset",
+    "stranger",
+    "tag",
+  ],
+  "spaceViewer": [
+    "spaceViewer",
+  ],
+  "stranger": [
+    "stranger",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > asset.view 1`] = `
+{
+  "albumLink": [
+    "ownAsset",
+  ],
+  "albumViewer": [
+    "ownAsset",
+  ],
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "partner": [
+    "albumSpaceAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceAlbumLink": [
+    "albumSpaceAsset",
+    "contributedAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+  "spaceLink": [
+    "editorAsset",
+    "spaceAsset",
+  ],
+  "spaceViewer": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > assetFile.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > assetFile.download 1`] = `{}`;
+
+exports[`checkAccess oracle > assetFile.read 1`] = `{}`;
+
+exports[`checkAccess oracle > auth.changePassword 1`] = `{}`;
+
+exports[`checkAccess oracle > authDevice.delete 1`] = `
+{
+  "owner": [
+    "session",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > backup.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > backup.download 1`] = `{}`;
+
+exports[`checkAccess oracle > backup.list 1`] = `{}`;
+
+exports[`checkAccess oracle > backup.upload 1`] = `{}`;
+
+exports[`checkAccess oracle > clusterGroup.leave 1`] = `{}`;
+
+exports[`checkAccess oracle > clusterGroup.read 1`] = `{}`;
+
+exports[`checkAccess oracle > clusterGroupRequest.create 1`] = `{}`;
+
+exports[`checkAccess oracle > clusterGroupRequest.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > clusterGroupRequest.read 1`] = `{}`;
+
+exports[`checkAccess oracle > duplicate.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > duplicate.read 1`] = `{}`;
+
+exports[`checkAccess oracle > face.create 1`] = `{}`;
+
+exports[`checkAccess oracle > face.delete 1`] = `
+{
+  "owner": [
+    "albumFace",
+    "libraryFace",
+    "privateFace",
+    "spaceFace",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > face.read 1`] = `{}`;
+
+exports[`checkAccess oracle > face.update 1`] = `{}`;
+
+exports[`checkAccess oracle > folder.read 1`] = `{}`;
+
+exports[`checkAccess oracle > job.create 1`] = `{}`;
+
+exports[`checkAccess oracle > job.read 1`] = `{}`;
+
+exports[`checkAccess oracle > library.create 1`] = `{}`;
+
+exports[`checkAccess oracle > library.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > library.read 1`] = `{}`;
+
+exports[`checkAccess oracle > library.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > library.update 1`] = `{}`;
+
+exports[`checkAccess oracle > maintenance 1`] = `{}`;
+
+exports[`checkAccess oracle > map.read 1`] = `{}`;
+
+exports[`checkAccess oracle > map.search 1`] = `{}`;
+
+exports[`checkAccess oracle > memory.create 1`] = `{}`;
+
+exports[`checkAccess oracle > memory.delete 1`] = `
+{
+  "owner": [
+    "memory",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > memory.read 1`] = `
+{
+  "owner": [
+    "memory",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > memory.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > memory.update 1`] = `
+{
+  "owner": [
+    "memory",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > memoryAsset.create 1`] = `{}`;
+
+exports[`checkAccess oracle > memoryAsset.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > notification.create 1`] = `{}`;
+
+exports[`checkAccess oracle > notification.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > notification.read 1`] = `{}`;
+
+exports[`checkAccess oracle > notification.update 1`] = `{}`;
+
+exports[`checkAccess oracle > partner.create 1`] = `{}`;
+
+exports[`checkAccess oracle > partner.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > partner.read 1`] = `{}`;
+
+exports[`checkAccess oracle > partner.update 1`] = `
+{
+  "partner": [
+    "owner",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > person.create 1`] = `
+{
+  "owner": [
+    "albumFace",
+    "libraryFace",
+    "privateFace",
+    "spaceFace",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > person.delete 1`] = `
+{
+  "owner": [
+    "albumPerson",
+    "libraryPerson",
+    "privatePerson",
+    "spacePerson",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > person.merge 1`] = `
+{
+  "owner": [
+    "albumPerson",
+    "libraryPerson",
+    "privatePerson",
+    "spacePerson",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > person.read 1`] = `
+{
+  "owner": [
+    "albumPerson",
+    "libraryPerson",
+    "privatePerson",
+    "spacePerson",
+  ],
+  "spaceEditor": [
+    "albumPerson",
+    "libraryPerson",
+    "spacePerson",
+  ],
+  "spaceViewer": [
+    "albumPerson",
+    "libraryPerson",
+    "spacePerson",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > person.reassign 1`] = `
+{
+  "owner": [
+    "albumFace",
+    "libraryFace",
+    "privateFace",
+    "spaceFace",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > person.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > person.update 1`] = `
+{
+  "owner": [
+    "albumPerson",
+    "libraryPerson",
+    "privatePerson",
+    "spacePerson",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > pinCode.create 1`] = `{}`;
+
+exports[`checkAccess oracle > pinCode.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > pinCode.update 1`] = `{}`;
+
+exports[`checkAccess oracle > plugin.create 1`] = `{}`;
+
+exports[`checkAccess oracle > plugin.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > plugin.read 1`] = `{}`;
+
+exports[`checkAccess oracle > plugin.update 1`] = `{}`;
+
+exports[`checkAccess oracle > queue.read 1`] = `{}`;
+
+exports[`checkAccess oracle > queue.update 1`] = `{}`;
+
+exports[`checkAccess oracle > queueJob.create 1`] = `{}`;
+
+exports[`checkAccess oracle > queueJob.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > queueJob.read 1`] = `{}`;
+
+exports[`checkAccess oracle > queueJob.update 1`] = `{}`;
+
+exports[`checkAccess oracle > server.about 1`] = `{}`;
+
+exports[`checkAccess oracle > server.apkLinks 1`] = `{}`;
+
+exports[`checkAccess oracle > server.statistics 1`] = `{}`;
+
+exports[`checkAccess oracle > server.storage 1`] = `{}`;
+
+exports[`checkAccess oracle > server.versionCheck 1`] = `{}`;
+
+exports[`checkAccess oracle > serverLicense.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > serverLicense.read 1`] = `{}`;
+
+exports[`checkAccess oracle > serverLicense.update 1`] = `{}`;
+
+exports[`checkAccess oracle > session.create 1`] = `{}`;
+
+exports[`checkAccess oracle > session.delete 1`] = `
+{
+  "owner": [
+    "session",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > session.lock 1`] = `
+{
+  "owner": [
+    "session",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > session.read 1`] = `
+{
+  "owner": [
+    "session",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > session.update 1`] = `
+{
+  "owner": [
+    "session",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > sharedLink.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedLink.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedLink.read 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedLink.update 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpace.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpace.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpace.read 1`] = `
+{
+  "owner": [
+    "space",
+  ],
+  "spaceEditor": [
+    "space",
+  ],
+  "spaceViewer": [
+    "space",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > sharedSpace.update 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAlbum.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAlbum.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAlbum.update 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAlbumFolder.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAlbumFolder.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAlbumFolder.update 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAsset.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAsset.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceAsset.read 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceLibrary.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceLibrary.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceMember.create 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceMember.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > sharedSpaceMember.update 1`] = `{}`;
+
+exports[`checkAccess oracle > stack.create 1`] = `{}`;
+
+exports[`checkAccess oracle > stack.delete 1`] = `
+{
+  "owner": [
+    "stack",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > stack.read 1`] = `
+{
+  "owner": [
+    "stack",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > stack.update 1`] = `
+{
+  "owner": [
+    "stack",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > sync.stream 1`] = `{}`;
+
+exports[`checkAccess oracle > syncCheckpoint.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > syncCheckpoint.read 1`] = `{}`;
+
+exports[`checkAccess oracle > syncCheckpoint.update 1`] = `{}`;
+
+exports[`checkAccess oracle > systemConfig.read 1`] = `{}`;
+
+exports[`checkAccess oracle > systemConfig.update 1`] = `{}`;
+
+exports[`checkAccess oracle > systemMetadata.read 1`] = `{}`;
+
+exports[`checkAccess oracle > systemMetadata.update 1`] = `{}`;
+
+exports[`checkAccess oracle > tag.asset 1`] = `
+{
+  "owner": [
+    "tag",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > tag.create 1`] = `{}`;
+
+exports[`checkAccess oracle > tag.delete 1`] = `
+{
+  "owner": [
+    "tag",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > tag.read 1`] = `
+{
+  "owner": [
+    "tag",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > tag.update 1`] = `
+{
+  "owner": [
+    "tag",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > timeline.download 1`] = `
+{
+  "albumViewer": [
+    "albumViewer",
+  ],
+  "owner": [
+    "owner",
+  ],
+  "partner": [
+    "partner",
+  ],
+  "spaceEditor": [
+    "spaceEditor",
+  ],
+  "spaceViewer": [
+    "spaceViewer",
+  ],
+  "stranger": [
+    "stranger",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > timeline.read 1`] = `
+{
+  "albumViewer": [
+    "albumViewer",
+  ],
+  "owner": [
+    "owner",
+  ],
+  "partner": [
+    "owner",
+    "partner",
+  ],
+  "spaceEditor": [
+    "spaceEditor",
+  ],
+  "spaceViewer": [
+    "spaceViewer",
+  ],
+  "stranger": [
+    "stranger",
+  ],
+}
+`;
+
+exports[`checkAccess oracle > user.read 1`] = `{}`;
+
+exports[`checkAccess oracle > user.update 1`] = `{}`;
+
+exports[`checkAccess oracle > userConfig.read 1`] = `{}`;
+
+exports[`checkAccess oracle > userGroup.create 1`] = `{}`;
+
+exports[`checkAccess oracle > userGroup.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > userGroup.read 1`] = `{}`;
+
+exports[`checkAccess oracle > userGroup.update 1`] = `{}`;
+
+exports[`checkAccess oracle > userLicense.create 1`] = `{}`;
+
+exports[`checkAccess oracle > userLicense.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > userLicense.read 1`] = `{}`;
+
+exports[`checkAccess oracle > userLicense.update 1`] = `{}`;
+
+exports[`checkAccess oracle > userOnboarding.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > userOnboarding.read 1`] = `{}`;
+
+exports[`checkAccess oracle > userOnboarding.update 1`] = `{}`;
+
+exports[`checkAccess oracle > userPreference.read 1`] = `{}`;
+
+exports[`checkAccess oracle > userPreference.update 1`] = `{}`;
+
+exports[`checkAccess oracle > userProfileImage.create 1`] = `{}`;
+
+exports[`checkAccess oracle > userProfileImage.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > userProfileImage.read 1`] = `{}`;
+
+exports[`checkAccess oracle > userProfileImage.update 1`] = `{}`;
+
+exports[`checkAccess oracle > workflow.create 1`] = `{}`;
+
+exports[`checkAccess oracle > workflow.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > workflow.logs 1`] = `{}`;
+
+exports[`checkAccess oracle > workflow.read 1`] = `{}`;
+
+exports[`checkAccess oracle > workflow.update 1`] = `{}`;

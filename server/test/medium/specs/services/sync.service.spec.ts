@@ -3,6 +3,7 @@ import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { v4 } from 'uuid';
 import { AssetMetadataKey, UserMetadataKey } from 'src/enum.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { BaseSync, SyncRepository } from 'src/repositories/sync.repository.js';
@@ -14,11 +15,12 @@ import { getKyselyDB } from 'test/utils.js';
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
-  return newMediumService(SyncService, {
+  const result = newMediumService(SyncService, {
     database: db || defaultDatabase,
-    real: [DatabaseRepository, SyncRepository],
+    real: [DatabaseRepository, SyncRepository, GallerySyncRepository],
     mock: [LoggingRepository],
   });
+  return result;
 };
 
 beforeAll(async () => {

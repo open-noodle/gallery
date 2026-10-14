@@ -1,7 +1,7 @@
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
 import { Mocked, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetType, ImmichWorker, QueueName } from 'src/enum.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';

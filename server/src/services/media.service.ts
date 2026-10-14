@@ -218,7 +218,7 @@ export class MediaService extends BaseService {
     }
 
     // For S3 assets, download the original to a local temp file for processing
-    await using original = await this.ensureLocalFile(asset.originalPath);
+    await using original = await this.backendMedia.ensureLocalFile(asset.originalPath);
     const { localPath } = original;
 
     const trimEdit = asset.edits.find((e) => e.action === AssetEditAction.Trim);
@@ -415,7 +415,7 @@ export class MediaService extends BaseService {
     }
 
     // For S3 assets, download the original to a local temp file for processing
-    await using original = await this.ensureLocalFile(asset.originalPath);
+    await using original = await this.backendMedia.ensureLocalFile(asset.originalPath);
     const { localPath } = original;
 
     let generated: Awaited<ReturnType<MediaService['generateImageThumbnails']>>;
@@ -633,8 +633,8 @@ export class MediaService extends BaseService {
     const { x1, y1, x2, y2, oldWidth, oldHeight, exifOrientation, previewPath, originalPath } = data;
 
     // For S3 assets, download to local temp files for processing
-    await using originalLocal = await this.ensureLocalFile(originalPath);
-    await using previewLocal = previewPath ? await this.ensureLocalFile(previewPath) : undefined;
+    await using originalLocal = await this.backendMedia.ensureLocalFile(originalPath);
+    await using previewLocal = previewPath ? await this.backendMedia.ensureLocalFile(previewPath) : undefined;
 
     let inputImage: string | Buffer;
     if (data.type === AssetType.Video) {
@@ -803,7 +803,7 @@ export class MediaService extends BaseService {
     }
 
     // For S3 assets, download the original to a local temp file for processing
-    await using original = await this.ensureLocalFile(asset.originalPath);
+    await using original = await this.backendMedia.ensureLocalFile(asset.originalPath);
     const input = original.localPath;
     const output = StorageCore.getEncodedVideoPath(asset);
     this.storageCore.ensureFolders(output);

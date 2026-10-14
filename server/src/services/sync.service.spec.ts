@@ -2,9 +2,10 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum.js';
-import { SYNC_TYPES_ORDER, SyncService, isForkAwareClient, send } from 'src/services/sync.service.js';
+import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
+import { SYNC_TYPES_ORDER, SyncService } from 'src/services/sync.service.js';
 import { ClientDisconnectedError } from 'src/utils/response.js';
-import { serialize, toAck } from 'src/utils/sync.js';
+import { send, serialize, toAck } from 'src/utils/sync.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
@@ -202,8 +203,9 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
     sharedSpaceAlbumToAsset: makeSub(),
   };
 
-  // Assign onto the mock
+  // Assign onto the mock; the fork streams live on GallerySyncRepository, backed by the same sub-mocks.
   Object.assign(mocks.sync, subs);
+  Object.assign(mocks.gallerySync, subs);
 
   return subs;
 };
@@ -212,7 +214,9 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
 const stockClient = (...types: SyncRequestType[]) => types;
 const galleryClient = (...types: SyncRequestType[]) => [...types, SyncRequestType.SharedSpacesV1];
 
-describe(isForkAwareClient.name, () => {
+describe('isForkAwareClient', () => {
+  const { isForkAwareClient } = GallerySyncStreams;
+
   // upstream Immich v3.3.1's SyncRequestType: everything a stock client can send
   const upstreamTypes = [
     'AlbumsV1',

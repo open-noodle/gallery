@@ -18,7 +18,7 @@ void main() {
   const upstreamRelease = SemVer(major: 3, minor: 0, patch: 0);
 
   Map<String, dynamic> locale(String code) =>
-      jsonDecode(File('../i18n/$code.json').readAsStringSync()) as Map<String, dynamic>;
+      jsonDecode(File('../i18n/gallery/merged/$code.json').readAsStringSync()) as Map<String, dynamic>;
 
   /// ROLLING: upstream (immich-31038) made [FeatureHighlight] an enum, so a batch entry is a
   /// member rather than a const construction and the copy lives in the enum's title/body switch.

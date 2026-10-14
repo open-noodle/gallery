@@ -4,8 +4,9 @@ import { mkdtempDisposable, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType, UserMetadataKey } from 'src/enum.js';
-import { FaceIdentityMaintenanceService } from 'src/gallery/face-identity-maintenance.service.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -476,7 +477,7 @@ describe(MetadataService.name, () => {
 
       const [{ identityId }] = await ctx.database
         .selectFrom('person')
-        .select('identityId')
+        .select(personIdentityId().as('identityId'))
         .where('personGroupId', '=', person.personGroupId)
         .execute();
       const { sut: personService } = setupPersonService(ctx.database);

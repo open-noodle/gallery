@@ -9,9 +9,9 @@ import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { v4 } from 'uuid';
 import { AssetVisibility, SharedSpaceRole, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
-import { SyncRepository } from 'src/repositories/sync.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -387,7 +387,7 @@ describe('SharedSpaceAlbumToAssetSync — album visibility purge/restore', () =>
       .returning('id')
       .executeTakeFirstOrThrow();
 
-    await ctx.get(SyncRepository).sharedSpaceAlbumToAsset.cleanupAuditTable(31);
+    await new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset.cleanupAuditTable(31);
 
     const remaining = await ctx.database.selectFrom(tableName).select('id').execute();
     const remainingIds = remaining.map((r) => r.id);
@@ -480,7 +480,7 @@ describe('contribution visibility parity (album_space_asset)', () => {
   it('purge tombstones a contributed asset so getDeletes drops it for members', async () => {
     const ctx = new SyncTestContext(defaultDatabase);
     const sharedSpace = ctx.get(SharedSpaceRepository);
-    const toAsset = ctx.get(SyncRepository).sharedSpaceAlbumToAsset;
+    const toAsset = new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { user: carol } = await ctx.newUser();
@@ -507,7 +507,7 @@ describe('contribution visibility parity (album_space_asset)', () => {
   it('restore bumps the contribution updateId so getUpserts re-emits it', async () => {
     const ctx = new SyncTestContext(defaultDatabase);
     const sharedSpace = ctx.get(SharedSpaceRepository);
-    const toAsset = ctx.get(SyncRepository).sharedSpaceAlbumToAsset;
+    const toAsset = new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { user: carol } = await ctx.newUser();
@@ -551,7 +551,7 @@ describe('contribution visibility parity (album_space_asset)', () => {
   it('C1: Locked path (removeAssetsFromAll) drops a contribution — getDeletes emits, row gone, no resurrection', async () => {
     const ctx = new SyncTestContext(defaultDatabase);
     const albums = ctx.get(AlbumRepository);
-    const toAsset = ctx.get(SyncRepository).sharedSpaceAlbumToAsset;
+    const toAsset = new GallerySyncRepository(ctx.database).sharedSpaceAlbumToAsset;
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     const { user: carol } = await ctx.newUser();

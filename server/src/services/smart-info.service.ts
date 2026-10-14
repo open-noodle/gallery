@@ -134,7 +134,7 @@ export class SmartInfoService extends BaseService {
     originalPath: string,
     clipConfig: MachineLearningConfig['clip'],
   ): Promise<string | null> {
-    const { localPath, cleanup } = await this.ensureLocalFile(originalPath);
+    const { localPath, cleanup } = await this.backendMedia.ensureLocalFile(originalPath);
     try {
       let videoInfo: VideoInfo;
       try {

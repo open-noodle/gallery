@@ -183,7 +183,7 @@ describe(`${DownloadService.name} — space-linked album (#1048)`, () => {
     const ids = manifestIds(await sut.getDownloadInfo(auth, { albumId: album.id }));
 
     expect(ids).toEqual(new Set([ownAsset.id, contributed.id]));
-    await expect(ctx.get(AccessRepository).asset.checkSpaceAccess(contributor.id, ids)).resolves.toEqual(ids);
+    await expect(ctx.get(AccessRepository).spaceAsset.checkSpaceAccess(contributor.id, ids)).resolves.toEqual(ids);
   });
 
   it('serves only the album owner to a plain album share with no space behind it', async () => {
@@ -214,7 +214,7 @@ describe(`${DownloadService.name} — space-linked album (#1048)`, () => {
 
       expect(ids).toEqual(new Set([ownAsset.id, contributed.id]));
       expect(ids.has(offline.id)).toBe(false);
-      await expect(ctx.get(AccessRepository).asset.checkSpaceAccess(contributor.id, ids)).resolves.toEqual(ids);
+      await expect(ctx.get(AccessRepository).spaceAsset.checkSpaceAccess(contributor.id, ids)).resolves.toEqual(ids);
     });
 
     it('omits an OFFLINE asset the album OWNER contributed to the space', async () => {
@@ -230,7 +230,7 @@ describe(`${DownloadService.name} — space-linked album (#1048)`, () => {
       const ids = manifestIds(await sut.getDownloadInfo(factory.auth({ user: member }), { albumId: album.id }));
 
       expect(ids).toEqual(new Set([ownAsset.id, contributed.id]));
-      await expect(ctx.get(AccessRepository).asset.checkSpaceAccess(member.id, ids)).resolves.toEqual(ids);
+      await expect(ctx.get(AccessRepository).spaceAsset.checkSpaceAccess(member.id, ids)).resolves.toEqual(ids);
     });
 
     it("carries a contributed live photo's motion part, and the gate grants it on both paths", async () => {
@@ -248,7 +248,7 @@ describe(`${DownloadService.name} — space-linked album (#1048)`, () => {
         await sut.getDownloadInfo(factory.auth({ user: contributor }), { albumId: album.id }),
       );
       expect(memberIds).toEqual(expected);
-      await expect(ctx.get(AccessRepository).asset.checkSpaceAccess(contributor.id, memberIds)).resolves.toEqual(
+      await expect(ctx.get(AccessRepository).spaceAsset.checkSpaceAccess(contributor.id, memberIds)).resolves.toEqual(
         memberIds,
       );
 

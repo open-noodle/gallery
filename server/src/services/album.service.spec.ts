@@ -1017,7 +1017,7 @@ describe(AlbumService.name, () => {
       mocks.album.getById.mockResolvedValue(getForAlbum(album));
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id]));
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id]));
       mocks.album.getMetadataForIds.mockResolvedValue([
         { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
       ]);
@@ -1091,7 +1091,7 @@ describe(AlbumService.name, () => {
       mocks.album.getById.mockResolvedValue(getForAlbum(album));
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id]));
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id]));
       mocks.album.getMetadataForIds.mockResolvedValue([
         { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
       ]);
@@ -1173,7 +1173,7 @@ describe(AlbumService.name, () => {
       const album = AlbumFactory.from().albumUser().build(); // owned by someone else
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set()); // not the owner
       mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set()); // not a shared album_user
-      mocks.access.album.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id])); // reaches via space
+      mocks.access.spaceAlbum.checkSpaceLinkedAlbumReadAccess.mockResolvedValue(new Set([album.id])); // reaches via space
       mocks.album.getById.mockResolvedValue(getForAlbum(album));
       mocks.album.getMetadataForIds.mockResolvedValue([
         { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },

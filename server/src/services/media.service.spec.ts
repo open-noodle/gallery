@@ -1062,14 +1062,7 @@ describe(MediaService.name, () => {
     it('should decode S3-backed HEIC thumbnails from the local temp file through the image pipeline', async () => {
       const cleanup = vi.fn(async () => {});
       const ensureLocalFile = vi
-        .spyOn(
-          sut as unknown as {
-            ensureLocalFile: (
-              filePath: string,
-            ) => Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable>;
-          },
-          'ensureLocalFile',
-        )
+        .spyOn(sut['backendMedia'], 'ensureLocalFile')
         .mockResolvedValue({ localPath: '/tmp/immich-s3-heic.tmp', cleanup, [Symbol.asyncDispose]: cleanup });
       const asset = AssetFactory.from({
         originalFileName: 'IMG_1234.HEIC',
@@ -2625,14 +2618,7 @@ describe(MediaService.name, () => {
     it('should decode S3-backed HEIC person thumbnails from the local temp file through the image pipeline', async () => {
       const cleanup = vi.fn(async () => {});
       const ensureLocalFile = vi
-        .spyOn(
-          sut as unknown as {
-            ensureLocalFile: (
-              filePath: string,
-            ) => Promise<{ localPath: string; cleanup: () => Promise<void> } & AsyncDisposable>;
-          },
-          'ensureLocalFile',
-        )
+        .spyOn(sut['backendMedia'], 'ensureLocalFile')
         .mockResolvedValue({ localPath: '/tmp/immich-s3-person-heic.tmp', cleanup, [Symbol.asyncDispose]: cleanup });
       const person = PersonFactory.create();
       const data = {

@@ -1,4 +1,4 @@
-import { Insertable, Kysely } from 'kysely';
+import { Insertable, Kysely, Updateable } from 'kysely';
 import { DateTime } from 'luxon';
 import { createHash, randomBytes } from 'node:crypto';
 import { Stats } from 'node:fs';
@@ -22,13 +22,15 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
-import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { PersonSidecarFields, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -270,9 +272,12 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
     return { result };
   }
 
-  async newAssetFace(dto: Partial<Insertable<AssetFace>> & { assetId: string }) {
+  async newAssetFace({ createdBy, ...dto }: Partial<Insertable<AssetFace>> & { assetId: string; createdBy?: string }) {
     const assetFace = mediumFactory.assetFaceInsert(dto);
     const result = await this.get(PersonRepository).createAssetFace(assetFace);
+    if (createdBy) {
+      await this.database.insertInto('asset_face_creator').values({ assetFaceId: result, userId: createdBy }).execute();
+    }
     return { assetFace, result };
   }
 
@@ -310,6 +315,9 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
 
   async newAlbumUser(dto: { albumId: string; userId: string; role?: AlbumUserRole }) {
     const { albumId, userId, role = AlbumUserRole.Editor } = dto;
+    // album_user.updateId is a v7 uuid from clock_timestamp(); without a millisecond gap the owner row written by
+    // newAlbum and this row can share a prefix, and sync emission order (by updateId) becomes random.
+    await wait(2);
     const result = await this.get(AlbumUserRepository).create({ albumId, userId, role });
     return { albumUser: { albumId, userId, role }, result };
   }
@@ -339,7 +347,7 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
     return { jobStatus, result };
   }
 
-  async newPerson(dto: Partial<Insertable<PersonTable>> & { ownerId: string }) {
+  async newPerson(dto: Partial<Insertable<PersonTable>> & PersonSidecarFields & { ownerId: string }) {
     const repository = this.get(PersonRepository);
     let personGroupId = dto.personGroupId;
     if (!personGroupId) {
@@ -563,7 +571,7 @@ export class SyncTestContext extends MediumTestContext<typeof SyncService> {
   constructor(database: Kysely<DB>) {
     super(SyncService, {
       database,
-      real: [SyncRepository, SyncCheckpointRepository, SessionRepository],
+      real: [SyncRepository, GallerySyncRepository, SyncCheckpointRepository, SessionRepository],
       mock: [LoggingRepository],
     });
   }
@@ -705,6 +713,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case SharedSpaceRepository:
     case StackRepository:
     case SyncRepository:
+    case GallerySyncRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -797,6 +806,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case PersonRepository:
     case SessionRepository:
     case SyncRepository:
+    case GallerySyncRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -977,6 +987,18 @@ const assetJobStatusInsert = (
  * Option M: `user.clusterGroupId` is a NOT NULL foreign key. `ctx.newUser` mints the group through
  * ClusterGroupRepository; specs that build a user row by hand need the same.
  */
+/** Updates a person row together with its fork sidecar fields (person_identity, person_pet). */
+export const updatePersonForTest = async (
+  db: Kysely<DB>,
+  personGroupId: string,
+  { identityId, type, species, ...person }: Updateable<PersonTable> & PersonSidecarFields,
+) => {
+  if (Object.values(person).some((value) => value !== undefined)) {
+    await db.updateTable('person').set(person).where('personGroupId', '=', personGroupId).execute();
+  }
+  await writePersonSidecars(db, personGroupId, { identityId, type, species });
+};
+
 export const insertClusterGroup = async (db: Kysely<DB>): Promise<string> => {
   const { id } = await db.insertInto('cluster_group').defaultValues().returning('id').executeTakeFirstOrThrow();
   return id;
@@ -992,7 +1014,9 @@ export const insertPersonGroup = async (db: Kysely<DB>, ownerId: string): Promis
   return id;
 };
 
-const personInsert = (person: Partial<Insertable<PersonTable>> & { ownerId: string; personGroupId: string }) => {
+const personInsert = (
+  person: Partial<Insertable<PersonTable>> & PersonSidecarFields & { ownerId: string; personGroupId: string },
+) => {
   const defaults = {
     birthDate: person.birthDate || null,
     color: person.color || null,

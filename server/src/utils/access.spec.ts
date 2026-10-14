@@ -127,7 +127,7 @@ describe('space asset access via checkOtherAccess', () => {
       const auth = makeAuth();
       const assetId = newUuid();
 
-      accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+      accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -165,7 +165,7 @@ describe('space asset access via checkOtherAccess', () => {
         ids: new Set([assetId]),
       });
 
-      expect(accessMock.asset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
+      expect(accessMock.spaceAsset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
     });
 
     it('should not call checkSpaceAccess when album access already granted', async () => {
@@ -181,7 +181,7 @@ describe('space asset access via checkOtherAccess', () => {
         ids: new Set([assetId]),
       });
 
-      expect(accessMock.asset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
+      expect(accessMock.spaceAsset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
     });
 
     it('should not call checkSpaceAccess when partner access already granted', async () => {
@@ -197,7 +197,7 @@ describe('space asset access via checkOtherAccess', () => {
         ids: new Set([assetId]),
       });
 
-      expect(accessMock.asset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
+      expect(accessMock.spaceAsset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
     });
 
     it('should check space access for assets not covered by owner/album/partner', async () => {
@@ -207,7 +207,7 @@ describe('space asset access via checkOtherAccess', () => {
       const spaceAsset = newUuid();
 
       accessMock.asset.checkOwnerAccess.mockResolvedValue(new Set([ownedAsset]));
-      accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([spaceAsset]));
+      accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([spaceAsset]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -216,7 +216,7 @@ describe('space asset access via checkOtherAccess', () => {
       });
 
       expect(result).toEqual(new Set([ownedAsset, spaceAsset]));
-      expect(accessMock.asset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([spaceAsset]));
+      expect(accessMock.spaceAsset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([spaceAsset]));
     });
   });
 
@@ -226,7 +226,7 @@ describe('space asset access via checkOtherAccess', () => {
       const auth = makeAuth();
       const assetId = newUuid();
 
-      accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+      accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -256,7 +256,7 @@ describe('space asset access via checkOtherAccess', () => {
       const auth = makeAuth();
       const livePhotoVideoId = newUuid();
 
-      accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([livePhotoVideoId]));
+      accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([livePhotoVideoId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -265,7 +265,7 @@ describe('space asset access via checkOtherAccess', () => {
       });
 
       expect(result).toEqual(new Set([livePhotoVideoId]));
-      expect(accessMock.asset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([livePhotoVideoId]));
+      expect(accessMock.spaceAsset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([livePhotoVideoId]));
     });
   });
 
@@ -275,7 +275,7 @@ describe('space asset access via checkOtherAccess', () => {
       const auth = makeAuth();
       const assetId = newUuid();
 
-      accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+      accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -305,7 +305,7 @@ describe('space asset access via checkOtherAccess', () => {
       const auth = makeAuth();
       const livePhotoVideoId = newUuid();
 
-      accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([livePhotoVideoId]));
+      accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([livePhotoVideoId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -314,7 +314,7 @@ describe('space asset access via checkOtherAccess', () => {
       });
 
       expect(result).toEqual(new Set([livePhotoVideoId]));
-      expect(accessMock.asset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([livePhotoVideoId]));
+      expect(accessMock.spaceAsset.checkSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([livePhotoVideoId]));
     });
   });
 
@@ -374,7 +374,7 @@ describe('library-linked space asset access', () => {
     const auth = makeAuth();
     const assetId = newUuid();
 
-    accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+    accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
 
     const result = await checkAccess(accessMock as any, {
       auth,
@@ -390,7 +390,7 @@ describe('library-linked space asset access', () => {
     const auth = makeAuth();
     const assetId = newUuid();
 
-    accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+    accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
 
     const result = await checkAccess(accessMock as any, {
       auth,
@@ -406,7 +406,7 @@ describe('library-linked space asset access', () => {
     const auth = makeAuth();
     const assetId = newUuid();
 
-    accessMock.asset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
+    accessMock.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([assetId]));
 
     const result = await checkAccess(accessMock as any, {
       auth,
@@ -425,7 +425,7 @@ describe('space person access via checkOtherAccess', () => {
       const auth = makeAuth();
       const personId = newUuid();
 
-      accessMock.person.checkSharedSpaceAccess.mockResolvedValue(new Set([personId]));
+      accessMock.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([personId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -434,7 +434,7 @@ describe('space person access via checkOtherAccess', () => {
       });
 
       expect(result).toEqual(new Set([personId]));
-      expect(accessMock.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([personId]));
+      expect(accessMock.galleryPerson.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set([personId]));
     });
 
     it('should not consult shared-space access when owner access is already granted', async () => {
@@ -442,7 +442,7 @@ describe('space person access via checkOtherAccess', () => {
       const auth = makeAuth();
       const personId = newUuid();
 
-      accessMock.person.checkOwnerAccess.mockResolvedValue(new Set([personId]));
+      accessMock.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([personId]));
 
       const result = await checkAccess(accessMock as any, {
         auth,
@@ -451,7 +451,7 @@ describe('space person access via checkOtherAccess', () => {
       });
 
       expect(result).toEqual(new Set([personId]));
-      expect(accessMock.person.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
+      expect(accessMock.galleryPerson.checkSharedSpaceAccess).toHaveBeenCalledWith(auth.user.id, new Set());
     });
 
     it('should deny access when the user is neither owner nor shared-space member', async () => {
@@ -476,7 +476,7 @@ describe('space person access via checkOtherAccess', () => {
         const auth = makeAuth();
         const personId = newUuid();
 
-        accessMock.person.checkSharedSpaceAccess.mockResolvedValue(new Set([personId]));
+        accessMock.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([personId]));
 
         const result = await checkAccess(accessMock as any, {
           auth,
@@ -485,7 +485,7 @@ describe('space person access via checkOtherAccess', () => {
         });
 
         expect(result).toEqual(new Set());
-        expect(accessMock.person.checkSharedSpaceAccess).not.toHaveBeenCalled();
+        expect(accessMock.galleryPerson.checkSharedSpaceAccess).not.toHaveBeenCalled();
       });
     }
   });

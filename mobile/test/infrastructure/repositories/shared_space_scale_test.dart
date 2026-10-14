@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -46,6 +47,7 @@ void main() {
 
   late Drift db;
   late SyncStreamRepository sut;
+  late GallerySyncStreamRepository gallery;
 
   setUpAll(() async {
     // The sharedSpace() bucket query uses locale-aware date formatting — the
@@ -56,6 +58,7 @@ void main() {
   setUp(() async {
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     sut = SyncStreamRepository(db);
+    gallery = GallerySyncStreamRepository(db);
   });
 
   tearDown(() async {
@@ -84,7 +87,7 @@ void main() {
           profileChangedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateLibrariesV1([
+      await gallery.updateLibrariesV1([
         SyncLibraryV1(
           id: libraryId,
           name: 'Scale Test Library',
@@ -93,7 +96,7 @@ void main() {
           updatedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: spaceId,
           name: 'Scale Test Space',
@@ -109,7 +112,7 @@ void main() {
           updatedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: spaceId,
           libraryId: libraryId,
@@ -151,7 +154,7 @@ void main() {
       // Time the actual handler path — this is the production hot path for a
       // backfill. If memory pressure surfaces it shows up here.
       final insertStart = DateTime.now();
-      await sut.updateLibraryAssetsV1(dtos);
+      await gallery.updateLibraryAssetsV1(dtos);
       final insertMs = DateTime.now().difference(insertStart).inMilliseconds;
 
       // Verify all rows landed.
@@ -160,7 +163,7 @@ void main() {
 
       // Time the bucket query — the hot path when a user opens the space on
       // mobile. Target is 200ms; we assert <500ms with noise tolerance.
-      final timelineRepo = TimelineRepository(db);
+      final timelineRepo = SharedSpaceTimelineRepository(TimelineRepository(db));
       final query = timelineRepo.sharedSpace(spaceId, GroupAssetsBy.day);
 
       final queryStart = DateTime.now();
@@ -229,7 +232,7 @@ void main() {
           profileChangedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateLibrariesV1([
+      await gallery.updateLibrariesV1([
         SyncLibraryV1(
           id: libraryId,
           name: 'Mixed Scale Library',
@@ -238,7 +241,7 @@ void main() {
           updatedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: spaceId,
           name: 'Mixed Scale Space',
@@ -254,7 +257,7 @@ void main() {
           updatedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: spaceId,
           libraryId: libraryId,
@@ -296,10 +299,10 @@ void main() {
       final directAssetDtos = List<SyncAssetV1>.generate(halfCount, (i) => makeAsset(halfCount + i));
 
       final insertStart = DateTime.now();
-      await sut.updateLibraryAssetsV1(libraryAssetDtos);
-      await sut.updateSharedSpaceAssetsV1(directAssetDtos);
+      await gallery.updateLibraryAssetsV1(libraryAssetDtos);
+      await gallery.updateSharedSpaceAssetsV1(directAssetDtos);
       // Wire each direct-add asset into the shared_space_asset join table.
-      await sut.updateSharedSpaceToAssetsV1([
+      await gallery.updateSharedSpaceToAssetsV1([
         for (final dto in directAssetDtos) SyncSharedSpaceToAssetV1(spaceId: spaceId, assetId: dto.id),
       ]);
       final insertMs = DateTime.now().difference(insertStart).inMilliseconds;
@@ -309,7 +312,7 @@ void main() {
       expect(rowCount, halfCount * 2);
 
       // Time the UNION bucket query across both sources.
-      final timelineRepo = TimelineRepository(db);
+      final timelineRepo = SharedSpaceTimelineRepository(TimelineRepository(db));
       final query = timelineRepo.sharedSpace(spaceId, GroupAssetsBy.day);
 
       final queryStart = DateTime.now();
@@ -353,7 +356,7 @@ void main() {
           profileChangedAt: DateTime(2024, 1, 1),
         ),
       ]);
-      await sut.updateLibrariesV1([
+      await gallery.updateLibrariesV1([
         SyncLibraryV1(
           id: libraryId,
           name: 'Delta Library',
@@ -391,12 +394,12 @@ void main() {
 
       // Backfill.
       final initialStart = DateTime.now();
-      await sut.updateLibraryAssetsV1(List.generate(initialCount, makeAsset));
+      await gallery.updateLibraryAssetsV1(List.generate(initialCount, makeAsset));
       final initialMs = DateTime.now().difference(initialStart).inMilliseconds;
 
       // Delta batch — typical "user reopens app and has 1k new photos".
       final deltaStart = DateTime.now();
-      await sut.updateLibraryAssetsV1(List.generate(deltaCount, (i) => makeAsset(initialCount + i)));
+      await gallery.updateLibraryAssetsV1(List.generate(deltaCount, (i) => makeAsset(initialCount + i)));
       final deltaMs = DateTime.now().difference(deltaStart).inMilliseconds;
 
       final finalCount = (await db.remoteAssetEntity.select().get()).length;
@@ -448,7 +451,7 @@ void main() {
 
       // Create 200 libraries — all owned by the foreign user so their
       // assets are orphan candidates on sweep.
-      await sut.updateLibrariesV1([
+      await gallery.updateLibrariesV1([
         for (int i = 0; i < libraryCount; i++)
           SyncLibraryV1(
             id: 'sweep-lib-$i',
@@ -488,7 +491,7 @@ void main() {
 
       // Batch-insert 100k assets.
       final insertStart = DateTime.now();
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibraryAssetsV1([
         for (int l = 0; l < libraryCount; l++)
           for (int a = 0; a < assetsPerLibrary; a++) makeAsset(l, a),
       ]);
@@ -498,7 +501,7 @@ void main() {
 
       // Delete the first 100 libraries — 50k orphan assets must be swept.
       final sweepStart = DateTime.now();
-      await sut.deleteLibrariesV1([
+      await gallery.deleteLibrariesV1([
         for (int i = 0; i < librariesToDelete; i++) SyncLibraryDeleteV1(libraryId: 'sweep-lib-$i'),
       ], currentUserId: userId);
       final sweepMs = DateTime.now().difference(sweepStart).inMilliseconds;

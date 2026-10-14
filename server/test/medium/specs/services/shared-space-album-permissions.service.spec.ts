@@ -239,7 +239,7 @@ describe('SharedSpaceService — space-album permission matrix', () => {
         ['nonMember', false],
         ['crossEditor', false],
       ] as const) {
-        const r = await accessRepo.asset.checkSpaceAccess(world.actors[actor].id, new Set([world.assetInA]));
+        const r = await accessRepo.spaceAsset.checkSpaceAccess(world.actors[actor].id, new Set([world.assetInA]));
         expect(r.has(world.assetInA)).toBe(expected);
       }
     });
@@ -259,7 +259,7 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       ['albumOwner', false], // album membership ⊥ space membership
       ['albumViewer', false], // album membership ⊥ space membership
     ] as const)('%s space-linked write to A → allowed=%s', async (actor, allowed) => {
-      const result = await accessRepo.album.checkSpaceLinkedAlbumAccess(
+      const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumAccess(
         world.actors[actor].id,
         new Set([world.albumA]),
       );
@@ -267,7 +267,7 @@ describe('SharedSpaceService — space-album permission matrix', () => {
     });
 
     it('spaceEditor cannot space-link-write to unlinked album B', async () => {
-      const result = await accessRepo.album.checkSpaceLinkedAlbumAccess(
+      const result = await accessRepo.spaceAlbum.checkSpaceLinkedAlbumAccess(
         world.actors.spaceEditor.id,
         new Set([world.albumB]),
       );
@@ -569,7 +569,7 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       // outsideAsset has no path into S.
       const allCandidates = new Set([world.assetInA, outsideAsset.id]);
 
-      const result = await accessRepo.asset.checkSpaceAccess(world.actors.spaceViewer.id, allCandidates);
+      const result = await accessRepo.spaceAsset.checkSpaceAccess(world.actors.spaceViewer.id, allCandidates);
 
       expect([...result].sort()).toEqual([world.assetInA]);
     });
@@ -577,13 +577,16 @@ describe('SharedSpaceService — space-album permission matrix', () => {
     it('spaceOwner checkSpaceAccess for all fixture assets returns exactly {assetInA}', async () => {
       // Same predicate, different actor (spaceOwner). Expected set is the same
       // since album A is linked to S and assetInA is in album A.
-      const result = await accessRepo.asset.checkSpaceAccess(world.actors.spaceOwner.id, new Set([world.assetInA]));
+      const result = await accessRepo.spaceAsset.checkSpaceAccess(
+        world.actors.spaceOwner.id,
+        new Set([world.assetInA]),
+      );
 
       expect([...result].sort()).toEqual([world.assetInA]);
     });
 
     it('nonMember checkSpaceAccess returns empty set (no drift toward public access)', async () => {
-      const result = await accessRepo.asset.checkSpaceAccess(world.actors.nonMember.id, new Set([world.assetInA]));
+      const result = await accessRepo.spaceAsset.checkSpaceAccess(world.actors.nonMember.id, new Set([world.assetInA]));
 
       expect([...result]).toHaveLength(0);
     });
@@ -591,7 +594,10 @@ describe('SharedSpaceService — space-album permission matrix', () => {
     it('crossEditor (member of S2 only) cannot reach assetInA via checkSpaceAccess', async () => {
       // crossEditor is editor of S2 (which links album C), but NOT a member of S.
       // assetInA is only in album A which is linked to S. No path exists.
-      const result = await accessRepo.asset.checkSpaceAccess(world.actors.crossEditor.id, new Set([world.assetInA]));
+      const result = await accessRepo.spaceAsset.checkSpaceAccess(
+        world.actors.crossEditor.id,
+        new Set([world.assetInA]),
+      );
 
       expect([...result]).toHaveLength(0);
     });
@@ -656,14 +662,14 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       await isolatedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
       // Before soft-delete: member can read the asset
-      const before = await isolatedAccessRepo.asset.checkSpaceAccess(member.id, new Set([asset.id]));
+      const before = await isolatedAccessRepo.spaceAsset.checkSpaceAccess(member.id, new Set([asset.id]));
       expect(before.has(asset.id)).toBe(true);
 
       // Soft-delete the album (album.deletedAt = now(), link row survives)
       await ctx.softDeleteAlbum(album.id);
 
       // After soft-delete: asset must NOT be readable via the space-album path
-      const after = await isolatedAccessRepo.asset.checkSpaceAccess(member.id, new Set([asset.id]));
+      const after = await isolatedAccessRepo.spaceAsset.checkSpaceAccess(member.id, new Set([asset.id]));
       expect(after.has(asset.id)).toBe(false);
     });
 
@@ -684,14 +690,22 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       await isolatedSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
       // Before soft-delete: accessible via checkSpaceAccessForSpace
-      const before = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(member.id, space.id, new Set([asset.id]));
+      const before = await isolatedAccessRepo.spaceAsset.checkSpaceAccessForSpace(
+        member.id,
+        space.id,
+        new Set([asset.id]),
+      );
       expect(before.has(asset.id)).toBe(true);
 
       // Soft-delete the album
       await ctx.softDeleteAlbum(album.id);
 
       // After soft-delete: must be denied
-      const after = await isolatedAccessRepo.asset.checkSpaceAccessForSpace(member.id, space.id, new Set([asset.id]));
+      const after = await isolatedAccessRepo.spaceAsset.checkSpaceAccessForSpace(
+        member.id,
+        space.id,
+        new Set([asset.id]),
+      );
       expect(after.has(asset.id)).toBe(false);
     });
   });
@@ -722,12 +736,12 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       await spaceAccessSpaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
 
       // Both paths grant access
-      const before = await spaceAccessRepo.asset.checkSpaceAccess(member.id, new Set([asset.id]));
+      const before = await spaceAccessRepo.spaceAsset.checkSpaceAccess(member.id, new Set([asset.id]));
       expect(before.has(asset.id)).toBe(true);
 
       // Remove album link — direct-asset path still works
       await spaceAccessSpaceRepo.removeAlbum(space.id, album.id);
-      const after = await spaceAccessRepo.asset.checkSpaceAccess(member.id, new Set([asset.id]));
+      const after = await spaceAccessRepo.spaceAsset.checkSpaceAccess(member.id, new Set([asset.id]));
       expect(after.has(asset.id)).toBe(true);
     });
 
@@ -755,16 +769,16 @@ describe('SharedSpaceService — space-album permission matrix', () => {
       await spaceAccessSpaceRepo.addAlbum({ spaceId: s2.id, albumId: album.id, addedById: owner.id });
 
       // Both members can read
-      const r1 = await spaceAccessRepo.asset.checkSpaceAccess(memberS1.id, new Set([asset.id]));
+      const r1 = await spaceAccessRepo.spaceAsset.checkSpaceAccess(memberS1.id, new Set([asset.id]));
       expect(r1.has(asset.id)).toBe(true);
-      const r2 = await spaceAccessRepo.asset.checkSpaceAccess(memberS2.id, new Set([asset.id]));
+      const r2 = await spaceAccessRepo.spaceAsset.checkSpaceAccess(memberS2.id, new Set([asset.id]));
       expect(r2.has(asset.id)).toBe(true);
 
       // Unlink from s1; s1-member loses access, s2-member retains it
       await spaceAccessSpaceRepo.removeAlbum(s1.id, album.id);
-      const r1after = await spaceAccessRepo.asset.checkSpaceAccess(memberS1.id, new Set([asset.id]));
+      const r1after = await spaceAccessRepo.spaceAsset.checkSpaceAccess(memberS1.id, new Set([asset.id]));
       expect(r1after.has(asset.id)).toBe(false);
-      const r2after = await spaceAccessRepo.asset.checkSpaceAccess(memberS2.id, new Set([asset.id]));
+      const r2after = await spaceAccessRepo.spaceAsset.checkSpaceAccess(memberS2.id, new Set([asset.id]));
       expect(r2after.has(asset.id)).toBe(true);
     });
   });

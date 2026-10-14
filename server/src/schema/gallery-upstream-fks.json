@@ -1,0 +1,108 @@
+{
+  "$comment": "Fork foreign keys onto upstream keys, grouped by the upstream key. Checked against the fork tables by src/schema/gallery-upstream-fks.spec.ts; read by tools/upstream-preflight to flag upstream migrations that drop or alter a listed key, table or column.",
+  "keys": {
+    "album_pkey": {
+      "table": "album",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "album_space_asset_albumId_fkey",
+        "shared_space_album_albumId_fkey",
+        "shared_space_album_user_albumId_fkey"
+      ]
+    },
+    "asset_face_pkey": {
+      "table": "asset_face",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "asset_face_creator_assetFaceId_fkey",
+        "face_identity_face_assetFaceId_fkey",
+        "face_identity_representativeFaceId_fkey",
+        "face_person_verdict_assetFaceId_fkey",
+        "face_repair_decline_assetFaceId_fkey",
+        "pet_search_faceId_fkey",
+        "shared_space_person_face_assetFaceId_fkey",
+        "shared_space_person_representativeFaceId_fkey"
+      ]
+    },
+    "asset_pkey": {
+      "table": "asset",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "album_space_asset_assetId_fkey",
+        "asset_duplicate_checksum_assetId_fkey",
+        "asset_favorite_assetId_fkey",
+        "asset_job_status_gallery_assetId_fkey",
+        "shared_space_asset_assetId_fkey",
+        "shared_space_face_match_backfill_target_assetId_fkey",
+        "shared_space_thumbnailAssetId_fkey"
+      ]
+    },
+    "library_pkey": {
+      "table": "library",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "library_user_libraryId_fkey",
+        "shared_space_library_libraryId_fkey"
+      ]
+    },
+    "person_group_pkey": {
+      "table": "person_group",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "face_person_verdict_personGroupId_fkey",
+        "face_repair_decline_personGroupId_fkey",
+        "face_repair_decline_suspectedOwnerId_fkey",
+        "person_identity_personGroupId_fkey",
+        "person_pet_personGroupId_fkey"
+      ]
+    },
+    "shared_link_pkey": {
+      "table": "shared_link",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "shared_link_space_sharedLinkId_fkey"
+      ]
+    },
+    "user_pkey": {
+      "table": "user",
+      "columns": [
+        "id"
+      ],
+      "forkForeignKeys": [
+        "album_space_asset_addedById_fkey",
+        "asset_duplicate_checksum_ownerId_fkey",
+        "asset_face_creator_userId_fkey",
+        "asset_favorite_userId_fkey",
+        "face_person_verdict_actorId_fkey",
+        "face_repair_decline_declinedBy_fkey",
+        "face_repair_scan_requestedBy_fkey",
+        "library_user_userId_fkey",
+        "person_identity_ownerId_fkey",
+        "shared_space_activity_userId_fkey",
+        "shared_space_album_addedById_fkey",
+        "shared_space_album_folder_createdById_fkey",
+        "shared_space_album_hidden_userId_fkey",
+        "shared_space_album_user_userId_fkey",
+        "shared_space_asset_addedById_fkey",
+        "shared_space_createdById_fkey",
+        "shared_space_library_addedById_fkey",
+        "shared_space_member_userId_fkey",
+        "shared_space_person_alias_userId_fkey",
+        "user_group_createdById_fkey",
+        "user_group_member_userId_fkey"
+      ]
+    }
+  }
+}

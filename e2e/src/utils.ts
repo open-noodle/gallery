@@ -566,9 +566,14 @@ export const utils = {
         RETURNING id
       ),
       person_row AS (
-        SELECT "identityId", type
-        FROM "person"
-        WHERE "personGroupId" = $2
+        SELECT
+          p."ownerId",
+          pi."identityId",
+          CASE WHEN pp."personGroupId" IS NULL THEN 'person' ELSE 'pet' END AS type
+        FROM "person" p
+        LEFT JOIN "person_identity" pi ON pi."personGroupId" = p."personGroupId"
+        LEFT JOIN "person_pet" pp ON pp."personGroupId" = p."personGroupId"
+        WHERE p."personGroupId" = $2
       ),
       inserted_identity AS (
         INSERT INTO "face_identity" ("type", "representativeFaceId")
@@ -580,11 +585,15 @@ export const utils = {
       resolved_identity AS (
         SELECT COALESCE((SELECT "identityId" FROM person_row), (SELECT id FROM inserted_identity)) AS id
       ),
+      inserted_person_identity AS (
+        INSERT INTO "person_identity" ("personGroupId", "ownerId", "identityId")
+        SELECT $2, "ownerId", (SELECT id FROM inserted_identity)
+        FROM person_row
+        WHERE "identityId" IS NULL
+      ),
       updated_person AS (
         UPDATE "person"
-        SET
-          "identityId" = (SELECT id FROM resolved_identity),
-          "faceAssetId" = COALESCE("faceAssetId", (SELECT id FROM inserted_face))
+        SET "faceAssetId" = COALESCE("faceAssetId", (SELECT id FROM inserted_face))
         WHERE "personGroupId" = $2
       ),
       updated_identity AS (
@@ -700,9 +709,12 @@ export const utils = {
        INSERT INTO "person_group" ("clusterGroupId")
        SELECT "clusterGroupId" FROM "user" WHERE "id" = $1
        RETURNING id
+       ), new_pet AS (
+       INSERT INTO "person_pet" ("personGroupId", "species")
+       SELECT new_group.id, $2 FROM new_group
        )
-       INSERT INTO "person" ("ownerId", "personGroupId", "type", "species", "name", "thumbnailPath")
-       SELECT $1, new_group.id, 'pet', $2, $3, '/my/awesome/thumbnail.jpg' FROM new_group
+       INSERT INTO "person" ("ownerId", "personGroupId", "name", "thumbnailPath")
+       SELECT $1, new_group.id, $3, '/my/awesome/thumbnail.jpg' FROM new_group
        RETURNING "personGroupId" AS id`,
       [ownerId, species, name ?? species],
     );

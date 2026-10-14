@@ -22,9 +22,10 @@
 
 import { Kysely } from 'kysely';
 import { AlbumUserRole, AssetVisibility, TimeBucketSize } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
+import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
+import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -86,7 +87,7 @@ const setup = () => {
     memoryRepo: ctx.get(MemoryRepository),
     suggestionRepo: ctx.get(FilterSuggestionRepository),
     spaceRepo: ctx.get(SharedSpaceRepository),
-    syncRepo: ctx.get(SyncRepository),
+    syncRepo: new GallerySyncRepository(ctx.database),
     tagRepo: ctx.get(TagRepository),
     viewRepo: ctx.get(ViewRepository),
   };
@@ -366,7 +367,7 @@ describe('matrix: checkSpaceAccess', () => {
       a.albumHiddenArchive,
       a.albumDeletedTimeline,
     ]);
-    const result = await accessRepo.asset.checkSpaceAccess(f.viewerId, allIds);
+    const result = await accessRepo.spaceAsset.checkSpaceAccess(f.viewerId, allIds);
 
     // Direct path
     expect(result.has(a.directTimeline)).toBe(true);
@@ -401,7 +402,7 @@ describe('matrix: checkSpaceAccess', () => {
     const f = await seedMatrix(ctx, spaceRepo);
     const a = f.assets;
 
-    const before = await accessRepo.asset.checkSpaceAccess(f.viewerId, new Set([a.directTimeline]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(f.viewerId, new Set([a.directTimeline]));
     expect(before.has(a.directTimeline)).toBe(true);
 
     await defaultDatabase
@@ -410,7 +411,7 @@ describe('matrix: checkSpaceAccess', () => {
       .where('id', '=', a.directTimeline)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceAccess(f.viewerId, new Set([a.directTimeline]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(f.viewerId, new Set([a.directTimeline]));
     expect(after.has(a.directTimeline)).toBe(false);
   });
 
@@ -419,7 +420,7 @@ describe('matrix: checkSpaceAccess', () => {
     const f = await seedMatrix(ctx, spaceRepo);
     const a = f.assets;
 
-    const before = await accessRepo.asset.checkSpaceAccess(f.viewerId, new Set([a.albumShownTimeline]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccess(f.viewerId, new Set([a.albumShownTimeline]));
     expect(before.has(a.albumShownTimeline)).toBe(true);
 
     await defaultDatabase
@@ -428,7 +429,7 @@ describe('matrix: checkSpaceAccess', () => {
       .where('id', '=', a.albumShownTimeline)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceAccess(f.viewerId, new Set([a.albumShownTimeline]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccess(f.viewerId, new Set([a.albumShownTimeline]));
     expect(after.has(a.albumShownTimeline)).toBe(false);
   });
 });
@@ -461,7 +462,7 @@ describe('matrix: checkSpaceAccessForSpace', () => {
       a.albumHiddenArchive,
       a.albumDeletedTimeline,
     ]);
-    const result = await accessRepo.asset.checkSpaceAccessForSpace(f.viewerId, f.spaceId, allIds);
+    const result = await accessRepo.spaceAsset.checkSpaceAccessForSpace(f.viewerId, f.spaceId, allIds);
 
     expect(result.has(a.directTimeline)).toBe(true);
     expect(result.has(a.directArchive)).toBe(true);
@@ -491,7 +492,7 @@ describe('matrix: checkSpaceAccessForSpace', () => {
     const f = await seedMatrix(ctx, spaceRepo);
     const a = f.assets;
 
-    const before = await accessRepo.asset.checkSpaceAccessForSpace(f.viewerId, f.spaceId, new Set([a.libArchive]));
+    const before = await accessRepo.spaceAsset.checkSpaceAccessForSpace(f.viewerId, f.spaceId, new Set([a.libArchive]));
     expect(before.has(a.libArchive)).toBe(true);
 
     await defaultDatabase
@@ -500,7 +501,7 @@ describe('matrix: checkSpaceAccessForSpace', () => {
       .where('id', '=', a.libArchive)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceAccessForSpace(f.viewerId, f.spaceId, new Set([a.libArchive]));
+    const after = await accessRepo.spaceAsset.checkSpaceAccessForSpace(f.viewerId, f.spaceId, new Set([a.libArchive]));
     expect(after.has(a.libArchive)).toBe(false);
   });
 });
@@ -533,13 +534,16 @@ describe('matrix: checkSpaceEditAccess', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId });
     }
 
-    const editorResult = await accessRepo.asset.checkSpaceEditAccess(editor.id, new Set([tl.id, ar.id, hi.id, lo.id]));
+    const editorResult = await accessRepo.spaceAsset.checkSpaceEditAccess(
+      editor.id,
+      new Set([tl.id, ar.id, hi.id, lo.id]),
+    );
     expect(editorResult.has(tl.id)).toBe(true);
     expect(editorResult.has(ar.id)).toBe(true);
     expect(editorResult.has(hi.id)).toBe(false);
     expect(editorResult.has(lo.id)).toBe(false);
 
-    const viewerResult = await accessRepo.asset.checkSpaceEditAccess(viewer.id, new Set([tl.id]));
+    const viewerResult = await accessRepo.spaceAsset.checkSpaceEditAccess(viewer.id, new Set([tl.id]));
     expect(viewerResult.has(tl.id)).toBe(false);
   });
 
@@ -554,7 +558,7 @@ describe('matrix: checkSpaceEditAccess', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-    const before = await accessRepo.asset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
+    const before = await accessRepo.spaceAsset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
     expect(before.has(asset.id)).toBe(true);
 
     await defaultDatabase
@@ -563,7 +567,7 @@ describe('matrix: checkSpaceEditAccess', () => {
       .where('id', '=', asset.id)
       .execute();
 
-    const after = await accessRepo.asset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
+    const after = await accessRepo.spaceAsset.checkSpaceEditAccess(editor.id, new Set([asset.id]));
     expect(after.has(asset.id)).toBe(false);
   });
 });

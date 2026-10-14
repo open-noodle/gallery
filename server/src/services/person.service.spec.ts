@@ -444,14 +444,17 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       await expect(sut.getById(auth, person.personGroupId)).rejects.toBeInstanceOf(BadRequestException);
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should throw a bad request when person is not found', async () => {
       const auth = AuthFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['unknown']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['unknown']));
       await expect(sut.getById(auth, 'unknown')).rejects.toBeInstanceOf(BadRequestException);
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set(['unknown']));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set(['unknown']));
     });
 
     it('should get a person by id', async () => {
@@ -459,12 +462,15 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       await expect(sut.getById(auth, person.personGroupId)).resolves.toEqual(
         expect.objectContaining({ id: person.personGroupId }),
       );
       expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(person.personGroupId);
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should resolve an accessible shared-space profile id as an identity-wide person', async () => {
@@ -483,7 +489,7 @@ describe(PersonService.name, () => {
         primaryProfile: { type: 'space-person', id: profileId, spaceId: newUuid() },
       };
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(accessiblePerson);
 
       await expect(sut.getById(auth, profileId)).resolves.toEqual(accessiblePerson);
@@ -496,7 +502,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ ownerId: auth.user.id });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.getById(auth, person.personGroupId)).resolves.toEqual(
         expect.objectContaining({ id: person.personGroupId }),
@@ -510,7 +516,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const profileId = newUuid();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
 
       await expect(sut.getById(auth, profileId)).rejects.toBeInstanceOf(BadRequestException);
@@ -529,7 +535,7 @@ describe(PersonService.name, () => {
       });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue({
         id: person.personGroupId,
         name: 'Karolin',
@@ -550,7 +556,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ ownerId: auth.user.id, identityId: null, birthDate: null });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.getById(auth, person.personGroupId)).resolves.toEqual(
         expect.objectContaining({ id: person.personGroupId, birthDate: null }),
@@ -568,7 +574,7 @@ describe(PersonService.name, () => {
       });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       (mocks.faceIdentity as any).getResolvedPersonByIdentityId.mockResolvedValue(void 0);
 
       await expect(sut.getById(auth, person.personGroupId)).resolves.toEqual(
@@ -585,17 +591,20 @@ describe(PersonService.name, () => {
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       await expect(sut.getThumbnail(auth, person.personGroupId)).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should throw an error when personId is invalid', async () => {
       const auth = AuthFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['unknown']));
-      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set(['unknown']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['unknown']));
+      mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set(['unknown']));
       await expect(sut.getThumbnail(auth, 'unknown')).rejects.toBeInstanceOf(NotFoundException);
       expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set(['unknown']));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set(['unknown']));
     });
 
     it('should throw an error when person has no thumbnail', async () => {
@@ -603,11 +612,14 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ thumbnailPath: '' });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
       await expect(sut.getThumbnail(auth, person.personGroupId)).rejects.toBeInstanceOf(NotFoundException);
       expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should serve the thumbnail', async () => {
@@ -615,8 +627,8 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
       await expect(sut.getThumbnail(auth, person.personGroupId)).resolves.toEqual(
         new ImmichFileResponse({
           path: person.thumbnailPath,
@@ -624,7 +636,10 @@ describe(PersonService.name, () => {
           cacheControl: CacheControl.PrivateWithoutCache,
         }),
       );
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should serve the thumbnail when the person is visible through a shared space', async () => {
@@ -632,9 +647,9 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.getThumbnail(auth, person.personGroupId)).resolves.toEqual(
         new ImmichFileResponse({
@@ -643,8 +658,11 @@ describe(PersonService.name, () => {
           cacheControl: CacheControl.PrivateWithoutCache,
         }),
       );
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
-      expect(mocks.access.person.checkSharedSpaceAccess).toHaveBeenCalledWith(
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
+      expect(mocks.access.galleryPerson.checkSharedSpaceAccess).toHaveBeenCalledWith(
         auth.user.id,
         new Set([person.personGroupId]),
       );
@@ -658,8 +676,8 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set());
 
       await expect(sut.getThumbnail(auth, person.personGroupId)).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.storage.createReadStream).not.toHaveBeenCalled();
@@ -670,8 +688,8 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.access.person.checkUnlockedThumbnailAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkUnlockedThumbnailAccess.mockResolvedValue(new Set());
 
       await expect(sut.getThumbnail(auth, person.personGroupId)).resolves.toEqual(
         new ImmichFileResponse({
@@ -693,7 +711,10 @@ describe(PersonService.name, () => {
         BadRequestException,
       );
       expect(mocks.person.update).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('does not let a shared-space member rename a person they do not own', async () => {
@@ -701,8 +722,8 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { name: 'Renamed' })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -711,12 +732,15 @@ describe(PersonService.name, () => {
     });
 
     it('should throw an error when personId is invalid', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       await expect(sut.update(authStub.admin, 'person-1', { name: 'Person 1' })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(mocks.person.update).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set(['person-1']));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        authStub.admin.user.id,
+        new Set(['person-1']),
+      );
     });
 
     it("should update a person's name", async () => {
@@ -725,7 +749,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { name: 'Person 1' })).resolves.toEqual(
         expect.objectContaining({ id: person.personGroupId, name: 'Person 1' }),
@@ -736,7 +760,10 @@ describe(PersonService.name, () => {
         personGroupId: person.personGroupId,
         name: 'Person 1',
       });
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should queue scoped space metadata backfill when an identity-backed person name changes', async () => {
@@ -745,7 +772,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { name: 'Aurelia' })).resolves.toEqual(
         expect.objectContaining({ id: person.personGroupId, name: 'Aurelia' }),
@@ -763,7 +790,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { birthDate: '1976-06-30' })).resolves.toEqual({
         otherPeople: [],
@@ -787,7 +814,10 @@ describe(PersonService.name, () => {
       });
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should update a person visibility', async () => {
@@ -796,7 +826,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { isHidden: true })).resolves.toEqual(
         expect.objectContaining({ isHidden: true }),
@@ -807,7 +837,10 @@ describe(PersonService.name, () => {
         personGroupId: person.personGroupId,
         isHidden: true,
       });
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should update a person favorite status', async () => {
@@ -816,7 +849,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { isFavorite: true })).resolves.toEqual(
         expect.objectContaining({ isFavorite: true }),
@@ -827,7 +860,10 @@ describe(PersonService.name, () => {
         personGroupId: person.personGroupId,
         isFavorite: true,
       });
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it("should update a person's thumbnailPath", async () => {
@@ -839,7 +875,7 @@ describe(PersonService.name, () => {
       mocks.person.update.mockResolvedValue(person);
       mocks.person.getForFeatureFaceUpdate.mockResolvedValue(face);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([face.assetId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { featureFaceAssetId: face.assetId })).resolves.toEqual(
         expect.objectContaining({ id: person.personGroupId }),
@@ -858,7 +894,10 @@ describe(PersonService.name, () => {
         name: JobName.PersonGenerateThumbnail,
         data: { ownerId: person.ownerId, personGroupId: person.personGroupId },
       });
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should throw an error when the face feature assetId is invalid', async () => {
@@ -866,13 +905,16 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.update(auth, person.personGroupId, { featureFaceAssetId: '-1' })).rejects.toThrow(
         BadRequestException,
       );
       expect(mocks.person.update).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     describe('suggestion on-name trigger', () => {
@@ -892,7 +934,7 @@ describe(PersonService.name, () => {
         mocks.systemMetadata.get.mockResolvedValue(enabled);
         const auth = AuthFactory.create();
         const prior = PersonFactory.create({ name: '', isHidden: false });
-        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
+        mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
         mocks.person.getByGroupIdOnly.mockResolvedValue(prior);
         mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
 
@@ -908,7 +950,7 @@ describe(PersonService.name, () => {
         mocks.systemMetadata.get.mockResolvedValue(enabled);
         const auth = AuthFactory.create();
         const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
-        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
+        mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
         mocks.person.getByGroupIdOnly.mockResolvedValue(prior);
         mocks.person.update.mockResolvedValue({ ...prior, name: 'Bob' });
 
@@ -924,7 +966,7 @@ describe(PersonService.name, () => {
         mocks.systemMetadata.get.mockResolvedValue(enabled);
         const auth = AuthFactory.create();
         const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
-        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
+        mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
         mocks.person.getByGroupIdOnly.mockResolvedValue(prior);
         mocks.person.update.mockResolvedValue({ ...prior }); // name unchanged
 
@@ -940,7 +982,7 @@ describe(PersonService.name, () => {
         mocks.systemMetadata.get.mockResolvedValue(enabled);
         const auth = AuthFactory.create();
         const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
-        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
+        mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
         mocks.person.getByGroupIdOnly.mockResolvedValue(prior);
         mocks.person.update.mockResolvedValue({ ...prior, name: '' });
 
@@ -956,7 +998,7 @@ describe(PersonService.name, () => {
         mocks.systemMetadata.get.mockResolvedValue(enabled);
         const auth = AuthFactory.create();
         const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
-        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
+        mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
         mocks.person.getByGroupIdOnly.mockResolvedValue(prior);
         mocks.person.update.mockResolvedValue({ ...prior, isHidden: true }); // name unchanged
 
@@ -982,7 +1024,7 @@ describe(PersonService.name, () => {
         });
         const auth = AuthFactory.create();
         const prior = PersonFactory.create({ name: '', isHidden: false });
-        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
+        mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([prior.personGroupId]));
         mocks.person.getByGroupIdOnly.mockResolvedValue(prior);
         mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
 
@@ -998,19 +1040,22 @@ describe(PersonService.name, () => {
 
   describe('updateAll', () => {
     it('should throw an error when personId is invalid', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
 
       await expect(sut.updateAll(authStub.admin, { people: [{ id: 'person-1', name: 'Person 1' }] })).resolves.toEqual([
         { error: BulkIdErrorReason.UNKNOWN, id: 'person-1', success: false },
       ]);
       expect(mocks.person.update).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set(['person-1']));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        authStub.admin.user.id,
+        new Set(['person-1']),
+      );
     });
   });
 
   describe('reassignFaces', () => {
     it('should throw an error if user has no access to the person', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
 
       await expect(
         sut.reassignFaces(AuthFactory.create(), 'person-id', {
@@ -1026,7 +1071,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
@@ -1056,7 +1101,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
       const [face1, face2] = [AssetFaceFactory.create(), AssetFaceFactory.create()];
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.person.checkFaceOwnerAccess
         .mockResolvedValueOnce(new Set([face1.id]))
@@ -1090,7 +1135,7 @@ describe(PersonService.name, () => {
       const ownedFace = AssetFaceFactory.create();
       const foreignFace = AssetFaceFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getFacesByIds
         .mockResolvedValueOnce([getForAssetFace(ownedFace)])
@@ -1319,7 +1364,7 @@ describe(PersonService.name, () => {
       });
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getRandomFace.mockResolvedValue(featureFace);
@@ -1370,7 +1415,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ faceAssetId: newUuid() });
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
@@ -1399,7 +1444,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ faceAssetId: null });
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(
         sut.createFace(auth, {
@@ -1438,7 +1483,7 @@ describe(PersonService.name, () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.reassignFace.mockResolvedValue(1);
@@ -1470,7 +1515,7 @@ describe(PersonService.name, () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
@@ -1489,7 +1534,7 @@ describe(PersonService.name, () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
@@ -3990,14 +4035,14 @@ describe(PersonService.name, () => {
       identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: 'person-y', success: true }]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergePerson);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
 
       await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-y'] })).resolves.toEqual([
         { id: 'person-y', success: true },
       ]);
 
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalled();
       expect(identityMergePropagation.mergePersonalPeople).toHaveBeenCalledWith(
         auth,
         'person-x',
@@ -4014,8 +4059,8 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(void 0);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set(['person-y']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set(['person-y']));
 
       await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-y', 'person-z'] })).resolves.toEqual([
         { id: 'person-y', success: false, error: BulkIdErrorReason.NOT_FOUND },
@@ -4036,8 +4081,8 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(validSource);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([validSource.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([validSource.personGroupId]));
 
       await expect(sut.mergePerson(auth, 'person-x', { ids: ['person-y', 'person-z'] })).resolves.toEqual([
         { id: 'person-z', success: false, error: BulkIdErrorReason.NO_PERMISSION },
@@ -4082,7 +4127,10 @@ describe(PersonService.name, () => {
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
 
       expect(mocks.person.delete).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should delegate single-source merges without mutating faces directly', async () => {
@@ -4095,8 +4143,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergePerson);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [mergePerson.personGroupId] })).resolves.toEqual([
         { id: mergePerson.personGroupId, success: true },
@@ -4109,7 +4157,10 @@ describe(PersonService.name, () => {
         expect.any(Function),
       );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should leave identity collapsing to propagation', async () => {
@@ -4122,8 +4173,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergePerson);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [mergePerson.personGroupId] })).resolves.toEqual([
         { id: mergePerson.personGroupId, success: true },
@@ -4155,8 +4206,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergePerson);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [mergePerson.personGroupId] })).resolves.toEqual([
         { id: mergePerson.personGroupId, success: true },
@@ -4170,18 +4221,24 @@ describe(PersonService.name, () => {
       );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.update).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('should throw an error when the primary person is not found', async () => {
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set(['person-1']));
 
       await expect(sut.mergePerson(authStub.admin, 'person-1', { ids: ['person-2'] })).rejects.toBeInstanceOf(
         BadRequestException,
       );
 
       expect(mocks.person.delete).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set(['person-1']));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        authStub.admin.user.id,
+        new Set(['person-1']),
+      );
     });
 
     it('should handle invalid merge ids', async () => {
@@ -4189,8 +4246,8 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set(['unknown']));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set(['unknown']));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: ['unknown'] })).resolves.toEqual([
         { id: 'unknown', success: false, error: BulkIdErrorReason.NOT_FOUND },
@@ -4198,7 +4255,10 @@ describe(PersonService.name, () => {
 
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.delete).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     it('does not convert propagation failures to per-source unknown failures', async () => {
@@ -4209,8 +4269,8 @@ describe(PersonService.name, () => {
       identityMergePropagation.mergePersonalPeople.mockRejectedValue(new Error('propagation failed'));
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergePerson);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [mergePerson.personGroupId] })).rejects.toThrow(
         'propagation failed',
@@ -4224,7 +4284,10 @@ describe(PersonService.name, () => {
       );
       expect(mocks.person.reassignFaces).not.toHaveBeenCalled();
       expect(mocks.person.delete).not.toHaveBeenCalled();
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
   });
 
@@ -4249,8 +4312,8 @@ describe(PersonService.name, () => {
       identityMergePropagation.mergePersonalPeople.mockResolvedValue([{ id: source.personGroupId, success: true }]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(target);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(source);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([target.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([source.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([target.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([source.personGroupId]));
 
       await expect(
         sut.mergePeople(auth, { ids: [target.personGroupId, source.personGroupId] } as never),
@@ -4283,8 +4346,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergeTarget);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
       await sut.mergePerson(auth, person.personGroupId, { ids: [mergeTarget.personGroupId] });
       const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
@@ -4306,8 +4369,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergeTarget);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
       await sut.mergePerson(auth, person.personGroupId, { ids: [mergeTarget.personGroupId] });
       const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
@@ -4329,8 +4392,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergeTarget);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
       await sut.mergePerson(auth, person.personGroupId, { ids: [mergeTarget.personGroupId], confirmCrossOwner: true });
       const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
@@ -4354,8 +4417,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergeTarget);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
       await sut.mergePerson(auth, person.personGroupId, { ids: [mergeTarget.personGroupId] });
       const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
@@ -4386,8 +4449,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergeTarget);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
       await sut.mergePerson(auth, person.personGroupId, { ids: [mergeTarget.personGroupId] });
       const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
@@ -4416,8 +4479,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergeTarget);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergeTarget.personGroupId]));
       await sut.mergePerson(auth, person.personGroupId, { ids: [mergeTarget.personGroupId], confirmCrossOwner: true });
       const authorize = identityMergePropagation.mergePersonalPeople.mock.calls[0][3] as MergeAuthorizerFn;
 
@@ -4436,7 +4499,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getStatistics.mockResolvedValue({ assets: 3, faces: 4 });
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.getStatistics(auth, person.personGroupId)).resolves.toEqual({ assets: 3, faces: 4 });
       expect(mocks.person.getStatistics).toHaveBeenCalledWith(person.personGroupId, auth.user.id);
@@ -4448,7 +4511,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ identityId: 'identity-1' });
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 7, faces: 9 });
 
       await expect(sut.getStatistics(auth, person.personGroupId)).resolves.toEqual({ assets: 7, faces: 9 });
@@ -4464,7 +4527,7 @@ describe(PersonService.name, () => {
       const personId = newUuid();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(void 0);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue('identity-from-space');
       (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 11, faces: 13 });
 
@@ -4481,7 +4544,7 @@ describe(PersonService.name, () => {
       const personId = newUuid();
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(void 0);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
 
       await expect(sut.getStatistics(auth, personId)).rejects.toThrow('Not found or no person.read access');
@@ -4494,7 +4557,10 @@ describe(PersonService.name, () => {
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       await expect(sut.getStatistics(auth, person.personGroupId)).rejects.toBeInstanceOf(BadRequestException);
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(
+        auth.user.id,
+        new Set([person.personGroupId]),
+      );
     });
 
     // L3: a space-only reader (PersonRead granted only via checkSharedSpaceAccess, never the
@@ -4506,8 +4572,8 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ identityId: null }); // ownerId is random, != auth.user.id
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkSharedSpaceAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getStatistics.mockResolvedValue({ assets: 2, faces: 2 });
 
       await expect(sut.getStatistics(auth, person.personGroupId)).resolves.toEqual({ assets: 2, faces: 2 });
@@ -4532,8 +4598,8 @@ describe(PersonService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(person);
       mocks.person.getByGroupIdOnly.mockResolvedValueOnce(mergePerson);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([mergePerson.personGroupId]));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [mergePerson.personGroupId] })).resolves.toEqual([
         { id: mergePerson.personGroupId, success: true },
@@ -4552,7 +4618,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [person.personGroupId] })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -4564,8 +4630,8 @@ describe(PersonService.name, () => {
       const [person, mergePerson] = [PersonFactory.create(), PersonFactory.create()];
 
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValueOnce(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValueOnce(new Set());
 
       await expect(sut.mergePerson(auth, person.personGroupId, { ids: [mergePerson.personGroupId] })).resolves.toEqual([
         { id: mergePerson.personGroupId, success: false, error: BulkIdErrorReason.NO_PERMISSION },
@@ -4580,7 +4646,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.delete.mockResolvedValue([person]);
 
       await sut.delete(auth, person.personGroupId);
@@ -4599,7 +4665,9 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const [person1, person2] = [PersonFactory.create(), PersonFactory.create()];
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person1.personGroupId, person2.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(
+        new Set([person1.personGroupId, person2.personGroupId]),
+      );
       mocks.person.delete.mockResolvedValue([person1, person2]);
 
       await sut.deleteAll(auth, { ids: [person1.personGroupId, person2.personGroupId] });
@@ -4632,7 +4700,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create({ faceAssetId: null });
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFacesByIds.mockResolvedValue([face] as any);
@@ -4664,7 +4732,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const newPerson = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([newPerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([newPerson.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(newPerson);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFacesByIds.mockResolvedValue([face] as any);
@@ -4685,7 +4753,7 @@ describe(PersonService.name, () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create({ faceAssetId: null });
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(face as any);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
@@ -4706,7 +4774,7 @@ describe(PersonService.name, () => {
       face.person!.faceAssetId = face.id;
       const newPerson = PersonFactory.create();
 
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([newPerson.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([newPerson.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(face as any);
       mocks.person.getByGroupIdOnly.mockResolvedValue(newPerson);
@@ -4973,7 +5041,7 @@ describe(PersonService.name, () => {
       const asset = AssetFactory.from().exif().build();
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.asset.getById.mockResolvedValue(asset as any);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.createAssetFace.mockResolvedValue('new-face');
@@ -5011,7 +5079,7 @@ describe(PersonService.name, () => {
       const assetId = newUuid();
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       mocks.asset.getById.mockResolvedValue(undefined);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
@@ -5148,7 +5216,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ ownerId: auth.user.id });
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.update.mockResolvedValue(person);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(
         sut.update(auth, person.personGroupId, { name: 'Renamed', userId: newUuid() }),
@@ -5164,7 +5232,7 @@ describe(PersonService.name, () => {
     it("refuses to delete another owner's row of a person", async () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create({ ownerId: auth.user.id });
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
 
       await expect(sut.deleteAll(auth, { ids: [person.personGroupId], userId: newUuid() })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -5179,7 +5247,7 @@ describe(PersonService.name, () => {
       const face = AssetFaceFactory.create();
       const auth = AuthFactory.create();
       const person = PersonFactory.create({ ownerId: auth.user.id, faceAssetId: null });
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFacesByIds.mockResolvedValue([face] as any);
@@ -5208,7 +5276,7 @@ describe(PersonService.name, () => {
     it('allows a userId naming the caller', async () => {
       const auth = AuthFactory.create();
       const person = PersonFactory.create({ ownerId: auth.user.id });
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.delete.mockResolvedValue([person]);
 
       await sut.deleteAll(auth, { ids: [person.personGroupId], userId: auth.user.id });

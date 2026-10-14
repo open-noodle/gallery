@@ -12,6 +12,7 @@ import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
 import 'package:immich_mobile/utils/datetime_helpers.dart';
 import 'package:openapi/api.dart';
@@ -153,10 +154,12 @@ SyncAssetExifV1 _createExif({
 void main() {
   late Drift db;
   late SyncStreamRepository sut;
+  late GallerySyncStreamRepository gallery;
 
   setUp(() async {
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     sut = SyncStreamRepository(db);
+    gallery = GallerySyncStreamRepository(db);
   });
 
   tearDown(() async {
@@ -306,7 +309,7 @@ void main() {
       // Seed a fully-populated fork-space graph via the real sync handlers so
       // FK-parent ordering (space → album/library → link/membership) is honoured.
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: 'space-1',
           name: 'Space',
@@ -322,7 +325,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceMembersV1([
+      await gallery.updateSharedSpaceMembersV1([
         SyncSharedSpaceMemberV1(
           spaceId: 'space-1',
           userId: 'user-1',
@@ -332,8 +335,8 @@ void main() {
         ),
       ]);
       await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
-      await sut.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-1')]);
-      await sut.updateLibrariesV1([
+      await gallery.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-1')]);
+      await gallery.updateLibrariesV1([
         SyncLibraryV1(
           id: 'library-1',
           name: 'Lib',
@@ -342,7 +345,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: 'space-1',
           libraryId: 'library-1',
@@ -351,7 +354,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceAlbumsV1([
+      await gallery.updateSharedSpaceAlbumsV1([
         SyncAlbumV2(
           id: 'album-1',
           name: 'Album',
@@ -363,7 +366,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceAlbumLinksV1([
+      await gallery.updateSharedSpaceAlbumLinksV1([
         SyncSharedSpaceAlbumLinkV1(
           spaceId: 'space-1',
           albumId: 'album-1',
@@ -375,7 +378,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'asset-1')]);
+      await gallery.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'asset-1')]);
 
       // Sanity: every table is non-empty before reset.
       expect(await db.sharedSpaceEntity.select().get(), isNotEmpty);
@@ -411,7 +414,7 @@ void main() {
     // hidden-album rows, or a stale hide survives a SyncResetV1 re-sync.
     test('reset() clears the hidden-album table (mobile-4, #1041)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: 'space-1',
           name: 'Space',
@@ -427,7 +430,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceAlbumHiddenV1([
+      await gallery.updateSharedSpaceAlbumHiddenV1([
         SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
       ]);
 
@@ -701,7 +704,7 @@ void main() {
 
     test('updateSharedSpacesV1 inserts a new shared space row', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace(name: 'First')]);
+      await gallery.updateSharedSpacesV1([makeSpace(name: 'First')]);
 
       final row = await (db.sharedSpaceEntity.select()..where((t) => t.id.equals('space-1'))).getSingle();
       expect(row.name, 'First');
@@ -710,8 +713,8 @@ void main() {
 
     test('updateSharedSpacesV1 upserts on conflict (idempotent)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace(name: 'Original')]);
-      await sut.updateSharedSpacesV1([makeSpace(name: 'Renamed', description: 'Updated')]);
+      await gallery.updateSharedSpacesV1([makeSpace(name: 'Original')]);
+      await gallery.updateSharedSpacesV1([makeSpace(name: 'Renamed', description: 'Updated')]);
 
       final row = await (db.sharedSpaceEntity.select()..where((t) => t.id.equals('space-1'))).getSingle();
       expect(row.name, 'Renamed');
@@ -720,12 +723,12 @@ void main() {
 
     test('deleteSharedSpacesV1 removes the row and cascades to members and join rows', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace()]);
-      await sut.updateSharedSpaceMembersV1([makeMember()]);
+      await gallery.updateSharedSpacesV1([makeSpace()]);
+      await gallery.updateSharedSpaceMembersV1([makeMember()]);
       await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
-      await sut.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-1')]);
+      await gallery.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-1')]);
 
-      await sut.deleteSharedSpacesV1([SyncSharedSpaceDeleteV1(spaceId: 'space-1')]);
+      await gallery.deleteSharedSpacesV1([SyncSharedSpaceDeleteV1(spaceId: 'space-1')]);
 
       final spaceCount = await db.sharedSpaceEntity.select().get();
       final memberCount = await db.sharedSpaceMemberEntity.select().get();
@@ -737,8 +740,8 @@ void main() {
 
     test('updateSharedSpaceMembersV1 inserts a new member row', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace()]);
-      await sut.updateSharedSpaceMembersV1([makeMember()]);
+      await gallery.updateSharedSpacesV1([makeSpace()]);
+      await gallery.updateSharedSpaceMembersV1([makeMember()]);
 
       final row =
           await (db.sharedSpaceMemberEntity.select()
@@ -750,9 +753,9 @@ void main() {
 
     test('updateSharedSpaceMembersV1 upserts on conflict (role change)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace()]);
-      await sut.updateSharedSpaceMembersV1([makeMember(role: 'editor')]);
-      await sut.updateSharedSpaceMembersV1([makeMember(role: 'owner', showInTimeline: false)]);
+      await gallery.updateSharedSpacesV1([makeSpace()]);
+      await gallery.updateSharedSpaceMembersV1([makeMember(role: 'editor')]);
+      await gallery.updateSharedSpaceMembersV1([makeMember(role: 'owner', showInTimeline: false)]);
 
       final row =
           await (db.sharedSpaceMemberEntity.select()
@@ -764,10 +767,10 @@ void main() {
 
     test('deleteSharedSpaceMembersV1 removes the (space, user) pair only', () async {
       await sut.updateUsersV1([_createUser(), _createUser(id: 'user-2')]);
-      await sut.updateSharedSpacesV1([makeSpace()]);
-      await sut.updateSharedSpaceMembersV1([makeMember(userId: 'user-1'), makeMember(userId: 'user-2')]);
+      await gallery.updateSharedSpacesV1([makeSpace()]);
+      await gallery.updateSharedSpaceMembersV1([makeMember(userId: 'user-1'), makeMember(userId: 'user-2')]);
 
-      await sut.deleteSharedSpaceMembersV1([SyncSharedSpaceMemberDeleteV1(spaceId: 'space-1', userId: 'user-1')]);
+      await gallery.deleteSharedSpaceMembersV1([SyncSharedSpaceMemberDeleteV1(spaceId: 'space-1', userId: 'user-1')]);
 
       final remaining = await db.sharedSpaceMemberEntity.select().get();
       expect(remaining, hasLength(1));
@@ -776,7 +779,7 @@ void main() {
 
     test('updateSharedSpaceAssetsV1 delegates to updateAssetsV1 (writes remote_asset)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpaceAssetsV1([_createAsset(id: 'asset-1', checksum: 'cccc', fileName: 'shared.jpg')]);
+      await gallery.updateSharedSpaceAssetsV1([_createAsset(id: 'asset-1', checksum: 'cccc', fileName: 'shared.jpg')]);
 
       final row = await (db.remoteAssetEntity.select()..where((t) => t.id.equals('asset-1'))).getSingle();
       expect(row.name, 'shared.jpg');
@@ -784,8 +787,8 @@ void main() {
 
     test('updateSharedSpaceAssetExifsV1 delegates to updateAssetsExifV1 (writes remote_exif)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpaceAssetsV1([_createAsset(id: 'asset-1', checksum: 'cccc', fileName: 'shared.jpg')]);
-      await sut.updateSharedSpaceAssetExifsV1([
+      await gallery.updateSharedSpaceAssetsV1([_createAsset(id: 'asset-1', checksum: 'cccc', fileName: 'shared.jpg')]);
+      await gallery.updateSharedSpaceAssetExifsV1([
         _createExif(assetId: 'asset-1', width: 100, height: 200, orientation: '1'),
       ]);
 
@@ -800,9 +803,9 @@ void main() {
       // delivery between the SharedSpaceToAssetV1 stream and the SharedSpaceAssetCreateV1
       // stream.
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace()]);
+      await gallery.updateSharedSpacesV1([makeSpace()]);
 
-      await sut.updateSharedSpaceToAssetsV1([
+      await gallery.updateSharedSpaceToAssetsV1([
         SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-not-yet-synced'),
       ]);
 
@@ -813,13 +816,15 @@ void main() {
 
     test('deleteSharedSpaceToAssetsV1 removes the (space, asset) pair', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([makeSpace()]);
-      await sut.updateSharedSpaceToAssetsV1([
+      await gallery.updateSharedSpacesV1([makeSpace()]);
+      await gallery.updateSharedSpaceToAssetsV1([
         SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-1'),
         SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'asset-2'),
       ]);
 
-      await sut.deleteSharedSpaceToAssetsV1([SyncSharedSpaceToAssetDeleteV1(spaceId: 'space-1', assetId: 'asset-1')]);
+      await gallery.deleteSharedSpaceToAssetsV1([
+        SyncSharedSpaceToAssetDeleteV1(spaceId: 'space-1', assetId: 'asset-1'),
+      ]);
 
       final remaining = await db.sharedSpaceAssetEntity.select().get();
       expect(remaining, hasLength(1));
@@ -879,7 +884,7 @@ void main() {
 
     test('updateLibrariesV1 inserts a new library row', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary(name: 'First')]);
+      await gallery.updateLibrariesV1([makeLibrary(name: 'First')]);
 
       final row = await (db.libraryEntity.select()..where((t) => t.id.equals('library-1'))).getSingle();
       expect(row.name, 'First');
@@ -888,8 +893,8 @@ void main() {
 
     test('updateLibrariesV1 upserts on conflict', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary(name: 'Original')]);
-      await sut.updateLibrariesV1([makeLibrary(name: 'Renamed')]);
+      await gallery.updateLibrariesV1([makeLibrary(name: 'Original')]);
+      await gallery.updateLibrariesV1([makeLibrary(name: 'Renamed')]);
 
       final row = await (db.libraryEntity.select()..where((t) => t.id.equals('library-1'))).getSingle();
       expect(row.name, 'Renamed');
@@ -897,8 +902,8 @@ void main() {
 
     test('updateLibraryAssetsV1 delegates to updateAssetsV1 (writes remote_asset with libraryId)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
 
@@ -908,11 +913,13 @@ void main() {
 
     test('updateLibraryAssetExifsV1 delegates to updateAssetsExifV1', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
-      await sut.updateLibraryAssetExifsV1([_createExif(assetId: 'asset-1', width: 640, height: 480, orientation: '1')]);
+      await gallery.updateLibraryAssetExifsV1([
+        _createExif(assetId: 'asset-1', width: 640, height: 480, orientation: '1'),
+      ]);
 
       final row = await (db.remoteExifEntity.select()..where((t) => t.assetId.equals('asset-1'))).getSingle();
       expect(row.width, 640);
@@ -921,13 +928,13 @@ void main() {
 
     test('deleteLibraryAssetsV1 removes individual asset rows', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
         makeLibraryAsset(id: 'asset-2', checksum: 'c2', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
 
-      await sut.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
+      await gallery.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
 
       final remaining = await db.remoteAssetEntity.select().get();
       expect(remaining, hasLength(1));
@@ -936,26 +943,26 @@ void main() {
 
     test('deleteLibraryAssetsV1 is idempotent — calling twice with the same id is safe', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-1', checksum: 'cIdem', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
 
-      await sut.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
+      await gallery.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
       // Second call must not throw and must leave the table unchanged.
-      await sut.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
+      await gallery.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
 
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
     });
 
     test('deleteLibraryAssetsV1 handles a mixed batch (some present, some missing)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-present', checksum: 'cMix', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
 
-      await sut.deleteLibraryAssetsV1([
+      await gallery.deleteLibraryAssetsV1([
         SyncLibraryAssetDeleteV1(assetId: 'asset-present'),
         SyncLibraryAssetDeleteV1(assetId: 'asset-missing-1'),
         SyncLibraryAssetDeleteV1(assetId: 'asset-missing-2'),
@@ -967,12 +974,12 @@ void main() {
 
     test('deleteLibraryAssetsV1 with empty input is a no-op (does not throw)', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-1', checksum: 'cEmpty', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
 
-      await sut.deleteLibraryAssetsV1(const <SyncLibraryAssetDeleteV1>[]);
+      await gallery.deleteLibraryAssetsV1(const <SyncLibraryAssetDeleteV1>[]);
 
       // Asset untouched.
       expect(await db.remoteAssetEntity.select().get(), hasLength(1));
@@ -980,7 +987,7 @@ void main() {
 
     test('updateSharedSpaceLibrariesV1 inserts a join row', () async {
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: 'space-1',
           name: 'Space',
@@ -997,7 +1004,7 @@ void main() {
         ),
       ]);
 
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: 'space-1',
           libraryId: 'library-1',
@@ -1015,7 +1022,7 @@ void main() {
 
     test('deleteSharedSpaceLibrariesV1 removes join row but does NOT touch assets', () async {
       await sut.updateUsersV1([_createUser(), _createUser(id: 'user-2')]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: 'space-1',
           name: 'Space',
@@ -1031,11 +1038,11 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateLibrariesV1([makeLibrary()]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary()]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-2', libraryId: 'library-1'),
       ]);
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: 'space-1',
           libraryId: 'library-1',
@@ -1045,7 +1052,7 @@ void main() {
         ),
       ]);
 
-      await sut.deleteSharedSpaceLibrariesV1([
+      await gallery.deleteSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryDeleteV1(spaceId: 'space-1', libraryId: 'library-1'),
       ]);
 
@@ -1066,15 +1073,15 @@ void main() {
           _createUser(id: 'user-partner'),
           _createUser(id: 'user-foreign'),
         ]);
-        await sut.updateLibrariesV1([makeLibrary(id: 'library-1', ownerId: 'user-foreign')]);
+        await gallery.updateLibrariesV1([makeLibrary(id: 'library-1', ownerId: 'user-foreign')]);
       });
 
       test('preserves an asset owned by the current user', () async {
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'mine', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
         ]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         final rows = await db.remoteAssetEntity.select().get();
         expect(rows, hasLength(1));
@@ -1083,11 +1090,11 @@ void main() {
 
       test('preserves an asset owned by an active partner', () async {
         await insertPartner(sharedById: 'user-partner', sharedWithId: 'user-1');
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'partner-asset', checksum: 'c2', ownerId: 'user-partner', libraryId: 'library-1'),
         ]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         final rows = await db.remoteAssetEntity.select().get();
         expect(rows, hasLength(1));
@@ -1095,7 +1102,7 @@ void main() {
       });
 
       test('preserves an asset also present in shared_space_asset', () async {
-        await sut.updateSharedSpacesV1([
+        await gallery.updateSharedSpacesV1([
           SyncSharedSpaceV1(
             id: 'space-1',
             name: 'Space',
@@ -1111,12 +1118,14 @@ void main() {
             updatedAt: DateTime(2026, 4, 6),
           ),
         ]);
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'direct-add', checksum: 'c3', ownerId: 'user-foreign', libraryId: 'library-1'),
         ]);
-        await sut.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'direct-add')]);
+        await gallery.updateSharedSpaceToAssetsV1([
+          SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'direct-add'),
+        ]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         final rows = await db.remoteAssetEntity.select().get();
         expect(rows, hasLength(1));
@@ -1124,11 +1133,11 @@ void main() {
       });
 
       test('deletes a foreign asset reachable only via the now-deleted library', () async {
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'orphan', checksum: 'c4', ownerId: 'user-foreign', libraryId: 'library-1'),
         ]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         final rows = await db.remoteAssetEntity.select().get();
         expect(rows, isEmpty);
@@ -1138,12 +1147,12 @@ void main() {
 
       test('happy path: library delete and orphan sweep both succeed in a single call', () async {
         // Pre-seed assets that should survive a successful sweep.
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'mine', checksum: 'c5', ownerId: 'user-1', libraryId: 'library-1'),
           makeLibraryAsset(id: 'orphan', checksum: 'c6', ownerId: 'user-foreign', libraryId: 'library-1'),
         ]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         // Library removed, orphan removed, user-owned preserved.
         expect(await db.libraryEntity.select().get(), isEmpty);
@@ -1159,7 +1168,7 @@ void main() {
         // db handle and confirms rollback behaviour. If Drift's transaction
         // primitive ever loses rollback semantics, this test catches it before
         // the production sweep silently splits into separate operations.
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'mine', checksum: 'cAtom', ownerId: 'user-1', libraryId: 'library-1'),
         ]);
         expect(await db.libraryEntity.select().get(), hasLength(1));
@@ -1199,9 +1208,9 @@ void main() {
         const int batchSize = 600;
         final libraryIds = List.generate(batchSize, (i) => 'lib-$i');
 
-        await sut.updateLibrariesV1(libraryIds.map((id) => makeLibrary(id: id, ownerId: 'user-foreign')));
+        await gallery.updateLibrariesV1(libraryIds.map((id) => makeLibrary(id: id, ownerId: 'user-foreign')));
         // Insert 600 orphan assets, one per library.
-        await sut.updateLibraryAssetsV1(
+        await gallery.updateLibraryAssetsV1(
           List.generate(
             batchSize,
             (i) => makeLibraryAsset(
@@ -1216,7 +1225,7 @@ void main() {
         expect(await db.libraryEntity.select().get(), hasLength(batchSize + 1));
         expect(await db.remoteAssetEntity.select().get(), hasLength(batchSize));
 
-        await sut.deleteLibrariesV1([
+        await gallery.deleteLibrariesV1([
           SyncLibraryDeleteV1(libraryId: 'library-1'),
           ...libraryIds.map((id) => SyncLibraryDeleteV1(libraryId: id)),
         ], currentUserId: 'user-1');
@@ -1230,19 +1239,19 @@ void main() {
         // Verifies the placeholder expansion in the customStatement works for
         // N > 1 libraryIds. Single-library is the common case but
         // syncLibrariesV1 may dispatch multiple deletes per batch.
-        await sut.updateLibrariesV1([
+        await gallery.updateLibrariesV1([
           makeLibrary(id: 'library-1', ownerId: 'user-foreign'),
           makeLibrary(id: 'library-2', ownerId: 'user-foreign'),
           makeLibrary(id: 'library-3', ownerId: 'user-foreign'),
         ]);
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'mine', checksum: 'cM1', ownerId: 'user-1', libraryId: 'library-1'),
           makeLibraryAsset(id: 'orphan-1', checksum: 'cO1', ownerId: 'user-foreign', libraryId: 'library-1'),
           makeLibraryAsset(id: 'orphan-2', checksum: 'cO2', ownerId: 'user-foreign', libraryId: 'library-2'),
           makeLibraryAsset(id: 'orphan-3', checksum: 'cO3', ownerId: 'user-foreign', libraryId: 'library-3'),
         ]);
 
-        await sut.deleteLibrariesV1([
+        await gallery.deleteLibrariesV1([
           SyncLibraryDeleteV1(libraryId: 'library-1'),
           SyncLibraryDeleteV1(libraryId: 'library-2'),
           SyncLibraryDeleteV1(libraryId: 'library-3'),
@@ -1256,11 +1265,11 @@ void main() {
       });
 
       test('LibraryDeleteV1 for an unknown library is a no-op', () async {
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'mine', checksum: 'c7', ownerId: 'user-1', libraryId: 'library-1'),
         ]);
 
-        await sut.deleteLibrariesV1([
+        await gallery.deleteLibrariesV1([
           SyncLibraryDeleteV1(libraryId: 'library-does-not-exist'),
         ], currentUserId: 'user-1');
 
@@ -1270,21 +1279,21 @@ void main() {
       });
 
       test('preserves an asset also present in shared_space_album_asset (album path — mobile-2)', () async {
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'album-add', checksum: 'cA1', ownerId: 'user-foreign', libraryId: 'library-1'),
         ]);
         // The asset is a member of a space-linked album (no FK on assetId, so this
         // join row can reference the library asset directly).
-        await sut.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'album-add')]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'album-add')]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         final rows = await db.remoteAssetEntity.select().get();
         expect(rows.map((r) => r.id), ['album-add']);
       });
 
       test('preserves an asset also present in remote_album_asset (classic album — pre-existing gap)', () async {
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'classic-add', checksum: 'cC1', ownerId: 'user-foreign', libraryId: 'library-1'),
         ]);
         // A personal (classic) album that also contains the asset. remote_album_asset
@@ -1303,7 +1312,7 @@ void main() {
         ]);
         await sut.updateAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'classic-album-1', assetId: 'classic-add')]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         final rows = await db.remoteAssetEntity.select().get();
         expect(rows.map((r) => r.id), ['classic-add']);
@@ -1312,7 +1321,7 @@ void main() {
       test('deletes a Hidden foreign asset reachable only via the removed library (no accidental retention)', () async {
         // Visibility is NOT part of the sweep predicate — an asset with no album/space/
         // partner/owner path is still swept regardless of Hidden.
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           SyncAssetV1(
             id: 'hidden-orphan',
             checksum: 'cH1',
@@ -1337,19 +1346,19 @@ void main() {
           ),
         ]);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         expect(await db.remoteAssetEntity.select().get(), isEmpty);
       });
 
       test('empty album/space-album sets: orphan sweep still deletes (no regression from new exclusions)', () async {
-        await sut.updateLibraryAssetsV1([
+        await gallery.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'orphan-empty', checksum: 'cE1', ownerId: 'user-foreign', libraryId: 'library-1'),
         ]);
         expect(await db.sharedSpaceAlbumAssetEntity.select().get(), isEmpty);
         expect(await db.remoteAlbumAssetEntity.select().get(), isEmpty);
 
-        await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
+        await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'library-1')], currentUserId: 'user-1');
 
         expect(await db.remoteAssetEntity.select().get(), isEmpty);
       });
@@ -1361,7 +1370,7 @@ void main() {
       // sync stream tolerate out-of-order delivery between the library and
       // shared-space-library streams.
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateSharedSpacesV1([
+      await gallery.updateSharedSpacesV1([
         SyncSharedSpaceV1(
           id: 'space-1',
           name: 'Space',
@@ -1378,7 +1387,7 @@ void main() {
         ),
       ]);
 
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: 'space-1',
           libraryId: 'not-yet-synced-library',
@@ -1403,7 +1412,7 @@ void main() {
       await sut.updateUsersV1([_createUser()]);
 
       await expectLater(
-        sut.updateSharedSpaceLibrariesV1([
+        gallery.updateSharedSpaceLibrariesV1([
           SyncSharedSpaceLibraryV1(
             spaceId: 'not-yet-synced-space',
             libraryId: 'also-not-yet-synced',
@@ -1424,7 +1433,7 @@ void main() {
       // expected to stream the owner user row BEFORE the library row.
       await sut.updateUsersV1([_createUser()]);
 
-      await expectLater(sut.updateLibrariesV1([makeLibrary(ownerId: 'user-does-not-exist')]), throwsA(anything));
+      await expectLater(gallery.updateLibrariesV1([makeLibrary(ownerId: 'user-does-not-exist')]), throwsA(anything));
       // Library table untouched.
       expect(await db.libraryEntity.select().get(), isEmpty);
     });
@@ -1441,9 +1450,9 @@ void main() {
 
       Future<void> seedAndDelete(int count) async {
         final libraryIds = List.generate(count, (i) => 'boundary-lib-$i');
-        await sut.updateLibrariesV1(libraryIds.map((id) => makeLibrary(id: id, ownerId: 'user-foreign')));
+        await gallery.updateLibrariesV1(libraryIds.map((id) => makeLibrary(id: id, ownerId: 'user-foreign')));
         // Each library has exactly one foreign-owned orphan asset.
-        await sut.updateLibraryAssetsV1(
+        await gallery.updateLibraryAssetsV1(
           List.generate(
             count,
             (i) => makeLibraryAsset(
@@ -1455,7 +1464,7 @@ void main() {
           ),
         );
 
-        await sut.deleteLibrariesV1(
+        await gallery.deleteLibrariesV1(
           libraryIds.map((id) => SyncLibraryDeleteV1(libraryId: id)),
           currentUserId: 'user-1',
         );
@@ -1496,12 +1505,12 @@ void main() {
       // batches when the server has nothing to delete but still sends an
       // end-of-stream frame.
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary(id: 'library-1', ownerId: 'user-1')]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibrariesV1([makeLibrary(id: 'library-1', ownerId: 'user-1')]);
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'keep-me', checksum: 'cEmpty', ownerId: 'user-1', libraryId: 'library-1'),
       ]);
 
-      await sut.deleteLibrariesV1(const <SyncLibraryDeleteV1>[], currentUserId: 'user-1');
+      await gallery.deleteLibrariesV1(const <SyncLibraryDeleteV1>[], currentUserId: 'user-1');
 
       expect(await db.libraryEntity.select().get(), hasLength(1));
       expect(await db.remoteAssetEntity.select().get(), hasLength(1));
@@ -1512,10 +1521,10 @@ void main() {
       // throw on the "no orphans to sweep" case) and the library_entity
       // row must be gone.
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([makeLibrary(id: 'empty-lib', ownerId: 'user-1')]);
+      await gallery.updateLibrariesV1([makeLibrary(id: 'empty-lib', ownerId: 'user-1')]);
       expect(await db.libraryEntity.select().get(), hasLength(1));
 
-      await sut.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'empty-lib')], currentUserId: 'user-1');
+      await gallery.deleteLibrariesV1([SyncLibraryDeleteV1(libraryId: 'empty-lib')], currentUserId: 'user-1');
 
       expect(await db.libraryEntity.select().get(), isEmpty);
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
@@ -1526,15 +1535,15 @@ void main() {
       // same id but libraryId = libB. The remote_asset_entity row should
       // reflect libB — not duplicate, not revert.
       await sut.updateUsersV1([_createUser()]);
-      await sut.updateLibrariesV1([
+      await gallery.updateLibrariesV1([
         makeLibrary(id: 'libA', ownerId: 'user-1'),
         makeLibrary(id: 'libB', ownerId: 'user-1'),
       ]);
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'mover', checksum: 'cMove', ownerId: 'user-1', libraryId: 'libA'),
       ]);
 
-      await sut.updateLibraryAssetsV1([
+      await gallery.updateLibraryAssetsV1([
         makeLibraryAsset(id: 'mover', checksum: 'cMove', ownerId: 'user-1', libraryId: 'libB'),
       ]);
 
@@ -1588,7 +1597,7 @@ void main() {
       await db.authUserEntity.deleteAll();
       await sut.updateAssetsV1([foreignAsset(id: 'orphan', checksum: 'c1')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect(await db.remoteAssetEntity.select().get(), hasLength(1), reason: 'no auth user → no pruning');
     });
@@ -1598,7 +1607,7 @@ void main() {
       await sut.updateAssetsExifV1([_createExif(assetId: 'orphan', width: 100, height: 100, orientation: '1')]);
       expect(await db.remoteExifEntity.select().get(), hasLength(1));
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
       expect(await db.remoteExifEntity.select().get(), isEmpty, reason: 'FK ON DELETE CASCADE removes exif');
@@ -1607,7 +1616,7 @@ void main() {
     test('keeps an owned asset even with no album/space path', () async {
       await sut.updateAssetsV1([_createAsset(id: 'mine', checksum: 'c1', fileName: 'mine.jpg', ownerId: 'user-1')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['mine']);
     });
@@ -1626,7 +1635,7 @@ void main() {
         _createAsset(id: 'partner', checksum: 'c1', fileName: 'p.jpg', ownerId: 'user-partner'),
       ]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['partner']);
     });
@@ -1647,33 +1656,33 @@ void main() {
       ]);
       await sut.updateAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'classic-album', assetId: 'classic')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['classic']);
     });
 
     test('keeps an asset reachable via shared_space_asset (direct add)', () async {
       await sut.updateAssetsV1([foreignAsset(id: 'direct', checksum: 'c1')]);
-      await sut.updateSharedSpacesV1([_pruneSpace()]);
-      await sut.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'direct')]);
+      await gallery.updateSharedSpacesV1([_pruneSpace()]);
+      await gallery.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'direct')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['direct']);
     });
 
     test('keeps an asset reachable via shared_space_album_asset (granted album)', () async {
       await sut.updateAssetsV1([foreignAsset(id: 'album-add', checksum: 'c1')]);
-      await sut.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'album-add')]);
+      await gallery.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'album-add')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['album-add']);
     });
 
     test('keeps an asset reachable via a space-linked library (shared_space_library)', () async {
-      await sut.updateSharedSpacesV1([_pruneSpace()]);
-      await sut.updateLibrariesV1([
+      await gallery.updateSharedSpacesV1([_pruneSpace()]);
+      await gallery.updateLibrariesV1([
         SyncLibraryV1(
           id: 'library-1',
           name: 'Lib',
@@ -1682,7 +1691,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: 'space-1',
           libraryId: 'library-1',
@@ -1693,7 +1702,7 @@ void main() {
       ]);
       await sut.updateAssetsV1([foreignAsset(id: 'lib-asset', checksum: 'c1', libraryId: 'library-1')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['lib-asset']);
     });
@@ -1701,25 +1710,25 @@ void main() {
     test('multi-path: pruned only when ALL paths are gone', () async {
       // Reachable via BOTH a direct add and a space album.
       await sut.updateAssetsV1([foreignAsset(id: 'multi', checksum: 'c1')]);
-      await sut.updateSharedSpacesV1([_pruneSpace()]);
-      await sut.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'multi')]);
-      await sut.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'multi')]);
+      await gallery.updateSharedSpacesV1([_pruneSpace()]);
+      await gallery.updateSharedSpaceToAssetsV1([SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'multi')]);
+      await gallery.updateSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetV1(albumId: 'album-1', assetId: 'multi')]);
 
       // Drop ONE path — still reachable via the other → kept.
-      await sut.deleteSharedSpaceToAssetsV1([SyncSharedSpaceToAssetDeleteV1(spaceId: 'space-1', assetId: 'multi')]);
-      await sut.pruneAssets();
+      await gallery.deleteSharedSpaceToAssetsV1([SyncSharedSpaceToAssetDeleteV1(spaceId: 'space-1', assetId: 'multi')]);
+      await gallery.pruneAssets();
       expect((await db.remoteAssetEntity.select().get()).map((a) => a.id), ['multi']);
 
       // Drop the last path → now unreachable → pruned.
-      await sut.deleteSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetDeleteV1(albumId: 'album-1', assetId: 'multi')]);
-      await sut.pruneAssets();
+      await gallery.deleteSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetDeleteV1(albumId: 'album-1', assetId: 'multi')]);
+      await gallery.pruneAssets();
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
     });
 
     test('prunes an orphan with a NULL library_id (NULL-in-subquery trap regression)', () async {
       // A space-linked library exists but this orphan is not in it (null library_id).
-      await sut.updateSharedSpacesV1([_pruneSpace()]);
-      await sut.updateLibrariesV1([
+      await gallery.updateSharedSpacesV1([_pruneSpace()]);
+      await gallery.updateLibrariesV1([
         SyncLibraryV1(
           id: 'library-1',
           name: 'Lib',
@@ -1728,7 +1737,7 @@ void main() {
           updatedAt: DateTime(2026, 4, 6),
         ),
       ]);
-      await sut.updateSharedSpaceLibrariesV1([
+      await gallery.updateSharedSpaceLibrariesV1([
         SyncSharedSpaceLibraryV1(
           spaceId: 'space-1',
           libraryId: 'library-1',
@@ -1740,7 +1749,7 @@ void main() {
       // Orphan has libraryId: null → must still be pruned (not shielded by NULL NOT IN).
       await sut.updateAssetsV1([foreignAsset(id: 'null-lib-orphan', checksum: 'c1')]);
 
-      await sut.pruneAssets();
+      await gallery.pruneAssets();
 
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
     });
@@ -1803,7 +1812,7 @@ void main() {
       expect(await db.memoryAssetEntity.select().get(), isEmpty);
 
       // The shared-space asset stream (or any other) delivers the asset afterwards.
-      await sut.updateSharedSpaceAssetsV1([
+      await gallery.updateSharedSpaceAssetsV1([
         _createAsset(id: 'asset-late', checksum: 'c2', fileName: 'late.jpg', ownerId: 'user-1'),
       ]);
       await sut.flushDeferredMemoryAssetsV1();
@@ -2006,7 +2015,7 @@ void main() {
   group('SyncStreamRepository - SharedSpaceAlbum handlers', () {
     group('updateSharedSpaceAlbumsV1', () {
       test('upserts a metadata row (id/name/thumbnailAssetId/order)', () async {
-        await sut.updateSharedSpaceAlbumsV1([makeAlbumV2(id: 'album-1', name: 'Holiday')]);
+        await gallery.updateSharedSpaceAlbumsV1([makeAlbumV2(id: 'album-1', name: 'Holiday')]);
 
         final rows = await db.sharedSpaceAlbumEntity.select().get();
         expect(rows, hasLength(1));
@@ -2016,8 +2025,8 @@ void main() {
       });
 
       test('upsert is idempotent — re-inserting updates the row', () async {
-        await sut.updateSharedSpaceAlbumsV1([makeAlbumV2(id: 'album-1', name: 'Original')]);
-        await sut.updateSharedSpaceAlbumsV1([
+        await gallery.updateSharedSpaceAlbumsV1([makeAlbumV2(id: 'album-1', name: 'Original')]);
+        await gallery.updateSharedSpaceAlbumsV1([
           SyncAlbumV2(
             id: 'album-1',
             name: 'Renamed',
@@ -2041,8 +2050,8 @@ void main() {
     group('updateSharedSpaceAlbumLinksV1', () {
       test('upserts a link row (showInTimeline carried)', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
-        await sut.updateSharedSpaceAlbumLinksV1([makeAlbumLink(showInTimeline: true)]);
+        await gallery.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpaceAlbumLinksV1([makeAlbumLink(showInTimeline: true)]);
 
         final rows = await db.sharedSpaceAlbumLinkEntity.select().get();
         expect(rows, hasLength(1));
@@ -2053,9 +2062,9 @@ void main() {
 
       test('re-upsert updates showInTimeline', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
-        await sut.updateSharedSpaceAlbumLinksV1([makeAlbumLink(showInTimeline: true)]);
-        await sut.updateSharedSpaceAlbumLinksV1([makeAlbumLink(showInTimeline: false)]);
+        await gallery.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpaceAlbumLinksV1([makeAlbumLink(showInTimeline: true)]);
+        await gallery.updateSharedSpaceAlbumLinksV1([makeAlbumLink(showInTimeline: false)]);
 
         final rows = await db.sharedSpaceAlbumLinkEntity.select().get();
         expect(rows, hasLength(1));
@@ -2065,7 +2074,7 @@ void main() {
 
     group('updateSharedSpaceAlbumToAssetsV1', () {
       test('inserts a membership row', () async {
-        await sut.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset(albumId: 'album-1', assetId: 'asset-1')]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset(albumId: 'album-1', assetId: 'asset-1')]);
 
         final rows = await db.sharedSpaceAlbumAssetEntity.select().get();
         expect(rows, hasLength(1));
@@ -2074,8 +2083,8 @@ void main() {
       });
 
       test('idempotent on conflict — no duplicate row', () async {
-        await sut.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset()]);
-        await sut.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset()]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset()]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset()]);
 
         final rows = await db.sharedSpaceAlbumAssetEntity.select().get();
         expect(rows, hasLength(1));
@@ -2085,13 +2094,13 @@ void main() {
     group('deleteSharedSpaceAlbumLinksV1', () {
       test('removes only the (spaceId, albumId) link row', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
-        await sut.updateSharedSpaceAlbumLinksV1([
+        await gallery.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpaceAlbumLinksV1([
           makeAlbumLink(spaceId: 'space-1', albumId: 'album-1'),
           makeAlbumLink(spaceId: 'space-1', albumId: 'album-2'),
         ]);
 
-        await sut.deleteSharedSpaceAlbumLinksV1([
+        await gallery.deleteSharedSpaceAlbumLinksV1([
           SyncSharedSpaceAlbumLinkDeleteV1(spaceId: 'space-1', albumId: 'album-1'),
         ]);
 
@@ -2103,12 +2112,14 @@ void main() {
 
     group('deleteSharedSpaceAlbumToAssetsV1', () {
       test('removes the (albumId, assetId) membership row', () async {
-        await sut.updateSharedSpaceAlbumToAssetsV1([
+        await gallery.updateSharedSpaceAlbumToAssetsV1([
           makeAlbumToAsset(albumId: 'album-1', assetId: 'asset-1'),
           makeAlbumToAsset(albumId: 'album-1', assetId: 'asset-2'),
         ]);
 
-        await sut.deleteSharedSpaceAlbumToAssetsV1([SyncAlbumToAssetDeleteV1(albumId: 'album-1', assetId: 'asset-1')]);
+        await gallery.deleteSharedSpaceAlbumToAssetsV1([
+          SyncAlbumToAssetDeleteV1(albumId: 'album-1', assetId: 'asset-1'),
+        ]);
 
         final remaining = await db.sharedSpaceAlbumAssetEntity.select().get();
         expect(remaining, hasLength(1));
@@ -2120,8 +2131,8 @@ void main() {
     group('updateSharedSpaceAlbumHiddenV1', () {
       test('upserts a hidden row (spaceId/albumId/userId)', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
-        await sut.updateSharedSpaceAlbumHiddenV1([
+        await gallery.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpaceAlbumHiddenV1([
           SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
         ]);
 
@@ -2134,10 +2145,10 @@ void main() {
 
       test('upsert is idempotent — re-inserting does not duplicate the row', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpacesV1([makeSpace()]);
         final hidden = SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1');
-        await sut.updateSharedSpaceAlbumHiddenV1([hidden]);
-        await sut.updateSharedSpaceAlbumHiddenV1([hidden]);
+        await gallery.updateSharedSpaceAlbumHiddenV1([hidden]);
+        await gallery.updateSharedSpaceAlbumHiddenV1([hidden]);
 
         final rows = await db.sharedSpaceAlbumHiddenEntity.select().get();
         expect(rows, hasLength(1));
@@ -2147,13 +2158,13 @@ void main() {
     group('deleteSharedSpaceAlbumHiddenV1', () {
       test('removes only the (spaceId, albumId, userId) hidden row', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
-        await sut.updateSharedSpaceAlbumHiddenV1([
+        await gallery.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpaceAlbumHiddenV1([
           SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
           SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-2', userId: 'user-1'),
         ]);
 
-        await sut.deleteSharedSpaceAlbumHiddenV1([
+        await gallery.deleteSharedSpaceAlbumHiddenV1([
           SyncSharedSpaceAlbumHiddenDeleteV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
         ]);
 
@@ -2167,15 +2178,15 @@ void main() {
       test('removes metadata + membership rows; leaves remote_asset intact', () async {
         // Seed: user, album metadata, membership, AND an asset blob.
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpaceAlbumsV1([makeAlbumV2()]);
-        await sut.updateSharedSpaceAlbumToAssetsV1([
+        await gallery.updateSharedSpaceAlbumsV1([makeAlbumV2()]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([
           makeAlbumToAsset(albumId: 'album-1', assetId: 'asset-1'),
           makeAlbumToAsset(albumId: 'album-1', assetId: 'asset-2'),
         ]);
         // Asset blob written via the shared remote_asset store.
         await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
 
-        await sut.deleteSharedSpaceAlbumsV1([SyncAlbumDeleteV1(albumId: 'album-1')]);
+        await gallery.deleteSharedSpaceAlbumsV1([SyncAlbumDeleteV1(albumId: 'album-1')]);
 
         expect(await db.sharedSpaceAlbumEntity.select().get(), isEmpty, reason: 'metadata row must be deleted');
         expect(await db.sharedSpaceAlbumAssetEntity.select().get(), isEmpty, reason: 'membership rows must be swept');
@@ -2189,7 +2200,7 @@ void main() {
     group('updateSharedSpaceAlbumAssetsV1', () {
       test('delegates to updateAssetsV2 → writes remote_asset', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpaceAlbumAssetsV1([
+        await gallery.updateSharedSpaceAlbumAssetsV1([
           SyncAssetV2(
             id: 'asset-sa-1',
             checksum: 'cSA1',
@@ -2222,7 +2233,7 @@ void main() {
     group('updateSharedSpaceAlbumAssetExifsV1', () {
       test('delegates to updateAssetsExifV1 → writes remote_exif', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpaceAlbumAssetsV1([
+        await gallery.updateSharedSpaceAlbumAssetsV1([
           SyncAssetV2(
             id: 'asset-sa-2',
             checksum: 'cSA2',
@@ -2246,7 +2257,7 @@ void main() {
             isEdited: false,
           ),
         ]);
-        await sut.updateSharedSpaceAlbumAssetExifsV1([
+        await gallery.updateSharedSpaceAlbumAssetExifsV1([
           SyncAssetExifV1(
             assetId: 'asset-sa-2',
             exifImageWidth: 1920,
@@ -2296,11 +2307,11 @@ void main() {
 
         // Dispatch all 8 SharedSpaceAlbum handler types.
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpacesV1([makeSpace()]);
-        await sut.updateSharedSpaceAlbumsV1([makeAlbumV2()]);
-        await sut.updateSharedSpaceAlbumLinksV1([makeAlbumLink()]);
-        await sut.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset()]);
-        await sut.updateSharedSpaceAlbumAssetsV1([
+        await gallery.updateSharedSpacesV1([makeSpace()]);
+        await gallery.updateSharedSpaceAlbumsV1([makeAlbumV2()]);
+        await gallery.updateSharedSpaceAlbumLinksV1([makeAlbumLink()]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset()]);
+        await gallery.updateSharedSpaceAlbumAssetsV1([
           SyncAssetV2(
             id: 'asset-inv-1',
             checksum: 'cInv1',
@@ -2354,15 +2365,17 @@ void main() {
       test('a contributed (albumId, assetId) membership is present after insert, '
           'absent after delete, blob retained', () async {
         await sut.updateUsersV1([_createUser()]);
-        await sut.updateSharedSpaceAlbumAssetsV1([
+        await gallery.updateSharedSpaceAlbumAssetsV1([
           _createAssetV2(id: 'contrib-asset', checksum: 'cContrib1', fileName: 'contrib.jpg'),
         ]);
-        await sut.updateSharedSpaceAlbumToAssetsV1([makeAlbumToAsset(albumId: 'album-1', assetId: 'contrib-asset')]);
+        await gallery.updateSharedSpaceAlbumToAssetsV1([
+          makeAlbumToAsset(albumId: 'album-1', assetId: 'contrib-asset'),
+        ]);
 
         final present = await db.sharedSpaceAlbumAssetEntity.select().get();
         expect(present.any((r) => r.albumId == 'album-1' && r.assetId == 'contrib-asset'), isTrue);
 
-        await sut.deleteSharedSpaceAlbumToAssetsV1([
+        await gallery.deleteSharedSpaceAlbumToAssetsV1([
           SyncAlbumToAssetDeleteV1(albumId: 'album-1', assetId: 'contrib-asset'),
         ]);
 
@@ -2391,7 +2404,7 @@ void main() {
       await sut.updateUsersV1([_createUser()]);
       await sut.updateAssetsV1([_createAsset(id: 'fav-asset-1', checksum: 'cFav1', fileName: 'fav1.jpg')]);
 
-      await sut.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'fav-asset-1')]);
+      await gallery.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'fav-asset-1')]);
 
       final row = await (db.remoteAssetEntity.select()..where((t) => t.id.equals('fav-asset-1'))).getSingle();
       expect(row.isFavorite, isTrue);
@@ -2400,21 +2413,24 @@ void main() {
     test('deleteAssetFavoritesV1 flips isFavorite back to false for a known asset', () async {
       await sut.updateUsersV1([_createUser()]);
       await sut.updateAssetsV1([_createAsset(id: 'fav-asset-2', checksum: 'cFav2', fileName: 'fav2.jpg')]);
-      await sut.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'fav-asset-2')]);
+      await gallery.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'fav-asset-2')]);
 
-      await sut.deleteAssetFavoritesV1([SyncAssetFavoriteDeleteV1(assetId: 'fav-asset-2')]);
+      await gallery.deleteAssetFavoritesV1([SyncAssetFavoriteDeleteV1(assetId: 'fav-asset-2')]);
 
       final row = await (db.remoteAssetEntity.select()..where((t) => t.id.equals('fav-asset-2'))).getSingle();
       expect(row.isFavorite, isFalse);
     });
 
     test('updateAssetFavoritesV1 for an unknown assetId is a silent no-op (self-heals)', () async {
-      await expectLater(sut.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'not-synced-yet')]), completes);
+      await expectLater(gallery.updateAssetFavoritesV1([SyncAssetFavoriteV1(assetId: 'not-synced-yet')]), completes);
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
     });
 
     test('deleteAssetFavoritesV1 for an unknown assetId is a silent no-op (self-heals)', () async {
-      await expectLater(sut.deleteAssetFavoritesV1([SyncAssetFavoriteDeleteV1(assetId: 'not-synced-yet')]), completes);
+      await expectLater(
+        gallery.deleteAssetFavoritesV1([SyncAssetFavoriteDeleteV1(assetId: 'not-synced-yet')]),
+        completes,
+      );
       expect(await db.remoteAssetEntity.select().get(), isEmpty);
     });
   });

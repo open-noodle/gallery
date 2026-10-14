@@ -26,7 +26,7 @@ const PERSON_SUGGESTION_NUM_RESULTS = 100;
  * `person.service.ts` keeps only the in-place hook this engine needs from upstream code it cannot
  * own outright: the re-scan queue in `update()`. The backfill-completion queue
  * (`handleFaceIdentityBackfill`) and the bootstrap sweep (`queueInitialFaceSuggestionSweep`,
- * `onConfigValidate`, `onConfigUpdate`) live in `src/gallery/face-identity-maintenance.service.ts`.
+ * `onConfigValidate`, `onConfigUpdate`) live in `src/gallery/services/face-identity-maintenance.service.ts`.
  */
 @Injectable()
 export class FaceSuggestionService extends BaseService {

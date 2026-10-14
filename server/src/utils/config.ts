@@ -8,7 +8,7 @@ import {
   deriveSuggestionBand,
   foldLegacyFaceSuggestionConfig,
   migrateLegacyPetDetectionModel,
-} from 'src/gallery/config-migrations.js';
+} from 'src/gallery/utils/config-migrations.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';

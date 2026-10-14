@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
