@@ -27,6 +27,7 @@ const collectIdentityQueryText = () => {
   const files = [
     join(process.cwd(), 'src/repositories/face-identity.repository.ts'),
     join(process.cwd(), 'src/repositories/search.repository.ts'),
+    join(process.cwd(), 'src/gallery/filter-suggestion.repository.ts'),
     join(process.cwd(), 'src/queries/face.identity.repository.sql'),
   ].filter((path) => existsSync(path));
 
@@ -107,7 +108,7 @@ describe('Face identity query shape', () => {
       slice(/async hydrateAccessiblePeople[\s\S]*?private mapAccessiblePerson/),
       slice(/async getAccessiblePersonFilterSuggestions[\s\S]*?async getAccessiblePeople/),
       slice(/async searchAccessiblePeople[\s\S]*?async getAccessiblePersonFilterSuggestions/),
-      slice(/private async getFilteredIdentityPeople[\s\S]*?private async getFilteredRatings/),
+      slice(/export async function getFilteredIdentityPeople[\s\S]*?@Injectable\(\)/),
       slice(/identity-filter-suggestions[\s\S]*?async getFilterSuggestions/),
     ].join('\n');
 

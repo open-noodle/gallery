@@ -1,9 +1,9 @@
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
 import { Mocked, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetType, ImmichWorker, QueueName } from 'src/enum.js';
+import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
-import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository.js';
 import { AppMetricsService } from 'src/services/app-metrics.service.js';
@@ -20,7 +20,7 @@ type AppMetricsServiceMocks = {
   config: Mocked<Pick<ConfigRepository, 'getWorker'>>;
   telemetry: ReturnType<typeof newTelemetryRepositoryMock>;
   appMetrics: Mocked<Pick<AppMetricsRepository, 'getMetrics'>>;
-  job: Mocked<Pick<JobRepository, 'getTelemetryMetrics'>>;
+  queueMaintenance: Mocked<Pick<QueueMaintenanceRepository, 'getTelemetryMetrics'>>;
 };
 
 describe(AppMetricsService.name, () => {
@@ -36,14 +36,14 @@ describe(AppMetricsService.name, () => {
       config: { getWorker: vi.fn() },
       telemetry: newTelemetryRepositoryMock(),
       appMetrics: { getMetrics: vi.fn() },
-      job: { getTelemetryMetrics: vi.fn() },
+      queueMaintenance: { getTelemetryMetrics: vi.fn() },
     };
     sut = new AppMetricsService(
       mocks.logger as unknown as LoggingRepository,
       mocks.config as unknown as ConfigRepository,
       mocks.telemetry as unknown as TelemetryRepository,
       mocks.appMetrics as unknown as AppMetricsRepository,
-      mocks.job as unknown as JobRepository,
+      mocks.queueMaintenance as unknown as QueueMaintenanceRepository,
     );
     appCallbacks = new Map();
     jobCallbacks = new Map();
@@ -178,7 +178,7 @@ describe(AppMetricsService.name, () => {
 
   it('observes queue counts and oldest job age', async () => {
     mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
-    mocks.job.getTelemetryMetrics.mockResolvedValue({
+    mocks.queueMaintenance.getTelemetryMetrics.mockResolvedValue({
       counts: [{ queue: QueueName.ThumbnailGeneration, status: 'waiting', count: 5 }],
       oldestJobAges: [{ queue: QueueName.ThumbnailGeneration, status: 'waiting', ageSeconds: 120 }],
     });

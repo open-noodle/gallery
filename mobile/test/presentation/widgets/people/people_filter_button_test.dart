@@ -10,6 +10,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/people/people_filter_button.widget.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
@@ -43,13 +44,14 @@ void main() {
     });
   });
 
-  Future<void> pumpButton(WidgetTester tester) async {
+  Future<void> pumpButton(WidgetTester tester, {bool gallery = true}) async {
     await tester.pumpConsumerWidget(
       const CustomScrollView(
         slivers: [
           SliverAppBar(actions: [PeopleFilterButton()]),
         ],
       ),
+      overrides: [serverSupportsSpacesProvider.overrideWithValue(gallery)],
     );
     await tester.pumpAndSettle();
   }
@@ -91,6 +93,12 @@ void main() {
       expect(checkColor(tester, PeopleFilterBy.pets), isNot(Colors.transparent));
       expect(checkColor(tester, PeopleFilterBy.all), Colors.transparent);
       expect(checkColor(tester, PeopleFilterBy.people), Colors.transparent);
+    });
+
+    testWidgets('is absent on a stock Immich server', (tester) async {
+      await pumpButton(tester, gallery: false);
+
+      expect(find.byKey(const Key('people-filter-button')), findsNothing);
     });
   });
 }

@@ -20,13 +20,7 @@ export const newJobRepositoryMock = (): Mocked<RepositoryInterface<JobRepository
     isPaused: vitest.fn(),
     getJobCounts: vitest.fn(),
     getJobCountsWithRepair: vitest.fn(),
-    hasInFlightDedupChain: vitest.fn().mockResolvedValue(false),
-    getJobTypes: vitest.fn().mockResolvedValue([]),
-    getTelemetryMetrics: vitest.fn(),
     clear: vitest.fn(),
-    reconcileOrphanedActiveJobs: vitest.fn().mockImplementation(() => Promise.resolve()),
-    removeOrphanedActiveJobs: vitest.fn().mockImplementation(() => Promise.resolve([])),
-    removeFailedJobsByJobIdPrefix: vitest.fn().mockResolvedValue(0),
     waitForQueueCompletion: vitest.fn(),
     removeJob: vitest.fn(),
   };
