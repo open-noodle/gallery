@@ -1821,18 +1821,12 @@ export type RotateParameters = {
 export type MirrorParameters = {
     axis: MirrorAxis;
 };
-export type TrimParameters = {
-    /** End time in seconds */
-    endTime: number;
-    /** Start time in seconds */
-    startTime: number;
-};
 export type AssetEditActionItemResponseDto = {
     action: AssetEditAction;
     /** Asset edit ID */
     id: string;
-    /** List of edit actions to apply (crop, rotate, mirror, or trim) */
-    parameters: CropParameters | RotateParameters | MirrorParameters | TrimParameters;
+    /** List of edit actions to apply (crop, rotate, or mirror) */
+    parameters: CropParameters | RotateParameters | MirrorParameters;
 };
 export type AssetEditsResponseDto = {
     /** Asset ID these edits belong to */
@@ -1842,11 +1836,11 @@ export type AssetEditsResponseDto = {
 };
 export type AssetEditActionItemDto = {
     action: AssetEditAction;
-    /** List of edit actions to apply (crop, rotate, mirror, or trim) */
-    parameters: CropParameters | RotateParameters | MirrorParameters | TrimParameters;
+    /** List of edit actions to apply (crop, rotate, or mirror) */
+    parameters: CropParameters | RotateParameters | MirrorParameters;
 };
 export type AssetEditsCreateDto = {
-    /** List of edit actions to apply (crop, rotate, mirror, or trim) */
+    /** List of edit actions to apply (crop, rotate, or mirror) */
     edits: AssetEditActionItemDto[];
 };
 export type AssetMetadataResponseDto = {
@@ -1888,6 +1882,20 @@ export type AssetOcrResponseDto = {
     y3: number;
     /** Normalized y coordinate of box corner 4 (0-1) */
     y4: number;
+};
+export type AssetVideoTrimResponseDto = {
+    /** End of the kept part, in seconds from the start of the original video */
+    endTime: number;
+    /** Length of the untrimmed video, in seconds */
+    originalDuration: number;
+    /** Start of the kept part, in seconds from the start of the original video */
+    startTime: number;
+};
+export type AssetVideoTrimDto = {
+    /** End of the kept part, in seconds from the start of the original video */
+    endTime: number;
+    /** Start of the kept part, in seconds from the start of the original video */
+    startTime: number;
 };
 export type SignUpDto = {
     /** User email */
@@ -6695,6 +6703,46 @@ export function viewAsset({ edited, id, key, size, slug }: {
     }))}`, {
         ...opts
     }));
+}
+/**
+ * Remove the trim of a video
+ */
+export function removeAssetTrim({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/trim`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Retrieve the trim of a video
+ */
+export function getAssetTrim({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetVideoTrimResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/trim`, {
+        ...opts
+    }));
+}
+/**
+ * Trim a video
+ */
+export function updateAssetTrim({ id, assetVideoTrimDto }: {
+    id: string;
+    assetVideoTrimDto: AssetVideoTrimDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetVideoTrimResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/trim`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: assetVideoTrimDto
+    })));
 }
 /**
  * Play asset video
@@ -11583,8 +11631,7 @@ export enum Type {
 export enum AssetEditAction {
     Crop = "crop",
     Rotate = "rotate",
-    Mirror = "mirror",
-    Trim = "trim"
+    Mirror = "mirror"
 }
 export enum MirrorAxis {
     Horizontal = "horizontal",

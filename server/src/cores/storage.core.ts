@@ -204,6 +204,7 @@ export class StorageCore {
       return;
     }
 
+    // fs.rename only moves disk files (absolute paths); a relative S3 key stays where its backend put it
     if (!isAbsolute(oldPath)) {
       return;
     }

@@ -5,6 +5,7 @@ import path from 'node:path';
 import sanitize from 'sanitize-filename';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, StorageAsset } from 'src/types.js';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ConfigTemplateStorageOptionDto } from 'src/dtos/config.dto.js';
@@ -153,11 +154,6 @@ export class StorageTemplateService extends BaseService {
       return JobStatus.Failed;
     }
 
-    if (!path.isAbsolute(asset.originalPath)) {
-      this.logger.debug(`Skipping storage template migration for S3 asset ${id}`);
-      return JobStatus.Skipped;
-    }
-
     const user = await this.userRepository.get(asset.ownerId, {});
     const storageLabel = user?.storageLabel || null;
     const filename = asset.originalFileName || asset.id;
@@ -238,8 +234,8 @@ export class StorageTemplateService extends BaseService {
       return;
     }
 
-    if (!path.isAbsolute(asset.originalPath)) {
-      // S3 relative keys cannot be moved through fs.rename — S3 has its own placement rules.
+    // moveFile would not move a backend key either; this skips rendering its template path (album lookups, a lock)
+    if (!isDiskPath(asset.originalPath)) {
       this.logger.debug(`Skipping storage template migration for S3 asset ${asset.id}`);
       return;
     }

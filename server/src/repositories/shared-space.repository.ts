@@ -30,6 +30,7 @@ import { reviewableAssetVisibility } from 'src/utils/face-review.js';
 import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge.js';
 import { without } from 'src/utils/filter-suggestions.js';
 import {
+  albumMembership,
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceContributedAssetExists,
@@ -841,23 +842,12 @@ export class SharedSpaceRepository {
       .where('shared_space_album.spaceId', '=', spaceId)
       .where('album.deletedAt', 'is', null)
       .where((eb) =>
-        eb.or([
-          eb.exists(
-            eb
-              .selectFrom('album_asset')
-              .select('album_asset.assetId')
-              .whereRef('album_asset.albumId', '=', 'album.id')
-              .where('album_asset.assetId', 'in', assetIds),
-          ),
-          eb.exists(
-            eb
-              .selectFrom('album_space_asset')
-              .select('album_space_asset.assetId')
-              .whereRef('album_space_asset.albumId', '=', 'album.id')
-              .where('album_space_asset.spaceId', '=', spaceId)
-              .where('album_space_asset.assetId', 'in', assetIds),
-          ),
-        ]),
+        eb.exists(
+          eb
+            .selectFrom(albumMembership(eb, 'album.id', { spaceId }).as('album_members'))
+            .select('album_members.assetId')
+            .where('album_members.assetId', 'in', assetIds),
+        ),
       )
       .select(['album.id as albumId', 'album.albumName as albumName'])
       .distinct()

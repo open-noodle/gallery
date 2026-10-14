@@ -10,6 +10,17 @@ select
       (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           to_json("exifInfo") as "exifInfo"
         from
           "asset"
@@ -73,6 +84,17 @@ select
       (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           to_json("exifInfo") as "exifInfo",
           exists (
             select
@@ -150,6 +172,17 @@ select
       (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           (
             select
               coalesce(json_agg(agg), '[]')
@@ -232,6 +265,17 @@ select
       (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           (
             select
               coalesce(json_agg(agg), '[]')
