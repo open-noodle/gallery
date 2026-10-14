@@ -8,7 +8,6 @@ import { readFileSync } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
 import { basename } from 'node:path';
 import type { MaintenanceModeState } from 'src/types.js';
-import { serverVersion } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import {
   MaintenanceAuthDto,
@@ -18,6 +17,7 @@ import {
 } from 'src/dtos/maintenance.dto.js';
 import { ServerConfigDto, ServerPingResponse, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
 import { DatabaseLock, ImmichCookie, MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
+import { getClientServerVersion } from 'src/gallery/client-version.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
@@ -37,7 +37,9 @@ import { createMaintenanceLoginUrl, detectPriorInstall } from 'src/utils/mainten
 import { getExternalDomain } from 'src/utils/misc.js';
 import { detectMediaLocation } from 'src/utils/storage.js';
 
-/** This service is available inside of maintenance mode to manage maintenance mode */
+/**
+ * This service is available inside of maintenance mode to manage maintenance mode
+ */
 @Injectable()
 export class MaintenanceWorkerService {
   #secret: string | null = null;
@@ -94,7 +96,9 @@ export class MaintenanceWorkerService {
     }
   }
 
-  /** {@link _BaseService.configRepos} */
+  /**
+   * {@link _BaseService.configRepos}
+   */
   private get configRepos() {
     return {
       configRepo: this.configRepository,
@@ -103,28 +107,36 @@ export class MaintenanceWorkerService {
     };
   }
 
-  /** {@link _BaseService.prototype.getConfig} */
+  /**
+   * {@link _BaseService.prototype.getConfig}
+   */
   private getConfig(options: { withCache: boolean }) {
     return getConfig(this.configRepos, options);
   }
 
-  /** {@link _ServerService.getSystemConfig} */
+  /**
+   * {@link _ServerService.getSystemConfig}
+   */
   getSystemConfig() {
     return {
       maintenanceMode: true,
     } as ServerConfigDto;
   }
 
-  /** {@link _VersionService.getVersion} */
-  getVersion() {
-    return ServerVersionResponseDto.fromSemVer(serverVersion);
+  /**
+   * {@link _VersionService.getVersion}
+   */
+  getVersion(headers: IncomingHttpHeaders) {
+    return ServerVersionResponseDto.fromSemVer(getClientServerVersion(headers));
   }
 
   ping(): ServerPingResponse {
     return { res: 'pong' };
   }
 
-  /** {@link _ApiService.ssr} */
+  /**
+   * {@link _ApiService.ssr}
+   */
   ssr(excludePaths: string[]) {
     const { resourcePaths } = this.configRepository.getEnv();
 

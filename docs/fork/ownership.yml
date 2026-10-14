@@ -296,6 +296,7 @@ features:
       - rc-build-workflow
       - split-mobile-server-release
       - environment-tagged-user-agent
+      - stock-client-version
       - fork-migration-compatibility
       - schema-functions
       - structured-json-logging
@@ -318,6 +319,11 @@ features:
       - scripts/spec-citation-check.sh
       - scripts/upstream-review-pr.sh
       - Template/**
+      - server/src/gallery/client-version*.ts
+      - server/src/gallery/stock-client-socket.spec.ts
+      - web/src/lib/gallery/client-header*.ts
+      - mobile/lib/gallery/gallery_app_header.dart
+      - mobile/test/gallery/gallery_app_header_test.dart
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts
@@ -327,6 +333,18 @@ features:
       - docker/**
       - server/src/config.ts
       - server/src/utils/fetch.ts
+      - server/src/constants.ts
+      - server/src/controllers/server.controller.ts
+      - server/src/maintenance/maintenance-worker.controller.ts
+      - server/src/maintenance/maintenance-worker.service.ts
+      - server/src/repositories/websocket.repository.ts
+      - server/src/services/version.service.ts
+      - server/src/services/job.service.ts
+      - web/src/lib/stores/websocket.ts
+      - web/src/lib/utils/server.ts
+      - mobile/lib/infrastructure/repositories/network.repository.dart
+      - mobile/lib/services/api.service.dart
+      - packages/cli/src/utils.ts
       - server/src/schema/functions.ts
       - server/helmet.json
       - web/vite.config.ts

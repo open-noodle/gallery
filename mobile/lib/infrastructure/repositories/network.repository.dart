@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cupertino_http/cupertino_http.dart';
 import 'package:http/http.dart' as http;
+import 'package:immich_mobile/gallery/gallery_app_header.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:ok_http/ok_http.dart';
 import 'package:web_socket/web_socket.dart';
@@ -34,7 +35,8 @@ class NetworkRepository {
   }
 
   static Future<void> setHeaders(Map<String, String> headers, List<String> serverUrls, {String? token}) async {
-    await networkApi.setRequestHeaders(headers, serverUrls, token);
+    // The native clients carry these headers on every request, including the websocket upgrade.
+    await networkApi.setRequestHeaders({...headers, ...await galleryAppHeaders()}, serverUrls, token);
     if (Platform.isIOS) {
       await init();
     }

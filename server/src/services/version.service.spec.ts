@@ -10,7 +10,12 @@ const mockVersionResponse = (version: string) => ({
   published_at: DateTime.utc().toISO(),
 });
 
-vitest.mock('node:fs', () => ({ readFileSync: () => JSON.stringify({ version: 'v3.0.0' }) }));
+vitest.mock('node:fs', () => ({
+  readFileSync: () => JSON.stringify({ version: 'v3.0.0', immichVersion: '2.7.5' }),
+}));
+
+const galleryVersion = { major: 3, minor: 0, patch: 0, prerelease: null, featureLevel: expect.any(Number) };
+const baseVersion = { major: 2, minor: 7, patch: 5, prerelease: null, featureLevel: expect.any(Number) };
 
 describe(VersionService.name, () => {
   let sut: VersionService;
@@ -105,6 +110,16 @@ describe(VersionService.name, () => {
       });
       expect(Number.isSafeInteger(version.featureLevel)).toBe(true);
     });
+
+    it('should respond the Gallery version to Gallery clients', () => {
+      expect(sut.getVersion({ 'x-gallery-app': '3.0.0' })).toEqual(galleryVersion);
+      expect(sut.getVersion({ 'user-agent': 'immich-android/5.1.0' })).toEqual(galleryVersion);
+    });
+
+    it('should respond the upstream base version to stock clients', () => {
+      expect(sut.getVersion({ 'user-agent': 'immich-ios/3.3.1' })).toEqual(baseVersion);
+      expect(sut.getVersion({})).toEqual(baseVersion);
+    });
   });
 
   describe('getVersionHistory', () => {
@@ -153,7 +168,9 @@ describe(VersionService.name, () => {
       await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Success);
       expect(mocks.systemMetadata.set).toHaveBeenCalled();
       expect(mocks.logger.log).toHaveBeenCalled();
-      expect(mocks.websocket.clientBroadcast).toHaveBeenCalled();
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith('on_new_release', undefined, [
+        expect.objectContaining({ isAvailable: true }),
+      ]);
     });
 
     it('should not notify if the version is equal', async () => {
@@ -164,7 +181,7 @@ describe(VersionService.name, () => {
         checkedAt: expect.any(String),
         releaseVersion: 'v3.0.0',
       });
-      expect(mocks.websocket.clientBroadcast).not.toHaveBeenCalled();
+      expect(mocks.websocket.clientSendByClient).not.toHaveBeenCalled();
     });
 
     it('should handle a version check error', async () => {
@@ -172,7 +189,7 @@ describe(VersionService.name, () => {
       mocks.serverInfo.getLatestRelease.mockRejectedValue(new Error('Version service is down'));
       await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Failed);
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
-      expect(mocks.websocket.clientBroadcast).not.toHaveBeenCalled();
+      expect(mocks.websocket.clientSendByClient).not.toHaveBeenCalled();
       expect(mocks.logger.warn).toHaveBeenCalled();
     });
   });
@@ -204,16 +221,15 @@ describe(VersionService.name, () => {
   });
 
   describe('onWebsocketConnection', () => {
-    it('should send on_server_version client event', async () => {
+    it('should send on_server_version with the base version for stock clients', async () => {
       await sut.onWebsocketConnection({ userId: '42' });
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_server_version', '42', {
-        major: 3,
-        minor: 0,
-        patch: 0,
-        prerelease: null,
-        featureLevel: expect.any(Number),
-      });
-      expect(mocks.websocket.clientSend).toHaveBeenCalledTimes(1);
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith(
+        'on_server_version',
+        '42',
+        [galleryVersion],
+        [baseVersion],
+      );
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledTimes(1);
     });
 
     it('should also send a new release notification', async () => {
@@ -221,27 +237,25 @@ describe(VersionService.name, () => {
         .mockResolvedValueOnce({ newVersionCheck: { enabled: true } })
         .mockResolvedValueOnce({ checkedAt: '2024-01-01', releaseVersion: 'v1.42.0' });
       await sut.onWebsocketConnection({ userId: '42' });
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_server_version', '42', {
-        major: 3,
-        minor: 0,
-        patch: 0,
-        prerelease: null,
-        featureLevel: expect.any(Number),
-      });
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_new_release', '42', expect.any(Object));
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith(
+        'on_server_version',
+        '42',
+        [galleryVersion],
+        [baseVersion],
+      );
+      // no stock payload: a Gallery release notice would make stock apps compare against Gallery's version
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledWith('on_new_release', '42', [expect.any(Object)]);
     });
 
     it('should not send a release notification when the version check is disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValueOnce({ newVersionCheck: { enabled: false } });
       await sut.onWebsocketConnection({ userId: '42' });
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_server_version', '42', {
-        major: 3,
-        minor: 0,
-        patch: 0,
-        prerelease: null,
-        featureLevel: expect.any(Number),
-      });
-      expect(mocks.websocket.clientSend).not.toHaveBeenCalledWith('on_new_release', '42', expect.any(Object));
+      expect(mocks.websocket.clientSendByClient).toHaveBeenCalledTimes(1);
+      expect(mocks.websocket.clientSendByClient).not.toHaveBeenCalledWith(
+        'on_new_release',
+        expect.anything(),
+        expect.anything(),
+      );
     });
   });
 });
