@@ -7,7 +7,6 @@ enum SortOrder {
   }
 }
 
-// ignore: unused-code
 enum TextSearchType { context, filename, description, ocr }
 
 enum ActionSource { timeline, viewer }

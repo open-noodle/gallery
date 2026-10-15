@@ -16,7 +16,6 @@ import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 class MainTimelinePage extends ConsumerStatefulWidget {
   const MainTimelinePage({super.key});
 
-  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
 
   @override
