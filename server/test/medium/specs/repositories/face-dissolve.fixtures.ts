@@ -28,8 +28,13 @@ export const seedPerson = async (db: Kysely<DB>, dto: { ownerId: string; name?: 
     .expression((eb) => eb.selectFrom('user').select('user.clusterGroupId').where('user.id', '=', dto.ownerId))
     .returningAll()
     .executeTakeFirstOrThrow();
-  const person = mediumFactory.personInsert({ ...dto, personGroupId: group.id, name: dto.name ?? 'Person' });
+  const { type, ...rest } = dto;
+  const person = mediumFactory.personInsert({ ...rest, personGroupId: group.id, name: dto.name ?? 'Person' });
   await db.insertInto('person').values(person).execute();
+  // A pet is a person whose group has a person_pet row.
+  if (type === 'pet') {
+    await db.insertInto('person_pet').values({ personGroupId: group.id }).execute();
+  }
   return person;
 };
 

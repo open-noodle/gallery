@@ -37,9 +37,11 @@ const compileWhere = (where: (eb: ExpressionBuilder<DB, 'asset_face'>) => Expres
     .compile();
 
 describe('handDrawnFacePredicate', () => {
-  it('keys on createdBy alone, never on sourceType', () => {
+  it('keys on the asset_face_creator row alone, never on sourceType', () => {
     const { sql } = compileWhere((eb) => handDrawnFacePredicate(eb));
-    expect(sql).toContain('"asset_face"."createdBy" is not null');
+    expect(sql).toContain(
+      'exists (select from "asset_face_creator" where "asset_face_creator"."assetFaceId" = "asset_face"."id")',
+    );
     // Owner-drawn boxes are `manual` with no createdBy; gating on sourceType would misclassify them (§6.6).
     expect(sql).not.toContain('sourceType');
   });
@@ -55,7 +57,7 @@ describe('dissolveDeletableFacePredicate', () => {
     const inScopeWhere = inScopeSql.slice(inScopeSql.indexOf(' where ') + ' where '.length);
     expect(sql).toContain(inScopeWhere);
     // … and the hand-drawn exclusion is ANDed on top of it.
-    expect(sql).toContain('and not "asset_face"."createdBy" is not null');
+    expect(sql).toContain('and not exists (select from "asset_face_creator"');
     expect(parameters).toContain('person-1');
   });
 });
