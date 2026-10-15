@@ -24,6 +24,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -69,7 +70,8 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case GalleryPersonRepository:
     case SpatialSceneRepository:
     case DataSaverVideoRepository:
-    case VideoFaceRepository: {
+    case VideoFaceRepository:
+    case GameRepository: {
       return new key(db) as InstanceType<T>;
     }
 
@@ -105,7 +107,8 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case CleanupRepository:
     case SpatialSceneRepository:
     case DataSaverVideoRepository:
-    case VideoFaceRepository: {
+    case VideoFaceRepository:
+    case GameRepository: {
       return automock(key);
     }
 

@@ -38,6 +38,7 @@ const SharedSpaceUpdateSchema = z
       .nullable()
       .optional()
       .describe('Let editors change viewer and editor roles (null follows the server setting)'),
+    dailyChallengeEnabled: z.boolean().optional().describe('Enable the daily challenge for this space'),
   })
   .meta({ id: 'SharedSpaceUpdateDto' });
 
@@ -119,6 +120,11 @@ const SharedSpaceResponseSchema = z
     color: UserAvatarColorSchema.nullable().optional().describe('Space color'),
     faceRecognitionEnabled: z.boolean().optional().describe('Whether face recognition is enabled for this space'),
     petsEnabled: z.boolean().optional().describe('Whether pets are shown in space people list'),
+    dailyChallengeEnabled: z
+      .boolean()
+      .nullable()
+      .optional()
+      .describe('Whether the daily challenge is enabled; null when nobody has been asked yet'),
     hasPets: z.boolean().optional().describe('Whether any pet-type persons exist in this space'),
     lastActivityAt: z.string().nullable().optional().describe('Last activity timestamp (most recent asset add)'),
     recentAssetIds: z.array(z.string()).optional().describe('Recent asset IDs for collage display (up to 4)'),

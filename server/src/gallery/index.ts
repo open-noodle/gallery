@@ -2,6 +2,8 @@ import { ClassificationController } from 'src/controllers/classification.control
 import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller.js';
 import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
+import { GameSoloController } from 'src/controllers/game-solo.controller.js';
+import { GameController } from 'src/controllers/game.controller.js';
 import { LibraryManifestController } from 'src/controllers/library-manifest.controller.js';
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
@@ -59,6 +61,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
@@ -67,6 +70,7 @@ import { AppMetricsService } from 'src/services/app-metrics.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
+import { GameService } from 'src/services/game.service.js';
 import { LibraryManifestService } from 'src/services/library-manifest.service.js';
 import { PetDetectionService } from 'src/services/pet-detection.service.js';
 import { PetRecognitionService } from 'src/services/pet-recognition.service.js';
@@ -87,6 +91,8 @@ export const galleryControllers = [
   GalleryAssetController,
   GalleryClusterGroupController,
   GalleryFaceController,
+  GameController,
+  GameSoloController,
   GalleryMapController,
   GalleryPeopleController,
   GallerySearchController,
@@ -132,6 +138,7 @@ export const galleryRepositories = [
   GalleryMachineLearningRepository,
   DataSaverVideoRepository,
   VideoFaceRepository,
+  GameRepository,
 ];
 
 export const galleryServices = [
@@ -149,6 +156,7 @@ export const galleryServices = [
   GalleryPeopleService,
   GallerySearchService,
   GalleryStackService,
+  GameService,
   LibraryManifestService,
   PetDetectionService,
   SpatialSceneService,
