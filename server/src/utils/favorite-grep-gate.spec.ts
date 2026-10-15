@@ -28,6 +28,10 @@ const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
     reason:
       'columns.syncAsset (AssetSync streams only ownerId = the syncing user) and columns.workflowAssetV1 (listed twice, as upstream; workflow jobs act as the owner)',
   },
+  'src/repositories/cleanup.repository.ts': {
+    count: 1,
+    reason: 'cleanupAssetColumns: every Library Cleanup query filters ownerId = the caller',
+  },
   'src/repositories/asset.repository.ts': {
     count: 1,
     reason:

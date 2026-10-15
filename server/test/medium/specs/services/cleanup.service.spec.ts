@@ -10,7 +10,6 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { DB } from 'src/schema/index.js';
 import { CleanupService } from 'src/services/cleanup.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
-import { favoriteExistsForOwner } from 'src/utils/favorite.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -34,9 +33,8 @@ const setup = (db?: Kysely<DB>) => {
 const getAssetRow = (ctx: MediumTestContext, id: string) =>
   ctx.database
     .selectFrom('asset')
-    .select(['id', 'status', 'deletedAt'])
-    // Per-user favorites (#763): the owner's `asset_favorite` row, not a column on `asset`.
-    .select((eb) => favoriteExistsForOwner(eb).as('isFavorite'))
+    // asset.isFavorite is the owner's projection of the per-user favorites overlay (#763).
+    .select(['id', 'status', 'deletedAt', 'isFavorite'])
     .where('id', '=', id)
     .executeTakeFirst();
 

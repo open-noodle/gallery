@@ -19,7 +19,6 @@ import {
   CleanupStrictnessValue,
 } from 'src/utils/cleanup.js';
 import { anyUuid, withFilePath } from 'src/utils/database.js';
-import { favoriteExistsForOwner } from 'src/utils/favorite.js';
 
 /**
  * `afterLocalDateTime` is the previous window's last `cursorT` (full precision). A `Date` is accepted
@@ -104,9 +103,9 @@ const cleanupAssetColumns = <E extends readonly unknown[]>(
     eb.fn.coalesce('asset.height', 'asset_exif.exifImageHeight').as('height'),
     'asset.duration' as const,
     cleanupFileSizeExpr.as('fileSize'),
-    // Per-user favorites (#763): every cleanup query is owner-scoped, so the owner's overlay row is
-    // the caller's.
-    favoriteExistsForOwner(eb).as('isFavorite'),
+    // Every cleanup query is owner-scoped, and asset.isFavorite is the owner's projection of the
+    // per-user favorites overlay (#763), so it is the caller's favorite.
+    'asset.isFavorite' as const,
     eb
       .exists(
         eb

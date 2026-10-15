@@ -50,10 +50,7 @@ import { AssetMetadataAuditTable } from 'src/schema/tables/asset-metadata-audit.
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table.js';
 import { AssetOcrAuditTable } from 'src/schema/tables/asset-ocr-audit.table.js';
 import { AssetOcrTable } from 'src/schema/tables/asset-ocr.table.js';
-import { AssetQualityTable } from 'src/schema/tables/asset-quality.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
-import { CleanupDayReviewTable } from 'src/schema/tables/cleanup-day-review.table.js';
-import { CleanupDecisionTable } from 'src/schema/tables/cleanup-decision.table.js';
 import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-request.table.js';
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
@@ -127,9 +124,6 @@ export class ImmichDatabase {
     AssetTable,
     AssetFileTable,
     AssetExifTable,
-    AssetQualityTable,
-    CleanupDecisionTable,
-    CleanupDayReviewTable,
     ClusterGroupTable,
     ClusterGroupRequestTable,
     FaceSearchTable,
@@ -245,11 +239,7 @@ export interface DB extends GalleryDB {
   asset_audio: AssetAudioTable;
   asset_video: AssetVideoTable;
   asset_keyframe: AssetKeyframeTable;
-  asset_quality: AssetQualityTable;
   ocr_search: OcrSearchTable;
-
-  cleanup_decision: CleanupDecisionTable;
-  cleanup_day_review: CleanupDayReviewTable;
 
   face_search: FaceSearchTable;
 

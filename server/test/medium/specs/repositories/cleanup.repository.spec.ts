@@ -522,7 +522,7 @@ describe(CleanupRepository.name, () => {
       expect(quality.isScreenshot).toBe(true);
 
       const status = await ctx.database
-        .selectFrom('asset_job_status')
+        .selectFrom('asset_job_status_gallery')
         .select('qualityAnalyzedAt')
         .where('assetId', '=', asset.id)
         .executeTakeFirstOrThrow();
@@ -550,7 +550,7 @@ describe(CleanupRepository.name, () => {
       await sut.resetQualityAnalyzedAt();
 
       const status = await ctx.database
-        .selectFrom('asset_job_status')
+        .selectFrom('asset_job_status_gallery')
         .select('qualityAnalyzedAt')
         .where('assetId', '=', asset.id)
         .executeTakeFirstOrThrow();
