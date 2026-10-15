@@ -106,6 +106,7 @@ describe(MemoryService.name, () => {
     mocks.memoryRuleAsset.getMemoryFacesForPeriod.mockResolvedValue([]);
     mocks.memoryRuleAsset.getMemoryPersonDailyCounts.mockResolvedValue([]);
     mocks.memoryRuleAsset.getMemoryAssetsForPersonWindow.mockResolvedValue([]);
+    mocks.memoryRuleAsset.getPetPersonGroupIds.mockResolvedValue(new Set());
     mocks.user.getMetadata.mockResolvedValue([]);
     // Without these, every `onMemoriesCreate` test outside the `reconcileMemoryOverlap` /
     // `overlap backfill` describe blocks hits an unstubbed mock, `rows.length` throws a
@@ -202,8 +203,8 @@ describe(MemoryService.name, () => {
       mocks.user.getList.mockResolvedValue([user]);
       mocks.systemMetadata.get.mockResolvedValue(null);
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([
-        { personGroupId: 'person-1', name: 'Alice', birthDate: new Date('1990-04-23T00:00:00Z') },
+      mocks.person.forBirthdayMemories.mockResolvedValue([
+        { personGroupId: 'person-1', name: 'Alice', birthDate: { year: 1990, month: 4, day: 23 } },
       ]);
       mocks.memoryRuleAsset.getMemoryAssetsForPerson.mockResolvedValue([
         { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
@@ -228,7 +229,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledTimes(1);
       expect(mocks.memory.create).toHaveBeenCalledWith(
         expect.objectContaining({
           ownerId: user.id,
@@ -269,7 +270,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).not.toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).not.toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -292,11 +293,11 @@ describe(MemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -322,7 +323,7 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).not.toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).not.toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
       expect(mocks.memory.create).not.toHaveBeenCalled();
 
@@ -697,14 +698,14 @@ describe(MemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
       mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
       // birthday rule runs only for userA; recent-trip runs for both
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledWith(userA.id, expect.anything());
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledTimes(1);
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledWith(userA.id, expect.anything());
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userA.id, expect.anything());
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userB.id, expect.anything());
 
@@ -725,12 +726,12 @@ describe(MemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -748,11 +749,11 @@ describe(MemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.getBirthdaysForDay.mockResolvedValue([]);
+      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalled();
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
 
       vi.useRealTimers();
     });

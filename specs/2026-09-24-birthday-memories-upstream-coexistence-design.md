@@ -308,3 +308,17 @@ memory query now follows upstream and has **no type filter**. The previous
 `isInValues([onThisDay, rule])` existed because mobile could not title `birthday`, which is no
 longer true, and the server-side withholding above remains the guard. Follow-up 3 above is
 therefore done upstream's way.
+
+## 2026-10-15: the birthday rule runs upstream's query
+
+`BirthdayMemoryRule` now selects people with upstream's `PersonRepository.forBirthdayMemories`
+instead of the fork's `getBirthdaysForDay`, which is deleted. Upstream's query observes a 29 February
+birthday on 28 February in a non-leap year; the fork's matched month and day only, so those people
+never got a card three years in four. Upstream's query has no notion of pets, so the rule drops them
+with `MemoryRuleAssetRepository.getPetPersonGroupIds` (a `person_pet` lookup). It also requires a
+birth year before the target year, so a person born this year gets no card on the day of birth.
+
+Nothing else here changes: upstream's generator stays undispatched, `birthday` rows stay off every
+read path, and `forBirthdayMemories` stays upstream text, so the "Repositories" bullet above now
+describes one dormant query fewer. Medium cases in `memory.service.spec.ts` ("birthday rule on
+upstream birthday query") pin the leap-day observance and the pet exclusion.

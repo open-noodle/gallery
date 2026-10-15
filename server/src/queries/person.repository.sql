@@ -131,36 +131,6 @@ where
   )
   and date_part('year', person."birthDate")::int < $8
 
--- PersonRepository.getBirthdaysForDay
-select
-  "personGroupId",
-  "name",
-  "birthDate"
-from
-  "person"
-where
-  "ownerId" = $1
-  and "isHidden" = $2
-  and not EXISTS (
-    SELECT
-    FROM
-      "person_pet"
-    WHERE
-      "person_pet"."personGroupId" = "person"."personGroupId"
-  )
-  and "name" != $3
-  and "birthDate" is not null
-  and extract(
-    month
-    from
-      "birthDate"
-  ) = $4
-  and extract(
-    day
-    from
-      "birthDate"
-  ) = $5
-
 -- PersonRepository.getDormantPeople
 select
   "person"."personGroupId" as "id",
