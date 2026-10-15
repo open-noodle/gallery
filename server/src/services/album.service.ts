@@ -75,9 +75,10 @@ export class AlbumService extends BaseService {
 
     // Get asset count for each album. Then map the result to an object:
     // { [albumId]: assetCount }
+    // Gallery: stock sync streams album_asset only, so a stock client's count leaves out space contributions.
     const results = await this.albumRepository.getMetadataForIds(
       albums.map((album) => album.id),
-      { forUserId: auth.user.id },
+      { forUserId: auth.stockClient ? undefined : auth.user.id },
     );
     const albumMetadata: Record<string, AlbumAssetCount> = {};
     for (const metadata of results) {
@@ -108,7 +109,7 @@ export class AlbumService extends BaseService {
         ? auth.sharedLink.spaceId
           ? { forUserId: auth.sharedLink.userId, spaceId: auth.sharedLink.spaceId }
           : { forUserId: undefined }
-        : { forUserId: auth.user.id },
+        : { forUserId: auth.stockClient ? undefined : auth.user.id },
     );
 
     const hasSharedUsers = album.albumUsers && album.albumUsers.length > 1;

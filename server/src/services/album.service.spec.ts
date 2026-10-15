@@ -970,6 +970,24 @@ describe(AlbumService.name, () => {
       expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], { forUserId: owner.id });
     });
 
+    // Stock sync streams album_asset only, so a stock client's count must not promise the space contributions.
+    it('counts album_asset rows only for a stock client', async () => {
+      const album = AlbumFactory.from().albumUser().build();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      const auth = { ...AuthFactory.create(owner), stockClient: true as const };
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.getAll.mockResolvedValue([getForAlbum(album)]);
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.sharedSpace.getAlbumSpaceLinks.mockResolvedValue([]);
+      mocks.album.getMetadataForIds.mockResolvedValue([]);
+
+      await sut.get(auth, album.id);
+      await sut.getAll(auth, {});
+
+      expect(mocks.album.getMetadataForIds).toHaveBeenNthCalledWith(1, [album.id], { forUserId: undefined });
+      expect(mocks.album.getMetadataForIds).toHaveBeenNthCalledWith(2, [album.id], { forUserId: undefined });
+    });
+
     it('should get a shared album via shared with user', async () => {
       const user = UserFactory.create();
       const album = AlbumFactory.from().albumUser({ userId: user.id }).build();
