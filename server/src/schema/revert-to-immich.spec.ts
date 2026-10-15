@@ -231,8 +231,10 @@ describe('revert-to-immich.sql', () => {
     expect(sql).toMatch(/UPDATE "user_metadata"\s+SET "value" = "value" #- '\{memories,types\}'/);
   });
 
-  it('moves jit=off off the database, and off the role only for databases from before 1799400000000', () => {
-    expect(sql).toContain(`EXECUTE format('ALTER DATABASE %I RESET jit', current_database())`);
+  it('moves jit=off off the database, and off the role when the database could not hold it', () => {
+    expect(sql).toMatch(
+      /EXECUTE format\('ALTER DATABASE %I RESET jit', current_database\(\)\);\s+EXCEPTION WHEN insufficient_privilege THEN/,
+    );
     expect(sql).toMatch(/'1799400000000-ScopeJitOffToDatabase'\)\s+THEN\s+EXECUTE 'ALTER ROLE CURRENT_USER RESET jit'/);
   });
 });

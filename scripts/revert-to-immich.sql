@@ -742,10 +742,20 @@ DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 -- setting on this database. Before it, 1783628194057-DisablePostgresJit set it on
 -- the application role, which only that role can reset here; on such a database
 -- this resets the role running the script, so run it as the application role.
+-- ALTER DATABASE needs the database owner or a superuser. Without that privilege
+-- 1799400000000 also left the setting on the role, so the role is reset instead.
 DO $$
+DECLARE
+  database_reset boolean := true;
 BEGIN
-  EXECUTE format('ALTER DATABASE %I RESET jit', current_database());
-  IF to_regclass('public.gallery_migrations') IS NULL
+  BEGIN
+    EXECUTE format('ALTER DATABASE %I RESET jit', current_database());
+  EXCEPTION WHEN insufficient_privilege THEN
+    database_reset := false;
+    RAISE WARNING 'jit stays as set on database %: % cannot alter it', current_database(), CURRENT_USER;
+  END;
+  IF NOT database_reset
+     OR to_regclass('public.gallery_migrations') IS NULL
      OR NOT EXISTS (SELECT FROM "gallery_migrations" WHERE "name" = '1799400000000-ScopeJitOffToDatabase')
   THEN
     EXECUTE 'ALTER ROLE CURRENT_USER RESET jit';
