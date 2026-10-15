@@ -26,9 +26,9 @@ where
             1 as "one"
           from
             "person"
+            inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
           where
             "person"."personGroupId" = "asset_face"."personGroupId"
-            and "person"."type" = $3
         )
       )
   )
@@ -46,7 +46,13 @@ select
   ) as "softDeleted",
   count(*) filter (
     where
-      "asset_face"."createdBy" is not null
+      exists (
+        select
+        from
+          "asset_face_creator"
+        where
+          "asset_face_creator"."assetFaceId" = "asset_face"."id"
+      )
   ) as "handDrawn",
   count(*) filter (
     where
@@ -96,9 +102,9 @@ where
           1 as "one"
         from
           "person"
+          inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."type" = $5
       )
     )
   )
@@ -129,9 +135,9 @@ where
               1 as "one"
             from
               "person"
+              inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
             where
               "person"."personGroupId" = "asset_face"."personGroupId"
-              and "person"."type" = $2
           )
         )
       )
@@ -144,7 +150,7 @@ where
     where
       "other"."assetId" = "asset"."id"
       and "other"."personGroupId" is not null
-      and "other"."personGroupId" != $3
+      and "other"."personGroupId" != $2
       and "other"."deletedAt" is null
       and not (
         exists (
@@ -159,10 +165,9 @@ where
           select
             1 as "one"
           from
-            "person"
+            "person_pet"
           where
-            "person"."personGroupId" = "other"."personGroupId"
-            and "person"."type" = $4
+            "person_pet"."personGroupId" = "other"."personGroupId"
         )
       )
   )
@@ -193,15 +198,15 @@ where
               1 as "one"
             from
               "person"
+              inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
             where
               "person"."personGroupId" = "asset_face"."personGroupId"
-              and "person"."type" = $2
           )
         )
       )
   )
   and (
-    "asset"."visibility" = $3
+    "asset"."visibility" = $2
     or "asset"."deletedAt" is not null
     or not exists (
       select
@@ -210,7 +215,7 @@ where
         "asset_file"
       where
         "asset_file"."assetId" = "asset"."id"
-        and "asset_file"."type" = $4
+        and "asset_file"."type" = $3
     )
   )
 select
@@ -235,9 +240,9 @@ where
         1 as "one"
       from
         "person"
+        inner join "person_pet" on "person_pet"."personGroupId" = "person"."personGroupId"
       where
         "person"."personGroupId" = "asset_face"."personGroupId"
-        and "person"."type" = $2
     )
   )
 
@@ -274,8 +279,14 @@ from
   "person"
   left join "asset_face" on "asset_face"."personGroupId" = "person"."personGroupId"
 where
-  "person"."type" != $4
-  and "person"."ownerId" = $5
+  not EXISTS (
+    SELECT
+    FROM
+      "person_pet"
+    WHERE
+      "person_pet"."personGroupId" = "person"."personGroupId"
+  )
+  and "person"."ownerId" = $4
 group by
   "person"."personGroupId",
   "person"."name",
@@ -284,13 +295,19 @@ order by
   "exif" desc,
   "person"."personGroupId" asc
 limit
-  $6
+  $5
 offset
-  $7
+  $6
 select
   count(*) as "count"
 from
   "person"
 where
-  "person"."type" != $1
-  and "person"."ownerId" = $2
+  not EXISTS (
+    SELECT
+    FROM
+      "person_pet"
+    WHERE
+      "person_pet"."personGroupId" = "person"."personGroupId"
+  )
+  and "person"."ownerId" = $1
