@@ -79,6 +79,7 @@ ServerFeaturesDto makeServerFeatures({Optional<List<String>?> syncRequestTypes =
       peopleStatistics: false,
       realtimeTranscoding: false,
       reverseGeocoding: true,
+      s3Configured: false,
       s3Storage: false,
       search: true,
       sidecar: true,
