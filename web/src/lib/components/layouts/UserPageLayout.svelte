@@ -113,7 +113,7 @@
           {/if}
           {#if description}
             <p
-              class="shrink-0 text-sm whitespace-nowrap text-gray-400 dark:text-gray-600"
+              class="shrink-0 text-sm whitespace-nowrap text-gray-400 dark:text-gray-500"
               data-testid="page-header-description"
             >
               {description}

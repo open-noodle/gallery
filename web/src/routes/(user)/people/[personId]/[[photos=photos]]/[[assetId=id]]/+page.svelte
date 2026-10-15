@@ -6,6 +6,7 @@
   import OnEvents from '#lib/components/OnEvents.svelte';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import PersonIndicator from '#lib/components/faces-page/PersonIndicator.svelte';
+  import FamilyLinkDialog from '#lib/components/family/FamilyLinkDialog.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
@@ -67,7 +68,9 @@
   import { page } from '$app/state';
   import type { PageData } from './$types';
   import EditNameInput from './EditNameInput.svelte';
+  import FamilyRelationsPanel from './FamilyRelationsPanel.svelte';
   import UnmergeFaceSelector from './UnmergeFaceSelector.svelte';
+  import { getPersonFamilyRelations, type PersonFamilyRelations } from './family-relations';
 
   interface Props {
     data: PageData;
@@ -77,6 +80,27 @@
 
   let person = $derived(data.person);
   let thumbnailData = $derived(getScopedThumbnailUrl(person));
+
+  // Gallery-fork: family relationships, slice 8. Loaded outside `data` (rather than the page's
+  // own `load`) because it must never block the rest of the page — a viewer with no family
+  // access, or an instance with the feature disabled, still gets the whole person page instantly.
+  let familyRelations = $state<PersonFamilyRelations>({ access: 'none', relations: [] });
+  // The panel has always rendered an "Add a relationship" button, but the handler prop is
+  // optional and this page never passed one — so it rendered `onclick={undefined}` and did
+  // nothing at all. It opens the same dialog the /family page uses.
+  let linkingRelationship = $state(false);
+  const refreshFamilyRelations = (targetPerson: typeof person) =>
+    getPersonFamilyRelations(targetPerson).then((result) => {
+      // Guard against a slower, now-stale response landing after the viewer has already
+      // navigated to a different person's page.
+      if (person.id === targetPerson.id) {
+        familyRelations = result;
+      }
+    });
+
+  $effect(() => {
+    void refreshFamilyRelations(person);
+  });
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
   const timelineGrouping = timelineGroupingProps(() => timelineManager);
@@ -486,6 +510,22 @@
                 {/if}
               </section>
             </div>
+            <FamilyRelationsPanel
+              isPet={person.type === 'pet'}
+              access={familyRelations.access}
+              relations={familyRelations.relations}
+              onAddRelationship={() => (linkingRelationship = true)}
+            />
+            {#if linkingRelationship}
+              <FamilyLinkDialog
+                onClose={(created) => {
+                  linkingRelationship = false;
+                  if (created) {
+                    void refreshFamilyRelations(person);
+                  }
+                }}
+              />
+            {/if}
             {#if isEditingName}
               <div class="absolute z-1 w-64 sm:w-96">
                 {#if isSearchingPeople}

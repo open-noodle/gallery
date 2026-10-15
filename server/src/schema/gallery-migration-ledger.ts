@@ -31,6 +31,8 @@ const renamedGalleryMigrations: Record<string, string | null> = {
   // Shipped in the pr-1195 RC images, then renumbered above the fork migrations main had shipped meanwhile, so a
   // rollback reverts it first on fresh installs too.
   '1799400000000-ScopeJitOffToDatabase': '1799800000000-ScopeJitOffToDatabase',
+  // Shipped in the pr-1064 RC images, then renumbered above main's fork migrations.
+  '1795000000000-AddFamilyRelationships': '1800700000000-AddFamilyRelationships',
 };
 
 const createGalleryMigrator = (db: Kysely<any>) =>

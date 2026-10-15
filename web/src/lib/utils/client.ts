@@ -1,5 +1,6 @@
 import { galleryAppHeader } from '#lib/gallery/client-header.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+import { familyAccessManager } from '#lib/managers/family-access-manager.svelte.ts';
 import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
@@ -22,6 +23,13 @@ async function _init(fetch: Fetch) {
 
   if (!serverConfig.maintenanceMode) {
     await Promise.all([queryClient.query(getPublicConfigQuery()), featureFlagsManager.init()]);
+
+    // Gallery-fork: family relationships. Only probed once the caller is authenticated: the
+    // underlying `GET /family/me` call requires a session, and running it on e.g. the login page
+    // would just be a guaranteed 401 for no benefit.
+    if (authManager.authenticated) {
+      await familyAccessManager.init();
+    }
   }
 }
 
