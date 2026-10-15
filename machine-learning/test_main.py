@@ -3055,6 +3055,35 @@ class TestPrometheusMetrics:
         assert 'immich_ml_request_duration_ms_count{status="success",task="clip",type="textual"} 1.0' in metrics
         assert "immich_ml_active_requests 0.0" in metrics
 
+    def test_predict_records_http_error_metrics(self, deployed_app: TestClient) -> None:
+        from immich_ml.metrics import reset_metrics_for_tests
+
+        reset_metrics_for_tests()
+        entries = {"clip": {"textual": {"modelName": "ViT-B-32__openai"}}}
+
+        response = deployed_app.post("/predict", data={"entries": orjson.dumps(entries).decode()})
+        metrics = deployed_app.get("/metrics").text
+
+        assert response.status_code == 400
+        assert 'immich_ml_requests_total{status="error",task="clip",type="textual"} 1.0' in metrics
+        assert 'immich_ml_request_duration_ms_count{status="error",task="clip",type="textual"} 1.0' in metrics
+        assert 'status="success"' not in metrics
+
+    def test_predict_records_unhandled_error_metrics(self, deployed_app: TestClient, mocker: MockerFixture) -> None:
+        from immich_ml.metrics import reset_metrics_for_tests
+
+        reset_metrics_for_tests()
+        mocker.patch("immich_ml.main.run_inference", new_callable=mock.AsyncMock, side_effect=RuntimeError("boom"))
+        entries = {"clip": {"textual": {"modelName": "ViT-B-32__openai"}}}
+
+        with pytest.raises(RuntimeError):
+            deployed_app.post("/predict", data={"entries": orjson.dumps(entries).decode(), "text": "hello"})
+        metrics = deployed_app.get("/metrics").text
+
+        assert 'immich_ml_requests_total{status="error",task="clip",type="textual"} 1.0' in metrics
+        assert 'status="success"' not in metrics
+        assert "immich_ml_active_requests 0.0" in metrics
+
     def test_predict_records_validation_failure_with_unknown_labels(self, deployed_app: TestClient) -> None:
         from immich_ml.metrics import reset_metrics_for_tests
 
