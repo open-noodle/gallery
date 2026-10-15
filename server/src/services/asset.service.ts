@@ -1,7 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
-import type { AssetFile } from 'src/database.js';
+import type { ShallowDehydrateObject } from 'kysely';
+import type { AssetFace, AssetFile } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';

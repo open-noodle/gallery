@@ -780,10 +780,10 @@ describe(AssetService.name, () => {
           .exif()
           .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
           .build();
-        mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.access.spaceAsset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
         mocks.asset.getById.mockResolvedValue(asset as any);
         mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
-        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+        mocks.access.spaceAsset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
         mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(
           new Map([['person-1', { id: 'space-person-1', isHidden: false }]]),
         );

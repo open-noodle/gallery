@@ -731,7 +731,7 @@ describe(FamilyService.name, () => {
     it("labels relations relative to the SUBJECT, never the viewer's own root", async () => {
       giveViewOnlyAccess(sut, mocks);
       setUpGraphMocks();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
 
       const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
@@ -751,7 +751,7 @@ describe(FamilyService.name, () => {
     it('yields a null person with an opaque slot and no identity id for an unresolvable participant', async () => {
       giveViewOnlyAccess(sut, mocks);
       setUpGraphMocks();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
 
       const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
@@ -766,7 +766,7 @@ describe(FamilyService.name, () => {
     it('excludes everything from a union the viewer cannot see', async () => {
       giveViewOnlyAccess(sut, mocks);
       setUpGraphMocks();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
 
       const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
@@ -781,7 +781,7 @@ describe(FamilyService.name, () => {
 
     it('returns no relations for an accessible person never linked to a family identity', async () => {
       giveViewOnlyAccess(sut, mocks);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: LENA_PERSON_ID, identityId: null } as any);
 
       await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).resolves.toEqual([]);
@@ -790,7 +790,7 @@ describe(FamilyService.name, () => {
 
     it('throws not found when the person is not accessible at all', async () => {
       giveViewOnlyAccess(sut, mocks);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.faceIdentity.getAccessibleProfileIdentityId.mockResolvedValue(undefined);
 
       await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).rejects.toBeInstanceOf(NotFoundException);
@@ -803,7 +803,7 @@ describe(FamilyService.name, () => {
       sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
 
       await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).rejects.toBeInstanceOf(ForbiddenException);
-      expect(mocks.access.person.checkOwnerAccess).not.toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkOwnerAccess).not.toHaveBeenCalled();
     });
   });
 });
@@ -831,7 +831,7 @@ describe('creating relationships from person ids', () => {
     mocks.family.isAncestor.mockResolvedValue(false);
     mocks.family.getPartnerIds.mockResolvedValue([]);
     mocks.family.getChildIds.mockResolvedValue([]);
-    mocks.access.person.checkOwnerAccess.mockImplementation((_userId: string, ids: Set<string>) =>
+    mocks.access.galleryPerson.checkOwnerAccess.mockImplementation((_userId: string, ids: Set<string>) =>
       Promise.resolve(new Set(ids)),
     );
     mocks.person.getByGroupIdOnly.mockImplementation((id: string) =>

@@ -262,7 +262,9 @@ describe('family relationships — visibility query (real SQL)', () => {
         .updateTable('person')
         .set({ isHidden: false })
         .where('ownerId', '=', viewerId)
-        .where('identityId', '=', partnerB)
+        .where('personGroupId', 'in', (eb) =>
+          eb.selectFrom('person_identity').select('personGroupId').where('identityId', '=', partnerB),
+        )
         .execute();
 
       const unhiddenResult = await sut.getVisibleGraph(auth);

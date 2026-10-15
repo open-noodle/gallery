@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FamilyRepository } from 'src/repositories/family.repository.js';
@@ -57,11 +58,7 @@ const createPersonProfile = async (
   input: { ownerId: string; identityId: string; name?: string },
 ) => {
   const { person } = await ctx.newPerson({ ownerId: input.ownerId, name: input.name ?? 'Person' });
-  await ctx.database
-    .updateTable('person')
-    .set({ identityId: input.identityId })
-    .where('personGroupId', '=', person.personGroupId)
-    .execute();
+  await writePersonSidecars(ctx.database, person.personGroupId, { identityId: input.identityId });
   return person;
 };
 

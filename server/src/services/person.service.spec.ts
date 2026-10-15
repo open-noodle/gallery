@@ -636,7 +636,7 @@ describe(PersonService.name, () => {
       enableFamilyFeature(sut);
       setUpGraph();
       mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       const response = await sut.getById(auth, person.personGroupId);
@@ -650,7 +650,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ ownerId: auth.user.id, identityId: PERSON_IDENTITY_ID });
       enableFamilyFeature(sut);
       mocks.family.getAccess.mockResolvedValue({ level: 'none' } as any);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       const response = await sut.getById(auth, person.personGroupId);
@@ -666,7 +666,7 @@ describe(PersonService.name, () => {
       setUpGraph();
       mocks.user.getMetadata.mockResolvedValue([]);
       mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       const response = await sut.getById(auth, person.personGroupId);

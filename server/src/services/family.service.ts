@@ -228,7 +228,7 @@ export class FamilyService extends BaseService {
       throw new NotFoundException();
     }
 
-    return this.serveFromBackend(
+    return this.backendMedia.serveFromBackend(
       person.thumbnailPath,
       mimeTypes.lookup(person.thumbnailPath),
       CacheControl.PrivateWithoutCache,
