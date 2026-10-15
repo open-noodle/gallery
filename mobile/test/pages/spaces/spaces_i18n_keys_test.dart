@@ -60,6 +60,36 @@ void main() {
     );
   });
 
+  // Hard-coded English in the shapes these files use for user-facing text: a Text literal, a
+  // toast message, a tooltip or field label, or a ternary branch inside one of them.
+  final englishLiteralPattern = RegExp(r"(?:\bText\(|\bmsg: |\btooltip: |\blabelText: |\bhintText: |\? )'[A-Z][a-z]");
+
+  test('the spaces feature has no hard-coded English user-facing strings', () {
+    final found = <String>[];
+    for (final dir in [...scannedDirs, 'lib/widgets/spaces']) {
+      for (final entity in Directory(dir).listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) {
+          continue;
+        }
+        final lines = entity.readAsLinesSync();
+        for (var i = 0; i < lines.length; i++) {
+          if (englishLiteralPattern.hasMatch(lines[i])) {
+            found.add('${entity.path}:${i + 1}: ${lines[i].trim()}');
+          }
+        }
+      }
+    }
+
+    expect(found, isEmpty, reason: 'use a key from i18n/gallery/en.json instead:\n${found.join('\n')}');
+  });
+
+  test('the English literal pattern matches the shapes it guards', () {
+    expect(englishLiteralPattern.hasMatch("title: const Text('Members'),"), isTrue);
+    expect(englishLiteralPattern.hasMatch("msg: 'Space deleted',"), isTrue);
+    expect(englishLiteralPattern.hasMatch("Text(isLeaving ? 'Leave Space' : 'Remove Member')"), isTrue);
+    expect(englishLiteralPattern.hasMatch('title: Text(context.t.members),'), isFalse);
+  });
+
   // Proves the check above can actually fail — otherwise a broken regex or a bad path would make
   // it green regardless of what the source contains.
   test('the key pattern matches the call shape used in these files', () {
