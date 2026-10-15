@@ -911,7 +911,7 @@ export class GameService extends BaseService {
     // deployment) streams the bytes server-side and is unaffected. Closing the redirect-mode gap
     // needs a force-proxy option on serveFromBackend or route-specific streaming - a deliberate
     // follow-up, not an oversight.
-    return this.serveFromBackend(
+    return this.backendMedia.serveFromBackend(
       previewFile.previewPath,
       mimeTypes.lookup(previewFile.previewPath),
       // Private, not public: this is membership-gated content pulled from a private shared space,

@@ -1,6 +1,3 @@
-import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
-import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
-import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
 import { AlbumSpaceAssetAuditTable } from 'src/schema/tables/album-space-asset-audit.table.js';
 import { AlbumSpaceAssetTable } from 'src/schema/tables/album-space-asset.table.js';
 import { AssetDuplicateChecksumTable } from 'src/schema/tables/asset-duplicate-checksum.table.js';
@@ -16,6 +13,9 @@ import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.ta
 import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table.js';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
+import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
