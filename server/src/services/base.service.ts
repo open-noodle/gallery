@@ -38,6 +38,7 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
@@ -174,6 +175,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   FaceSearchRepository,
   GallerySyncRepository,
   VideoTrimRepository,
+  FaceDissolveRepository,
 ] as const;
 
 @Injectable()
@@ -260,6 +262,7 @@ export class BaseService {
     protected faceSearchRepository: FaceSearchRepository,
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
+    protected faceDissolveRepository: FaceDissolveRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -374,6 +377,7 @@ export class BaseService {
       ctx.faceSearchRepository,
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
+      ctx.faceDissolveRepository,
     );
 
     service.logger.setContext(BaseService.name);

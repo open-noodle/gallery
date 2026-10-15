@@ -5,7 +5,12 @@
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { Route } from '$lib/route';
   import { manualReviewOwnerId } from '$lib/stores/face-cleanup-manual-review.store';
-  import { getFaceRepairOwnerPeople, type FaceRepairOwnerPeopleResponseDto } from '@immich/sdk';
+  import {
+    getFaceRepairOwnerPeople,
+    getFaceRepairPeopleHealth,
+    type FaceRepairOwnerPeopleResponseDto,
+    type PeopleHealthResponseDto,
+  } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';
   import { mdiAccountCircleOutline, mdiMagnify } from '@mdi/js';
   import { onMount } from 'svelte';
@@ -17,7 +22,14 @@
   // new server endpoints — everything here already exists (searchUsersAdmin for the owner list,
   // getFaceRepairOwnerPeople for the paginated rows, the admin face-thumbnail route for crops).
 
+  // Discovery (Task 8): a second tab, "Health", backed by getFaceRepairPeopleHealth — the contamination
+  // signal. Deliberately NOT folded into the Browse grid above: that grid is a name-search picker with no
+  // way to rank people by how contaminated they are, and no scan ever flags an EXIF-only person for review
+  // (the scan requires an embedding). This tab is the only way an admin finds one.
+
   type OwnerPerson = FaceRepairOwnerPeopleResponseDto['people'][number];
+  type PersonHealthRow = PeopleHealthResponseDto['people'][number];
+  type HealthSort = 'faceCount' | 'exifFaces' | 'facesWithoutEmbedding';
 
   type Props = { data: PageData };
   const { data }: Props = $props();
@@ -40,6 +52,7 @@
     return users.length > 0 ? users[0].id : null;
   };
   let selectedOwnerId = $state<string | null>(resolveInitialOwnerId());
+  let view = $state<'browse' | 'health'>('browse');
   let query = $state('');
   let people = $state<OwnerPerson[]>([]);
   let total = $state(0);
@@ -132,6 +145,11 @@
     page = 0;
     hasLoadedOnce = false;
     void fetchPage(ownerId, 0, '');
+
+    resetHealth();
+    if (view === 'health') {
+      void fetchHealthPage(ownerId, 1, healthSort);
+    }
   };
 
   onMount(() => {
@@ -175,6 +193,104 @@
     }
     void fetchPage(selectedOwnerId, 0, trimmedQuery);
   };
+
+  // --- Health tab (Task 8: discovery) ---------------------------------------------------------
+
+  let healthSort = $state<HealthSort>('faceCount');
+  let healthPeople = $state<PersonHealthRow[]>([]);
+  let healthTotal = $state(0);
+  let healthHasMore = $state(false);
+  let healthPage = $state(1);
+  let healthLoading = $state(false);
+  let healthLoadingMore = $state(false);
+  let healthLoadError = $state(false);
+  let healthLoadMoreError = $state(false);
+  let healthHasLoadedOnce = $state(false);
+
+  const showHealthEmpty = $derived(
+    healthHasLoadedOnce && !healthLoading && !healthLoadError && healthPeople.length === 0,
+  );
+
+  // Same stale-response guard as fetchPage above, kept separate so a browse-tab request and a health-tab
+  // request can never clobber each other's state.
+  let healthRequestToken = 0;
+
+  const fetchHealthPage = async (ownerId: string, requestPage: number, sort: HealthSort) => {
+    const token = ++healthRequestToken;
+    if (requestPage === 1) {
+      healthLoading = true;
+      healthLoadError = false;
+    } else {
+      healthLoadingMore = true;
+      healthLoadMoreError = false;
+    }
+    try {
+      const result = await getFaceRepairPeopleHealth({ ownerId, sort, page: requestPage });
+      if (token !== healthRequestToken) {
+        return;
+      }
+      healthPeople = requestPage === 1 ? result.people : [...healthPeople, ...result.people];
+      healthTotal = result.total;
+      healthHasMore = result.hasMore;
+      healthPage = requestPage;
+      healthHasLoadedOnce = true;
+    } catch {
+      if (token !== healthRequestToken) {
+        return;
+      }
+      if (requestPage === 1) {
+        healthLoadError = true;
+        healthPeople = [];
+      } else {
+        healthLoadMoreError = true;
+      }
+    } finally {
+      if (token === healthRequestToken) {
+        healthLoading = false;
+        healthLoadingMore = false;
+      }
+    }
+  };
+
+  const resetHealth = () => {
+    healthPeople = [];
+    healthTotal = 0;
+    healthHasMore = false;
+    healthPage = 1;
+    healthHasLoadedOnce = false;
+  };
+
+  const handleViewChange = (nextView: 'browse' | 'health') => {
+    if (view === nextView) {
+      return;
+    }
+    view = nextView;
+    if (nextView === 'health' && selectedOwnerId && !healthHasLoadedOnce) {
+      void fetchHealthPage(selectedOwnerId, 1, healthSort);
+    }
+  };
+
+  const handleHealthSortChange = (event: Event) => {
+    healthSort = (event.currentTarget as HTMLSelectElement).value as HealthSort;
+    resetHealth();
+    if (selectedOwnerId) {
+      void fetchHealthPage(selectedOwnerId, 1, healthSort);
+    }
+  };
+
+  const handleHealthLoadMore = () => {
+    if (!selectedOwnerId || healthLoadingMore) {
+      return;
+    }
+    void fetchHealthPage(selectedOwnerId, healthPage + 1, healthSort);
+  };
+
+  const handleHealthRetry = () => {
+    if (!selectedOwnerId) {
+      return;
+    }
+    void fetchHealthPage(selectedOwnerId, 1, healthSort);
+  };
 </script>
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, manualCrumb($t))}>
@@ -184,135 +300,290 @@
       <p class="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{$t('admin.face_cleanup_mode_manual_sub')}</p>
     </div>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-      {#if showOwnerSelect}
-        <select
-          class="immich-form-input h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
-          value={selectedOwnerId}
-          onchange={handleOwnerChange}
-          data-testid="owner-select"
-        >
-          {#each users as user (user.id)}
-            <option value={user.id}>{user.name}</option>
-          {/each}
-        </select>
-      {/if}
-
-      <div
-        class="flex min-w-48 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
+    <!-- Task 8: Browse (the existing name-search picker) vs Health (the contamination signal). -->
+    <div class="mb-6 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
+      <button
+        type="button"
+        onclick={() => handleViewChange('browse')}
+        class={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
+          view === 'browse'
+            ? 'bg-primary/10 text-primary'
+            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+        }`}
+        data-testid="people-tab-browse"
       >
-        <Icon icon={mdiMagnify} size="16" class="flex-none text-gray-300" />
-        <input
-          type="text"
-          bind:value={query}
-          oninput={handleSearchInput}
-          placeholder={$t('admin.face_cleanup_people_search_placeholder')}
-          class="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none dark:text-gray-200"
-          data-testid="people-search-input"
-        />
-      </div>
+        {$t('admin.face_cleanup_people_tab_browse')}
+      </button>
+      <button
+        type="button"
+        onclick={() => handleViewChange('health')}
+        class={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
+          view === 'health'
+            ? 'bg-primary/10 text-primary'
+            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+        }`}
+        data-testid="people-tab-health"
+      >
+        {$t('admin.face_cleanup_people_tab_health')}
+      </button>
     </div>
 
-    {#if loadError}
-      <div
-        class="mb-4 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
-        data-testid="people-load-error"
-      >
-        <span class="flex-1">{$t('admin.face_cleanup_people_load_error')}</span>
-        <Button color="secondary" size="small" onclick={handleRetry} data-testid="people-load-error-retry">
-          {$t('retry')}
-        </Button>
-      </div>
-    {:else if loading}
-      <div class="flex items-center justify-center py-20 text-gray-400">
-        <span>{$t('loading')}</span>
-      </div>
-    {:else if !selectedOwnerId}
-      <div
-        class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
-        data-testid="people-no-users"
-      >
-        <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_no_users')}</div>
-      </div>
-    {:else if showEmptyOwner}
-      <div
-        class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
-        data-testid="people-empty-owner"
-      >
-        <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_empty_owner')}</div>
-      </div>
-    {:else if showNoResults}
-      <div
-        class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
-        data-testid="people-no-results"
-      >
-        <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_no_results')}</div>
-      </div>
-    {:else}
-      <div class="mb-2 text-xs text-gray-400 tabular-nums">
-        {people.length.toLocaleString()} / {total.toLocaleString()}
-      </div>
-      <div
-        class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-        data-testid="people-grid"
-      >
-        {#each people as person (person.id)}
-          <a
-            href={Route.viewFaceCleanupManualPerson({ id: person.id })}
-            class="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition hover:border-primary/50 dark:border-gray-700 dark:bg-gray-800"
-            data-testid={`person-tile-${person.id}`}
+    {#if view === 'browse'}
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        {#if showOwnerSelect}
+          <select
+            class="immich-form-input h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
+            value={selectedOwnerId}
+            onchange={handleOwnerChange}
+            data-testid="owner-select"
           >
-            <div class="aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
-              {#if person.thumbnailFaceId}
-                <img
-                  src={getAdminFaceThumbnailUrl(person.thumbnailFaceId)}
-                  alt=""
-                  class="size-full object-cover"
-                  loading="lazy"
-                  data-testid={`person-tile-thumb-${person.id}`}
-                />
-              {:else}
-                <div
-                  class="flex size-full items-center justify-center text-gray-300 dark:text-gray-600"
-                  data-testid={`person-tile-placeholder-${person.id}`}
-                >
-                  <Icon icon={mdiAccountCircleOutline} size="32" />
-                </div>
-              {/if}
-            </div>
-            <div class="p-3">
-              <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">{displayName(person.name)}</div>
-              <div class="mt-0.5 text-xs text-gray-400 tabular-nums">
-                {person.faceCount.toLocaleString()}
-                {$t('admin.face_cleanup_faces')}
-              </div>
-            </div>
-          </a>
-        {/each}
+            {#each users as user (user.id)}
+              <option value={user.id}>{user.name}</option>
+            {/each}
+          </select>
+        {/if}
+
+        <div
+          class="flex min-w-48 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
+        >
+          <Icon icon={mdiMagnify} size="16" class="flex-none text-gray-300" />
+          <input
+            type="text"
+            bind:value={query}
+            oninput={handleSearchInput}
+            placeholder={$t('admin.face_cleanup_people_search_placeholder')}
+            class="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none dark:text-gray-200"
+            data-testid="people-search-input"
+          />
+        </div>
       </div>
 
-      {#if loadMoreError}
-        <!-- F27: scoped to the failed page only — the grid above (every page loaded so far) stays exactly as
-             it was. Retry re-requests the SAME page (`page` was never advanced on failure), never page 0. -->
+      {#if loadError}
         <div
-          class="mt-6 flex items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
-          data-testid="people-load-more-error"
+          class="mb-4 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
+          data-testid="people-load-error"
         >
-          <span>{$t('admin.face_cleanup_people_page_error')}</span>
-          <Button color="secondary" size="small" onclick={handleLoadMore} data-testid="people-load-more-error-retry">
+          <span class="flex-1">{$t('admin.face_cleanup_people_load_error')}</span>
+          <Button color="secondary" size="small" onclick={handleRetry} data-testid="people-load-error-retry">
             {$t('retry')}
           </Button>
         </div>
+      {:else if loading}
+        <div class="flex items-center justify-center py-20 text-gray-400">
+          <span>{$t('loading')}</span>
+        </div>
+      {:else if !selectedOwnerId}
+        <div
+          class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
+          data-testid="people-no-users"
+        >
+          <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_no_users')}</div>
+        </div>
+      {:else if showEmptyOwner}
+        <div
+          class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
+          data-testid="people-empty-owner"
+        >
+          <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_empty_owner')}</div>
+        </div>
+      {:else if showNoResults}
+        <div
+          class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
+          data-testid="people-no-results"
+        >
+          <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_no_results')}</div>
+        </div>
       {:else}
-        <!-- Scroll-driven pagination: the sentinel loads the next page as it enters the viewport, so the grid
-             grows as the admin scrolls instead of dead-ending on a "Load more" button. -->
-        <InfiniteScrollSentinel
-          {hasMore}
-          loading={loadingMore}
-          onLoadMore={handleLoadMore}
-          itemCount={people.length}
-          class="mt-6 flex h-10 w-full items-center justify-center"
-        />
+        <div class="mb-2 text-xs text-gray-400 tabular-nums">
+          {people.length.toLocaleString()} / {total.toLocaleString()}
+        </div>
+        <div
+          class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+          data-testid="people-grid"
+        >
+          {#each people as person (person.id)}
+            <a
+              href={Route.viewFaceCleanupManualPerson({ id: person.id })}
+              class="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition hover:border-primary/50 dark:border-gray-700 dark:bg-gray-800"
+              data-testid={`person-tile-${person.id}`}
+            >
+              <div class="aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
+                {#if person.thumbnailFaceId}
+                  <img
+                    src={getAdminFaceThumbnailUrl(person.thumbnailFaceId)}
+                    alt=""
+                    class="size-full object-cover"
+                    loading="lazy"
+                    data-testid={`person-tile-thumb-${person.id}`}
+                  />
+                {:else}
+                  <div
+                    class="flex size-full items-center justify-center text-gray-300 dark:text-gray-600"
+                    data-testid={`person-tile-placeholder-${person.id}`}
+                  >
+                    <Icon icon={mdiAccountCircleOutline} size="32" />
+                  </div>
+                {/if}
+              </div>
+              <div class="p-3">
+                <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                  {displayName(person.name)}
+                </div>
+                <div class="mt-0.5 text-xs text-gray-400 tabular-nums">
+                  {person.faceCount.toLocaleString()}
+                  {$t('admin.face_cleanup_faces')}
+                </div>
+              </div>
+            </a>
+          {/each}
+        </div>
+
+        {#if loadMoreError}
+          <!-- F27: scoped to the failed page only — the grid above (every page loaded so far) stays exactly as
+               it was. Retry re-requests the SAME page (`page` was never advanced on failure), never page 0. -->
+          <div
+            class="mt-6 flex items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
+            data-testid="people-load-more-error"
+          >
+            <span>{$t('admin.face_cleanup_people_page_error')}</span>
+            <Button color="secondary" size="small" onclick={handleLoadMore} data-testid="people-load-more-error-retry">
+              {$t('retry')}
+            </Button>
+          </div>
+        {:else}
+          <!-- Scroll-driven pagination: the sentinel loads the next page as it enters the viewport, so the grid
+               grows as the admin scrolls instead of dead-ending on a "Load more" button. -->
+          <InfiniteScrollSentinel
+            {hasMore}
+            loading={loadingMore}
+            onLoadMore={handleLoadMore}
+            itemCount={people.length}
+            class="mt-6 flex h-10 w-full items-center justify-center"
+          />
+        {/if}
+      {/if}
+    {:else}
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        {#if showOwnerSelect}
+          <select
+            class="immich-form-input h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
+            value={selectedOwnerId}
+            onchange={handleOwnerChange}
+            data-testid="owner-select-health"
+          >
+            {#each users as user (user.id)}
+              <option value={user.id}>{user.name}</option>
+            {/each}
+          </select>
+        {/if}
+
+        <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          {$t('admin.face_cleanup_people_sort_label')}
+          <select
+            class="immich-form-input h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
+            value={healthSort}
+            onchange={handleHealthSortChange}
+            data-testid="health-sort-select"
+          >
+            <option value="faceCount">{$t('admin.face_cleanup_people_sort_faceCount')}</option>
+            <option value="exifFaces">{$t('admin.face_cleanup_people_sort_exifFaces')}</option>
+            <option value="facesWithoutEmbedding">
+              {$t('admin.face_cleanup_people_sort_facesWithoutEmbedding')}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      {#if healthLoadError}
+        <div
+          class="mb-4 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
+          data-testid="health-load-error"
+        >
+          <span class="flex-1">{$t('admin.face_cleanup_people_load_error')}</span>
+          <Button color="secondary" size="small" onclick={handleHealthRetry} data-testid="health-load-error-retry">
+            {$t('retry')}
+          </Button>
+        </div>
+      {:else if healthLoading}
+        <div class="flex items-center justify-center py-20 text-gray-400">
+          <span>{$t('loading')}</span>
+        </div>
+      {:else if !selectedOwnerId}
+        <div
+          class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
+          data-testid="health-no-users"
+        >
+          <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_no_users')}</div>
+        </div>
+      {:else if showHealthEmpty}
+        <div
+          class="rounded-2xl border border-dashed border-gray-200 py-20 text-center dark:border-gray-700"
+          data-testid="health-empty-owner"
+        >
+          <div class="text-lg font-medium text-gray-500">{$t('admin.face_cleanup_people_empty_owner')}</div>
+        </div>
+      {:else}
+        <div class="mb-2 text-xs text-gray-400 tabular-nums">
+          {healthPeople.length.toLocaleString()} / {healthTotal.toLocaleString()}
+        </div>
+        <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+          <table class="w-full text-left text-sm" data-testid="health-table">
+            <thead class="bg-gray-50 text-xs text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
+              <tr>
+                <th class="px-4 py-2 font-medium">{$t('name')}</th>
+                <th class="px-4 py-2 text-right font-medium">{$t('admin.face_cleanup_col_faces')}</th>
+                <th class="px-4 py-2 text-right font-medium">{$t('admin.face_cleanup_col_exif')}</th>
+                <th class="px-4 py-2 text-right font-medium">{$t('admin.face_cleanup_col_machine_learning')}</th>
+                <th class="px-4 py-2 text-right font-medium">{$t('admin.face_cleanup_col_manual')}</th>
+                <th class="px-4 py-2 text-right font-medium">{$t('admin.face_cleanup_col_no_embedding')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each healthPeople as person (person.id)}
+                <tr class="border-t border-gray-100 dark:border-gray-700" data-testid={`health-row-${person.id}`}>
+                  <td class="px-4 py-2">
+                    <a
+                      href={Route.viewFaceCleanupManualPerson({ id: person.id })}
+                      class="font-medium text-gray-900 hover:text-primary dark:text-white"
+                    >
+                      {displayName(person.name)}
+                    </a>
+                  </td>
+                  <td class="px-4 py-2 text-right tabular-nums">{person.faceCount.toLocaleString()}</td>
+                  <td class="px-4 py-2 text-right tabular-nums">{person.exif.toLocaleString()}</td>
+                  <td class="px-4 py-2 text-right tabular-nums">{person.machineLearning.toLocaleString()}</td>
+                  <td class="px-4 py-2 text-right tabular-nums">{person.manual.toLocaleString()}</td>
+                  <td class="px-4 py-2 text-right tabular-nums">{person.facesWithoutEmbedding.toLocaleString()}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+
+        {#if healthLoadMoreError}
+          <div
+            class="mt-6 flex items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
+            data-testid="health-load-more-error"
+          >
+            <span>{$t('admin.face_cleanup_people_page_error')}</span>
+            <Button
+              color="secondary"
+              size="small"
+              onclick={handleHealthLoadMore}
+              data-testid="health-load-more-error-retry"
+            >
+              {$t('retry')}
+            </Button>
+          </div>
+        {:else}
+          <InfiniteScrollSentinel
+            hasMore={healthHasMore}
+            loading={healthLoadingMore}
+            onLoadMore={handleHealthLoadMore}
+            itemCount={healthPeople.length}
+            class="mt-6 flex h-10 w-full items-center justify-center"
+          />
+        {/if}
       {/if}
     {/if}
   </div>
