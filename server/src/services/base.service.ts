@@ -19,6 +19,7 @@ import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.reposit
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
+import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -176,6 +177,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  CleanupRepository,
 ] as const;
 
 @Injectable()
@@ -263,6 +265,7 @@ export class BaseService {
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
     protected imageAdjustRepository: ImageAdjustRepository,
+    protected cleanupRepository: CleanupRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -378,6 +381,7 @@ export class BaseService {
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
       ctx.imageAdjustRepository,
+      ctx.cleanupRepository,
     );
 
     service.logger.setContext(BaseService.name);

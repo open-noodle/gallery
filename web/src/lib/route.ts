@@ -197,6 +197,10 @@ export const Route = {
   duplicatesUtility: (params?: { index?: number }) => '/utilities/duplicates' + asQueryString(params),
   largeFileUtility: () => '/utilities/large-files',
   geolocationUtility: () => '/utilities/geolocation',
+  cleanupUtility: () => '/utilities/cleanup',
+  cleanupRewind: ({ monthDay }: { monthDay: number }) => `/utilities/cleanup/rewind/${monthDay}`,
+  cleanupQueue: ({ queue }: { queue: 'space-hogs' | 'bursts' | 'screenshots' | 'blurry' }) =>
+    `/utilities/cleanup/${queue}`,
 
   // workflows
   workflows: () => '/workflows',
