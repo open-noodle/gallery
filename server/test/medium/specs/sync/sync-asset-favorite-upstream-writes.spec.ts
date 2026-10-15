@@ -69,7 +69,15 @@ describe('upstream owner-only favorite writes', () => {
     const { ctx, auth, user } = await setup();
     const { sut, ctx: serviceCtx } = newMediumService(AssetMediaService, {
       database: defaultDatabase,
-      real: [AccessRepository, AlbumRepository, AssetRepository, SharedLinkRepository, UserRepository],
+      real: [
+        AccessRepository,
+        AlbumRepository,
+        AssetRepository,
+        ConfigRepository,
+        SharedLinkRepository,
+        SystemMetadataRepository,
+        UserRepository,
+      ],
       mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
     });
     serviceCtx.getMock(StorageRepository).utimes.mockResolvedValue();

@@ -98,6 +98,14 @@ else
 
   run_phase setup
 
+  # Per-file-type routing (originals/thumbnails/encodedVideo pinned independently of
+  # IMMICH_STORAGE_BACKEND) never needs a restart — the S3 backend is initialized
+  # whenever IMMICH_S3_BUCKET is set, which docker-compose.storage-migration.yml
+  # always sets regardless of the active backend.
+  run_phase routing-mixed-write
+  run_phase routing-flip-safe
+  run_phase routing-migrate-converge
+
   restart_server s3
   run_phase migrate-to-s3
   run_phase video-trim-s3

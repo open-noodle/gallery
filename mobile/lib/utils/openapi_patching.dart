@@ -44,6 +44,7 @@ final Map<String, Map<String, Object?>> openApiPatches = {
     'realtimeTranscoding': false,
     'peopleStatistics': false,
     'smartSearchHasCutoff': false,
+    's3Storage': false,
   },
   'SearchAssetResponseDto': {'nextCursor': null},
   'MemoriesResponse': {'duration': 5, 'sidebarWeb': false, 'types': const <String, bool>{}},

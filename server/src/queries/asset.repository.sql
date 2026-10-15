@@ -537,6 +537,8 @@ select
   "path"
 from
   "asset_file"
+where
+  "path" like $1
 limit
   3
 
