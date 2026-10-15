@@ -833,7 +833,8 @@ export class PersonRepository {
           )
           .orderBy('person.personGroupId'),
       )
-      .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
+      // an explicit isHidden filter takes precedence over withHidden
+      .$if(!options?.withHidden && options?.isHidden === undefined, (qb) => qb.where('person.isHidden', '=', false))
       .$if(!!options?.type, (qb) => qb.where(personType(), '=', options!.type!))
       .$if(options?.isFavorite !== undefined, (qb) => qb.where('person.isFavorite', '=', options!.isFavorite!))
       .$if(options?.isHidden !== undefined, (qb) => qb.where('person.isHidden', '=', options!.isHidden!))
