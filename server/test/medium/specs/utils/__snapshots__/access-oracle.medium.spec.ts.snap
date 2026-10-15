@@ -603,6 +603,10 @@ exports[`checkAccess oracle > face.read 1`] = `{}`;
 
 exports[`checkAccess oracle > face.update 1`] = `{}`;
 
+exports[`checkAccess oracle > family.read 1`] = `{}`;
+
+exports[`checkAccess oracle > family.write 1`] = `{}`;
+
 exports[`checkAccess oracle > folder.read 1`] = `{}`;
 
 exports[`checkAccess oracle > job.create 1`] = `{}`;

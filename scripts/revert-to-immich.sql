@@ -269,7 +269,8 @@ UPDATE "api_key" k
                 'sharedSpaceAlbum.create', 'sharedSpaceAlbum.update', 'sharedSpaceAlbum.delete',
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
-                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete'
+                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
+                'family.read', 'family.write'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
@@ -352,6 +353,10 @@ DROP TABLE IF EXISTS "shared_space_person" CASCADE;
 DROP TABLE IF EXISTS "shared_space_face_match_backfill_target" CASCADE;
 DROP TABLE IF EXISTS "shared_space_library_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_asset_audit" CASCADE;
+DROP TABLE IF EXISTS "family_access" CASCADE;
+DROP TABLE IF EXISTS "family_union_child" CASCADE;
+DROP TABLE IF EXISTS "family_union_partner" CASCADE;
+DROP TABLE IF EXISTS "family_union" CASCADE;
 DROP TABLE IF EXISTS "face_person_verdict" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
@@ -583,7 +588,9 @@ DELETE FROM "migration_overrides"
    'trigger_asset_favorite_delete_audit',
    'trigger_asset_favorite_after_insert',
    'trigger_asset_favorite_after_delete',
-   'trigger_asset_is_favorite_after_write'
+   'trigger_asset_is_favorite_after_write',
+   'trigger_family_union_updatedAt',
+   'index_family_union_partner_key_uq'
  );
 
 -- -----------------------------------------------------------------------------
@@ -789,6 +796,7 @@ DELETE FROM "kysely_migrations"
   -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
   '1794000000000-AddAssetFavoriteTables',
   '1794100000000-DropAssetIsFavoriteColumn',
+  '1795000000000-AddFamilyRelationships',
   '1796000000000-AddAssetFaceCreatedBy',
   '1797000000000-AddAssetLocalDateTimeIndex',
   '1798000000000-AddSharedLinkSpaceTable',
@@ -876,7 +884,8 @@ BEGIN
       OR "name" LIKE '%AddFaceRepairLock%'
       OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
       OR "name" LIKE '%AddFaceRepairScanInFlightIndex%'
-      OR "name" LIKE '%AssetFavoriteTables%';
+      OR "name" LIKE '%AssetFavoriteTables%'
+      OR "name" LIKE '%FamilyRelationships%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -912,6 +921,8 @@ BEGIN
        'asset_video_trim',
        'person_identity',
        'person_pet',
+       'family_access', 'family_union_child', 'family_union_partner',
+       'family_union',
        'gallery_migrations', 'gallery_migrations_lock'
      );
   IF fork_tables_left > 0 THEN

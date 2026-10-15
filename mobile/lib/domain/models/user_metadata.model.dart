@@ -9,6 +9,11 @@ enum UserMetadataKey {
   onboarding,
   preferences,
   license,
+  // Gallery-fork: mirrors the server's `family-root` UserMetadataKey (the identity the viewer
+  // nominated as themselves for family-relationship labels). Added here only so the generic
+  // user-metadata sync stream compiles against the server enum — relations themselves are
+  // server-sourced and never synced to Drift (see `family_relations.provider.dart`).
+  familyRoot,
 }
 
 @freezed
@@ -72,12 +77,51 @@ abstract class License with _$License {
   }
 }
 
+// Gallery-fork: the local shape of the server's `family-root` metadata value — just the
+// nominated identity id, or null if never set / cleared. See `UserMetadataKey.familyRoot`.
+class FamilyRoot {
+  final String? identityId;
+
+  const FamilyRoot({this.identityId});
+
+  FamilyRoot copyWith({String? identityId}) {
+    return FamilyRoot(identityId: identityId ?? this.identityId);
+  }
+
+  Map<String, Object?> toMap() {
+    return {"identityId": identityId};
+  }
+
+  factory FamilyRoot.fromMap(Map<String, Object?> map) {
+    return FamilyRoot(identityId: map["identityId"] as String?);
+  }
+
+  @override
+  String toString() {
+    return '''FamilyRoot {
+identityId: ${identityId ?? "<NA>"},
+}''';
+  }
+
+  @override
+  bool operator ==(covariant FamilyRoot other) {
+    if (identical(this, other)) {
+      return true;
+    }
+
+    return identityId == other.identityId;
+  }
+
+  @override
+  int get hashCode => identityId.hashCode;
+}
+
 // Model for a user metadata stored in the server
 @freezed
 abstract class UserMetadata with _$UserMetadata {
   @Assert(
-    'onboarding != null || preferences != null || license != null',
-    'One of onboarding, preferences and license must be provided',
+    'onboarding != null || preferences != null || license != null || familyRoot != null',
+    'One of onboarding, preferences, license and familyRoot must be provided',
   )
   const factory UserMetadata({
     required String userId,
@@ -85,5 +129,7 @@ abstract class UserMetadata with _$UserMetadata {
     Onboarding? onboarding,
     Preferences? preferences,
     License? license,
+    // Gallery-fork: the nominated family root identity (UserMetadataKey.familyRoot).
+    FamilyRoot? familyRoot,
   }) = _UserMetadata;
 }

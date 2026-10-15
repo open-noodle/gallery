@@ -7,6 +7,14 @@ export enum SharedSpaceRole {
   Viewer = 'viewer',
 }
 
+// Family relationships. Access comes from an admin-granted level (or the instance default), never
+// from a shared-space role. See FamilyService.
+export enum FamilyAccessLevel {
+  None = 'none',
+  View = 'view',
+  Contribute = 'contribute',
+}
+
 export enum SharedSpaceActivityType {
   AssetAdd = 'asset_add',
   AssetRemove = 'asset_remove',

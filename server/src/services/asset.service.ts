@@ -1,7 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
-import type { AssetFile } from 'src/database.js';
+import type { ShallowDehydrateObject } from 'kysely';
+import type { AssetFace, AssetFile } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
@@ -34,6 +35,7 @@ import {
   AssetStatus,
   AssetType,
   AssetVisibility,
+  FamilyAccessLevel,
   JobName,
   JobStatus,
   Permission,
@@ -116,7 +118,54 @@ export class AssetService extends BaseService {
       { auth, id, spaceId, data, faces: asset.faces ?? [] },
     );
 
+    // Gallery-fork: family relationships. Applied LAST, after every space-scoping/hidden-people
+    // branch above, and unconditionally across all of them — access to `familyRelationLabel`
+    // comes from the family grant alone, never from a space role, so a space-sourced person (or
+    // one reached through an album/partner share) must not silently lose its label. `person.id`
+    // is never reassigned by `applySpacePeople` (it only overlays display fields), so the
+    // owner-scoped `identityByPersonId` built from `asset.faces` still applies to every branch.
+    await this.applyFamilyRelationLabels(auth, data, asset.faces ?? []);
+
     return data;
+  }
+
+  private buildIdentityByPersonId(faces: ShallowDehydrateObject<AssetFace>[]): Map<string, string> {
+    const identityByPersonId = new Map<string, string>();
+    for (const face of faces) {
+      // Keyed on `personGroupId`, not `person.id`: since upstream's cluster groups landed, the
+      // `id` on a mapped `PersonResponseDto` is the person GROUP id, so keying this map on the
+      // per-cluster `person.id` would never match the `person.id` the callers look up.
+      if (face.person?.personGroupId && face.person.identityId) {
+        identityByPersonId.set(face.person.personGroupId, face.person.identityId);
+      }
+    }
+    return identityByPersonId;
+  }
+
+  // ONE graph load per request (`getFamilyLabelSet`, `BaseService`) regardless of how many people
+  // this one asset carries — never one per person, and this is only ever called once per `get()`
+  // call, never once per asset in a list (see the base slice's report for why list/search/
+  // timeline responses are out of scope here: none of them fetch the `faces` relation at all, so
+  // `mapAsset`'s `people` array is already empty for every OTHER caller of `mapAsset`).
+  private async applyFamilyRelationLabels(
+    auth: AuthDto,
+    data: AssetResponseDto,
+    faces: ShallowDehydrateObject<AssetFace>[],
+  ): Promise<void> {
+    const people = data.people;
+    if (!people?.length) {
+      return;
+    }
+
+    const labelSet = await this.getFamilyLabelSet(auth);
+    if (labelSet.level === FamilyAccessLevel.None) {
+      return;
+    }
+
+    const identityByPersonId = this.buildIdentityByPersonId(faces);
+    for (const person of people) {
+      person.familyRelationLabel = labelSet.label(identityByPersonId.get(person.id));
+    }
   }
 
   async update(auth: AuthDto, id: string, dto: UpdateAssetDto): Promise<AssetResponseDto> {
