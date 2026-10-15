@@ -729,7 +729,7 @@ END $$;
 
 -- 1782000000000-AddAssetExifDescriptionTrigramIndex added a fork-only GIN
 -- trigram index on asset_exif.description (for timeline description filtering)
--- that v2.7.5 does not have, plus its migration_overrides registration row.
+-- that upstream Immich does not have, plus its migration_overrides registration row.
 DROP INDEX IF EXISTS "idx_asset_exif_description_trigram";
 DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_description_trigram';
 
@@ -753,9 +753,10 @@ BEGIN
 END $$;
 
 -- No post-tag upstream migration needs reversing right now. `upstream.version` is
--- 3.3.1 and this branch's `server/src/schema/migrations/` is identical to upstream
--- v3.3.1's (same 100 files, unchanged from v3.3.0), so every upstream migration Gallery
--- carries is one the tagged release also ships. The 3.3.0 -> 3.3.1 bump removed nothing.
+-- 3.3.3 and this branch's `server/src/schema/migrations/` is identical to upstream
+-- v3.3.3's (same 100 files, unchanged from v3.3.0), so every upstream migration Gallery
+-- carries is one the tagged release also ships. The 3.3.0 -> 3.3.1 and 3.3.1 -> 3.3.3
+-- bumps removed nothing.
 -- The 3.2.4 -> 3.3.0 bump removed four more entries, for the
 -- same reason as below: 1789419229196-ConvertUserOAuthIdEmptyStringToNull,
 -- 1790587508209-RenameGeoNamesCountries, 1790616293884-PersonSharing and
@@ -922,7 +923,7 @@ DELETE FROM "kysely_migrations"
 
    -- Post-tag upstream migrations pulled in by rebase would follow here, paired with
    -- schema rollbacks in step 7 and kept timestamp-sorted. None right now:
-   -- `upstream.version` is 3.3.1 and every upstream migration this branch carries ships
+   -- `upstream.version` is 3.3.3 and every upstream migration this branch carries ships
    -- in that tag (see step 7).
  );
 

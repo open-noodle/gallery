@@ -60,6 +60,7 @@ on:
       - 'packages/plugin-gallery/**'
       - '.github/workflows/gallery-revert-to-immich-validation.yml'
       - '.github/scripts/revert-to-immich-data.sh'
+      - 'docs/docs/guides/switch-back-to-immich.md'
 
 concurrency:
   group: gallery-revert-to-immich-validation
@@ -156,6 +157,15 @@ jobs:
               fi
             done < <(comm -23 <(enum_values "$enum" server/src/enum.ts) <(enum_values "$enum" "$upstream_enum"))
           done
+
+          # The switch-back guide names the Immich release to pin. Any Immich version it names (major
+          # below 5; Gallery's own start at 5) must be the one this build is based on.
+          while IFS=: read -r line version; do
+            if [ "$version" != "$UPSTREAM_TAG" ]; then
+              echo "::error file=docs/docs/guides/switch-back-to-immich.md,line=${line}::Names Immich ${version}, but upstream.version is ${UPSTREAM_TAG}"
+              missing=1
+            fi
+          done < <(grep -noE '\bv[0-4]\.[0-9]+\.[0-9]+\b' docs/docs/guides/switch-back-to-immich.md || true)
 
           exit "$missing"
 
