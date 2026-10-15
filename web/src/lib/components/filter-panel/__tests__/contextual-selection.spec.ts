@@ -38,6 +38,8 @@ const suggestions = (overrides: Partial<FilterSuggestionsResponse> = {}): Filter
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   ...overrides,
 });
 
@@ -288,6 +290,24 @@ describe('the panel reflects a contextual STATE filter', () => {
 
     // The section toggles live inside the cog's popover since #912, so open it before reaching for
     // one — the same `openSectionMenu` step filter-panel.spec.ts grew for its own toggle tests.
+    await userEvent.click(page.getByTestId('section-menu-btn'));
+
+    await userEvent.click(page.getByTestId('section-toggle-location'));
+    expect(page.getByTestId('section-toggle-dot-location').element()).toBeInTheDocument();
+  });
+
+  // Same bug class, same fix, for the absence-of-location rows: a locationPresence-only filter must
+  // mark the section active too.
+  it('marks the location section active for a locationPresence-only filter', async () => {
+    await renderPanel(
+      {
+        sections: ['location', 'rating'],
+        suggestionsProvider: () => Promise.resolve(suggestions({ hasNoGpsAssets: true })),
+        providers: {},
+      },
+      { locationPresence: 'noGps' },
+    );
+
     await userEvent.click(page.getByTestId('section-menu-btn'));
 
     await userEvent.click(page.getByTestId('section-toggle-location'));

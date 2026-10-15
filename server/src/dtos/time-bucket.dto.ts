@@ -3,76 +3,79 @@ import z from 'zod';
 import { BBoxSchema } from 'src/dtos/bbox.dto.js';
 import { AssetOrderBySchema, AssetOrderSchema, AssetVisibilitySchema } from 'src/enum.js';
 import { GalleryTimeBucketQueryExtension } from 'src/gallery/dtos/time-bucket.dto.js';
-import { stringToBool } from 'src/validation.js';
+import { IsNotSiblingOf, stringToBool } from 'src/validation.js';
 
-const TimeBucketQueryBaseSchema = z
-  .object({
-    userId: z.uuidv4().optional().describe('Filter assets by specific user ID'),
-    albumId: z.uuidv4().optional().describe('Filter assets belonging to a specific album'),
-    personId: z.uuidv4().optional().describe('Filter assets containing a specific person (face recognition)'),
-    tagId: z.uuidv4().optional().describe('Filter assets with a specific tag'),
-    isFavorite: stringToBool
-      .optional()
-      .describe('Filter by favorite status (true for favorites only, false for non-favorites only)'),
-    isTrashed: stringToBool
-      .optional()
-      .describe('Filter by trash status (true for trashed assets only, false for non-trashed only)'),
-    withStacked: stringToBool
-      .optional()
-      .describe('Include stacked assets in the response. When true, only primary assets from stacks are returned.'),
-    withPartners: stringToBool.optional().describe('Include assets shared by partners'),
-    ...GalleryTimeBucketQueryExtension,
-    order: AssetOrderSchema.optional().describe(
-      'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
-    ),
-    orderBy: AssetOrderBySchema.optional().describe(
-      'Date to group and order assets by (takenAt for date taken, createdAt for date added to Immich)',
-    ),
-    visibility: AssetVisibilitySchema.optional().describe(
-      'Filter by asset visibility status (ARCHIVE, TIMELINE, HIDDEN, LOCKED)',
-    ),
-    withCoordinates: stringToBool.optional().describe('Include location data in the response'),
-    key: z.string().optional(),
-    slug: z.string().optional(),
-    bbox: z
-      .string()
-      .transform((value, ctx) => {
-        const parts = value.split(',');
-        if (parts.length !== 4) {
-          ctx.issues.push({
-            code: 'custom',
-            message: 'bbox must have 4 comma-separated numbers: west,south,east,north',
-            input: value,
-          });
-          return z.NEVER;
-        }
+const TimeBucketQueryBaseSchema = z.object({
+  userId: z.uuidv4().optional().describe('Filter assets by specific user ID'),
+  albumId: z.uuidv4().optional().describe('Filter assets belonging to a specific album'),
+  personId: z.uuidv4().optional().describe('Filter assets containing a specific person (face recognition)'),
+  tagId: z.uuidv4().optional().describe('Filter assets with a specific tag'),
+  isFavorite: stringToBool
+    .optional()
+    .describe('Filter by favorite status (true for favorites only, false for non-favorites only)'),
+  isTrashed: stringToBool
+    .optional()
+    .describe('Filter by trash status (true for trashed assets only, false for non-trashed only)'),
+  withStacked: stringToBool
+    .optional()
+    .describe('Include stacked assets in the response. When true, only primary assets from stacks are returned.'),
+  withPartners: stringToBool.optional().describe('Include assets shared by partners'),
+  ...GalleryTimeBucketQueryExtension,
+  order: AssetOrderSchema.optional().describe(
+    'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
+  ),
+  orderBy: AssetOrderBySchema.optional().describe(
+    'Date to group and order assets by (takenAt for date taken, createdAt for date added to Immich)',
+  ),
+  visibility: AssetVisibilitySchema.optional().describe(
+    'Filter by asset visibility status (ARCHIVE, TIMELINE, HIDDEN, LOCKED)',
+  ),
+  withCoordinates: stringToBool.optional().describe('Include location data in the response'),
+  key: z.string().optional(),
+  slug: z.string().optional(),
+  bbox: z
+    .string()
+    .transform((value, ctx) => {
+      const parts = value.split(',');
+      if (parts.length !== 4) {
+        ctx.issues.push({
+          code: 'custom',
+          message: 'bbox must have 4 comma-separated numbers: west,south,east,north',
+          input: value,
+        });
+        return z.NEVER;
+      }
 
-        const [west, south, east, north] = parts.map(Number);
-        if ([west, south, east, north].some((part) => Number.isNaN(part))) {
-          ctx.issues.push({
-            code: 'custom',
-            message: 'bbox parts must be valid numbers',
-            input: value,
-          });
-          return z.NEVER;
-        }
+      const [west, south, east, north] = parts.map(Number);
+      if ([west, south, east, north].some((part) => Number.isNaN(part))) {
+        ctx.issues.push({
+          code: 'custom',
+          message: 'bbox parts must be valid numbers',
+          input: value,
+        });
+        return z.NEVER;
+      }
 
-        return { west, south, east, north };
-      })
-      .pipe(BBoxSchema)
-      .optional()
-      .describe('Bounding box coordinates as west,south,east,north (WGS84)')
-      .meta({ example: '11.075683,49.416711,11.117589,49.454875' }),
-  })
-  .meta({ id: 'TimeBucketDto' });
+      return { west, south, east, north };
+    })
+    .pipe(BBoxSchema)
+    .optional()
+    .describe('Bounding box coordinates as west,south,east,north (WGS84)')
+    .meta({ example: '11.075683,49.416711,11.117589,49.454875' }),
+});
 
-const TimeBucketSchema = TimeBucketQueryBaseSchema;
-const TimeBucketAssetSchema = TimeBucketQueryBaseSchema.extend({
+const TimeBucketSchema = TimeBucketQueryBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketQueryBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketDto' });
+const TimeBucketAssetBaseSchema = TimeBucketQueryBaseSchema.extend({
   timeBucket: z
     .string()
     .describe('Time bucket identifier in YYYY-MM-DDT00:00:00.000Z format')
     .meta({ example: '2024-01-01T00:00:00.000Z' }),
-}).meta({ id: 'TimeBucketAssetDto' });
+});
+const TimeBucketAssetSchema = TimeBucketAssetBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketAssetBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketAssetDto' });
 
 const stackTupleSchema = z.array(z.string()).length(2).nullable();
 
@@ -137,11 +140,14 @@ export const TimeBucketsResponseSchema = z
   })
   .meta({ id: 'TimeBucketsResponseDto' });
 
-const TimeBucketCoverSchema = TimeBucketQueryBaseSchema.extend({
+const TimeBucketCoverBaseSchema = TimeBucketQueryBaseSchema.extend({
   timeBuckets: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.string()))
     .describe('Time bucket identifiers (YYYY-MM-DD) to resolve covers for'),
-}).meta({ id: 'TimeBucketCoverDto' });
+});
+const TimeBucketCoverSchema = TimeBucketCoverBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketCoverBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketCoverDto' });
 
 export class TimeBucketDto extends createZodDto(TimeBucketSchema) {}
 export class TimeBucketAssetDto extends createZodDto(TimeBucketAssetSchema) {}

@@ -251,6 +251,30 @@ describe('buildMapFilterConfig', () => {
       });
     });
 
+    // The map plots markers from asset_exif.latitude IS NOT NULL (map.repository.ts:187), so a
+    // "no GPS" / "no place name" filter can only ever produce an empty map — neither row may ever
+    // be offered here. Assert against a server response that says TRUE, so this fails the moment
+    // the override is removed (a response that already says false would pass either way).
+    it('always reports no-location suggestions as false, even when the server says true', async () => {
+      vi.mocked(getFilterSuggestions).mockResolvedValueOnce({
+        countries: [],
+        cameraMakes: [],
+        tags: [],
+        people: [],
+        ratings: [],
+        mediaTypes: [],
+        hasUnnamedPeople: false,
+        hasNoGpsAssets: true,
+        hasNoPlaceNameAssets: true,
+      } as never);
+
+      const config = buildMapFilterConfig();
+      const result = await config.suggestionsProvider!(emptyFilters);
+
+      expect(result.hasNoGpsAssets).toBe(false);
+      expect(result.hasNoPlaceNameAssets).toBe(false);
+    });
+
     it('should map tags correctly', async () => {
       vi.mocked(getFilterSuggestions).mockResolvedValueOnce({
         countries: [],
