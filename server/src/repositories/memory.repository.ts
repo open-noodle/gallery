@@ -167,8 +167,9 @@ export class MemoryRepository implements IBulkAsset {
       .executeTakeFirstOrThrow();
   }
 
-  statisticsAccessible(userId: string, dto: MemorySearchDto) {
+  statisticsAccessible(userId: string, dto: MemorySearchDto, types: MemoryType[]) {
     return this.accessibleSearchBuilder(userId, dto)
+      .where('memory.type', 'in', types)
       .select((qb) => qb.fn.countAll<number>().as('total'))
       .executeTakeFirstOrThrow();
   }
