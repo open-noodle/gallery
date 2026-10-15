@@ -140,14 +140,15 @@ jobs:
           done < <(sed -n '/^DELETE FROM "kysely_migrations"/,/^ *);/p' scripts/revert-to-immich.sql |
             grep -oE "'[0-9]+-[A-Za-z0-9_.]+'" | tr -d "'" | sort -u)
 
-          # Fork-only enum values stored in upstream tables: Permission in api_key.permissions and
-          # SystemMetadataKey rows in system_metadata. The revert prunes each by literal value.
+          # Fork-only enum values stored in upstream tables: Permission in api_key.permissions,
+          # SystemMetadataKey rows in system_metadata and SyncEntityType rows in
+          # session_sync_checkpoint. The revert prunes each by literal value.
           # The "Run validation" step reads the same file for the stock sync request types.
           upstream_enum=$RUNNER_TEMP/upstream-enum.ts
           gh api -H 'Accept: application/vnd.github.raw' \
             "repos/immich-app/immich/contents/server/src/enum.ts?ref=${UPSTREAM_TAG}" > "$upstream_enum"
           enum_values() { awk "/^export enum $1 \\{/,/^\\}/" "$2" | grep -oE "= '[^']+'" | sed "s/^= '//; s/'\$//" | sort -u; }
-          for enum in Permission SystemMetadataKey; do
+          for enum in Permission SystemMetadataKey SyncEntityType; do
             while IFS= read -r value; do
               if ! grep -qF "'${value}'" scripts/revert-to-immich.sql; then
                 echo "::error file=scripts/revert-to-immich.sql::Gallery-only ${enum} value '${value}' is not removed by the revert"

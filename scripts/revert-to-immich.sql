@@ -17,7 +17,9 @@
 --     activity, audit trail
 --   * User groups and their memberships
 --   * Classification categories and prompts (including the merged copy in
---     system_metadata's system-config row — that key is stripped too)
+--     system_metadata's system-config row)
+--   * Every Gallery setting in system-config and Gallery's per-type memory
+--     switches in user preferences
 --   * Pet detection results: every pet, its faces and its embeddings
 --   * Rule memories (Immich only knows on-this-day and birthday memories)
 --   * Video trims: the full-length video comes back and the trimmed copy is
@@ -309,6 +311,29 @@ UPDATE "api_key" k
  WHERE kept."id" = k."id"
    AND kept."permissions" <> k."permissions";
 
+-- Sync checkpoints for Gallery's sync streams (Gallery's SyncEntityType values
+-- minus Immich's). Immich never reads them; they would stay in its table forever.
+DELETE FROM "session_sync_checkpoint"
+ WHERE "type" IN (
+    'AssetFavoriteDeleteV1', 'AssetFavoriteV1', 'LibraryAssetBackfillV1', 'LibraryAssetCreateV1',
+    'LibraryAssetDeleteV1', 'LibraryAssetExifBackfillV1', 'LibraryAssetExifCreateV1',
+    'LibraryDeleteV1', 'LibraryV1', 'SharedSpaceAlbumAssetBackfillV1',
+    'SharedSpaceAlbumAssetCreateV1', 'SharedSpaceAlbumAssetExifBackfillV1',
+    'SharedSpaceAlbumAssetExifCreateV1', 'SharedSpaceAlbumAssetExifUpdateV1',
+    'SharedSpaceAlbumAssetUpdateV1', 'SharedSpaceAlbumBackfillV1', 'SharedSpaceAlbumDeleteV1',
+    'SharedSpaceAlbumFolderBackfillV1', 'SharedSpaceAlbumFolderDeleteV1',
+    'SharedSpaceAlbumFolderV1', 'SharedSpaceAlbumHiddenBackfillV1',
+    'SharedSpaceAlbumHiddenDeleteV1', 'SharedSpaceAlbumHiddenV1', 'SharedSpaceAlbumLinkBackfillV1',
+    'SharedSpaceAlbumLinkDeleteV1', 'SharedSpaceAlbumLinkV1', 'SharedSpaceAlbumToAssetBackfillV1',
+    'SharedSpaceAlbumToAssetDeleteV1', 'SharedSpaceAlbumToAssetV1', 'SharedSpaceAlbumV1',
+    'SharedSpaceAssetBackfillV1', 'SharedSpaceAssetCreateV1', 'SharedSpaceAssetExifBackfillV1',
+    'SharedSpaceAssetExifCreateV1', 'SharedSpaceAssetExifUpdateV1', 'SharedSpaceAssetUpdateV1',
+    'SharedSpaceDeleteV1', 'SharedSpaceLibraryBackfillV1', 'SharedSpaceLibraryDeleteV1',
+    'SharedSpaceLibraryV1', 'SharedSpaceMemberBackfillV1', 'SharedSpaceMemberDeleteV1',
+    'SharedSpaceMemberV1', 'SharedSpaceToAssetBackfillV1', 'SharedSpaceToAssetDeleteV1',
+    'SharedSpaceToAssetV1', 'SharedSpaceV1'
+ );
+
 -- -----------------------------------------------------------------------------
 -- 1. Drop Gallery-only triggers on Immich-native tables.
 --
@@ -511,13 +536,39 @@ DROP INDEX IF EXISTS "asset_face_createdBy_idx";
 ALTER TABLE "asset_face"        DROP COLUMN IF EXISTS "createdBy";
 
 -- -----------------------------------------------------------------------------
--- 5. Strip Gallery's merged 'classification' key out of system_metadata's
---    system-config row (added by migration 1778000000000).
+-- 5. Strip Gallery's settings out of system_metadata's system-config row and
+--    out of each user's preferences.
+--
+-- Stock Immich warns about every unknown key in system-config on each config
+-- load, until an admin next saves the settings. The list is every fork path in
+-- the config DTO (server/src/gallery/dtos/config.dto.ts and its spreads in
+-- server/src/dtos/config.dto.ts); revert-to-immich.spec.ts fails until a new
+-- one is added here. 'classification' holds the categories that migration
+-- 1778000000000 merged in from the dropped classification tables.
 -- -----------------------------------------------------------------------------
 UPDATE "system_metadata"
-   SET "value" = "value" - 'classification'
- WHERE "key" = 'system-config'
-   AND "value" ? 'classification';
+   SET "value" = "value"
+     #- '{classification}'
+     #- '{memories}'
+     #- '{storageUsage}'
+     #- '{job,peopleBackfill}'
+     #- '{job,petDetection}'
+     #- '{job,classification}'
+     #- '{machineLearning,clip,maxDistance}'
+     #- '{machineLearning,petDetection}'
+     #- '{machineLearning,petRecognition}'
+     #- '{machineLearning,facialRecognition,suggestions}'
+     #- '{machineLearning,facialRecognition,suggestionMaxDistance}'
+     #- '{nightlyTasks,clusterNewPets}'
+     #- '{server,mergePeopleAcrossOwners}'
+ WHERE "key" = 'system-config';
+
+-- Gallery's per-type memory switches (memories.types), which Immich's
+-- preferences do not have.
+UPDATE "user_metadata"
+   SET "value" = "value" #- '{memories,types}'
+ WHERE "key" = 'preferences'
+   AND "value" #> '{memories,types}' IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
 -- 6. Delete Gallery-added rows from migration_overrides.
