@@ -2,6 +2,7 @@ import { cloneDeep } from 'lodash-es';
 import request from 'supertest';
 import { SystemConfigController } from 'src/controllers/system-config.controller.js';
 import { defaults } from 'src/dtos/config.dto.js';
+import { galleryConfigPaths } from 'src/gallery/dtos/config.dto.js';
 import { StorageTemplateService } from 'src/services/storage-template.service.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
 import { errorDto } from 'test/medium/responses.js';
@@ -41,6 +42,28 @@ describe(SystemConfigController.name, () => {
   });
 
   describe('PUT /system-config', () => {
+    // F9: a stock admin tool or config-as-code script sends upstream's shape without Gallery's settings.
+    it('should accept an upstream-shaped body and keep the stored Gallery settings', async () => {
+      const stored = { ...validConfig(), classification: { enabled: false, categories: [] } };
+      systemConfigService.getAdminConfig.mockResolvedValue(stored);
+      systemConfigService.updateAdminConfig.mockImplementation((dto) => Promise.resolve(dto));
+      const body = cloneDeep(stored) as Record<string, any>;
+      for (const path of galleryConfigPaths) {
+        const keys = path.split('.');
+        const key = keys.pop()!;
+        let node = body;
+        for (const parent of keys) {
+          node = node[parent];
+        }
+        delete node[key];
+      }
+
+      const { status } = await request(ctx.getHttpServer()).put('/system-config').send(body);
+
+      expect(status).toBe(200);
+      expect(systemConfigService.updateAdminConfig).toHaveBeenCalledWith(stored);
+    });
+
     describe('nightlyTasks', () => {
       it('should validate nightly jobs start time', async () => {
         const config = validConfig();
