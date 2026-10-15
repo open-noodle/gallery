@@ -4,9 +4,9 @@ import { app, asBearerAuth, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-// Coverage for the fork-only gallery-core workflow plugin (packages/plugin-gallery) and the
-// `gallery` host function it reaches through. If the host-function seam in onPluginLoad is ever
-// removed, the wasm plugin fails to instantiate and every test here goes red — which is the point.
+// Coverage for the fork-only gallery-core workflow plugin (packages/plugin-gallery). Its WASM exports
+// are no-ops; the server runs these steps in TypeScript (GalleryWorkflowHostService.runStep). If that
+// interception in the workflow execute loop is ever removed, every test here goes red — which is the point.
 
 /** Polls until `check` returns truthy. waitForQueueFinish reports "done" while work remains. */
 const until = async <T>(check: () => Promise<T>, timeoutMs = 30_000): Promise<T> => {
