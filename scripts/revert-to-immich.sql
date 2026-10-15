@@ -820,10 +820,20 @@ DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_descripti
 -- asset."localDateTime" for the filter panel's taken range.
 DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 
--- 1783628194057-DisablePostgresJit set jit=off on the application role. Restore
--- the PostgreSQL default so the reverted database carries no Gallery-specific
--- planner tuning.
-ALTER ROLE CURRENT_USER RESET jit;
+-- jit=off: restore the PostgreSQL default so the reverted database carries no
+-- Gallery-specific planner tuning. 1799400000000-ScopeJitOffToDatabase keeps the
+-- setting on this database. Before it, 1783628194057-DisablePostgresJit set it on
+-- the application role, which only that role can reset here; on such a database
+-- this resets the role running the script, so run it as the application role.
+DO $$
+BEGIN
+  EXECUTE format('ALTER DATABASE %I RESET jit', current_database());
+  IF to_regclass('public.gallery_migrations') IS NULL
+     OR NOT EXISTS (SELECT FROM "gallery_migrations" WHERE "name" = '1799400000000-ScopeJitOffToDatabase')
+  THEN
+    EXECUTE 'ALTER ROLE CURRENT_USER RESET jit';
+  END IF;
+END $$;
 
 -- No post-tag upstream migration needs reversing right now. `upstream.version` is
 -- 3.3.1 and this branch's `server/src/schema/migrations/` is identical to upstream
@@ -970,6 +980,7 @@ DELETE FROM "kysely_migrations"
   '1798900000000-MoveVideoTrimToSidecar',
   '1799000000000-AddAssetImageAdjustTable',
   '1799100000000-AddSharedSpaceEditorMemberPermissions',
+  '1799400000000-ScopeJitOffToDatabase',
   '1799500000000-AddCleanupTables',
   '1799600000000-AddAssetQualityScreenshotVersion',
   '1799700000000-AddAssetSpatialSceneTable',
