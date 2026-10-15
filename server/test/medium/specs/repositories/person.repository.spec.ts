@@ -736,20 +736,65 @@ describe(PersonRepository.name, () => {
       expect(items.map(({ personGroupId }) => personGroupId)).not.toContain(individual.personGroupId);
     });
 
-    it('keeps a named species bucket on the unfiltered view', async () => {
+    // A species bucket is named after its species ('dog'), so the name alone passes the minimumFaces
+    // gate. It is never an individual (docs/docs/features/pet-detection.md), on any view.
+    it('hides a named species bucket on every view and in the header total', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
       const bucket = await seedTypedPerson(ctx, {
         ownerId: user.id,
         type: 'pet',
-        species: 'horse',
-        name: 'horse',
+        species: 'dog',
+        name: 'dog',
         faces: 2,
       });
 
-      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+      for (const type of [undefined, 'person', 'pet']) {
+        const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type });
+        expect(items.map(({ personGroupId }) => personGroupId)).not.toContain(bucket.personGroupId);
+        await expect(sut.getNumberOfPeople(user.id, { type })).resolves.toMatchObject({ total: 0 });
+      }
+    });
 
-      expect(items.map(({ personGroupId }) => personGroupId)).toContain(bucket.personGroupId);
+    // OD-14: upstream's name filter, unaccented and case-insensitive word similarity.
+    it('filters by name like upstream', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const jose = await seedTypedPerson(ctx, { ownerId: user.id, name: 'José Álvarez', faces: 3 });
+      await seedTypedPerson(ctx, { ownerId: user.id, name: 'Maria', faces: 3 });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, name: 'jose' });
+
+      expect(items.map(({ personGroupId }) => personGroupId)).toEqual([jose.personGroupId]);
+    });
+
+    // GET /people advertises both filters (upstream's PersonSearchDto); they narrow the list.
+    it('filters by isFavorite and isHidden', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const favorite = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Fay', faces: 3 });
+      const hidden = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Hal', faces: 3 });
+      const plain = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Pat', faces: 3 });
+      await ctx.database
+        .updateTable('person')
+        .set({ isFavorite: true })
+        .where('personGroupId', '=', favorite.personGroupId)
+        .execute();
+      await ctx.database
+        .updateTable('person')
+        .set({ isHidden: true })
+        .where('personGroupId', '=', hidden.personGroupId)
+        .execute();
+
+      const ids = async (options: { isFavorite?: boolean; isHidden?: boolean }) => {
+        const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: true, ...options });
+        return items.map(({ personGroupId }) => personGroupId).toSorted();
+      };
+
+      await expect(ids({ isFavorite: true })).resolves.toEqual([favorite.personGroupId]);
+      await expect(ids({ isFavorite: false })).resolves.toEqual([hidden.personGroupId, plain.personGroupId].toSorted());
+      await expect(ids({ isHidden: true })).resolves.toEqual([hidden.personGroupId]);
+      await expect(ids({ isHidden: false })).resolves.toEqual([favorite.personGroupId, plain.personGroupId].toSorted());
     });
 
     it('scopes the header total to the type filter', async () => {
@@ -791,6 +836,7 @@ describe(PersonRepository.name, () => {
         species: 'dog',
         name: 'Bandit',
         faces: 3,
+        embedded: true,
       });
 
       const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });

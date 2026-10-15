@@ -51,6 +51,16 @@ export function favoriteExistsFor(
 }
 
 /**
+ * `isFavorite` on a partner or album asset row of the sync stream. A fork-aware client gets the viewer's own
+ * overlay and hears of changes through AssetFavoritesV1. A stock client never syncs that stream and a non-owner's
+ * favourite does not move `asset.updateId`, so it gets upstream's owner-only value, which stays correct.
+ */
+export const syncFavoriteFor = (eb: ExpressionBuilder<DB, 'asset'>, userId: string, forkAwareClient?: boolean) =>
+  forkAwareClient
+    ? favoriteExistsFor(eb as ExpressionBuilder<DB, keyof DB>, userId)
+    : eb.case().when('asset.ownerId', '=', userId).then(eb.ref('asset.isFavorite')).else(eb.val(false)).end();
+
+/**
  * The user whose favorites a response should reflect, or undefined when there is none. A
  * shared-link session's `auth.user` is the link OWNER (validateSharedLinkKey/Slug), not the
  * anonymous visitor — projecting their overlay would show a visitor which of the album's

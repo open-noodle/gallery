@@ -11,7 +11,7 @@ import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
 import { MapMarkerDto } from 'src/dtos/map.dto.js';
 import { MetadataSearchDto, SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
-import { AlbumUserRole, AssetStatus, AssetVisibility, SharedLinkType, TimeBucketSize } from 'src/enum.js';
+import { AlbumUserRole, AssetStatus, AssetVisibility, MemoryType, SharedLinkType, TimeBucketSize } from 'src/enum.js';
 import { SearchOptionsRequestDto, searchOptionsDimensions } from 'src/gallery/dtos/search.dto.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
@@ -233,8 +233,10 @@ const seed = async () => {
   const tagSpace = await newTag('tagSpace', owner.id, [spaceAsset, spaceLocked, libraryAsset]);
   await newTag('tagEditor', spaceEditor.id, [editorAsset]);
 
-  const newMemory = async (name: string, ownerId: string, assetIds: string[]) => {
-    const { memory } = await ctx.newMemory({ ownerId });
+  const newMemory = async (name: string, ownerId: string, assetIds: string[], rule = false) => {
+    const { memory } = await ctx.newMemory(
+      rule ? { ownerId, type: MemoryType.Rule, data: { ruleId: 'season_recap', dedupeKey: name } } : { ownerId },
+    );
     label(name, memory.id);
     for (const assetId of assetIds) {
       await ctx.newMemoryAsset({ memoryId: memory.id, assetId });
@@ -243,6 +245,8 @@ const seed = async () => {
   };
   const memOwner = await newMemory('memOwner', owner.id, [ownAsset, ownArchived, spaceAsset]);
   const memViewer = await newMemory('memViewer', spaceViewer.id, [spaceAsset, spaceArchived, libraryAsset, petAsset]);
+  // A rule memory, which a stock client cannot decode (F5).
+  await newMemory('memRule', owner.id, [ownAsset], true);
 
   const newLink = async (name: string, dto: Parameters<typeof ctx.newSharedLink>[0]) => {
     const { sharedLink } = await ctx.newSharedLink(dto);
@@ -294,6 +298,8 @@ const seed = async () => {
     albumEditor: user(albumEditor.id),
     albumViewer: user(albumViewer.id),
     stranger: user(stranger.id),
+    // The owner through a stock Immich or third-party client (AuthService.authenticate marks it).
+    stockOwner: { ...user(owner.id), stockClient: true as const },
     albumLink: link(albumLink, { albumId: ownAlbum.id }),
     individualLink: link(individualLink, {}),
     spaceLink: link(spaceLink, { spaceId: space.id }),

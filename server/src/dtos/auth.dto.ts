@@ -17,6 +17,8 @@ export type AuthDto = {
   apiKey?: AuthApiKey;
   sharedLink?: AuthSharedLink;
   session?: AuthSession;
+  /** Gallery: set by `AuthService.authenticate` for a stock Immich or third-party client (src/gallery/utils/client-version.ts). */
+  stockClient?: true;
 };
 
 const LoginCredentialSchema = z

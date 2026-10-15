@@ -670,20 +670,25 @@ describe('/pet-detection', () => {
       const asset = await utils.createAsset(admin.accessToken);
       integrationAssetId = asset.id;
 
-      integrationPetId = await utils.createPet(admin.userId, 'cat', 'Whiskers');
+      // An individual pet (a pet_search face); a species bucket is never listed.
+      ({ personGroupId: integrationPetId } = await utils.createPetWithEmbedding(
+        admin.userId,
+        'cat',
+        integrationAssetId,
+        'Whiskers',
+      ));
       const person = await utils.createPerson(admin.accessToken, { name: 'John' });
       integrationPersonId = person.id;
 
-      await Promise.all([
-        utils.createFace({ assetId: integrationAssetId, personGroupId: integrationPetId }),
-        utils.createFace({ assetId: integrationAssetId, personGroupId: integrationPersonId }),
-      ]);
+      await utils.createFace({ assetId: integrationAssetId, personGroupId: integrationPersonId });
     });
 
     it('should return both persons and pets in GET /people', async () => {
       const { status, body } = await request(app)
         .get('/people')
         .set('Authorization', `Bearer ${admin.accessToken}`)
+        // A Gallery client; a stock one gets people only when it names no type.
+        .set('x-gallery-app', 'e2e')
         .query({ withHidden: true });
 
       expect(status).toBe(200);
@@ -749,23 +754,21 @@ describe('/pet-detection', () => {
       ]);
       await utils.connectDatabase();
 
-      user1PetId = await utils.createPet(isoUser1.userId, 'dog', 'Rover');
-      user2PetId = await utils.createPet(isoUser2.userId, 'dog', 'Spot');
-
       const [a1, a2] = await Promise.all([
         utils.createAsset(isoUser1.accessToken),
         utils.createAsset(isoUser2.accessToken),
       ]);
-      await Promise.all([
-        utils.createFace({ assetId: a1.id, personGroupId: user1PetId }),
-        utils.createFace({ assetId: a2.id, personGroupId: user2PetId }),
-      ]);
+      // Individual pets (a pet_search face each); a species bucket is never listed.
+      ({ personGroupId: user1PetId } = await utils.createPetWithEmbedding(isoUser1.userId, 'dog', a1.id, 'Rover'));
+      ({ personGroupId: user2PetId } = await utils.createPetWithEmbedding(isoUser2.userId, 'dog', a2.id, 'Spot'));
     });
 
     it('should not show user1 pets to user2 in GET /people', async () => {
       const { body } = await request(app)
         .get('/people')
         .set('Authorization', `Bearer ${isoUser2.accessToken}`)
+        // A Gallery client; a stock one gets people only when it names no type.
+        .set('x-gallery-app', 'e2e')
         .query({ withHidden: true });
 
       const petIds = body.people.map((p: any) => p.id);

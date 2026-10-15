@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
-import { AssetType, SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { AlbumUserRole, AssetType, SyncEntityType, SyncRequestType } from 'src/enum.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
+import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { DB } from 'src/schema/index.js';
 import { SyncTestContext } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -84,5 +85,44 @@ describe('stock Immich client gating', () => {
         expect.arrayContaining([humanFace.id, unassignedHumanFace.id, petFace.id, embeddedPetFace.id]),
       );
     }
+  });
+
+  // A stock client never syncs AssetFavoritesV1, so a favourite of someone else's photo would never reach it again
+  // when it changes (it does not move asset.updateId). It gets upstream's owner-only value instead.
+  it("should send a stock client upstream's owner-only isFavorite for partner and album assets", async () => {
+    const { auth, ctx } = await setup();
+    const { user: partner } = await ctx.newUser();
+    const { asset: partnerAsset } = await ctx.newAsset({ ownerId: partner.id });
+    await ctx.newPartner({ sharedById: partner.id, sharedWithId: auth.user.id });
+    const { asset: albumAsset } = await ctx.newAsset({ ownerId: partner.id });
+    const { album } = await ctx.newAlbum({ ownerId: partner.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: albumAsset.id });
+    await ctx.newAlbumUser({ albumId: album.id, userId: auth.user.id, role: AlbumUserRole.Viewer });
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: auth.user.id });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: ownAsset.id });
+    await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [partnerAsset.id, albumAsset.id, ownAsset.id]);
+
+    const favorites = async (types: SyncRequestType[]) => {
+      const response = await ctx.syncStream(auth, types);
+      return Object.fromEntries(
+        response
+          .filter(({ type }) =>
+            [SyncEntityType.PartnerAssetV2, SyncEntityType.AlbumAssetCreateV2].includes(type as any),
+          )
+          .map(({ data }) => [(data as any).id, (data as any).isFavorite]),
+      );
+    };
+
+    const types = [SyncRequestType.PartnerAssetsV2, SyncRequestType.AlbumAssetsV2];
+    await expect(favorites(types)).resolves.toEqual({
+      [partnerAsset.id]: false,
+      [albumAsset.id]: false,
+      [ownAsset.id]: true,
+    });
+    await expect(favorites([...types, SyncRequestType.SharedSpacesV1])).resolves.toEqual({
+      [partnerAsset.id]: true,
+      [albumAsset.id]: true,
+      [ownAsset.id]: true,
+    });
   });
 });
