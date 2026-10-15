@@ -563,6 +563,16 @@ ci_invariants:
     paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
     exceptions:
       - .github/workflows/merge-translations.yml
+      # Upstream's release-line workflows, kept as upstream's text (OD-4) so upstream edits to them
+      # apply cleanly instead of stopping the replay on a modify/delete. None of them can run here:
+      # draft-release/prepare-release are workflow_dispatch only (draft-release also passes two
+      # app-token secrets the fork's build-mobile.yml no longer declares, so a manual run fails at
+      # validation), backport needs a `backport:release/*` label, and docs-destroy is disabled in
+      # the repository settings (see the docs-destroy note below).
+      - .github/workflows/backport.yml
+      - .github/workflows/docs-destroy.yml
+      - .github/workflows/draft-release.yml
+      - .github/workflows/prepare-release.yml
   # Upstream builds some ML variants on its own self-hosted `pokedex-*` runners (immich-32020 put
   # OpenVINO on `pokedex-large` when it moved to an onnxruntime source build). The fork has no such
   # runners, so a merged mapping leaves that matrix job queued forever with zero conflict.
@@ -584,6 +594,13 @@ ci_invariants:
     forbidden_patterns: ['workflow_run:']
     paths: [.github/workflows/docs-deploy.yml]
     exceptions: []
+  # docs-destroy.yml (OD-4) is upstream's text, unedited, and triggers on every closed pull request
+  # (`pull_request_target: types: [closed]`); without Immich's Cloudflare and app secrets each run
+  # fails. Editing the trigger would bring back the modify/delete stops OD-4 removed, so the workflow
+  # is switched off in GitHub instead, by hand, once per repository:
+  #   gh workflow disable docs-destroy.yml --repo open-noodle/gallery
+  # A forbidden pattern cannot see a repository setting, so this is a record, not a check.
+
   # Option M: a person_group holds exactly one person row — the owner's. Upstream filters its person
   # joins to the VIEWER's row, which is meaningful with cluster groups on and a silent nullifier here:
   # every non-owner gets `person: null` on faces they may see, and hidden people stop being hidden.
