@@ -2271,7 +2271,14 @@ WITH
       'user-person'::text AS "profileType",
       person."personGroupId" AS "profileId",
       NULL::uuid AS "spaceId",
-      person."identityId",
+      (
+        SELECT
+          "person_identity"."identityId"
+        FROM
+          "person_identity"
+        WHERE
+          "person_identity"."personGroupId" = "person"."personGroupId"
+      ) AS "identityId",
       person.name,
       person."birthDate",
       CASE
@@ -2284,12 +2291,37 @@ WITH
       person."isFavorite",
       person.color,
       person."updatedAt",
-      person.type,
-      person.species,
+      (
+        CASE
+          WHEN EXISTS (
+            SELECT
+            FROM
+              "person_pet"
+            WHERE
+              "person_pet"."personGroupId" = "person"."personGroupId"
+          ) THEN 'pet'
+          ELSE 'person'
+        END
+      ) AS type,
+      (
+        SELECT
+          "person_pet"."species"
+        FROM
+          "person_pet"
+        WHERE
+          "person_pet"."personGroupId" = "person"."personGroupId"
+      ) AS species,
       0 AS "profileRank"
     FROM
       person
-      INNER JOIN requested_identities ON requested_identities."identityId" = person."identityId"
+      INNER JOIN requested_identities ON requested_identities."identityId" = (
+        SELECT
+          "person_identity"."identityId"
+        FROM
+          "person_identity"
+        WHERE
+          "person_identity"."personGroupId" = "person"."personGroupId"
+      )
     WHERE
       person."ownerId" = $5
       AND (
