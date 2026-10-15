@@ -47,6 +47,8 @@ const overlapRow = (overrides: {
   assets: overrides.assets.map((id) => ({ id })),
 });
 
+const stockAuth = (userId: string) => ({ ...factory.auth({ user: { id: userId } }), stockClient: true as const });
+
 describe(MemoryService.name, () => {
   let sut: MemoryService;
   let mocks: ServiceMocks;
@@ -1601,7 +1603,56 @@ describe(MemoryService.name, () => {
       const result = await sut.statistics(auth, dto);
 
       expect(result).toEqual(stats);
-      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, dto);
+      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, dto, [
+        MemoryType.OnThisDay,
+        MemoryType.Rule,
+      ]);
+    });
+
+    it('should count only on-this-day memories for a stock client', async () => {
+      const auth = { ...factory.auth(), stockClient: true as const };
+      mocks.memory.statisticsAccessible.mockResolvedValue({ total: 1 });
+
+      await sut.statistics(auth, {});
+
+      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, {}, [MemoryType.OnThisDay]);
+    });
+  });
+
+  describe('stock clients', () => {
+    it('should not list rule memories to a stock client', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const onThisDay = MemoryFactory.from({ ownerId: userId }).asset(asset).build();
+      const rule = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(onThisDay), getForMemory(rule)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+
+      const stock = await sut.search(stockAuth(userId), {});
+      expect(stock.map(({ id }) => id)).toEqual([onThisDay.id]);
+
+      const gallery = await sut.search(factory.auth({ user: { id: userId } }), {});
+      expect(gallery.map(({ id }) => id)).toEqual([onThisDay.id, rule.id]);
+    });
+
+    it('should not return a rule memory by id to a stock client', async () => {
+      const userId = newUuid();
+      const rule = MemoryFactory.create({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
+      });
+      mocks.memory.get.mockResolvedValue(getForMemory(rule));
+      mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([rule.id]));
+
+      await expect(sut.get(stockAuth(userId), rule.id)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(sut.get(factory.auth({ user: { id: userId } }), rule.id)).resolves.toMatchObject({ id: rule.id });
     });
   });
 
