@@ -687,8 +687,6 @@ describe('/pet-detection', () => {
       const { status, body } = await request(app)
         .get('/people')
         .set('Authorization', `Bearer ${admin.accessToken}`)
-        // A Gallery client; a stock one gets people only when it names no type.
-        .set('x-gallery-app', 'e2e')
         .query({ withHidden: true });
 
       expect(status).toBe(200);
@@ -767,8 +765,6 @@ describe('/pet-detection', () => {
       const { body } = await request(app)
         .get('/people')
         .set('Authorization', `Bearer ${isoUser2.accessToken}`)
-        // A Gallery client; a stock one gets people only when it names no type.
-        .set('x-gallery-app', 'e2e')
         .query({ withHidden: true });
 
       const petIds = body.people.map((p: any) => p.id);
