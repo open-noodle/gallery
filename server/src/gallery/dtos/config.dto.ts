@@ -153,6 +153,7 @@ export const galleryJobDefaults = {
   [QueueName.PeopleBackfill]: { concurrency: 1 },
   [QueueName.PetDetection]: { concurrency: 1 },
   [QueueName.Classification]: { concurrency: 1 },
+  [QueueName.QualityAnalysis]: { concurrency: 2 },
 };
 
 export const galleryMachineLearningDefaults = {

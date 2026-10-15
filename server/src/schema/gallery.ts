@@ -5,7 +5,10 @@ import { AssetFaceCreatorTable } from 'src/schema/tables/asset-face-creator.tabl
 import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
 import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
 import { AssetJobStatusGalleryTable } from 'src/schema/tables/asset-job-status-gallery.table.js';
+import { AssetQualityTable } from 'src/schema/tables/asset-quality.table.js';
 import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js';
+import { CleanupDayReviewTable } from 'src/schema/tables/cleanup-day-review.table.js';
+import { CleanupDecisionTable } from 'src/schema/tables/cleanup-decision.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table.js';
@@ -48,6 +51,9 @@ import { UserGroupTable } from 'src/schema/tables/user-group.table.js';
 
 // Gallery fork tables, spread into ImmichDatabase.tables and merged into DB by src/schema/index.ts.
 export const galleryTables = [
+  CleanupDayReviewTable,
+  CleanupDecisionTable,
+  AssetQualityTable,
   AlbumSpaceAssetTable,
   AlbumSpaceAssetAuditTable,
   AssetDuplicateChecksumTable,
@@ -98,6 +104,9 @@ export const galleryTables = [
 ];
 
 export interface GalleryDB {
+  cleanup_day_review: CleanupDayReviewTable;
+  cleanup_decision: CleanupDecisionTable;
+  asset_quality: AssetQualityTable;
   album_space_asset: AlbumSpaceAssetTable;
   album_space_asset_audit: AlbumSpaceAssetAuditTable;
   asset_duplicate_checksum: AssetDuplicateChecksumTable;

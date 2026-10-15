@@ -1,4 +1,5 @@
 import { ClassificationController } from 'src/controllers/classification.controller.js';
+import { CleanupController } from 'src/controllers/cleanup.controller.js';
 import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller.js';
 import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
@@ -26,6 +27,7 @@ import { StorageUsageService } from 'src/gallery/services/storage-usage.service.
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
+import { CleanupRepository } from 'src/repositories/cleanup.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
@@ -36,6 +38,7 @@ import { StorageMigrationRepository } from 'src/repositories/storage-migration.r
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { AppMetricsService } from 'src/services/app-metrics.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
+import { CleanupService } from 'src/services/cleanup.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
 import { LibraryManifestService } from 'src/services/library-manifest.service.js';
@@ -51,6 +54,7 @@ import { UserGroupService } from 'src/services/user-group.service.js';
 // keep running before same-priority upstream ones, e.g. before SystemConfigService's ConfigUpdate clears the cache.
 export const galleryControllers = [
   ClassificationController,
+  CleanupController,
   FaceRepairAdminController,
   FaceSuggestionController,
   GalleryAssetController,
@@ -83,12 +87,14 @@ export const galleryRepositories = [
   FaceSearchRepository,
   GallerySyncRepository,
   VideoTrimRepository,
+  CleanupRepository,
 ];
 
 export const galleryServices = [
   AppMetricsService,
   AssetVisibilityTransitionService,
   ClassificationService,
+  CleanupService,
   FaceIdentityMaintenanceService,
   FaceRepairService,
   FaceSuggestionService,

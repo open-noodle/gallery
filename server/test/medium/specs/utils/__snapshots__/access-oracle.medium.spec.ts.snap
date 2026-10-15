@@ -572,6 +572,10 @@ exports[`checkAccess oracle > backup.list 1`] = `{}`;
 
 exports[`checkAccess oracle > backup.upload 1`] = `{}`;
 
+exports[`checkAccess oracle > cleanup.read 1`] = `{}`;
+
+exports[`checkAccess oracle > cleanup.update 1`] = `{}`;
+
 exports[`checkAccess oracle > clusterGroup.leave 1`] = `{}`;
 
 exports[`checkAccess oracle > clusterGroup.read 1`] = `{}`;

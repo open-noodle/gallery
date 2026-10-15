@@ -23,7 +23,9 @@ export const getTrashActions = ($t: MessageFormatter, assetCount: number) => {
   return { RestoreAll, Empty };
 };
 
-const handleEmptyTrash = async () => {
+// gallery-fork: exported for the Library Cleanup hub's "empty trash" footer
+// (web/src/routes/(user)/utilities/cleanup/+page.svelte).
+export const handleEmptyTrash = async () => {
   const $t = await getFormatter();
 
   const confirmed = await modalManager.showDialog({ prompt: $t('empty_trash_confirmation') });

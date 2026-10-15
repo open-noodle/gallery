@@ -204,6 +204,9 @@ export enum Permission {
   DuplicateRead = 'duplicate.read',
   DuplicateDelete = 'duplicate.delete',
 
+  CleanupRead = 'cleanup.read',
+  CleanupUpdate = 'cleanup.update',
+
   FaceCreate = 'face.create',
   FaceRead = 'face.read',
   FaceUpdate = 'face.update',
@@ -905,6 +908,7 @@ export enum QueueName {
   Editor = 'editor',
   StorageBackendMigration = 'storageBackendMigration',
   Classification = 'classification',
+  QualityAnalysis = 'qualityAnalysis',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -1060,6 +1064,10 @@ export enum JobName {
   // Classification
   AssetClassifyQueueAll = 'AssetClassifyQueueAll',
   AssetClassify = 'AssetClassify',
+
+  // Library Cleanup
+  AssetAnalyzeQualityQueueAll = 'AssetAnalyzeQualityQueueAll',
+  AssetAnalyzeQuality = 'AssetAnalyzeQuality',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
@@ -1458,6 +1466,7 @@ export enum ApiTag {
   Assets = 'Assets',
   AssetFiles = 'Asset files',
   Classification = 'Classification',
+  Cleanup = 'Cleanup',
   ConfigUser = 'Config (user)',
   ConfigAdmin = 'Config (admin)',
   ConfigPublic = 'Config (public)',
@@ -1535,3 +1544,16 @@ export enum SearchOrderField {
 }
 
 export const SearchOrderFieldSchema = z.enum(SearchOrderField).meta({ id: 'SearchOrderField' });
+
+// gallery-fork: Library Cleanup (specs/2026-09-23-library-cleanup-design.md)
+export enum CleanupQueue {
+  Rewind = 'rewind',
+  SpaceHogs = 'space_hogs',
+  Bursts = 'bursts',
+  Screenshots = 'screenshots',
+  Blurry = 'blurry',
+}
+
+export enum CleanupDecisionType {
+  Keep = 'keep',
+}
