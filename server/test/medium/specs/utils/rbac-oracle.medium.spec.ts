@@ -229,7 +229,7 @@ const seed = async () => {
     await ctx.newTagAsset({ tagIds: [tag.id], assetIds });
     return tag.id;
   };
-  await newTag('tagOwn', owner.id, [ownAsset]);
+  const tagOwn = await newTag('tagOwn', owner.id, [ownAsset]);
   const tagSpace = await newTag('tagSpace', owner.id, [spaceAsset, spaceLocked, libraryAsset]);
   await newTag('tagEditor', spaceEditor.id, [editorAsset]);
 
@@ -310,6 +310,7 @@ const seed = async () => {
       space: space.id,
       ownAlbum: ownAlbum.id,
       spaceAlbum: spaceAlbum.id,
+      tagOwn,
       tagSpace,
       pet: pet.personGroupId,
       memories: { memOwner, memViewer },
@@ -378,7 +379,7 @@ beforeAll(async () => {
 describe('viewer-scope RBAC oracle', () => {
   it('timeline buckets and bucket contents', async () => {
     const sut = world.ctx.getService(TimelineService);
-    const { owner, space, ownAlbum, spaceAlbum, tagSpace } = world.ids;
+    const { owner, space, ownAlbum, spaceAlbum, tagOwn, tagSpace } = world.ids;
     const variants = {
       personal: (auth: Auth) => ({
         userId: me(auth),
@@ -416,6 +417,14 @@ describe('viewer-scope RBAC oracle', () => {
         userId: me(auth),
         withSharedSpaces: true,
         tagIds: [tagSpace],
+        visibility: AssetVisibility.Timeline,
+      }),
+      // The tag page's single tagId is access-checked (owned or reached through a space); tagIds above are not.
+      tagPageOwn: (auth: Auth) => ({ userId: me(auth), tagId: tagOwn, visibility: AssetVisibility.Timeline }),
+      tagPageSpace: (auth: Auth) => ({
+        userId: me(auth),
+        withSharedSpaces: true,
+        tagId: tagSpace,
         visibility: AssetVisibility.Timeline,
       }),
       partnerTimeline: () => ({ userId: owner, visibility: AssetVisibility.Timeline }),
