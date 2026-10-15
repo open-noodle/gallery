@@ -7270,6 +7270,19 @@ export function scanClassification(opts?: Oazapfts.RequestOpts) {
     }));
 }
 /**
+ * Retrieve the users of a cluster group
+ */
+export function getClusterGroupUsers({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UserResponseDto[];
+    }>(`/cluster-groups/${encodeURIComponent(id)}/users`, {
+        ...opts
+    }));
+}
+/**
  * Get the configuration with user visibility
  */
 export function getUserConfig(opts?: Oazapfts.RequestOpts) {
