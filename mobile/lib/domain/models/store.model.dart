@@ -26,6 +26,9 @@ enum StoreKey<T> {
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
+  // JSON array of space ids whose daily-challenge banner this device hides on the space timeline.
+  // Empty (the default) means every banner shows, so an upgrade never hides one already on screen.
+  spacesHiddenDailyBanner<String>._(90008),
 
   syncMigrationStatus<String>._(1013),
 
