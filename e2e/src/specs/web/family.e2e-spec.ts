@@ -61,9 +61,10 @@ async function mintIdentity(
   // silently wiping the identity out from under the test a few seconds into the run. See the
   // comment on utils.createFace itself for the same warning.
   await utils.createFace({ assetId: asset.id, personGroupId: person.id, sourceType: 'manual' });
-  const row = await db.query<{ identityId: string }>(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
-    person.id,
-  ]);
+  const row = await db.query<{ identityId: string }>(
+    `SELECT "identityId" FROM "person_identity" WHERE "personGroupId" = $1`,
+    [person.id],
+  );
   return { personId: person.id, identityId: row.rows[0].identityId };
 }
 
@@ -268,7 +269,7 @@ test.describe('Family relationships (web)', () => {
     // sourceType: 'manual' — see the note on mintIdentity above.
     await utils.createFace({ assetId: privateAsset.id, personGroupId: hiddenPerson.id, sourceType: 'manual' });
     const hiddenRow = await db.query<{ identityId: string }>(
-      `SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`,
+      `SELECT "identityId" FROM "person_identity" WHERE "personGroupId" = $1`,
       [hiddenPerson.id],
     );
     const hiddenIdentityId = hiddenRow.rows[0].identityId;
