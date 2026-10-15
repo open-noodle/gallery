@@ -8,6 +8,7 @@ import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/e
 import {
   clearOrphanPersonIdentities,
   personIdentityId,
+  personIsPet,
   personSpecies,
   personType,
   setPersonIdentity,
@@ -1825,7 +1826,7 @@ export class FaceIdentityRepository {
           )
           AND (${typeFilter} = '' OR ${personType()} = ${typeFilter})
           AND (
-            ${typeFilter} <> 'pet'
+            NOT ${personIsPet()}
             OR ${personIdentityId()} IN (SELECT "identityId" FROM embedded_pet_identities)
           )
         UNION ALL
@@ -1858,7 +1859,7 @@ export class FaceIdentityRepository {
           )
           AND (${typeFilter} = '' OR shared_space_person.type = ${typeFilter})
           AND (
-            ${typeFilter} <> 'pet'
+            shared_space_person.type <> 'pet'
             OR shared_space_person."identityId" IN (SELECT "identityId" FROM embedded_pet_identities)
           )
       ),

@@ -231,6 +231,24 @@ where
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
   and "person"."isHidden" = $2
+  and (
+    not EXISTS (
+      SELECT
+      FROM
+        "person_pet"
+      WHERE
+        "person_pet"."personGroupId" = "person"."personGroupId"
+    )
+    or exists (
+      select
+        1 as "one"
+      from
+        "asset_face" as "pet_face"
+        inner join "pet_search" on "pet_search"."faceId" = "pet_face"."id"
+      where
+        "pet_face"."personGroupId" = "person"."personGroupId"
+    )
+  )
 group by
   "person"."ownerId",
   "person"."personGroupId"
@@ -1019,7 +1037,13 @@ WITH
         ) = $4
       )
       AND (
-        $5 <> 'pet'
+        NOT EXISTS (
+          SELECT
+          FROM
+            "person_pet"
+          WHERE
+            "person_pet"."personGroupId" = "person"."personGroupId"
+        )
         OR EXISTS (
           SELECT
             1
@@ -1037,7 +1061,7 @@ WITH
     HAVING
       NULLIF(BTRIM("person"."name"), '') IS NOT NULL
       OR (
-        $6 = 'pet'
+        $5 = 'pet'
         AND EXISTS (
           SELECT
           FROM
@@ -1046,7 +1070,7 @@ WITH
             "person_pet"."personGroupId" = "person"."personGroupId"
         )
       )
-      OR COUNT("asset_face"."assetId") >= $7
+      OR COUNT("asset_face"."assetId") >= $6
   )
 SELECT
   COUNT(*)::int AS "total",
