@@ -22,6 +22,7 @@ class SpaceDetailKebab extends StatelessWidget {
     required this.onToggleTimeline,
     required this.onPeople,
     required this.onMembers,
+    required this.onChallenges,
     required this.onEdit,
     required this.onDelete,
   });
@@ -42,6 +43,7 @@ class SpaceDetailKebab extends StatelessWidget {
   final VoidCallback onToggleTimeline;
   final VoidCallback onPeople;
   final VoidCallback onMembers;
+  final VoidCallback onChallenges;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -53,6 +55,7 @@ class SpaceDetailKebab extends StatelessWidget {
         _KebabAction.toggleTimeline => onToggleTimeline(),
         _KebabAction.people => onPeople(),
         _KebabAction.members => onMembers(),
+        _KebabAction.challenges => onChallenges(),
         _KebabAction.edit => onEdit(),
         _KebabAction.delete => onDelete(),
       },
@@ -74,6 +77,13 @@ class SpaceDetailKebab extends StatelessWidget {
           value: _KebabAction.members,
           child: Text(context.t.members),
         ),
+        // Playing needs membership, not the editor role — no canEdit gate, exactly like People
+        // and Members above.
+        PopupMenuItem<_KebabAction>(
+          key: const Key('space-detail-kebab-challenges'),
+          value: _KebabAction.challenges,
+          child: Text(context.t.game_challenges),
+        ),
         if (canEdit)
           PopupMenuItem<_KebabAction>(
             key: const Key('space-detail-kebab-edit'),
@@ -91,4 +101,4 @@ class SpaceDetailKebab extends StatelessWidget {
   }
 }
 
-enum _KebabAction { toggleTimeline, people, members, edit, delete }
+enum _KebabAction { toggleTimeline, people, members, challenges, edit, delete }

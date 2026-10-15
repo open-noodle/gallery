@@ -487,6 +487,10 @@ features:
         - server/src/schema/migrations-gallery/1798700000000-AddPersonPetTable.ts
         - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
         - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
+        - server/src/schema/migrations-gallery/1799100000000-AddPhotoGuessingGame.ts
+        - server/src/schema/migrations-gallery/1799200000000-AddDailyGameChallenge.ts
+        - server/src/schema/migrations-gallery/1799300000000-AddSpaceDailyChallengeEnabled.ts
+        - server/src/schema/migrations-gallery/1799400000000-AddSoloGameChallenge.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:

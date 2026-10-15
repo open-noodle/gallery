@@ -64,6 +64,14 @@ const SharedLinksUpdateSchema = z
   .optional()
   .meta({ id: 'SharedLinksUpdate' });
 
+const PhotoGuesserUpdateSchema = z
+  .object({
+    includePartners: z.boolean().optional().describe('Whether PhotoGuesser solo rounds include partner photos'),
+    includeSpaces: z.boolean().optional().describe('Whether PhotoGuesser solo rounds include shared-space photos'),
+  })
+  .optional()
+  .meta({ id: 'PhotoGuesserUpdate' });
+
 const TagsUpdateSchema = z
   .object({
     enabled: z.boolean().optional().describe('Whether tags are enabled'),
@@ -124,6 +132,7 @@ const UserPreferencesUpdateSchema = z
     purchase: PurchaseUpdateSchema,
     ratings: RatingsUpdateSchema,
     sharedLinks: SharedLinksUpdateSchema,
+    photoGuesser: PhotoGuesserUpdateSchema,
     tags: TagsUpdateSchema,
     recentlyAdded: RecentlyAddedUpdateSchema,
   })
@@ -172,6 +181,13 @@ const SharedLinksResponseSchema = z
     sidebarWeb: z.boolean().describe('Whether shared links appear in web sidebar'),
   })
   .meta({ id: 'SharedLinksResponse' });
+
+const PhotoGuesserResponseSchema = z
+  .object({
+    includePartners: z.boolean().describe('Whether PhotoGuesser solo rounds include partner photos'),
+    includeSpaces: z.boolean().describe('Whether PhotoGuesser solo rounds include shared-space photos'),
+  })
+  .meta({ id: 'PhotoGuesserResponse' });
 
 const TagsResponseSchema = z
   .object({
@@ -222,6 +238,7 @@ const UserPreferencesResponseSchema = z
     people: PeopleResponseSchema,
     ratings: RatingsResponseSchema,
     sharedLinks: SharedLinksResponseSchema,
+    photoGuesser: PhotoGuesserResponseSchema,
     tags: TagsResponseSchema,
     emailNotifications: EmailNotificationsResponseSchema,
     download: DownloadResponseSchema,

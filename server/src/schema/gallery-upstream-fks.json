@@ -39,6 +39,7 @@
         "asset_favorite_assetId_fkey",
         "asset_job_status_gallery_assetId_fkey",
         "asset_video_trim_assetId_fkey",
+        "game_round_assetId_fkey",
         "shared_space_asset_assetId_fkey",
         "shared_space_face_match_backfill_target_assetId_fkey",
         "shared_space_thumbnailAssetId_fkey"
@@ -89,6 +90,9 @@
         "face_person_verdict_actorId_fkey",
         "face_repair_decline_declinedBy_fkey",
         "face_repair_scan_requestedBy_fkey",
+        "game_challenge_createdById_fkey",
+        "game_challenge_ownerId_fkey",
+        "game_guess_userId_fkey",
         "library_user_userId_fkey",
         "person_identity_ownerId_fkey",
         "shared_space_activity_userId_fkey",

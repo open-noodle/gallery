@@ -12,6 +12,9 @@ import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.ta
 import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table.js';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
+import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
 import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryUserTable } from 'src/schema/tables/library-user.table.js';
@@ -48,6 +51,9 @@ import { UserGroupTable } from 'src/schema/tables/user-group.table.js';
 
 // Gallery fork tables, spread into ImmichDatabase.tables and merged into DB by src/schema/index.ts.
 export const galleryTables = [
+  GameGuessTable,
+  GameRoundTable,
+  GameChallengeTable,
   AlbumSpaceAssetTable,
   AlbumSpaceAssetAuditTable,
   AssetDuplicateChecksumTable,
@@ -98,6 +104,9 @@ export const galleryTables = [
 ];
 
 export interface GalleryDB {
+  game_guess: GameGuessTable;
+  game_round: GameRoundTable;
+  game_challenge: GameChallengeTable;
   album_space_asset: AlbumSpaceAssetTable;
   album_space_asset_audit: AlbumSpaceAssetAuditTable;
   asset_duplicate_checksum: AssetDuplicateChecksumTable;

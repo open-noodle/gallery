@@ -76,3 +76,7 @@
 1798700000000-AddPersonPetTable
 1798800000000-RestoreAssetIsFavoriteProjection
 1798900000000-MoveVideoTrimToSidecar
+1799100000000-AddPhotoGuessingGame
+1799200000000-AddDailyGameChallenge
+1799300000000-AddSpaceDailyChallengeEnabled
+1799400000000-AddSoloGameChallenge

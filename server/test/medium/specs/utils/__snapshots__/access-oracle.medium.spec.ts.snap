@@ -605,6 +605,12 @@ exports[`checkAccess oracle > face.update 1`] = `{}`;
 
 exports[`checkAccess oracle > folder.read 1`] = `{}`;
 
+exports[`checkAccess oracle > game.create 1`] = `{}`;
+
+exports[`checkAccess oracle > game.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > game.read 1`] = `{}`;
+
 exports[`checkAccess oracle > job.create 1`] = `{}`;
 
 exports[`checkAccess oracle > job.read 1`] = `{}`;
