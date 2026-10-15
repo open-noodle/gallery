@@ -3,6 +3,7 @@ import { Expression, ExpressionBuilder, Kysely, SqlBool, Transaction, sql } from
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetFileType, AssetVisibility, SourceType } from 'src/enum.js';
+import { personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { DB } from 'src/schema/index.js';
 import {
   DissolveScope,
@@ -191,10 +192,9 @@ export class FaceDissolveRepository {
                   ),
                   inner.exists(
                     inner
-                      .selectFrom('person')
+                      .selectFrom('person_pet')
                       .select(sql`1`.as('one'))
-                      .whereRef('person.personGroupId', '=', 'other.personGroupId')
-                      .where('person.type', '=', 'pet'),
+                      .whereRef('person_pet.personGroupId', '=', 'other.personGroupId'),
                   ),
                 ]),
               ),
@@ -269,7 +269,7 @@ export class FaceDissolveRepository {
       // under-report against the dialog for the same person — an admin comparing the two saw numbers that
       // could not be reconciled, and the dissolve then deleted faces discovery never counted.
       .leftJoin('asset_face', (join) => join.onRef('asset_face.personGroupId', '=', 'person.personGroupId'))
-      .where('person.type', '!=', 'pet')
+      .where((eb) => eb.not(personIsPet('person')))
       // ownerId is mandatory: an unfiltered aggregate spans every visible asset_face row on the instance and
       // orders by an aggregate alias, so no page can be pruned and each page re-runs the whole GROUP BY.
       .where('person.ownerId', '=', options.ownerId)
@@ -316,7 +316,7 @@ export class FaceDissolveRepository {
     const totalRow = await this.db
       .selectFrom('person')
       .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('person.type', '!=', 'pet')
+      .where((eb) => eb.not(personIsPet('person')))
       .where('person.ownerId', '=', options.ownerId)
       .executeTakeFirstOrThrow();
 

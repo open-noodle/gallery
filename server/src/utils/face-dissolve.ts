@@ -68,7 +68,7 @@ export const dissolveFacePredicate = (
   eb.and([eb('asset_face.personGroupId', '=', personGroupId), dissolveScopePredicate(eb, scope)]);
 
 /**
- * A box someone drew by hand. `createdBy` is the SOLE deletability signal for a hand-drawn face
+ * A box someone drew by hand. Its `asset_face_creator` row (`createdBy`) is the SOLE deletability signal for a hand-drawn face
  * (specs/2026-08-23-space-editor-face-assignment-design.md §6.6): it is NULL for every detector face and every
  * pre-existing row, and `sourceType` cannot stand in for it (owner-drawn boxes are `manual` with no `createdBy`).
  *
@@ -77,7 +77,7 @@ export const dissolveFacePredicate = (
  * The preview counts them (`handDrawn`) with this same predicate, so the dialog and the transaction agree.
  */
 export const handDrawnFacePredicate = (eb: ExpressionBuilder<DB, 'asset_face'>): Expression<SqlBool> =>
-  eb('asset_face.createdBy', 'is not', null);
+  eb.exists(eb.selectFrom('asset_face_creator').whereRef('asset_face_creator.assetFaceId', '=', 'asset_face.id'));
 
 /**
  * The faces a DELETE outcome actually deletes: in scope, and not hand-drawn. Shared for the same reason as

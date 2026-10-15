@@ -267,8 +267,14 @@ describe('FaceDissolveRepository.dissolve', () => {
 
       const kept = await db
         .selectFrom('asset_face')
-        .select(['id', 'personGroupId', 'createdBy', 'deletedAt'])
-        .where('id', '=', handDrawn.id)
+        .leftJoin('asset_face_creator', 'asset_face_creator.assetFaceId', 'asset_face.id')
+        .select([
+          'asset_face.id',
+          'asset_face.personGroupId',
+          'asset_face_creator.userId as createdBy',
+          'asset_face.deletedAt',
+        ])
+        .where('asset_face.id', '=', handDrawn.id)
         .executeTakeFirst();
       expect(kept).toEqual({ id: handDrawn.id, personGroupId: null, createdBy: editor.id, deletedAt: null });
 
