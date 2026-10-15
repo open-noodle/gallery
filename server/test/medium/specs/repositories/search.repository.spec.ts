@@ -2276,34 +2276,34 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports which absence-of-location entries are worth offering', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions: suggestionRepository } = setup();
       const { user } = await ctx.newUser();
       await newLocationFixture(ctx, user.id);
 
-      const suggestions = await sut.getFilterSuggestions([user.id], {});
+      const suggestions = await suggestionRepository.getFilterSuggestions([user.id], {});
 
       expect(suggestions.hasNoGpsAssets).toBe(true);
       expect(suggestions.hasNoPlaceNameAssets).toBe(true);
     });
 
     it('reports both false for a fully located library', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions: suggestionRepository } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: asset.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
 
-      const suggestions = await sut.getFilterSuggestions([user.id], {});
+      const suggestions = await suggestionRepository.getFilterSuggestions([user.id], {});
 
       expect(suggestions.hasNoGpsAssets).toBe(false);
       expect(suggestions.hasNoPlaceNameAssets).toBe(false);
     });
 
     it('keeps the sibling entry offered once one is selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions: suggestionRepository } = setup();
       const { user } = await ctx.newUser();
       await newLocationFixture(ctx, user.id);
 
-      const suggestions = await sut.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
+      const suggestions = await suggestionRepository.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
 
       // Both flags are computed with the location group excluded, so selecting one entry must not
       // make the other vanish from the panel.
@@ -2312,7 +2312,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('narrows the camera-makes list, not just the flags and countries, when locationPresence is selected', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, suggestions: suggestionRepository } = setup();
       const { user } = await ctx.newUser();
 
       const { asset: noGpsCanon } = await ctx.newAsset({ ownerId: user.id });
@@ -2328,7 +2328,7 @@ describe(SearchRepository.name, () => {
         make: 'Nikon',
       });
 
-      const suggestions = await sut.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
+      const suggestions = await suggestionRepository.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
 
       // Unlike countries (excluded because it's the location group's own entry), every other
       // suggestion list must narrow by locationPresence the same way it narrows by city/country —
@@ -2337,49 +2337,49 @@ describe(SearchRepository.name, () => {
     });
 
     it('reports the same flags through the smart-facets path', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets: facetRepository } = setup();
       const { user } = await ctx.newUser();
       const { a1 } = await newLocationFixture(ctx, user.id);
       await addEmbedding(ctx.database, a1.id);
 
-      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const facets = await facetRepository.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(facets.hasNoGpsAssets).toBe(true);
     });
 
     it('reports hasNoPlaceNameAssets through the smart-facets path', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets: facetRepository } = setup();
       const { user } = await ctx.newUser();
       const { a3 } = await newLocationFixture(ctx, user.id);
       await addEmbedding(ctx.database, a3.id);
 
-      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const facets = await facetRepository.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(facets.hasNoPlaceNameAssets).toBe(true);
     });
 
     it('reports both false for a fully located smart-search result set', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets: facetRepository } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newExif({ assetId: asset.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
       await addEmbedding(ctx.database, asset.id);
 
-      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+      const facets = await facetRepository.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(facets.hasNoGpsAssets).toBe(false);
       expect(facets.hasNoPlaceNameAssets).toBe(false);
     });
 
     it('keeps the sibling entry and countries offered when locationPresence is selected on smart facets', async () => {
-      const { ctx, sut } = setup();
+      const { ctx, facets: facetRepository } = setup();
       const { user } = await ctx.newUser();
       const { a1, a3, a4 } = await newLocationFixture(ctx, user.id);
       await addEmbedding(ctx.database, a1.id);
       await addEmbedding(ctx.database, a3.id);
       await addEmbedding(ctx.database, a4.id);
 
-      const facets = await sut.getSmartSearchFacets({
+      const facets = await facetRepository.getSmartSearchFacets({
         userIds: [user.id],
         embedding: matchingEmbedding,
         locationPresence: 'noGps',

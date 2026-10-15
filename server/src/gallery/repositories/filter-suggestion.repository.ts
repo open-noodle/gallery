@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { type Kysely, type SelectQueryBuilder, type SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
+import type { LocationPresence } from 'src/repositories/search.repository.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetType, AssetVisibility } from 'src/enum.js';
 import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
-import type { LocationPresence } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { withAssetFilter } from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, hasPeople } from 'src/utils/database.js';
