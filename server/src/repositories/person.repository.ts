@@ -55,6 +55,8 @@ export interface PersonSearchOptions {
   closestFaceAssetId?: string;
   /** People-page type filter: 'person' or 'pet'. Undefined returns both. */
   type?: string;
+  isFavorite?: boolean;
+  isHidden?: boolean;
 }
 
 export interface PersonNameSearchOptions {
@@ -847,10 +849,14 @@ export class PersonRepository {
       )
       .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
       .$if(!!options?.type, (qb) => qb.where(personType(), '=', options!.type!))
-      // "Pets" means the individuals pet recognition identified, not the per-species buckets the
-      // detector alone produces. A bucket has no pet_search row on any of its faces.
-      .$if(options?.type === 'pet', (qb) =>
-        qb.where((eb) =>
+      .$if(options?.isFavorite !== undefined, (qb) => qb.where('person.isFavorite', '=', options!.isFavorite!))
+      .$if(options?.isHidden !== undefined, (qb) => qb.where('person.isHidden', '=', options!.isHidden!))
+      // A pet is listed only as an individual pet recognition identified, never as the per-species
+      // bucket the detector alone produces, on every view: the bucket's species name would otherwise
+      // pass the named-person arm above. A bucket has no pet_search row on any of its faces.
+      .where((eb) =>
+        eb.or([
+          eb.not(personIsPet()),
           eb.exists(
             eb
               .selectFrom('asset_face as pet_face')
@@ -858,7 +864,7 @@ export class PersonRepository {
               .select(sql`1`.as('one'))
               .whereRef('pet_face.personGroupId', '=', 'person.personGroupId'),
           ),
-        ),
+        ]),
       )
       .offset(pagination.skip ?? 0)
       .limit(pagination.take + 1)
@@ -1268,7 +1274,7 @@ export class PersonRepository {
           AND "asset_face"."isVisible" = true
           AND (${typeFilter} = '' OR ${personType()} = ${typeFilter})
           AND (
-            ${typeFilter} <> 'pet'
+            NOT ${personIsPet()}
             OR EXISTS (
               SELECT 1 FROM "asset_face" "pet_face"
               INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
