@@ -177,6 +177,38 @@ describe('filter-url codec', () => {
     expect(params.get('month')).toBeNull();
   });
 
+  describe('locationPresence', () => {
+    it('round-trips locationPresence', () => {
+      const decoded = decodeFilterParams(new URL(`https://g.test/photos?${encode({ locationPresence: 'noGps' })}`));
+
+      expect(decoded.locationPresence).toBe('noGps');
+    });
+
+    it('drops city, state and country when locationPresence is present', () => {
+      const url = new URL('https://g.test/photos?locationPresence=noGps&city=Paris&state=IDF&country=France');
+      const decoded = decodeFilterParams(url);
+
+      expect(decoded.locationPresence).toBe('noGps');
+      expect(decoded.city).toBeUndefined();
+      expect(decoded.state).toBeUndefined();
+      expect(decoded.country).toBeUndefined();
+    });
+
+    it('ignores a locationPresence value outside the enum', () => {
+      const decoded = decodeFilterParams(new URL('https://g.test/photos?locationPresence=nogps'));
+
+      expect(decoded.locationPresence).toBeUndefined();
+    });
+
+    it('clears locationPresence with the rest of the filter params', () => {
+      const params = encode({ locationPresence: 'noGps' });
+      clearFilterParams(params);
+
+      // clearFilterParams iterates FILTER_URL_PARAMS — this fails if the key was never added to it.
+      expect(params.get('locationPresence')).toBeNull();
+    });
+  });
+
   // D2 — the temporal picker's own control (selectedYear/selectedMonth) is IN the codec. It used to
   // be transient, so a shared link silently lost it and every URL-backed page needed a carry-over
   // slot to smuggle it across its own goto().

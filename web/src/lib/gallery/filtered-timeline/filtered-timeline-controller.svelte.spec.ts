@@ -52,6 +52,8 @@ const emptySuggestions = () => ({
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 });
 
 const facets = (total: number) =>

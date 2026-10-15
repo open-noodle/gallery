@@ -1,4 +1,4 @@
-import { AssetTypeEnum } from '@immich/sdk';
+import { AssetTypeEnum, LocationPresence } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
@@ -77,6 +77,14 @@ describe('filterStateToSearchTerms', () => {
         state: 'State of Berlin',
       }),
     );
+  });
+
+  it('maps locationPresence to the metadata-search enum', () => {
+    const noGps = filterStateToSearchTerms({ ...createFilterState(), locationPresence: 'noGps' });
+    expect(noGps.locationPresence).toBe(LocationPresence.NoGps);
+
+    const noPlaceName = filterStateToSearchTerms({ ...createFilterState(), locationPresence: 'noPlaceName' });
+    expect(noPlaceName.locationPresence).toBe(LocationPresence.NoPlaceName);
   });
 
   // MetadataSearchDto's albumIds field is plural/array, so a single albumId filter must be wrapped.

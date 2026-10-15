@@ -14,18 +14,20 @@ The pattern is called **faceted search**. Amazon and eBay do the same thing.
 
 ## What updates
 
-| Filter     | Options narrow with other filters? | Whole section hidden when it cannot filter?            |
-| ---------- | ---------------------------------- | ------------------------------------------------------ |
-| People     | Yes                                | Yes, unless unnamed faces exist                        |
-| Location   | Yes (countries)                    | Yes, when no photo has a location                      |
-| Camera     | Yes (makes)                        | Yes, when no photo has camera metadata                 |
-| Tags       | Yes                                | Yes, when nothing is tagged                            |
-| Rating     | No, all five stars always show     | Yes, when nothing is rated                             |
-| Media Type | No, all three buttons always show  | Yes, unless you have both photos and videos            |
-| Favorites  | n/a, a toggle rather than a list   | Yes, when nothing is favourited                        |
-| Albums     | n/a, a toggle rather than a list   | Yes, unless some photos are in albums and some are not |
-| Timeline   | Drives filtering                   | Never; it greys out instead                            |
-| Text       | No, free text                      | Never                                                  |
+| Filter        | Options narrow with other filters? | Whole section hidden when it cannot filter?            |
+| ------------- | ---------------------------------- | ------------------------------------------------------ |
+| People        | Yes                                | Yes, unless unnamed faces exist                        |
+| Location      | Yes (countries)                    | Yes, when no photo has a location and none lacks one   |
+| No GPS        | Yes                                | Yes, unless some photo has no coordinates at all       |
+| No place name | Yes                                | Yes, unless some photo has coordinates but no place    |
+| Camera        | Yes (makes)                        | Yes, when no photo has camera metadata                 |
+| Tags          | Yes                                | Yes, when nothing is tagged                            |
+| Rating        | No, all five stars always show     | Yes, when nothing is rated                             |
+| Media Type    | No, all three buttons always show  | Yes, unless you have both photos and videos            |
+| Favorites     | n/a, a toggle rather than a list   | Yes, when nothing is favourited                        |
+| Albums        | n/a, a toggle rather than a list   | Yes, unless some photos are in albums and some are not |
+| Timeline      | Drives filtering                   | Never; it greys out instead                            |
+| Text          | No, free text                      | Never                                                  |
 
 ## Sections you do not see
 
@@ -52,7 +54,7 @@ An in-flight request is cancelled as soon as a new filter change arrives.
 
 ## Architecture
 
-A single API endpoint (`GET /search/suggestions/filters`) returns all suggestion categories in one round trip. The server runs eight facet queries in parallel, one per category, including the favourites and album-membership presence checks. Each query applies all active filters **except its own category**. That exclusion is what makes it faceted: selecting Germany still shows every country that matches the other filters. Album membership is one of the eight, but it issues two SQL probes internally (one asking whether any matching asset is already filed, one asking whether any is unfiled), so nine queries reach the database.
+A single API endpoint (`GET /search/suggestions/filters`) returns all suggestion categories in one round trip. The server runs nine facet queries in parallel, one per category, including the favourites, album-membership and location-presence presence checks. Each query applies all active filters **except its own category**. That exclusion is what makes it faceted: selecting Germany still shows every country that matches the other filters. Album membership is one of the nine, but it issues two SQL probes internally (one asking whether any matching asset is already filed, one asking whether any is unfiled), so ten queries reach the database.
 
 For album detail pages, the same endpoint is scoped with `albumId`. Album scoping cannot be combined with `spaceId` or `withSharedSpaces`, because an album and a space are separate collection boundaries.
 
@@ -64,8 +66,8 @@ Client: GET /search/suggestions/filters?country=Germany&withSharedSpaces=true
 Server:
   1. Resolve user IDs (own + partners)
   2. Resolve shared space IDs (if withSharedSpaces)
-  3. Run 8 facet queries in parallel:
-     - Countries: all filters EXCEPT country/city
+  3. Run 9 facet queries in parallel:
+     - Countries: all filters EXCEPT country/city/state/locationPresence
      - Camera makes: all filters EXCEPT make/model
      - Tags: all filters EXCEPT tagIds
      - People: all filters EXCEPT personIds
@@ -75,6 +77,7 @@ Server:
      - Album membership: all filters EXCEPT isInAlbum/isNotInAlbum
        - probe 1: is any matching asset already filed in an album?
        - probe 2: is any matching asset not filed in any album?
+     - Location presence (no GPS / no place name): all filters EXCEPT country/city/state/locationPresence
   4. Return unified response
 ```
 
@@ -92,7 +95,7 @@ FilterPanel:
 
 ### Shared query helper
 
-All eight facet queries share a common `buildFilteredAssetIds` helper that applies user/space scoping, temporal bounds, exif filters, person filters (via EXISTS), tag filters (via EXISTS), media type, and favorites. Each extraction method passes its own filter through `without()` to exclude its category before building the query. Album membership calls the helper once per probe.
+All nine facet queries share a common `buildFilteredAssetIds` helper that applies user/space scoping, temporal bounds, exif filters, person filters (via EXISTS), tag filters (via EXISTS), media type, and favorites. Each extraction method passes its own filter through `without()` to exclude its category before building the query. Album membership calls the helper once per probe.
 
 ## Supported pages
 

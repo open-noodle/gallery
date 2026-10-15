@@ -16,6 +16,8 @@ FilterSuggestionsResponseDto _sugg(List<String> countries) => FilterSuggestionsR
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   countries: countries,
 );
 

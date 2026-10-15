@@ -13,7 +13,11 @@ import {
 } from '$lib/components/filter-panel/filter-panel';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
-function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>, spaceId?: string) {
+function mapSuggestions(
+  response: Awaited<ReturnType<typeof getFilterSuggestions>>,
+  spaceId?: string,
+  offerLocationPresence = false,
+) {
   return {
     countries: response.countries,
     cameraMakes: response.cameraMakes,
@@ -29,10 +33,18 @@ function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions
     hasFavorites: response.hasFavorites,
     hasAssetsInAlbum: response.hasAssetsInAlbum,
     hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
+    // The map plots markers from asset_exif.latitude IS NOT NULL (map.repository.ts:187), so a
+    // "no GPS" filter can only ever produce an empty map. The map never offers either entry; the
+    // photos and space timelines, which share this config, do.
+    hasNoGpsAssets: offerLocationPresence && response.hasNoGpsAssets,
+    hasNoPlaceNameAssets: offerLocationPresence && response.hasNoPlaceNameAssets,
   };
 }
 
-export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
+export function buildMapFilterConfig(
+  spaceId?: string,
+  { offerLocationPresence = false }: { offerLocationPresence?: boolean } = {},
+): FilterPanelConfig {
   const suggestionsProvider = async (filters: FilterState) => {
     const context = buildFilterContext(filters);
     const response = await getFilterSuggestions({
@@ -40,6 +52,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
       country: filters.country,
       state: filters.state,
       city: filters.city,
+      locationPresence: offerLocationPresence ? filters.locationPresence : undefined,
       make: filters.make,
       model: filters.model,
       lensModel: filters.lensModel,
@@ -59,7 +72,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
       takenBefore: context?.takenBefore,
       ...(spaceId ? { spaceId } : { withSharedSpaces: true }),
     });
-    return mapSuggestions(response, spaceId);
+    return mapSuggestions(response, spaceId, offerLocationPresence);
   };
 
   return {
@@ -67,7 +80,11 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
     suggestionsProvider,
     // #910: the baseline is the same call with the filter arguments dropped, keeping only scope.
     baselineProvider: async () =>
-      mapSuggestions(await getFilterSuggestions({ ...(spaceId ? { spaceId } : { withSharedSpaces: true }) }), spaceId),
+      mapSuggestions(
+        await getFilterSuggestions({ ...(spaceId ? { spaceId } : { withSharedSpaces: true }) }),
+        spaceId,
+        offerLocationPresence,
+      ),
     providers: {
       cities: (country: string, context) =>
         getSearchSuggestions({

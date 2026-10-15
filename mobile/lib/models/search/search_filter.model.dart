@@ -9,7 +9,8 @@ part 'search_filter.model.freezed.dart';
 abstract class SearchLocationFilter with _$SearchLocationFilter {
   const SearchLocationFilter._();
 
-  const factory SearchLocationFilter({String? country, String? state, String? city}) = _SearchLocationFilter;
+  const factory SearchLocationFilter({String? country, String? state, String? city, String? locationPresence}) =
+      _SearchLocationFilter;
 }
 
 @freezed
@@ -112,6 +113,7 @@ abstract class SearchFilter with _$SearchFilter {
         location.country == null &&
         location.state == null &&
         location.city == null &&
+        location.locationPresence == null &&
         camera.make == null &&
         camera.model == null &&
         date.takenBefore == null &&

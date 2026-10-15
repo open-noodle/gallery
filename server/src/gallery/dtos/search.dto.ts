@@ -23,6 +23,36 @@ const ScopedPersonTokenSchema = z
   .regex(new RegExp(`^(?:${UUID_PATTERN}|person:${UUID_PATTERN}|space-person:${UUID_PATTERN})$`))
   .describe('Legacy person ID or scoped identity filter token');
 
+const LOCATION_PRESENCE_SIBLINGS = ['city', 'state', 'country'] as const;
+
+/**
+ * Fork (#868): `locationPresence` is a MEMBER of the location filter group, never an extra
+ * narrowing on top of one, so it is mutually exclusive with city/state/country.
+ *
+ * Written as a `superRefine` rather than the `IsNotSiblingOf` pipe used for the suggestion DTOs
+ * because the result must stay a ZodObject: the search DTOs are extended and then wrapped by
+ * upstream's `withShapeExclusivity`, and a ZodPipe has neither `.extend()` nor a `.shape`.
+ */
+export const withLocationPresenceExclusivity = <T extends z.ZodObject<z.ZodRawShape>>(schema: T) =>
+  schema.superRefine((dto, ctx) => {
+    const values = dto as Record<string, unknown>;
+    if (values.locationPresence === undefined) {
+      return;
+    }
+
+    for (const sibling of LOCATION_PRESENCE_SIBLINGS) {
+      if (values[sibling] === undefined) {
+        continue;
+      }
+
+      ctx.addIssue({
+        code: 'custom',
+        path: ['locationPresence'],
+        message: `locationPresence cannot exist alongside ${LOCATION_PRESENCE_SIBLINGS.join(' or ')}`,
+      });
+    }
+  });
+
 /** BaseSearchSchema: overrides of upstream fields first, then fork-only fields. */
 export const GallerySearchFilterExtension = {
   takenBefore: isoDatetimeToDate
@@ -40,6 +70,14 @@ export const GallerySearchFilterExtension = {
     .optional()
     .describe('Filter by asset owner (contributor). Narrows within the current scope; never widens it.'),
   isInAlbum: z.boolean().optional().describe('Filter assets in at least one album'),
+  // Deliberately NOT marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3 replacement, and
+  // this facet has none — `withShapeExclusivity` would then reject it alongside `filter`.
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   // Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3 replacement, and there is none for
   // shared spaces.
   spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
@@ -180,6 +218,10 @@ const FilterSuggestionsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -201,6 +243,10 @@ const SmartSearchFacetsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
@@ -212,6 +258,12 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   country: z.string().optional().describe('Filter by country'),
   state: z.string().optional().describe('Filter by state/province'),
   city: z.string().optional().describe('Filter by city'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
@@ -237,9 +289,9 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
 });
 
-const FilterSuggestionsRequestSchema = withGallerySuggestionScope(FilterSuggestionsRequestBaseSchema).meta({
-  id: 'FilterSuggestionsRequestDto',
-});
+const FilterSuggestionsRequestSchema = withGallerySuggestionScope(FilterSuggestionsRequestBaseSchema)
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'locationPresence', ['city', 'state', 'country']))
+  .meta({ id: 'FilterSuggestionsRequestDto' });
 
 export class TagSuggestionRequestDto extends createZodDto(TagSuggestionRequestSchema) {}
 export class TagSuggestionResponseDto extends createZodDto(TagSuggestionResponseSchema) {}
