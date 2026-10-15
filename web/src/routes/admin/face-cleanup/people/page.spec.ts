@@ -2,7 +2,12 @@ import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { Route } from '#lib/route.ts';
 import { manualReviewOwnerId } from '#lib/stores/face-cleanup-manual-review.store.ts';
 import { factory } from '#test/unit/factories.ts';
-import { getFaceRepairOwnerPeople, type FaceRepairOwnerPeopleResponseDto } from '@immich/sdk';
+import {
+  getFaceRepairOwnerPeople,
+  getFaceRepairPeopleHealth,
+  type FaceRepairOwnerPeopleResponseDto,
+  type PeopleHealthResponseDto,
+} from '@immich/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -13,12 +18,16 @@ import Page from './+page.svelte';
 // specs/2026-07-23-manual-face-review-mode-design.md). Owner selector →
 // paginated people grid via getFaceRepairOwnerPeople(ownerId, {query, page}). Covers plan Step 1's
 // 12 cases (manual face review, slice 6).
+//
+// Task 8 (discovery) adds a second "Health" tab backed by getFaceRepairPeopleHealth — see the dedicated
+// describe block near the bottom of this file.
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();
   return {
     ...actual,
     getFaceRepairOwnerPeople: vi.fn(),
+    getFaceRepairPeopleHealth: vi.fn(),
   };
 });
 
@@ -130,6 +139,26 @@ const makeResponse = (
 const makePageData = (users: ReturnType<typeof makeUser>[]) => ({
   users,
   meta: { title: 'Manual review' },
+});
+
+type PersonHealthRow = PeopleHealthResponseDto['people'][number];
+
+const makeHealthRow = (over: Partial<PersonHealthRow> = {}): PersonHealthRow => ({
+  id: 'health-person-1',
+  name: 'Dirty Person',
+  ownerId: 'u1',
+  faceCount: 10,
+  machineLearning: 0,
+  exif: 10,
+  manual: 0,
+  facesWithoutEmbedding: 10,
+  ...over,
+});
+
+const makeHealthResponse = (people: PersonHealthRow[]): PeopleHealthResponseDto => ({
+  people,
+  total: people.length,
+  hasMore: false,
 });
 
 describe('+page.svelte (manual face-cleanup people browser)', () => {
@@ -534,5 +563,127 @@ describe('+page.svelte (manual face-cleanup people browser)', () => {
 
     expect(trail.getByText('admin.face_cleanup_mode_manual', { exact: true }).element()).toBeInTheDocument();
     expect(getAll(trail.getByRole('link'))).toHaveLength(1);
+  });
+});
+
+// Task 8 (discovery): the "Health" tab, backed by getFaceRepairPeopleHealth. Separate describe block —
+// its own tab, own data source, own state — from the browse-grid tests above.
+describe('+page.svelte (face health tab)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authManager.setUser(factory.user({ id: 'current-admin-not-in-owner-list' }));
+    localStorage.clear();
+    manualReviewOwnerId.reset();
+    // The health tab is not the default view, but onMount always fires the browse-tab fetch regardless of
+    // which tab is initially selected — mock it so it resolves quietly instead of rejecting unhandled.
+    vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue(makeResponse([]));
+  });
+
+  afterEach(() => {
+    authManager.reset();
+  });
+
+  it('switching to the Health tab fetches getFaceRepairPeopleHealth with the default sort', async () => {
+    const users = [makeUser('u1', 'Alice Owner')];
+    vi.mocked(getFaceRepairPeopleHealth).mockResolvedValue(makeHealthResponse([makeHealthRow()]));
+
+    await render(Page, { props: { data: makePageData(users) } });
+    await userEvent.click(page.getByTestId('people-tab-health').element());
+
+    await vi.waitFor(() => {
+      expect(getFaceRepairPeopleHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: 'u1', sort: 'faceCount' }),
+      );
+    });
+    expect(page.getByTestId('health-table').element()).toBeInTheDocument();
+    expect(page.getByTestId('health-row-health-person-1').element()).toBeInTheDocument();
+  });
+
+  it('renders the per-source counts for each row', async () => {
+    const users = [makeUser('u1', 'Alice Owner')];
+    vi.mocked(getFaceRepairPeopleHealth).mockResolvedValue(
+      makeHealthResponse([
+        makeHealthRow({ id: 'p1', faceCount: 8, exif: 5, machineLearning: 2, manual: 1, facesWithoutEmbedding: 6 }),
+      ]),
+    );
+
+    await render(Page, { props: { data: makePageData(users) } });
+    await userEvent.click(page.getByTestId('people-tab-health').element());
+
+    const row = await vi.waitFor(() => page.getByTestId('health-row-p1').element());
+    const cells = page.elementLocator(row).getByRole('cell').elements();
+    // name, faceCount, exif, machineLearning, manual, facesWithoutEmbedding
+    expect(cells[1].textContent).toContain('8');
+    expect(cells[2].textContent).toContain('5');
+    expect(cells[3].textContent).toContain('2');
+    expect(cells[4].textContent).toContain('1');
+    expect(cells[5].textContent).toContain('6');
+  });
+
+  it('a row links to the person detail page', async () => {
+    const users = [makeUser('u1', 'Alice Owner')];
+    vi.mocked(getFaceRepairPeopleHealth).mockResolvedValue(makeHealthResponse([makeHealthRow({ id: 'p1' })]));
+
+    await render(Page, { props: { data: makePageData(users) } });
+    await userEvent.click(page.getByTestId('people-tab-health').element());
+
+    const row = await vi.waitFor(() => page.getByTestId('health-row-p1').element());
+    const link = page.elementLocator(row).getByRole('link').element();
+    expect(link).toHaveAttribute('href', Route.viewFaceCleanupManualPerson({ id: 'p1' }));
+  });
+
+  it('changing the sort control re-fetches with the newly selected sort key', async () => {
+    const users = [makeUser('u1', 'Alice Owner')];
+    vi.mocked(getFaceRepairPeopleHealth).mockResolvedValue(makeHealthResponse([makeHealthRow()]));
+
+    await render(Page, { props: { data: makePageData(users) } });
+    await userEvent.click(page.getByTestId('people-tab-health').element());
+    await vi.waitFor(() => expect(getFaceRepairPeopleHealth).toHaveBeenCalledTimes(1));
+
+    const select = page.getByTestId('health-sort-select').element();
+    await userEvent.selectOptions(select, 'exifFaces');
+
+    await vi.waitFor(() => {
+      expect(getFaceRepairPeopleHealth).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ownerId: 'u1', sort: 'exifFaces' }),
+      );
+    });
+  });
+
+  it('shows a full-page retry when the first page fails to load', async () => {
+    const users = [makeUser('u1', 'Alice Owner')];
+    vi.mocked(getFaceRepairPeopleHealth).mockRejectedValueOnce(new Error('boom'));
+
+    await render(Page, { props: { data: makePageData(users) } });
+    await userEvent.click(page.getByTestId('people-tab-health').element());
+
+    await vi.waitFor(() => {
+      expect(page.getByTestId('health-load-error').element()).toBeInTheDocument();
+    });
+
+    vi.mocked(getFaceRepairPeopleHealth).mockResolvedValue(makeHealthResponse([makeHealthRow({ id: 'p1' })]));
+    await userEvent.click(page.getByTestId('health-load-error-retry').element());
+
+    await vi.waitFor(() => {
+      expect(page.getByTestId('health-row-p1').element()).toBeInTheDocument();
+    });
+  });
+
+  it('switching owner re-fetches health for the new owner', async () => {
+    const users = [makeUser('u1', 'Alice Owner'), makeUser('u2', 'Bob Owner')];
+    vi.mocked(getFaceRepairPeopleHealth).mockResolvedValue(makeHealthResponse([makeHealthRow({ id: 'p1' })]));
+
+    await render(Page, { props: { data: makePageData(users) } });
+    await userEvent.click(page.getByTestId('people-tab-health').element());
+    await vi.waitFor(() =>
+      expect(getFaceRepairPeopleHealth).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 'u1' })),
+    );
+
+    const select = page.getByTestId('owner-select-health').element();
+    await userEvent.selectOptions(select, 'u2');
+
+    await vi.waitFor(() => {
+      expect(getFaceRepairPeopleHealth).toHaveBeenLastCalledWith(expect.objectContaining({ ownerId: 'u2' }));
+    });
   });
 });

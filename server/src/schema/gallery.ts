@@ -13,6 +13,7 @@ import { AssetSpatialSceneTable } from 'src/schema/tables/asset-spatial-scene.ta
 import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js';
 import { CleanupDayReviewTable } from 'src/schema/tables/cleanup-day-review.table.js';
 import { CleanupDecisionTable } from 'src/schema/tables/cleanup-decision.table.js';
+import { FaceDissolveFaceTable, FaceDissolveTable } from 'src/schema/tables/face-dissolve.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table.js';
@@ -73,6 +74,8 @@ export const galleryTables = [
   AssetFaceVideoFrameTable,
   AssetJobStatusGalleryTable,
   AssetVideoTrimTable,
+  FaceDissolveTable,
+  FaceDissolveFaceTable,
   FaceIdentityTable,
   FaceIdentityFaceTable,
   FaceRepairDeclineTable,
@@ -133,6 +136,8 @@ export interface GalleryDB {
   asset_face_video_frame: AssetFaceVideoFrameTable;
   asset_job_status_gallery: AssetJobStatusGalleryTable;
   asset_video_trim: AssetVideoTrimTable;
+  face_dissolve: FaceDissolveTable;
+  face_dissolve_face: FaceDissolveFaceTable;
   face_identity: FaceIdentityTable;
   face_identity_face: FaceIdentityFaceTable;
   face_repair_decline: FaceRepairDeclineTable;

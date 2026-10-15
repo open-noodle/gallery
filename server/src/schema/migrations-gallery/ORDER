@@ -85,3 +85,4 @@
 1799800000000-ScopeJitOffToDatabase
 1799900000000-AddAssetDataSaverVideoTable
 1800000000000-AddAssetFaceVideoFrameTable
+1800200000000-AddFaceDissolveTables
