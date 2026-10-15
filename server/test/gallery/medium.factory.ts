@@ -1,3 +1,4 @@
+import { FaceDissolveRepository } from 'src/repositories/face-dissolve.repository.js';
 import { Kysely } from 'kysely';
 import type { ClassConstructor } from 'src/types.js';
 import { CleanupRepository } from 'src/gallery/repositories/cleanup.repository.js';
@@ -67,7 +68,8 @@ export const newGalleryRealRepository = <T extends ClassConstructor<any>>(key: T
     case GalleryAssetRepository:
     case GalleryPersonRepository:
     case SpatialSceneRepository:
-    case DataSaverVideoRepository: {
+    case DataSaverVideoRepository:
+    case FaceDissolveRepository: {
       return new key(db) as InstanceType<T>;
     }
 
@@ -102,7 +104,8 @@ export const newGalleryMockRepository = <T>(key: ClassConstructor<T>) => {
     case GalleryPersonRepository:
     case CleanupRepository:
     case SpatialSceneRepository:
-    case DataSaverVideoRepository: {
+    case DataSaverVideoRepository:
+    case FaceDissolveRepository: {
       return automock(key);
     }
 
