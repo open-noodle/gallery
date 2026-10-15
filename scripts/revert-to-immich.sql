@@ -301,7 +301,8 @@ UPDATE "api_key" k
                 'sharedSpaceAlbum.create', 'sharedSpaceAlbum.update', 'sharedSpaceAlbum.delete',
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
-                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete'
+                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
+                'family.read', 'family.write'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
