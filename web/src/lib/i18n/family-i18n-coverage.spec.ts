@@ -21,7 +21,7 @@ import { FORK_LOCALES } from '$lib/i18n/fork-locales';
 // with no "at least one" escape hatch. A key present only in en.json fails here, on day one,
 // rather than waiting for someone else to translate it into one locale first.
 
-const I18N_DIR = path.resolve(process.cwd(), '../i18n');
+const I18N_DIR = path.resolve(process.cwd(), '../i18n/gallery/merged');
 
 type Messages = Record<string, string>;
 
