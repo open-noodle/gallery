@@ -13128,6 +13128,27 @@ exports[`viewer-scope RBAC oracle > tag writes 1`] = `
     "bulk": 0,
     "tagged": [],
   },
+  "stockOwner": {
+    "bulk": 16,
+    "tagged": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "dupAsset",
+      "dupAsset2",
+      "editorAsset",
+      "libraryAsset",
+      "ownArchived",
+      "ownAsset",
+      "ownHidden",
+      "ownTrashed",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+      "spaceHidden",
+      "spaceTrashed",
+      "stackAsset",
+    ],
+  },
   "stranger": {
     "bulk": 1,
     "tagged": [
@@ -14386,6 +14407,19 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "count": 9,
     },
     "tag": {
+      "assets": [
+        "libraryAsset",
+        "spaceAsset*",
+      ],
+      "count": 2,
+    },
+    "tagPageOwn": {
+      "assets": [
+        "ownAsset*",
+      ],
+      "count": 1,
+    },
+    "tagPageSpace": {
       "assets": [
         "libraryAsset",
         "spaceAsset*",
