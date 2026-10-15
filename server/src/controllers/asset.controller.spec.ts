@@ -70,6 +70,19 @@ describe(AssetController.name, () => {
       expect(status).toBe(400);
       expect(body).toEqual(factory.responses.validationError([{ path: ['id'], message: 'Invalid UUID' }]));
     });
+
+    it('should require a valid spaceId', async () => {
+      const { status, body } = await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}?spaceId=123`);
+      expect(status).toBe(400);
+      expect(body).toEqual(factory.responses.validationError([{ path: ['spaceId'], message: 'Invalid UUID' }]));
+    });
+
+    it('should pass a valid spaceId to the service', async () => {
+      const id = factory.uuid();
+      const spaceId = factory.uuid();
+      await request(ctx.getHttpServer()).get(`/assets/${id}?spaceId=${spaceId}`);
+      expect(service.get).toHaveBeenCalledWith(undefined, id, spaceId);
+    });
   });
 
   describe('PUT /assets/copy', () => {

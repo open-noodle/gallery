@@ -1,3 +1,4 @@
+import { CLS_REQ, ClsServiceManager } from 'nestjs-cls';
 import { EventEmitter } from 'node:events';
 import { CacheControl } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -98,6 +99,28 @@ describe(BaseService.name, () => {
       expect(signal.aborted).toBe(false);
       res.emit('close');
       expect(signal.aborted).toBe(true);
+    });
+
+    // A client that puts its credential in a header would resend it to the storage host on a redirect.
+    it.each([
+      ['an API key', { 'x-api-key': 'secret' }, true],
+      ['a bearer token', { authorization: 'Bearer secret' }, true],
+      ['a user token header', { 'x-immich-user-token': 'secret' }, true],
+      ['a session token header', { 'x-immich-session-token': 'secret' }, true],
+      ['a shared link key header', { 'x-immich-share-key': 'secret' }, true],
+      ['only a session cookie', { cookie: 'immich_access_token=secret' }, false],
+    ])('picks the serve path for a request with %s', async (_, headers, proxy) => {
+      const backend = { getServeStrategy: vi.fn().mockResolvedValue({ type: 'redirect', url: 'https://s3/key' }) };
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
+      const cls = ClsServiceManager.getClsService();
+
+      await cls.run(() => {
+        cls.set(CLS_REQ, { headers });
+        return (sut as any).backendMedia.serveFromBackend('upload/user/abc.jpg', 'image/jpeg', CacheControl.None);
+      });
+
+      expect(backend.getServeStrategy.mock.calls[0][1].proxy ?? false).toBe(proxy);
     });
   });
 });

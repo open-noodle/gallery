@@ -229,7 +229,7 @@ const seed = async () => {
     await ctx.newTagAsset({ tagIds: [tag.id], assetIds });
     return tag.id;
   };
-  await newTag('tagOwn', owner.id, [ownAsset]);
+  const tagOwn = await newTag('tagOwn', owner.id, [ownAsset]);
   const tagSpace = await newTag('tagSpace', owner.id, [spaceAsset, spaceLocked, libraryAsset]);
   await newTag('tagEditor', spaceEditor.id, [editorAsset]);
 
@@ -310,6 +310,7 @@ const seed = async () => {
       space: space.id,
       ownAlbum: ownAlbum.id,
       spaceAlbum: spaceAlbum.id,
+      tagOwn,
       tagSpace,
       pet: pet.personGroupId,
       memories: { memOwner, memViewer },
@@ -378,7 +379,7 @@ beforeAll(async () => {
 describe('viewer-scope RBAC oracle', () => {
   it('timeline buckets and bucket contents', async () => {
     const sut = world.ctx.getService(TimelineService);
-    const { owner, space, ownAlbum, spaceAlbum, tagSpace } = world.ids;
+    const { owner, space, ownAlbum, spaceAlbum, tagOwn, tagSpace } = world.ids;
     const variants = {
       personal: (auth: Auth) => ({
         userId: me(auth),
@@ -416,6 +417,14 @@ describe('viewer-scope RBAC oracle', () => {
         userId: me(auth),
         withSharedSpaces: true,
         tagIds: [tagSpace],
+        visibility: AssetVisibility.Timeline,
+      }),
+      // The tag page's single tagId is access-checked (owned or reached through a space); tagIds above are not.
+      tagPageOwn: (auth: Auth) => ({ userId: me(auth), tagId: tagOwn, visibility: AssetVisibility.Timeline }),
+      tagPageSpace: (auth: Auth) => ({
+        userId: me(auth),
+        withSharedSpaces: true,
+        tagId: tagSpace,
         visibility: AssetVisibility.Timeline,
       }),
       partnerTimeline: () => ({ userId: owner, visibility: AssetVisibility.Timeline }),
@@ -844,6 +853,30 @@ describe('viewer-scope RBAC oracle', () => {
               .toSorted((a, b) => a.stack.localeCompare(b.stack)),
         ),
       };
+    }
+    expect(result).toMatchSnapshot();
+  });
+
+  // The one write surface here: which assets each actor can put its own tag on through PUT /tags/assets. #734 lets a
+  // space Owner/Editor tag a member's space asset (AssetUpdate plus the space edit grant); a viewer, a non-member and
+  // a shared link tag nothing. Runs last because it writes; each actor's tag is deleted again.
+  it('tag writes', async () => {
+    const sut = world.ctx.getService(TagService);
+    world.ctx.getMock(EventRepository).emit.mockResolvedValue();
+    const result: Record<string, unknown> = {};
+    for (const [actor, auth] of Object.entries(world.actors)) {
+      const { tag } = await world.ctx.newTag({ userId: me(auth), value: `write-${actor}` });
+      const bulk = await attempt(
+        () => sut.bulkTagAssets(auth, { tagIds: [tag.id], assetIds: Object.values(world.assets) }),
+        ({ count }) => count,
+      );
+      const tagged = await world.ctx.database
+        .selectFrom('tag_asset')
+        .select('assetId as id')
+        .where('tagId', '=', tag.id)
+        .execute();
+      result[actor] = { bulk, tagged: labelsOf(tagged) };
+      await world.ctx.database.deleteFrom('tag').where('id', '=', tag.id).execute();
     }
     expect(result).toMatchSnapshot();
   });
