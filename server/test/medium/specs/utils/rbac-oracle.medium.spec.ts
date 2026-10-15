@@ -847,4 +847,28 @@ describe('viewer-scope RBAC oracle', () => {
     }
     expect(result).toMatchSnapshot();
   });
+
+  // The one write surface here: which assets each actor can put its own tag on through PUT /tags/assets. #734 lets a
+  // space Owner/Editor tag a member's space asset (AssetUpdate plus the space edit grant); a viewer, a non-member and
+  // a shared link tag nothing. Runs last because it writes; each actor's tag is deleted again.
+  it('tag writes', async () => {
+    const sut = world.ctx.getService(TagService);
+    world.ctx.getMock(EventRepository).emit.mockResolvedValue();
+    const result: Record<string, unknown> = {};
+    for (const [actor, auth] of Object.entries(world.actors)) {
+      const { tag } = await world.ctx.newTag({ userId: me(auth), value: `write-${actor}` });
+      const bulk = await attempt(
+        () => sut.bulkTagAssets(auth, { tagIds: [tag.id], assetIds: Object.values(world.assets) }),
+        ({ count }) => count,
+      );
+      const tagged = await world.ctx.database
+        .selectFrom('tag_asset')
+        .select('assetId as id')
+        .where('tagId', '=', tag.id)
+        .execute();
+      result[actor] = { bulk, tagged: labelsOf(tagged) };
+      await world.ctx.database.deleteFrom('tag').where('id', '=', tag.id).execute();
+    }
+    expect(result).toMatchSnapshot();
+  });
 });
