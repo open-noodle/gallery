@@ -1,12 +1,36 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, sql } from 'kysely';
+import { Expression, ExpressionBuilder, Insertable, Kysely, SqlBool, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
+import {
+  MIGRATION_FILE_TYPE_TO_KIND,
+  StorageMigrationFileType,
+  StorageRoutingKind,
+} from 'src/backends/storage-router.js';
 import { AssetFileType } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { StorageMigrationLogTable } from 'src/schema/tables/storage-migration-log.table.js';
 import { escapeLikePattern } from 'src/utils/database.js';
 
 export type StorageMigrationDirection = 'toS3' | 'toDisk';
+
+/**
+External-library originals live outside the media location and are matched on by the library
+scanner (originalPath.startsWith(importPath)). Rewriting the path on migration detaches the
+asset from its source file. Every query that touches originals (the stream, `getFileCounts`,
+and the size estimate the admin sees alongside those counts) excludes them through this one
+predicate so none of them can drift from what a migration would actually move.
+*/
+const excludeExternalLibraryOriginals = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
+  eb('asset.libraryId', 'is', null);
+
+/**
+Sidecars of an external-library asset are excluded for the same reason as the original itself;
+Immich-generated derivatives (thumbnails, previews, fullsize, encoded video) of an external
+asset stay migratable since only the source file is scanner-matched. Shared by every query
+that filters `asset_file` rows on the sidecar/non-sidecar split.
+*/
+const excludeExternalLibrarySidecars = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
+  eb.or([eb('asset_file.type', '!=', AssetFileType.Sidecar), eb('asset.libraryId', 'is', null)]);
 
 export interface StorageMigrationFileCounts {
   originals: number;
@@ -29,6 +53,7 @@ export class StorageMigrationRepository {
     return this.db
       .selectFrom('asset')
       .select(['id', 'originalPath'])
+      .where((eb) => excludeExternalLibraryOriginals(eb))
       .$if(direction === 'toS3', (qb) => qb.where('originalPath', 'like', '/%'))
       .$if(direction === 'toDisk', (qb) => qb.where('originalPath', 'not like', '/%'))
       .stream();
@@ -40,6 +65,7 @@ export class StorageMigrationRepository {
       .innerJoin('asset', 'asset.id', 'asset_file.assetId')
       .select(['asset_file.id', 'asset_file.assetId', 'asset_file.path', 'asset_file.type'])
       .where('asset_file.type', 'in', fileTypes)
+      .where((eb) => excludeExternalLibrarySidecars(eb))
       .$if(direction === 'toS3', (qb) => qb.where('asset_file.path', 'like', '/%'))
       .$if(direction === 'toDisk', (qb) => qb.where('asset_file.path', 'not like', '/%'))
       .stream();
@@ -160,6 +186,7 @@ export class StorageMigrationRepository {
       .selectFrom('asset')
       .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select((eb) => eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('totalSize'))
+      .where((eb) => excludeExternalLibraryOriginals(eb))
       .$if(direction === 'toS3', (qb) => qb.where('asset.originalPath', 'like', '/%'))
       .$if(direction === 'toDisk', (qb) => qb.where('asset.originalPath', 'not like', '/%'))
       .executeTakeFirstOrThrow();
@@ -176,18 +203,21 @@ export class StorageMigrationRepository {
         this.db
           .selectFrom('asset')
           .select((eb) => eb.fn.countAll<number>().as('count'))
+          .where((eb) => excludeExternalLibraryOriginals(eb))
           .where('originalPath', pathFilter, pathPattern)
           .executeTakeFirstOrThrow(),
 
         this.db
           .selectFrom('asset_file')
+          .innerJoin('asset', 'asset.id', 'asset_file.assetId')
           .select((eb) => [
-            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Thumbnail).as('thumbnails'),
-            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Preview).as('previews'),
-            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.FullSize).as('fullsize'),
-            eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Sidecar).as('sidecars'),
+            eb.fn.countAll<number>().filterWhere('asset_file.type', '=', AssetFileType.Thumbnail).as('thumbnails'),
+            eb.fn.countAll<number>().filterWhere('asset_file.type', '=', AssetFileType.Preview).as('previews'),
+            eb.fn.countAll<number>().filterWhere('asset_file.type', '=', AssetFileType.FullSize).as('fullsize'),
+            eb.fn.countAll<number>().filterWhere('asset_file.type', '=', AssetFileType.Sidecar).as('sidecars'),
           ])
-          .where('path', pathFilter, pathPattern)
+          .where((eb) => excludeExternalLibrarySidecars(eb))
+          .where('asset_file.path', pathFilter, pathPattern)
           .executeTakeFirstOrThrow(),
 
         this.db
@@ -242,6 +272,32 @@ export class StorageMigrationRepository {
       personThumbnails: Number(personThumbnails.count) + Number(videoFaceFrames.count),
       profileImages: profileImages.count,
     };
+  }
+
+  /**
+  Per-kind disk/s3 breakdown for the settings page. Built from two `getFileCounts` calls
+  (the set of files eligible to move toS3 is exactly the disk-resident set, and vice versa)
+  rather than a hand-rolled query, so it shares the exact same predicate, exclusions and
+  type groupings as `getFileCounts` and the streams: it cannot drift from what a migration
+  would actually move. `MIGRATION_FILE_TYPE_TO_KIND` is the single source of truth for which
+  migrator file type rolls up into which routing kind (see storage-router.ts).
+  */
+  async getRoutingCounts(): Promise<Record<StorageRoutingKind, { disk: number; s3: number }>> {
+    const [disk, s3] = await Promise.all([this.getFileCounts('toS3'), this.getFileCounts('toDisk')]);
+
+    const counts: Record<StorageRoutingKind, { disk: number; s3: number }> = {
+      [StorageRoutingKind.Originals]: { disk: 0, s3: 0 },
+      [StorageRoutingKind.Thumbnails]: { disk: 0, s3: 0 },
+      [StorageRoutingKind.EncodedVideo]: { disk: 0, s3: 0 },
+    };
+
+    for (const fileType of Object.keys(MIGRATION_FILE_TYPE_TO_KIND) as StorageMigrationFileType[]) {
+      const kind = MIGRATION_FILE_TYPE_TO_KIND[fileType];
+      counts[kind].disk += Number(disk[fileType]);
+      counts[kind].s3 += Number(s3[fileType]);
+    }
+
+    return counts;
   }
 
   // --- Optimistic update methods ---

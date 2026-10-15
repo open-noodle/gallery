@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { OnJob } from 'src/decorators.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
@@ -145,6 +146,7 @@ export class VideoTrimService extends MediaService {
         outputPath,
         getRelativeEditedEncodedVideoPath(asset),
         'video/mp4',
+        StorageRoutingKind.EncodedVideo,
       );
 
       // Sync both edited encoded video and edited thumbnail files

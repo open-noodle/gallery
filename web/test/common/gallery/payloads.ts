@@ -85,6 +85,7 @@ export const galleryServerConfig = { availableMemoryTypes: [] } satisfies Partia
 
 export const galleryServerFeatures = {
   peopleStatistics: false,
+  s3Configured: false,
   s3Storage: false,
   smartSearchHasCutoff: false,
 } satisfies Partial<ResponseOf<'getServerFeatures'>>;

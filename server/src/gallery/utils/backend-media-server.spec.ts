@@ -1,4 +1,6 @@
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
+import { AssetFileType } from 'src/enum.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -18,6 +20,14 @@ describe(BackendMediaServer.name, () => {
     // vitest.config.mjs sets no restoreMocks, so a StorageService spy would leak into later tests
     vi.restoreAllMocks();
   });
+
+  // A remote write backend whose resolution is observable, for the routing cases.
+  const remote = () => {
+    const put = vi.fn().mockResolvedValue(void 0);
+    const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+    mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('data')]) as any);
+    return { put, getWriteBackend };
+  };
 
   describe('persistFile', () => {
     it('uploads to the write backend and removes the local temp (S3 mode)', async () => {
@@ -42,6 +52,53 @@ describe(BackendMediaServer.name, () => {
       expect(result).toBe('/local/out.jpg');
       expect(mocks.storage.createPlainReadStream).not.toHaveBeenCalled();
       expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+  });
+
+  // Per-file-type storage routing (specs/2026-08-15-per-file-type-storage-routing-design.md): every file this
+  // module writes resolves its backend through the kind it belongs to, once per file.
+  describe('routing', () => {
+    it('passes the caller-supplied kind and the config through to getWriteBackend', async () => {
+      const { getWriteBackend } = remote();
+
+      await sut.persistFile('/local/out.mp4', 'encoded/aa/bb/x.mp4', 'video/mp4', StorageRoutingKind.EncodedVideo);
+
+      expect(getWriteBackend).toHaveBeenCalledTimes(1);
+      expect(getWriteBackend).toHaveBeenCalledWith(
+        StorageRoutingKind.EncodedVideo,
+        expect.objectContaining({ storage: expect.anything() }),
+      );
+    });
+
+    it('keeps the environment backend when no kind is given', async () => {
+      const { getWriteBackend } = remote();
+
+      await sut.persistFile('/local/frame.jpg', 'thumbs/aa/bb/frame.jpg', 'image/jpeg');
+
+      expect(getWriteBackend).toHaveBeenCalledWith(undefined, undefined);
+    });
+
+    it('resolves the thumbnails kind for every file in a persistImageFiles batch', async () => {
+      const { getWriteBackend } = remote();
+      const asset = { id: 'asset-1', ownerId: 'owner-1' };
+
+      await sut.persistImageFiles(asset as any, [
+        { path: '/local/thumb.webp', type: AssetFileType.Thumbnail, isEdited: false },
+        { path: '/local/preview.jpeg', type: AssetFileType.Preview, isEdited: false },
+      ]);
+
+      expect(getWriteBackend).toHaveBeenCalledTimes(2);
+      for (const call of getWriteBackend.mock.calls) {
+        expect(call[0]).toBe(StorageRoutingKind.Thumbnails);
+      }
+    });
+
+    it('routes a profile image as a thumbnail, not an original', async () => {
+      const { getWriteBackend } = remote();
+
+      await sut.persistProfileImage('user-1', '/dev/null');
+
+      expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.Thumbnails, expect.anything());
     });
   });
 
