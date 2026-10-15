@@ -55,7 +55,7 @@ where
   "asset"."id" = $1
 
 -- CleanupRepository.resetQualityAnalyzedAt
-update "asset_job_status"
+update "asset_job_status_gallery"
 set
   "qualityAnalyzedAt" = $1
 where
@@ -161,15 +161,7 @@ select
     ),
     0
   ) as "fileSize",
-  exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = "asset"."ownerId"
-  ) as "isFavorite",
+  "asset"."isFavorite",
   exists (
     select
       1 as "one"
@@ -320,7 +312,7 @@ select
     where
       (
         (
-          "asset_job_status"."qualityAnalyzedAt" is not null
+          "asset_job_status_gallery"."qualityAnalyzedAt" is not null
           and "asset_quality"."version" >= $1
         )
         or (
@@ -331,7 +323,7 @@ select
   ) as "analysed"
 from
   "asset"
-  left join "asset_job_status" on "asset_job_status"."assetId" = "asset"."id"
+  left join "asset_job_status_gallery" on "asset_job_status_gallery"."assetId" = "asset"."id"
   left join "asset_quality" on "asset_quality"."assetId" = "asset"."id"
 where
   "asset"."deletedAt" is null
@@ -361,15 +353,7 @@ select
     ),
     0
   ) as "fileSize",
-  exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = "asset"."ownerId"
-  ) as "isFavorite",
+  "asset"."isFavorite",
   exists (
     select
       1 as "one"
@@ -443,15 +427,7 @@ select
     ),
     0
   ) as "fileSize",
-  exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = "asset"."ownerId"
-  ) as "isFavorite",
+  "asset"."isFavorite",
   exists (
     select
       1 as "one"
@@ -528,15 +504,7 @@ select
     ),
     0
   ) as "fileSize",
-  exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = "asset"."ownerId"
-  ) as "isFavorite",
+  "asset"."isFavorite",
   exists (
     select
       1 as "one"
@@ -874,15 +842,7 @@ select
     ),
     0
   ) as "fileSize",
-  exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = "asset"."ownerId"
-  ) as "isFavorite",
+  "asset"."isFavorite",
   exists (
     select
       1 as "one"
