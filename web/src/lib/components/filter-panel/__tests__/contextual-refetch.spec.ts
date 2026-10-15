@@ -52,6 +52,8 @@ const defaultSuggestions: FilterSuggestionsResponse = {
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 };
 
 describe('Contextual re-fetch on temporal change', () => {

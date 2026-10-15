@@ -123,6 +123,8 @@ describe(GallerySearchController.name, () => {
         hasFavorites: true,
         hasAssetsInAlbum: true,
         hasAssetsNotInAlbum: true,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     });
 
@@ -218,6 +220,8 @@ describe(GallerySearchController.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
 
       const { status, body } = await request(ctx.getHttpServer()).get('/search/suggestions/filters').query({ albumId });
@@ -234,6 +238,8 @@ describe(GallerySearchController.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
       expect(service.getFilterSuggestions).toHaveBeenCalledWith(
         expect.anything(),
@@ -289,6 +295,8 @@ describe(GallerySearchController.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
 
       const { status } = await request(ctx.getHttpServer())
@@ -319,6 +327,8 @@ describe(GallerySearchController.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
 
       const { status } = await request(ctx.getHttpServer())

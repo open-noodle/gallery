@@ -29,6 +29,8 @@ export const galleryHandlers = (data: MockData): Handlers => ({
       countries: [],
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
       hasFavorites: false,
       hasUnnamedPeople: false,
       mediaTypes: [],

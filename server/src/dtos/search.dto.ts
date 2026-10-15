@@ -20,6 +20,7 @@ import {
   GallerySmartSearchExtension,
   GalleryStatisticsSearchExtension,
   withGallerySuggestionScope,
+  withLocationPresenceExclusivity,
 } from 'src/gallery/dtos/search.dto.js';
 import { isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation.js';
 
@@ -83,10 +84,12 @@ const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
   size: z.int().min(1).max(1000).default(250).describe('Number of results to return'),
 });
 
-const LargeAssetSearchSchema = BaseSearchWithResultsSchema.extend({
-  minFileSize: z.coerce.number().int().min(0).optional().describe('Minimum file size in bytes'),
-  size: z.coerce.number().int().min(1).max(1000).default(250).describe('Number of results to return'),
-}).meta({ id: 'LargeAssetSearchDto' });
+const LargeAssetSearchSchema = withLocationPresenceExclusivity(
+  BaseSearchWithResultsSchema.extend({
+    minFileSize: z.coerce.number().int().min(0).optional().describe('Minimum file size in bytes'),
+    size: z.coerce.number().int().min(1).max(1000).default(250).describe('Number of results to return'),
+  }),
+).meta({ id: 'LargeAssetSearchDto' });
 
 const SearchPlacesSchema = z
   .object({
@@ -375,75 +378,90 @@ const RandomSearchBaseSchema = BaseSearchWithResultsSchema.extend({
   filter: filterField,
 });
 
-const RandomSearchSchema = withShapeExclusivity(RandomSearchBaseSchema).meta({ id: 'RandomSearchDto' });
+const RandomSearchSchema = withLocationPresenceExclusivity(withShapeExclusivity(RandomSearchBaseSchema)).meta({
+  id: 'RandomSearchDto',
+});
 
-const MetadataSearchSchema = withShapeExclusivity(
-  RandomSearchBaseSchema.extend({
-    id: z.uuidv4().optional().describe('Filter by asset ID').meta(DEPRECATED_FLAT_FIELD),
-    description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
-    checksum: z.string().optional().describe('Filter by file checksum').meta(DEPRECATED_FLAT_FIELD),
-    originalFileName: z.string().trim().optional().describe('Filter by original file name').meta(DEPRECATED_FLAT_FIELD),
-    originalPath: z.string().optional().describe('Filter by original file path').meta(DEPRECATED_FLAT_FIELD),
-    previewPath: z.string().optional().describe('Filter by preview file path').meta(DEPRECATED_FLAT_FIELD),
-    thumbnailPath: z.string().optional().describe('Filter by thumbnail file path').meta(DEPRECATED_FLAT_FIELD),
-    encodedVideoPath: z.string().optional().describe('Filter by encoded video file path').meta(DEPRECATED_FLAT_FIELD),
-    order: AssetOrderSchema.optional().describe('Sort order').meta(DEPRECATED_FLAT_FIELD),
-    page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
-    orderBy: SearchOrderSchema.optional().meta(ADDED_V3_2),
-    cursor: cursorField,
-  }).extend(GalleryMetadataSearchExtension),
+const MetadataSearchSchema = withLocationPresenceExclusivity(
+  withShapeExclusivity(
+    RandomSearchBaseSchema.extend({
+      id: z.uuidv4().optional().describe('Filter by asset ID').meta(DEPRECATED_FLAT_FIELD),
+      description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
+      checksum: z.string().optional().describe('Filter by file checksum').meta(DEPRECATED_FLAT_FIELD),
+      originalFileName: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Filter by original file name')
+        .meta(DEPRECATED_FLAT_FIELD),
+      originalPath: z.string().optional().describe('Filter by original file path').meta(DEPRECATED_FLAT_FIELD),
+      previewPath: z.string().optional().describe('Filter by preview file path').meta(DEPRECATED_FLAT_FIELD),
+      thumbnailPath: z.string().optional().describe('Filter by thumbnail file path').meta(DEPRECATED_FLAT_FIELD),
+      encodedVideoPath: z.string().optional().describe('Filter by encoded video file path').meta(DEPRECATED_FLAT_FIELD),
+      order: AssetOrderSchema.optional().describe('Sort order').meta(DEPRECATED_FLAT_FIELD),
+      page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
+      orderBy: SearchOrderSchema.optional().meta(ADDED_V3_2),
+      cursor: cursorField,
+    }).extend(GalleryMetadataSearchExtension),
+  ),
 ).meta({ id: 'MetadataSearchDto' });
 
-const StatisticsSearchSchema = withShapeExclusivity(
-  BaseSearchSchema.extend({
-    description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
-    filter: filterField,
-  }).extend(GalleryStatisticsSearchExtension),
+const StatisticsSearchSchema = withLocationPresenceExclusivity(
+  withShapeExclusivity(
+    BaseSearchSchema.extend({
+      description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
+      filter: filterField,
+    }).extend(GalleryStatisticsSearchExtension),
+  ),
 ).meta({ id: 'StatisticsSearchDto' });
 
-const SmartSearchSchema = withShapeExclusivity(
-  BaseSearchWithResultsSchema.extend({
-    size: z.int().min(1).max(1000).default(100).describe('Number of results to return'),
-    query: z.string().trim().optional().describe('Natural language search query'),
-    queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
-    language: z.string().optional().describe('Search language code'),
-    page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
-    filter: filterField,
-    ...GallerySmartSearchExtension,
-  }),
+const SmartSearchSchema = withLocationPresenceExclusivity(
+  withShapeExclusivity(
+    BaseSearchWithResultsSchema.extend({
+      size: z.int().min(1).max(1000).default(100).describe('Number of results to return'),
+      query: z.string().trim().optional().describe('Natural language search query'),
+      queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
+      language: z.string().optional().describe('Search language code'),
+      page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
+      filter: filterField,
+      ...GallerySmartSearchExtension,
+    }),
+  ),
 ).meta({ id: 'SmartSearchDto' });
 
 // gallery-fork: fork-only schema kept inline because it picks from BaseSearchSchema, and
 // gallery/dtos/search.dto.ts is a leaf that cannot import back from this file.
-const SmartSearchFacetsSchema = BaseSearchSchema.pick({
-  type: true,
-  isFavorite: true,
-  isNotInAlbum: true,
-  isInAlbum: true,
-  takenBefore: true,
-  takenAfter: true,
-  city: true,
-  country: true,
-  make: true,
-  model: true,
-  personIds: true,
-  tagIds: true,
-  rating: true,
-  // An album detail page runs its page-aware search scoped to its own album, so the facets that
-  // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
-  // here does not merely lose a filter: zod strips the field, so the facets would silently describe
-  // the whole library beside a result grid showing one album.
-  albumIds: true,
-  spaceId: true,
-  spacePersonIds: true,
-})
-  .extend({
+const SmartSearchFacetsSchema = withLocationPresenceExclusivity(
+  BaseSearchSchema.pick({
+    type: true,
+    isFavorite: true,
+    isNotInAlbum: true,
+    isInAlbum: true,
+    takenBefore: true,
+    takenAfter: true,
+    city: true,
+    country: true,
+    // `state` is not picked here, so only `city`/`country` can ever collide with `locationPresence`.
+    locationPresence: true,
+    make: true,
+    model: true,
+    personIds: true,
+    tagIds: true,
+    rating: true,
+    // An album detail page runs its page-aware search scoped to its own album, so the facets that
+    // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
+    // here does not merely lose a filter: zod strips the field, so the facets would silently describe
+    // the whole library beside a result grid showing one album.
+    albumIds: true,
+    spaceId: true,
+    spacePersonIds: true,
+  }).extend({
     query: z.string().trim().optional().describe('Natural language search query'),
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-  })
-  .meta({ id: 'SmartSearchFacetsDto' });
+  }),
+).meta({ id: 'SmartSearchFacetsDto' });
 
 export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
 export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}

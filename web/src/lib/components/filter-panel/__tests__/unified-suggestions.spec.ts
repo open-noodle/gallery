@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import type { FilterPanelConfig, FilterSection, FilterSuggestionsResponse } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -21,6 +21,8 @@ const defaultResponse: FilterSuggestionsResponse = {
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 };
 
 const timeBuckets = [
@@ -237,6 +239,25 @@ describe('Unified suggestionsProvider', () => {
         expect.objectContaining({
           personIds: ['p1'],
         }),
+      );
+    });
+  });
+
+  it('should forward locationPresence to the suggestions provider when a no-location entry is selected', async () => {
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...defaultResponse, hasNoGpsAssets: true }),
+    });
+    await render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.waitFor(() => expect(page.getByTestId('location-presence-noGps').element()).toBeTruthy());
+
+    await userEvent.click(page.getByTestId('location-presence-noGps'));
+    await vi.advanceTimersByTimeAsync(50);
+
+    await vi.waitFor(() => {
+      expect(config.suggestionsProvider).toHaveBeenLastCalledWith(
+        expect.objectContaining({ locationPresence: 'noGps' }),
       );
     });
   });

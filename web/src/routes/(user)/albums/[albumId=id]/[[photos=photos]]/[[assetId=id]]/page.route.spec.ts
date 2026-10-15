@@ -112,6 +112,8 @@ function renderPage(album = factory.album({ assetCount: 2 })) {
         hasFavorites: true,
         hasAssetsInAlbum: true,
         hasAssetsNotInAlbum: true,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     }
 
@@ -129,6 +131,8 @@ function renderPage(album = factory.album({ assetCount: 2 })) {
       hasFavorites: true,
       hasAssetsInAlbum: true,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
   });
 

@@ -140,6 +140,8 @@ const emptyFilterSuggestions = (): FilterSuggestionsResponse => ({
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 });
 
 const replaceUrl = (url: string) => void goto(url, { replace: true, reset: false });

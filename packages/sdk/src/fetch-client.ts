@@ -3290,6 +3290,8 @@ export type MetadataSearchDto = {
     /** Library ID to filter by */
     libraryId?: string | null;
     libraryView?: LibraryView;
+    /** Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country. */
+    locationPresence?: LocationPresence;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3608,6 +3610,8 @@ export type RandomSearchDto = {
     /** Library ID to filter by */
     libraryId?: string | null;
     libraryView?: LibraryView;
+    /** Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country. */
+    locationPresence?: LocationPresence;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3686,6 +3690,8 @@ export type SmartSearchDto = {
     /** Library ID to filter by */
     libraryId?: string | null;
     libraryView?: LibraryView;
+    /** Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country. */
+    locationPresence?: LocationPresence;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3752,6 +3758,8 @@ export type SmartSearchFacetsDto = {
     isNotInAlbum?: boolean;
     /** Search language code */
     language?: string;
+    /** Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country. */
+    locationPresence?: LocationPresence;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3807,6 +3815,10 @@ export type SmartSearchFacetsResponseDto = {
     hasAssetsNotInAlbum: boolean;
     /** Whether any favourite exists in the filtered set, ignoring isFavorite */
     hasFavorites: boolean;
+    /** Whether assets without coordinates exist in the filtered set */
+    hasNoGpsAssets: boolean;
+    /** Whether assets with coordinates but no place name exist in the filtered set */
+    hasNoPlaceNameAssets: boolean;
     /** Whether unnamed people exist in the filtered smart-search set */
     hasUnnamedPeople: boolean;
     /** Available media types */
@@ -3853,6 +3865,8 @@ export type StatisticsSearchDto = {
     /** Library ID to filter by */
     libraryId?: string | null;
     libraryView?: LibraryView;
+    /** Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country. */
+    locationPresence?: LocationPresence;
     /** Filter by camera make */
     make?: string | null;
     /** Filter by camera model */
@@ -3905,6 +3919,10 @@ export type FilterSuggestionsResponseDto = {
     hasAssetsNotInAlbum: boolean;
     /** Whether any favourite exists in the filtered set, ignoring isFavorite */
     hasFavorites: boolean;
+    /** Whether assets without coordinates exist in the filtered set */
+    hasNoGpsAssets: boolean;
+    /** Whether assets with coordinates but no place name exist in the filtered set */
+    hasNoPlaceNameAssets: boolean;
     /** Whether unnamed people exist in the filtered set */
     hasUnnamedPeople: boolean;
     /** Available media types */
@@ -9345,7 +9363,7 @@ export function getExploreData(opts?: Oazapfts.RequestOpts) {
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, libraryView, make, minFileSize, model, ocr, ownerId, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
+export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, libraryView, locationPresence, make, minFileSize, model, ocr, ownerId, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -9360,6 +9378,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     lensModel?: string | null;
     libraryId?: string | null;
     libraryView?: LibraryView;
+    locationPresence?: "noGps" | "noPlaceName";
     make?: string | null;
     minFileSize?: number;
     model?: string | null;
@@ -9402,6 +9421,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         lensModel,
         libraryId,
         libraryView,
+        locationPresence,
         make,
         minFileSize,
         model,
@@ -9617,7 +9637,7 @@ export function getSearchSuggestions({ albumId, city, country, includeNull, isFa
 /**
  * Retrieve dynamic filter suggestions
  */
-export function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, mediaType, model, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+export function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, lensModel, locationPresence, make, mediaType, model, ownerId, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
     albumId?: string;
     city?: string;
     country?: string;
@@ -9625,6 +9645,7 @@ export function getFilterSuggestions({ albumId, city, country, isFavorite, isInA
     isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     lensModel?: string;
+    locationPresence?: "noGps" | "noPlaceName";
     make?: string;
     mediaType?: AssetTypeEnum;
     model?: string;
@@ -9649,6 +9670,7 @@ export function getFilterSuggestions({ albumId, city, country, isFavorite, isInA
         isInAlbum,
         isNotInAlbum,
         lensModel,
+        locationPresence,
         make,
         mediaType,
         model,
@@ -11388,7 +11410,7 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucket({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, locationPresence, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
@@ -11402,6 +11424,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
     key?: string;
     lensModel?: string;
     libraryView?: LibraryView;
+    locationPresence?: "noGps" | "noPlaceName";
     make?: string;
     model?: string;
     ocr?: string;
@@ -11448,6 +11471,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
         key,
         lensModel,
         libraryView,
+        locationPresence,
         make,
         model,
         ocr,
@@ -11483,7 +11507,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, descri
 /**
  * Get time bucket covers
  */
-export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, locationPresence, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
@@ -11497,6 +11521,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
     key?: string;
     lensModel?: string;
     libraryView?: LibraryView;
+    locationPresence?: "noGps" | "noPlaceName";
     make?: string;
     model?: string;
     ocr?: string;
@@ -11543,6 +11568,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
         key,
         lensModel,
         libraryView,
+        locationPresence,
         make,
         model,
         ocr,
@@ -11578,7 +11604,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, description, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, lensModel, libraryView, locationPresence, make, model, ocr, order, orderBy, originalFileName, ownerId, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, stackCountInAlbum, state, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
@@ -11592,6 +11618,7 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
     key?: string;
     lensModel?: string;
     libraryView?: LibraryView;
+    locationPresence?: "noGps" | "noPlaceName";
     make?: string;
     model?: string;
     ocr?: string;
@@ -11637,6 +11664,7 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, descr
         key,
         lensModel,
         libraryView,
+        locationPresence,
         make,
         model,
         ocr,
@@ -12861,6 +12889,10 @@ export enum QueueJobStatus {
 export enum LibraryView {
     Personal = "personal",
     Spaces = "spaces"
+}
+export enum LocationPresence {
+    NoGps = "noGps",
+    NoPlaceName = "noPlaceName"
 }
 export enum SearchOrderField {
     FileCreatedAt = "fileCreatedAt",
