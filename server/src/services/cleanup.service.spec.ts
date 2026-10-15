@@ -307,7 +307,7 @@ describe(CleanupService.name, () => {
     });
     it('scores an image from its preview and cleans up the temp file', async () => {
       const cleanup = vi.fn();
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: '/tmp/x', cleanup });
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({ localPath: '/tmp/x', cleanup });
       const px = new Uint8Array(25);
       px[12] = 255;
       mocks.media.getGreyscalePixels.mockResolvedValue({ data: Buffer.from(px), width: 5, height: 5 });
@@ -340,7 +340,7 @@ describe(CleanupService.name, () => {
     });
     it('records null scores and does not throw when decoding fails, and always cleans up', async () => {
       const cleanup = vi.fn();
-      vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: '/tmp/x', cleanup });
+      vi.spyOn((sut as any).backendMedia, 'ensureLocalFile').mockResolvedValue({ localPath: '/tmp/x', cleanup });
       mocks.media.getGreyscalePixels.mockRejectedValue(new Error('corrupt'));
       mocks.cleanup.getForQualityAnalysis.mockResolvedValue({
         id: 'a',
