@@ -795,6 +795,10 @@ describe(PersonRepository.name, () => {
       await expect(ids({ isFavorite: false })).resolves.toEqual([hidden.personGroupId, plain.personGroupId].toSorted());
       await expect(ids({ isHidden: true })).resolves.toEqual([hidden.personGroupId]);
       await expect(ids({ isHidden: false })).resolves.toEqual([favorite.personGroupId, plain.personGroupId].toSorted());
+
+      // As upstream, an explicit isHidden filter takes precedence over withHidden.
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, isHidden: true });
+      expect(items.map(({ personGroupId }) => personGroupId)).toEqual([hidden.personGroupId]);
     });
 
     it('scopes the header total to the type filter', async () => {
