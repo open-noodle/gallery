@@ -10,7 +10,7 @@ import {
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
+import { StorageRouting } from 'src/gallery/dtos/config.dto.js';
 import { StorageMigrationDirection } from 'src/repositories/storage-migration.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';

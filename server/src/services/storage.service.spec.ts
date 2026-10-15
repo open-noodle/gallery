@@ -2,7 +2,7 @@ import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { JobStatus, SystemMetadataKey } from 'src/enum.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
+import { StorageRouting } from 'src/gallery/dtos/config.dto.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';

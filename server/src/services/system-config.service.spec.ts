@@ -18,7 +18,7 @@ import {
   VideoCodec,
   VideoContainer,
 } from 'src/enum.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
+import { StorageRouting } from 'src/gallery/dtos/config.dto.js';
 import { MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';

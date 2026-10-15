@@ -2007,11 +2007,9 @@ describe(MediaService.name, () => {
         const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
-        const asset = AssetFactory.from({ type: AssetType.Video })
-          .exif()
-          .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
-          .build();
+        const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
+        mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
         mocks.media.probe.mockResolvedValue({
           ...videoInfoStub.noAudioStreams,
           format: { ...videoInfoStub.noAudioStreams.format, duration: 20 },

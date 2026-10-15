@@ -5,7 +5,7 @@ import {
   StorageRoutingKind,
   resolveRouting,
 } from 'src/backends/storage-router.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
+import { StorageRouting } from 'src/gallery/dtos/config.dto.js';
 
 describe('resolveRouting', () => {
   it('follows the env backend when set to auto', () => {

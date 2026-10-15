@@ -18,7 +18,7 @@ import {
   StorageFolder,
   SystemMetadataKey,
 } from 'src/enum.js';
-import { StorageRouting } from 'src/gallery/config.dto.js';
+import { StorageRouting } from 'src/gallery/dtos/config.dto.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { BaseService } from 'src/services/base.service.js';
