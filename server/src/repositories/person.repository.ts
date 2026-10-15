@@ -692,21 +692,6 @@ export class PersonRepository {
     }));
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, { month: 4, day: 23 }] })
-  getBirthdaysForDay(ownerId: string, { month, day }: { month: number; day: number }) {
-    return this.db
-      .selectFrom('person')
-      .select(['personGroupId', 'name', 'birthDate'])
-      .where('ownerId', '=', ownerId)
-      .where('isHidden', '=', false)
-      .where((eb) => eb.not(personIsPet()))
-      .where('name', '!=', '')
-      .where('birthDate', 'is not', null)
-      .where(sql`extract(month from "birthDate")`, '=', month)
-      .where(sql`extract(day from "birthDate")`, '=', day)
-      .execute();
-  }
-
   /**
    * Dormant people: named, non-hidden, non-pet persons whose most recent Timeline-visible,
    * previewable asset predates `lastSeenBefore`, with at least `minAssets` such assets ever.
