@@ -1142,8 +1142,8 @@ export class PersonRepository {
    * is deliberate: it is the one place M's 1:1 bet is load-bearing.
    */
   @GenerateSql({ params: [DummyValue.UUID] })
-  getByGroupIdOnly(personGroupId: string) {
-    return this.db //
+  getByGroupIdOnly(personGroupId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db //
       .selectFrom('person')
       .selectAll('person')
       .select(personSidecarColumns())
@@ -1412,14 +1412,13 @@ export class PersonRepository {
     };
   }
 
-  async create({
-    identityId = null,
-    type = 'person',
-    species = null,
-    ...person
-  }: Insertable<PersonTable> & PersonSidecarFields) {
+  async create(
+    { identityId = null, type = 'person', species = null, ...person }: Insertable<PersonTable> & PersonSidecarFields,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
     // One transaction, as when type lived on person: a pet whose person_pet write failed would surface as a human.
-    const created = await this.db.transaction().execute(async (trx) => {
+    // A caller that already holds a transaction (#765's reassign) gets both writes inside it.
+    const write = async (trx: Kysely<DB> | Transaction<DB>) => {
       const row = await trx.insertInto('person').values(person).returningAll().executeTakeFirstOrThrow();
       await writePersonSidecars(trx, row.personGroupId, {
         identityId: identityId ?? undefined,
@@ -1427,7 +1426,8 @@ export class PersonRepository {
         species: type === 'pet' ? species : undefined,
       });
       return row;
-    });
+    };
+    const created = db.isTransaction ? await write(db) : await db.transaction().execute(write);
     return { ...created, identityId, type, species: type === 'pet' ? species : null };
   }
 
@@ -1439,9 +1439,12 @@ export class PersonRepository {
    * was a standalone primary key — and it is the only sanctioned way to mint a person, so the 1:1
    * invariant cannot be broken by accident at a call site.
    */
-  async createWithGroup(person: Omit<Insertable<PersonTable>, 'personGroupId'> & PersonSidecarFields) {
-    const group = await this.createGroup(person.ownerId);
-    return this.create({ ...person, personGroupId: group.id });
+  async createWithGroup(
+    person: Omit<Insertable<PersonTable>, 'personGroupId'> & PersonSidecarFields,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
+    const group = await this.createGroup(person.ownerId, db);
+    return this.create({ ...person, personGroupId: group.id }, db);
   }
 
   async createAll(people: Insertable<PersonTable>[]) {
@@ -1453,8 +1456,8 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  createGroup(ownerId: string) {
-    return this.db
+  createGroup(ownerId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .insertInto('person_group')
       .columns(['clusterGroupId'])
       .expression((eb) => eb.selectFrom('user').select('user.clusterGroupId').where('user.id', '=', ownerId))

@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import type { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum.js';
 import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -19,7 +20,7 @@ import { getKyselyDB } from 'test/utils.js';
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db: Kysely<DB> = defaultDatabase) => {
-  const { ctx } = newMediumService(BaseService, {
+  const { ctx, sut: base } = newMediumService(BaseService, {
     database: db,
     real: [DatabaseRepository, FaceIdentityRepository, PersonRepository, SharedSpaceRepository],
     mock: [JobRepository, LoggingRepository],
@@ -27,8 +28,11 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   const jobRepository = ctx.getMock(JobRepository);
   jobRepository.queue.mockResolvedValue();
 
+  // The BaseService instance builds the shared FaceAssignmentService over the same repositories.
+  const { faceAssignmentService } = base as unknown as { faceAssignmentService: FaceAssignmentService };
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
+    faceAssignmentService,
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
     jobRepository,
     logger: ctx.getMock(LoggingRepository),

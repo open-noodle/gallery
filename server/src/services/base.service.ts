@@ -272,14 +272,6 @@ export class BaseService {
       systemMetadataRepository,
       this.logger,
     );
-    this.identityMergePropagationService = new IdentityMergePropagationService({
-      databaseRepository,
-      faceIdentityRepository,
-      jobRepository,
-      logger: this.logger,
-      personRepository,
-      sharedSpaceRepository,
-    });
     this.faceAssignmentService = new FaceAssignmentService({
       databaseRepository,
       faceIdentityRepository,
@@ -293,6 +285,15 @@ export class BaseService {
       mediaRepository,
       storageRepository,
       getConfig: (options) => this.getConfig(options),
+    });
+    this.identityMergePropagationService = new IdentityMergePropagationService({
+      databaseRepository,
+      faceAssignmentService: this.faceAssignmentService,
+      faceIdentityRepository,
+      jobRepository,
+      logger: this.logger,
+      personRepository,
+      sharedSpaceRepository,
     });
   }
 
