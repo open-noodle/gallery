@@ -46,7 +46,6 @@ import { TelemetryService } from 'src/services/telemetry.service.js';
 import { TimelineService } from 'src/services/timeline.service.js';
 import { TranscodingService } from 'src/services/transcoding.service.js';
 import { TrashService } from 'src/services/trash.service.js';
-import { UploadSessionService } from 'src/services/upload-session.service.js';
 import { UserAdminService } from 'src/services/user-admin.service.js';
 import { UserService } from 'src/services/user.service.js';
 import { VersionService } from 'src/services/version.service.js';
@@ -103,7 +102,6 @@ export const services = [
   TimelineService,
   TranscodingService,
   TrashService,
-  UploadSessionService,
   UserAdminService,
   UserService,
   VersionService,
