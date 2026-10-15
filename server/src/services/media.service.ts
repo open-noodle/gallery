@@ -472,13 +472,14 @@ export class MediaService extends BaseService {
     localOriginalPath?: string,
   ) {
     const inputPath = localOriginalPath ?? asset.originalPath;
-    const extractEmbedded = image.extractEmbedded && mimeTypes.isRaw(asset.originalFileName);
-    const extracted = extractEmbedded ? await this.extractImage(inputPath, image.preview.size) : null;
-    const generateFullsize =
+    const isExtractEmbedded = image.extractEmbedded && mimeTypes.isRaw(asset.originalFileName);
+    const extracted = isExtractEmbedded ? await this.extractImage(inputPath, image.preview.size) : null;
+    const isGenerateFullsize =
       ((image.fullsize.enabled || asset.exifInfo.projectionType === 'EQUIRECTANGULAR') &&
         !mimeTypes.isWebSupportedImage(asset.originalPath)) ||
       useEdits;
-    const convertFullsize = generateFullsize && (!extracted || !mimeTypes.isWebSupportedImage(` .${extracted.format}`));
+    const isConvertFullsize =
+      isGenerateFullsize && (!extracted || !mimeTypes.isWebSupportedImage(` .${extracted.format}`));
 
     const thumbSource = extracted ? extracted.buffer : inputPath;
     const { data, info, colorspace } = await this.decodeImage(
@@ -486,7 +487,7 @@ export class MediaService extends BaseService {
       // only specify orientation to extracted images which don't have EXIF orientation data
       // or it can double rotate the image
       extracted ? asset.exifInfo : { ...asset.exifInfo, orientation: null },
-      convertFullsize ? undefined : image.preview.size,
+      isConvertFullsize ? undefined : image.preview.size,
     );
 
     let isTransparent = false;
@@ -499,8 +500,8 @@ export class MediaService extends BaseService {
       data,
       info,
       colorspace,
-      convertFullsize,
-      generateFullsize,
+      convertFullsize: isConvertFullsize,
+      generateFullsize: isGenerateFullsize,
       isTransparent,
     };
   }
@@ -934,9 +935,9 @@ export class MediaService extends BaseService {
   }
 
   private isVideoTranscodeRequired(ffmpegConfig: ConfigFFmpegDto, stream: VideoStreamInfo): boolean {
-    const scalingEnabled = ffmpegConfig.targetResolution !== 'original';
+    const isScalingEnabled = ffmpegConfig.targetResolution !== 'original';
     const targetRes = Number.parseInt(ffmpegConfig.targetResolution);
-    const isLargerThanTargetRes = scalingEnabled && Math.min(stream.height, stream.width) > targetRes;
+    const isLargerThanTargetRes = isScalingEnabled && Math.min(stream.height, stream.width) > targetRes;
     const maxBitrate = this.parseBitrateToBps(ffmpegConfig.maxBitrate);
     const isLargerThanTargetBitrate = maxBitrate > 0 && stream.bitrate > maxBitrate;
 

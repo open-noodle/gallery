@@ -712,7 +712,7 @@ export class MetadataService extends BaseService {
         ? String(tag)
         : tag
             .split('|')
-            .map((t) => t.replaceAll('/', '|'))
+            .map((tag) => tag.replaceAll('/', '|'))
             .join('/'),
     );
 
@@ -897,8 +897,8 @@ export class MetadataService extends BaseService {
       // write extracted motion video to storage
       if (isDiskPath(motionAsset.originalPath)) {
         // Disk mode
-        const existsOnDisk = await this.storageRepository.checkFileExists(motionAsset.originalPath);
-        if (!existsOnDisk) {
+        const isExistsOnDisk = await this.storageRepository.checkFileExists(motionAsset.originalPath);
+        if (!isExistsOnDisk) {
           this.storageCore.ensureFolders(motionAsset.originalPath);
           await this.storageRepository.createFile(motionAsset.originalPath, video);
           this.logger.log(`Wrote motion photo video to ${motionAsset.originalPath}`);
