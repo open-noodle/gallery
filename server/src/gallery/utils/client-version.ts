@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders } from 'node:http';
 import { SemVer, coerce } from 'semver';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { immichVersion, serverVersion } from 'src/constants.js';
 import { getAppVersionFromUA } from 'src/utils/request.js';
 
@@ -31,3 +32,21 @@ export const isGalleryClient = (headers: IncomingHttpHeaders, socketAuth?: Recor
 /** Stock clients see the Immich version Gallery is based on, so they do not treat Gallery's 5.x as a newer server. */
 export const getClientServerVersion = (headers: IncomingHttpHeaders): SemVer =>
   isGalleryClient(headers) ? serverVersion : immichVersion;
+
+const UPSTREAM_REPOSITORY = 'https://github.com/immich-app/immich';
+
+/** `GET /server/about` for a stock client names the Immich base, the version `GET /server/version` reports to it. */
+export const forClientAbout = <T extends { version: string; versionUrl: string }>(auth: AuthDto, about: T): T => {
+  if (!auth.stockClient) {
+    return about;
+  }
+  const version = `v${immichVersion}`;
+  return { ...about, version, versionUrl: `${UPSTREAM_REPOSITORY}/releases/tag/${version}` };
+};
+
+/**
+ * `GET /server/version-check` for a stock client: Gallery releases reach Gallery clients only, as `on_new_release`
+ * does, so the latest release a stock client sees is the Immich base it is told it runs.
+ */
+export const forClientVersionCheck = <T extends { releaseVersion: string | null }>(auth: AuthDto, state: T): T =>
+  auth.stockClient && state.releaseVersion ? { ...state, releaseVersion: `v${immichVersion}` } : state;
