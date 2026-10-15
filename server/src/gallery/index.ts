@@ -1,6 +1,7 @@
 import { ClassificationController } from 'src/controllers/classification.controller.js';
 import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.controller.js';
 import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller.js';
+import { FamilyController } from 'src/controllers/family.controller.js';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller.js';
 import { LibraryManifestController } from 'src/controllers/library-manifest.controller.js';
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
@@ -38,6 +39,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
@@ -45,6 +47,7 @@ import { AppMetricsService } from 'src/services/app-metrics.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
 import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
+import { FamilyService } from 'src/services/family.service.js';
 import { LibraryManifestService } from 'src/services/library-manifest.service.js';
 import { PetDetectionService } from 'src/services/pet-detection.service.js';
 import { PetRecognitionService } from 'src/services/pet-recognition.service.js';
@@ -61,6 +64,7 @@ export const galleryControllers = [
   FaceRepairAdminController,
   FaceSuggestionController,
   GalleryAlbumController,
+  FamilyController,
   GalleryAssetController,
   GalleryMapController,
   GalleryPeopleController,
@@ -93,6 +97,7 @@ export const galleryRepositories = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  FamilyRepository,
 ];
 
 export const galleryServices = [
@@ -105,6 +110,7 @@ export const galleryServices = [
   FaceRepairService,
   FaceSuggestionService,
   GalleryAlbumService,
+  FamilyService,
   GalleryAssetService,
   GalleryPeopleService,
   GalleryPluginService,

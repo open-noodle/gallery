@@ -54,6 +54,10 @@ import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-request.table.js';
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
+import { FamilyAccessTable } from 'src/schema/tables/family-access.table.js';
+import { FamilyUnionChildTable } from 'src/schema/tables/family-union-child.table.js';
+import { FamilyUnionPartnerTable } from 'src/schema/tables/family-union-partner.table.js';
+import { FamilyUnionTable } from 'src/schema/tables/family-union.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
@@ -127,6 +131,10 @@ export class ImmichDatabase {
     ClusterGroupTable,
     ClusterGroupRequestTable,
     FaceSearchTable,
+    FamilyUnionTable,
+    FamilyUnionPartnerTable,
+    FamilyUnionChildTable,
+    FamilyAccessTable,
     GeodataPlacesTable,
     IntegrityReportTable,
     LibraryTable,
@@ -242,6 +250,11 @@ export interface DB extends GalleryDB {
   ocr_search: OcrSearchTable;
 
   face_search: FaceSearchTable;
+
+  family_union: FamilyUnionTable;
+  family_union_partner: FamilyUnionPartnerTable;
+  family_union_child: FamilyUnionChildTable;
+  family_access: FamilyAccessTable;
 
   geodata_places: GeodataPlacesTable;
 
