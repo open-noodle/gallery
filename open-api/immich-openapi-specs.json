@@ -11325,6 +11325,15 @@
             }
           },
           {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -11374,7 +11383,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which the detector produces without an embedding, are never listed. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11661,6 +11670,15 @@
             }
           },
           {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -11710,7 +11728,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which the detector produces without an embedding, are never listed. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11933,6 +11951,15 @@
             }
           },
           {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -11982,7 +12009,7 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.",
+            "description": "Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which the detector produces without an embedding, are never listed. Omit for the unfiltered list.",
             "schema": {
               "type": "string",
               "enum": [

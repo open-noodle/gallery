@@ -801,6 +801,18 @@ describe(PersonRepository.name, () => {
       }
     });
 
+    // OD-14: upstream's name filter, unaccented and case-insensitive word similarity.
+    it('filters by name like upstream', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const jose = await seedTypedPerson(ctx, { ownerId: user.id, name: 'José Álvarez', faces: 3 });
+      await seedTypedPerson(ctx, { ownerId: user.id, name: 'Maria', faces: 3 });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, name: 'jose' });
+
+      expect(items.map(({ personGroupId }) => personGroupId)).toEqual([jose.personGroupId]);
+    });
+
     // GET /people advertises both filters (upstream's PersonSearchDto); they narrow the list.
     it('filters by isFavorite and isHidden', async () => {
       const { sut, ctx } = setup();

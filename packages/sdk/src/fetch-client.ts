@@ -8092,11 +8092,12 @@ export function deletePeople({ peopleDeleteDto }: {
 /**
  * Get all people
  */
-export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
+export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHidden, name, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     isFavorite?: boolean;
     isHidden?: boolean;
+    name?: string;
     page?: number;
     sharedById?: string;
     sharedWithId?: string;
@@ -8113,6 +8114,7 @@ export function getAllPeople({ closestAssetId, closestPersonId, isFavorite, isHi
         closestPersonId,
         isFavorite,
         isHidden,
+        name,
         page,
         sharedById,
         sharedWithId,
@@ -8169,11 +8171,12 @@ export function detachScopedPerson({ detachScopedPersonDto }: {
 /**
  * Get people face statistics
  */
-export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
+export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, isFavorite, isHidden, name, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     isFavorite?: boolean;
     isHidden?: boolean;
+    name?: string;
     page?: number;
     sharedById?: string;
     sharedWithId?: string;
@@ -8190,6 +8193,7 @@ export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, isFav
         closestPersonId,
         isFavorite,
         isHidden,
+        name,
         page,
         sharedById,
         sharedWithId,
@@ -8231,11 +8235,12 @@ export function mergeScopedPeople({ mergeScopedPeopleDto }: {
 /**
  * Get people statistics
  */
-export function getPeopleStatistics({ closestAssetId, closestPersonId, isFavorite, isHidden, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
+export function getPeopleStatistics({ closestAssetId, closestPersonId, isFavorite, isHidden, name, page, sharedById, sharedWithId, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     isFavorite?: boolean;
     isHidden?: boolean;
+    name?: string;
     page?: number;
     sharedById?: string;
     sharedWithId?: string;
@@ -8252,6 +8257,7 @@ export function getPeopleStatistics({ closestAssetId, closestPersonId, isFavorit
         closestPersonId,
         isFavorite,
         isHidden,
+        name,
         page,
         sharedById,
         sharedWithId,

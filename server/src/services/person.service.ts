@@ -104,6 +104,8 @@ export class PersonService extends BaseService {
   async getAll(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleResponseDto> {
     const { withHidden = false, withSharedSpaces = false, closestAssetId, closestPersonId, page, size } = dto;
     const { isFavorite, isHidden } = dto;
+    // OD-14: upstream's name filter, for stock clients only (stock web's People page search).
+    const name = auth.stockClient ? dto.name : undefined;
     // Gallery: stock sync withholds pets, so a stock client's list does too unless it asks for a type.
     const type = dto.type ?? (auth.stockClient ? 'person' : undefined);
     const minimumFaceCount = await this.resolveMinimumFaceCount(auth);
@@ -140,6 +142,7 @@ export class PersonService extends BaseService {
       type,
       isFavorite,
       isHidden,
+      name,
     });
     const { total, hidden } = await this.personRepository.getNumberOfPeople(auth.user.id, {
       minimumFaceCount,
