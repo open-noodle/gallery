@@ -11738,6 +11738,109 @@ exports[`viewer-scope RBAC oracle > shared links 1`] = `
 }
 `;
 
+exports[`viewer-scope RBAC oracle > tag writes 1`] = `
+{
+  "albumEditor": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "albumLink": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "albumViewer": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "individualLink": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "owner": {
+    "bulk": 16,
+    "tagged": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "dupAsset",
+      "dupAsset2",
+      "editorAsset",
+      "libraryAsset",
+      "ownArchived",
+      "ownAsset",
+      "ownHidden",
+      "ownTrashed",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+      "spaceHidden",
+      "spaceTrashed",
+      "stackAsset",
+    ],
+  },
+  "ownerElevated": {
+    "bulk": 18,
+    "tagged": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "dupAsset",
+      "dupAsset2",
+      "editorAsset",
+      "libraryAsset",
+      "ownArchived",
+      "ownAsset",
+      "ownHidden",
+      "ownLocked",
+      "ownTrashed",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+      "spaceHidden",
+      "spaceLocked",
+      "spaceTrashed",
+      "stackAsset",
+    ],
+  },
+  "partner": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "spaceAlbumLink": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "spaceEditor": {
+    "bulk": 7,
+    "tagged": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "editorAsset",
+      "libraryAsset",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+    ],
+  },
+  "spaceLink": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "spaceViewer": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "spaceViewerOff": {
+    "bulk": 0,
+    "tagged": [],
+  },
+  "stranger": {
+    "bulk": 1,
+    "tagged": [
+      "strangerAsset",
+    ],
+  },
+}
+`;
+
 exports[`viewer-scope RBAC oracle > tags 1`] = `
 {
   "albumEditor": {

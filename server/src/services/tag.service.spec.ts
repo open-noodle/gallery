@@ -227,6 +227,20 @@ describe(TagService.name, () => {
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([]);
     });
 
+    // #734: a space Owner/Editor tags a member's asset through this route (AssetUpdate plus the space edit grant).
+    it('should tag a member asset the caller edits as a space owner or editor', async () => {
+      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.asset.getForUpdateTags.mockResolvedValue({ tags: [{ value: 'tag-1' }] });
+      mocks.tag.upsertAssetIds.mockResolvedValue([{ tagId: 'tag-1', assetId: 'asset-1' }]);
+
+      await expect(sut.bulkTagAssets(authStub.admin, { tagIds: ['tag-1'], assetIds: ['asset-1'] })).resolves.toEqual({
+        count: 1,
+      });
+      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-1', assetId: 'asset-1' }]);
+    });
+
     it('should upsert records', async () => {
       mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1', 'tag-2']));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1', 'asset-2', 'asset-3']));
