@@ -394,9 +394,9 @@
       filteredEmpty={{
         message:
           viewMode === AlbumPageViewMode.SELECT_ASSETS
-            ? 'None of the photos you can add match your filters'
-            : 'No photos match your filters',
-        clearLabel: 'Clear all filters',
+            ? $t('space_album_no_photos_to_add_match_filters')
+            : $t('space_album_no_photos_match_filters'),
+        clearLabel: $t('space_album_clear_all_filters'),
       }}
       isFilteredEmpty={filtered.isLoadedEmpty &&
         (viewMode === AlbumPageViewMode.SELECT_ASSETS ? picker.activeCount : filtered.activeFilterCount) > 0}
