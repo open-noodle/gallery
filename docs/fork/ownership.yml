@@ -14,12 +14,20 @@ fork_surface:
   preferred_namespaces:
     server:
       - server/src/gallery/**
+      # fork tests of upstream code, beside the upstream spec (AGENTS.md rule 6)
+      - server/src/**/*.gallery.spec.ts
+      - server/test/medium/specs/gallery/**
     web:
       - web/src/lib/gallery/**
+      - web/src/**/*.gallery.spec.ts
       # the i18n overlay; web and mobile both read it, i18n/*.json stay upstream's
       - i18n/gallery/**
     mobile:
       - mobile/lib/gallery/**
+      - mobile/test/gallery/**
+    ml:
+      - machine-learning/test_pet_detection.py
+      - machine-learning/test_metrics.py
     database:
       - server/src/schema/migrations-gallery/**
     ci:
@@ -270,6 +278,8 @@ features:
       - machine-learning/immich_ml/models/pet_detection/**
       - machine-learning/immich_ml/models/pet_recognition/**
       - machine-learning/immich_ml/models/gallery_hosted.py
+      - machine-learning/test_pet_detection.py
+      - machine-learning/test_metrics.py
       - server/src/services/pet-detection.service.ts
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
