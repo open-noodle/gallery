@@ -864,15 +864,29 @@ patch_ios() {
   # Info.plist — bundle name
   sed -i "s|<string>immich_mobile</string>|<string>${NAME_SLUG}</string>|g" "$info_plist"
 
-  # Info.plist — register branded URL scheme alongside immich:// (additive, idempotent)
-  # The CFBundleURLSchemes <string>immich</string> entry sits at 4-tab indent inside
-  # CFBundleURLTypes; CFBundleName (also <string>${NAME_SLUG}</string>) is at 1-tab indent,
-  # so we anchor the idempotency check to the 4-tab prefix to avoid a false-positive when
-  # NAME_SLUG happens to equal DEEP_LINK_SCHEME. Use $'\t' ANSI-C quoting for literal
-  # tabs — BSD grep (macOS) lacks -P.
-  local indent=$'\t\t\t\t'
-  if ! grep -q "^${indent}<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
-    sed -i $'/\t\t\t\t<string>immich<\\/string>/a\\\n\t\t\t\t<string>'"${DEEP_LINK_SCHEME}"$'<\\/string>' "$info_plist"
+  # Info.plist stays byte-identical to upstream in source. Every edit below matches on content,
+  # never on indentation, so upstream re-serializing the file (tabs or spaces) cannot break it.
+
+  # Info.plist — register branded URL scheme alongside immich:// (additive, idempotent).
+  # Inserted on the line after the CFBundleURLSchemes <string>immich</string>, with its indent,
+  # unless that next line already is the branded scheme. Checking the neighbour rather than
+  # "the scheme appears anywhere" matters: CFBundleName becomes <string>${NAME_SLUG}</string>,
+  # which equals the scheme when NAME_SLUG == DEEP_LINK_SCHEME.
+  sed -i -E "/^[[:space:]]*<string>immich<\/string>\$/{N;/\n[[:space:]]*<string>${DEEP_LINK_SCHEME}<\/string>\$/!s|^([[:space:]]*)<string>immich</string>\n|&\1<string>${DEEP_LINK_SCHEME}</string>\n|}" "$info_plist"
+
+  # Info.plist — permission prompts (config.json mobile.ios_usage_descriptions). Replaces the
+  # <string> after each <key>; upstream wraps some over several lines, which the N loop joins
+  # (GNU sed's `.` spans the joined newlines).
+  local usage_key usage_text
+  while IFS=$'\t' read -r usage_key usage_text; do
+    usage_text=$(printf '%s' "$usage_text" | sed 's/[\\&|]/\\&/g')
+    sed -i "/<key>${usage_key}<\/key>/{n;:a;/<\/string>/!{N;ba};s|<string>.*</string>|<string>${usage_text}</string>|}" "$info_plist"
+  done < <(jq -r '.mobile.ios_usage_descriptions | to_entries[] | "\(.key)\t\(.value)"' "$CONFIG")
+
+  # Info.plist — version. Upstream hardcodes its own; the release lanes restamp it via fastlane.
+  if [[ -n "${FORK_VERSION:-}" ]]; then
+    sed -i "/<key>CFBundleShortVersionString<\/key>/{n;s|<string>[^<]*</string>|<string>${FORK_VERSION}</string>|}" "$info_plist"
+    sed -i "/<key>CFBundleVersion<\/key>/{n;s|<string>[^<]*</string>|<string>${BUILD_NUMBER:-1}</string>|}" "$info_plist"
   fi
 
   # Info.plist — background task identifiers
