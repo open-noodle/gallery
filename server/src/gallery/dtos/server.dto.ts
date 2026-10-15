@@ -29,6 +29,8 @@ export const GalleryServerFeaturesExtension = {
     .describe(
       'Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end.',
     ),
+  // An S3 bucket is configured, so S3 can be chosen per file type even on the disk backend.
+  s3Configured: z.boolean().describe('Whether an S3 bucket is configured'),
   // the admin UI hides config that only applies on the S3 storage backend (database backups to S3),
   // and the client has no other signal for which backend the server is running on.
   s3Storage: z.boolean().describe('Whether the server is running on the S3 storage backend'),

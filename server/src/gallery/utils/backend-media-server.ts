@@ -7,6 +7,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { FACE_THUMBNAIL_SIZE, THUMBNAIL_DECODING_TIER } from 'src/constants.js';
 import { ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFace } from 'src/database.js';
@@ -261,11 +262,16 @@ export class BackendMediaServer {
     }
   }
 
-  /** The configured write backend when it is not the disk: a locally written file then has to be uploaded to it. */
-  private async getRemoteWriteBackend(): Promise<StorageBackend | undefined> {
+  /**
+  The write backend when it is not the disk: a locally written file then has to be uploaded to it. With a `kind` the
+  backend follows that kind's storage routing; without one it is the backend IMMICH_STORAGE_BACKEND selects.
+  The backend is resolved once per file, so its upload and its local unlink cannot disagree after a config save.
+  */
+  private async getRemoteWriteBackend(kind?: StorageRoutingKind): Promise<StorageBackend | undefined> {
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('../../services/storage.service.js');
-    const writeBackend = StorageService.getWriteBackend();
+    const config = kind ? await this.deps.getConfig({ withCache: true }) : undefined;
+    const writeBackend = StorageService.getWriteBackend(kind, config);
     return !writeBackend || writeBackend instanceof DiskStorageBackend ? undefined : writeBackend;
   }
 
@@ -273,8 +279,13 @@ export class BackendMediaServer {
   After generating a file locally, uploads it to S3 if the write backend is S3.
   Returns the key to store in the DB.
   */
-  async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
-    const writeBackend = await this.getRemoteWriteBackend();
+  async persistFile(
+    localPath: string,
+    relativeKey: string,
+    contentType?: string,
+    kind?: StorageRoutingKind,
+  ): Promise<string> {
+    const writeBackend = await this.getRemoteWriteBackend(kind);
     if (!writeBackend) {
       // Disk mode: the file was already written to the final path
       return localPath;
@@ -304,13 +315,18 @@ export class BackendMediaServer {
         format: file.path.split('.').pop() as ImageFormat,
         isEdited: file.isEdited,
       });
-      file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
+      file.path = await this.persistFile(
+        file.path,
+        relativeKey,
+        mimeTypes.lookup(file.path),
+        StorageRoutingKind.Thumbnails,
+      );
     }
   }
 
   /** Uploads a locally generated profile image to an S3 write backend; returns the path to store on the user. */
   async persistProfileImage(userId: string, profileImagePath: string): Promise<string> {
-    const writeBackend = await this.getRemoteWriteBackend();
+    const writeBackend = await this.getRemoteWriteBackend(StorageRoutingKind.Thumbnails);
     if (!writeBackend) {
       return profileImagePath;
     }
@@ -330,7 +346,7 @@ export class BackendMediaServer {
   later failure in the caller queues the uploaded objects (not the already-queued local files) for deletion.
   */
   async moveUploadToBackend(asset: { id: string; ownerId: string }, file: UploadFile, sidecarFile?: UploadFile) {
-    const writeBackend = await this.getRemoteWriteBackend();
+    const writeBackend = await this.getRemoteWriteBackend(StorageRoutingKind.Originals);
     if (!writeBackend) {
       return;
     }

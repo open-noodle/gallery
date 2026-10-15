@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { join } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
+import { StorageRoutingKind, resolveRouting } from 'src/backends/storage-router.js';
 import { ErrorMessages } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
+import { SystemConfig } from 'src/dtos/config.dto.js';
 import {
   BootstrapEventPriority,
   DatabaseLock,
@@ -14,8 +16,11 @@ import {
   StorageFolder,
   SystemMetadataKey,
 } from 'src/enum.js';
+import { StorageRouting } from 'src/gallery/dtos/config.dto.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobOf, SystemFlags } from 'src/types.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
@@ -28,8 +33,78 @@ export class StorageService extends BaseService {
   // the backends live in a leaf module (src/gallery/utils/storage-backends.ts) that StorageCore and utils can import
   static getDiskBackend = (): DiskStorageBackend => storageBackends.diskBackend;
   static getS3Backend = (): S3StorageBackend | undefined => storageBackends.s3Backend;
-  static getWriteBackend = (): StorageBackend => storageBackends.getWriteBackend();
   static backendFor = (key: string, absoluteDisk?: StorageBackend) => storageBackends.backendFor(key, absoluteDisk);
+
+  /**
+  The backend a new file of `kind` is written to (per-file-type routing). Without a kind it is the backend
+  IMMICH_STORAGE_BACKEND selects, as before routing existed.
+  */
+  static getWriteBackend(kind?: StorageRoutingKind, config?: SystemConfig): StorageBackend {
+    if (!kind || !config) {
+      return storageBackends.getWriteBackend();
+    }
+    const resolved = resolveRouting(config.storage.routing[kind], storageBackends.writeBackendType);
+    if (resolved === 's3') {
+      const s3Backend = storageBackends.s3Backend;
+      if (s3Backend) {
+        return s3Backend;
+      }
+      // Credentials can be removed from the environment after routing was configured. Failing
+      // every write would brick a running instance; disk is always safe because stored keys are
+      // self-describing, so the file remains readable wherever it lands.
+      StorageService.warnMissingS3Backend(kind);
+    }
+    return storageBackends.diskBackend;
+  }
+
+  private static warnedKinds = new Set<StorageRoutingKind>();
+
+  // getWriteBackend is static and has no `this.logger`. LoggingRepository.create(context) is the
+  // established seam for logging from a static/free-standing context elsewhere in the codebase
+  // (see plugin.repository.ts, base.service.ts, and the migrations) — it routes through the same
+  // structured JSON logging as instance loggers, unlike a raw console.warn.
+  private static staticLogger = LoggingRepository.create(StorageService.name);
+
+  private static warnMissingS3Backend(kind: StorageRoutingKind) {
+    if (StorageService.warnedKinds.has(kind)) {
+      return;
+    }
+    StorageService.warnedKinds.add(kind);
+    StorageService.staticLogger.warn(
+      `Storage routing for "${kind}" is set to s3 but no S3 backend is configured; writing to disk.`,
+    );
+  }
+
+  private getS3PinnedKindsWithoutBucket(config: SystemConfig): StorageRoutingKind[] {
+    const { bucket } = this.configRepository.getEnv().storage.s3;
+    if (bucket) {
+      return [];
+    }
+    return Object.values(StorageRoutingKind).filter((kind) => config.storage.routing[kind] === StorageRouting.S3);
+  }
+
+  @OnEvent({ name: 'ConfigValidate' })
+  onConfigValidate({ newConfig }: ArgOf<'ConfigValidate'>) {
+    const offending = this.getS3PinnedKindsWithoutBucket(newConfig);
+    if (offending.length > 0) {
+      throw new Error(
+        `Storage routing cannot be set to S3 for ${offending.join(', ')} because IMMICH_S3_BUCKET is not configured.`,
+      );
+    }
+  }
+
+  // Config-file installs never emit ConfigValidate (SystemConfigService.updateSystemConfig rejects
+  // outright when IMMICH_CONFIG_FILE is set), so this is their only signal. It logs rather than
+  // throws: a config edit must not prevent a running instance from starting.
+  @OnEvent({ name: 'ConfigInit' })
+  onStorageConfigInit({ newConfig }: ArgOf<'ConfigInit'>) {
+    const offending = this.getS3PinnedKindsWithoutBucket(newConfig);
+    if (offending.length > 0) {
+      this.logger.error(
+        `Storage routing is set to S3 for ${offending.join(', ')} but IMMICH_S3_BUCKET is not configured; those files will be written to disk instead.`,
+      );
+    }
+  }
 
   private detectMediaLocation(): string {
     const envData = this.configRepository.getEnv();
@@ -109,6 +184,11 @@ export class StorageService extends BaseService {
       const current = StorageCore.getMediaLocation();
       const samples = await this.assetRepository.getFileSamples();
       const savedValue = await this.systemMetadataRepository.get(SystemMetadataKey.MediaLocation);
+      // Load-bearing: getFileSamples now only returns disk-resident (absolute-path) rows, so on
+      // an install that is entirely on S3 — or mid-migration with no disk-resident asset_file
+      // rows left — samples is empty and the location check below is skipped entirely. Without
+      // this guard, an unordered sample could be a relative S3 key on one restart and an
+      // absolute disk path on the next, making InconsistentMediaLocation fire nondeterministically.
       if (samples.length > 0) {
         const path = samples[0].path;
 

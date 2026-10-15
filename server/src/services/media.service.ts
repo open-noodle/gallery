@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import { FACE_THUMBNAIL_SIZE, THUMBNAIL_DECODING_TIER } from 'src/constants.js';
 import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFile } from 'src/database.js';
@@ -514,7 +515,12 @@ export class MediaService extends BaseService {
 
     // Persist person thumbnail to S3 if needed
     const relativeKey = getRelativePersonThumbnailPath({ ownerId, personGroupId });
-    const finalPath = await this.backendMedia.persistFile(thumbnailPath, relativeKey, 'image/jpeg');
+    const finalPath = await this.backendMedia.persistFile(
+      thumbnailPath,
+      relativeKey,
+      'image/jpeg',
+      StorageRoutingKind.Thumbnails,
+    );
 
     await this.personRepository.update({ ownerId, personGroupId, thumbnailPath: finalPath });
 
@@ -706,7 +712,12 @@ export class MediaService extends BaseService {
 
     // Persist encoded video to S3 if needed
     const relativeKey = getRelativeEncodedVideoPath(asset);
-    const finalPath = await this.backendMedia.persistFile(output, relativeKey, 'video/mp4');
+    const finalPath = await this.backendMedia.persistFile(
+      output,
+      relativeKey,
+      'video/mp4',
+      StorageRoutingKind.EncodedVideo,
+    );
 
     await this.assetRepository.upsertFile({
       assetId: asset.id,

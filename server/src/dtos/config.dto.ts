@@ -41,6 +41,7 @@ import {
   GalleryPetRecognitionSchema,
   GalleryServerExtension,
   GallerySpatialSceneSchema,
+  GalleryStorageSchema,
   GalleryStorageUsageSchema,
   galleryBackupDatabaseDefaults,
   galleryFacialRecognitionDefaults,
@@ -479,6 +480,8 @@ const AdminConfigSchemaWithVisibility = z
       .meta({ id: 'AdminConfigUserDto' }),
     classification: GalleryClassificationSchema,
     memories: GalleryMemoriesSchema,
+    // Gallery-fork: see GalleryStorageSchema in src/gallery/config.dto.ts.
+    storage: GalleryStorageSchema,
     storageUsage: GalleryStorageUsageSchema,
   })
   .describe('Configuration properties that are visible to the admin')

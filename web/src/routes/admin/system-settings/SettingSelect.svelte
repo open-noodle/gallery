@@ -7,7 +7,7 @@
 
   interface Props {
     value: string | number | undefined;
-    options: { value: string | number; text: string }[];
+    options: { value: string | number; text: string; disabled?: boolean }[];
     label?: string;
     desc?: string;
     name?: string;
@@ -77,7 +77,7 @@
       onchange={handleChange}
     >
       {#each options as option (option.value)}
-        <option value={option.value}>{option.text}</option>
+        <option value={option.value} disabled={option.disabled}>{option.text}</option>
       {/each}
     </select>
   </div>
