@@ -381,7 +381,7 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
     // Upstream PR #27666 removed the beta-timeline toggle; beta is now the
     // default and the only option. Fork layers its own bottom nav on top.
     if (context.router.current.name == SplashScreenRoute.name) {
-      unawaited(context.replaceRoute(const GalleryTabShellRoute()));
+      unawaited(context.router.replaceAll([const GalleryTabShellRoute(), ?widget.deepLink]));
     }
   }
 
