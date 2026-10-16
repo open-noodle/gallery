@@ -15,10 +15,37 @@ import {
 } from 'src/dtos/person.dto.js';
 import { JobName, Permission } from 'src/enum.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
+import { AccessRepository } from 'src/repositories/access.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { findOrFail } from 'src/utils/misc.js';
+
+/** `PersonService.getThumbnail`'s access check: owner or shared-space reader, and never a Locked Folder crop. */
+export const requireThumbnailAccess = async (accessRepository: AccessRepository, auth: AuthDto, id: string) => {
+  const ids = new Set([id]);
+  const ownerAccess = await accessRepository.galleryPerson.checkOwnerAccess(auth.user.id, ids);
+  const isOwner = ownerAccess.has(id);
+  if (!isOwner) {
+    const isShared = await accessRepository.galleryPerson.checkSharedSpaceAccess(auth.user.id, ids);
+    if (!isShared.has(id)) {
+      throw new BadRequestException('Not found or no person.read access');
+    }
+  }
+
+  // Fork (#869 follow-up): both arms above grant person.read off ANY reachable face, while the thumbnail
+  // is a crop of the representative face's photo specifically. The owner needs an elevated session to be
+  // handed back a crop of their own Locked Folder photo; a shared-space viewer must never receive one at
+  // all — the folder belongs to the owner, so the viewer's own elevation says nothing about it.
+  if (isOwner && auth.session?.hasElevatedPermission) {
+    return;
+  }
+
+  const isUnlocked = await accessRepository.galleryPerson.checkUnlockedThumbnailAccess(ids);
+  if (!isUnlocked.has(id)) {
+    throw new BadRequestException('Not found or no person.read access');
+  }
+};
 
 @Injectable()
 export class GalleryPeopleService extends BaseService {
