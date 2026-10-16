@@ -63,6 +63,10 @@
   let albums = $state<AlbumResponseDto[]>([]);
   // Space-linked albums the caller has no `album_user` row for, fetched only for a non-shareable selection.
   let linkedAlbums = $state<AlbumResponseDto[]>([]);
+  // #1114: albums linked to the caller's writable spaces that they are not a member of, fetched on the
+  // first search so typing finds them for a shareable selection too. Listed only while searching.
+  let searchLinkedAlbums = $state<AlbumResponseDto[]>([]);
+  let searchLinkedAlbumsRequested = false;
   // Album id → accepted asset count from `POST /albums/add-targets`; null = not resolved (no filtering).
   let acceptedCounts = $state<Record<string, number> | null>(null);
   let shareableCount = $state<number | null>(null);
@@ -83,7 +87,7 @@
   const currentUserId = $derived(authManager.authenticated ? (authManager.user?.id ?? null) : null);
 
   const albumCollections = $derived(
-    [...albums, ...linkedAlbums]
+    [...albums, ...linkedAlbums, ...(search.trim() ? searchLinkedAlbums : [])]
       .filter((album) => acceptedCounts === null || (acceptedCounts[album.id] ?? 0) > 0)
       .map((a) => albumToCollection(a)),
   );
@@ -192,6 +196,43 @@
     acceptedCounts = counts;
     shareableCount = own.shareableAssetCount;
   };
+
+  /**
+   * Fetch the linked albums of every space the caller can write to, once, the first time they search.
+   * Without it a shareable selection only reaches another member's space-linked album by expanding its
+   * space, and search does not look inside spaces (#1114). Resolved against the selection like the other
+   * targets, so an album that would accept nothing stays hidden.
+   */
+  const loadSearchLinkedAlbums = async () => {
+    const writable = spaces.filter((space) => isWritableSpace(space, currentUserId));
+    const perSpace = await Promise.all(writable.map((space) => fetchSpaceAlbums(space.id)));
+    let found: AlbumResponseDto[] = [];
+    for (const album of perSpace.flat()) {
+      if ([...albums, ...linkedAlbums, ...found].every(({ id }) => id !== album.id)) {
+        found.push(album);
+      }
+    }
+    if (found.length > 0 && acceptedCounts !== null && assetIds && assetIds.length > 0) {
+      const targets = await getAlbumAddTargets({
+        albumAddTargetsDto: { albumIds: found.map(({ id }) => id), assetIds },
+      });
+      const counts = { ...acceptedCounts };
+      for (const { albumId, acceptedAssetCount } of targets.albums) {
+        counts[albumId] = acceptedAssetCount;
+      }
+      acceptedCounts = counts;
+      found = found.filter(({ id }) => (counts[id] ?? 0) > 0);
+    }
+    searchLinkedAlbums = found;
+  };
+
+  $effect(() => {
+    if (!search.trim() || restricted || loading || searchLinkedAlbumsRequested) {
+      return;
+    }
+    searchLinkedAlbumsRequested = true;
+    loadSearchLinkedAlbums().catch((error) => handleError(error, $t('errors.unable_to_load_albums')));
+  });
 
   /**
    * Every album the user can add to: one request, no filters.
