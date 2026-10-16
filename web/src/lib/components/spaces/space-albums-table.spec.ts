@@ -7,6 +7,12 @@ import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-alb
 import { toggleSpaceAlbumGroupCollapsing } from '$lib/utils/space-album-grouping';
 import { renderWithTooltips } from '$tests/helpers';
 
+vi.mock('@immich/ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@immich/ui')>();
+  const { default: MockContextMenuButton } = await import('@test-data/mocks/action-context-menu.stub.svelte');
+  return { ...original, ContextMenuButton: MockContextMenuButton };
+});
+
 function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSpaceLinkedAlbumDto {
   return {
     id: 'album-1',

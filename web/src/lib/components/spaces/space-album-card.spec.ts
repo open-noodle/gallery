@@ -4,6 +4,12 @@ import { getActiveDragPayload, readDragPayload, setActiveDragPayload } from '$li
 import { renderWithTooltips } from '$tests/helpers';
 import SpaceAlbumCard from './space-album-card.svelte';
 
+vi.mock('@immich/ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@immich/ui')>();
+  const { default: MockContextMenuButton } = await import('@test-data/mocks/action-context-menu.stub.svelte');
+  return { ...original, ContextMenuButton: MockContextMenuButton };
+});
+
 describe('SpaceAlbumCard', () => {
   beforeAll(async () => {
     register('en-US', () => import('$i18n/en.json'));
