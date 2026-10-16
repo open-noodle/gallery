@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
@@ -192,8 +191,8 @@ void main() {
       final album = await ctx.newSharedSpaceAlbum(name: 'NoDates');
       await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
 
-      final asset1 = await ctx.newRemoteAsset(ownerId: user.id, localDateTime: const Value(null));
-      final asset2 = await ctx.newRemoteAsset(ownerId: user.id, localDateTime: const Value(null));
+      final asset1 = await ctx.newRemoteAsset(ownerId: user.id, withoutLocalDateTime: true);
+      final asset2 = await ctx.newRemoteAsset(ownerId: user.id, withoutLocalDateTime: true);
       await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset1.id);
       await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset2.id);
 
