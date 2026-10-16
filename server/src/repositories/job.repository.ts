@@ -2,7 +2,6 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
-import { setTimeout } from 'node:timers/promises';
 import type { JobCounts, JobItem, JobOf } from 'src/types.js';
 import { JobConfig } from 'src/decorators.js';
 import { QueueJobResponseDto, QueueJobSearchDto } from 'src/dtos/queue.dto.js';
@@ -19,11 +18,6 @@ type JobMapItem = {
   handler: (job: JobOf<any>) => Promise<JobStatus>;
   label: string;
 };
-
-export interface WaitForQueueCompletionOptions {
-  /** S9 (F19): give up waiting after this many milliseconds instead of polling forever. */
-  timeoutMs?: number;
-}
 
 const WORKER_WATCH_INTERVAL_MS = 30_000;
 
@@ -220,26 +214,6 @@ export class JobRepository {
     ) as unknown as Promise<JobCounts>;
   }
 
-  /**
-   * Slice 14 (fork isolation): `getJobCounts` is a pure delegate upstream — every read-only caller
-   * (the admin queue poll in queue.service.ts, media.service.ts, person.service.ts's recognition-queue
-   * checks, storage-migration.service.ts, and this repository's own getTelemetryMetrics) expects a read
-   * that never mutates Redis. `removeDanglingActiveJobs` used to run unconditionally inside
-   * `getJobCounts`, so those upstream call paths silently wrote to Redis on every poll.
-   *
-   * This variant carries that repair. `waitForQueueCompletion` is the one caller that genuinely needs
-   * it: it blocks in a loop deciding whether a queue (including the fork's PeopleBackfill, where the
-   * dangling-active-entry bug this repair fixes was originally found — see the "fix(server): clean
-   * dangling active queue entries" commit) has actually drained, and a dangling active entry with no
-   * backing job hash would otherwise read as perpetually "still active." A blocking wait loop paying for
-   * an extra bounded Redis scan per poll is a reasonable trade against a passive per-request read paying
-   * the same cost for no benefit.
-   */
-  async getJobCountsWithRepair(name: QueueName): Promise<JobCounts> {
-    await this.queueMaintenanceRepository.removeDanglingActiveJobs(name);
-    return this.getJobCounts(name);
-  }
-
   private getQueueName(name: JobName) {
     return (this.handlers[name] as JobMapItem).queueName;
   }
@@ -292,64 +266,10 @@ export class JobRepository {
     return this.queueAll([item]);
   }
 
-  /**
-   * S9 (F19): the trailing-options form keeps every existing call site's variadic syntax
-   * (`waitForQueueCompletion(a, b, c)`) byte-identical — only a caller that explicitly appends a
-   * trailing options object opts into the bounded wait. Without `timeoutMs` this is the original
-   * unbounded `while (pending.length > 0)` poll; with it, a forced recognition run that gives up
-   * waiting still proceeds instead of parking indefinitely while F17/F18's suggestion sweep keeps
-   * the PeopleBackfill queue busy.
-   */
   async waitForQueueCompletion(
-    ...args: [...queues: QueueName[]] | [...queues: QueueName[], options: WaitForQueueCompletionOptions]
+    ...args: Parameters<QueueMaintenanceRepository['waitForQueueCompletion']>
   ): Promise<void> {
-    const maybeOptions = args.at(-1);
-    const hasOptions = typeof maybeOptions === 'object' && maybeOptions !== null;
-    const { timeoutMs } = hasOptions ? (maybeOptions as WaitForQueueCompletionOptions) : {};
-    const queues = (hasOptions ? args.slice(0, -1) : args) as QueueName[];
-
-    const getPending = async () => {
-      const results = await Promise.all(
-        queues.map(async (name) => {
-          // Slice 14: the repairing variant. This loop decides whether a queue has actually drained, and
-          // a dangling active entry with no backing job hash (the bug getJobCountsWithRepair fixes) would
-          // otherwise read as perpetually "still active" — see the comment on getJobCountsWithRepair.
-          const [counts, paused] = await Promise.all([this.getJobCountsWithRepair(name), this.isPaused(name)]);
-          const pending = counts.active + counts.waiting + counts.delayed + counts.paused;
-          return { counts, name, paused, pending };
-        }),
-      );
-
-      return results.filter(({ pending }) => pending > 0);
-    };
-
-    const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
-    let pending = await getPending();
-
-    while (pending.length > 0) {
-      if (deadline !== undefined && Date.now() >= deadline) {
-        const names = pending.map(({ name }) => name).join(', ');
-        this.logger.warn(
-          `Gave up waiting for ${names} queue(s) to finish after ${timeoutMs}ms; proceeding without waiting`,
-        );
-        return;
-      }
-
-      const blocked = pending[0];
-      const message =
-        `Waiting for ${blocked.name} queue to finish ` +
-        `(${blocked.counts.active} active, ${blocked.counts.waiting} waiting, ` +
-        `${blocked.counts.delayed} delayed, ${blocked.counts.paused} paused)`;
-
-      if (blocked.paused) {
-        this.logger.warn(`${message}; queue is paused`);
-      } else {
-        this.logger.verbose(`${message}...`);
-      }
-
-      await setTimeout(1000);
-      pending = await getPending();
-    }
+    return this.queueMaintenanceRepository.waitForQueueCompletion(...args);
   }
 
   async searchJobs(name: QueueName, dto: QueueJobSearchDto): Promise<QueueJobResponseDto[]> {

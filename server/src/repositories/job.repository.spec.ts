@@ -208,8 +208,8 @@ describe(JobRepository.name, () => {
   // Slice 14 (fork isolation): getJobCounts is upstream's pure delegate — every read-only caller (the
   // admin queue poll, media.service.ts, person.service.ts's recognition-queue checks,
   // storage-migration.service.ts, and this repository's own getTelemetryMetrics) must never see a read
-  // mutate Redis. The dangling-active repair moved to getJobCountsWithRepair, whose only caller is
-  // waitForQueueCompletion.
+  // mutate Redis. The dangling-active repair runs only in waitForQueueCompletion (through
+  // QueueMaintenanceRepository.getJobCountsWithRepair) and searchJobs.
   it('getJobCounts performs no Redis writes, even with a dangling active entry present', async () => {
     const { sut, client, queue } = setup([emptyCounts()]);
     client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
@@ -224,12 +224,12 @@ describe(JobRepository.name, () => {
     expect(queue.getJobCounts).toHaveBeenCalledWith('active', 'completed', 'failed', 'delayed', 'waiting', 'paused');
   });
 
-  it('getJobCountsWithRepair removes active queue ids whose job hash and lock are both gone before counting jobs', async () => {
+  it('waitForQueueCompletion removes active queue ids whose job hash and lock are both gone before counting jobs', async () => {
     const { sut, client, queue, logger } = setup([emptyCounts()]);
     client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
     client.lrem.mockResolvedValue(1);
 
-    await sut.getJobCountsWithRepair(QueueName.PeopleBackfill);
+    await sut.waitForQueueCompletion(QueueName.PeopleBackfill);
 
     expect(client.lrange).toHaveBeenCalledWith('queue:active', 0, -1);
     expect(client.exists).toHaveBeenCalledWith('queue:face-identity-backfill/space-person/orphan');
