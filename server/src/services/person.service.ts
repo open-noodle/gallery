@@ -798,13 +798,14 @@ export class PersonService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const { ownerId } = face.asset;
-    const matches = await this.faceSearchRepository.searchFaces({
-      userIds: [ownerId],
+    const { ownerId, clusterGroupId } = face.asset;
+    const matches = await this.searchRepository.searchFaces({
+      clusterGroupId,
       embedding: face.faceSearch.embedding,
       maxDistance: machineLearning.facialRecognition.maxDistance,
       numResults: machineLearning.facialRecognition.minFaces,
       minBirthDate: new Date(face.asset.fileCreatedAt),
+      excludeDeletedFaces: true,
     });
 
     this.logger.debug(`Face ${id} has ${matches.length} matches`);
@@ -848,13 +849,14 @@ export class PersonService extends BaseService {
     }
 
     if (!personGroupId) {
-      const [matchWithPerson] = await this.faceSearchRepository.searchFaces({
-        userIds: [ownerId],
+      const [matchWithPerson] = await this.searchRepository.searchFaces({
+        clusterGroupId,
         embedding: face.faceSearch.embedding,
         maxDistance: machineLearning.facialRecognition.maxDistance,
         numResults: 1,
         hasPerson: true,
         minBirthDate: new Date(face.asset.fileCreatedAt),
+        excludeDeletedFaces: true,
       });
 
       personGroupId = matchWithPerson?.personGroupId ?? undefined;
