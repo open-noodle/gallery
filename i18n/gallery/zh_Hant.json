@@ -1004,7 +1004,7 @@
   "rotated_count": "已旋轉 {count, plural, one {# 個項目} other {# 個項目}}",
   "search_everywhere": "全域搜尋",
   "search_here": "在此搜尋",
-  "search_legacy_notice": "按 ⌘K 進行搜尋。",
+  "search_legacy_notice": "按 {hotkey} 進行搜尋。",
   "search_no_pets": "沒有寵物",
   "search_open_palette": "開啟命令面板",
   "search_sort_newest": "最新優先",

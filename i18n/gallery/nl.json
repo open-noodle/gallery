@@ -988,7 +988,7 @@
   "rotated_count": "{count, plural, one {# item} other {# items}} gedraaid",
   "search_everywhere": "Overal zoeken",
   "search_here": "Hier zoeken",
-  "search_legacy_notice": "Gebruik ⌘K om te zoeken.",
+  "search_legacy_notice": "Gebruik {hotkey} om te zoeken.",
   "search_no_pets": "Geen huisdieren",
   "search_open_palette": "Palet openen",
   "search_sort_newest": "Nieuwste eerst",

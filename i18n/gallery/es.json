@@ -989,7 +989,7 @@
   "rotated_count": "{count, plural, one {# recurso girado} other {# recursos girados}}",
   "search_everywhere": "Buscar en todas partes",
   "search_here": "Buscar aquí",
-  "search_legacy_notice": "Usa ⌘K para buscar.",
+  "search_legacy_notice": "Usa {hotkey} para buscar.",
   "search_no_pets": "Ninguna mascota",
   "search_open_palette": "Abrir la paleta",
   "search_sort_newest": "Más recientes primero",

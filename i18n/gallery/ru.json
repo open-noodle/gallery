@@ -991,7 +991,7 @@
   "rotated_count": "Повёрнуто {count, plural, one {# объект} few {# объекта} many {# объектов} other {# объекта}}",
   "search_everywhere": "Искать везде",
   "search_here": "Искать здесь",
-  "search_legacy_notice": "Используйте ⌘K для поиска.",
+  "search_legacy_notice": "Используйте {hotkey} для поиска.",
   "search_no_pets": "Нет питомцев",
   "search_open_palette": "Открыть палитру",
   "search_sort_newest": "Сначала новые",
