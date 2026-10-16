@@ -77,8 +77,6 @@ export class TimelineManager extends VirtualScrollManager {
   });
 
   isInitialized = $state(false);
-  /** Increments on every (re)load. Views `{#key}` their bucket DOM on it to drop stale nodes. */
-  reloadToken = $state(0);
   isScrollingOnLoad = false;
   grouping: TimelineGrouping = $state(DEFAULT_TIMELINE_GROUPING);
   timelineBuckets: TimelineBucket[] = $state([]);
@@ -356,10 +354,6 @@ export class TimelineManager extends VirtualScrollManager {
 
   async #init(options: TimelineManagerOptions) {
     const sequence = ++this.#initSequence;
-    // Bump on every (re)load so views can `{#key}` their bucket DOM on it. Rapid filter changes
-    // can otherwise leave the keyed {#each months} with stale month nodes mounted (manager state
-    // is correct, but the DOM keeps an old month — they overlap). Remounting on reload clears it.
-    this.reloadToken++;
     this.isInitialized = false;
     this.disconnect();
     this.initTask.cancel();

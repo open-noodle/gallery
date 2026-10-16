@@ -784,85 +784,79 @@
         {onTimelineBucketActivate}
         onRequestCovers={(timeBuckets) => void timelineManager.bucketLayout.loadCovers(timeBuckets)}
       />
-    {:else if !isEmpty}
-      <!-- Guard with `!isEmpty` (so the block unmounts when a filter empties the timeline) and
-           `{#key reloadToken}` (so it remounts on every reload). Without these, the keyed
-           {#each} can leave stale month DOM mounted on rapid filter changes (manager state is
-           correct, but an old month node lingers — it overlaps the new results / "no results"
-           placeholder). Remounting on reload clears that stale DOM. -->
-      {#key timelineManager.reloadToken}
-        {#each timelineManager.months as timelineMonth (timelineMonth.viewId)}
-          {@const isInOrNearViewport = timelineMonth.isInOrNearViewport}
-          {@const absoluteHeight = timelineMonth.top + timelineManager.renderOffset}
-
-          {#if !timelineMonth.isLoaded}
-            <div
-              data-testid="timeline-month-skeleton"
-              style:height={timelineMonth.height + 'px'}
-              style:position="absolute"
-              style:transform={`translate3d(0,${absoluteHeight}px,0)`}
-              style:width="100%"
-            >
-              <Skeleton {invisible} height={timelineMonth.height} title={timelineMonth.title} />
-            </div>
-          {:else if isInOrNearViewport}
-            <div
-              class="timeline-month"
-              style:height={timelineMonth.height + 'px'}
-              style:position="absolute"
-              style:transform={`translate3d(0,${absoluteHeight}px,0)`}
-              style:width="100%"
-            >
-              <Month
-                {assetInteraction}
-                {customThumbnailLayout}
-                {singleSelect}
-                {timelineMonth}
-                manager={timelineManager}
-                onTimelineDaySelect={handleGroupSelect}
-              >
-                {#snippet thumbnail({ asset, position, timelineDay, groupIndex })}
-                  {@const isAssetSelectionCandidate = assetInteraction.hasSelectionCandidate(asset.id)}
-                  {@const isAssetSelected =
-                    assetInteraction.hasSelectedAsset(asset.id) || timelineManager.albumAssets.has(asset.id)}
-                  {@const isAssetDisabled = timelineManager.albumAssets.has(asset.id)}
-                  <Thumbnail
-                    showStackedIcon={withStacked}
-                    {showArchiveIcon}
-                    {asset}
-                    {albumUsers}
-                    {groupIndex}
-                    onClick={(asset) => {
-                      if (typeof onThumbnailClick === 'function') {
-                        onThumbnailClick(asset, timelineManager, timelineDay, _onClick);
-                      } else {
-                        _onClick(timelineManager, timelineDay.getAssets(), timelineDay.groupTitle, asset);
-                      }
-                    }}
-                    onSelect={() => {
-                      if (isSelectionMode || assetInteraction.selectionActive) {
-                        assetSelectHandler(timelineManager, asset, timelineDay.getAssets(), timelineDay.groupTitle);
-                        return;
-                      }
-                      void onSelectAssets(asset);
-                    }}
-                    onMouseEvent={() => handleSelectAssetCandidates(asset)}
-                    onPreview={isSelectionMode || assetInteraction.selectionActive
-                      ? (asset) => void navigate({ targetRoute: 'current', assetId: asset.id })
-                      : undefined}
-                    selected={isAssetSelected}
-                    selectionCandidate={isAssetSelectionCandidate}
-                    disabled={isAssetDisabled}
-                    thumbnailWidth={position.width}
-                    thumbnailHeight={position.height}
-                  />
-                {/snippet}
-              </Month>
-            </div>
-          {/if}
-        {/each}
-      {/key}
     {/if}
+    <!-- Keyed on the month object, not its year-month: a reload rebuilds every month, so the month DOM remounts
+         instead of patching, which on rapid filter changes left stale months overlapping the new results. -->
+    {#each isEmpty || activeGrouping !== 'day' ? [] : timelineManager.months as timelineMonth (timelineMonth)}
+      {@const isInOrNearViewport = timelineMonth.isInOrNearViewport}
+      {@const absoluteHeight = timelineMonth.top + timelineManager.renderOffset}
+
+      {#if !timelineMonth.isLoaded}
+        <div
+          data-testid="timeline-month-skeleton"
+          style:height={timelineMonth.height + 'px'}
+          style:position="absolute"
+          style:transform={`translate3d(0,${absoluteHeight}px,0)`}
+          style:width="100%"
+        >
+          <Skeleton {invisible} height={timelineMonth.height} title={timelineMonth.title} />
+        </div>
+      {:else if isInOrNearViewport}
+        <div
+          class="timeline-month"
+          style:height={timelineMonth.height + 'px'}
+          style:position="absolute"
+          style:transform={`translate3d(0,${absoluteHeight}px,0)`}
+          style:width="100%"
+        >
+          <Month
+            {assetInteraction}
+            {customThumbnailLayout}
+            {singleSelect}
+            {timelineMonth}
+            manager={timelineManager}
+            onTimelineDaySelect={handleGroupSelect}
+          >
+            {#snippet thumbnail({ asset, position, timelineDay, groupIndex })}
+              {@const isAssetSelectionCandidate = assetInteraction.hasSelectionCandidate(asset.id)}
+              {@const isAssetSelected =
+                assetInteraction.hasSelectedAsset(asset.id) || timelineManager.albumAssets.has(asset.id)}
+              {@const isAssetDisabled = timelineManager.albumAssets.has(asset.id)}
+              <Thumbnail
+                showStackedIcon={withStacked}
+                {showArchiveIcon}
+                {asset}
+                {albumUsers}
+                {groupIndex}
+                onClick={(asset) => {
+                  if (typeof onThumbnailClick === 'function') {
+                    onThumbnailClick(asset, timelineManager, timelineDay, _onClick);
+                  } else {
+                    _onClick(timelineManager, timelineDay.getAssets(), timelineDay.groupTitle, asset);
+                  }
+                }}
+                onSelect={() => {
+                  if (isSelectionMode || assetInteraction.selectionActive) {
+                    assetSelectHandler(timelineManager, asset, timelineDay.getAssets(), timelineDay.groupTitle);
+                    return;
+                  }
+                  void onSelectAssets(asset);
+                }}
+                onMouseEvent={() => handleSelectAssetCandidates(asset)}
+                onPreview={isSelectionMode || assetInteraction.selectionActive
+                  ? (asset) => void navigate({ targetRoute: 'current', assetId: asset.id })
+                  : undefined}
+                selected={isAssetSelected}
+                selectionCandidate={isAssetSelectionCandidate}
+                disabled={isAssetDisabled}
+                thumbnailWidth={position.width}
+                thumbnailHeight={position.height}
+              />
+            {/snippet}
+          </Month>
+        </div>
+      {/if}
+    {/each}
     <!-- spacer for leadout -->
     <div
       data-testid="timeline-leadout"

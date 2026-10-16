@@ -144,18 +144,19 @@ describe('TimelineManager', () => {
     });
   });
 
-  describe('reloadToken', () => {
-    it('increments on every reload so views can key+remount their bucket DOM', async () => {
-      sdkMock.getTimeBuckets.mockResolvedValue([]);
+  describe('reload', () => {
+    it('rebuilds the month objects on every reload, so views keyed on them remount their month DOM', async () => {
+      sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 1 }]);
       const timelineManager = new TimelineManager();
-      const start = timelineManager.reloadToken;
 
       await timelineManager.updateOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-1'] });
-      const afterFirst = timelineManager.reloadToken;
-      expect(afterFirst).toBeGreaterThan(start);
+      const [first] = timelineManager.months;
 
       await timelineManager.updateOptions({ visibility: AssetVisibility.Timeline, personIds: ['person-2'] });
-      expect(timelineManager.reloadToken).toBeGreaterThan(afterFirst);
+      const [second] = timelineManager.months;
+
+      expect(second.viewId).toBe(first.viewId);
+      expect(second).not.toBe(first);
     });
   });
 
