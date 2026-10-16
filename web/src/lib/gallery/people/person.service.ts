@@ -1,17 +1,24 @@
 import {
+  detachScopedPerson,
   getPersonFaces,
   getSpacePersonFaces,
+  Type2 as ScopedPersonProfileType,
   SharedSpaceRole,
   updatePerson,
   updateRepresentativeFace,
   updateSpacePerson,
   updateSpacePersonRepresentativeFace,
   type PersonFacePageResponseDto,
+  type PersonFaceResponseDto,
   type PersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { toastManager } from '@immich/ui';
+import { modalManager, toastManager, type ActionItem } from '@immich/ui';
+import { mdiAccountBoxOutline, mdiAccountMultipleCheckOutline } from '@mdi/js';
+import type { MessageFormatter } from 'svelte-i18n';
+import { invalidateAll } from '$app/navigation';
 import { eventManager } from '$lib/managers/event-manager.svelte';
+import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
 import { getSpaceProfile } from '$lib/utils/global-person-route';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
@@ -122,4 +129,64 @@ export const handleUpdatePersonBirthDate = async (person: PersonResponseDto, bir
   } catch (error) {
     handleError(error, $t('errors.unable_to_save_date_of_birth'));
   }
+};
+
+// The person page's fork menu items. Getters, because the page's person changes after a face pick.
+export const getPersonPageActions = (
+  $t: MessageFormatter,
+  {
+    getPerson,
+    canEditSpacePerson,
+    onPersonUpdate,
+    onThumbnailUpdate,
+  }: {
+    getPerson: () => PersonResponseDto;
+    canEditSpacePerson: () => boolean;
+    onPersonUpdate: (person: PersonResponseDto) => void;
+    onThumbnailUpdate: () => void;
+  },
+) => {
+  const SelectRepresentativeFace: ActionItem = {
+    title: $t('select_representative_face'),
+    icon: mdiAccountBoxOutline,
+    $if: canEditSpacePerson,
+    onAction: async () => {
+      const updated = await modalManager.show(RepresentativeFacePickerModal, {
+        title: $t('select_representative_face'),
+        loadFaces: ({ page, size }: { page: number; size: number }) => getPersonFacesPage(getPerson(), { page, size }),
+        updateFace: async (faceId: string) => {
+          onPersonUpdate(await updatePersonRepresentativeFace(getPerson(), faceId));
+        },
+        getThumbnailUrl: (face: PersonFaceResponseDto) => getPersonFaceThumbnail(getPerson(), face.id),
+        canUpdate: true,
+      });
+
+      if (updated) {
+        onThumbnailUpdate();
+      }
+    },
+  };
+
+  const SeparateFromGroupedPerson: ActionItem = {
+    title: $t('separate_from_grouped_person'),
+    icon: mdiAccountMultipleCheckOutline,
+    onAction: async () => {
+      const isConfirm = await modalManager.showDialog({ prompt: $t('separate_from_grouped_person_prompt') });
+      if (!isConfirm) {
+        return;
+      }
+
+      try {
+        await detachScopedPerson({
+          detachScopedPersonDto: { profile: { type: ScopedPersonProfileType.Person, id: getPerson().id } },
+        });
+        await invalidateAll();
+        toastManager.primary($t('separate_from_grouped_person'));
+      } catch (error) {
+        handleError(error, $t('errors.unable_to_save_name'));
+      }
+    },
+  };
+
+  return { SelectRepresentativeFace, SeparateFromGroupedPerson };
 };
