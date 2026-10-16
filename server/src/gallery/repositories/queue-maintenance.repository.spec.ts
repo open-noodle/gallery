@@ -84,9 +84,9 @@ describe(QueueMaintenanceRepository.name, () => {
     });
   });
 
-  // The bootstrap reconcile (QueueService.onBootstrap) used to run its own looser copy of the repair
-  // (getJob only: no lock check, no stalled-set cleanup). It now runs the one shared implementation,
-  // the same removeDanglingActiveJobs that waitForQueueCompletion and searchJobs use.
+  // The bootstrap reconcile (QueueService.onBootstrap) runs the same removeDanglingActiveJobs that
+  // waitForQueueCompletion and searchJobs use, but ignores the lock: no worker runs yet, so a lock left
+  // by a crashed process (up to 5 min on FacialRecognition) must not keep the dangling id.
   describe('reconcileOrphanedActiveJobs', () => {
     it('removes active ids whose job hash and lock are both gone, from the active list and the stalled set', async () => {
       const { sut, queue, logger } = setup();
@@ -105,7 +105,7 @@ describe(QueueMaintenanceRepository.name, () => {
       expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Removed 1 dangling active job id from '));
     });
 
-    it('keeps an active id whose hash is gone but whose lock is still held', async () => {
+    it('removes an active id whose hash is gone even when its lock is still held', async () => {
       const { sut, queue } = setup();
       const client = stubActiveList(queue, ['locked-1']);
       client.exists.mockImplementation((key: string) =>
@@ -113,6 +113,20 @@ describe(QueueMaintenanceRepository.name, () => {
       );
 
       await sut.reconcileOrphanedActiveJobs();
+
+      expect(client.lrem).toHaveBeenCalledWith('immich_bull:facialRecognition:active', 0, 'locked-1');
+      expect(client.srem).toHaveBeenCalledWith('immich_bull:facialRecognition:stalled', 'locked-1');
+    });
+
+    it('keeps that id on the runtime repair, where a running worker may hold the lock', async () => {
+      const { sut, queue } = setup();
+      const client = stubActiveList(queue, ['locked-1']);
+      client.exists.mockImplementation((key: string) =>
+        Promise.resolve(key === 'immich_bull:facialRecognition:locked-1:lock' ? 1 : 0),
+      );
+      queue.getJobCounts.mockResolvedValue({ active: 1 });
+
+      await sut.getJobCountsWithRepair(QueueName.FacialRecognition);
 
       expect(client.lrem).not.toHaveBeenCalled();
       expect(client.srem).not.toHaveBeenCalled();

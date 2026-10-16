@@ -72,11 +72,12 @@ export class QueueMaintenanceRepository {
    */
   async reconcileOrphanedActiveJobs(): Promise<void> {
     for (const queueName of Object.values(QueueName)) {
-      await this.removeDanglingActiveJobs(queueName);
+      // No worker runs yet, so a surviving lock is a crashed process's (up to 5 min on FacialRecognition).
+      await this.removeDanglingActiveJobs(queueName, { ignoreLock: true });
     }
   }
 
-  async removeDanglingActiveJobs(name: QueueName): Promise<void> {
+  async removeDanglingActiveJobs(name: QueueName, { ignoreLock = false } = {}): Promise<void> {
     const queue = this.getQueue(name);
     const client = await queue.client;
     const activeKey = queue.toKey('active');
@@ -95,7 +96,7 @@ export class QueueMaintenanceRepository {
       const jobKey = queue.toKey(jobId);
       const lockKey = `${jobKey}:lock`;
       const [jobExists, lockExists] = await Promise.all([redis.exists(jobKey), redis.exists(lockKey)]);
-      if (jobExists > 0 || lockExists > 0) {
+      if (jobExists > 0 || (!ignoreLock && lockExists > 0)) {
         continue;
       }
 
