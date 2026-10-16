@@ -185,6 +185,7 @@ features:
       - .github/workflows/gallery-revert-to-immich-validation.yml
       - server/src/gallery/utils/storage-keys*.ts
       - server/src/gallery/utils/s3-job-skip*.ts
+      - server/src/gallery/services/video-trim.service*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts
