@@ -604,8 +604,8 @@ export class SharedSpaceController {
   @Endpoint({
     summary: 'Detach a face from a person in a shared space',
     description:
-      'Remove the face from the space person. Only the space projection row is removed -- the ' +
-      "face's global identity is left untouched. Response reports whether it acted.",
+      "Remove the face from the space person. The face's link to that person's identity goes too, unless " +
+      'the photo belongs to a non-member who named the face. Response reports whether it acted.',
     history: new HistoryBuilder().added('v2').stable('v2'),
   })
   async detachSpacePersonFace(
