@@ -335,14 +335,17 @@ export class SharedSpaceService extends BaseService {
   async get(auth: AuthDto, id: string): Promise<SharedSpaceResponseDto> {
     const membership = await this.requireMembership(auth, id);
 
-    const space = await this.sharedSpaceRepository.getById(id);
+    // Independent reads; the two asset scans dominate, so run them side by side.
+    const [space, members, assetCount, recentAssets, newAssetCount] = await Promise.all([
+      this.sharedSpaceRepository.getById(id),
+      this.sharedSpaceRepository.getMembers(id),
+      this.sharedSpaceRepository.getAssetCount(id),
+      this.sharedSpaceRepository.getRecentAssets(id),
+      membership.lastViewedAt ? this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt) : 0,
+    ]);
     if (!space) {
       throw new BadRequestException('Shared space not found');
     }
-
-    const members = await this.sharedSpaceRepository.getMembers(id);
-    const assetCount = await this.sharedSpaceRepository.getAssetCount(id);
-    const recentAssets = await this.sharedSpaceRepository.getRecentAssets(id);
 
     let { thumbnailAssetId } = space;
     if (thumbnailAssetId) {
@@ -352,10 +355,6 @@ export class SharedSpaceService extends BaseService {
         await this.sharedSpaceRepository.update(id, { thumbnailAssetId: null });
       }
     }
-
-    const newAssetCount = membership.lastViewedAt
-      ? await this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt)
-      : 0;
 
     let hasPets: boolean | undefined;
     if (space.faceRecognitionEnabled) {
@@ -513,9 +512,11 @@ export class SharedSpaceService extends BaseService {
   async getMembers(auth: AuthDto, spaceId: string): Promise<SharedSpaceMemberResponseDto[]> {
     await this.requireMembership(auth, spaceId);
 
-    const members = await this.sharedSpaceRepository.getMembers(spaceId);
-    const contributions = await this.sharedSpaceRepository.getContributionCounts(spaceId);
-    const activity = await this.sharedSpaceRepository.getMemberActivity(spaceId);
+    const [members, contributions, activity] = await Promise.all([
+      this.sharedSpaceRepository.getMembers(spaceId),
+      this.sharedSpaceRepository.getContributionCounts(spaceId),
+      this.sharedSpaceRepository.getMemberActivity(spaceId),
+    ]);
 
     const countMap = new Map(contributions.map((c) => [c.addedById, Number(c.count)]));
     const activityMap = new Map(activity.map((a) => [a.addedById, a]));
