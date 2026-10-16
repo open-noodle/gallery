@@ -83,6 +83,8 @@ features:
       - web/src/lib/components/SchemaSpaceAlbumPicker.spec.ts
       - web/src/lib/components/SchemaConfiguration.spec.ts
       - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
+      - server/src/gallery/repositories/gallery-asset.repository.ts
+      - server/src/queries/gallery.asset.repository.sql
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts

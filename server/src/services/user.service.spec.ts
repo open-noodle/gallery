@@ -973,7 +973,7 @@ describe(UserService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
-      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
+      mocks.galleryAsset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize
         .mockResolvedValueOnce(10)
         .mockResolvedValueOnce(20)
@@ -1004,7 +1004,7 @@ describe(UserService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
-      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
+      mocks.galleryAsset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize
         .mockResolvedValueOnce(100)
         .mockResolvedValueOnce(200)
@@ -1038,7 +1038,7 @@ describe(UserService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
-      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
+      mocks.galleryAsset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize.mockResolvedValue(100);
 
       await expect(sut.handleUserSyncUsage()).resolves.toBe(JobStatus.Success);
@@ -1069,7 +1069,7 @@ describe(UserService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
-      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set([externalId]));
+      mocks.galleryAsset.getExternalAssetIds.mockResolvedValue(new Set([externalId]));
       mocks.storage.getFolderSize.mockResolvedValue(0);
 
       await sut.handleUserSyncUsage();

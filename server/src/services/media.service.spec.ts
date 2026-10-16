@@ -1825,7 +1825,7 @@ describe(MediaService.name, () => {
         ...getForGenerateThumbnail(asset),
         edits: [],
       } as any);
-      mocks.asset.getEditedEncodedVideo.mockResolvedValue({
+      mocks.galleryAsset.getEditedEncodedVideo.mockResolvedValue({
         id: 'file-id-1',
         path: 'encoded-video/owner/ab/cd/video_edited.mp4',
       });
@@ -1850,7 +1850,7 @@ describe(MediaService.name, () => {
         ...getForGenerateThumbnail(asset),
         edits: [],
       } as any);
-      mocks.asset.getEditedEncodedVideo.mockResolvedValue(void 0);
+      mocks.galleryAsset.getEditedEncodedVideo.mockResolvedValue(void 0);
 
       const result = await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 

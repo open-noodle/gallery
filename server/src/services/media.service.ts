@@ -238,7 +238,7 @@ export class MediaService extends BaseService {
       // asset.files never contains EncodedVideo rows (getForGenerateThumbnailJob only loads
       // thumbnail/preview/fullsize), so syncFiles cannot see the trimmed video. Without this,
       // getForVideo (isEdited DESC) would keep serving the trimmed video after an undo.
-      const editedVideo = await this.assetRepository.getEditedEncodedVideo(asset.id);
+      const editedVideo = await this.galleryAssetRepository.getEditedEncodedVideo(asset.id);
       if (editedVideo) {
         await this.assetRepository.deleteFiles([editedVideo]);
         await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [editedVideo.path] } });

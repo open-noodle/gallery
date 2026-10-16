@@ -1,8 +1,8 @@
 import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { StorageFolder } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
-import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 
 const UUID_LENGTH = 36;
@@ -38,7 +38,7 @@ export const getDerivativeAssetId = (filename: string): string | null => {
 
 type PhysicalUsageDeps = {
   user: Pick<UserAdmin, 'id' | 'storageLabel'>;
-  assetRepository: AssetRepository;
+  assetRepository: GalleryAssetRepository;
   storageRepository: StorageRepository;
   s3: StorageBackend | undefined;
 };
