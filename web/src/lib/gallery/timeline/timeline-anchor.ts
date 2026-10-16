@@ -1,5 +1,5 @@
-import type { TimelineManager } from './timeline-manager.svelte';
-import type { TimelineBucketDate, TimelineTemporalAnchor } from './types';
+import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
+import type { TimelineBucketDate, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
 
 type TimelineTemporalAnchorTarget = {
   top: number;

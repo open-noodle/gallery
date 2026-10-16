@@ -86,7 +86,7 @@ vi.mock('$lib/components/timeline/TimelineGroupingControl.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('$lib/gallery/timeline/timeline-anchor', () => ({
   getTimelineTopVisibleAnchor: vi.fn().mockReturnValue(undefined),
 }));
 

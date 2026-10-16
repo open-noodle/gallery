@@ -1,5 +1,9 @@
 import type { TimeBucketSize } from '@immich/sdk';
-import type { AssetApiGetTimeBucketRequest, AssetApiGetTimeBucketsRequest, TimelineManagerOptions } from '../types';
+import type {
+  AssetApiGetTimeBucketRequest,
+  AssetApiGetTimeBucketsRequest,
+  TimelineManagerOptions,
+} from '$lib/managers/timeline-manager/types';
 
 function getApiRequestOptions(options: TimelineManagerOptions): Omit<AssetApiGetTimeBucketsRequest, 'bucketSize'> {
   return Object.fromEntries(

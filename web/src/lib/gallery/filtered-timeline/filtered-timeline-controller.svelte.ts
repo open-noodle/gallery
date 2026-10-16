@@ -20,13 +20,13 @@ import {
   type FilterState,
   type FilterSuggestionsResponse,
 } from '$lib/components/filter-panel/filter-panel';
+import { getTimelineTopVisibleAnchor } from '$lib/gallery/timeline/timeline-anchor';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import {
   registerSelectionContext,
   type RegisterSelectionContextOptions,
 } from '$lib/managers/command-context-manager.svelte';
 import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import type {
   TimelineAsset,

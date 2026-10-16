@@ -1,10 +1,11 @@
 import { AssetOrder, TimeBucketSize } from '@immich/sdk';
 import { tick } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import { fromISODateTimeUTCToObject } from '$lib/utils/timeline-util';
 import { timelineAssetFactory, toResponseDto } from '@test-data/factories/asset-factory';
-import { mergeTimeBuckets } from './internal/album-picker-support';
-import { toTimeBucketRequest, toTimeBucketsRequest } from './internal/request-options';
+import { mergeTimeBuckets } from './album-picker-support';
+import { toTimeBucketRequest, toTimeBucketsRequest } from './request-options';
 import {
   aggregateDayBucketsByMonth,
   getTimeBucketSizeForGrouping,
@@ -13,7 +14,6 @@ import {
   REPRESENTATIVE_TIMELINE_BUCKET_HEIGHT,
   TimelineBucket,
 } from './timeline-bucket.svelte';
-import { TimelineManager } from './timeline-manager.svelte';
 
 function buildTimelineAssetAt(id: string, isoDate: string) {
   const date = fromISODateTimeUTCToObject(isoDate);
@@ -757,5 +757,159 @@ describe('TimelineManager grouping metadata', () => {
     expect(timelineManager.isInitialized).toBe(false);
     expect(timelineManager.months).toEqual([]);
     expect(timelineManager.timelineBuckets).toEqual([]);
+  });
+});
+
+describe('TimelineBucketLayout.loadCovers', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('fetches only requested buckets, dedupes, and applies covers', async () => {
+    sdkMock.getTimeBuckets.mockResolvedValue([
+      { timeBucket: '2024-01-01', count: 3 },
+      { timeBucket: '2023-01-01', count: 5 },
+    ]);
+    sdkMock.getTimeBucketCovers.mockResolvedValue([
+      {
+        timeBucket: '2024-01-01',
+        representativeAssetId: 'a-2024',
+        representativeThumbhash: 'h',
+        representativeRatio: 1.5,
+      },
+    ]);
+    const timelineManager = new TimelineManager();
+    await timelineManager.updateOptions({ grouping: 'year' });
+
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']); // deduped — no second request
+
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledTimes(1);
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledWith(
+      expect.objectContaining({ bucketSize: TimeBucketSize.Year, timeBuckets: ['2024-01-01'] }),
+    );
+    const bucket = timelineManager.timelineBuckets.find((b) => b.timeBucket === '2024-01-01')!;
+    expect(bucket.representativeAssetId).toBe('a-2024');
+    expect(bucket.representativeThumbhash).toBe('h');
+    expect(bucket.representativeRatio).toBe(1.5);
+  });
+
+  it('does nothing for day grouping', async () => {
+    sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 3 }]);
+    const timelineManager = new TimelineManager();
+    await timelineManager.updateOptions({ grouping: 'day' });
+
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+
+    expect(sdkMock.getTimeBucketCovers).not.toHaveBeenCalled();
+  });
+
+  it('allows retry after a failed request by un-marking the bucket keys', async () => {
+    sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 3 }]);
+    const timelineManager = new TimelineManager();
+    await timelineManager.updateOptions({ grouping: 'year' });
+
+    // First call: reject — cover should remain null and keys should be un-marked
+    sdkMock.getTimeBucketCovers.mockRejectedValueOnce(new Error('network error'));
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+
+    const bucket = timelineManager.timelineBuckets.find((b) => b.timeBucket === '2024-01-01')!;
+    expect(bucket.representativeAssetId).toBeNull();
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledTimes(1);
+
+    // Second call: resolve — key was un-marked so a new request is made and cover is applied
+    sdkMock.getTimeBucketCovers.mockResolvedValueOnce([
+      {
+        timeBucket: '2024-01-01',
+        representativeAssetId: 'retry-asset',
+        representativeThumbhash: null,
+        representativeRatio: null,
+      },
+    ]);
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledTimes(2);
+    expect(bucket.representativeAssetId).toBe('retry-asset');
+  });
+
+  it('discards a cover response that arrives after re-initialization (stale-generation guard)', async () => {
+    sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 3 }]);
+    const timelineManager = new TimelineManager();
+    await timelineManager.updateOptions({ grouping: 'year' });
+
+    // Hold the first cover response so we can resolve it after re-init
+    let resolveCovers!: (v: import('@immich/sdk').TimeBucketCoverResponseDto[]) => void;
+    sdkMock.getTimeBucketCovers.mockReturnValueOnce(new Promise((r) => (resolveCovers = r)));
+
+    const p = timelineManager.bucketLayout.loadCovers(['2024-01-01']); // starts request at sequence N
+
+    // Re-init clears the bucket layout (bumping its generation) and rebuilds timelineBuckets
+    sdkMock.getTimeBucketCovers.mockResolvedValue([]);
+    await timelineManager.updateOptions({ grouping: 'year', personIds: ['person-1'] });
+
+    // Resolve the stale response from before re-init
+    resolveCovers([
+      {
+        timeBucket: '2024-01-01',
+        representativeAssetId: 'stale-cover',
+        representativeThumbhash: null,
+        representativeRatio: null,
+      },
+    ]);
+    await p;
+
+    // The stale cover must NOT have been applied to the re-initialized bucket
+    const bucket = timelineManager.timelineBuckets.find((b) => b.timeBucket === '2024-01-01')!;
+    expect(bucket.representativeAssetId).toBeNull();
+  });
+
+  it('clears the dedup set when buckets reinitialize', async () => {
+    sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 3 }]);
+    sdkMock.getTimeBucketCovers.mockResolvedValue([
+      {
+        timeBucket: '2024-01-01',
+        representativeAssetId: 'asset-1',
+        representativeThumbhash: null,
+        representativeRatio: null,
+      },
+    ]);
+    const timelineManager = new TimelineManager();
+    await timelineManager.updateOptions({ grouping: 'year' });
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledTimes(1);
+
+    // Re-init clears the layout's requested-cover set
+    await timelineManager.updateOptions({ grouping: 'year', personIds: ['person-1'] });
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledTimes(2);
+  });
+
+  it('prefers the album cover for overlay buckets when timelineAlbumId is set', async () => {
+    sdkMock.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 3 }]);
+    // album-scoped request carries albumId; main request does not
+    sdkMock.getTimeBucketCovers.mockImplementation(({ albumId }: { albumId?: string }) =>
+      Promise.resolve([
+        {
+          timeBucket: '2024-01-01',
+          representativeAssetId: albumId ? 'album-asset' : 'main-asset',
+          representativeThumbhash: null,
+          representativeRatio: null,
+        },
+      ]),
+    );
+    const timelineManager = new TimelineManager();
+    await timelineManager.updateOptions({ grouping: 'year', timelineAlbumId: 'album-1' });
+
+    await timelineManager.bucketLayout.loadCovers(['2024-01-01']);
+
+    // Both main and album cover requests are made
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledTimes(2);
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledWith(
+      expect.not.objectContaining({ albumId: expect.anything() }),
+    );
+    expect(sdkMock.getTimeBucketCovers).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-1' }));
+    // Album cover wins
+    const bucket = timelineManager.timelineBuckets.find((b) => b.timeBucket === '2024-01-01')!;
+    expect(bucket.representativeAssetId).toBe('album-asset');
   });
 });

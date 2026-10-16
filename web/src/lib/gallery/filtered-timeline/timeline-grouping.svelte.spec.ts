@@ -7,7 +7,7 @@ const { selection, showModal } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({ assetMultiSelectManager: selection }));
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('$lib/gallery/timeline/timeline-anchor', () => ({
   getTimelineTopVisibleAnchor: () => ({ year: 2020 }),
 }));
 vi.mock('@immich/ui', async (importOriginal) => ({
