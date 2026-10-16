@@ -292,20 +292,7 @@ export class LibraryService extends BaseService {
 
     await this.queuePostSyncJobs(assetIds);
 
-    // Queue face match for spaces linked to this library
-    if (assetIds.length > 0) {
-      const linkedSpaces = await this.sharedSpaceRepository.getSpacesLinkedToLibrary(job.libraryId);
-      for (const link of linkedSpaces) {
-        if (link.faceRecognitionEnabled) {
-          for (const assetId of assetIds) {
-            await this.jobRepository.queue({
-              name: JobName.SharedSpaceFaceMatch,
-              data: { spaceId: link.spaceId, assetId },
-            });
-          }
-        }
-      }
-    }
+    await this.eventRepository.emit('LibraryAssetsCreate', { libraryId: job.libraryId, assetIds });
 
     return JobStatus.Success;
   }
