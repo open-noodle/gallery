@@ -83,6 +83,12 @@ features:
       - web/src/lib/components/SchemaSpaceAlbumPicker.spec.ts
       - web/src/lib/components/SchemaConfiguration.spec.ts
       - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
+      - server/src/gallery/dtos/sync.dto.ts
+      - server/src/gallery/dtos/person.dto.ts
+      - server/src/gallery/dtos/album.dto.ts
+      - server/src/gallery/dtos/shared-link.dto.ts
+      - server/src/gallery/database.ts
+      - server/src/gallery/types.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -164,6 +170,8 @@ features:
       - docs/docs/administration/remote-database-backups.md
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
+      - server/src/gallery/dtos/env.dto.ts
+      - server/src/gallery/dtos/queue.dto.ts
       - web/src/lib/managers/import-manager.svelte.ts
       - web/src/lib/utils/google-takeout-*.ts
       - web/src/routes/admin/system-settings/StorageUsageSettings.svelte
@@ -264,6 +272,9 @@ features:
       - web/src/routes/(user)/albums/**
       - web/src/routes/(user)/memories/**
       - patches/@immich__ui@*.patch
+      - server/src/gallery/dtos/time-bucket.dto.ts
+      - server/src/gallery/dtos/asset-response.dto.ts
+      - server/src/gallery/dtos/server.dto.ts
     optional_paths:
       - web/src/lib/**
       - web/src/routes/**
