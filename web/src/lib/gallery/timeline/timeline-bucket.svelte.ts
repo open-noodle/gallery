@@ -1,5 +1,5 @@
 import { AssetOrder, TimeBucketSize, type TimeBucketsResponseDto } from '@immich/sdk';
-import type { TimelineBucketDate, TimelineGrouping } from './types';
+import type { TimelineBucketDate, TimelineGrouping } from '$lib/managers/timeline-manager/types';
 
 export const REPRESENTATIVE_TIMELINE_BUCKET_HEIGHT = 296;
 export const REPRESENTATIVE_TIMELINE_BUCKET_GAP = 32;

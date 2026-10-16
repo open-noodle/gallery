@@ -1,7 +1,7 @@
 import { modalManager } from '@immich/ui';
 import { get } from 'svelte/store';
+import { getTimelineTopVisibleAnchor } from '$lib/gallery/timeline/timeline-anchor';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
 import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';

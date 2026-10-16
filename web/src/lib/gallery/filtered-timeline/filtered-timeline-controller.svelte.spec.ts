@@ -36,7 +36,7 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
   registerSelectionContext: registerSelectionContextMock,
 }));
 vi.mock('$lib/utils/filter-name-resolution', () => ({ resolveFilterNames: vi.fn(() => Promise.resolve()) }));
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('$lib/gallery/timeline/timeline-anchor', () => ({
   getTimelineTopVisibleAnchor: topVisibleAnchorMock,
 }));
 

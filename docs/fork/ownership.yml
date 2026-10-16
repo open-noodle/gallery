@@ -289,6 +289,7 @@ features:
       - server/src/gallery/utils/memory-access.ts
       - web/src/lib/gallery/filtered-timeline/timeline-grouping.svelte*.ts
       - web/src/lib/gallery/filtered-map/**
+      - web/src/lib/gallery/timeline/**
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts

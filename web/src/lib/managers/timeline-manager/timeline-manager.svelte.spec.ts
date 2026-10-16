@@ -8,9 +8,9 @@ import {
 import { Settings } from 'luxon';
 import { tick } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { scrollTimelineToTemporalAnchor } from '$lib/gallery/timeline/timeline-anchor';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { getTimelineMonthByDate } from '$lib/managers/timeline-manager/internal/search-support.svelte';
-import { scrollTimelineToTemporalAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
 import { AbortError } from '$lib/utils';
 import { fromISODateTimeUTCToObject } from '$lib/utils/timeline-util';
 import { assetFactory, timelineAssetFactory, toResponseDto } from '@test-data/factories/asset-factory';

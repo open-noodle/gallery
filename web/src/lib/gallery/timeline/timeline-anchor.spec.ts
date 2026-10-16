@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import { getTimelineTopVisibleAnchor, scrollTimelineToTemporalAnchor } from './timeline-anchor';
-import type { TimelineManager } from './timeline-manager.svelte';
 
 function buildManager(timelineManager: Partial<TimelineManager>) {
   return timelineManager as TimelineManager;

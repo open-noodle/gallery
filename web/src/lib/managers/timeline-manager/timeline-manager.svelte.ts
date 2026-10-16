@@ -10,18 +10,22 @@ import {
 } from '@immich/sdk';
 import { clamp, isEqual } from 'lodash-es';
 import { SvelteDate, SvelteSet } from 'svelte/reactivity';
+import { getTimelineAlbumQueryOptions, mergeTimeBuckets } from '$lib/gallery/timeline/album-picker-support';
+import { toTimeBucketsRequest } from '$lib/gallery/timeline/request-options';
+import {
+  REPRESENTATIVE_TIMELINE_BUCKET_GAP,
+  TimelineBucket,
+  aggregateDayBucketsByMonth,
+  getTimeBucketSizeForGrouping,
+  layoutTimelineBuckets,
+} from '$lib/gallery/timeline/timeline-bucket.svelte';
 import { VirtualScrollManager } from '$lib/managers/VirtualScrollManager/VirtualScrollManager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { GroupInsertionCache } from '$lib/managers/timeline-manager/group-insertion-cache.svelte';
-import {
-  getTimelineAlbumQueryOptions,
-  mergeTimeBuckets,
-} from '$lib/managers/timeline-manager/internal/album-picker-support';
 import { updateTimelineMonthViewportProximity } from '$lib/managers/timeline-manager/internal/intersection-support.svelte';
 import { updateGeometry } from '$lib/managers/timeline-manager/internal/layout-support.svelte';
 import { loadFromTimeBuckets } from '$lib/managers/timeline-manager/internal/load-support.svelte';
-import { toTimeBucketsRequest } from '$lib/managers/timeline-manager/internal/request-options';
 import {
   findClosestTimelineMonthForDate,
   findTimelineMonthForAsset as findTimelineMonthForAssetUtil,
@@ -43,13 +47,6 @@ import {
   type TimelineYearMonth,
 } from '$lib/utils/timeline-util';
 import { isMismatched, updateObject } from './internal/utils.svelte';
-import {
-  REPRESENTATIVE_TIMELINE_BUCKET_GAP,
-  TimelineBucket,
-  aggregateDayBucketsByMonth,
-  getTimeBucketSizeForGrouping,
-  layoutTimelineBuckets,
-} from './timeline-bucket.svelte';
 import { TimelineDay } from './timeline-day.svelte';
 import { TimelineMonth } from './timeline-month.svelte';
 import {

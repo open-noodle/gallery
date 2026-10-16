@@ -1,10 +1,11 @@
 import { AssetOrder, TimeBucketSize } from '@immich/sdk';
 import { tick } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import { fromISODateTimeUTCToObject } from '$lib/utils/timeline-util';
 import { timelineAssetFactory, toResponseDto } from '@test-data/factories/asset-factory';
-import { mergeTimeBuckets } from './internal/album-picker-support';
-import { toTimeBucketRequest, toTimeBucketsRequest } from './internal/request-options';
+import { mergeTimeBuckets } from './album-picker-support';
+import { toTimeBucketRequest, toTimeBucketsRequest } from './request-options';
 import {
   aggregateDayBucketsByMonth,
   getTimeBucketSizeForGrouping,
@@ -13,7 +14,6 @@ import {
   REPRESENTATIVE_TIMELINE_BUCKET_HEIGHT,
   TimelineBucket,
 } from './timeline-bucket.svelte';
-import { TimelineManager } from './timeline-manager.svelte';
 
 function buildTimelineAssetAt(id: string, isoDate: string) {
   const date = fromISODateTimeUTCToObject(isoDate);

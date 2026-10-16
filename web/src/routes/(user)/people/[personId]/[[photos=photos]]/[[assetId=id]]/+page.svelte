@@ -44,7 +44,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
-  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
+  import { getTimelineTopVisibleAnchor } from '$lib/gallery/timeline/timeline-anchor';
 
   import { AssetVisibility, searchPerson, type PersonResponseDto } from '@immich/sdk';
   import {
