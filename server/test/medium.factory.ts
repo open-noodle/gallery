@@ -26,6 +26,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -169,6 +170,14 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
 
   private makeDeps(options: MediumTestOptions) {
     const deps = BASE_SERVICE_DEPENDENCIES;
+    // GalleryPersonRepository holds the fork methods moved out of PersonRepository, so it follows PersonRepository.
+    const withGalleryPerson = (list: MediumTestOptions['real']) =>
+      list.includes(PersonRepository) ? [...list, GalleryPersonRepository] : list;
+    this.options = options = {
+      ...options,
+      real: withGalleryPerson(options.real),
+      mock: withGalleryPerson(options.mock),
+    };
 
     for (const dep of options.mock) {
       if (!deps.includes(dep)) {
@@ -697,6 +706,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case StorageUsageRepository:
     case GalleryDuplicateRepository:
     case GalleryAssetRepository:
+    case GalleryPersonRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -793,6 +803,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case StorageUsageRepository:
     case GalleryDuplicateRepository:
     case GalleryAssetRepository:
+    case GalleryPersonRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
