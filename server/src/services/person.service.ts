@@ -92,7 +92,7 @@ export class PersonService extends BaseService {
 
   // Gallery: the face-identity steps of recognition live in FaceIdentityMaintenanceService.
   private get faceIdentity() {
-    this.faceIdentityMaintenance ??= BaseService.create(FaceIdentityMaintenanceService, this);
+    this.faceIdentityMaintenance ??= FaceIdentityMaintenanceService.createFor(this);
     return this.faceIdentityMaintenance;
   }
 
