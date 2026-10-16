@@ -21,8 +21,6 @@ type JobMapItem = {
 
 const WORKER_WATCH_INTERVAL_MS = 30_000;
 
-const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
-
 /**
  * Per-queue worker lock overrides. BullMQ defaults to a 30s lock + 30s stalled check + maxStalledCount
  * 1, which is fine for short handlers but dangerous for queues whose handlers can legitimately run for
@@ -235,19 +233,11 @@ export class JobRepository {
 
       if (job.options?.jobId || job.options?.deduplication) {
         // need to use add() instead of addBulk() for jobId/deduplication to take effect
-        const queue = this.getQueue(queueName);
-        if (item.name === JobName.FacialRecognitionQueueAll) {
-          const action = await this.prepareFacialRecognitionQueueAll(queue, item.data, job.options);
-          if (!action.add) {
-            continue;
-          }
-
-          job.options = action.options;
-        } else if (this.isSharedSpaceFacePipelineJob(item.name) && job.options.jobId) {
-          await this.removePausedStableJob(queue, job.options.jobId);
+        const options = await this.queueMaintenanceRepository.prepareStableJobAdd(queueName, item, job.options);
+        if (!options) {
+          continue;
         }
-
-        promises.push(queue.add(item.name, item.data, job.options));
+        promises.push(this.getQueue(queueName).add(item.name, item.data, options));
       } else {
         itemsByQueue[queueName] ||= [];
         itemsByQueue[queueName].push(job);
@@ -285,6 +275,11 @@ export class JobRepository {
   }
 
   private getJobOptions(item: JobItem): JobsOptions | null {
+    const galleryOptions = this.queueMaintenanceRepository.getJobOptions(item);
+    if (galleryOptions) {
+      return galleryOptions;
+    }
+
     switch (item.name) {
       case JobName.NotifyAlbumUpdate: {
         return {
@@ -299,47 +294,7 @@ export class JobRepository {
         return { priority: 1 };
       }
       case JobName.FacialRecognitionQueueAll: {
-        return { jobId: JobName.FacialRecognitionQueueAll, removeOnComplete: true };
-      }
-      case JobName.FaceIdentityBackfill: {
-        const data = item.data as { stage?: string; cursor?: string; continuationId?: string };
-        if (data.cursor) {
-          return { jobId: `face-identity-backfill/${data.stage ?? 'person'}/${data.cursor}`, removeOnFail: true };
-        }
-        if (data.continuationId) {
-          return { jobId: `face-identity-backfill/continuation/${data.continuationId}`, removeOnFail: true };
-        }
-        return { jobId: 'face-identity-backfill/root', removeOnFail: true, removeOnComplete: true };
-      }
-      case JobName.FaceIdentityMaintenanceAfterRecognition: {
-        const data = item.data as { delay?: number };
-        if (data.delay !== undefined) {
-          return { delay: data.delay, removeOnFail: true };
-        }
-        return { jobId: 'face-identity-maintenance-after-recognition', removeOnFail: true };
-      }
-      case JobName.FaceSuggestionMaintenance: {
-        return { jobId: 'face-suggestion-maintenance', removeOnComplete: true, removeOnFail: true };
-      }
-      case JobName.PersonSuggestionScanQueueAll: {
-        return { jobId: 'person-suggestion-scan/all', removeOnComplete: true, removeOnFail: true };
-      }
-      case JobName.SpacePersonSuggestionScanQueueAll: {
-        return { jobId: 'space-person-suggestion-scan/all', removeOnComplete: true, removeOnFail: true };
-      }
-      case JobName.PersonSuggestionScan: {
-        // S9.8: a per-id jobId so a re-entrant QueueAll sweep (F18 — FaceIdentityBackfill re-queues
-        // both QueueAll jobs on every drain) coalesces onto the in-flight job for the same person
-        // instead of stacking a duplicate on the concurrency-1 PeopleBackfill queue.
-        //
-        // H8: removeOnFail, unlike before — without it a failed run permanently occupies this stable
-        // dedup jobId (see removeFailedJobsByJobIdPrefix's doc comment above) and every later add() for
-        // that person is silently dropped, so their suggestion queue never refills.
-        return { jobId: `person-suggestion-scan/${item.data.id}`, removeOnComplete: true, removeOnFail: true };
-      }
-      case JobName.SpacePersonSuggestionScan: {
-        // H8: see PersonSuggestionScan above — same stuck-dedup-jobId hazard, same fix.
-        return { jobId: `space-person-suggestion-scan/${item.data.id}`, removeOnComplete: true, removeOnFail: true };
+        return { deduplication: { id: JobName.FacialRecognitionQueueAll } };
       }
       case JobName.VersionCheck: {
         return { deduplication: { id: JobName.VersionCheck } };
@@ -347,183 +302,10 @@ export class JobRepository {
       case JobName.DatabaseBackup: {
         return { deduplication: { id: JobName.DatabaseBackup } };
       }
-      case JobName.SharedSpaceBulkAddAssets: {
-        return { jobId: `bulk-add-${item.data.spaceId}-${item.data.userId}` };
-      }
-      case JobName.SharedSpaceAlbumGrantReconcile: {
-        const data = item.data as { albumIds: string[] };
-        return {
-          jobId: `space-album-grant-reconcile-${[...data.albumIds].sort().join(',')}`,
-          removeOnComplete: true,
-          // M6: a hard failure must not leave a permanently-failed job occupying this dedup jobId —
-          // that would silently block every future reconcile for the same album set.
-          removeOnFail: true,
-        };
-      }
-      case JobName.SharedSpaceAlbumGrantReconcileSweep: {
-        // L8: single stable jobId — a nightly trigger while a previous run is still active is a
-        // harmless dedup, and removeOnFail keeps a hard failure from blocking the next run.
-        return { jobId: 'space-album-grant-reconcile-sweep', removeOnComplete: true, removeOnFail: true };
-      }
-      case JobName.SharedSpaceIdentityReconciliationSweep: {
-        // Single stable jobId — a nightly trigger while a previous sweep is still active dedups
-        // harmlessly, and removeOnFail keeps a hard failure from blocking the next run.
-        return { jobId: 'shared-space-identity-reconciliation-sweep', removeOnComplete: true, removeOnFail: true };
-      }
-      case JobName.SharedSpaceFaceMatch: {
-        const prefix =
-          item.data.source === 'identity-backfill'
-            ? 'shared-space-face-match/identity-backfill'
-            : 'shared-space-face-match';
-        return {
-          jobId: `${prefix}/${item.data.spaceId}/${item.data.assetId}`,
-          removeOnComplete: true,
-        };
-      }
-      case JobName.SharedSpaceFaceMatchFromBackfill: {
-        return {
-          jobId: `shared-space-face-match/from-backfill/${item.data.spaceId}/${item.data.assetId}`,
-          removeOnComplete: true,
-        };
-      }
-      case JobName.SharedSpaceFaceMatchAll: {
-        return {
-          jobId: `shared-space-face-match-all/${item.data.spaceId}`,
-          removeOnComplete: true,
-          // M6: same rationale as SharedSpaceAlbumGrantReconcile — a failed run must not
-          // permanently occupy the per-space dedup jobId and block later re-projection.
-          removeOnFail: true,
-        };
-      }
-      case JobName.SharedSpaceFaceMatchPage: {
-        const data = item.data as { spaceId: string; afterAssetId?: string };
-        const cursor = data.afterAssetId ? `after/${data.afterAssetId}` : 'start';
-        return {
-          jobId: `shared-space-face-match-page/${data.spaceId}/${cursor}`,
-          removeOnComplete: true,
-        };
-      }
-      case JobName.SharedSpacePersonDedup: {
-        // Follow-up passes (pass >= 2) use a pass-scoped jobId so they enqueue even while the
-        // current dedup job is still "active" (the base jobId stays occupied until the handler
-        // returns). The initial trigger (no pass) keeps the bare jobId so concurrent external
-        // triggers still dedupe into one.
-        const pass = (item.data as { pass?: number }).pass;
-        const jobId =
-          pass && pass > 1 ? `space-dedup-${item.data.spaceId}-pass-${pass}` : `space-dedup-${item.data.spaceId}`;
-        return { jobId, removeOnComplete: true };
-      }
-      case JobName.SharedSpaceIdentityReconciliation: {
-        const data = item.data as { spaceId: string; userId?: string; spacePersonId?: string };
-        return {
-          jobId: `space-identity-reconcile-${data.spaceId}-${data.userId ?? 'all-members'}-${data.spacePersonId ?? 'all-people'}`,
-          removeOnComplete: true,
-        };
-      }
-      case JobName.SharedSpacePersonMetadataBackfill: {
-        const data = item.data as { identityId?: string; cursor?: string };
-        const scope = data.identityId ? `identity/${data.identityId}` : 'all';
-        if (data.cursor) {
-          return { jobId: `shared-space-person-metadata-backfill/${scope}/${data.cursor}`, removeOnFail: true };
-        }
-        return { jobId: `shared-space-person-metadata-backfill/${scope}`, removeOnFail: true };
-      }
-      case JobName.FaceRepairScan: {
-        // Fixed jobId so BullMQ dedupes concurrent scan enqueues into one (single-flight, complementing the DB
-        // partial unique index). removeOnComplete/Fail frees the id once the scan finishes so the next can run.
-        return { jobId: JobName.FaceRepairScan, removeOnComplete: true, removeOnFail: true };
-      }
       default: {
         return null;
       }
     }
-  }
-
-  private async removeFailedStableJob(queue: Queue, jobId: string) {
-    const existingJob = await queue.getJob(jobId);
-    if (!existingJob) {
-      return;
-    }
-
-    const state = (await existingJob.getState()) as string;
-    if (state === 'failed') {
-      await existingJob.remove();
-    }
-  }
-
-  private async removePausedStableJob(queue: Queue, jobId: string) {
-    const existingJob = await queue.getJob(jobId);
-    if (!existingJob) {
-      return;
-    }
-
-    const state = (await existingJob.getState()) as string;
-    if (state === 'paused') {
-      await existingJob.remove();
-    }
-  }
-
-  private isSharedSpaceFacePipelineJob(name: JobName): boolean {
-    return [
-      JobName.SharedSpaceFaceMatch,
-      JobName.SharedSpaceFaceMatchAll,
-      JobName.SharedSpaceFaceMatchPage,
-      JobName.SharedSpaceFaceMatchFromBackfill,
-    ].includes(name);
-  }
-
-  private async prepareFacialRecognitionQueueAll(
-    queue: Queue,
-    data: JobOf<JobName.FacialRecognitionQueueAll>,
-    options: JobsOptions,
-  ): Promise<{ add: true; options: JobsOptions } | { add: false }> {
-    const existingJob = await queue.getJob(JobName.FacialRecognitionQueueAll);
-    if (!existingJob) {
-      if (data.force === true) {
-        const forceFollowUpJob = await queue.getJob(FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID);
-        if (forceFollowUpJob) {
-          const forceFollowUpState = (await forceFollowUpJob.getState()) as string;
-          if (forceFollowUpState === 'active' && forceFollowUpJob.data?.force === true) {
-            return { add: false };
-          }
-        }
-
-        await queue.drain(true);
-      }
-      return { add: true, options };
-    }
-
-    const state = (await existingJob.getState()) as string;
-    if (state === 'failed') {
-      await existingJob.remove();
-      if (data.force === true) {
-        await queue.drain(true);
-      }
-      return { add: true, options };
-    }
-
-    if (data.force !== true) {
-      return { add: true, options };
-    }
-
-    if (['waiting', 'delayed', 'paused'].includes(state)) {
-      await existingJob.remove();
-      await queue.drain(true);
-      return { add: true, options };
-    }
-
-    if (state === 'active') {
-      if (existingJob.data?.force === true) {
-        return { add: false };
-      }
-
-      await queue.drain(true);
-      const forceOptions = { ...options, jobId: FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID };
-      await this.removeFailedStableJob(queue, FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID);
-      return { add: true, options: forceOptions };
-    }
-
-    return { add: true, options };
   }
 
   private getQueue(queue: QueueName): Queue {
