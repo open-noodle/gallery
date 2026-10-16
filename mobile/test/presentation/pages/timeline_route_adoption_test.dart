@@ -16,18 +16,9 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
-import 'package:immich_mobile/presentation/pages/archive.page.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
-import 'package:immich_mobile/presentation/pages/favorite.page.dart';
-import 'package:immich_mobile/presentation/pages/local_timeline.page.dart';
-import 'package:immich_mobile/presentation/pages/locked_folder.page.dart';
 import 'package:immich_mobile/presentation/pages/partner_detail.page.dart';
-import 'package:immich_mobile/presentation/pages/person.page.dart';
-import 'package:immich_mobile/presentation/pages/place_detail.page.dart';
-import 'package:immich_mobile/presentation/pages/recently_taken.page.dart';
-import 'package:immich_mobile/presentation/pages/remote_album.page.dart';
 import 'package:immich_mobile/presentation/pages/trash.page.dart';
-import 'package:immich_mobile/presentation/pages/video.page.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -138,34 +129,19 @@ void main() {
   });
 
   group('adopted timeline route contracts', () {
-    test('Main Photos keeps app bar selector and route-local controls contract', () {
-      expect(MainTimelinePage.timelineOverviewControlsEnabled, isTrue);
+    test('Main Photos keeps the app bar grouping selector', () {
       // The Photos app bar leads with the grouping selector (#625); it also carries
       // the live-search sort and filter actions (#654), so it is no longer a single action.
       expect(PhotosTimelineAppBar.actions.first, isA<TimelineGroupingSelector>());
     });
 
-    test('all pill-adopting routes expose controls flag; composed pages expose extra-sliver heights', () {
-      // Simple pages: header sliver replaced by withGroupingPill; no extra top sliver.
-      expect(PersonPage.timelineOverviewControlsEnabled, isTrue);
-      expect(RemoteAlbumPage.timelineOverviewControlsEnabled, isTrue);
-      expect(LocalTimelinePage.timelineOverviewControlsEnabled, isTrue);
-      expect(FavoritePage.timelineOverviewControlsEnabled, isTrue);
-      expect(ArchivePage.timelineOverviewControlsEnabled, isTrue);
-      expect(LockedFolderPage.timelineOverviewControlsEnabled, isTrue);
-      expect(VideoPage.timelineOverviewControlsEnabled, isTrue);
-      expect(RecentlyTakenPage.timelineOverviewControlsEnabled, isTrue);
-      expect(PlaceDetailPage.timelineOverviewControlsEnabled, isTrue);
-
-      // Composed pages: keep a non-header extra sliver; the const now measures only that sliver.
-      expect(TrashPage.timelineOverviewControlsEnabled, isTrue);
+    test('composed pages expose extra-sliver heights', () {
+      // Composed pages keep a non-header extra sliver; the const measures only that sliver.
       expect(TrashPage.trashInfoBannerTopSliverHeight, 24.0);
 
-      expect(PartnerDetailPage.timelineOverviewControlsEnabled, isTrue);
       expect(PartnerDetailPage.partnerInfoBoxTopSliverHeight, 110.0);
 
       // Space detail: sync-banner height is dynamic; its contract is unchanged.
-      expect(SpaceDetailPage.timelineOverviewControlsEnabled, isTrue);
       expect(SpaceDetailPage.syncBannerTopSliverHeight(isRemoteSyncing: false), 0.0);
       expect(SpaceDetailPage.syncBannerTopSliverHeight(isRemoteSyncing: true), kSyncStatusBannerSliverHeight);
     });
