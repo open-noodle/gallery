@@ -196,6 +196,11 @@ export class AssetMediaService extends BaseService {
 
       return { id: asset.id, status: AssetMediaStatus.CREATED };
     } catch (error: any) {
+      // clean up the asset row if one was created, before its files: a failed remove keeps them (#569)
+      if (asset) {
+        await this.assetRepository.remove({ id: asset.id });
+      }
+
       // clean up files
       await this.jobRepository.queue({
         name: JobName.FileDelete,
@@ -216,11 +221,6 @@ export class AssetMediaService extends BaseService {
 
         this.logger.debug(`Duplicate asset upload rejected: existing asset ${duplicateId}`);
         return { status: AssetMediaStatus.DUPLICATE, id: duplicateId };
-      }
-
-      // clean up the asset row if one was created
-      if (asset) {
-        await this.assetRepository.remove({ id: asset.id });
       }
 
       this.logger.error(`Error uploading file ${error}`, error?.stack);
