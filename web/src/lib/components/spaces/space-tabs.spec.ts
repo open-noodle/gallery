@@ -6,11 +6,27 @@ import SpaceTabs from './space-tabs.svelte';
 const mockPage = vi.hoisted(() => ({ url: new URL('https://gallery.test/spaces/s1') }));
 vi.mock('$app/state', () => ({ page: mockPage }));
 
+const mockFeatureFlags = vi.hoisted(() => ({ map: true }));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: { value: mockFeatureFlags },
+}));
+
 const base = { spaceId: 's1', photoCount: 35, albumCount: 4, memberCount: 3 };
 
 describe('SpaceTabs', () => {
   beforeEach(() => {
     mockPage.url = new URL('https://gallery.test/spaces/s1');
+    mockFeatureFlags.map = true;
+  });
+
+  // #1046 — with the map feature off, /map redirects to /photos: the tab would bounce the user out
+  // of the Space instead of showing a map.
+  it('hides the Map tab when the map feature is disabled', () => {
+    mockFeatureFlags.map = false;
+    render(SpaceTabs, base);
+    expect(screen.getByTestId('space-tab-photos')).toBeInTheDocument();
+    expect(screen.getByTestId('space-tab-members')).toBeInTheDocument();
+    expect(screen.queryByTestId('space-tab-map')).not.toBeInTheDocument();
   });
 
   it('renders Photos, Albums, Map, Members but hides People when face recognition is off', () => {

@@ -1,6 +1,7 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { Route } from '$lib/route';
 import { clearFilterParams, decodeFilterParams, encodeFilterParams } from '$lib/utils/filter-url';
 import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
@@ -222,10 +223,11 @@ export function rememberContextualPersonName(destination: string, personId: stri
  * losing what I am looking at". It carries the Space scope (`spaceId`), the active search term and
  * every active filter over to `/map` — dropping them is bug #767.
  *
- * Returns **null when there is nothing honest to link to**, which today means the ALBUM surface:
- * there is no album-map URL at all (`AlbumMap` is a modal rendered over the album page). A pin there
- * would land on the GLOBAL map carrying the album's filters but NOT its album scope — silently
- * widening "this album" to "the whole library". Callers must not render the pin when this is null.
+ * Returns **null when there is nothing honest to link to**: with the map feature off, `/map` redirects
+ * to `/photos` (#1046), and on the ALBUM surface there is no album-map URL at all (`AlbumMap` is a
+ * modal rendered over the album page). A pin there would land on the GLOBAL map carrying the album's
+ * filters but NOT its album scope — silently widening "this album" to "the whole library". Callers
+ * must not render the pin when this is null.
  *
  * A non-filterable surface (`resolveFilterTarget` → null, e.g. /search) carries nothing over: there
  * is no scope to preserve, so there is none to lie about either. Note this does NOT pick up
@@ -233,6 +235,11 @@ export function rememberContextualPersonName(destination: string, personId: stri
  * map", so widening is what it promises, and unlike a filter it cannot come back empty.
  */
 export function buildContextualMapUrl(url: URL, point?: { lat: number; lng: number; zoom?: number }): string | null {
+  // Fails open while the flags are still loading; the server answers `map: false` once they are.
+  if (featureFlagsManager.valueOrUndefined?.map === false) {
+    return null;
+  }
+
   const target = resolveFilterTarget(url);
 
   if (target?.kind === 'album') {
