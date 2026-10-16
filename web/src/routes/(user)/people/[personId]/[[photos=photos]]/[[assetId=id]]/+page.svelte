@@ -28,7 +28,7 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
   import PersonSuggestionReviewModal from '$lib/gallery/people/PersonSuggestionReviewModal.svelte';
   import { Route } from '$lib/route';
@@ -43,8 +43,7 @@
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { normalizeSearchString } from '$lib/utils/string-utils';
-  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
-  import { getTimelineTopVisibleAnchor } from '$lib/gallery/timeline/timeline-anchor';
+  import { timelineGroupingProps } from '$lib/gallery/filtered-timeline/timeline-grouping.svelte';
 
   import { AssetVisibility, searchPerson, type PersonResponseDto } from '@immich/sdk';
   import {
@@ -74,8 +73,7 @@
   let thumbnailData = $derived(getScopedThumbnailUrl(person));
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  let timelineGrouping = $state<TimelineGrouping>('day');
-  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const timelineGrouping = timelineGroupingProps(() => timelineManager);
   let numberOfAssets = $derived(timelineManager?.isInitialized ? timelineManager.assetCount : data.statistics.assets);
 
   const handleAddAllToCollection = () => {
@@ -98,7 +96,7 @@
   });
   const options = $derived({
     ...baseTimelineOptions,
-    grouping: timelineGrouping,
+    grouping: timelineGrouping.grouping,
   });
 
   let viewMode: PersonPageViewMode = $state(PersonPageViewMode.VIEW_ASSETS);
@@ -319,26 +317,6 @@
     assetMultiSelectManager.clear();
   };
 
-  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
-    const anchor = getTimelineTopVisibleAnchor(timelineManager);
-    timelineGrouping = grouping;
-    temporalAnchor = anchor;
-  }
-
-  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
-    if (assetMultiSelectManager.selectionActive) {
-      return;
-    }
-
-    const result = getTimelineBucketZoomTarget(bucket);
-    if (!result) {
-      return;
-    }
-
-    timelineGrouping = result.grouping;
-    temporalAnchor = result.anchor;
-  }
-
   const onPersonUpdate = async (response: PersonResponseDto) => {
     if (response.id !== person.id) {
       return;
@@ -401,11 +379,10 @@
   <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
        mt-12 clears the taller ControlAppBar, which exceeds the --control-bar-height padding reserve. -->
   <TimelineRouteGroupingBar
-    grouping={timelineGrouping}
+    {...timelineGrouping.barProps}
     hidden={assetMultiSelectManager.selectionActive || viewMode !== PersonPageViewMode.VIEW_ASSETS}
     class="mt-12 shrink-0"
     resultCount={numberOfAssets}
-    onGroupingChange={handleTimelineGroupingChange}
     onAddAllToCollection={handleAddAllToCollection}
   />
   <div class="relative min-h-0 flex-1">
@@ -417,11 +394,7 @@
         {options}
         assetInteraction={assetMultiSelectManager}
         onEscape={handleEscape}
-        {temporalAnchor}
-        onTimelineBucketActivate={handleTimelineBucketActivate}
-        onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-        grouping={timelineGrouping}
-        onGroupingChange={handleTimelineGroupingChange}
+        {...timelineGrouping.timelineProps}
       >
         {#if viewMode === PersonPageViewMode.VIEW_ASSETS}
           <!-- Person information block -->
