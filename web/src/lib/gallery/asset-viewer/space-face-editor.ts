@@ -1,8 +1,11 @@
 import { createSpaceAssetFace, getSpacePeople, type PersonResponseDto } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
+import { t } from 'svelte-i18n';
+import { get } from 'svelte/store';
 import CreateSpaceFaceModal from '$lib/modals/CreateSpaceFaceModal.svelte';
 import type { FaceCoordinates } from '$lib/utils/face-box-drag';
 import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';
+import { handleError } from '$lib/utils/handle-error';
 import { refreshAssetPeople } from '$lib/utils/refresh-asset-people';
 
 /**
@@ -25,7 +28,15 @@ export type FaceEditorSpace = {
 export const getFaceEditorSpace = (spaceId: string, assetId: string): FaceEditorSpace => ({
   // FaceEditor reads only `id`, `name` and `updatedAt` off a candidate, which both DTOs carry, and
   // hands the same object back to `thumbnailUrl` and `tag`.
-  loadPeople: async () => (await getSpacePeople({ id: spaceId, withHidden: false })) as unknown as PersonResponseDto[],
+  // FaceEditor awaits this unguarded on mount, so a failed load must toast here and resolve empty.
+  loadPeople: async () => {
+    try {
+      return (await getSpacePeople({ id: spaceId, withHidden: false })) as unknown as PersonResponseDto[];
+    } catch (error) {
+      handleError(error, get(t)('errors.cant_get_faces'));
+      return [];
+    }
+  },
   thumbnailUrl: (person) => getSpacePersonThumbnailUrl({ spaceId, id: person.id }, person.updatedAt),
   tag: async (person, face) => {
     await createSpaceAssetFace({
