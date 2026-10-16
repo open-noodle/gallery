@@ -184,13 +184,14 @@ features:
       - .github/workflows/storage-migration*.yml
       - .github/workflows/gallery-revert-to-immich-validation.yml
       - server/src/gallery/utils/storage-keys*.ts
+      - server/src/gallery/utils/s3-job-skip*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts
       - server/src/services/metadata.service.ts
       - server/src/services/auth.service.ts
       - server/src/services/user.service.ts
-      - server/src/services/integrity.service.ts
+      - server/src/services/job.service.ts
       - server/src/services/index.ts
       - server/src/repositories/user.repository.ts
       - server/src/repositories/asset.repository.ts
@@ -211,8 +212,8 @@ features:
       - web/src/routes/admin/system-settings/BackupSettings.svelte
       - mobile/lib/utils/openapi_patching.dart
     expected_symbols:
-      server/src/services/integrity.service.ts:
-        - skipIfS3Configured
+      server/src/services/job.service.ts:
+        - isSkippedOnS3
       server/src/interfaces/storage-backend.interface.ts:
         - list
       server/src/services/database-backup.service.ts:
