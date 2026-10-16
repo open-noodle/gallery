@@ -48,7 +48,6 @@
   import { lang, locale } from '#lib/stores/preferences.store.ts';
   import { loadSpaces, userInteraction } from '#lib/stores/user.svelte.ts';
   import { websocketEvents } from '#lib/stores/websocket.ts';
-  import { getPeopleThumbnailUrl } from '#lib/utils.ts';
   import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import {
     createCrossOwnerMergeHandlers,
@@ -378,7 +377,7 @@
       return;
     }
 
-    const result = await searchPerson({ name: personName, withHidden: true });
+    const result = await searchPerson({ name: personName, withHidden: true, withSharedSpaces: true });
 
     const normalizedPersonName = normalizeSearchString(personName);
     const existingPerson = result.find(
@@ -761,7 +760,7 @@
                         <ImageThumbnail
                           circle
                           shadow
-                          url={getPeopleThumbnailUrl(person)}
+                          url={getGlobalPersonThumbnailUrl(person)}
                           altText={person.name}
                           widthStyle="2rem"
                           heightStyle="2rem"

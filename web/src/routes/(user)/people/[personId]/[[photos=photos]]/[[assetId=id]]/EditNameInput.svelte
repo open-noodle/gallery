@@ -41,6 +41,7 @@
       bind:searchedPeopleLocal={suggestedPeople}
       type="input"
       numberPeopleToSearch={5}
+      withSharedSpaces
       inputClass="w-full gap-2 bg-gray-100 dark:bg-gray-700 dark:text-white"
       bind:showLoadingSpinner={isSearchingPeople}
     />
