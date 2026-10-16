@@ -3,7 +3,7 @@ import { CLS_REQ, ClsServiceManager } from 'nestjs-cls';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { Request } from 'express';
 import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
@@ -11,9 +11,12 @@ import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat, ImmichHeader } from 'src/enum.js';
+import { AssetFileType, CacheControl, ImageFormat, ImmichHeader, JobName } from 'src/enum.js';
+import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import {
@@ -24,6 +27,7 @@ import {
   ImmichStreamResponse,
   getResponseSignal,
 } from 'src/utils/file.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
 import { clamp } from 'src/utils/misc.js';
 
 // HTTP clients resend custom headers (and some resend Authorization) when they follow a redirect to another host, so a
@@ -52,6 +56,8 @@ type FaceThumbnailBounds = {
 
 type BackendMediaServerDependencies = {
   assetRepository: AssetRepository;
+  jobRepository: JobRepository;
+  logger: LoggingRepository;
   mediaRepository: MediaRepository;
   storageRepository: StorageRepository;
   getConfig: (options: { withCache: boolean }) => Promise<SystemConfig>;
@@ -168,6 +174,29 @@ export class BackendMediaServer {
     const { StorageService } = await import('../../services/storage.service.js');
     // no media location: this backend only ever receives absolute paths
     return StorageService.backendFor(key, new DiskStorageBackend('', this.deps.storageRepository));
+  }
+
+  /** The configured write backend when it is not the disk: a locally written file then has to be uploaded to it. */
+  private async getRemoteWriteBackend(): Promise<StorageBackend | undefined> {
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('../../services/storage.service.js');
+    const writeBackend = StorageService.getWriteBackend();
+    return !writeBackend || writeBackend instanceof DiskStorageBackend ? undefined : writeBackend;
+  }
+
+  /** Uploads a locally generated profile image to an S3 write backend; returns the path to store on the user. */
+  async persistProfileImage(userId: string, profileImagePath: string): Promise<string> {
+    const writeBackend = await this.getRemoteWriteBackend();
+    if (!writeBackend) {
+      return profileImagePath;
+    }
+
+    const relativeKey = getRelativeProfileImagePath(userId, basename(profileImagePath));
+    const stream = createReadStream(profileImagePath);
+    await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
+    // After S3 upload, drop the local generated file and store the relative key.
+    await this.deps.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
+    return relativeKey;
   }
 
   async getFaceThumbnailSource(assetId: string): Promise<string | null> {
