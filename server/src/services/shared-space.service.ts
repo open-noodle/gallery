@@ -267,14 +267,18 @@ export class SharedSpaceService extends BaseService {
     const spaces = await this.sharedSpaceRepository.getAllByUserId(auth.user.id);
 
     const results: SharedSpaceResponseDto[] = [];
+    // Spaces stay one at a time so a user in many spaces does not take over the connection pool; the reads for
+    // one space are independent, so they run side by side, as in get() (#817).
     for (const space of spaces) {
-      const members = await this.sharedSpaceRepository.getMembers(space.id);
-      const assetCount = await this.sharedSpaceRepository.getAssetCount(space.id);
-      const recentAssets = await this.sharedSpaceRepository.getRecentAssets(space.id);
-      const albumCount = await this.sharedSpaceRepository.getLinkedAlbumCount(space.id);
-
-      // Recency badge data
-      const membership = await this.sharedSpaceRepository.getMember(space.id, auth.user.id);
+      const [members, assetCount, recentAssets, albumCount, membership, links] = await Promise.all([
+        this.sharedSpaceRepository.getMembers(space.id),
+        this.sharedSpaceRepository.getAssetCount(space.id),
+        this.sharedSpaceRepository.getRecentAssets(space.id),
+        this.sharedSpaceRepository.getLinkedAlbumCount(space.id),
+        // Recency badge data
+        this.sharedSpaceRepository.getMember(space.id, auth.user.id),
+        auth.user.isAdmin ? this.sharedSpaceRepository.getLinkedLibraries(space.id) : undefined,
+      ]);
       let newAssetCount: number;
       let lastContributor: { id: string; name: string } | null = null;
 
@@ -289,11 +293,11 @@ export class SharedSpaceService extends BaseService {
       }
 
       let linkedLibraries: SharedSpaceLinkedLibraryDto[] | undefined;
-      if (auth.user.isAdmin) {
-        const links = await this.sharedSpaceRepository.getLinkedLibraries(space.id);
+      if (links) {
+        const libraries = await Promise.all(links.map((link) => this.libraryRepository.get(link.libraryId)));
         linkedLibraries = [];
-        for (const link of links) {
-          const library = await this.libraryRepository.get(link.libraryId);
+        for (const [index, link] of links.entries()) {
+          const library = libraries[index];
           if (library) {
             linkedLibraries.push({
               libraryId: link.libraryId,
