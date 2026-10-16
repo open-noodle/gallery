@@ -1,7 +1,7 @@
 <script lang="ts">
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import RoleBadge from '$lib/components/spaces/role-badge.svelte';
-  import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
+  import { showAddSpaceMembersModal } from '$lib/gallery/spaces/add-space-members';
   import { handleError } from '$lib/utils/handle-error';
   import {
     removeMember,
@@ -49,12 +49,12 @@
   };
 
   const handleAddMember = async () => {
-    const added = await modalManager.show(SpaceAddMemberModal, {
+    const added = await showAddSpaceMembersModal(
       spaceId,
-      existingMemberIds: members.map((m) => m.userId),
-    });
+      members.map((m) => m.userId),
+    );
 
-    if (added && added.length > 0) {
+    if (added.length > 0) {
       members = [...members, ...added];
     }
   };
