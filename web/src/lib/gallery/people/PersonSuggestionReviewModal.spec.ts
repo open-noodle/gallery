@@ -1,17 +1,44 @@
 import type { PersonFaceSuggestionPageResponseDto, PersonResponseDto } from '@immich/sdk';
-import { toastManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
+import PersonSuggestionReviewModal from '$lib/gallery/people/PersonSuggestionReviewModal.svelte';
+import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
+import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
+import { reactivePageMock } from '@test-data/mocks/reactive-page.mock.svelte';
 
 vi.mock('svelte-i18n', () => ({
   t: { subscribe: (run: (f: (k: string) => string) => void) => (run((k) => k), () => {}) },
+  locale: { subscribe: (run: (v: string) => void) => (run('en-US'), () => {}) },
 }));
 
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock };
+});
+
 vi.mock('$lib/utils/handle-error', () => ({ handleError: vi.fn() }));
+
+// The Details panel loads the asset; nothing here is about its rows (suggestion-asset-details.spec.ts is).
+const getAssetMock = vi.hoisted(() => vi.fn());
+vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
+
+// `MediaQuery` reads matchMedia once at mount; stub it to the screen width a test is about.
+function screenIsWide(wide: boolean) {
+  vi.spyOn(globalThis, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: wide,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+}
 
 vi.mock('@immich/ui', async (importOriginal: () => Promise<typeof import('@immich/ui')>) => {
   const actual = await importOriginal();
@@ -21,6 +48,7 @@ vi.mock('@immich/ui', async (importOriginal: () => Promise<typeof import('@immic
       primary: vi.fn(),
       danger: vi.fn(),
     },
+    modalManager: { ...actual.modalManager, show: vi.fn() },
   };
 });
 
@@ -50,6 +78,7 @@ function item(id: string) {
     boundingBoxX2: 40,
     boundingBoxY1: 10,
     boundingBoxY2: 40,
+    fileCreatedAt: '2015-08-12T14:32:00.000Z',
   };
 }
 const page1: PersonFaceSuggestionPageResponseDto = { total: 2, items: [item('f1'), item('f2')] };
@@ -200,24 +229,157 @@ describe('PersonSuggestionReviewModal', () => {
     expect(dismiss).not.toHaveBeenCalled();
   });
 
-  it('keyboard: ArrowRight confirms, ArrowLeft dismisses, ArrowDown ignores', async () => {
+  // #1079: letters judge, arrows move — the arrows used to be verdicts, which made "look at the next one" and
+  // "this is the same person" the same reach.
+  it('keyboard: s confirms, d dismisses, i ignores', async () => {
     const confirm = vi.fn().mockResolvedValue(acted());
     const dismiss = vi.fn().mockResolvedValue(acted());
     const ignore = vi.fn().mockResolvedValue(acted());
-    setup({ confirm, dismiss, ignore });
+    setup({
+      confirm,
+      dismiss,
+      ignore,
+      loadPage: vi.fn().mockResolvedValue({ total: 3, items: [item('f1'), item('f2'), item('f3')] }),
+    });
     await waitFor(() => screen.getByTestId('suggestion-same-btn'));
-    await userEvent.keyboard('{ArrowRight}'); // f1 → confirm
+    await userEvent.keyboard('s'); // f1 → confirm
     expect(confirm).toHaveBeenCalledWith('f1');
-    await userEvent.keyboard('{ArrowDown}'); // f2 → ignore
-    expect(ignore).toHaveBeenCalledWith('f2');
+    await userEvent.keyboard('d'); // f2 → dismiss
+    expect(dismiss).toHaveBeenCalledWith('f2');
+    await userEvent.keyboard('i'); // f3 → ignore
+    expect(ignore).toHaveBeenCalledWith('f3');
   });
 
-  it('keyboard: ArrowLeft dismisses', async () => {
+  it('keyboard: arrows move through the queue without judging', async () => {
+    const confirm = vi.fn().mockResolvedValue(acted());
     const dismiss = vi.fn().mockResolvedValue(acted());
-    setup({ dismiss });
-    await waitFor(() => screen.getByTestId('suggestion-different-btn'));
-    await userEvent.keyboard('{ArrowLeft}'); // f1 → dismiss
-    expect(dismiss).toHaveBeenCalledWith('f1');
+    setup({ confirm, dismiss });
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(screen.getByTestId('suggestion-progress')).toHaveAttribute('data-current', '2'));
+    await userEvent.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(screen.getByTestId('suggestion-progress')).toHaveAttribute('data-current', '1'));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it('keyboard: modified letters are left to the browser', async () => {
+    const confirm = vi.fn().mockResolvedValue(acted());
+    setup({ confirm });
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    await userEvent.keyboard('{Meta>}s{/Meta}{Control>}s{/Control}');
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('keyboard: m toggles the photo details', async () => {
+    faceSuggestionContextExpanded.set(false);
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    await userEvent.keyboard('m');
+    expect(get(faceSuggestionContextExpanded)).toBe(true);
+    await userEvent.keyboard('m');
+    expect(get(faceSuggestionContextExpanded)).toBe(false);
+  });
+
+  it('keyboard: o opens the current photo in a new tab, through the space when in one', async () => {
+    reactivePageMock.reset('https://gallery.test/spaces/s1/people/p1', { params: { spaceId: 's1' } });
+    const open = vi.spyOn(globalThis, 'open').mockReturnValue(null);
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    await userEvent.keyboard('o');
+    expect(open).toHaveBeenCalledWith('/spaces/s1/photos/asset-f1', '_blank', 'noopener');
+    open.mockRestore();
+  });
+
+  // #1079 user feedback: with Details open, the stacked panel pushed the two face crops (the comparison
+  // itself) below the fold. A wide screen now puts the panel beside the photo, which shrinks to keep the crops
+  // under it in view.
+  describe('Details layout', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      faceSuggestionContextExpanded.set(false);
+    });
+
+    it('collapsed: no panel, and nothing is loaded for it', async () => {
+      faceSuggestionContextExpanded.set(false);
+      getAssetMock.mockClear();
+      setup();
+      await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+      expect(screen.queryByTestId('suggestion-context-details')).not.toBeInTheDocument();
+      expect(getAssetMock).not.toHaveBeenCalled();
+    });
+
+    it('open on a wide screen: the panel sits beside the photo, and the face crops stay under it', async () => {
+      screenIsWide(true);
+      faceSuggestionContextExpanded.set(true);
+      setup();
+      await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+      const layout = screen.getByTestId('suggestion-layout');
+      expect(layout).toHaveAttribute('data-beside', 'true');
+      const [photoColumn, sideColumn] = [...layout.children];
+      expect(within(photoColumn as HTMLElement).getByTestId('suggestion-full-photo')).toBeInTheDocument();
+      expect(within(photoColumn as HTMLElement).getByTestId('suggestion-reference')).toBeInTheDocument();
+      expect(sideColumn).toHaveAttribute('data-testid', 'suggestion-context-details');
+      expect(screen.getAllByTestId('suggestion-reference')).toHaveLength(1);
+    });
+
+    it('open on a narrow screen: everything stays stacked under the photo', async () => {
+      screenIsWide(false);
+      faceSuggestionContextExpanded.set(true);
+      setup();
+      await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+      const layout = screen.getByTestId('suggestion-layout');
+      expect(layout).toHaveAttribute('data-beside', 'false');
+      expect(layout.children).toHaveLength(1);
+      expect(within(layout).getByTestId('suggestion-context-details')).toBeInTheDocument();
+    });
+  });
+
+  it('shows each verdict’s key on its button', async () => {
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    expect(screen.getByTestId('suggestion-same-btn')).toHaveTextContent(/s$/);
+    expect(screen.getByTestId('suggestion-different-btn')).toHaveTextContent(/d$/);
+    expect(screen.getByTestId('suggestion-ignore-btn')).toHaveTextContent(/i$/);
+  });
+
+  it('? lists the shortcuts, and the verdict keys pause while that list covers the face', async () => {
+    let closeOverlay!: () => void;
+    vi.mocked(modalManager.show).mockImplementation(
+      // `show` is typed by the modal it opens; ShortcutsModal closes with no result, so `never` is honest here.
+      () => new Promise<never>((resolve) => (closeOverlay = () => resolve(undefined as never))),
+    );
+    const confirm = vi.fn().mockResolvedValue(acted());
+    setup({ confirm });
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+
+    await userEvent.keyboard('{Shift>}?{/Shift}'); // what a real keyboard sends
+    expect(modalManager.show).toHaveBeenCalledWith(
+      ShortcutsModal,
+      expect.objectContaining({
+        shortcuts: expect.objectContaining({
+          actions: [
+            { key: ['s'], action: 'face_suggestion_same' },
+            { key: ['d'], action: 'face_suggestion_different' },
+            { key: ['i'], action: 'face_suggestion_ignore' },
+          ],
+        }),
+      }),
+    );
+
+    await userEvent.keyboard('s');
+    expect(confirm).not.toHaveBeenCalled();
+
+    closeOverlay();
+    await new Promise((resolve) => setTimeout(resolve, 0)); // let showShortcuts' `finally` run
+    await userEvent.keyboard('s');
+    expect(confirm).toHaveBeenCalledWith('f1');
+    vi.mocked(modalManager.show).mockReset();
   });
 
   // S11.1/F24: the modal must stop inferring "already resolved" from a status code that ALSO means "you're
@@ -486,7 +648,7 @@ describe('PersonSuggestionReviewModal', () => {
 
     // Bypass the disabled DOM attribute entirely — this exercises act()'s own internal guard, not just the
     // button's `disabled`.
-    await userEvent.keyboard('{ArrowRight}');
+    await userEvent.keyboard('s');
     expect(confirm).toHaveBeenCalledTimes(1); // still just the original confirm, no re-invocation
   });
 
@@ -506,5 +668,28 @@ describe('PersonSuggestionReviewModal', () => {
     const group = screen.getByTestId('suggestion-actions');
     expect(group).toHaveClass('flex-col', 'grow');
     expect(group).toHaveClass('sm:flex-row', 'sm:grow-0');
+  });
+
+  // #1039 — "this is sometimes difficult to tell if a face is the good person": the reviewer had to
+  // right-click and open the photo in a new tab to place it. The context row below the photo does that
+  // without leaving the queue. The block's own behaviour is covered in
+  // suggestion-asset-details.spec.ts; these two pin that the MODAL feeds it the right candidate and the
+  // right surface.
+  it('shows the current candidate’s date and a link to its photo', async () => {
+    reactivePageMock.reset('https://gallery.test/people/p1');
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+    expect(screen.getByTestId('suggestion-context-date')).toHaveTextContent('Aug 12, 2015');
+    expect(screen.getByTestId('suggestion-context-open')).toHaveAttribute('href', '/photos/asset-f1');
+  });
+
+  it('links into the space when the review is opened from a space person', async () => {
+    reactivePageMock.reset('https://gallery.test/spaces/s1/people/p1', { params: { spaceId: 's1' } });
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+    // A space viewer reaching this asset through the space would get a 403 from /photos/{id}.
+    expect(screen.getByTestId('suggestion-context-open')).toHaveAttribute('href', '/spaces/s1/photos/asset-f1');
   });
 });

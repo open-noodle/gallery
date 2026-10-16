@@ -145,7 +145,7 @@ vi.mock('$lib/modals/RepresentativeFacePickerModal.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/modals/PersonSuggestionReviewModal.svelte', async () => {
+vi.mock('$lib/gallery/people/PersonSuggestionReviewModal.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
