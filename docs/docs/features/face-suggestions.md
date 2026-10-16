@@ -32,6 +32,22 @@ The difference between the last two is worth knowing. **Different person** is a 
 Dismissing a suggestion hides the _suggestion_, not the face. If a future, more confident match brings that same face inside the automatic-recognition threshold, it can still be auto-assigned. That is by design: saying "different person" once should never permanently block normal recognition.
 :::
 
+Below the photo is the date it was taken and an **Open photo** link, which opens the photo in a new tab so your place in the review is kept. **Details** expands the capture time, file, place, camera, the albums the photo is in, and the people already recognised in it. Knowing who else is in the frame is often the quickest way to settle a borderline face. On a wide screen the details open beside the photo, so the photo and both faces stay in view. Details stays open or closed for the next face, and the next time you review.
+
+### Keyboard shortcuts
+
+Each action button shows its key. Press <kbd>?</kbd> during a review to list them all.
+
+| Key                       | Action                      |
+| ------------------------- | --------------------------- |
+| <kbd>s</kbd>              | Same person                 |
+| <kbd>d</kbd>              | Different person            |
+| <kbd>i</kbd>              | Ignore face                 |
+| <kbd>←</kbd> <kbd>→</kbd> | Previous or next face       |
+| <kbd>m</kbd>              | Show or hide photo details  |
+| <kbd>o</kbd>              | Open the photo in a new tab |
+| <kbd>Esc</kbd>            | Close the review            |
+
 ## Shared Spaces
 
 People in a [Shared Space](shared-spaces.md) work the same way, whether you open the person from inside the space or from the main People view.
