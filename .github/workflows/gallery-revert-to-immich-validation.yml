@@ -46,6 +46,7 @@ on:
       # Gallery's plugin when Gallery comes back.
       - 'server/src/schema/tables/**'
       - 'server/src/schema/functions.ts'
+      - 'server/src/schema/gallery-functions.ts'
       - 'server/src/database.ts'
       - 'server/src/services/asset.service.ts'
       - 'server/src/repositories/asset.repository.ts'
