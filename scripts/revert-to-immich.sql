@@ -265,6 +265,7 @@ BEGIN
     SELECT f."userId", f."assetId"
       FROM "asset_favorite" f
       JOIN "asset" a ON a."id" = f."assetId" AND a."ownerId" <> f."userId" AND a."deletedAt" IS NULL
+      JOIN "user" u ON u."id" = f."userId" AND u."deletedAt" IS NULL
      WHERE EXISTS (SELECT FROM "album_user" au
                      JOIN "album" al ON al."id" = au."albumId" AND al."deletedAt" IS NULL
                      JOIN "album_asset" aa ON aa."albumId" = au."albumId"
@@ -437,8 +438,10 @@ DELETE FROM "asset_edit" WHERE "action" = 'adjust';
 -- Immich (own assets, and partners' assets under the same conditions as
 -- Immich's asset share permission), drop album links to albums the creator
 -- neither owns nor edits (Immich's album share permission), and drop asset
--- links this leaves empty. Space access to an album lives in the dropped
--- shared_space_album* tables, never in album_user.
+-- links this leaves empty. Without 0a, space access to an album lives only in
+-- the dropped shared_space_album* tables, never in album_user. With 0a, every
+-- member holds an album_user row on the space's linked albums, so a link a space
+-- owner or editor made on a linked album survives as an Immich album editor's.
 -- The asset prune covers every link, not only those made from a space: deleting
 -- a space drops the link's space row but keeps the other members' asset rows. It
 -- also drops assets of partners removed since the link was made.
@@ -879,14 +882,16 @@ DELETE FROM "migration_overrides"
 -- 6b. Delete Gallery's own workflow plugin.
 --
 -- Plugins are stored IN THE DATABASE (`plugin.wasmBytes`), not just on disk, and the server loads
--- every row from `getForLoad()` at boot. Gallery ships `gallery-core`, whose wasm imports the
--- fork-only `gallery` host function. Upstream Immich does not register that function, so leaving
--- the row behind makes its microservices worker die on startup with
+-- every enabled row from `getForLoad()` at boot. Current Gallery ships `gallery-core` as a no-op
+-- wasm with no custom host import (its steps run in Gallery's TypeScript), so stock Immich loads it
+-- but every Gallery step would do nothing. Gallery releases before that change shipped a wasm that
+-- imports the fork-only `gallery` host function. A database last booted by one of those still holds
+-- that wasm (the row keeps version 1.0.0 and is rewritten in place only by a newer Gallery boot), and
+-- stock Immich's microservices worker then dies on startup with
 --
 --   cannot resolve import "extism:host/user" "gallery"
 --
--- and the server never answers /api/server/ping. Unlike the migration_overrides cleanup above, this
--- one is load-bearing: skip it and upstream Immich does not boot at all.
+-- so for such a database this delete is load-bearing.
 --
 -- `plugin_method` cascades from `plugin`, and `workflow_step.pluginMethodId` cascades from
 -- `plugin_method`, so this also removes any workflow step wired to a Gallery action. Those steps
