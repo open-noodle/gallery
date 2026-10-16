@@ -84,6 +84,21 @@ class TestPrometheusMetrics:
         assert response.status_code == 422
         assert 'immich_ml_requests_total{status="validation_error",task="unknown",type="unknown"} 1.0' in metrics
 
+    def test_predict_input_validation_failure_records_no_metric(self, deployed_app: TestClient) -> None:
+        from immich_ml.metrics import reset_metrics_for_tests
+
+        reset_metrics_for_tests()
+        entries = {"clip": {"textual": {"modelName": "ViT-B-32__openai"}}}
+
+        # `text` sent as a file part fails FastAPI's own validation after the entries dependency resolved
+        response = deployed_app.post(
+            "/predict", data={"entries": orjson.dumps(entries).decode()}, files={"text": ("t.txt", b"hello")}
+        )
+        metrics = deployed_app.get("/metrics").text
+
+        assert response.status_code == 422
+        assert "immich_ml_requests_total{" not in metrics
+
     def test_render_aggregates_multiprocess_metrics(self, tmp_path: Path) -> None:
         record_script = """
 from immich_ml import metrics

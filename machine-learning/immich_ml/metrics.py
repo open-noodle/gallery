@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator, Callable, Iterable
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Depends
+from fastapi.exceptions import RequestValidationError
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
 
 if TYPE_CHECKING:
@@ -76,6 +77,8 @@ def predict_metrics(get_entries: Callable[..., list[InferenceEntry[Any]]]) -> An
         labels = labels_from_entries(entries)
         try:
             yield
+        except RequestValidationError:
+            raise  # `image`/`text` resolve after this dependency; their 422 is not a prediction
         except Exception:
             record_predict(labels, "error", started)
             raise
