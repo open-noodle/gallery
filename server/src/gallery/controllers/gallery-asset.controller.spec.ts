@@ -95,4 +95,53 @@ describe(GalleryAssetController.name, () => {
       expect(service.removeTrim).toHaveBeenCalledWith(undefined, id);
     });
   });
+
+  describe('PUT /assets/:id/adjust', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/adjust`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require a valid id', async () => {
+      const { status } = await request(ctx.getHttpServer()).put('/assets/123/adjust').send({ exposure: 10 });
+      expect(status).toBe(400);
+    });
+
+    it.each([{ exposure: 101 }, { contrast: -101 }, { saturation: 'more' }, { invert: 'yes' }])(
+      'should reject %o',
+      async (dto) => {
+        const { status } = await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/adjust`).send(dto);
+        expect(status).toBe(400);
+        expect(service.setAdjust).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should default the values it is not given to neutral', async () => {
+      const id = factory.uuid();
+      const { status } = await request(ctx.getHttpServer()).put(`/assets/${id}/adjust`).send({ exposure: -12.5 });
+      expect(status).toBe(200);
+      expect(service.setAdjust).toHaveBeenCalledWith(undefined, id, {
+        exposure: -12.5,
+        contrast: 0,
+        saturation: 0,
+        invert: false,
+      });
+    });
+  });
+
+  describe('GET /assets/:id/adjust', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}/adjust`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /assets/:id/adjust', () => {
+    it('should remove the adjustment', async () => {
+      const id = factory.uuid();
+      const { status } = await request(ctx.getHttpServer()).delete(`/assets/${id}/adjust`);
+      expect(status).toBe(204);
+      expect(service.removeAdjust).toHaveBeenCalledWith(undefined, id);
+    });
+  });
 });

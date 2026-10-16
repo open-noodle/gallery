@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
+import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 import type {
   AudioStreamInfo,
   DecodeToBufferOptions,
@@ -509,6 +510,7 @@ export class MediaService extends BaseService {
     { image }: SystemConfig,
     useEdits: boolean = false,
     localOriginalPath?: string,
+    adjust?: ImageAdjust,
   ) {
     // Handle embedded preview extraction for RAW files
     const extractedImage = await this.extractOriginalImage(asset, image, useEdits, localOriginalPath);
@@ -538,7 +540,12 @@ export class MediaService extends BaseService {
 
     // generate final images
     const decoded = { data, info };
-    const baseOptions = { colorspace, processInvalidImages: false, edits: useEdits ? asset.edits : [] };
+    const baseOptions = {
+      colorspace,
+      processInvalidImages: false,
+      edits: useEdits ? asset.edits : [],
+      adjust: useEdits ? adjust : undefined,
+    };
     const thumbnailOptions = { ...image.thumbnail, ...baseOptions, format: thumbnailFormat };
     const previewOptions = { ...image.preview, ...baseOptions, format: previewFormat };
     const promises = [
@@ -1067,12 +1074,16 @@ export class MediaService extends BaseService {
   }
 
   private async generateEditedThumbnails(asset: ThumbnailAsset, config: SystemConfig, localOriginalPath?: string) {
-    if (asset.type !== AssetType.Image || (asset.files.length === 0 && asset.edits.length === 0)) {
+    // Gallery: the Adjust panel's colour adjustment lives beside asset_edit (src/gallery/utils/image-adjust.ts).
+    const adjust = asset.type === AssetType.Image ? await this.imageAdjustRepository.getForRender(asset.id) : undefined;
+    if (asset.type !== AssetType.Image || (asset.files.length === 0 && asset.edits.length === 0 && !adjust)) {
       return;
     }
 
     const generated =
-      asset.edits.length > 0 ? await this.generateImageThumbnails(asset, config, true, localOriginalPath) : undefined;
+      asset.edits.length > 0 || adjust
+        ? await this.generateImageThumbnails(asset, config, true, localOriginalPath, adjust)
+        : undefined;
 
     const crop = asset.edits.find((e) => e.action === AssetEditAction.Crop);
     const cropBox = crop
