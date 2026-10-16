@@ -17,7 +17,8 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '$lib/route';
-  import { getPersonActions, isSpaceEditor, updatePersonName } from '$lib/services/person.service';
+  import { isSpaceEditor, updatePersonName } from '$lib/gallery/people/person.service';
+  import { getPersonActions } from '$lib/services/person.service';
   import Dropdown from '$lib/elements/Dropdown.svelte';
   import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
   import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';

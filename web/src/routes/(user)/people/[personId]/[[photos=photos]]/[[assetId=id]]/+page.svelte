@@ -37,13 +37,13 @@
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import {
-    getPersonActions,
     getPersonFacesPage,
     getPersonFaceThumbnail,
     isSpaceEditor,
     updatePersonName,
     updatePersonRepresentativeFace,
-  } from '$lib/services/person.service';
+  } from '$lib/gallery/people/person.service';
+  import { getPersonActions } from '$lib/services/person.service';
   import { lang, locale } from '$lib/stores/preferences.store';
   import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
   import { websocketEvents } from '$lib/stores/websocket';

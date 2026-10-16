@@ -1,6 +1,7 @@
 import { Type, updatePerson, updateSpacePerson, type PersonResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
-import { getPersonActions, updatePersonName } from '$lib/services/person.service';
+import { updatePersonName } from '$lib/gallery/people/person.service';
+import { getPersonActions } from '$lib/services/person.service';
 import {
   getGlobalPersonHref,
   getGlobalPersonThumbnailUrl,
