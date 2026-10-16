@@ -2009,7 +2009,7 @@ export class SharedSpaceService extends BaseService {
     if (!ownerLink?.ownerIsSpaceMember) {
       return;
     }
-    const ownerPerson = await this.personRepository.getOrCreateOwnerPersonForIdentity(
+    const ownerPerson = await this.galleryPersonRepository.getOrCreateOwnerPersonForIdentity(
       {
         ownerId: ownerLink.assetOwnerId,
         identityId: identity.id,
@@ -2018,7 +2018,10 @@ export class SharedSpaceService extends BaseService {
       },
       trx,
     );
-    await this.personRepository.setFaceOwnerPerson({ assetFaceId, personGroupId: ownerPerson.personGroupId }, trx);
+    await this.galleryPersonRepository.setFaceOwnerPerson(
+      { assetFaceId, personGroupId: ownerPerson.personGroupId },
+      trx,
+    );
   }
 
   /**
@@ -2196,7 +2199,7 @@ export class SharedSpaceService extends BaseService {
         person.identityId &&
         ownerLink.identityId === person.identityId
       ) {
-        await this.personRepository.setFaceOwnerPerson(
+        await this.galleryPersonRepository.setFaceOwnerPerson(
           { assetFaceId, personGroupId: null, expectedPersonGroupId: ownerLink.personGroupId },
           trx,
         );

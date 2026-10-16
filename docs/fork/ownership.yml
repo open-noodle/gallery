@@ -69,7 +69,8 @@ features:
       - server/src/services/gallery-workflow-host.service.spec.ts
       # Replay-owned: upstream files the fork owns outright. The fork-only people code lives in
       # server/src/gallery/ (GalleryPeopleService/Controller, FaceIdentityMaintenanceService,
-      # PetFaceRepository); what remains here is upstream code rewritten for Option M and Spaces.
+      # GalleryPersonRepository, PetFaceRepository); what remains here is upstream code rewritten for
+      # Option M and Spaces.
       # Upstream changes to these files are not merged by conflict resolution: the preflight report
       # lists every upstream commit touching them ("Touches shared-spaces owned path"), and each one
       # is replayed by hand and recorded in that cycle's specs/upstream-reports/ entry.
@@ -83,6 +84,7 @@ features:
       - web/src/lib/components/SchemaSpaceAlbumPicker.spec.ts
       - web/src/lib/components/SchemaConfiguration.spec.ts
       - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
+      - server/src/queries/gallery.person.repository.sql
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts

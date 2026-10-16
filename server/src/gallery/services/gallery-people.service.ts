@@ -46,7 +46,7 @@ export class GalleryPeopleService extends BaseService {
       });
     }
 
-    return this.personRepository.getPeopleOverviewStatistics(auth.user.id, {
+    return this.galleryPersonRepository.getPeopleOverviewStatistics(auth.user.id, {
       minimumFaceCount,
     });
   }
@@ -64,7 +64,7 @@ export class GalleryPeopleService extends BaseService {
       });
     }
 
-    return this.personRepository.getPeopleFaceStatistics(auth.user.id, {
+    return this.galleryPersonRepository.getPeopleFaceStatistics(auth.user.id, {
       minimumFaceCount,
     });
   }
@@ -108,7 +108,7 @@ export class GalleryPeopleService extends BaseService {
     // unscoped list.
     const isOwner = await this.accessRepository.galleryPerson.checkOwnerAccess(auth.user.id, new Set([id]));
     const scope = isOwner.has(id) ? undefined : { memberUserId: auth.user.id };
-    const rows = await this.personRepository.getRepresentativeFaces({
+    const rows = await this.galleryPersonRepository.getRepresentativeFaces({
       personId: id,
       take,
       skip: (dto.page - 1) * dto.size,
@@ -137,7 +137,7 @@ export class GalleryPeopleService extends BaseService {
 
   async getFaceThumbnail(auth: AuthDto, personId: string, faceId: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personId] });
-    const face = await this.personRepository.getRepresentativeFaceForUpdate({ personId, assetFaceId: faceId });
+    const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({ personId, assetFaceId: faceId });
     if (!face) {
       throw new NotFoundException();
     }
@@ -174,7 +174,7 @@ export class GalleryPeopleService extends BaseService {
       }
     }
 
-    const face = await this.personRepository.getRepresentativeFaceForUpdate({
+    const face = await this.galleryPersonRepository.getRepresentativeFaceForUpdate({
       personId: id,
       assetFaceId: dto.assetFaceId,
     });

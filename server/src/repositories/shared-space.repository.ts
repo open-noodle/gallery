@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, NotNull, Transaction, type Updateable, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { PeopleFaceStatistics } from 'src/repositories/person.repository.js';
+import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import {

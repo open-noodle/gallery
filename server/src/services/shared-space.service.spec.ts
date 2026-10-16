@@ -7772,7 +7772,7 @@ describe(SharedSpaceService.name, () => {
       });
       // §6.3.1 (revised): every attach now propagates into the owner's layer, so the owner-person
       // resolve is on the default path for all of these tests, not just the propagation ones.
-      mocks.person.getOrCreateOwnerPersonForIdentity.mockResolvedValue({ personGroupId: 'owner-person-1' });
+      mocks.galleryPerson.getOrCreateOwnerPersonForIdentity.mockResolvedValue({ personGroupId: 'owner-person-1' });
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
     });
 
@@ -7877,11 +7877,11 @@ describe(SharedSpaceService.name, () => {
       // (personGroupId null), so the resolve must run against the ASSET OWNER -- not the acting
       // editor -- and create the person under the owner's id. Getting that wrong would file the new
       // person in the editor's own library, where the owner would never see it.
-      expect(mocks.person.getOrCreateOwnerPersonForIdentity).toHaveBeenCalledWith(
+      expect(mocks.galleryPerson.getOrCreateOwnerPersonForIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ ownerId: 'default-asset-owner', identityId: 'space-identity-1' }),
         mocks.database,
       );
-      expect(mocks.person.setFaceOwnerPerson).toHaveBeenCalledWith(
+      expect(mocks.galleryPerson.setFaceOwnerPerson).toHaveBeenCalledWith(
         { assetFaceId: 'face-1', personGroupId: 'owner-person-1' },
         mocks.database,
       );
@@ -7954,11 +7954,11 @@ describe(SharedSpaceService.name, () => {
         mocks.database,
       );
       // and the owner's own person layer follows it, so the asset-detail People row agrees with the space
-      expect(mocks.person.getOrCreateOwnerPersonForIdentity).toHaveBeenCalledWith(
+      expect(mocks.galleryPerson.getOrCreateOwnerPersonForIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ ownerId: 'default-asset-owner', identityId: 'space-identity-1' }),
         mocks.database,
       );
-      expect(mocks.person.setFaceOwnerPerson).toHaveBeenCalledWith(
+      expect(mocks.galleryPerson.setFaceOwnerPerson).toHaveBeenCalledWith(
         { assetFaceId: 'face-1', personGroupId: 'owner-person-1' },
         mocks.database,
       );
@@ -8028,8 +8028,8 @@ describe(SharedSpaceService.name, () => {
         { identityId: 'carol-identity', source: 'suggestion', actorId: expect.any(String) },
         mocks.database,
       );
-      expect(mocks.person.getOrCreateOwnerPersonForIdentity).not.toHaveBeenCalled();
-      expect(mocks.person.setFaceOwnerPerson).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getOrCreateOwnerPersonForIdentity).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.setFaceOwnerPerson).not.toHaveBeenCalled();
     });
 
     // §3, row 1: an unnamed face on a non-member's asset still gets the space person's identity (what
@@ -8054,8 +8054,8 @@ describe(SharedSpaceService.name, () => {
         { assetFaceId: 'face-1', identityId: 'space-identity-1', source: 'manual' },
         mocks.database,
       );
-      expect(mocks.person.getOrCreateOwnerPersonForIdentity).not.toHaveBeenCalled();
-      expect(mocks.person.setFaceOwnerPerson).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.getOrCreateOwnerPersonForIdentity).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.setFaceOwnerPerson).not.toHaveBeenCalled();
     });
 
     // F-13: reassign between two space people in the SAME space. Attaching a face already held by another
@@ -8180,7 +8180,7 @@ describe(SharedSpaceService.name, () => {
         true,
       );
 
-      expect(mocks.person.setFaceOwnerPerson).toHaveBeenCalledWith(
+      expect(mocks.galleryPerson.setFaceOwnerPerson).toHaveBeenCalledWith(
         { assetFaceId: 'face-1', personGroupId: null, expectedPersonGroupId: 'owner-person-1' },
         mocks.database,
       );
@@ -8218,7 +8218,7 @@ describe(SharedSpaceService.name, () => {
         true,
       );
 
-      expect(mocks.person.setFaceOwnerPerson).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.setFaceOwnerPerson).not.toHaveBeenCalled();
     });
 
     // §3: the detach twin of the attach test above. Even when the identities match, the tag on a
@@ -8241,7 +8241,7 @@ describe(SharedSpaceService.name, () => {
       );
 
       expect(mocks.sharedSpace.removePersonFace).toHaveBeenCalledWith('space-person-1', 'face-1', mocks.database);
-      expect(mocks.person.setFaceOwnerPerson).not.toHaveBeenCalled();
+      expect(mocks.galleryPerson.setFaceOwnerPerson).not.toHaveBeenCalled();
       expect(mocks.faceIdentity.unlinkFaceFromIdentity).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.markRejectedForSpacePerson).toHaveBeenCalledWith(
         'space-person-1',
