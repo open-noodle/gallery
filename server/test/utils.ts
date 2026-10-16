@@ -166,7 +166,8 @@ export const controllerSetup = async (controller: ControllerClass | ControllerCl
     routeConflictPolicy: { duplicate: 'error' },
     routeResolutionStrategy: 'specificity',
   });
-  await app.init();
+  // listen on an ephemeral port once, so supertest doesn't bind a new one per request (#1042)
+  await app.listen(0, '127.0.0.1');
 
   // allow the AuthController to override the AuthService itself
   const resolvedAuthService = app.get<Mocked<AuthService>>(AuthService);
