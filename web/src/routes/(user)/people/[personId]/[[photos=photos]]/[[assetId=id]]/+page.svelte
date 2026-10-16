@@ -33,7 +33,7 @@
   } from '#lib/managers/timeline-manager/types.ts';
   import PersonMergeSuggestionModal from '#lib/modals/PersonMergeSuggestionModal.svelte';
   import PersonSuggestionBanner from '#lib/components/faces-page/person-suggestion-banner.svelte';
-  import PersonSuggestionReviewModal from '#lib/modals/PersonSuggestionReviewModal.svelte';
+  import PersonSuggestionReviewModal from '#lib/gallery/people/PersonSuggestionReviewModal.svelte';
   import RepresentativeFacePickerModal from '#lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
