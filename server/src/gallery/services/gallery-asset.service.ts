@@ -4,12 +4,19 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
 import { AssetType, JobName, Permission } from 'src/enum.js';
+import {
+  AssetImageAdjustDto,
+  AssetImageAdjustResponseDto,
+  NEUTRAL_IMAGE_ADJUST,
+  isNeutralImageAdjust,
+} from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
 import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireAccess } from 'src/utils/access.js';
+import { isPanorama } from 'src/utils/asset.util.js';
 
 /**
  * #763 canonical write surface for per-user favorites (PUT /assets/favorites), also called by
@@ -44,7 +51,8 @@ export const updateAssetFavorites = async (
     : assetFavoriteRepository.removeAll(auth.user.id, dto.ids));
 };
 
-// Fork asset endpoints served by GalleryAssetController: per-user favorites, the editable-subset query and video trim.
+// Fork asset endpoints served by GalleryAssetController: per-user favorites, the editable-subset query, video trim and
+// image colour adjustment.
 @Injectable()
 export class GalleryAssetService extends BaseService {
   async getEditable(auth: AuthDto, dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
@@ -142,6 +150,61 @@ export class GalleryAssetService extends BaseService {
       await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
     // The edit job removes the trimmed files and regenerates thumbnails; clients wait for its AssetEditReadyV2.
+    await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+  }
+
+  async getAdjust(auth: AuthDto, id: string): Promise<AssetImageAdjustResponseDto> {
+    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [id] });
+    return (await this.imageAdjustRepository.get(id)) ?? { ...NEUTRAL_IMAGE_ADJUST };
+  }
+
+  async setAdjust(auth: AuthDto, id: string, dto: AssetImageAdjustDto): Promise<AssetImageAdjustResponseDto> {
+    await this.requireAccess({ auth, permission: Permission.AssetEditCreate, ids: [id] });
+
+    // Web sends all-neutral values when the sliders are back at zero: that removes the adjustment.
+    if (isNeutralImageAdjust(dto)) {
+      await this.removeAdjust(auth, id);
+      return { ...NEUTRAL_IMAGE_ADJUST };
+    }
+
+    // The same images Immich lets you edit (AssetService.editAsset): the adjusted thumbnails are its edited ones.
+    const asset = await this.assetRepository.getForEdit(id);
+    if (!asset) {
+      throw new BadRequestException('Asset not found');
+    }
+
+    if (asset.type !== AssetType.Image) {
+      throw new BadRequestException('Only images can be adjusted');
+    }
+
+    if (asset.livePhotoVideoId) {
+      throw new BadRequestException('Adjusting live photos is not supported');
+    }
+
+    if (isPanorama(asset)) {
+      throw new BadRequestException('Adjusting panorama images is not supported');
+    }
+
+    const extension = asset.originalPath?.toLowerCase();
+    if (extension?.endsWith('.gif') || extension?.endsWith('.svg')) {
+      throw new BadRequestException('Adjusting GIF or SVG images is not supported');
+    }
+
+    const { exposure, contrast, saturation, invert } = dto;
+    await this.imageAdjustRepository.upsert(id, { exposure, contrast, saturation, invert });
+    await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+    await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
+
+    return { exposure, contrast, saturation, invert };
+  }
+
+  async removeAdjust(auth: AuthDto, id: string): Promise<void> {
+    await this.requireAccess({ auth, permission: Permission.AssetEditDelete, ids: [id] });
+
+    if (await this.imageAdjustRepository.delete(id)) {
+      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
+    }
+    // The edit job removes or regenerates the edited files; clients wait for its AssetEditReadyV2.
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
   }
 }

@@ -25,6 +25,7 @@ import {
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
@@ -702,6 +703,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case SyncRepository:
     case GallerySyncRepository:
     case VideoTrimRepository:
+    case ImageAdjustRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -796,6 +798,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case SyncRepository:
     case GallerySyncRepository:
     case VideoTrimRepository:
+    case ImageAdjustRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:

@@ -1,5 +1,6 @@
 import { ShallowDehydrateObject } from 'kysely';
 import { Mocked } from 'vitest';
+import type { ImageAdjust } from 'src/gallery/dtos/image-adjust.dto.js';
 import { VECTOR_EXTENSIONS } from 'src/constants.js';
 import { AssetFile } from 'src/database.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
@@ -43,14 +44,19 @@ export type DeepPartial<T> = T extends Date
 
 export type RepositoryInterface<T extends object> = Pick<T, keyof T>;
 
+export type FullsizeImageOptions = {
+  format: ImageFormat;
+  quality: number;
+  enabled: boolean;
+  progressive?: boolean;
+};
+
 export type ImageOptions = {
   format: ImageFormat;
   quality: number;
+  size: number;
   progressive?: boolean;
-  decodingTier: 0 | 1 | 2 | 3 | 4;
 };
-
-export type FullsizeImageOptions = ImageOptions & { enabled: boolean };
 
 export type RawImageInfo = {
   width: number;
@@ -77,10 +83,14 @@ export type TransformOptions = {
   size?: number;
   fit?: 'inside' | 'outside';
   edits?: AssetEditActionItem[];
+  /** Gallery: the Adjust panel's colour adjustment, applied after `edits` (src/gallery/utils/image-adjust.ts). */
+  adjust?: ImageAdjust;
 };
 
-export type GenerateThumbnailOptions = ImageOptions & ImageColorOptions & TransformOptions;
-export type GenerateThumbhashOptions = ImageColorOptions & Pick<TransformOptions, 'edits'>;
+export type GenerateThumbnailOptions = Pick<ImageOptions, 'format' | 'quality' | 'progressive'> &
+  ImageColorOptions &
+  TransformOptions;
+export type GenerateThumbhashOptions = ImageColorOptions & Pick<TransformOptions, 'edits' | 'adjust'>;
 
 export interface VideoStreamInfo {
   index: number;

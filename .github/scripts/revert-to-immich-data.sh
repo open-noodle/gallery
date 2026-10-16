@@ -115,6 +115,12 @@ seed() {
   [ "$(api GET "/assets/$video" "$owner" | jq -r .duration)" != "$original_duration" ] ||
     fail "seed: Gallery does not report the trimmed duration"
 
+  # A colour adjustment, kept in asset_image_adjust: Immich has no such edit, so the revert drops the adjusted files.
+  api PUT "/assets/$photo_a/adjust" "$owner" '{"exposure":20,"invert":true}' >/dev/null
+  poll 180 "SELECT count(*) FROM asset_file WHERE \"assetId\" = '$photo_a' AND \"isEdited\"" '^[1-9]' >/dev/null
+  [ "$(psql_q "SELECT \"isEdited\" FROM asset WHERE id = '$photo_a'")" = t ] || fail "seed: the adjustment did not mark the photo edited"
+  [ "$(psql_q "SELECT count(*) FROM asset_edit WHERE \"assetId\" = '$photo_a'")" = 0 ] || fail "seed: the adjustment wrote asset_edit"
+
   # A space with the member as editor, holding both owners' photos.
   local space
   space=$(api POST /shared-spaces "$owner" '{"name":"Revert test"}' | jq -r .id)
@@ -332,6 +338,7 @@ gallery_assert() {
   check gallery "owner's favorite kept" "$(api GET "/assets/$PHOTO_A" "$owner" | jq -r .isFavorite)" true
   check gallery 'favorite set on stock arrives' "$(api GET "/assets/$VIDEO" "$owner" | jq -r .isFavorite)" true
   check gallery 'trim kept' "$(api GET "/assets/$VIDEO/trim" "$owner" | jq -c '[.startTime, .endTime]')" '[1,3]'
+  check gallery 'adjustment kept' "$(api GET "/assets/$PHOTO_A/adjust" "$owner" | jq -c '[.exposure, .invert]')" '[20,true]'
   check gallery 'trimmed duration served again' \
     "$([ "$(api GET "/assets/$VIDEO" "$owner" | jq -r .duration)" -lt "$ORIGINAL_DURATION" ] && echo yes)" yes
   check gallery 'pet kept' "$(psql_q "SELECT count(*) FROM person WHERE name = 'Revert Pet'")" 1
@@ -385,6 +392,8 @@ stock_sync_checks() {
   check "$phase" 'sync stream completes' "$(jq -r .type <<<"$body" | tail -n1)" SyncCompleteV1
   check "$phase" 'sync sends no rule memory' "$(jq -c 'select((.type | startswith("MemoryV")) and .data.type == "rule")' <<<"$body")" ''
   check "$phase" 'sync sends no pet' "$(jq -c 'select(.type == "PersonV1" and .data.name == "Revert Pet")' <<<"$body")" ''
+  check "$phase" 'sync sends only Immich edit actions' \
+    "$(jq -c 'select(.type == "AssetEditV1" and (.data.action | IN("crop", "rotate", "mirror") | not))' <<<"$body")" ''
 }
 
 # shellcheck disable=SC2153 # vars come from the sourced $STATE file
@@ -414,6 +423,9 @@ assert() {
   check assert 'trimmed video no longer edited' "$(psql_q "SELECT \"isEdited\" FROM asset WHERE id = '$VIDEO'")" f
   check assert 'trimmed files unreferenced' "$(psql_q "SELECT count(*) FROM asset_file WHERE \"assetId\" = '$VIDEO' AND \"isEdited\"")" 0
   check assert 'trimmed thumbhash cleared' "$(psql_q "SELECT thumbhash IS NULL FROM asset WHERE id = '$VIDEO'")" t
+  check assert 'adjusted photo no longer edited' "$(psql_q "SELECT \"isEdited\" FROM asset WHERE id = '$PHOTO_A'")" f
+  check assert 'adjusted files unreferenced' "$(psql_q "SELECT count(*) FROM asset_file WHERE \"assetId\" = '$PHOTO_A' AND \"isEdited\"")" 0
+  check assert 'adjusted thumbhash cleared' "$(psql_q "SELECT thumbhash IS NULL FROM asset WHERE id = '$PHOTO_A'")" t
 
   check assert 'space link keeps own photo' "$(status GET "/assets/$PHOTO_A?key=$MIXED_LINK")" 200
   check assert "space link stops serving the member's photo" "$(status GET "/assets/$MEMBER_PHOTO?key=$MIXED_LINK")" 400
