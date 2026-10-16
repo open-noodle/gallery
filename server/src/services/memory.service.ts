@@ -2,8 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { shuffle } from 'lodash-es';
 import { DateTime } from 'luxon';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
-import type { MemoryRule, MemoryRuleCandidate } from 'src/services/memory-rules/memory-rule.interface.js';
-import type { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import type { MemoryRule, MemoryRuleCandidate } from 'src/gallery/services/memory-rules/memory-rule.interface.js';
+import type { ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import type { MemoriesState, RuleMemoryData } from 'src/types.js';
 import { Memory } from 'src/database.js';
 import { OnJob } from 'src/decorators.js';
@@ -17,19 +17,19 @@ import {
   mapMemory,
 } from 'src/dtos/memory.dto.js';
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
-import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
-import { type YearMonthDay } from 'src/repositories/asset.repository.js';
-import { BaseService } from 'src/services/base.service.js';
 import {
   getAdminAvailableMemoryTypeKeys,
   getMemoryTypeFloor,
   getMemoryTypeKeyForMemory,
   getMemoryTypeMetadata,
   isMemoryTypeEnabledForUser,
-} from 'src/services/memory-rules/memory-type.metadata.js';
-import { createMemoryRules } from 'src/services/memory-rules/memory-type.registry.js';
-import { type ReservableMemory, planReservation } from 'src/services/memory-rules/reservation.util.js';
-import { MemoryThemeSearchAdapter } from 'src/services/memory-rules/theme-search.adapter.js';
+} from 'src/gallery/services/memory-rules/memory-type.metadata.js';
+import { createMemoryRules } from 'src/gallery/services/memory-rules/memory-type.registry.js';
+import { type ReservableMemory, planReservation } from 'src/gallery/services/memory-rules/reservation.util.js';
+import { MemoryThemeSearchAdapter } from 'src/gallery/services/memory-rules/theme-search.adapter.js';
+import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
+import { type YearMonthDay } from 'src/repositories/asset.repository.js';
+import { BaseService } from 'src/services/base.service.js';
 import { addAssets, removeAssets } from 'src/utils/asset.util.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences } from 'src/utils/preferences.js';

@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
-import type { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import type { ThemeSearchAsset, ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -714,7 +714,7 @@ describe(MemoryService.name, () => {
 
     it('sweeps an on_this_day memory that holds fewer photos than its floor', async () => {
       // on_this_day's floor is 3 (`minAssets` on the 'on_this_day' entry in
-      // `src/services/memory-rules/memory-type.metadata.ts`), applied unconditionally per spec
+      // `src/gallery/services/memory-rules/memory-type.metadata.ts`), applied unconditionally per spec
       // §6.2/P3 -- even with nothing else visible that day. This is deliberately what removes
       // the reporter's original 2-photo card, so pin it here rather than leaving it as an
       // incidental side effect of the overlap-reconciliation tests below.
