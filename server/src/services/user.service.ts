@@ -17,6 +17,7 @@ import { UserPreferencesResponseDto, UserPreferencesUpdateDto, mapPreferences } 
 import { CreateProfileImageResponseDto } from 'src/dtos/user-profile.dto.js';
 import { UserAdminResponseDto, UserResponseDto, UserUpdateMeDto, mapUser, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { CacheControl, JobName, JobStatus, QueueName, StorageFolder, UserMetadataKey } from 'src/enum.js';
+import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { UserFindOptions } from 'src/repositories/user.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -129,7 +130,7 @@ export class UserService extends BaseService {
 
     if (!(writeBackend instanceof DiskStorageBackend)) {
       const filename = basename(profileImagePath);
-      const relativeKey = StorageCore.getRelativeProfileImagePath(auth.user.id, filename);
+      const relativeKey = getRelativeProfileImagePath(auth.user.id, filename);
       const stream = createReadStream(profileImagePath);
       await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
       // After S3 upload, drop the local generated file and store the relative key.

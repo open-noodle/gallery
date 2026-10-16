@@ -7,6 +7,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { AssetJobName } from 'src/dtos/asset.dto.js';
 import { MemoryType } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
@@ -52,6 +53,7 @@ const setup = async () => {
       AssetFavoriteRepository,
       AssetJobRepository,
       AssetRepository,
+      GalleryAssetRepository,
       ConfigRepository,
       DatabaseRepository,
       DuplicateRepository,

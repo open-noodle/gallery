@@ -89,6 +89,8 @@ features:
       - server/src/gallery/dtos/shared-link.dto.ts
       - server/src/gallery/database.ts
       - server/src/gallery/types.ts
+      - server/src/gallery/repositories/gallery-asset.repository.ts
+      - server/src/queries/gallery.asset.repository.sql
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -179,6 +181,7 @@ features:
       - scripts/revert-to-immich.sql
       - .github/workflows/storage-migration*.yml
       - .github/workflows/gallery-revert-to-immich-validation.yml
+      - server/src/gallery/utils/storage-keys*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts
@@ -263,6 +266,9 @@ features:
       - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
       - mobile/test/fixtures/search_contract/**
       - server/src/gallery/utils/smart-search.ts
+      - server/src/gallery/validation.ts
+      - server/src/gallery/utils/database.ts
+      - server/src/gallery/utils/time-bucket-filter*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -309,6 +315,7 @@ features:
       - server/src/services/duplicate.service.ts
       - server/src/repositories/duplicate.repository.ts
       - server/src/gallery/repositories/gallery-duplicate.repository*.ts
+      - server/src/gallery/utils/misc.ts
     upstream_extension_paths:
       - server/src/config.ts
       - server/src/dtos/system-config.dto.ts

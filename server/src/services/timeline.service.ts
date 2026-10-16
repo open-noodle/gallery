@@ -29,7 +29,7 @@ export class TimelineService extends BaseService {
   async getTimeBucketCovers(auth: AuthDto, dto: TimeBucketCoverDto): Promise<TimeBucketCoverResponseDto[]> {
     await this.timeBucketChecks(auth, dto as Partial<TimeBucketDto>);
     const timeBucketOptions = await this.buildTimeBucketOptions(auth, dto as Partial<TimeBucketDto>);
-    return this.assetRepository.getTimeBucketCovers({ ...timeBucketOptions, timeBuckets: dto.timeBuckets });
+    return this.galleryAssetRepository.getTimeBucketCovers({ ...timeBucketOptions, timeBuckets: dto.timeBuckets });
   }
 
   // pre-jsonified response

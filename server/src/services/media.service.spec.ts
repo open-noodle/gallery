@@ -1,7 +1,6 @@
 import { ShallowDehydrateObject } from 'kysely';
 import { OutputInfo } from 'sharp';
 import type { AudioStreamInfo, JobCounts, RawImageInfo, VideoFormat, VideoStreamInfo } from 'src/types.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { Exif } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
@@ -22,6 +21,11 @@ import {
   TranscodePolicy,
   VideoCodec,
 } from 'src/enum.js';
+import {
+  getEditedEncodedVideoPath,
+  getRelativeEditedEncodedVideoPath,
+  getRelativeEncodedVideoPath,
+} from 'src/gallery/utils/storage-keys.js';
 import { MediaService } from 'src/services/media.service.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -1788,7 +1792,7 @@ describe(MediaService.name, () => {
 
       await expect(sut.handleAssetEditThumbnailGeneration({ id: asset.id })).rejects.toThrow('bad frame');
 
-      const outputPath = StorageCore.getEditedEncodedVideoPath(asset as any);
+      const outputPath = getEditedEncodedVideoPath(asset as any);
       expect(mocks.storage.unlink).toHaveBeenCalledWith(outputPath);
     });
 
@@ -1821,7 +1825,7 @@ describe(MediaService.name, () => {
         ...getForGenerateThumbnail(asset),
         edits: [],
       } as any);
-      mocks.asset.getEditedEncodedVideo.mockResolvedValue({
+      mocks.galleryAsset.getEditedEncodedVideo.mockResolvedValue({
         id: 'file-id-1',
         path: 'encoded-video/owner/ab/cd/video_edited.mp4',
       });
@@ -1846,7 +1850,7 @@ describe(MediaService.name, () => {
         ...getForGenerateThumbnail(asset),
         edits: [],
       } as any);
-      mocks.asset.getEditedEncodedVideo.mockResolvedValue(void 0);
+      mocks.galleryAsset.getEditedEncodedVideo.mockResolvedValue(void 0);
 
       const result = await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
@@ -1880,7 +1884,7 @@ describe(MediaService.name, () => {
 
         await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-        const editedKey = StorageCore.getRelativeEditedEncodedVideoPath(asset as any);
+        const editedKey = getRelativeEditedEncodedVideoPath(asset as any);
         expect(put).toHaveBeenCalledWith(editedKey, expect.anything(), { contentType: 'video/mp4' });
         expect(mocks.asset.upsertFiles).toHaveBeenCalledWith(
           expect.arrayContaining([
@@ -1930,7 +1934,7 @@ describe(MediaService.name, () => {
 
         await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-        const nonEditedKey = StorageCore.getRelativeEncodedVideoPath(asset as any);
+        const nonEditedKey = getRelativeEncodedVideoPath(asset as any);
         const keys = put.mock.calls.map((call) => call[0]);
         expect(keys).not.toContain(nonEditedKey);
       });
@@ -1966,7 +1970,7 @@ describe(MediaService.name, () => {
         mocks.storage.createPlainReadStream.mockReturnValue(makeStream([Buffer.from('mp4')]) as any);
 
         const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
-        const editedKey = StorageCore.getRelativeEditedEncodedVideoPath(asset as any);
+        const editedKey = getRelativeEditedEncodedVideoPath(asset as any);
         const withExistingEdit = {
           ...getForGenerateThumbnail(asset),
           files: [

@@ -7,7 +7,6 @@ import { basename } from 'node:path';
 import sanitize from 'sanitize-filename';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { LOGIN_DUMMY_HASH, LOGIN_URL, MOBILE_CALLBACK_URI, MOBILE_REDIRECT, SALT_ROUNDS } from 'src/constants.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { AuthSharedLink, AuthUser, UserAdmin } from 'src/database.js';
 import {
   AuthDto,
@@ -29,6 +28,7 @@ import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { UserAdminResponseDto, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission } from 'src/enum.js';
 import { isGalleryClient } from 'src/gallery/utils/client-version.js';
+import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { OAuthProfile } from 'src/repositories/oauth.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -405,7 +405,7 @@ export class AuthService extends BaseService {
 
       if (!(writeBackend instanceof DiskStorageBackend)) {
         const filename = basename(profileImagePath);
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, filename);
+        const relativeKey = getRelativeProfileImagePath(user.id, filename);
         const stream = createReadStream(profileImagePath);
         await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
         // After S3 upload, drop the local generated file and store the relative key.

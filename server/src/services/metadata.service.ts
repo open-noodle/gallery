@@ -27,6 +27,7 @@ import {
   StorageFolder,
 } from 'src/enum.js';
 import { resolveAssumedUtcVideoZone, resolveDatelessFileDates } from 'src/gallery/utils/metadata-time-zone.js';
+import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
 import { ReverseGeocodeResult } from 'src/repositories/map.repository.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -816,7 +817,7 @@ export class MetadataService extends BaseService {
         try {
           const motionAssetId = this.cryptoRepository.randomUUID();
           const motionPath = isS3Asset
-            ? StorageCore.getRelativeNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${motionAssetId}-MP.mp4`)
+            ? getRelativeNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${motionAssetId}-MP.mp4`)
             : StorageCore.getAndroidMotionPath(asset, motionAssetId);
           motionAsset = await this.assetRepository.create({
             id: motionAssetId,

@@ -11111,7 +11111,10 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(100).mockResolvedValueOnce(63).mockResolvedValueOnce(12);
+      mocks.galleryAsset.getTimelineAssetCount
+        .mockResolvedValueOnce(100)
+        .mockResolvedValueOnce(63)
+        .mockResolvedValueOnce(12);
 
       const result = await sut.getTimelineHidePreview(auth, space.id);
 
@@ -11134,20 +11137,20 @@ describe(SharedSpaceService.name, () => {
       // #1041 follow-up: the third count is the one narrowed to THIS space — it is what makes
       // "3 photos leave, 56,417 stay" explainable. Scoping it to the space is the whole point, so
       // assert the option rather than just the returned number.
-      expect(mocks.asset.getTimelineAssetCount).toHaveBeenCalledTimes(3);
-      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+      expect(mocks.galleryAsset.getTimelineAssetCount).toHaveBeenCalledTimes(3);
+      expect(mocks.galleryAsset.getTimelineAssetCount).toHaveBeenNthCalledWith(
         3,
         expect.objectContaining({ callerId: auth.user.id, spaceId: space.id }),
         stubTrx,
       );
       // ...and the first two must NOT be space-scoped, or the diff would stop being the whole
       // timeline and hiddenAssetCount would silently become a per-space number.
-      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+      expect(mocks.galleryAsset.getTimelineAssetCount).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ spaceId: undefined }),
         undefined,
       );
-      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+      expect(mocks.galleryAsset.getTimelineAssetCount).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ spaceId: undefined }),
         stubTrx,
@@ -11164,7 +11167,10 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(50).mockResolvedValueOnce(50).mockResolvedValueOnce(50);
+      mocks.galleryAsset.getTimelineAssetCount
+        .mockResolvedValueOnce(50)
+        .mockResolvedValueOnce(50)
+        .mockResolvedValueOnce(50);
 
       await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({
         hiddenAssetCount: 0,
@@ -11183,7 +11189,7 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount
+      mocks.galleryAsset.getTimelineAssetCount
         .mockResolvedValueOnce(66_413) // whole timeline before
         .mockResolvedValueOnce(66_410) // whole timeline after — only 3 actually leave
         .mockResolvedValueOnce(56_417); // of this space, still on the timeline via another space
@@ -11203,7 +11209,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
       // Defensive only — "after" should never legitimately exceed "before".
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(10).mockResolvedValueOnce(12);
+      mocks.galleryAsset.getTimelineAssetCount.mockResolvedValueOnce(10).mockResolvedValueOnce(12);
 
       await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({ hiddenAssetCount: 0 });
     });
@@ -11240,7 +11246,10 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
       mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(20).mockResolvedValueOnce(5).mockResolvedValueOnce(0);
+      mocks.galleryAsset.getTimelineAssetCount
+        .mockResolvedValueOnce(20)
+        .mockResolvedValueOnce(5)
+        .mockResolvedValueOnce(0);
 
       const result = await sut.getAlbumTimelineHidePreview(auth, space.id, albumId);
 
@@ -11263,14 +11272,17 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
       // before = 20, after = 20 (nothing actually leaves), retained-in-album = 3.
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(20).mockResolvedValueOnce(20).mockResolvedValueOnce(3);
+      mocks.galleryAsset.getTimelineAssetCount
+        .mockResolvedValueOnce(20)
+        .mockResolvedValueOnce(20)
+        .mockResolvedValueOnce(3);
 
       const result = await sut.getAlbumTimelineHidePreview(auth, space.id, albumId);
 
       expect(result).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 3 });
       // Scoped to the ALBUM, not the whole space — otherwise it would count photos that were never
       // in the album and the sentence would be wrong.
-      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+      expect(mocks.galleryAsset.getTimelineAssetCount).toHaveBeenNthCalledWith(
         3,
         expect.objectContaining({ albumId, albumSpaceIds: [space.id] }),
         stubTrx,
@@ -11287,7 +11299,10 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
       mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(8).mockResolvedValueOnce(8).mockResolvedValueOnce(0);
+      mocks.galleryAsset.getTimelineAssetCount
+        .mockResolvedValueOnce(8)
+        .mockResolvedValueOnce(8)
+        .mockResolvedValueOnce(0);
 
       await expect(sut.getAlbumTimelineHidePreview(auth, space.id, albumId)).resolves.toEqual({
         hiddenAssetCount: 0,
@@ -11537,7 +11552,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces
+      mocks.galleryAsset.getByLibraryIdWithFaces
         .mockResolvedValueOnce([{ id: assetId1 }, { id: assetId2 }])
         .mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
@@ -11546,8 +11561,8 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.asset.getByLibraryIdWithFaces).toHaveBeenCalledWith(libraryId, 1000, 0);
-      expect(mocks.asset.getByLibraryIdWithFaces).toHaveBeenCalledWith(libraryId, 1000, 2);
+      expect(mocks.galleryAsset.getByLibraryIdWithFaces).toHaveBeenCalledWith(libraryId, 1000, 0);
+      expect(mocks.galleryAsset.getByLibraryIdWithFaces).toHaveBeenCalledWith(libraryId, 1000, 2);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonDedup,
         data: { spaceId },
@@ -11561,7 +11576,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.isAssetInSpace.mockResolvedValue(true);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -11606,7 +11621,7 @@ describe(SharedSpaceService.name, () => {
       const libraryId = newUuid();
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValue([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValue([]);
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
       expect(result).toBe(JobStatus.Success);
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
@@ -11630,7 +11645,7 @@ describe(SharedSpaceService.name, () => {
         .mockResolvedValueOnce(true) // initial check
         .mockResolvedValueOnce(true) // first batch check inside loop
         .mockResolvedValueOnce(false); // second batch check — unlinked
-      mocks.asset.getByLibraryIdWithFaces
+      mocks.galleryAsset.getByLibraryIdWithFaces
         .mockResolvedValueOnce([{ id: assetId1 }])
         .mockResolvedValueOnce([{ id: assetId2 }]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
@@ -11640,7 +11655,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toBe(JobStatus.Success);
       // Only first batch should be processed
-      expect(mocks.asset.getByLibraryIdWithFaces).toHaveBeenCalledTimes(1);
+      expect(mocks.galleryAsset.getByLibraryIdWithFaces).toHaveBeenCalledTimes(1);
       expect(mocks.sharedSpace.getAssetFacesForMatching).toHaveBeenCalledTimes(1);
     });
 
@@ -11653,7 +11668,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
         { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
@@ -11683,7 +11698,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
         { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
@@ -11714,7 +11729,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
         { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
@@ -11748,7 +11763,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
         { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
@@ -11785,7 +11800,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
         { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
@@ -11820,7 +11835,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
         { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
@@ -11843,7 +11858,7 @@ describe(SharedSpaceService.name, () => {
     it('should queue full-space identity reconciliation after linked library face sync changes space evidence', async () => {
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1', faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
-      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: 'asset-1' }]).mockResolvedValueOnce([]);
+      mocks.galleryAsset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: 'asset-1' }]).mockResolvedValueOnce([]);
       mockOneAffectedSpacePerson();
 
       await sut.handleSharedSpaceLibraryFaceSync({ spaceId: 'space-1', libraryId: 'library-1' });
@@ -11882,7 +11897,7 @@ describe(SharedSpaceService.name, () => {
       const albumId = newUuid();
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
-      mocks.asset.getByAlbumIdWithFaces.mockResolvedValue([]);
+      mocks.galleryAsset.getByAlbumIdWithFaces.mockResolvedValue([]);
       const result = await sut.handleSharedSpaceAlbumFaceSync({ spaceId, albumId });
       expect(result).toBe(JobStatus.Success);
       expect(mocks.job.queue).toHaveBeenCalledTimes(1);
@@ -11903,7 +11918,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
-      mocks.asset.getByAlbumIdWithFaces
+      mocks.galleryAsset.getByAlbumIdWithFaces
         .mockResolvedValueOnce([{ id: assetId1 }, { id: assetId2 }])
         .mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
@@ -11912,8 +11927,8 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceAlbumFaceSync({ spaceId, albumId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.asset.getByAlbumIdWithFaces).toHaveBeenCalledWith(albumId, spaceId, 1000, 0);
-      expect(mocks.asset.getByAlbumIdWithFaces).toHaveBeenCalledWith(albumId, spaceId, 1000, 2);
+      expect(mocks.galleryAsset.getByAlbumIdWithFaces).toHaveBeenCalledWith(albumId, spaceId, 1000, 0);
+      expect(mocks.galleryAsset.getByAlbumIdWithFaces).toHaveBeenCalledWith(albumId, spaceId, 1000, 2);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonDedup,
         data: { spaceId },
@@ -11931,7 +11946,7 @@ describe(SharedSpaceService.name, () => {
         .mockResolvedValueOnce(true) // initial check
         .mockResolvedValueOnce(true) // first batch check inside loop
         .mockResolvedValueOnce(false); // second batch check — unlinked
-      mocks.asset.getByAlbumIdWithFaces
+      mocks.galleryAsset.getByAlbumIdWithFaces
         .mockResolvedValueOnce([{ id: assetId1 }])
         .mockResolvedValueOnce([{ id: assetId2 }]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
@@ -11941,7 +11956,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toBe(JobStatus.Success);
       // Only first batch should be processed
-      expect(mocks.asset.getByAlbumIdWithFaces).toHaveBeenCalledTimes(1);
+      expect(mocks.galleryAsset.getByAlbumIdWithFaces).toHaveBeenCalledTimes(1);
       expect(mocks.sharedSpace.getAssetFacesForMatching).toHaveBeenCalledTimes(1);
     });
   });

@@ -4,10 +4,10 @@ import { Readable } from 'node:stream';
 import type { UserMetadataItem } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { SALT_ROUNDS } from 'src/constants.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { AuthDto, SignUpDto } from 'src/dtos/auth.dto.js';
 import { AuthType, JobName, Permission } from 'src/enum.js';
+import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { AuthService } from 'src/services/auth.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -1204,7 +1204,7 @@ describe(AuthService.name, () => {
 
         // OAuth profile pictures now flow through the thumbnail pipeline, which produces
         // a file named `{uuid}.{thumbnail-format}`. The default thumbnail format is webp.
-        const expectedRelativeKey = StorageCore.getRelativeProfileImagePath(user.id, `${fileId}.webp`);
+        const expectedRelativeKey = getRelativeProfileImagePath(user.id, `${fileId}.webp`);
         expect(mockS3Backend.put).toHaveBeenCalledWith(expectedRelativeKey, expect.anything(), {
           contentType: 'image/webp',
         });

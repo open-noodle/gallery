@@ -15,6 +15,7 @@ import { AlbumUserRole, AssetStatus, AssetVisibility, MemoryType, SharedLinkType
 import { SearchOptionsRequestDto, searchOptionsDimensions } from 'src/gallery/dtos/search.dto.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -79,6 +80,7 @@ const seed = async () => {
       AssetEditRepository,
       AssetFavoriteRepository,
       AssetRepository,
+      GalleryAssetRepository,
       ConfigRepository,
       CryptoRepository,
       DatabaseRepository,

@@ -876,7 +876,7 @@ describe(SearchRepository.name, () => {
     });
   });
 
-  // #763 E10 — sibling of the withTimeBucketAssetFilters block in asset.repository.spec.ts, for
+  // #763 E10 — sibling of the withTimeBucketAssetFilters block in time-bucket-filter.spec.ts, for
   // the search builder. `asset_favorite` rows outlive access loss by design (spec §5.2), so an
   // `isFavorite` search is only safe because the favorite predicate is ANDed with a scope
   // recomputed from live membership: the timelineSpaceIds arm while the caller has member-spaces,
