@@ -4,6 +4,7 @@
   "add_all_search_results": "Dodaj wszystkie {count, plural, one {# wynik} few {# wyniki} many {# wyników} other {# wyników}} do...",
   "add_to_album_or_space": "Dodaj do albumu lub Space",
   "add_to_album_toggle": "Przełącz zaznaczenie dla {album}",
+  "add_to_collection_non_owned_space_albums_only": "Twój wybór zawiera zdjęcia należące do innych osób. Można je dodać tylko do albumów w Space, w którym jesteś właścicielem lub edytorem.",
   "add_to_collection_restricted_to_space": "Twój wybór zawiera zdjęcia należące do innych członków, więc mogą je przyjąć tylko albumy w tym Space.",
   "add_to_collections_count": "Dodaj do {count}",
   "add_to_shared_album": "Dodaj do udostępnionego albumu",

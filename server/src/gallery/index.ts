@@ -6,6 +6,7 @@ import { LibraryManifestController } from 'src/controllers/library-manifest.cont
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
+import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
@@ -19,6 +20,7 @@ import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repos
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
+import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
@@ -53,6 +55,7 @@ export const galleryControllers = [
   ClassificationController,
   FaceRepairAdminController,
   FaceSuggestionController,
+  GalleryAlbumController,
   GalleryAssetController,
   GalleryMapController,
   GalleryPeopleController,
@@ -92,6 +95,7 @@ export const galleryServices = [
   FaceIdentityMaintenanceService,
   FaceRepairService,
   FaceSuggestionService,
+  GalleryAlbumService,
   GalleryAssetService,
   GalleryPeopleService,
   GalleryPluginService,
