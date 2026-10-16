@@ -36,4 +36,4 @@
   };
 </script>
 
-<CollectionPickerModal assetCount={assetIds.length} onClose={handleClose} {restrictToSpaceId} />
+<CollectionPickerModal assetCount={assetIds.length} onClose={handleClose} {restrictToSpaceId} {assetIds} />
