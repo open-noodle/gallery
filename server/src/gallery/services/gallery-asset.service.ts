@@ -11,6 +11,7 @@ import {
   isNeutralImageAdjust,
 } from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
+import { checkAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -58,7 +59,7 @@ export class GalleryAssetService extends BaseService {
   async getEditable(auth: AuthDto, dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
     // Deliberately a bare access check, not a second implementation of the rule: this IS
     // the same call the write will make, so the answer cannot drift from enforcement.
-    const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
+    const editable = await checkAssetEditAccess(this.accessRepository, { auth, ids: dto.assetIds });
     return { editableAssetIds: [...editable] };
   }
 

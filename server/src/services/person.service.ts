@@ -41,6 +41,7 @@ import {
   SystemMetadataKey,
   VectorIndex,
 } from 'src/enum.js';
+import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { PersonId } from 'src/repositories/person.repository.js';
@@ -1141,7 +1142,7 @@ export class PersonService extends BaseService {
   // TODO return a asset face response
   async createFace(auth: AuthDto, dto: AssetFaceCreateDto): Promise<void> {
     await Promise.all([
-      this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [dto.assetId] }),
+      requireAssetEditAccess(this.accessRepository, { auth, ids: [dto.assetId] }),
       this.requireAccess({ auth, permission: Permission.PersonRead, ids: [dto.personId] }),
     ]);
 

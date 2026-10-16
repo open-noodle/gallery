@@ -420,20 +420,14 @@ exports[`checkAccess oracle > asset.update 1`] = `
   "owner": [
     "albumSpaceAsset",
     "archivedSpaceAsset",
-    "contributedAsset",
-    "editorAsset",
     "libraryAsset",
     "ownAsset",
     "spaceAsset",
     "stackAsset",
   ],
   "spaceEditor": [
-    "albumSpaceAsset",
-    "archivedSpaceAsset",
     "contributedAsset",
     "editorAsset",
-    "libraryAsset",
-    "spaceAsset",
   ],
 }
 `;
@@ -782,6 +776,29 @@ exports[`checkAccess oracle > queueJob.delete 1`] = `{}`;
 exports[`checkAccess oracle > queueJob.read 1`] = `{}`;
 
 exports[`checkAccess oracle > queueJob.update 1`] = `{}`;
+
+exports[`checkAccess oracle > requireAssetEditAccess 1`] = `
+{
+  "owner": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "ownAsset",
+    "spaceAsset",
+    "stackAsset",
+  ],
+  "spaceEditor": [
+    "albumSpaceAsset",
+    "archivedSpaceAsset",
+    "contributedAsset",
+    "editorAsset",
+    "libraryAsset",
+    "spaceAsset",
+  ],
+}
+`;
 
 exports[`checkAccess oracle > server.about 1`] = `{}`;
 
