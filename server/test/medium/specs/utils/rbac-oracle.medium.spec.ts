@@ -815,17 +815,22 @@ describe('viewer-scope RBAC oracle', () => {
     const result: Record<string, unknown> = {};
     for (const [actor, auth] of Object.entries(world.actors)) {
       const detail: string[] = [];
+      const canEdit: string[] = [];
       for (const id of Object.values(world.assets)) {
         const asset = await attempt(
           () => assetService.get(auth, id),
           (dto) => dto,
         );
+        if ((asset as { canEdit?: boolean }).canEdit) {
+          canEdit.push(name(id));
+        }
         if (typeof asset === 'object' && asset) {
           detail.push(...assetList([asset as { id: string; isFavorite?: boolean }]));
         }
       }
       result[actor] = {
         detail: sorted(detail),
+        canEdit: sorted(canEdit),
         statistics: await attempt(
           () => assetService.getStatistics(auth, {}),
           (stats) => stats,

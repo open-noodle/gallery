@@ -24,12 +24,10 @@ export class StackService extends BaseService {
   async create(auth: AuthDto, dto: StackCreateDto): Promise<StackResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
 
-    // #734: AssetUpdate now grants a space Owner/Editor write access over other members'
-    // assets, but stacking is owner-only filing — and StackUpdate/StackDelete are
-    // stack-owner-only, so a stack created over someone else's assets would leave the
-    // asset owner unable to manage it. AssetDelete is the pure owner arm (checkOwnerAccess,
-    // same hasElevatedPermission as the AssetUpdate gate's isOwner sub-check). Mirrors the
-    // rbac-3 shape in asset.service.ts.
+    // #734: stacking is owner-only filing — StackUpdate/StackDelete are stack-owner-only, so a
+    // stack created over someone else's assets would leave the asset owner unable to manage it.
+    // AssetDelete is the pure owner arm (checkOwnerAccess, same hasElevatedPermission as the
+    // AssetUpdate gate). Kept explicit so the rule never depends on how AssetUpdate is granted.
     const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: dto.assetIds });
     if (ownedIds.size !== new Set(dto.assetIds).size) {
       throw new ForbiddenException('Stacks can only be created from assets you own');

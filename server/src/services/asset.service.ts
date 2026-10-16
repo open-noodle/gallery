@@ -41,6 +41,7 @@ import {
 } from 'src/enum.js';
 import { applyVisibilityTransitionSideEffects } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { updateAssetFavorites } from 'src/gallery/services/gallery-asset.service.js';
+import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { applyAssetResponseOverlay } from 'src/gallery/utils/asset-response-overlay.js';
 import { logCrossOwnerEdit } from 'src/gallery/utils/cross-owner-edit.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -120,10 +121,10 @@ export class AssetService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: UpdateAssetDto): Promise<AssetResponseDto> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
 
     // rbac-3: visibility AND livePhotoVideoId are owner-only structural writes (see updateAll). A space editor
-    // holds AssetUpdate over other members' assets via checkSpaceEditAccess, but must not flip their visibility
+    // holds edit access over other members' assets via checkSpaceEditAccess, but must not flip their visibility
     // (fleet-wide tombstone) or re-link their motion video. Reject if either is set on an asset the caller does
     // not own; other metadata (description/rating/…) stays editor-allowed. Runs BEFORE the livePhotoVideoId
     // link/unlink side-effects and the visibility transition helper below.
@@ -233,10 +234,10 @@ export class AssetService extends BaseService {
       dateTimeRelative,
       timeZone,
     } = dto;
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids });
 
     // rbac-3: `visibility` is destructive — flipping an asset to Locked/Hidden strips it from the owner's
-    // albums (removeAssetsFromAll) and #757-tombstones it off every member device. AssetUpdate grants a space
+    // albums (removeAssetsFromAll) and #757-tombstones it off every member device. Edit access grants a space
     // EDITOR that power over OTHER members' direct+library+album assets (checkSpaceEditAccess), which would let
     // an editor wipe another member's asset fleet-wide. Restrict visibility to OWNED ids: reject the whole request
     // if visibility is set on any id the caller does not own. This guard MUST run before the write and the
@@ -603,7 +604,7 @@ export class AssetService extends BaseService {
   }
 
   async upsertBulkMetadata(auth: AuthDto, dto: AssetMetadataBulkUpsertDto): Promise<AssetMetadataBulkResponseDto[]> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.items.map((item) => item.assetId) });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: dto.items.map((item) => item.assetId) });
 
     const uniqueKeys = new Set<string>();
     for (const item of dto.items) {
@@ -619,7 +620,7 @@ export class AssetService extends BaseService {
   }
 
   async upsertMetadata(auth: AuthDto, id: string, dto: AssetMetadataUpsertDto): Promise<AssetMetadataResponseDto[]> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
 
     const uniqueKeys = new Set<string>();
     for (const { key } of dto.items) {
@@ -644,17 +645,17 @@ export class AssetService extends BaseService {
   }
 
   async deleteMetadataByKey(auth: AuthDto, id: string, key: string): Promise<void> {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: [id] });
     return this.assetRepository.deleteMetadataByKey(id, key);
   }
 
   async deleteBulkMetadata(auth: AuthDto, dto: AssetMetadataBulkDeleteDto) {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.items.map((item) => item.assetId) });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: dto.items.map((item) => item.assetId) });
     await this.assetRepository.deleteBulkMetadata(dto.items);
   }
 
   async run(auth: AuthDto, dto: AssetJobsDto) {
-    await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
+    await requireAssetEditAccess(this.accessRepository, { auth, ids: dto.assetIds });
 
     const jobs: JobItem[] = [];
 
