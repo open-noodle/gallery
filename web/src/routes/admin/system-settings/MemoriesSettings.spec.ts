@@ -136,7 +136,7 @@ describe('MemoriesSettings', () => {
     );
   });
 
-  // Mirrors MEMORY_TYPE_METADATA in server/src/services/memory-rules/memory-type.metadata.ts.
+  // Mirrors MEMORY_TYPE_METADATA in server/src/gallery/services/memory-rules/memory-type.metadata.ts.
   // Guards against the UI list drifting out of sync with the server registry — a type missing
   // here is a type no admin can ever turn off.
   const ALL_MEMORY_TYPE_KEYS = [

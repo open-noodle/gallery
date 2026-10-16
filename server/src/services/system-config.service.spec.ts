@@ -18,7 +18,7 @@ import {
   VideoCodec,
   VideoContainer,
 } from 'src/enum.js';
-import { MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata.js';
+import { MEMORY_TYPE_KEYS } from 'src/gallery/services/memory-rules/memory-type.metadata.js';
 import { SystemConfigService } from 'src/services/system-config.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';

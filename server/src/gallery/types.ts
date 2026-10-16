@@ -179,7 +179,10 @@ export type GalleryJobItem =
   | { name: JobName.AssetClassify; data: IEntityJob }
 
   // Face Repair
-  | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob };
+  | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob }
+
+  // Rule memories
+  | { name: JobName.MemoryRuleGenerate; data?: IBaseJob };
 
 export type RuleMemoryData = {
   ruleId: string;

@@ -95,6 +95,9 @@ apply to Immich unchanged and can be offered upstream; Immich has not been conta
   does the same to older rows. Stock clients receive only on-this-day memories, so they see fewer and smaller cards
   than Immich would make, and a stock server after a rollback keeps the reduced set. The alternative, a fork
   reservation table applied per client, touches the generator, search, four sync streams and audit synthesis.
+- **The memories union** (`memoryAccessibleTo`, `server/src/gallery/utils/memory-access.ts`): `GET /memories` lists
+  a memory through a hand-written owner/partner/Space union rather than `ownedOrSharedWithViewer`, because that helper
+  would admit archived Space assets and drop the offline-library filter.
 - **Fork facts in upstream rows.** Rule 1 holds for the schema, not for the data. Pets are `person` and `asset_face`
   rows, and their faces carry `sourceType = 'machine-learning'`, so a stock face re-detect deletes them (the
   switch-back guide warns against it during a trial). Also in upstream rows: `memory.type = 'rule'`,

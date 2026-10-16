@@ -34,6 +34,7 @@ import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
+import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
@@ -131,4 +132,5 @@ export const galleryServices = [
   StorageMigrationService,
   StorageUsageService,
   UserGroupService,
+  RuleMemoryService,
 ];
