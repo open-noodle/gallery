@@ -7,6 +7,12 @@
     type SpaceAlbumGroup,
   } from '$lib/utils/space-album-grouping';
   import LazyChunks from '$lib/gallery/components/lazy-chunks.svelte';
+  import SpaceAlbumsTableHeader from '$lib/components/spaces/space-albums-table-header.svelte';
+  import {
+    SpaceAlbumSortBy,
+    spaceAlbumMenuColumnStyle,
+    spaceAlbumSortOptionsMetadata,
+  } from '$lib/utils/space-album-sort';
   import { buildFolderSummaries, EMPTY_FOLDER_SUMMARY, getFolderContents } from '$lib/utils/space-album-folders';
   import { dateFormats } from '$lib/constants';
   import { Route } from '$lib/route';
@@ -70,27 +76,34 @@
   <tr
     class="flex w-full place-items-center border-3 border-transparent p-2 text-center odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
   >
-    <td class="text-md w-8/12 items-center text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">
-      <a
-        href={Route.viewSpaceAlbum({ spaceId, albumId: album.id })}
-        data-testid="space-album-row-{album.id}"
-        class="hover:text-immich-primary"
-      >
-        {album.albumName}
-      </a>
-    </td>
-    <td class="text-md text-center text-ellipsis sm:w-2/12 md:w-2/12 xl:w-[15%] 2xl:w-[12%]">
-      {$t('items_count', { values: { count: album.assetCount } })}
-    </td>
-    <td class="text-md hidden w-3/12 text-center text-ellipsis sm:block xl:w-[15%] 2xl:w-[12%]">
-      {dateLocaleString(album.updatedAt)}
-    </td>
-    <td class="text-md hidden w-3/12 text-center text-ellipsis sm:block xl:w-[15%] 2xl:w-[12%]">
-      {dateLocaleString(album.createdAt)}
-    </td>
+    {#each spaceAlbumSortOptionsMetadata as option (option.id)}
+      <td class="text-md text-ellipsis {option.columnStyle}">
+        {#if option.id === SpaceAlbumSortBy.Title}
+          <a
+            href={Route.viewSpaceAlbum({ spaceId, albumId: album.id })}
+            data-testid="space-album-row-{album.id}"
+            class="hover:text-immich-primary"
+          >
+            {album.albumName}
+          </a>
+        {:else if option.id === SpaceAlbumSortBy.ItemCount}
+          {$t('items_count', { values: { count: album.assetCount } })}
+        {:else if option.id === SpaceAlbumSortBy.DateModified}
+          {dateLocaleString(album.updatedAt)}
+        {:else if option.id === SpaceAlbumSortBy.DateCreated}
+          {dateLocaleString(album.createdAt)}
+        {:else if option.id === SpaceAlbumSortBy.MostRecentPhoto}
+          {album.endDate ? dateLocaleString(album.endDate) : '-'}
+        {:else if option.id === SpaceAlbumSortBy.OldestPhoto}
+          {album.startDate ? dateLocaleString(album.startDate) : '-'}
+        {:else if option.id === SpaceAlbumSortBy.RecentlyLinked}
+          {dateLocaleString(album.linkedAt)}
+        {/if}
+      </td>
+    {/each}
     <!-- Every member sees the menu (the "my timeline" item is a personal preference, not an
          editor action); only canManage adds the space-wide items. -->
-    <td class="text-md w-1/12 text-end" data-testid="space-album-row-menu-{album.id}">
+    <td class="text-md {spaceAlbumMenuColumnStyle}" data-testid="space-album-row-menu-{album.id}">
       <!-- @immich/ui only mounts the menu once opened; see space-album-card. -->
       <ContextMenuButton
         aria-label={$t('more')}
@@ -132,51 +145,51 @@
     class="flex w-full place-items-center border-3 border-transparent p-2 text-center odd:bg-subtle/80 even:bg-subtle/20 hover:border-immich-primary/75 md:px-5 md:py-2 odd:dark:bg-immich-dark-gray/75 even:dark:bg-immich-dark-gray/50 dark:hover:border-immich-dark-primary/75"
     data-testid="space-album-folder-row-{folder.id}"
   >
-    <td
-      class="text-md flex w-8/12 items-center gap-2 text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]"
-    >
-      <Icon icon={mdiFolder} size="20" />
-      <!-- An anchor, not a click handler on the <tr>: album rows in this same table are links,
-           and a row that only responds to a mouse click is unreachable by keyboard and announces
-           nothing to a screen reader. Going through the real URL also gives folders the
-           middle-click / open-in-new-tab / deep-link behaviour albums already have. The click
-           handler stays so the page can navigate client-side without a full load. -->
-      <a
-        href={Route.viewSpaceAlbums({ id: spaceId, folderId: folder.id })}
-        class="hover:text-immich-primary"
-        data-testid="space-album-folder-link-{folder.id}"
-        onclick={(event) => {
-          if (!onOpenFolder) {
-            return;
-          }
-          event.preventDefault();
-          onOpenFolder(folder);
-        }}
-      >
-        {folder.name}
-      </a>
-    </td>
-    <td class="text-md text-center text-ellipsis sm:w-2/12 md:w-2/12 xl:w-[15%] 2xl:w-[12%]">
-      {$t('space_album_folder_albums_count', {
-        values: { count: (folderSummaries.get(folder.id) ?? EMPTY_FOLDER_SUMMARY).albumCount },
-      })}
-    </td>
-    <td class="text-md hidden w-3/12 text-center text-ellipsis sm:block xl:w-[15%] 2xl:w-[12%]"></td>
-    <td class="text-md hidden w-3/12 text-center text-ellipsis sm:block xl:w-[15%] 2xl:w-[12%]"></td>
-    {#if canManage}
-      <td class="text-md w-1/12 text-end"></td>
-    {/if}
+    {#each spaceAlbumSortOptionsMetadata as option (option.id)}
+      {#if option.id === SpaceAlbumSortBy.Title}
+        <td class="text-md flex items-center gap-2 text-ellipsis {option.columnStyle}">
+          <Icon icon={mdiFolder} size="20" />
+          <!-- An anchor, not a click handler on the <tr>: album rows in this same table are links,
+             and a row that only responds to a mouse click is unreachable by keyboard and announces
+             nothing to a screen reader. Going through the real URL also gives folders the
+             middle-click / open-in-new-tab / deep-link behaviour albums already have. The click
+             handler stays so the page can navigate client-side without a full load. -->
+          <a
+            href={Route.viewSpaceAlbums({ id: spaceId, folderId: folder.id })}
+            class="hover:text-immich-primary"
+            data-testid="space-album-folder-link-{folder.id}"
+            onclick={(event) => {
+              if (!onOpenFolder) {
+                return;
+              }
+              event.preventDefault();
+              onOpenFolder(folder);
+            }}
+          >
+            {folder.name}
+          </a>
+        </td>
+      {:else if option.id === SpaceAlbumSortBy.ItemCount}
+        <td class="text-md text-ellipsis {option.columnStyle}">
+          {$t('space_album_folder_albums_count', {
+            values: { count: (folderSummaries.get(folder.id) ?? EMPTY_FOLDER_SUMMARY).albumCount },
+          })}
+        </td>
+      {:else}
+        <td class="text-md text-ellipsis {option.columnStyle}"></td>
+      {/if}
+    {/each}
+    <td class="text-md {spaceAlbumMenuColumnStyle}"></td>
   </tr>
 {/snippet}
 
 <table class="w-full text-start">
   <thead>
     <tr class="flex w-full place-items-center border-3 border-transparent p-2 text-center md:px-5 md:py-2">
-      <th class="text-md w-8/12 text-start sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">{$t('album_name')}</th>
-      <th class="text-md w-4/12 text-center sm:w-2/12 md:w-2/12 xl:w-[15%] 2xl:w-[12%]">{$t('sort_items')}</th>
-      <th class="text-md hidden text-center sm:block xl:w-[15%] 2xl:w-[12%]">{$t('sort_modified')}</th>
-      <th class="text-md hidden text-center sm:block xl:w-[15%] 2xl:w-[12%]">{$t('date_created')}</th>
-      <th class="text-md w-1/12 text-end"></th>
+      {#each spaceAlbumSortOptionsMetadata as option (option.id)}
+        <SpaceAlbumsTableHeader {option} />
+      {/each}
+      <th class="text-md {spaceAlbumMenuColumnStyle}"></th>
     </tr>
   </thead>
   {#if levelFolders.length > 0}
