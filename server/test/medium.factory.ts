@@ -24,6 +24,7 @@ import {
 } from 'src/enum.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -693,6 +694,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case GallerySyncRepository:
     case ImageAdjustRepository:
     case StorageUsageRepository:
+    case GalleryDuplicateRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -787,6 +789,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case VideoTrimRepository:
     case ImageAdjustRepository:
     case StorageUsageRepository:
+    case GalleryDuplicateRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:

@@ -8,6 +8,7 @@ import { UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -178,6 +179,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   VideoTrimRepository,
   ImageAdjustRepository,
   StorageUsageRepository,
+  GalleryDuplicateRepository,
 ] as const;
 
 @Injectable()
@@ -266,6 +268,7 @@ export class BaseService {
     protected videoTrimRepository: VideoTrimRepository,
     protected imageAdjustRepository: ImageAdjustRepository,
     protected storageUsageRepository: StorageUsageRepository,
+    protected galleryDuplicateRepository: GalleryDuplicateRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -382,6 +385,7 @@ export class BaseService {
       ctx.videoTrimRepository,
       ctx.imageAdjustRepository,
       ctx.storageUsageRepository,
+      ctx.galleryDuplicateRepository,
     );
 
     service.logger.setContext(BaseService.name);

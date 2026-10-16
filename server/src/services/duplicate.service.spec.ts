@@ -725,7 +725,7 @@ describe(DuplicateService.name, () => {
 
       expect(result[0].success).toBe(true);
       expect(mocks.asset.getChecksumsByIds).toHaveBeenCalledWith([asset2.id]);
-      expect(mocks.duplicateRepository.createChecksumTombstones).toHaveBeenCalledWith([
+      expect(mocks.galleryDuplicate.createChecksumTombstones).toHaveBeenCalledWith([
         { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum },
       ]);
     });
@@ -751,7 +751,7 @@ describe(DuplicateService.name, () => {
       });
 
       expect(result[0].success).toBe(true);
-      expect(mocks.duplicateRepository.createChecksumTombstones).toHaveBeenCalledWith([
+      expect(mocks.galleryDuplicate.createChecksumTombstones).toHaveBeenCalledWith([
         { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum: checksum2 },
         { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum: checksum3 },
       ]);
@@ -774,7 +774,7 @@ describe(DuplicateService.name, () => {
       });
 
       expect(result[0].success).toBe(true);
-      expect(mocks.duplicateRepository.createChecksumTombstones).toHaveBeenCalledWith([
+      expect(mocks.galleryDuplicate.createChecksumTombstones).toHaveBeenCalledWith([
         { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum },
       ]);
     });
@@ -794,7 +794,7 @@ describe(DuplicateService.name, () => {
 
       expect(result[0].success).toBe(true);
       expect(mocks.asset.getChecksumsByIds).not.toHaveBeenCalled();
-      expect(mocks.duplicateRepository.createChecksumTombstones).not.toHaveBeenCalled();
+      expect(mocks.galleryDuplicate.createChecksumTombstones).not.toHaveBeenCalled();
     });
 
     it('should succeed even if tombstone insert fails', async () => {
@@ -806,7 +806,7 @@ describe(DuplicateService.name, () => {
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
       });
       mocks.asset.getChecksumsByIds.mockResolvedValue([{ id: asset2.id, checksum: Buffer.from('aa', 'hex') }]);
-      mocks.duplicateRepository.createChecksumTombstones.mockRejectedValue(new Error('DB error'));
+      mocks.galleryDuplicate.createChecksumTombstones.mockRejectedValue(new Error('DB error'));
 
       const result = await sut.resolve(authStub.admin, {
         groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
@@ -829,7 +829,7 @@ describe(DuplicateService.name, () => {
 
       expect(result[0].success).toBe(true);
       expect(mocks.asset.getChecksumsByIds).not.toHaveBeenCalled();
-      expect(mocks.duplicateRepository.createChecksumTombstones).not.toHaveBeenCalled();
+      expect(mocks.galleryDuplicate.createChecksumTombstones).not.toHaveBeenCalled();
     });
   });
 

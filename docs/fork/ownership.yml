@@ -296,6 +296,7 @@ features:
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
       - server/src/repositories/duplicate.repository.ts
+      - server/src/gallery/repositories/gallery-duplicate.repository*.ts
     upstream_extension_paths:
       - server/src/config.ts
       - server/src/dtos/system-config.dto.ts

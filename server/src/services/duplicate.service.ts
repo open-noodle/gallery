@@ -291,7 +291,7 @@ export class DuplicateService extends BaseService {
       try {
         const trashedChecksums = await this.assetRepository.getChecksumsByIds(idsToTrash);
         const keepAssetId = idsToKeep[0];
-        await this.duplicateRepository.createChecksumTombstones(
+        await this.galleryDuplicateRepository.createChecksumTombstones(
           trashedChecksums.map(({ checksum }) => ({
             assetId: keepAssetId,
             ownerId: auth.user.id,
