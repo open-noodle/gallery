@@ -28,6 +28,13 @@ export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
 
 @Injectable()
 export class FaceIdentityMaintenanceService extends BaseService {
+  /** An instance for `ctx` that logs under ctx's context, as these helpers did inside PersonService. */
+  static createFor(ctx: BaseService) {
+    const service = BaseService.create(FaceIdentityMaintenanceService, ctx);
+    service.logger.setContext(ctx.constructor.name);
+    return service;
+  }
+
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
     await this.queueInitialFaceSuggestionSweep();
