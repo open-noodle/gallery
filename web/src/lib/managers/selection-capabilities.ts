@@ -24,13 +24,6 @@ export interface SelectionCapabilities {
    */
   shareScopedToSpace: boolean;
   canAddToAlbum: boolean;
-  /**
-   * The add-to-collection picker must offer only albums linked to this space, because the
-   * selection contains assets the user does not own. Those can only land as #764
-   * contributions (`album_space_asset`), which requires a space-linked album — never a
-   * personal album, a brand-new album, or any space's direct pool.
-   */
-  addToAlbumRestrictedToSpace: boolean;
   canFavorite: boolean;
   /**
    * Rotate, ChangeDate, ChangeDescription, ChangeLocation. True on the editable *subset* of
@@ -57,7 +50,6 @@ const NO_CAPABILITIES: SelectionCapabilities = {
   canShare: false,
   shareScopedToSpace: false,
   canAddToAlbum: false,
-  addToAlbumRestrictedToSpace: false,
   canFavorite: false,
   canEditMetadata: false,
   canSetVisibility: false,
@@ -122,7 +114,6 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
     canShare: sel.ownedSelectedAssetIds.length > 0 || isSpaceEditor,
     shareScopedToSpace: isSpaceEditor && !sel.isAllUserOwned,
     canAddToAlbum: sel.isAllUserOwned || isSpaceEditor,
-    addToAlbumRestrictedToSpace: !sel.isAllUserOwned && isSpaceEditor,
     // Not `isAllUserOwned` (#763): a favorite is a per-user row in the `asset_favorite` overlay,
     // not a flag on the asset, so favoriting never mutates someone else's asset. Any viewer who
     // can see the selection may favorite it — including a shared-space member favoriting another
