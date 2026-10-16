@@ -506,14 +506,7 @@
       {/if}
 
       {#if assetViewerManager.isFaceEditMode && videoPlayer && hasLoadedMetadata}
-        <FaceEditorPanel
-          htmlElement={videoPlayer}
-          {containerWidth}
-          {containerHeight}
-          {assetId}
-          {asset}
-          onClose={() => assetViewerManager.closeFaceEditMode()}
-        />
+        <FaceEditorPanel htmlElement={videoPlayer} {containerWidth} {containerHeight} {assetId} {asset} />
       {/if}
     {/if}
   </div>

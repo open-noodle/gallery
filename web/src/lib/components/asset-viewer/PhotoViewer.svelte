@@ -306,7 +306,6 @@
       {containerHeight}
       assetId={asset.id}
       {asset}
-      onClose={() => assetViewerManager.closeFaceEditMode()}
     />
   {/if}
 </div>

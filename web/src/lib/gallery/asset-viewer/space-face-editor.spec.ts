@@ -2,8 +2,10 @@ import type { SharedSpacePersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import FaceEditor from '$lib/components/asset-viewer/face-editor/FaceEditor.svelte';
+import { getFaceEditorSpace } from '$lib/gallery/asset-viewer/space-face-editor';
+import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
 import { renderWithTooltips } from '$tests/helpers';
-import SpaceFaceEditor from './SpaceFaceEditor.svelte';
 
 const { getSpacePeopleMock, createSpaceAssetFaceMock, modalShowMock } = vi.hoisted(() => ({
   getSpacePeopleMock: vi.fn(),
@@ -34,8 +36,8 @@ vi.mock('@immich/ui', async (importOriginal) => {
 });
 
 // Fabric.js draws to a real 2D canvas context, which happy-dom does not implement. The drag
-// GEOMETRY itself is covered directly and exhaustively by face-box-drag.spec.ts (the module this
-// component and the owner FaceEditor both call into) -- this stub only needs to let the component
+// GEOMETRY itself is covered directly and exhaustively by face-box-drag.spec.ts (the module
+// FaceEditor calls into) -- this stub only needs to let the component
 // mount and let getBoundingRect() return a stable box so the "which person did you pick" wiring
 // under test here can run without a real canvas.
 vi.mock('fabric', () => {
@@ -96,18 +98,21 @@ const spacePerson = (overrides: Partial<SharedSpacePersonResponseDto> = {}): Sha
     ...overrides,
   }) as SharedSpacePersonResponseDto;
 
-const renderEditor = (props: { onClose?: () => void } = {}) =>
-  renderWithTooltips(SpaceFaceEditor, {
+// Upstream's FaceEditor in its space mode: it closes itself through assetViewerManager.
+const renderEditor = (props: { onClose?: () => void } = {}) => {
+  vi.spyOn(assetViewerManager, 'closeFaceEditMode').mockImplementation(props.onClose ?? vi.fn());
+  return renderWithTooltips(FaceEditor, {
     htmlElement: image(2000, 1000),
     containerWidth: 1000,
     containerHeight: 1000,
     assetId: 'asset-1',
-    spaceId: 'space-1',
-    onClose: props.onClose ?? vi.fn(),
+    spaceFaces: getFaceEditorSpace('space-1', 'asset-1'),
   });
+};
 
-describe('SpaceFaceEditor', () => {
+describe('FaceEditor with getFaceEditorSpace', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     getSpacePeopleMock.mockReset();
     createSpaceAssetFaceMock.mockReset();
     modalShowMock.mockReset();
@@ -179,7 +184,7 @@ describe('SpaceFaceEditor', () => {
 
   /**
    * The reported bug: tagging from the ON-PHOTO editor left both the People row and the face boxes
-   * over the photo showing their pre-tag contents until a full page reload. This component simply
+   * over the photo showing their pre-tag contents until a full page reload. The editor simply
    * called `onClose()` and told nothing to re-read.
    *
    * Asserting the refresh happens BEFORE `onClose` matters -- closing first unmounts the editor,
