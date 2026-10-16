@@ -46,6 +46,6 @@ describe.skipIf(!hasUpstreamTag)(
         .stdout.split('\n')
         .filter(Boolean);
       expect(deleted.filter((file) => !isForkDeletedPath(file))).toEqual([]);
-    });
+    }, 60_000); // a whole-tree diff against the tag takes ~11 s
   },
 );
