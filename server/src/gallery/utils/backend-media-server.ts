@@ -1,12 +1,13 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { CLS_REQ, ClsServiceManager } from 'nestjs-cls';
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { Request } from 'express';
 import type { GenerateThumbnailOptions, ImageDimensions, UploadFile } from 'src/types.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
@@ -175,6 +176,74 @@ export class BackendMediaServer {
     const { StorageService } = await import('../../services/storage.service.js');
     // no media location: this backend only ever receives absolute paths
     return StorageService.backendFor(key, new DiskStorageBackend('', this.deps.storageRepository));
+  }
+
+  /** Whether `path` exists on its backend; with `readable`, a disk file must also be readable. */
+  async exists(path: string, options?: { readable?: boolean }): Promise<boolean> {
+    const backend = await this.backendFor(path);
+    return backend.exists(path, options);
+  }
+
+  /**
+   * Writes `data` to `path` unless something is already there, on the disk (creating its folder) or the S3 backend.
+   * Returns whether it wrote.
+   */
+  async writeFileIfMissing(path: string, data: Buffer, contentType: string): Promise<boolean> {
+    const { storageRepository } = this.deps;
+    if (isDiskPath(path)) {
+      if (await storageRepository.checkFileExists(path)) {
+        return false;
+      }
+      storageRepository.mkdirSync(dirname(path));
+      await storageRepository.createFile(path, data);
+      return true;
+    }
+
+    const backend = await this.backendFor(path);
+    if (await backend.exists(path)) {
+      return false;
+    }
+    await backend.put(path, data, { contentType });
+    return true;
+  }
+
+  /**
+   * Runs `write` on the sidecar at `sidecarPath`: in place on disk; for an S3 key against a local temp file that is
+   * then uploaded. An existing S3 sidecar is downloaded first so its contents are kept; otherwise `write` creates a
+   * fresh XMP at the temp path.
+   */
+  async writeSidecar(sidecarPath: string, write: (localPath: string) => Promise<unknown>): Promise<void> {
+    if (isDiskPath(sidecarPath)) {
+      await write(sidecarPath);
+      return;
+    }
+
+    const { storageRepository } = this.deps;
+    const backend = await this.backendFor(sidecarPath);
+    const sidecarExists = await backend.exists(sidecarPath);
+    let localSidecar: { localPath: string; cleanup: () => Promise<void> };
+    if (sidecarExists) {
+      localSidecar = await this.ensureLocalFile(sidecarPath);
+    } else {
+      const tempPath = join(tmpdir(), `immich-sidecar-${randomUUID()}.xmp`);
+      localSidecar = {
+        localPath: tempPath,
+        cleanup: async () => {
+          try {
+            await storageRepository.unlink(tempPath);
+          } catch {
+            // ignore — file may never have been created if the write failed
+          }
+        },
+      };
+    }
+    try {
+      await write(localSidecar.localPath);
+      const stream = storageRepository.createPlainReadStream(localSidecar.localPath);
+      await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
+    } finally {
+      await localSidecar.cleanup();
+    }
   }
 
   /** The configured write backend when it is not the disk: a locally written file then has to be uploaded to it. */
