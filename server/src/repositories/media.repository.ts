@@ -37,6 +37,7 @@ import {
   LogLevel,
   RawExtractedFormat,
 } from 'src/enum.js';
+import { applyImageAdjust } from 'src/gallery/utils/image-adjust.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { handlePromiseError } from 'src/utils/misc.js';
 import { createAffineMatrix } from 'src/utils/transform.js';
@@ -217,15 +218,20 @@ export class MediaRepository {
 
   /* Resamples in linear light; averaging gamma-encoded values darkens the result and loses detail. `colorspace`
    * always has a sRGB transfer function and scRGB applies no primaries matrix, so linearising as sRGB is exact. */
-  private transform(image: Bitmap, { size, fit = 'outside', edits = [] }: TransformOptions): Promise<Bitmap> {
-    if (!size && edits.length === 0) {
-      return Promise.resolve(image);
+  private async transform(
+    image: Bitmap,
+    { size, fit = 'outside', edits = [], adjust }: TransformOptions,
+  ): Promise<Bitmap> {
+    if (!size && edits.length === 0 && !adjust) {
+      return image;
     }
 
-    return this.edit(this.raw(image).pipelineColorspace('scrgb'), edits)
+    const transformed = await this.edit(this.raw(image).pipelineColorspace('scrgb'), edits)
       .resize(size, size, { fit, withoutEnlargement: true })
       .raw()
       .toBuffer({ resolveWithObject: true });
+    // Gallery: the colour adjustment is defined on encoded values, so it runs on this pass's output, not inside it.
+    return adjust ? applyImageAdjust(transformed, adjust) : transformed;
   }
 
   private raw({ data, info: raw }: Bitmap) {
@@ -244,7 +250,8 @@ export class MediaRepository {
   async generateThumbhash(image: Bitmap, options: GenerateThumbhashOptions): Promise<Buffer> {
     const { rgbaToThumbHash } = await import('thumbhash');
 
-    const transformed = await this.transform(image, { edits: options.edits, fit: 'inside', size: 100 });
+    const { edits, adjust } = options;
+    const transformed = await this.transform(image, { edits, adjust, fit: 'inside', size: 100 });
 
     const { data, info } = await sharp(transformed.data, { raw: transformed.info })
       .ensureAlpha()

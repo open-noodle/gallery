@@ -11,6 +11,7 @@ import { SystemConfig } from 'src/dtos/config.dto.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
@@ -182,6 +183,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   FaceSearchRepository,
   GallerySyncRepository,
   VideoTrimRepository,
+  ImageAdjustRepository,
 ] as const;
 
 @Injectable()
@@ -271,6 +273,7 @@ export class BaseService {
     protected faceSearchRepository: FaceSearchRepository,
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
+    protected imageAdjustRepository: ImageAdjustRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -388,6 +391,7 @@ export class BaseService {
       ctx.faceSearchRepository,
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
+      ctx.imageAdjustRepository,
     );
 
     service.logger.setContext(BaseService.name);
