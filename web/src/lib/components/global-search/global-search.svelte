@@ -267,7 +267,7 @@
         if (live.adminOnly && !isAdmin) {
           return false;
         }
-        const liveFlagEnabled = live.featureFlag ? flags?.[live.featureFlag] : true;
+        const liveFlagEnabled = !live.featureFlag || flags?.[live.featureFlag];
         return Boolean(liveFlagEnabled);
       });
     })(),
@@ -291,7 +291,7 @@
         if (item.category !== 'userPages') {
           return false;
         }
-        const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+        const itemFlagEnabled = !item.featureFlag || flags?.[item.featureFlag];
         return Boolean(itemFlagEnabled);
       });
     })(),

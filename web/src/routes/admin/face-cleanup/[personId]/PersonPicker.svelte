@@ -55,7 +55,7 @@
   // `lockOnMove` stays at its unreachable-toggle default (true) when the toggle is hidden — a caller that
   // opens the picker with showLock:false has no way to honour a lock either way, so the resolved destination
   // must say so truthfully rather than echoing a checkbox state the admin never saw or touched.
-  const effectiveLock = $derived(showLock ? lockOnMove : false);
+  const effectiveLock = $derived(showLock && lockOnMove);
 
   const unnamedLabel = () => $t('admin.face_cleanup_review_unnamed');
   const displayName = (name: string) => (name.trim() ? name : unnamedLabel());

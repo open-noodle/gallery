@@ -74,8 +74,8 @@ export function buildRecentlyAddedSuggestionRequest(filters: FilterState) {
     tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
     rating: filters.rating,
     isFavorite: filters.isFavorite,
-    isNotInAlbum: filters.isNotInAlbum === true ? true : undefined,
-    isInAlbum: filters.isInAlbum === true ? true : undefined,
+    isNotInAlbum: filters.isNotInAlbum === true || undefined,
+    isInAlbum: filters.isInAlbum === true || undefined,
     mediaType:
       filters.mediaType === 'all'
         ? undefined

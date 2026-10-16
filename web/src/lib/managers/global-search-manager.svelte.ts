@@ -572,7 +572,7 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      const itemFlagEnabled = !item.featureFlag || flags?.[item.featureFlag];
       if (!itemFlagEnabled) {
         continue;
       }
@@ -585,7 +585,7 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      const itemFlagEnabled = !item.featureFlag || flags?.[item.featureFlag];
       if (!itemFlagEnabled) {
         continue;
       }
@@ -2047,7 +2047,7 @@ export class GlobalSearchManager {
         this.close();
         return;
       }
-      const liveNavFlagEnabled = liveNavItem.featureFlag ? flags?.[liveNavItem.featureFlag] : true;
+      const liveNavFlagEnabled = !liveNavItem.featureFlag || flags?.[liveNavItem.featureFlag];
       if (!liveNavFlagEnabled) {
         console.warn('[cmdk] purging stale recent — feature flag disabled', entry.id);
         removeEntry(entry.id);
@@ -2314,7 +2314,7 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      const itemFlagEnabled = !item.featureFlag || flags?.[item.featureFlag];
       if (!itemFlagEnabled) {
         continue;
       }
@@ -2387,7 +2387,7 @@ export class GlobalSearchManager {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
-      const itemFlagEnabled = item.featureFlag ? flags?.[item.featureFlag] : true;
+      const itemFlagEnabled = !item.featureFlag || flags?.[item.featureFlag];
       if (!itemFlagEnabled) {
         continue;
       }
