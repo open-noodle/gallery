@@ -139,6 +139,7 @@ function selectedChoiceFromLiveChoice(
 }
 
 type TopSearchMatch = { id: 'top-search'; query: string; rawQuery: string };
+type SearchBelowTopMatch = { id: 'top-search-below'; query: string; rawQuery: string };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 // Slice size for the albums section. Kept as a named constant so the buildProviders
@@ -2338,6 +2339,22 @@ export class GlobalSearchManager {
       return null;
     }
     return { id: 'top-search', query: this.typedSearchPlainQuery || query, rawQuery: query };
+  });
+
+  /**
+   * The free-text search row listed directly under a promoted command or navigation match, so a query that
+   * names a command ("sign", "theme", "face") can still be searched for (#1155). The promoted match keeps the
+   * top slot and Enter; this row is one ArrowDown away. Null whenever `topSearchMatch` owns the top slot.
+   */
+  searchBelowTopMatch = $derived.by<SearchBelowTopMatch | null>(() => {
+    const query = this.query.trim();
+    if (this.scope !== 'all' || query.length === 0) {
+      return null;
+    }
+    if (this.topCommandMatch === null && this.topNavigationMatch === null) {
+      return null;
+    }
+    return { id: 'top-search-below', query: this.typedSearchPlainQuery || query, rawQuery: query };
   });
 
   /**
