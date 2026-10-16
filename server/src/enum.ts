@@ -407,7 +407,6 @@ export enum SystemMetadataKey {
   MediaLocation = 'MediaLocation',
   ReverseGeocodingState = 'reverse-geocoding-state',
   FacialRecognitionState = 'facial-recognition-state',
-  PetRecognitionState = 'pet-recognition-state',
   MemoriesState = 'memories-state',
   AdminOnboarding = 'admin-onboarding',
   MaintenanceMode = 'maintenance-mode',
@@ -416,6 +415,7 @@ export enum SystemMetadataKey {
   VersionCheckState = 'version-check-state',
   License = 'license',
   IntegrityChecksumCheckpoint = 'integrity-checksum-checkpoint',
+  PetRecognitionState = 'pet-recognition-state',
   ClassificationConfigState = 'classification-config-state',
   SharedSpaceFaceJobCleanupState = 'shared-space-face-job-cleanup-state',
   FaceSuggestionDefaultOnState = 'face-suggestion-default-on-state',
@@ -715,10 +715,10 @@ export enum ImmichWorker {
 export enum ImmichTelemetry {
   Host = 'host',
   Api = 'api',
-  App = 'app',
   Io = 'io',
   Repo = 'repo',
   Job = 'job',
+  App = 'app',
 }
 
 export enum ExifOrientation {
@@ -1457,7 +1457,6 @@ export enum ApiTag {
   AuthenticationAdmin = 'Authentication (admin)',
   Assets = 'Assets',
   AssetFiles = 'Asset files',
-  Classification = 'Classification',
   ConfigUser = 'Config (user)',
   ConfigAdmin = 'Config (admin)',
   ConfigPublic = 'Config (public)',
@@ -1483,9 +1482,7 @@ export enum ApiTag {
   Server = 'Server',
   Sessions = 'Sessions',
   SharedLinks = 'Shared links',
-  SharedSpaces = 'Shared Spaces',
   Stacks = 'Stacks',
-  StorageMigration = 'Storage Migration (admin)',
   Sync = 'Sync',
   SystemConfig = 'System config',
   SystemMetadata = 'System metadata',
@@ -1494,9 +1491,14 @@ export enum ApiTag {
   Trash = 'Trash',
   UsersAdmin = 'Users (admin)',
   Users = 'Users',
-  UserGroups = 'User Groups',
   Views = 'Views',
   Workflows = 'Workflows',
+
+  // Gallery fork tags
+  Classification = 'Classification',
+  SharedSpaces = 'Shared Spaces',
+  StorageMigration = 'Storage Migration (admin)',
+  UserGroups = 'User Groups',
 }
 
 export const WorkflowTriggerSchema = z

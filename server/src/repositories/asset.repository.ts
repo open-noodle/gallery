@@ -935,23 +935,21 @@ export class AssetRepository {
   )
   @ChunkedArray({ paramIndex: 0 })
   getByIdsWithAllRelationsButStacks(ids: string[], viewingUserId?: string, authUserId?: string) {
-    return (
-      this.db
-        .selectFrom('asset')
-        .selectAll('asset')
-        .select(projectedDuration)
-        .select(withFacesAndPeople({ viewingUserId }))
-        .select(withTags)
-        .$call(withExif)
-        // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
-        // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
-        // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
-        // It is a SEPARATE parameter from viewingUserId (face/people ordering) on purpose: the two
-        // are the same value for a real caller, but notification.service must set only the former.
-        .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
-        .where('asset.id', '=', anyUuid(ids))
-        .execute()
-    );
+    // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
+    // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
+    // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
+    // It is a SEPARATE parameter from viewingUserId (face/people ordering) on purpose: the two
+    // are the same value for a real caller, but notification.service must set only the former.
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .select(projectedDuration)
+      .select(withFacesAndPeople({ viewingUserId }))
+      .select(withTags)
+      .$call(withExif)
+      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+      .where('asset.id', '=', anyUuid(ids))
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -977,25 +975,23 @@ export class AssetRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, 1000, 0] })
   getByAlbumIdWithFaces(albumId: string, spaceId: string, limit = 1000, offset = 0) {
-    return (
-      this.db
-        .selectFrom('asset')
-        // #752 P1-7 / D1-b: link-time face sync must also page retained contributions on re-link, and
-        // only those made through the syncing space, so an S2 link-sync never pages an S1 contribution.
-        .innerJoin(
-          (eb) => albumMembership(eb, [albumId], { spaceId }).as('album_members'),
-          (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
-        )
-        .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-        .select('asset.id')
-        .where('asset.deletedAt', 'is', null)
-        .where('asset.isOffline', '=', false)
-        .groupBy('asset.id')
-        .orderBy('asset.id')
-        .limit(limit)
-        .offset(offset)
-        .execute()
-    );
+    // #752 P1-7 / D1-b: link-time face sync must also page retained contributions on re-link, and
+    // only those made through the syncing space, so an S2 link-sync never pages an S1 contribution.
+    return this.db
+      .selectFrom('asset')
+      .innerJoin(
+        (eb) => albumMembership(eb, [albumId], { spaceId }).as('album_members'),
+        (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
+      )
+      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+      .select('asset.id')
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .groupBy('asset.id')
+      .orderBy('asset.id')
+      .limit(limit)
+      .offset(offset)
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })

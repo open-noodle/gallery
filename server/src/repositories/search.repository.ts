@@ -424,17 +424,15 @@ export class SearchRepository {
     ],
   })
   async searchRandom(size: number, options: AssetSearchOptions) {
-    return (
-      searchAssetBuilderWithLocalTaken(this.db, options)
-        .select(columns.searchAsset)
+    return searchAssetBuilderWithLocalTaken(this.db, options)
+      .select(columns.searchAsset)
+      .$if(!!options.authUserId, (qb) =>
         // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
-        .$if(!!options.authUserId, (qb) =>
-          qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
-        )
-        .orderBy(sql`random()`)
-        .limit(size)
-        .execute()
-    );
+        qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+      )
+      .orderBy(sql`random()`)
+      .limit(size)
+      .execute();
   }
 
   // TODO(v4): remove with the deprecated flat-field search API
@@ -453,22 +451,20 @@ export class SearchRepository {
   })
   searchLargeAssets(size: number, options: LargeAssetSearchOptions) {
     const orderDirection = (options.orderDirection?.toLowerCase() || 'desc') as OrderByDirection;
-    return (
-      searchAssetBuilderWithLocalTaken(this.db, options)
-        .select(columns.searchAsset)
+    return searchAssetBuilderWithLocalTaken(this.db, options)
+      .select(columns.searchAsset)
+      .$if(!!options.authUserId, (qb) =>
         // #763: see searchMetadata above for why this lives per-caller rather than in searchAssetBuilderLegacy.
-        .$if(!!options.authUserId, (qb) =>
-          qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
-        )
-        .$call(withExifInner)
-        .$if(options.visibility !== AssetVisibility.Hidden, (qb) =>
-          qb.where('asset.visibility', '!=', sql.lit(AssetVisibility.Hidden)),
-        )
-        .where('asset_exif.fileSizeInByte', '>', options.minFileSize || 0)
-        .orderBy('asset_exif.fileSizeInByte', orderDirection)
-        .limit(size)
-        .execute()
-    );
+        qb.select((eb) => favoriteExistsFor(eb, options.authUserId!).as('isFavoriteForUser')),
+      )
+      .$call(withExifInner)
+      .$if(options.visibility !== AssetVisibility.Hidden, (qb) =>
+        qb.where('asset.visibility', '!=', sql.lit(AssetVisibility.Hidden)),
+      )
+      .where('asset_exif.fileSizeInByte', '>', options.minFileSize || 0)
+      .orderBy('asset_exif.fileSizeInByte', orderDirection)
+      .limit(size)
+      .execute();
   }
 
   // TODO(v4): remove with the deprecated flat-field search API
@@ -749,52 +745,52 @@ export class SearchRepository {
       );
     };
 
-    return (
-      this.db
-        .withRecursive('cte', (qb) => {
-          const base = qb
-            .selectFrom('asset_exif')
-            .select(['city', 'assetId'])
-            .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-            .where(viewerScope())
-            .where('asset.visibility', '=', AssetVisibility.Timeline)
-            .where('asset.type', '=', AssetType.Image)
-            .where('asset.deletedAt', 'is', null)
-            .orderBy('city')
-            .limit(1);
+    return this.db
+      .withRecursive('cte', (qb) => {
+        const base = qb
+          .selectFrom('asset_exif')
+          .select(['city', 'assetId'])
+          .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+          .where(viewerScope())
+          .where('asset.visibility', '=', AssetVisibility.Timeline)
+          .where('asset.type', '=', AssetType.Image)
+          .where('asset.deletedAt', 'is', null)
+          .orderBy('city')
+          .limit(1);
 
-          const recursive = qb
-            .selectFrom('cte')
-            .select(['l.city', 'l.assetId'])
-            .innerJoinLateral(
-              (qb) =>
-                qb
-                  .selectFrom('asset_exif')
-                  .select(['city', 'assetId'])
-                  .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-                  .where(viewerScope())
-                  .where('asset.visibility', '=', AssetVisibility.Timeline)
-                  .where('asset.type', '=', AssetType.Image)
-                  .where('asset.deletedAt', 'is', null)
-                  .whereRef('asset_exif.city', '>', 'cte.city')
-                  .orderBy('city')
-                  .limit(1)
-                  .as('l'),
-              (join) => join.onTrue(),
-            );
+        const recursive = qb
+          .selectFrom('cte')
+          .select(['l.city', 'l.assetId'])
+          .innerJoinLateral(
+            (qb) =>
+              qb
+                .selectFrom('asset_exif')
+                .select(['city', 'assetId'])
+                .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+                .where(viewerScope())
+                .where('asset.visibility', '=', AssetVisibility.Timeline)
+                .where('asset.type', '=', AssetType.Image)
+                .where('asset.deletedAt', 'is', null)
+                .whereRef('asset_exif.city', '>', 'cte.city')
+                .orderBy('city')
+                .limit(1)
+                .as('l'),
+            (join) => join.onTrue(),
+          );
 
-          return sql<{ city: string; assetId: string }>`(${base} union all ${recursive})`;
-        })
-        .selectFrom('asset')
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .innerJoin('cte', 'asset.id', 'cte.assetId')
-        .select(columns.searchAsset)
-        .select((eb) =>
-          eb
-            .fn('to_jsonb', [eb.table('asset_exif')])
-            .$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>()
-            .as('exifInfo'),
-        )
+        return sql<{ city: string; assetId: string }>`(${base} union all ${recursive})`;
+      })
+      .selectFrom('asset')
+      .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+      .innerJoin('cte', 'asset.id', 'cte.assetId')
+      .select(columns.searchAsset)
+      .select((eb) =>
+        eb
+          .fn('to_jsonb', [eb.table('asset_exif')])
+          .$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>()
+          .as('exifInfo'),
+      )
+      .$if(!!authUserId, (qb) =>
         // #763: project the per-user overlay for the CALLER onto the rows feeding
         // search.service.ts's getAssetsByCity -> mapAsset. The `eb` here is scoped to
         // `DB & { cte: ... }` (the `withRecursive('cte', ...)` above), which Kysely's
@@ -802,14 +798,12 @@ export class SearchRepository {
         // `ExpressionBuilder<DB, keyof DB>` favoriteExistsFor expects, even though the
         // 'asset_favorite' table it queries is unaffected by the extra CTE in scope. Safe cast
         // (same mechanism as asset.repository.ts's getTimeBucket).
-        .$if(!!authUserId, (qb) =>
-          qb.select((eb) =>
-            favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, authUserId!).as('isFavoriteForUser'),
-          ),
-        )
-        .orderBy('asset_exif.city')
-        .execute()
-    );
+        qb.select((eb) =>
+          favoriteExistsFor(eb as unknown as ExpressionBuilder<DB, keyof DB>, authUserId!).as('isFavoriteForUser'),
+        ),
+      )
+      .orderBy('asset_exif.city')
+      .execute();
   }
 
   async upsert(assetId: string, embedding: string): Promise<void> {
