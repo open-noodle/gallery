@@ -224,10 +224,6 @@
     };
   });
 
-  $effect(() => {
-    void onTimelineBucketActivate;
-  });
-
   const getAssetPosition = (assetId: string, timelineMonth: TimelineMonth) =>
     timelineMonth.findAssetAbsolutePosition(assetId);
 
