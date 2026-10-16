@@ -2,18 +2,13 @@
   import FaceEditorPanel from '$lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import VideoRemoteViewer from '$lib/components/asset-viewer/VideoRemoteViewer.svelte';
   import { assetViewerFadeDuration } from '$lib/constants';
+  import { persistVideoVolume } from '$lib/gallery/asset-viewer/video-volume';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { castManager } from '$lib/managers/cast-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { mediaCapabilitiesManager } from '$lib/managers/media-capabilities-manager.svelte';
-  import {
-    autoPlayVideo,
-    lang,
-    loopVideo as loopVideoPreference,
-    videoViewerMuted,
-    videoViewerVolume,
-  } from '$lib/stores/preferences.store';
+  import { autoPlayVideo, lang, loopVideo as loopVideoPreference } from '$lib/stores/preferences.store';
   import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '$lib/utils';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
   import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';
@@ -64,14 +59,6 @@
     onVideoEnded?: () => void;
     onVideoStarted?: () => void;
     onClose?: () => void;
-    /**
-     * Slice 8 gap closure — the same rule DetailPanel.svelte's People row and PhotoViewer.svelte's
-     * FaceEditorPanel use for THIS same asset (`resolveCanEditSpacePeople`). See
-     * `FaceEditorPanel.svelte` for how these two decide between the owner `FaceEditor` and the
-     * space-flavoured `SpaceFaceEditor`.
-     */
-    spaceId?: string;
-    canEditSpacePeople?: boolean;
   }
 
   let {
@@ -84,8 +71,6 @@
     onPreviousAsset = () => {},
     onNextAsset = () => {},
     onVideoEnded = () => {},
-    spaceId,
-    canEditSpacePeople = false,
     onVideoStarted = () => {},
     onClose = () => {},
   }: Props = $props();
@@ -350,21 +335,6 @@
     event.currentTarget?.dispatchEvent(new Event('timeupdate'));
   };
   const onSeeked = () => (isScrubbing = false);
-
-  const onVolumeChange = (event: Event) => {
-    const video = event.currentTarget as HTMLVideoElement;
-    $videoViewerMuted = video.muted;
-    $videoViewerVolume = video.volume;
-  };
-
-  $effect(() => {
-    if (!videoPlayer) {
-      return;
-    }
-
-    videoPlayer.muted = $videoViewerMuted;
-    videoPlayer.volume = $videoViewerVolume;
-  });
 </script>
 
 <svelte:body
@@ -427,7 +397,6 @@
             oncanplay={(e: Event) => handleCanPlay(e.currentTarget as HTMLVideoElement)}
             onloadedmetadata={() => (hasLoadedMetadata = true)}
             onended={onVideoEnded}
-            onvolumechange={onVolumeChange}
             onseeking={onSeeking}
             onseeked={onSeeked}
             onplaying={(e: Event) => {
@@ -439,7 +408,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
-            muted={$videoViewerMuted}
+            {@attach persistVideoVolume}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></hls-video>
         {:else}
@@ -456,7 +425,6 @@
             oncanplay={(e) => handleCanPlay(e.currentTarget)}
             onloadedmetadata={() => (hasLoadedMetadata = true)}
             onended={onVideoEnded}
-            onvolumechange={onVolumeChange}
             onseeking={onSeeking}
             onseeked={onSeeked}
             onplaying={(e) => {
@@ -468,7 +436,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
-            muted={$videoViewerMuted}
+            {@attach persistVideoVolume}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></video>
         {/if}
@@ -543,8 +511,7 @@
           {containerWidth}
           {containerHeight}
           {assetId}
-          {spaceId}
-          {canEditSpacePeople}
+          {asset}
           onClose={() => assetViewerManager.closeFaceEditMode()}
         />
       {/if}

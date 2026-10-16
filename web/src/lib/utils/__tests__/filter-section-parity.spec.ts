@@ -53,7 +53,7 @@ describe('filter section parity (#802)', () => {
 
   it('exposes every section on the album asset picker', () => {
     // The picker is NOT album-scoped server-side: `timelineAlbumId` is stripped from the request
-    // (timeline-manager/internal/request-options.ts), so isInAlbum/isNotInAlbum work here and are
+    // (lib/gallery/timeline/request-options.ts), so isInAlbum/isNotInAlbum work here and are
     // in fact the most useful way to find un-filed photos to add.
     expect(buildAlbumAssetPickerFilterConfig().sections).toEqual([...ALL_FILTER_SECTIONS]);
   });

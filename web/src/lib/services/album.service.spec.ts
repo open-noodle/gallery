@@ -2,19 +2,14 @@
 import { AlbumUserRole, BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
 import type { BulkIdResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { addAssetsToAlbumWithOutcome, handleLinkAlbumToSpace } from '$lib/gallery/album-actions';
 import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
-import {
-  addAssetsToAlbumWithOutcome,
-  getAlbumActions,
-  handleLinkAlbumToSpace,
-  notifyAddToAlbum,
-} from './album.service';
+import { getAlbumActions, notifyAddToAlbum } from './album.service';
 
 const linkAlbum = vi.fn();
 const showModal = vi.fn();
 const primary = vi.fn();
-const info = vi.fn();
-const warning = vi.fn();
+const danger = vi.fn();
 const handleError = vi.fn();
 
 const addAssetToAlbum = vi.fn();
@@ -36,8 +31,7 @@ vi.mock('@immich/ui', async (orig) => ({
   modalManager: { show: (...a: unknown[]) => showModal(...a) },
   toastManager: {
     primary: (...a: unknown[]) => primary(...a),
-    info: (...a: unknown[]) => info(...a),
-    warning: (...a: unknown[]) => warning(...a),
+    danger: (...a: unknown[]) => danger(...a),
   },
 }));
 
@@ -92,7 +86,7 @@ describe('handleLinkAlbumToSpace', () => {
   });
 });
 
-describe('notifyAddToAlbum — truthful severity (#764)', () => {
+describe('notifyAddToAlbum (upstream immich-30976 severity)', () => {
   const $t = ((key: string, opts?: { values?: Record<string, unknown> }) =>
     `${key}:${JSON.stringify(opts?.values ?? {})}`) as never;
 
@@ -104,44 +98,40 @@ describe('notifyAddToAlbum — truthful severity (#764)', () => {
     error: BulkIdErrorReason.NoPermission as never,
   });
 
-  it('all succeeded → green success toast (primary) with View album', () => {
+  it('all succeeded → primary toast with View album', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [ok('a'), ok('b')]);
     expect(primary).toHaveBeenCalledTimes(1);
-    expect(warning).not.toHaveBeenCalled();
+    expect(danger).not.toHaveBeenCalled();
     const [item] = primary.mock.calls[0];
     expect(item.description).toBe('assets_added_to_album_count:{"count":2}');
     expect(item.button).toBeDefined();
   });
 
-  it('nothing added (all no_permission) → warning toast, NEVER primary, no View album', () => {
+  it('nothing added (all no_permission) → danger toast, never primary', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [denied('a'), denied('b')]);
     expect(primary).not.toHaveBeenCalled();
-    expect(warning).toHaveBeenCalledTimes(1);
-    const [item] = warning.mock.calls[0];
-    expect(item.description).toBe('assets_cannot_be_added_to_album_count:{"count":2}');
-    expect(item.button).toBeUndefined();
+    expect(danger).toHaveBeenCalledTimes(1);
+    expect(danger.mock.calls[0][0].description).toBe('assets_cannot_be_added_to_album_count:{"count":2}');
   });
 
-  it('all duplicates → info toast (already in album), not primary', () => {
+  it('all duplicates → primary toast saying they were already in the album', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [dup('a'), dup('b')]);
-    expect(primary).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledTimes(1);
-    expect(info.mock.calls[0][0].description).toBe('assets_were_part_of_album_count:{"count":2}');
+    expect(primary).toHaveBeenCalledTimes(1);
+    expect(primary.mock.calls[0][0].description).toBe('assets_were_part_of_album_count:{"count":2}');
   });
 
-  it('partial success → info toast (not full green), keeps View album', () => {
+  it('partial success → primary toast with the partial count and View album', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [ok('a'), denied('b')]);
-    expect(primary).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledTimes(1);
-    const [item] = info.mock.calls[0];
+    expect(primary).toHaveBeenCalledTimes(1);
+    const [item] = primary.mock.calls[0];
     expect(item.description).toBe('assets_added_to_album_partial_count:{"successCount":1,"totalCount":2}');
     expect(item.button).toBeDefined();
   });
 
-  it('nothing added, mix of duplicate + no_permission → warning, not primary', () => {
+  it('nothing added, mix of duplicate + no_permission → danger, not primary', () => {
     notifyAddToAlbum($t, 'album-1', ['a', 'b'], [dup('a'), denied('b')]);
     expect(primary).not.toHaveBeenCalled();
-    expect(warning).toHaveBeenCalledTimes(1);
+    expect(danger).toHaveBeenCalledTimes(1);
   });
 });
 

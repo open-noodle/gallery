@@ -98,6 +98,20 @@ features:
       - server/src/gallery/utils/space-album-contribution.ts
       - server/src/gallery/utils/timeline-scope.ts
       - server/src/gallery/utils/duplicate-resolve.ts
+      - web/src/lib/gallery/viewer-space.ts
+      - web/src/lib/gallery/viewer-space.test-helpers.ts
+      # People list page, person page hooks and the space-aware person service (plan 9.3, OD-9).
+      - web/src/lib/gallery/people/**
+      - web/src/lib/gallery/album-actions.ts
+      - web/src/lib/gallery/LinkAlbumToSpaceMenuOption.svelte
+      # The sidebar's Spaces row (plan 9.6).
+      - web/src/lib/gallery/sidebar/SpacesNavItem.svelte
+      # Detail panel People row: person tile and avatar source toggle (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/PersonTile.svelte
+      - web/src/lib/gallery/asset-viewer/AvatarSourceToggle.svelte
+      # The asset's space for the viewer surfaces, and the space face side panel (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/asset-space.ts
+      - web/src/lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -191,6 +205,7 @@ features:
       - server/src/gallery/utils/storage-keys*.ts
       - server/src/gallery/utils/s3-job-skip*.ts
       - server/src/gallery/services/video-trim.service*.ts
+      - web/src/lib/gallery/asset-actions*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts
@@ -287,6 +302,20 @@ features:
       - server/src/gallery/services/memory-rules/**
       - server/src/gallery/services/rule-memory.service*.ts
       - server/src/gallery/utils/memory-access.ts
+      - web/src/lib/gallery/filtered-timeline/timeline-grouping.svelte*.ts
+      - web/src/lib/gallery/filtered-map/**
+      # Video volume persistence for the asset viewer (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/video-volume*.ts
+      # The sidebar's footer, a storage meter on the collapsed rail (plan 9.6).
+      - web/src/lib/gallery/sidebar/SidebarBottomInfo.svelte
+      # Search page scope default, person chip names, selection context and legacy notice (plan 9.6).
+      - web/src/lib/gallery/search/**
+      # Detail panel filter values, album filter, map view and map provider links (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/detail-panel-filters.ts
+      - web/src/lib/gallery/asset-viewer/FilterValue.svelte
+      - web/src/lib/gallery/asset-viewer/AppearsInAlbum.svelte
+      - web/src/lib/gallery/asset-viewer/MapProviderLinks.svelte
+      - web/src/lib/gallery/timeline/**
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts

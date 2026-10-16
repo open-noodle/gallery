@@ -1,12 +1,14 @@
 <script lang="ts">
   import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import { NavbarGroup } from '@immich/ui';
+  import type { ComponentProps } from 'svelte';
 
   interface Props {
     title: string;
+    size?: ComponentProps<typeof NavbarGroup>['size'];
   }
 
-  let { title }: Props = $props();
+  let { title, size = 'tiny' }: Props = $props();
 
   const collapsed = $derived(sidebarModeStore.layout === 'rail' && !sidebarModeStore.railExpanded);
 </script>
@@ -19,9 +21,9 @@
        collapsed and back again on hover. Reserving via the real component rather than a
        hard-coded height keeps the two in step if @immich/ui restyles NavbarGroup. -->
   <div class="relative">
-    <div class="invisible" aria-hidden="true"><NavbarGroup {title} size="tiny" /></div>
+    <div class="invisible" aria-hidden="true"><NavbarGroup {title} {size} /></div>
     <hr data-testid="sidebar-group-divider" class="absolute inset-x-0 top-1/2 mx-3 border-subtle" />
   </div>
 {:else}
-  <NavbarGroup {title} size="tiny" />
+  <NavbarGroup {title} {size} />
 {/if}

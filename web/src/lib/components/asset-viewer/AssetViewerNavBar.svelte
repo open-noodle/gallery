@@ -7,6 +7,7 @@
   import SetVisibilityAction from '$lib/components/asset-viewer/actions/SetVisibilityAction.svelte';
   import LoadingDots from '$lib/components/LoadingDots.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import { getViewerSpace } from '$lib/gallery/viewer-space';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { languageManager } from '$lib/managers/language-manager.svelte';
@@ -42,12 +43,6 @@
     onClose?: () => void;
     isPlayingOriginalVideo: boolean;
     setPlayOriginalVideo: (value: boolean) => void;
-    /**
-     * Present on shared-space surfaces (direct space, space album, space person). Gates and
-     * narrows the add-to-album action for assets the caller does not own — see
-     * `getAssetActions` (#889).
-     */
-    space?: { id: string; canWrite: boolean };
   }
 
   let {
@@ -61,9 +56,9 @@
     onClose,
     isPlayingOriginalVideo = false,
     setPlayOriginalVideo,
-    space,
   }: Props = $props();
 
+  const { space } = $derived.by(getViewerSpace());
   const isOwner = $derived(authManager.authenticated && asset.ownerId === authManager.user.id);
   const isLocked = $derived(asset.visibility === AssetVisibility.Locked);
   // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
@@ -90,7 +85,7 @@
   });
 
   const Actions = $derived(
-    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space, album }),
+    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, album, { space }),
   );
   const StackActions = $derived(getStackActions($t, stack, asset));
   const sharedLink = getSharedLink();

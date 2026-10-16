@@ -4,7 +4,7 @@ import {
   type TimeBucketSize,
   type TimeBucketsResponseDto,
 } from '@immich/sdk';
-import type { AssetApiGetTimeBucketsRequest, TimelineManagerOptions } from '../types';
+import type { AssetApiGetTimeBucketsRequest, TimelineManagerOptions } from '$lib/managers/timeline-manager/types';
 import { toTimeBucketsRequest } from './request-options';
 
 export function getTimelineAlbumQueryOptions(
