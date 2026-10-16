@@ -99,6 +99,21 @@ describe('AssetMediaService.uploadAsset on an S3 write backend', () => {
     expect(mocks.user.updateUsage).not.toHaveBeenCalled();
   });
 
+  it('keeps the uploaded S3 objects when removing the incomplete asset row fails', async () => {
+    const error = new Error('failed after s3 upload');
+    mocks.event.emit.mockRejectedValue(error);
+    mocks.asset.remove.mockRejectedValue(new Error('remove failed'));
+
+    await expect(sut.uploadAsset(authStub.user1, createDto, newFile(), newSidecarFile())).rejects.toThrow();
+
+    expect(mocks.asset.remove).toHaveBeenCalledWith({ id: assetEntity.id });
+    expect(mocks.job.queue).not.toHaveBeenCalledWith({
+      name: JobName.FileDelete,
+      data: { files: [expectedKey, expectedSidecarKey] },
+    });
+    expect(s3Backend.delete).not.toHaveBeenCalled();
+  });
+
   it('deletes uploaded S3 originals directly when the temp cleanup queue fails', async () => {
     const error = new Error('job queue unavailable');
     mocks.job.queue.mockRejectedValueOnce(error);
@@ -147,5 +162,31 @@ describe('AssetMediaService.uploadAsset on an S3 write backend', () => {
       type: AssetFileType.Sidecar,
     });
     expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FileDelete, data: { files: ['/dev/null'] } });
+  });
+});
+
+describe('AssetMediaService.uploadAsset on disk', () => {
+  let sut: AssetMediaService;
+  let mocks: ServiceMocks;
+
+  beforeEach(() => {
+    ({ sut, mocks } = newTestService(AssetMediaService));
+    mocks.asset.create.mockResolvedValue(assetEntity);
+  });
+
+  // #569: a row that outlives its files turns a client retry into a duplicate of a row with no file
+  it('keeps the uploaded files when removing the incomplete asset row fails', async () => {
+    const file = { ...newFile(), originalPath: 'fake_path/asset_1.heic' };
+    mocks.asset.upsertExif.mockRejectedValue(new Error('failed after asset create'));
+    mocks.asset.remove.mockRejectedValue(new Error('remove failed'));
+
+    await expect(sut.uploadAsset(authStub.user1, createDto, file)).rejects.toThrow();
+
+    expect(mocks.asset.remove).toHaveBeenCalledWith({ id: assetEntity.id });
+    expect(mocks.job.queue).not.toHaveBeenCalledWith({
+      name: JobName.FileDelete,
+      data: { files: [file.originalPath, undefined] },
+    });
+    expect(mocks.user.updateUsage).not.toHaveBeenCalled();
   });
 });

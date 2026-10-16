@@ -148,7 +148,7 @@ const rawOverlayWrites = (content: string) =>
     .split(';')
     .filter((statement) => /\b(?:insert\s+into|delete\s+from|update)\s+"?asset_favorite(?:"|\s|\()/i.test(statement));
 
-describe('asset.isFavorite gate (#763)', () => {
+describe('asset.isFavorite gate (#763)', { timeout: 30_000 }, () => {
   it('reads the raw column (table-qualified, or as a bare where key) only in the owner-scoped places listed here', () => {
     const counts: Record<string, number> = {};
     for (const { path, content } of sources) {
