@@ -89,6 +89,12 @@ features:
       - server/src/gallery/dtos/shared-link.dto.ts
       - server/src/gallery/database.ts
       - server/src/gallery/types.ts
+      - web/src/lib/gallery/utils/time-ago.ts
+      - web/src/lib/gallery/utils/editable-assets*.ts
+      - web/src/lib/gallery/stores/spaces-cache*.ts
+      - mobile/lib/gallery/utils/person_thumbnail_url.dart
+      - mobile/test/gallery/utils/person_thumbnail_url_test.dart
+      - mobile/lib/gallery/providers/gallery_action.notifier.dart
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -263,6 +269,7 @@ features:
       - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
       - mobile/test/fixtures/search_contract/**
       - server/src/gallery/utils/smart-search.ts
+      - web/src/lib/gallery/stores/preferences.store*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -309,6 +316,7 @@ features:
       - server/src/services/duplicate.service.ts
       - server/src/repositories/duplicate.repository.ts
       - server/src/gallery/repositories/gallery-duplicate.repository*.ts
+      - web/src/lib/gallery/utils/queue-jobs*.ts
     upstream_extension_paths:
       - server/src/config.ts
       - server/src/dtos/system-config.dto.ts
