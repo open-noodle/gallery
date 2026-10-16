@@ -3,6 +3,7 @@ import type { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType } from 'src/enum.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
@@ -42,6 +43,7 @@ const setup = (db?: Kysely<DB>) => {
       AlbumRepository,
       AccessRepository,
       DuplicateRepository,
+      GalleryDuplicateRepository,
       PersonRepository,
       SharedLinkAssetRepository,
       SharedSpaceRepository,
