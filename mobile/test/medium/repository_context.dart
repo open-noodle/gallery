@@ -132,10 +132,9 @@ class MediumRepositoryContext {
     String? stackId,
     String? thumbHash,
     String? libraryId,
-    // Defaults to createdAt.toLocal() (the pre-existing behaviour). Pass
-    // Value(null) explicitly to simulate an asset synced with no
-    // localDateTime — remote_asset.localDateTime is nullable (S13).
-    Value<DateTime?> localDateTime = const Value.absent(),
+    DateTime? localDateTime,
+    // gallery-fork: simulate an asset synced with no localDateTime — remote_asset.localDateTime is nullable (S13).
+    bool withoutLocalDateTime = false,
   }) async {
     id ??= TestUtils.uuid();
     createdAt ??= TestUtils.date();
@@ -160,7 +159,8 @@ class MediumRepositoryContext {
             isEdited: .new(isEdited ?? false),
             livePhotoVideoId: .new(livePhotoVideoId),
             stackId: .new(stackId),
-            localDateTime: localDateTime.present ? localDateTime : Value(createdAt.toLocal()),
+            localDateTime: withoutLocalDateTime ? const Value(null) : .new(date),
+            groupDate: .new(timelineGroupDate(date)),
             thumbHash: .new(TestUtils.uuid(thumbHash)),
             libraryId: .new(TestUtils.uuid(libraryId)),
           ),
