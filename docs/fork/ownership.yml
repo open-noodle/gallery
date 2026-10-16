@@ -109,6 +109,12 @@ features:
       - web/src/lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte
       - mobile/lib/gallery/remote_album/**
       - mobile/lib/gallery/data/heal_date_time_columns.dart
+      - web/src/lib/gallery/utils/time-ago.ts
+      - web/src/lib/gallery/utils/editable-assets*.ts
+      - web/src/lib/gallery/stores/spaces-cache*.ts
+      - mobile/lib/gallery/utils/person_thumbnail_url.dart
+      - mobile/test/gallery/utils/person_thumbnail_url_test.dart
+      - mobile/lib/gallery/providers/gallery_action.notifier.dart
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -314,6 +320,7 @@ features:
       - mobile/lib/gallery/location_disclosure.dart
       - mobile/test/gallery/location_disclosure_test.dart
       - mobile/lib/gallery/search/**
+      - web/src/lib/gallery/stores/preferences.store*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -361,6 +368,7 @@ features:
       - server/src/repositories/duplicate.repository.ts
       - server/src/gallery/repositories/gallery-duplicate.repository*.ts
       - server/src/gallery/utils/misc.ts
+      - web/src/lib/gallery/utils/queue-jobs*.ts
     upstream_extension_paths:
       - server/src/config.ts
       - server/src/dtos/system-config.dto.ts

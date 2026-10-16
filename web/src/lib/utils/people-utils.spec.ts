@@ -1,7 +1,7 @@
 import { AssetTypeEnum } from '@immich/sdk';
 import { get } from 'svelte/store';
+import { PeopleSortBy, peopleViewSettings } from '$lib/gallery/stores/preferences.store';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
-import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import type { Size } from '$lib/utils/container-utils';
 import {
   appendUniqueById,
