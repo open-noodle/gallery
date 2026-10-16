@@ -524,7 +524,7 @@ export class SharedSpaceRepository {
       .execute();
   }
 
-  // Unhiding is a row DELETE — shared_space_album_hidden_delete_audit (schema/functions.ts) records
+  // Unhiding is a row DELETE — shared_space_album_hidden_delete_audit (schema/gallery-functions.ts) records
   // it so mobile's Drift sync learns about the unhide (§5.1). A no-op delete (nothing was hidden) is
   // not an error.
   async unhideAlbumForUser(spaceId: string, albumId: string, userId: string): Promise<void> {

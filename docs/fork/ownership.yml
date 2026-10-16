@@ -391,6 +391,7 @@ features:
       - mobile/test/gallery/gallery_app_header_test.dart
       - e2e/src/gallery-client.ts
       - e2e/src/specs/server/api/stock-client.e2e-spec.ts
+      - server/src/schema/gallery-functions.ts
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts

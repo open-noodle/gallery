@@ -21,7 +21,7 @@ import { Kysely, sql } from 'kysely';
 //
 // Every statement below is idempotent and asserts the state a healthy database already has, so
 // this is a no-op rewrite for anyone who never touched their schema. All DDL is byte-identical to
-// src/schema/functions.ts and the originating migrations — migration-override-parity.spec.ts and
+// src/schema/gallery-functions.ts and the originating migrations — migration-override-parity.spec.ts and
 // trigger-override-parity.spec.ts pin it.
 export async function up(db: Kysely<any>): Promise<void> {
   // --- #752 F-A: member-join album grant must refresh createId on conflict ---
