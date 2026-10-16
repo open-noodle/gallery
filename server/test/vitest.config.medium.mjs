@@ -15,6 +15,11 @@ export default defineConfig({
     globals: true,
     include: ['test/medium/**/*.spec.ts'],
     globalSetup: ['test/medium/globalSetup.ts'],
+    // Metadata extraction falls back to the server's zone (#1147), so pin it
+    // like the unit config does; otherwise results depend on the machine's zone.
+    env: {
+      TZ: 'UTC',
+    },
   },
   plugins: [swc.vite()],
 });

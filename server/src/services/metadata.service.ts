@@ -26,6 +26,7 @@ import {
   SourceType,
   StorageFolder,
 } from 'src/enum.js';
+import { resolveAssumedUtcVideoZone, resolveDatelessFileDates } from 'src/gallery/utils/metadata-time-zone.js';
 import { ReverseGeocodeResult } from 'src/repositories/map.repository.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -1156,6 +1157,7 @@ export class MetadataService extends BaseService {
       // https://github.com/photostructure/exiftool-vendored.js/issues/203
       timeZone = 'UTC+0';
     }
+    timeZone = resolveAssumedUtcVideoZone(exifTags, dateTime?.rawValue, timeZone);
 
     if (timeZone) {
       this.logger.verbose(
@@ -1205,7 +1207,7 @@ export class MetadataService extends BaseService {
       this.logger.debug(
         `No exif date time found, falling back on ${earliestDate.toISO()}, earliest of file creation and modification for asset ${asset.id}: ${asset.originalPath}`,
       );
-      dateTimeOriginal = localDateTime = earliestDate;
+      ({ timeZone, dateTimeOriginal, localDateTime } = resolveDatelessFileDates(earliestDate, timeZone));
     }
 
     this.logger.verbose(`Found local date time ${localDateTime.toISO()} for asset ${asset.id}: ${asset.originalPath}`);
