@@ -487,6 +487,7 @@ features:
         - server/src/schema/migrations-gallery/1798700000000-AddPersonPetTable.ts
         - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
         - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
+        - server/src/schema/migrations-gallery/1799000000000-AddAssetImageAdjustTable.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
