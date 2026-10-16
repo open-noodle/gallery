@@ -162,6 +162,7 @@ features:
       - web/src/routes/admin/system-settings/BackupSettings.spec.ts
       - docs/docs/features/s3-storage.md
       - docs/docs/administration/remote-database-backups.md
+      - server/src/gallery/repositories/storage-usage.repository*.ts
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
       - web/src/lib/managers/import-manager.svelte.ts

@@ -20,6 +20,7 @@ import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
@@ -94,6 +95,7 @@ export const galleryRepositories = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  StorageUsageRepository,
 ];
 
 export const galleryServices = [
