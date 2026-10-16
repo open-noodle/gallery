@@ -8,7 +8,8 @@ const allowedPages = [
   'src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   'src/routes/(user)/tags/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   'src/routes/(user)/archive/[[photos=photos]]/[[assetId=id]]/+page.svelte',
-  'src/routes/(user)/search/[[photos=photos]]/[[assetId=id]]/+page.svelte',
+  // The search page registers through its fork module.
+  'src/lib/gallery/search/search-page.ts',
   'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte',
 ];
 

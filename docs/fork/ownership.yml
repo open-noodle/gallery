@@ -295,6 +295,8 @@ features:
       - web/src/lib/gallery/asset-viewer/video-volume*.ts
       # The sidebar's footer, a storage meter on the collapsed rail (plan 9.6).
       - web/src/lib/gallery/sidebar/SidebarBottomInfo.svelte
+      # Search page scope default, person chip names, selection context and legacy notice (plan 9.6).
+      - web/src/lib/gallery/search/**
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
