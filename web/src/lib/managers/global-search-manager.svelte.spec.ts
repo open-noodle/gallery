@@ -2966,6 +2966,38 @@ describe('topNavigationMatch', () => {
   });
 });
 
+describe('searchBelowTopMatch (#1155)', () => {
+  it('offers the free-text search under a promoted command, so a word that names a command can still be searched for', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('theme');
+
+    expect(m.topCommandMatch?.id).toBe('cmd:theme');
+    expect(m.topSearchMatch).toBeNull();
+    expect(m.searchBelowTopMatch).toEqual({ id: 'top-search-below', query: 'theme', rawQuery: 'theme' });
+  });
+
+  it('is null when the free-text search already owns the top slot', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('stopsign');
+
+    expect(m.topCommandMatch).toBeNull();
+    expect(m.topSearchMatch).not.toBeNull();
+    expect(m.searchBelowTopMatch).toBeNull();
+  });
+
+  it('is null for an empty query and under a prefix scope', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('');
+    expect(m.searchBelowTopMatch).toBeNull();
+
+    m.setQuery('>theme');
+    expect(m.searchBelowTopMatch).toBeNull();
+  });
+});
+
 describe('topSearchMatch', () => {
   it('is present only for non-empty all-scope queries', () => {
     const m = new GlobalSearchManager();
