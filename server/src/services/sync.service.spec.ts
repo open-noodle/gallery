@@ -857,9 +857,15 @@ describe(SyncService.name, () => {
 
           await streamTypes([...types], SyncEntityType.PersonV1);
 
-          expect(syncSubs.person.getUpserts).toHaveBeenCalledWith(expect.anything(), withPets);
-          expect(syncSubs.assetFace.getUpsertsV2).toHaveBeenCalledWith(expect.anything(), withPets);
-          expect(syncSubs.assetFace.getUpsertsV3).toHaveBeenCalledWith(expect.anything(), withPets);
+          expect(syncSubs.person.getUpserts).toHaveBeenCalledWith(
+            expect.objectContaining({ forkAwareClient: withPets }),
+          );
+          expect(syncSubs.assetFace.getUpsertsV2).toHaveBeenCalledWith(
+            expect.objectContaining({ forkAwareClient: withPets }),
+          );
+          expect(syncSubs.assetFace.getUpsertsV3).toHaveBeenCalledWith(
+            expect.objectContaining({ forkAwareClient: withPets }),
+          );
         }
       });
     });

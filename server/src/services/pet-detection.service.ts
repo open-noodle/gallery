@@ -87,7 +87,7 @@ export class PetDetectionService extends BaseService {
 
     try {
       const recognitionEnabled = isPetRecognitionEnabled(machineLearning);
-      const { pets, imageHeight, imageWidth } = await this.machineLearningRepository.detectPets(
+      const { pets, imageHeight, imageWidth } = await this.galleryMachineLearningRepository.detectPets(
         asset.previewFile,
         machineLearning.petDetection,
         recognitionEnabled ? { modelName: machineLearning.petRecognition.modelName } : undefined,

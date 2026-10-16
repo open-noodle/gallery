@@ -107,7 +107,7 @@ const isForkAwareClient = (dto: SyncStreamDto) => dto.types.some((type) => forkS
  *   and would abort its whole sync. That holds on MemoriesV2 too: a stock app at 3.3+ requests it
  *   from a Gallery server, whose 5.x version clears upstream's 3.3.0 gate.
  */
-const syncedMemoryTypes = (isForkAwareClient: boolean): MemoryType[] =>
+const syncedMemoryTypes = (isForkAwareClient?: boolean): MemoryType[] =>
   isForkAwareClient ? [MemoryType.OnThisDay, MemoryType.Rule] : [MemoryType.OnThisDay];
 
 type BackfillCheckpoint = { type: SyncEntityType; sessionId: string; createId: string };

@@ -58,7 +58,7 @@ export class ServerService extends BaseService {
     }
     this.mlHealthInFlight = (async () => {
       try {
-        const { ok } = await this.machineLearningRepository.ping();
+        const { ok } = await this.galleryMachineLearningRepository.ping();
         const value: ServerMlHealthResponseDto = { smartSearchHealthy: ok };
         this.mlHealthCache = { value, expiresAt: Date.now() + 30_000 };
         return value;

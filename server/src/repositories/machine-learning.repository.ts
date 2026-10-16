@@ -102,7 +102,7 @@ export class MachineLearningRepository {
   private interval?: ReturnType<typeof setInterval>;
   private _config?: MachineLearningConfig;
 
-  private get config(): MachineLearningConfig {
+  protected get config(): MachineLearningConfig {
     if (!this._config) {
       throw new Error('Machine learning repository not been setup');
     }
@@ -120,7 +120,7 @@ export class MachineLearningRepository {
     this.logger.setContext(MachineLearningRepository.name);
   }
 
-  private get connectionHeaders() {
+  protected get connectionHeaders() {
     return this.closeConnections ? CLOSE_CONNECTION_HEADERS : undefined;
   }
 
@@ -191,7 +191,7 @@ export class MachineLearningRepository {
     return this.healthyMap[url];
   }
 
-  private async predict<T>(
+  protected async predict<T>(
     payload: ModelPayload,
     config: MachineLearningRequest,
     options?: { timeoutMs?: number },
@@ -287,43 +287,6 @@ export class MachineLearningRepository {
     };
     const response = await this.predict<OcrResponse>({ imagePath }, request);
     return response[ModelTask.OCR];
-  }
-
-  async ping(): Promise<{ ok: boolean }> {
-    const url = this.config.urls[0];
-    if (!url) {
-      return { ok: false };
-    }
-    try {
-      const response = await fetch(new URL('ping', url), {
-        headers: this.connectionHeaders,
-        signal: AbortSignal.timeout(2000),
-      });
-      return { ok: response.ok };
-    } catch {
-      return { ok: false };
-    }
-  }
-
-  async detectPets(
-    imagePath: string,
-    { modelName, minScore }: { modelName: string; minScore: number },
-    recognition?: { modelName: string },
-  ) {
-    const request: PetDetectionRequest = {
-      [ModelTask.PET_DETECTION]: {
-        [ModelType.DETECTION]: { modelName, options: { minScore } },
-        ...(recognition && { [ModelType.RECOGNITION]: { modelName: recognition.modelName } }),
-      },
-    };
-    const response = await this.predict<PetDetectionResponse>({ imagePath }, request);
-    return {
-      imageHeight: response.imageHeight,
-      imageWidth: response.imageWidth,
-      // A missing key (e.g. an older/misbehaving ML service) must not crash the caller's
-      // `pets.filter(...)` — an absent response key is treated as "no pets detected".
-      pets: response[ModelTask.PET_DETECTION] ?? [],
-    };
   }
 
   private async getFormData(payload: ModelPayload, config: MachineLearningRequest): Promise<FormData> {

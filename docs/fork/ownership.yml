@@ -327,8 +327,10 @@ features:
       - server/src/repositories/duplicate.repository.ts
       - server/src/gallery/repositories/gallery-duplicate.repository*.ts
       - server/src/gallery/utils/misc.ts
+      - server/src/gallery/repositories/gallery-machine-learning.repository*.ts
     upstream_extension_paths:
       - server/src/config.ts
+      - server/src/app.module.ts
       - server/src/dtos/system-config.dto.ts
       - server/src/dtos/model-config.dto.ts
       - server/src/repositories/search.repository.ts
@@ -424,6 +426,9 @@ features:
       - e2e/src/gallery-client.ts
       - e2e/src/specs/server/api/stock-client.e2e-spec.ts
       - server/src/schema/gallery-functions.ts
+      - server/src/gallery/repositories/index.ts
+      - server/src/gallery/services/gallery-base.service.ts
+      - server/test/gallery/**
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts
