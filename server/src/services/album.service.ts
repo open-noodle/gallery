@@ -390,14 +390,34 @@ export class AlbumService extends BaseService {
     }
 
     const allowedAssetIds = await this.checkAccess({ auth, permission: Permission.AssetShare, ids: dto.assetIds });
-    if (allowedAssetIds.size === 0) {
-      results.error = BulkIdErrorReason.NO_PERMISSION;
-      return results;
-    }
+    // #764 cross-owner contributions: assets without AssetShare may still land in a space-linked album
+    // as `album_space_asset` bookmarks, exactly as in the single-album `addAssets` path.
+    const deniedAssetIds = [...new Set(dto.assetIds).difference(allowedAssetIds)];
+    // Set once any asset is accepted somewhere (added, contributed, or already present), so a batch that
+    // only hit duplicates reports DUPLICATE rather than NO_PERMISSION.
+    let anyAccepted = allowedAssetIds.size > 0;
 
     const albumAssetValues: { albumId: string; assetId: string }[] = [];
     const events: { id: string; userIds: string[]; recipientIds: string[] }[] = [];
     for (const albumId of allowedAlbumIds) {
+      if (deniedAssetIds.length > 0) {
+        const presentIds = await this.albumRepository.getAssetIds(albumId, deniedAssetIds);
+        const attempts: BulkIdResponseDto[] = deniedAssetIds
+          .filter((assetId) => !presentIds.has(assetId))
+          .map((assetId) => ({ id: assetId, success: false, error: BulkIdErrorReason.NO_PERMISSION }));
+        const contributedIds = await this.tryContributeDeniedAssets(auth, albumId, attempts);
+        if (contributedIds.size > 0) {
+          results.error = undefined;
+          results.success = true;
+        }
+        if (presentIds.size > 0 || attempts.some(({ error }) => error !== BulkIdErrorReason.NO_PERMISSION)) {
+          anyAccepted = true;
+        }
+      }
+
+      if (allowedAssetIds.size === 0) {
+        continue;
+      }
       const existingAssetIds = await this.albumRepository.getAssetIds(albumId, [...allowedAssetIds]);
       const notPresentAssetIds = [...allowedAssetIds.difference(existingAssetIds)];
       if (notPresentAssetIds.length === 0) {
@@ -447,6 +467,9 @@ export class AlbumService extends BaseService {
       await this.eventRepository.emit('AlbumAssetsAdd', { albumId, assetIds });
     }
 
+    if (!results.success && !anyAccepted) {
+      results.error = BulkIdErrorReason.NO_PERMISSION;
+    }
     return results;
   }
 

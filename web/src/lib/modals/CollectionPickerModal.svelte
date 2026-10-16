@@ -25,6 +25,7 @@
   import {
     createAlbum,
     createSpace,
+    getAlbumAddTargets,
     getAllAlbums,
     getAllSpaces,
     getSharedSpaceAlbums,
@@ -48,11 +49,23 @@
      * would all silently drop them, so none are offered.
      */
     restrictToSpaceId?: string;
+    /**
+     * The selection itself, when the caller knows it. The picker then asks the server which albums
+     * accept it (`POST /albums/add-targets`) and offers only those. A selection with photos the
+     * caller cannot share (another member's space photos) also hides spaces, gains the albums
+     * linked to the caller's writable spaces, and shows a hint explaining the narrower list.
+     */
+    assetIds?: string[];
   }
 
-  let { assetCount, onClose, restrictToSpaceId }: Props = $props();
+  let { assetCount, onClose, restrictToSpaceId, assetIds }: Props = $props();
 
   let albums = $state<AlbumResponseDto[]>([]);
+  // Space-linked albums the caller has no `album_user` row for, fetched only for a non-shareable selection.
+  let linkedAlbums = $state<AlbumResponseDto[]>([]);
+  // Album id → accepted asset count from `POST /albums/add-targets`; null = not resolved (no filtering).
+  let acceptedCounts = $state<Record<string, number> | null>(null);
+  let shareableCount = $state<number | null>(null);
   let spaces = $state<SharedSpaceResponseDto[]>([]);
   let loading = $state(true);
   let search = $state('');
@@ -61,10 +74,19 @@
   const multiSelectActive = $derived(multiSelectedKeys.length > 0);
 
   const restricted = $derived(restrictToSpaceId !== undefined);
-  const showSpaces = $derived(!restricted && assetCount <= MAX_SPACE_ASSETS_PER_REQUEST);
+  // Some of the selection is another member's photo: only space-linked albums can take those, and a
+  // space pool add would reject the whole request (`AssetShare` on every id).
+  const includesNonShareable = $derived(
+    !restricted && assetIds !== undefined && shareableCount !== null && shareableCount < assetIds.length,
+  );
+  const showSpaces = $derived(!restricted && !includesNonShareable && assetCount <= MAX_SPACE_ASSETS_PER_REQUEST);
   const currentUserId = $derived(authManager.authenticated ? (authManager.user?.id ?? null) : null);
 
-  const albumCollections = $derived(albums.map((a) => albumToCollection(a)));
+  const albumCollections = $derived(
+    [...albums, ...linkedAlbums]
+      .filter((album) => acceptedCounts === null || (acceptedCounts[album.id] ?? 0) > 0)
+      .map((a) => albumToCollection(a)),
+  );
   const spaceCollections = $derived(
     showSpaces ? spaces.filter((space) => isWritableSpace(space, currentUserId)).map((s) => spaceToCollection(s)) : [],
   );
@@ -86,11 +108,12 @@
   const rows = $derived(
     converter.toModalRows(search, recentCollections, allCollections, selectedRowIndex, multiSelectedKeys, {
       showSpaces,
-      allowCreate: !restricted,
+      // A brand-new album is personal: it takes only the shareable part of the selection.
+      allowCreate: !restricted && !(includesNonShareable && shareableCount === 0),
       // Restricted mode never lists spaces, so the default "no albums or spaces" wording
       // would name a collection type that was never on offer.
-      emptyText: restricted ? $t('no_albums_in_space_yet') : undefined,
-      noMatchText: restricted ? $t('no_albums_found') : undefined,
+      emptyText: restricted ? $t('no_albums_in_space_yet') : includesNonShareable ? $t('no_albums_found') : undefined,
+      noMatchText: restricted || includesNonShareable ? $t('no_albums_found') : undefined,
       expandedSpaceId,
       expandedSpaceAlbums,
     }),
@@ -115,8 +138,60 @@
     if (spaceResult.status === 'rejected') {
       handleError(spaceResult.reason, $t('failed_to_load_spaces'));
     }
+    if (assetIds && assetIds.length > 0) {
+      try {
+        await resolveAddTargets(assetIds);
+      } catch {
+        // Best effort: without an answer the picker lists everything, as before, and the add
+        // itself still reports what the server refused.
+        acceptedCounts = null;
+        shareableCount = null;
+        linkedAlbums = [];
+      }
+    }
     loading = false;
   });
+
+  /**
+   * Ask the server which albums accept the selection. When part of it is not shareable, the only
+   * other valid targets are albums linked to a space where the caller is Owner/Editor — including
+   * ones owned by other members, which `getAllAlbums` never returns — so those are fetched and
+   * resolved too.
+   */
+  const resolveAddTargets = async (ids: string[]) => {
+    const own = await getAlbumAddTargets({
+      albumAddTargetsDto: { albumIds: albums.map(({ id }) => id), assetIds: ids },
+    });
+    const counts = Object.fromEntries(
+      own.albums.map(({ albumId, acceptedAssetCount }) => [albumId, acceptedAssetCount]),
+    );
+
+    let extra: AlbumResponseDto[] = [];
+    if (own.shareableAssetCount < ids.length) {
+      const writable = spaces.filter((space) => isWritableSpace(space, currentUserId));
+      const perSpace = await Promise.all(writable.map((space) => fetchSpaceAlbums(space.id)));
+      // An album linked to several spaces comes back once per space; keep the first copy.
+      for (const album of perSpace.flat()) {
+        if ([...albums, ...extra].some(({ id }) => id === album.id)) {
+          continue;
+        }
+        extra.push(album);
+      }
+      if (extra.length > 0) {
+        const linked = await getAlbumAddTargets({
+          albumAddTargetsDto: { albumIds: extra.map(({ id }) => id), assetIds: ids },
+        });
+        for (const { albumId, acceptedAssetCount } of linked.albums) {
+          counts[albumId] = acceptedAssetCount;
+        }
+        extra = extra.filter(({ id }) => (counts[id] ?? 0) > 0);
+      }
+    }
+
+    linkedAlbums = extra;
+    acceptedCounts = counts;
+    shareableCount = own.shareableAssetCount;
+  };
 
   /**
    * Every album the user can add to: one request, no filters.
@@ -378,6 +453,14 @@
           >
             <Icon icon={mdiInformationOutline} size="1rem" />
             <span>{$t('add_to_collection_restricted_to_space')}</span>
+          </div>
+        {:else if includesNonShareable}
+          <div
+            class="flex items-center gap-2 px-6 py-2 text-sm text-gray-500 dark:text-gray-400"
+            data-testid="non-owned-space-albums-only-notice"
+          >
+            <Icon icon={mdiInformationOutline} size="1rem" />
+            <span>{$t('add_to_collection_non_owned_space_albums_only')}</span>
           </div>
         {:else if !showSpaces}
           <div
