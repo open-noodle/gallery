@@ -396,6 +396,19 @@ make fork-patches-check
 as avoiding upstream `PUSH_O_MATIC` token dependencies and keeping Gallery image
 names in release workflows.
 
+Some upstream workflows stay in the tree as upstream's unedited text, so a
+rebase never stops on them. `docs-destroy.yml` is one: it runs on every closed
+pull request and fails without Immich's Cloudflare and app secrets. Editing its
+trigger would bring the modify/delete conflicts back, so it is switched off in
+the repository settings instead, once per repository, by the owner:
+
+```bash
+gh workflow disable docs-destroy.yml --repo open-noodle/gallery
+```
+
+No check can see a repository setting. If closed pull requests start failing
+`docs-destroy.yml` runs, run the command again.
+
 `make fork-patches-check` verifies package patch metadata, including expected
 patch files and references in `pnpm-workspace.yaml`.
 
