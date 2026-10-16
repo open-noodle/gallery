@@ -2,12 +2,22 @@ import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import type { ThemeSearchAsset, ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
-import { AssetFileType, AssetType, AssetVisibility, MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum.js';
+import {
+  AssetFileType,
+  AssetType,
+  AssetVisibility,
+  JobName,
+  MemoryType,
+  SystemMetadataKey,
+  UserMetadataKey,
+} from 'src/enum.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { RULE_DAILY_LIMIT, RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { PartnerRepository } from 'src/repositories/partner.repository.js';
@@ -16,7 +26,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
-import { MemoryService, RULE_DAILY_LIMIT } from 'src/services/memory.service.js';
+import { MemoryService } from 'src/services/memory.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -24,7 +34,7 @@ import { getKyselyDB } from 'test/utils.js';
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
-  return newMediumService(MemoryService, {
+  const { sut, ctx } = newMediumService(MemoryService, {
     database: db || defaultDatabase,
     real: [
       AccessRepository,
@@ -41,8 +51,16 @@ const setup = (db?: Kysely<DB>) => {
       PartnerRepository,
       PersonRepository,
     ],
-    mock: [LoggingRepository],
+    mock: [JobRepository, LoggingRepository],
   });
+  // The nightly run end to end: MemoryGenerate queues the rule-memory job, run inline here.
+  const ruleSut = ctx.getService(RuleMemoryService);
+  ctx.getMock(JobRepository).queue.mockImplementation(async (item) => {
+    if (item.name === JobName.MemoryRuleGenerate) {
+      await ruleSut.onRuleMemoriesCreate();
+    }
+  });
+  return { sut, ctx, ruleSut };
 };
 
 const create = async (ctx: ReturnType<typeof setup>['ctx']) => {
@@ -1879,7 +1897,7 @@ describe(MemoryService.name, () => {
     });
 
     it('creates a themed rule memory from a stubbed theme search port (day 22)', async () => {
-      const { sut, ctx } = setup();
+      const { sut, ctx, ruleSut } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2026, month: 7, day: 22 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
@@ -1908,7 +1926,7 @@ describe(MemoryService.name, () => {
       };
       // Instance-override of the protected factory seam: getThemeSearchPort() memoizes lazily on
       // first use, so the override must land before the first onMemoriesCreate() call.
-      (sut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
+      (ruleSut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -1927,7 +1945,7 @@ describe(MemoryService.name, () => {
     });
 
     it('does not create a themed rule memory when the theme search port resolves no embedding', async () => {
-      const { sut, ctx } = setup();
+      const { sut, ctx, ruleSut } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2026, month: 7, day: 22 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
@@ -1937,7 +1955,7 @@ describe(MemoryService.name, () => {
         resolveEmbedding: vi.fn().mockResolvedValue(null),
         searchByEmbedding,
       };
-      (sut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
+      (ruleSut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();

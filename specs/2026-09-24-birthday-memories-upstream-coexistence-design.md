@@ -119,6 +119,10 @@ address a memory the caller already holds by id, which no Gallery client can obt
   and a `[MemoryType.Birthday]: BirthdayData` entry in the fork's `MemoryDataByType`. **Required**,
   not optional: `AnyMemoryData = MemoryDataByType[MemoryType]` does not compile once the enum gains
   a member the interface lacks.
+- Since the layering wave 7 move, the rule engine, `toReservable` and the overlap reconcile live in
+  `server/src/gallery/services/rule-memory.service.ts` (its own `MemoryRuleGenerate` job), and
+  `isMemoryTypeVisible` in `server/src/gallery/services/memory-rules/memory-type.metadata.ts`.
+  `onMemoriesCreate` stays in `memory.service.ts` and still never dispatches `createBirthdayMemories`.
 - **`server/src/services/memory.service.ts`** — keep upstream's private `createBirthdayMemories`,
   `getBirthdayAssets` and their three constants verbatim. Resolve `onMemoriesCreate` (it conflicts:
   upstream edits the `users.map(...createOnThisDayMemories...)` line the fork rewrote to

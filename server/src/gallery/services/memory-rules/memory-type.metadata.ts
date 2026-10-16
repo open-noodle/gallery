@@ -113,3 +113,28 @@ export const isMemoryTypeEnabledForUser = (userTypes: Record<string, boolean> | 
 /** Floor for a registry key; 0 (never removed for size) for an unknown or absent key. */
 export const getMemoryTypeFloor = (key: string | undefined): number =>
   (key === undefined ? undefined : getMemoryTypeMetadata(key)?.minAssets) ?? 0;
+
+/**
+ * A memory is visible unless its type maps to a KNOWN registry key that is currently
+ * unavailable (admin) or disabled (user). Saved memories and memories whose type key is
+ * unknown/underivable are always shown — except upstream's `birthday` type, which Gallery never
+ * shows (installed apps cannot decode it) and which therefore must not claim assets in overlap
+ * reconciliation either. See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
+ */
+export const isMemoryTypeVisible = (
+  memory: { type: MemoryType; data: unknown; isSaved: boolean },
+  availableTypes: Set<string>,
+  userTypes: Record<string, boolean>,
+): boolean => {
+  if (memory.type === MemoryType.Birthday) {
+    return false;
+  }
+  if (memory.isSaved) {
+    return true;
+  }
+  const key = getMemoryTypeKeyForMemory(memory.type, memory.data);
+  if (key === undefined || getMemoryTypeMetadata(key) === undefined) {
+    return true;
+  }
+  return availableTypes.has(key) && isMemoryTypeEnabledForUser(userTypes, key);
+};

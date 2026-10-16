@@ -1060,6 +1060,9 @@ export enum JobName {
   // Classification
   AssetClassifyQueueAll = 'AssetClassifyQueueAll',
   AssetClassify = 'AssetClassify',
+
+  // Rule memories, queued by MemoryGenerate
+  MemoryRuleGenerate = 'MemoryRuleGenerate',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
