@@ -107,6 +107,8 @@ features:
       # The asset's space for the viewer surfaces, and the space face side panel (plan 9.6).
       - web/src/lib/gallery/asset-viewer/asset-space.ts
       - web/src/lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte
+      - mobile/lib/gallery/remote_album/**
+      - mobile/lib/gallery/data/heal_date_time_columns.dart
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -309,6 +311,9 @@ features:
       - web/src/lib/gallery/asset-viewer/AppearsInAlbum.svelte
       - web/src/lib/gallery/asset-viewer/MapProviderLinks.svelte
       - web/src/lib/gallery/timeline/**
+      - mobile/lib/gallery/location_disclosure.dart
+      - mobile/test/gallery/location_disclosure_test.dart
+      - mobile/lib/gallery/search/**
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -400,6 +405,8 @@ features:
       - .github/actions/apply-branding/**
       - mobile/lib/gallery/presentation/widgets/timeline/timeline_scroll_driver.dart
       - mobile/lib/gallery/routing/**
+      - mobile/lib/gallery/widgets/library_collection_cards.dart
+      - mobile/lib/gallery/widgets/demo_login_button.dart
     upstream_extension_paths:
       - mobile/lib/routing/router.dart
       - mobile/lib/routing/router.gr.dart

@@ -146,7 +146,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
             ),
           ])
           ..addColumns([assetCountExp, dateExp])
-          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId) & extraWhere)
+          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId))
+          ..where(extraWhere)
           ..groupBy([dateExp])
           ..orderBy([OrderingTerm.desc(dateExp)]);
 
@@ -182,7 +183,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
             ),
           ])
           ..addColumns([_db.remoteAssetEntity.id])
-          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId) & extraWhere)
+          ..where(_db.localAlbumAssetEntity.albumId.equals(albumId))
+          ..where(extraWhere)
           ..orderBy([OrderingTerm.desc(_db.localAssetEntity.createdAt)])
           ..limit(count, offset: offset);
 
@@ -248,11 +250,8 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
                 useColumns: false,
               ),
             ])
-            ..where(
-              _db.remoteAssetEntity.deletedAt.isNull() &
-                  _db.remoteAlbumAssetEntity.albumId.equals(albumId) &
-                  extraWhere,
-            )
+            ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.remoteAlbumAssetEntity.albumId.equals(albumId))
+            ..where(extraWhere)
             ..groupBy([dateExp]);
 
           if (isAscending) {
@@ -296,16 +295,14 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
         ..limit(1),
     );
 
-    final query =
-        _db.remoteAssetEntity.select().addColumns([localId]).join([
-          innerJoin(
-            _db.remoteAlbumAssetEntity,
-            _db.remoteAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-            useColumns: false,
-          ),
-        ])..where(
-          _db.remoteAssetEntity.deletedAt.isNull() & _db.remoteAlbumAssetEntity.albumId.equals(albumId) & extraWhere,
-        );
+    final query = _db.remoteAssetEntity.select().addColumns([localId]).join([
+      innerJoin(
+        _db.remoteAlbumAssetEntity,
+        _db.remoteAlbumAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+        useColumns: false,
+      ),
+    ])..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.remoteAlbumAssetEntity.albumId.equals(albumId));
+    query.where(extraWhere);
 
     query.orderBy(
       _assetDateOrder(groupBy, ascending: isAscending).map((order) => order(_db.remoteAssetEntity)).toList(),
