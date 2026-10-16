@@ -244,6 +244,7 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
     try {
       await _db.batch((batch) {
         for (final asset in data) {
+          final groupDate = asset.localDateTime ?? asset.fileCreatedAt?.toLocal();
           final companion = RemoteAssetEntityCompanion(
             name: Value(asset.originalFileName),
             type: Value(asset.type.toAssetType()),
