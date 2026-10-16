@@ -26,7 +26,7 @@ import { personFactory } from '@test-data/factories/person-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
-import PeoplePage from './+page.svelte';
+import PeoplePage from './PeoplePage.svelte';
 
 const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
   let pageValue = {
