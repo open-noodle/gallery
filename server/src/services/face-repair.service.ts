@@ -590,6 +590,9 @@ export class FaceRepairService extends BaseService {
   }
 
   async getLatestScanStatus() {
+    // Self-heal on read as well: a scan whose worker vanished (container restart, flushed Redis) otherwise
+    // stays "running" until someone triggers a new scan, and the console disables Re-scan while it does (#1105).
+    await this.faceRepairScanRepository.failStaleScans(STALE_SCAN_TIMEOUT_MS);
     const scan = await this.faceRepairScanRepository.getLatestScan();
     if (!scan) {
       return null;
