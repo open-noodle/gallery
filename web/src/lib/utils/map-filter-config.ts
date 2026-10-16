@@ -53,8 +53,8 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
             ? AssetTypeEnum.Image
             : AssetTypeEnum.Video,
       isFavorite: filters.isFavorite,
-      isNotInAlbum: filters.isNotInAlbum === true ? true : undefined,
-      isInAlbum: filters.isInAlbum === true ? true : undefined,
+      isNotInAlbum: filters.isNotInAlbum === true || undefined,
+      isInAlbum: filters.isInAlbum === true || undefined,
       takenAfter: context?.takenAfter,
       takenBefore: context?.takenBefore,
       ...(spaceId ? { spaceId } : { withSharedSpaces: true }),
