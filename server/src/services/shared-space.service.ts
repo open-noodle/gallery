@@ -907,7 +907,7 @@ export class SharedSpaceService extends BaseService {
    * live stack members only.
    */
   private async expandStackAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
-    const stacked = await this.stackRepository.getStackedAssetIds(assetIds, visibilities);
+    const stacked = await this.sharedSpaceRepository.getStackedAssetIds(assetIds, visibilities);
     return [...new Set([...assetIds, ...stacked])];
   }
 

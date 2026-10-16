@@ -358,7 +358,7 @@ describe(SharedSpaceService.name, () => {
     });
     // Default: no stacks — expansion is the identity. Individual tests override
     // this to exercise stack-atomic add/remove (#751).
-    mocks.stack.getStackedAssetIds.mockImplementation((ids: string[]) => Promise.resolve(ids));
+    mocks.sharedSpace.getStackedAssetIds.mockImplementation((ids: string[]) => Promise.resolve(ids));
     // Default: treat every selected asset as a direct member and remove exactly what was asked (the
     // real repo filters to direct members and returns the deleted ids — see the medium S5 test).
     mocks.sharedSpace.getDirectAssetIds.mockImplementation((_spaceId: string, ids: string[]) => Promise.resolve(ids));
@@ -2998,7 +2998,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       // The client only selected the primary, but the stack has a child.
-      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([primaryId, childId]));
       mocks.sharedSpace.addAssets.mockResolvedValue([
         { spaceId, assetId: primaryId, addedById: auth.user.id },
@@ -3011,7 +3011,7 @@ describe(SharedSpaceService.name, () => {
       await sut.addAssets(auth, spaceId, { assetIds: [primaryId] });
 
       // Add restricts auto-expanded siblings to space-eligible visibility.
-      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith(
+      expect(mocks.sharedSpace.getStackedAssetIds).toHaveBeenCalledWith(
         [primaryId],
         [AssetVisibility.Archive, AssetVisibility.Timeline],
       );
@@ -3030,7 +3030,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       // Selecting the child expands to a primary the user cannot read.
-      mocks.stack.getStackedAssetIds.mockResolvedValue([childId, inaccessiblePrimaryId]);
+      mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([childId, inaccessiblePrimaryId]);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([childId]));
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
@@ -3050,7 +3050,7 @@ describe(SharedSpaceService.name, () => {
       const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
-      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([primaryId, childId]));
       mocks.sharedSpace.addAssets.mockResolvedValue([
         { spaceId, assetId: primaryId, addedById: auth.user.id },
@@ -3353,7 +3353,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
-      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
       mocks.sharedSpace.removeAssets.mockImplementation((_spaceId: string, ids: string[]) => Promise.resolve(ids));
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
@@ -3362,7 +3362,7 @@ describe(SharedSpaceService.name, () => {
       await sut.removeAssets(auth, spaceId, { assetIds: [primaryId] });
 
       // Remove reaches every live member regardless of visibility (no whitelist).
-      expect(mocks.stack.getStackedAssetIds).toHaveBeenCalledWith([primaryId], undefined);
+      expect(mocks.sharedSpace.getStackedAssetIds).toHaveBeenCalledWith([primaryId], undefined);
       expect(mocks.sharedSpace.removeAssets).toHaveBeenCalledWith(spaceId, [primaryId, childId]);
       expect(mocks.sharedSpace.removePersonFacesByAssetIds).toHaveBeenCalledWith(spaceId, [primaryId, childId]);
     });
@@ -3378,7 +3378,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.stack.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
+      mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([primaryId, childId]);
       mocks.sharedSpace.removeAssets.mockImplementation((_spaceId: string, ids: string[]) => Promise.resolve(ids));
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, thumbnailAssetId: null }));
@@ -3402,7 +3402,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       // getStackedAssetIds excludes soft-deleted assets, so a trashed input is
       // absent from its result — the service must still honor the explicit id.
-      mocks.stack.getStackedAssetIds.mockResolvedValue([]);
+      mocks.sharedSpace.getStackedAssetIds.mockResolvedValue([]);
       mocks.sharedSpace.removeAssets.mockImplementation((_spaceId: string, ids: string[]) => Promise.resolve(ids));
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
