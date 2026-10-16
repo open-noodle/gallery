@@ -130,16 +130,13 @@ describe('AssetViewerNavBar component', () => {
       await fireEvent.click(screen.getByLabelText('more'));
     };
 
-    it('narrows the picker to the space for an editor', async () => {
+    it('opens the same picker as the timeline for an editor (#1119)', async () => {
       const show = vi.spyOn(modalManager, 'show').mockResolvedValue(undefined as never);
 
       await renderSpaceViewer({ id: 'space-1', canWrite: true });
       await fireEvent.click(screen.getByText('add_to_album_or_space'));
 
-      expect(show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
-        assetIds: ['space-photo'],
-        restrictToSpaceId: 'space-1',
-      });
+      expect(show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['space-photo'] });
       show.mockRestore();
     });
 
