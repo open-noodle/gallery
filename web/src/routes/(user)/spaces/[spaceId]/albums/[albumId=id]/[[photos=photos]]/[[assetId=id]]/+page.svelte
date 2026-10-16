@@ -22,7 +22,8 @@
   import { buildAlbumAssetPickerOptions, buildSpaceAlbumAssetPickerOptions } from '$lib/utils/album-filter-options';
   import { createAlbumPickerFilters, createAlbumTimeline } from '$lib/gallery/filtered-timeline/album-timeline';
   import { getTimelineManagerTimeBuckets } from '$lib/utils/timeline-zoom-navigation';
-  import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
+  import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album-actions';
+  import { getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
   import { lang } from '$lib/stores/preferences.store';

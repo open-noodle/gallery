@@ -97,6 +97,8 @@ features:
       - web/src/lib/gallery/viewer-space.test-helpers.ts
       # People list page, person page hooks and the space-aware person service (plan 9.3, OD-9).
       - web/src/lib/gallery/people/**
+      - web/src/lib/gallery/album-actions.ts
+      - web/src/lib/gallery/LinkAlbumToSpaceMenuOption.svelte
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -188,6 +190,7 @@ features:
       - .github/workflows/storage-migration*.yml
       - .github/workflows/gallery-revert-to-immich-validation.yml
       - server/src/gallery/utils/storage-keys*.ts
+      - web/src/lib/gallery/asset-actions*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts
