@@ -782,7 +782,7 @@
         locale={$lang}
         disabled={isSelectionMode || assetInteraction.selectionActive}
         {onTimelineBucketActivate}
-        onRequestCovers={(timeBuckets) => void timelineManager.loadCoversForBuckets(timeBuckets)}
+        onRequestCovers={(timeBuckets) => void timelineManager.bucketLayout.loadCovers(timeBuckets)}
       />
     {:else if !isEmpty}
       <!-- Guard with `!isEmpty` (so the block unmounts when a filter empties the timeline) and
