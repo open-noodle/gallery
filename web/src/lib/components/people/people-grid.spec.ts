@@ -215,7 +215,7 @@ describe('PeopleGrid', () => {
     expect(loadNextPage).not.toHaveBeenCalled();
   });
 
-  it('does not retry the visibility re-check when loading finishes without new items', async () => {
+  it('does not retry the visibility re-check when loading finishes without new items or a new page', async () => {
     vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
       top: window.innerHeight - 1,
     } as DOMRect);
@@ -226,20 +226,53 @@ describe('PeopleGrid', () => {
         items: [{ id: 'p1', label: 'Alice' }],
         hasNextPage: true,
         loading: true,
+        loadedPages: 1,
         loadNextPage,
       },
     });
 
+    // A failed request: loading ends, but neither the items nor the page count moved.
     await rerender({
       items: [{ id: 'p1', label: 'Alice' }],
       hasNextPage: true,
       loading: false,
+      loadedPages: 1,
       loadNextPage,
     });
 
     flushAnimationFrames();
 
     expect(loadNextPage).not.toHaveBeenCalled();
+  });
+
+  it('loads the next page when a loaded page added no visible items (#1184)', async () => {
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
+      top: window.innerHeight - 1,
+    } as DOMRect);
+    const loadNextPage = vi.fn();
+
+    const { rerender } = render(PeopleGridWrapper, {
+      props: {
+        items: [{ id: 'p1', label: 'Alice' }],
+        hasNextPage: true,
+        loading: true,
+        loadedPages: 1,
+        loadNextPage,
+      },
+    });
+
+    // Page 2 held only hidden people: the page count advanced, the visible items did not.
+    await rerender({
+      items: [{ id: 'p1', label: 'Alice' }],
+      hasNextPage: true,
+      loading: false,
+      loadedPages: 2,
+      loadNextPage,
+    });
+
+    flushAnimationFrames();
+
+    await waitFor(() => expect(loadNextPage).toHaveBeenCalledTimes(1));
   });
 
   it('does not call loadNextPage twice when intersection fires before a pending visibility re-check', () => {

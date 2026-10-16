@@ -8,6 +8,12 @@
     class?: string;
     hasNextPage?: boolean;
     loading?: boolean;
+    /**
+     * Pages loaded so far. A page can add no visible items (all hidden, or all already shown), which leaves the
+     * sentinel in view without a new intersection; a change here re-runs the visibility check anyway (#1184).
+     * It only advances on a successful load, so a failed request is not retried in a loop.
+     */
+    loadedPages?: number;
     loadNextPage: () => void;
     children?: Snippet<[T, number]>;
   }
@@ -17,6 +23,7 @@
     class: className = 'w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-10 gap-1',
     hasNextPage = false,
     loading = false,
+    loadedPages,
     loadNextPage,
     children,
   }: Props = $props();
@@ -25,6 +32,7 @@
   let cancelVisibilityCheck: (() => void) | undefined;
   let lastVisibilityCheckItemCount: number | undefined;
   let lastVisibilityCheckSentinel: HTMLElement | undefined;
+  let lastVisibilityCheckLoadedPages: number | undefined;
 
   const cancelScheduledVisibilityCheck = () => {
     cancelVisibilityCheck?.();
@@ -71,21 +79,28 @@
   $effect(() => {
     const itemCount = items.length;
     const observedSentinel = sentinel;
+    const pageCount = loadedPages;
 
     if (!hasNextPage || !observedSentinel) {
       cancelScheduledVisibilityCheck();
       lastVisibilityCheckItemCount = undefined;
       lastVisibilityCheckSentinel = undefined;
+      lastVisibilityCheckLoadedPages = undefined;
       return;
     }
 
-    if (lastVisibilityCheckItemCount === itemCount && lastVisibilityCheckSentinel === observedSentinel) {
+    if (
+      lastVisibilityCheckItemCount === itemCount &&
+      lastVisibilityCheckSentinel === observedSentinel &&
+      lastVisibilityCheckLoadedPages === pageCount
+    ) {
       return;
     }
 
     cancelScheduledVisibilityCheck();
     lastVisibilityCheckItemCount = itemCount;
     lastVisibilityCheckSentinel = observedSentinel;
+    lastVisibilityCheckLoadedPages = pageCount;
 
     if (loading) {
       return;
