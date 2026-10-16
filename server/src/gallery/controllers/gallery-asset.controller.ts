@@ -4,6 +4,7 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
 import { ApiTag, Permission, RouteKey } from 'src/enum.js';
+import { AssetImageAdjustDto, AssetImageAdjustResponseDto } from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
@@ -81,5 +82,44 @@ export class GalleryAssetController {
   })
   removeAssetTrim(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
     return this.service.removeTrim(auth, id);
+  }
+
+  @Get(':id/adjust')
+  @Authenticated({ permission: Permission.AssetEditGet })
+  @Endpoint({
+    summary: 'Retrieve the colour adjustment of an image',
+    description: 'Returns the exposure, contrast, saturation and invert applied to the image; all zero when none is.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getAssetAdjust(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<AssetImageAdjustResponseDto> {
+    return this.service.getAdjust(auth, id);
+  }
+
+  @Put(':id/adjust')
+  @Authenticated({ permission: Permission.AssetEditCreate })
+  @Endpoint({
+    summary: 'Adjust the colours of an image',
+    description:
+      'Sets the exposure, contrast, saturation and invert applied after any crop, rotate or mirror, replacing an earlier adjustment. All-neutral values remove it. The original file is not changed.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateAssetAdjust(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: AssetImageAdjustDto,
+  ): Promise<AssetImageAdjustResponseDto> {
+    return this.service.setAdjust(auth, id, dto);
+  }
+
+  @Delete(':id/adjust')
+  @Authenticated({ permission: Permission.AssetEditDelete })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Remove the colour adjustment of an image',
+    description: 'Restores the image colours; any crop, rotate or mirror stays.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  removeAssetAdjust(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
+    return this.service.removeAdjust(auth, id);
   }
 }
