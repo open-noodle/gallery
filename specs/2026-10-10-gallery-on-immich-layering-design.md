@@ -55,6 +55,8 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
   out (owner decision OD-8, 2026-10-16) and the files stay replay-owned: identity and merge, the face picker, admin face
   reads, people statistics and suggestion scans to `GalleryPersonRepository`; the recognition identity helpers and the
   shared-space reset to `FaceIdentityMaintenanceService`; the thumbnail access check to `gallery-people.service.ts`.
+  Recognition's face KNN runs Immich's `SearchRepository.searchFaces` (one user per cluster group under Option M) with
+  one hook, `excludeDeletedFaces`, because a soft-deleted face keeps its `face_search` row (INT-DUP-005, 2026-10-16).
 - **Favorites:** `asset_favorite` is the source of truth for every user, `asset.isFavorite` is the owner's projection.
   Gallery code never writes the column; Immich's owner-only write paths (upload, copy, duplicate resolve) do, and a
   reverse trigger mirrors them. Paths a non-owner reaches (space editors hold `AssetUpdate`) write the caller's overlay
