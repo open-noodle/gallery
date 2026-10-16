@@ -747,6 +747,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
               onLoading: () =>
                   widget.loadingWidget ??
                   CustomScrollView(
+                    // Not primary: attaching to [_scrollController] while segments reload (e.g. on
+                    // rotation) would fire [_restoreAssetPosition] early and drop the saved position.
+                    primary: false,
                     slivers: [
                       if (widget.appBar != null) widget.appBar!,
                       const SliverFillRemaining(hasScrollBody: false, child: Center(child: ImmichLoadingIndicator())),
