@@ -1822,6 +1822,26 @@ export type UpdateAssetDto = {
     rating?: number | null;
     visibility?: AssetVisibility;
 };
+export type AssetImageAdjustResponseDto = {
+    /** Contrast, -100 to 100 (CSS contrast, 0 = unchanged) */
+    contrast: number;
+    /** Exposure, -100 to 100 (CSS brightness, 0 = unchanged) */
+    exposure: number;
+    /** Invert the colours, for scanned film negatives */
+    invert: boolean;
+    /** Saturation, -100 to 100 (CSS saturate, 0 = unchanged) */
+    saturation: number;
+};
+export type AssetImageAdjustDto = {
+    /** Contrast, -100 to 100 (CSS contrast, 0 = unchanged) */
+    contrast?: number;
+    /** Exposure, -100 to 100 (CSS brightness, 0 = unchanged) */
+    exposure?: number;
+    /** Invert the colours, for scanned film negatives */
+    invert?: boolean;
+    /** Saturation, -100 to 100 (CSS saturate, 0 = unchanged) */
+    saturation?: number;
+};
 export type CropParameters = {
     /** Height of the crop */
     height: number;
@@ -6583,6 +6603,46 @@ export function updateAsset({ id, updateAssetDto }: {
         ...opts,
         method: "PUT",
         body: updateAssetDto
+    })));
+}
+/**
+ * Remove the colour adjustment of an image
+ */
+export function removeAssetAdjust({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/adjust`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Retrieve the colour adjustment of an image
+ */
+export function getAssetAdjust({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetImageAdjustResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/adjust`, {
+        ...opts
+    }));
+}
+/**
+ * Adjust the colours of an image
+ */
+export function updateAssetAdjust({ id, assetImageAdjustDto }: {
+    id: string;
+    assetImageAdjustDto: AssetImageAdjustDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetImageAdjustResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/adjust`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: assetImageAdjustDto
     })));
 }
 /**

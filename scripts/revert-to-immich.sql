@@ -191,6 +191,38 @@ DELETE FROM "asset_file"
    AND "assetId" IN (SELECT "assetId" FROM "asset_edit" WHERE "action" = 'trim');
 DELETE FROM "asset_edit" WHERE "action" = 'trim';
 
+-- Image adjustments (the editor's exposure, contrast, saturation and invert),
+-- kept in asset_image_adjust. Immich has no such edit, and its edited files
+-- have the adjustment baked in. Drop them and clear the thumbhash, so Immich's
+-- nightly missing-thumbnails job regenerates them from asset_edit alone (crop,
+-- rotate, mirror), or the original thumbnails when the adjustment was the
+-- asset's only edit, which also clears isEdited. A pre-release build of the
+-- Adjust tool stored the adjustment as an asset_edit action Immich cannot
+-- decode; remove that too.
+DO $$
+BEGIN
+  IF to_regclass('public.asset_image_adjust') IS NOT NULL THEN
+    UPDATE "asset"
+       SET "thumbhash" = NULL,
+           "isEdited" = EXISTS (SELECT FROM "asset_edit" e WHERE e."assetId" = "asset"."id" AND e."action" <> 'adjust')
+      FROM "asset_image_adjust"
+     WHERE "asset_image_adjust"."assetId" = "asset"."id";
+    DELETE FROM "asset_file"
+     WHERE "isEdited"
+       AND "assetId" IN (SELECT "assetId" FROM "asset_image_adjust");
+  END IF;
+END
+$$;
+UPDATE "asset"
+   SET "thumbhash" = NULL
+  FROM "asset_edit"
+ WHERE "asset_edit"."assetId" = "asset"."id"
+   AND "asset_edit"."action" = 'adjust';
+DELETE FROM "asset_file"
+ WHERE "isEdited"
+   AND "assetId" IN (SELECT "assetId" FROM "asset_edit" WHERE "action" = 'adjust');
+DELETE FROM "asset_edit" WHERE "action" = 'adjust';
+
 -- Share links created from a space. Gallery lets such a link carry other
 -- members' assets and re-checks space membership on every read; Immich grants
 -- whatever shared_link_asset lists, and the whole album for an album link,
@@ -405,6 +437,7 @@ DROP TABLE IF EXISTS "asset_job_status_gallery" CASCADE;
 
 -- Video trims, cleaned up in step 1 above.
 DROP TABLE IF EXISTS "asset_video_trim" CASCADE;
+DROP TABLE IF EXISTS "asset_image_adjust" CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
@@ -799,6 +832,7 @@ DELETE FROM "kysely_migrations"
   '1798700000000-AddPersonPetTable',
   '1798800000000-RestoreAssetIsFavoriteProjection',
   '1798900000000-MoveVideoTrimToSidecar',
+  '1799000000000-AddAssetImageAdjustTable',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -910,6 +944,7 @@ BEGIN
        'asset_favorite_audit', 'asset_favorite',
        'asset_job_status_gallery',
        'asset_video_trim',
+       'asset_image_adjust',
        'person_identity',
        'person_pet',
        'gallery_migrations', 'gallery_migrations_lock'

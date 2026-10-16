@@ -4,6 +4,7 @@ import { AssetDuplicateChecksumTable } from 'src/schema/tables/asset-duplicate-c
 import { AssetFaceCreatorTable } from 'src/schema/tables/asset-face-creator.table.js';
 import { AssetFavoriteAuditTable } from 'src/schema/tables/asset-favorite-audit.table.js';
 import { AssetFavoriteTable } from 'src/schema/tables/asset-favorite.table.js';
+import { AssetImageAdjustTable } from 'src/schema/tables/asset-image-adjust.table.js';
 import { AssetJobStatusGalleryTable } from 'src/schema/tables/asset-job-status-gallery.table.js';
 import { AssetVideoTrimTable } from 'src/schema/tables/asset-video-trim.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
@@ -54,6 +55,7 @@ export const galleryTables = [
   AssetFaceCreatorTable,
   AssetFavoriteTable,
   AssetFavoriteAuditTable,
+  AssetImageAdjustTable,
   AssetJobStatusGalleryTable,
   AssetVideoTrimTable,
   FaceIdentityTable,
@@ -104,6 +106,7 @@ export interface GalleryDB {
   asset_face_creator: AssetFaceCreatorTable;
   asset_favorite: AssetFavoriteTable;
   asset_favorite_audit: AssetFavoriteAuditTable;
+  asset_image_adjust: AssetImageAdjustTable;
   asset_job_status_gallery: AssetJobStatusGalleryTable;
   asset_video_trim: AssetVideoTrimTable;
   face_identity: FaceIdentityTable;

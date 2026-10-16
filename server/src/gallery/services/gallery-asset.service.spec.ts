@@ -15,6 +15,17 @@ const video = (overrides: Record<string, unknown> = {}) => ({
   endTime: null,
   ...overrides,
 });
+const image = (overrides: Record<string, unknown> = {}) => ({
+  type: AssetType.Image,
+  livePhotoVideoId: null,
+  originalPath: '/data/library/photo.jpg',
+  originalFileName: 'photo.jpg',
+  exifImageWidth: 1920,
+  exifImageHeight: 1080,
+  orientation: null,
+  projectionType: null,
+  ...overrides,
+});
 const videoStream = { videoStreams: [{}], audioStreams: [{}], format: {} } as any;
 
 describe(GalleryAssetService.name, () => {
@@ -333,6 +344,131 @@ describe(GalleryAssetService.name, () => {
 
         await expect(sut.removeTrim(authStub.admin, assetId)).rejects.toBeInstanceOf(BadRequestException);
         expect(mocks.videoTrim.delete).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('image adjust', () => {
+    let assetId: string;
+    const adjust = { exposure: 20, contrast: -10, saturation: 0, invert: true };
+
+    beforeEach(() => {
+      assetId = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+    });
+
+    describe('getAdjust', () => {
+      it('returns the stored adjustment', async () => {
+        mocks.imageAdjust.get.mockResolvedValue(adjust);
+
+        await expect(sut.getAdjust(authStub.admin, assetId)).resolves.toEqual(adjust);
+      });
+
+      it('returns neutral values for an unadjusted image', async () => {
+        mocks.imageAdjust.get.mockResolvedValue(void 0);
+
+        await expect(sut.getAdjust(authStub.admin, assetId)).resolves.toEqual({
+          exposure: 0,
+          contrast: 0,
+          saturation: 0,
+          invert: false,
+        });
+      });
+
+      it('requires read access', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+
+        await expect(sut.getAdjust(authStub.admin, assetId)).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.imageAdjust.get).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('setAdjust', () => {
+      it('stores the adjustment and queues the edit job, without touching asset_edit', async () => {
+        mocks.asset.getForEdit.mockResolvedValue(image());
+
+        await expect(sut.setAdjust(authStub.admin, assetId, adjust)).resolves.toEqual(adjust);
+
+        expect(mocks.imageAdjust.upsert).toHaveBeenCalledWith(assetId, adjust);
+        expect(mocks.assetEdit.replaceAll).not.toHaveBeenCalled();
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: JobName.AssetEditThumbnailGeneration,
+          data: { id: assetId },
+        });
+      });
+
+      it('removes the adjustment when every value is neutral, like DELETE', async () => {
+        mocks.imageAdjust.delete.mockResolvedValue(true);
+
+        await expect(
+          sut.setAdjust(authStub.admin, assetId, { exposure: 0, contrast: 0, saturation: 0, invert: false }),
+        ).resolves.toEqual({ exposure: 0, contrast: 0, saturation: 0, invert: false });
+
+        expect(mocks.imageAdjust.upsert).not.toHaveBeenCalled();
+        expect(mocks.imageAdjust.delete).toHaveBeenCalledWith(assetId);
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: JobName.AssetEditThumbnailGeneration,
+          data: { id: assetId },
+        });
+      });
+
+      it('requires edit access', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+
+        await expect(sut.setAdjust(authStub.admin, assetId, adjust)).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.imageAdjust.upsert).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        { label: 'a missing asset', asset: undefined, message: 'Asset not found' },
+        { label: 'a video', asset: image({ type: AssetType.Video }), message: 'Only images can be adjusted' },
+        { label: 'a live photo', asset: image({ livePhotoVideoId: newUuid() }), message: 'live photos' },
+        { label: 'a panorama', asset: image({ projectionType: 'EQUIRECTANGULAR' }), message: 'panorama' },
+        { label: 'a GIF', asset: image({ originalPath: '/data/a.GIF' }), message: 'GIF or SVG' },
+        { label: 'an SVG', asset: image({ originalPath: '/data/a.svg' }), message: 'GIF or SVG' },
+      ])('rejects $label, as Immich rejects editing it', async ({ asset, message }) => {
+        mocks.asset.getForEdit.mockResolvedValue(asset as any);
+
+        await expect(sut.setAdjust(authStub.admin, assetId, adjust)).rejects.toThrow(message);
+        expect(mocks.imageAdjust.upsert).not.toHaveBeenCalled();
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('logs a cross-owner adjustment as a space edit', async () => {
+        const auth = AuthFactory.create();
+        const spaceId = newUuid();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
+        mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId } as any);
+        mocks.asset.getForEdit.mockResolvedValue(image());
+
+        await sut.setAdjust(auth, assetId, adjust);
+
+        expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+          expect.objectContaining({ spaceId, userId: auth.user.id, data: { count: 1, assetIds: [assetId] } }),
+        );
+      });
+    });
+
+    describe('removeAdjust', () => {
+      it('deletes the adjustment and queues the edit job', async () => {
+        mocks.imageAdjust.delete.mockResolvedValue(true);
+
+        await sut.removeAdjust(authStub.admin, assetId);
+
+        expect(mocks.imageAdjust.delete).toHaveBeenCalledWith(assetId);
+        expect(mocks.assetEdit.replaceAll).not.toHaveBeenCalled();
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: JobName.AssetEditThumbnailGeneration,
+          data: { id: assetId },
+        });
+      });
+
+      it('requires edit-delete access', async () => {
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+
+        await expect(sut.removeAdjust(authStub.admin, assetId)).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.imageAdjust.delete).not.toHaveBeenCalled();
       });
     });
   });

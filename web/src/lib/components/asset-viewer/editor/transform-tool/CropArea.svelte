@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { imageAdjustManager } from '#lib/gallery/edit/image-adjust-manager.svelte.ts';
   import { ResizeBoundary, transformManager } from '#lib/managers/edit/transform-manager.svelte.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { getAltText } from '#lib/utils/thumbnail-util.ts';
@@ -74,15 +75,22 @@
       alt={$getAltText(toTimelineAsset(asset))}
       class="h-full transition-transform select-none motion-reduce:transition-none"
       style:transform={imageTransform}
+      style:filter={imageAdjustManager.filter}
     />
     <div
       class={[
         'overlay pointer-events-none absolute top-0 size-full transition-colors motion-reduce:transition-none',
         transformManager.isInteracting ? 'bg-black/30' : 'bg-black/56',
+        imageAdjustManager.mode !== 'crop' && 'invisible',
       ]}
       bind:this={transformManager.overlayEl}
     ></div>
-    <div class="crop-frame absolute border-2 border-white" bind:this={transformManager.cropFrame}>
+    <!-- Gallery: hidden, not unmounted, while the Adjust sliders show: draw() keeps writing its position. -->
+    <div
+      class="crop-frame absolute border-2 border-white"
+      class:invisible={imageAdjustManager.mode !== 'crop'}
+      bind:this={transformManager.cropFrame}
+    >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class={[

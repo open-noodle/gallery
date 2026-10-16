@@ -1,5 +1,6 @@
 import TransformTool from '#lib/components/asset-viewer/editor/transform-tool/TransformTool.svelte';
 import TrimTool from '#lib/components/asset-viewer/editor/trim-tool/trim-tool.svelte';
+import { withImageAdjust } from '#lib/gallery/edit/image-adjust-manager.svelte.ts';
 import { transformManager } from '#lib/managers/edit/transform-manager.svelte.ts';
 import { trimManager } from '#lib/managers/edit/trim-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
@@ -49,7 +50,8 @@ export class EditManager {
       type: EditToolType.Transform,
       icon: mdiCropRotate,
       component: TransformTool,
-      manager: transformManager,
+      // Gallery: the Adjust panel's colour adjustment saves with the transform tool.
+      manager: withImageAdjust(transformManager),
     },
     {
       type: EditToolType.Trim,

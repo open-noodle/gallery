@@ -126,6 +126,8 @@ describe('revert-to-immich.sql', () => {
       'FROM "asset_video_trim"',
       `'originalDuration'`,
       `DELETE FROM "asset_edit" WHERE "action" = 'trim'`,
+      'FROM "asset_image_adjust"',
+      `DELETE FROM "asset_edit" WHERE "action" = 'adjust'`,
       'DELETE FROM "shared_link_asset"',
       'DELETE FROM "shared_link" sl',
       'DELETE FROM "system_metadata"',
