@@ -30,6 +30,7 @@ import {
   Permission,
   StorageFolder,
 } from 'src/enum.js';
+import { videoPlaybackCacheControl } from 'src/gallery/utils/video-playback.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -262,7 +263,7 @@ export class AssetMediaService extends BaseService {
     return this.backendMedia.serveFromBackend(
       filepath,
       mimeTypes.lookup(filepath),
-      CacheControl.PrivateWithCache,
+      videoPlaybackCacheControl(asset.encodedVideoPath),
       undefined,
       'inline',
       { range, acceptsRanges: true },
