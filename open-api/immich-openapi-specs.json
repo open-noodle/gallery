@@ -21005,7 +21005,7 @@
     },
     "/shared-spaces/{id}/people/{personId}/faces/{assetFaceId}": {
       "delete": {
-        "description": "Remove the face from the space person. Only the space projection row is removed -- the face's global identity is left untouched. Response reports whether it acted.",
+        "description": "Remove the face from the space person. The face's link to that person's identity goes too, unless the photo belongs to a non-member who named the face. Response reports whether it acted.",
         "operationId": "detachSpacePersonFace",
         "parameters": [
           {

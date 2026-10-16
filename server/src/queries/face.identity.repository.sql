@@ -2409,6 +2409,12 @@ delete from "face_identity_face"
 where
   "assetFaceId" in ($1)
 
+-- FaceIdentityRepository.unlinkFaceFromIdentity
+delete from "face_identity_face"
+where
+  "assetFaceId" = $1
+  and "identityId" = $2
+
 -- FaceIdentityRepository.unlinkFacesBySourceType
 delete from "face_identity_face"
 where
