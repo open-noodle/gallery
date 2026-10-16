@@ -193,10 +193,6 @@ export const FORK_DELETED_PATHS: { path: string; why: string }[] = [
     why: MOBILE_SEARCH,
   },
   {
-    path: 'web/src/lib/modals/AssetAddToAlbumModal.svelte',
-    why: 'replaced by the unified album + Space picker in 4bd38971bdf (#708)',
-  },
-  {
     path: 'web/src/lib/modals/ClusterGroupUserSelectionModal.svelte',
     why: CLUSTER_GROUPS_UI,
   },
