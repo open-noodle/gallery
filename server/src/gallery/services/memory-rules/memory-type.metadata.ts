@@ -22,7 +22,6 @@ export interface MemoryTypeMetadata {
 
 export const MEMORY_TYPE_METADATA: MemoryTypeMetadata[] = [
   { key: 'on_this_day', kind: 'on_this_day', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
-  { key: 'birthday', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
   { key: 'recent_trip', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 2 },
   { key: 'month_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 8 },
   { key: 'favorites_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
@@ -38,8 +37,7 @@ export const MEMORY_TYPE_METADATA: MemoryTypeMetadata[] = [
 export const MEMORY_TYPE_KEYS = MEMORY_TYPE_METADATA.map((m) => m.key);
 
 /** legacy SystemConfig.memories boolean field name per type key, for back-compat folding */
-export const LEGACY_MEMORY_CONFIG_KEYS: Record<string, 'birthday' | 'recentTrips'> = {
-  birthday: 'birthday',
+export const LEGACY_MEMORY_CONFIG_KEYS: Record<string, 'recentTrips'> = {
   recent_trip: 'recentTrips',
 };
 
@@ -64,14 +62,13 @@ export const getMemoryTypeKeyForMemory = (type: MemoryType, data: unknown): stri
 
 type AdminMemoriesConfig = {
   types?: Record<string, boolean>;
-  // deprecated legacy fields, still honored for back-compat
-  birthday?: boolean;
+  // deprecated legacy field, still honored for back-compat (`birthday` is inert since OD-3)
   recentTrips?: boolean;
 };
 
 /**
  * Resolve which type keys are globally available, applying precedence:
- * explicit `types[key]` > legacy bool (`birthday`/`recentTrips`) > `metadata.defaultEnabled`.
+ * explicit `types[key]` > legacy bool (`recentTrips`) > `metadata.defaultEnabled`.
  * Keys not present in the registry are ignored.
  */
 export const getAdminAvailableMemoryTypeKeys = (config: AdminMemoriesConfig): Set<string> => {
@@ -117,18 +114,14 @@ export const getMemoryTypeFloor = (key: string | undefined): number =>
 /**
  * A memory is visible unless its type maps to a KNOWN registry key that is currently
  * unavailable (admin) or disabled (user). Saved memories and memories whose type key is
- * unknown/underivable are always shown — except upstream's `birthday` type, which Gallery never
- * shows (installed apps cannot decode it) and which therefore must not claim assets in overlap
- * reconciliation either. See specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
+ * unknown/underivable are always shown, including upstream's `birthday` type (OD-3) and the
+ * `rule`/`birthday` rows Gallery's retired birthday rule left behind.
  */
 export const isMemoryTypeVisible = (
   memory: { type: MemoryType; data: unknown; isSaved: boolean },
   availableTypes: Set<string>,
   userTypes: Record<string, boolean>,
 ): boolean => {
-  if (memory.type === MemoryType.Birthday) {
-    return false;
-  }
   if (memory.isSaved) {
     return true;
   }

@@ -1,4 +1,10 @@
-import { getClientServerVersion, isGalleryClient, stockClientRoom } from 'src/gallery/utils/client-version.js';
+import {
+  classifyClient,
+  getClientServerVersion,
+  isGalleryClient,
+  stockClientRoom,
+} from 'src/gallery/utils/client-version.js';
+import { factory } from 'test/small.factory.js';
 
 vitest.mock('node:fs', () => ({
   readFileSync: () => JSON.stringify({ version: '5.4.0', immichVersion: '3.3.1' }),
@@ -30,6 +36,30 @@ describe(isGalleryClient.name, () => {
   it('accepts the header from the socket.io handshake auth payload', () => {
     expect(isGalleryClient({ 'user-agent': 'Mozilla/5.0' }, { 'x-gallery-app': '5.4.0' })).toBe(true);
     expect(isGalleryClient({ 'user-agent': 'Mozilla/5.0' }, {})).toBe(false);
+  });
+});
+
+describe(classifyClient.name, () => {
+  const auth = factory.auth();
+
+  it('marks a stock client', () => {
+    expect(classifyClient({ 'user-agent': 'immich-android/3.3.1' }, auth)).toEqual({ ...auth, stockClient: true });
+  });
+
+  it.each([
+    ['the x-gallery-app header', { 'x-gallery-app': '5.4.0', 'user-agent': 'Mozilla/5.0' }],
+    ['the header alongside an old app User-Agent', { 'x-gallery-app': '5.7.1', 'user-agent': 'immich-android/5.7.1' }],
+    ['a Gallery app at 5.8.0', { 'user-agent': 'immich-ios/5.8.0' }],
+  ])('leaves a Gallery client that decodes birthday memories unmarked: %s', (_, headers) => {
+    expect(classifyClient(headers, auth)).toBe(auth);
+  });
+
+  // immich-30831's `birthday` memory type first reached the Gallery app's generated client in 5.8.0.
+  it.each([
+    ['a Gallery android app at 5.7.1', { 'user-agent': 'immich-android/5.7.1' }],
+    ['a Gallery ios app at 5.0.0', { 'user-agent': 'immich-ios/5.0.0' }],
+  ])('marks %s as a legacy Gallery app', (_, headers) => {
+    expect(classifyClient(headers, auth)).toEqual({ ...auth, legacyGalleryApp: true });
   });
 });
 

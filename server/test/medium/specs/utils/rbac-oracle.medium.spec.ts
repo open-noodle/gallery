@@ -249,6 +249,14 @@ const seed = async () => {
   const memViewer = await newMemory('memViewer', spaceViewer.id, [spaceAsset, spaceArchived, libraryAsset, petAsset]);
   // A rule memory, which a stock client cannot decode (F5).
   await newMemory('memRule', owner.id, [ownAsset], true);
+  // An Immich birthday memory, which every client here can decode (OD-3).
+  const { memory: memBirthday } = await ctx.newMemory({
+    ownerId: owner.id,
+    type: MemoryType.Birthday,
+    data: { personId: pet.personGroupId, personName: 'Rex', year: 2020 },
+  });
+  label('memBirthday', memBirthday.id);
+  await ctx.newMemoryAsset({ memoryId: memBirthday.id, assetId: ownAsset });
 
   const newLink = async (name: string, dto: Parameters<typeof ctx.newSharedLink>[0]) => {
     const { sharedLink } = await ctx.newSharedLink(dto);

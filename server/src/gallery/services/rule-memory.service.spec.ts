@@ -101,7 +101,6 @@ describe(RuleMemoryService.name, () => {
     mocks.memoryRuleAsset.getMemoryFacesForPeriod.mockResolvedValue([]);
     mocks.memoryRuleAsset.getMemoryPersonDailyCounts.mockResolvedValue([]);
     mocks.memoryRuleAsset.getMemoryAssetsForPersonWindow.mockResolvedValue([]);
-    mocks.memoryRuleAsset.getPetPersonGroupIds.mockResolvedValue(new Set());
     mocks.user.getMetadata.mockResolvedValue([]);
     // Without these, every `onMemoriesCreate` test outside the `reconcileMemoryOverlap` /
     // `overlap backfill` describe blocks hits an unstubbed mock, `rows.length` throws a
@@ -118,83 +117,22 @@ describe(RuleMemoryService.name, () => {
       expect(config).toEqual({ name: JobName.MemoryRuleGenerate, queue: QueueName.BackgroundTask });
     });
 
-    it('should generate birthday rule memories only for the current day and persist lastRuleDate', async () => {
+    // OD-3: birthday memories are upstream's MemoryType.Birthday, written by MemoryGenerate, not a rule.
+    it('should persist lastRuleDate and never look up birthdays', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
 
-      const user = factory.userAdmin();
-      mocks.user.getList.mockResolvedValue([user]);
+      mocks.user.getList.mockResolvedValue([factory.userAdmin()]);
       mocks.systemMetadata.get.mockResolvedValue(null);
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.forBirthdayMemories.mockResolvedValue([
-        { personGroupId: 'person-1', name: 'Alice', birthDate: { year: 1990, month: 4, day: 23 } },
-      ]);
-      mocks.memoryRuleAsset.getMemoryAssetsForPerson.mockResolvedValue([
-        { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
-        { id: 'a-2024-1', localDateTime: new Date('2024-04-01T12:00:00Z') },
-        { id: 'a-2023-1', localDateTime: new Date('2023-04-01T12:00:00Z') },
-        { id: 'a-2022-1', localDateTime: new Date('2022-04-01T12:00:00Z') },
-        { id: 'a-2021-1', localDateTime: new Date('2021-04-01T12:00:00Z') },
-        { id: 'a-2020-1', localDateTime: new Date('2020-04-01T12:00:00Z') },
-      ]);
-      mocks.memoryRuleAsset.hasRuleMemory.mockResolvedValue(false);
-      mocks.memory.create.mockResolvedValue(
-        MemoryFactory.create({
-          ownerId: user.id,
-          type: MemoryType.Rule,
-          data: {
-            ruleId: 'birthday',
-            dedupeKey: 'birthday:person-1:2026-04-23',
-            context: { personId: 'person-1', personName: 'Alice', variant: 'across_years', distinctYears: 6 },
-          },
-        }) as any,
-      );
-
-      await sut.onRuleMemoriesCreate();
-
-      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledTimes(1);
-      expect(mocks.memory.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ownerId: user.id,
-          type: MemoryType.Rule,
-          data: expect.objectContaining({
-            ruleId: 'birthday',
-            context: expect.objectContaining({ personName: 'Alice', variant: 'across_years' }),
-          }),
-        }),
-        new Set(['a-2025-1', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1', 'a-2020-1']),
-      );
-      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
-        SystemMetadataKey.MemoriesState,
-        expect.objectContaining({ lastRuleDate: '2026-04-23T00:00:00.000Z' }),
-      );
-
-      vi.useRealTimers();
-    });
-
-    it('should skip birthday rule memories when birthday memories are disabled', async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
-
-      const user = factory.userAdmin();
-      mocks.user.getList.mockResolvedValue([user]);
-      mocks.systemMetadata.get.mockImplementation((key) =>
-        Promise.resolve(
-          key === SystemMetadataKey.SystemConfig
-            ? { memories: { birthday: false, recentTrips: true } }
-            : {
-                lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
-                lastRuleDate: '2026-04-22T00:00:00.000Z',
-              },
-        ),
-      );
-      mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onRuleMemoriesCreate();
 
       expect(mocks.person.forBirthdayMemories).not.toHaveBeenCalled();
-      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.MemoriesState,
+        expect.objectContaining({ lastRuleDate: '2026-04-23T00:00:00.000Z' }),
+      );
 
       vi.useRealTimers();
     });
@@ -208,7 +146,7 @@ describe(RuleMemoryService.name, () => {
       mocks.systemMetadata.get.mockImplementation((key) =>
         Promise.resolve(
           key === SystemMetadataKey.SystemConfig
-            ? { memories: { birthday: true, recentTrips: false } }
+            ? { memories: { recentTrips: false } }
             : {
                 lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
                 lastRuleDate: '2026-04-22T00:00:00.000Z',
@@ -216,11 +154,9 @@ describe(RuleMemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onRuleMemoriesCreate();
 
-      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -235,7 +171,7 @@ describe(RuleMemoryService.name, () => {
       mocks.systemMetadata.get.mockImplementation((key) =>
         Promise.resolve(
           key === SystemMetadataKey.SystemConfig
-            ? { memories: { birthday: false, recentTrips: false } }
+            ? { memories: { recentTrips: false } }
             : {
                 lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
                 lastRuleDate: '2026-04-22T00:00:00.000Z',
@@ -246,7 +182,6 @@ describe(RuleMemoryService.name, () => {
 
       await sut.onRuleMemoriesCreate();
 
-      expect(mocks.person.forBirthdayMemories).not.toHaveBeenCalled();
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
       expect(mocks.memory.create).not.toHaveBeenCalled();
 
@@ -587,7 +522,7 @@ describe(RuleMemoryService.name, () => {
 
       const userA = factory.userAdmin();
       const userB = factory.userAdmin({
-        metadata: [{ key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } }],
+        metadata: [{ key: UserMetadataKey.Preferences, value: { memories: { types: { recent_trip: false } } } }],
       });
       mocks.user.getList.mockResolvedValue([userA, userB]);
       mocks.systemMetadata.get.mockResolvedValue({
@@ -595,16 +530,13 @@ describe(RuleMemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.forBirthdayMemories.mockResolvedValue([]);
       mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onRuleMemoriesCreate();
 
-      // birthday rule runs only for userA; recent-trip runs for both
-      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledTimes(1);
-      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledWith(userA.id, expect.anything());
+      // recent-trip runs only for userA
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userA.id, expect.anything());
-      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalledWith(userB.id, expect.anything());
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalledWith(userB.id, expect.anything());
 
       vi.useRealTimers();
     });
@@ -623,12 +555,10 @@ describe(RuleMemoryService.name, () => {
         ),
       );
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.forBirthdayMemories.mockResolvedValue([]);
 
       await sut.onRuleMemoriesCreate();
 
       expect(mocks.memoryRuleAsset.getMemoryLocationClusters).not.toHaveBeenCalled();
-      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -646,11 +576,11 @@ describe(RuleMemoryService.name, () => {
         lastRuleDate: '2026-04-22T00:00:00.000Z',
       });
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.person.forBirthdayMemories.mockResolvedValue([]);
+      mocks.memoryRuleAsset.getMemoryLocationClusters.mockResolvedValue([]);
 
       await sut.onRuleMemoriesCreate();
 
-      expect(mocks.person.forBirthdayMemories).toHaveBeenCalled();
+      expect(mocks.memoryRuleAsset.getMemoryLocationClusters).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -1145,11 +1075,10 @@ describe(RuleMemoryService.name, () => {
       expect(mocks.memory.delete).not.toHaveBeenCalled();
     });
 
-    it('F1b: a birthday row (immich-30831) does not claim, and does not sink a visible on_this_day card below its floor', async () => {
-      // An Immich 3.3+ import carries upstream-generated birthday memories. They are hidden from
-      // every client (spec 2026-09-24), and their photos are the ones taken on the birthday — the
-      // same photos as that day's on_this_day card. Unhandled, the birthday row has no type key,
-      // counts as visible, ranks as unmanaged (highest claim priority) and strips them.
+    // OD-3: upstream's birthday memory is shown like any other, so it takes part in the sweep. It
+    // has no registry key, so it is unmanaged: it claims its photos (the ones taken on the birthday,
+    // which that day's on_this_day card also holds) and is never stripped or deleted itself.
+    it('F1b: a birthday row (immich-30831) claims its photos as an unmanaged memory', async () => {
       const shared = ids('x', 2);
       mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
         overlapRow({
@@ -1158,7 +1087,7 @@ describe(RuleMemoryService.name, () => {
           type: MemoryType.Birthday,
           data: { personId: 'person-1', personName: 'Alice', year: 1990 },
         }),
-        // Floor 3; losing the shared pair would leave 2 and delete it.
+        // Floor 3; losing the shared pair leaves 2, so it is deleted.
         overlapRow({
           id: 'otd',
           assets: [...shared, ...ids('o', 2)],
@@ -1169,32 +1098,8 @@ describe(RuleMemoryService.name, () => {
 
       await runJob();
 
+      expect(mocks.memory.delete).toHaveBeenCalledExactlyOnceWith('otd');
       expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
-      expect(mocks.memory.delete).not.toHaveBeenCalled();
-    });
-
-    it('F1c: a saved birthday row is dropped too', async () => {
-      const shared = ids('x', 2);
-      mocks.memoryRuleAsset.getForOverlapReconcile.mockResolvedValue([
-        overlapRow({
-          id: 'birthday',
-          assets: [...shared, ...ids('b', 3)],
-          type: MemoryType.Birthday,
-          data: { personId: 'person-1', personName: 'Alice', year: 1990 },
-          isSaved: true,
-        }),
-        overlapRow({
-          id: 'otd',
-          assets: [...shared, ...ids('o', 2)],
-          type: MemoryType.OnThisDay,
-          data: { year: 2025 },
-        }),
-      ] as any);
-
-      await runJob();
-
-      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
-      expect(mocks.memory.delete).not.toHaveBeenCalled();
     });
   });
 

@@ -69,7 +69,7 @@ export const GalleryClassificationSchema = z
 export const GalleryMemoriesSchema = z
   .object({
     retentionDays: z.coerce.number().int().min(0).describe('Retention days'),
-    /** @deprecated superseded by `types['birthday']`; kept for back-compat */
+    /** @deprecated inert since birthday memories moved to Immich's generator (OD-3); kept so existing configs validate */
     birthday: galleryConfigBool.describe('Birthday memories'),
     /** @deprecated superseded by `types['recent_trip']`; kept for back-compat */
     recentTrips: galleryConfigBool.describe('Recent trip memories'),

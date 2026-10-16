@@ -1,7 +1,6 @@
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
-import { BirthdayMemoryRule } from 'src/gallery/services/memory-rules/birthday.rule.js';
 import { FavoritesThrowbackMemoryRule } from 'src/gallery/services/memory-rules/favorites-throwback.rule.js';
 import { MemoryRule } from 'src/gallery/services/memory-rules/memory-rule.interface.js';
 import { MEMORY_TYPE_METADATA } from 'src/gallery/services/memory-rules/memory-type.metadata.js';
@@ -19,10 +18,8 @@ import { ThemedMemoryRule } from 'src/gallery/services/memory-rules/themed.rule.
 import { TripAnniversaryMemoryRule } from 'src/gallery/services/memory-rules/trip-anniversary.rule.js';
 import { VideoMomentsMemoryRule } from 'src/gallery/services/memory-rules/video-moments.rule.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
-import { PersonRepository } from 'src/repositories/person.repository.js';
 
 export interface MemoryRuleDeps {
-  personRepository: PersonRepository;
   galleryPersonRepository: GalleryPersonRepository;
   memoryRuleAssetRepository: MemoryRuleAssetRepository;
   memoryRepository: MemoryRepository;
@@ -36,7 +33,6 @@ export interface MemoryRuleDeps {
 
 /** per rule-kind key, how to construct its MemoryRule */
 const RULE_FACTORIES: Record<string, (deps: MemoryRuleDeps) => MemoryRule> = {
-  birthday: (deps) => new BirthdayMemoryRule(deps.personRepository, deps.memoryRuleAssetRepository),
   recent_trip: (deps) => new RecentTripMemoryRule(deps.memoryRuleAssetRepository, deps.memoryRepository),
   month_recap: (deps) => new MonthRecapMemoryRule(deps.memoryRuleAssetRepository),
   favorites_throwback: (deps) => new FavoritesThrowbackMemoryRule(deps.memoryRuleAssetRepository),
