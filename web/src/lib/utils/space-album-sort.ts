@@ -1,5 +1,6 @@
 import type { AlbumResponseDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { orderBy } from 'lodash-es';
+import type { Translations } from 'svelte-i18n';
 import { AlbumSortBy, SortOrder } from '$lib/stores/preferences.store';
 import { sortAlbums, sortOptionsMetadata, stringToSortOrder } from '$lib/utils/album-utils';
 
@@ -30,14 +31,48 @@ export interface SpaceAlbumSortOptionMetadata {
   columnStyle: string;
 }
 
+/**
+ * Column widths for the space album table (#972). Upstream's `sortOptionsMetadata` sizes six columns with no
+ * action column; the space table has seven sort columns plus the manage menu, so it carries its own set:
+ * title, items and the menu everywhere, the two album dates from `sm`, the photo and link dates from `xl`.
+ */
+const spaceAlbumColumnStyles: Record<SpaceAlbumSortByValue, string> = {
+  [SpaceAlbumSortBy.Title]: 'text-start w-7/12 sm:w-[35%] xl:w-[22%]',
+  [SpaceAlbumSortBy.ItemCount]: 'text-center w-4/12 sm:w-[15%] xl:w-[10%]',
+  [SpaceAlbumSortBy.DateModified]: 'text-center hidden sm:block sm:w-[22%] xl:w-[12%]',
+  [SpaceAlbumSortBy.DateCreated]: 'text-center hidden sm:block sm:w-[22%] xl:w-[12%]',
+  [SpaceAlbumSortBy.MostRecentPhoto]: 'text-center hidden xl:block xl:w-[12%]',
+  [SpaceAlbumSortBy.OldestPhoto]: 'text-center hidden xl:block xl:w-[12%]',
+  [SpaceAlbumSortBy.RecentlyLinked]: 'text-center hidden xl:block xl:w-[12%]',
+};
+
+/** The manage-menu column that ends every space album table row. */
+export const spaceAlbumMenuColumnStyle = 'w-1/12 sm:w-[6%] text-end';
+
 export const spaceAlbumSortOptionsMetadata: SpaceAlbumSortOptionMetadata[] = [
-  ...sortOptionsMetadata,
+  ...sortOptionsMetadata.map(({ id, defaultOrder }) => ({
+    id,
+    defaultOrder,
+    columnStyle: spaceAlbumColumnStyles[id],
+  })),
   {
     id: SpaceAlbumSortBy.RecentlyLinked,
     defaultOrder: SortOrder.Desc,
-    columnStyle: 'text-center hidden xl:block xl:w-[15%] 2xl:w-[12%]',
+    columnStyle: spaceAlbumColumnStyles[SpaceAlbumSortBy.RecentlyLinked],
   },
 ];
+
+/** Labels for the space album sort options, shared by the sort menu and the table header. */
+export const getSpaceAlbumSortLabels = (translate: (key: Translations) => string) =>
+  ({
+    [SpaceAlbumSortBy.Title]: translate('sort_title'),
+    [SpaceAlbumSortBy.ItemCount]: translate('sort_items'),
+    [SpaceAlbumSortBy.DateModified]: translate('sort_modified'),
+    [SpaceAlbumSortBy.DateCreated]: translate('sort_created'),
+    [SpaceAlbumSortBy.MostRecentPhoto]: translate('sort_recent'),
+    [SpaceAlbumSortBy.OldestPhoto]: translate('sort_oldest'),
+    [SpaceAlbumSortBy.RecentlyLinked]: translate('sort_recently_linked'),
+  }) satisfies Record<SpaceAlbumSortByValue, string>;
 
 const defaultSortOption = spaceAlbumSortOptionsMetadata.at(-1) as SpaceAlbumSortOptionMetadata;
 

@@ -1,10 +1,12 @@
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { fireEvent, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { init, register, waitLocale } from 'svelte-i18n';
+import { init, register, t, waitLocale } from 'svelte-i18n';
+import { get } from 'svelte/store';
 import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
 import { toggleSpaceAlbumGroupCollapsing } from '$lib/utils/space-album-grouping';
+import { getSpaceAlbumSortLabels, spaceAlbumSortOptionsMetadata } from '$lib/utils/space-album-sort';
 import { renderWithTooltips } from '$tests/helpers';
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -201,6 +203,65 @@ describe('SpaceAlbumsTable', () => {
     // The bug rendered the bare fragment; assert on the exact string so a
     // substring match cannot pass against it.
     expect(headerTexts).not.toContain('items');
+  });
+
+  describe('sortable headers (#972)', () => {
+    beforeEach(() => {
+      spaceAlbumViewSettings.update((settings) => ({ ...settings, sortBy: 'RecentlyLinked', sortOrder: 'desc' }));
+    });
+
+    it('renders every sort option as a header button, like /albums', () => {
+      renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+
+      const buttons = screen
+        .getAllByRole('columnheader')
+        .map((header) => header.querySelector('button')?.textContent?.replaceAll(/[↓↑]/g, '').trim())
+        .filter(Boolean);
+
+      // The same labels, in the same order, as the space's sort menu.
+      const labels = getSpaceAlbumSortLabels(get(t));
+      expect(buttons).toEqual(spaceAlbumSortOptionsMetadata.map(({ id }) => labels[id]));
+      expect(buttons).toHaveLength(7);
+    });
+
+    it('sorts by a header on click, with its default direction, and flips it on a second click', async () => {
+      renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+      const title = within(screen.getByTestId('space-albums-table-header-Title')).getByRole('button');
+
+      await fireEvent.click(title);
+      expect(get(spaceAlbumViewSettings)).toMatchObject({ sortBy: 'Title', sortOrder: 'asc' });
+
+      await fireEvent.click(title);
+      expect(get(spaceAlbumViewSettings)).toMatchObject({ sortBy: 'Title', sortOrder: 'desc' });
+    });
+
+    it('marks the active column with its direction', () => {
+      renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+
+      expect(screen.getByTestId('space-albums-table-header-RecentlyLinked').textContent).toContain('↓');
+      expect(screen.getByTestId('space-albums-table-header-Title').textContent).not.toMatch(/[↓↑]/);
+    });
+
+    it('fills the photo-date columns, with a dash when the album has no photos', () => {
+      const withPhotos = makeAlbum({
+        id: 'a-3',
+        startDate: '2019-01-01T00:00:00.000Z',
+        endDate: '2023-07-01T00:00:00.000Z',
+      });
+      const empty = makeAlbum({ id: 'a-4', assetCount: 0 });
+      renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [withPhotos, empty], canManage: false });
+
+      const cells = (id: string) =>
+        [...screen.getByTestId(`space-album-row-${id}`).closest('tr')!.querySelectorAll('td')].map((td) =>
+          td.textContent?.trim(),
+        );
+      // Title, items, modified, created, most recent, oldest, linked, menu
+      expect(cells('a-3')[4]).toMatch(/2023/);
+      expect(cells('a-3')[5]).toMatch(/2019/);
+      expect(cells('a-3')[6]).toMatch(/2026/);
+      expect(cells('a-4')[4]).toBe('-');
+      expect(cells('a-4')[5]).toBe('-');
+    });
   });
 
   it('gives the item-count column header a base width so the longer label does not wrap', () => {

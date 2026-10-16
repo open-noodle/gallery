@@ -12,8 +12,8 @@
   import {
     type SpaceAlbumSortByValue,
     type SpaceAlbumSortOptionMetadata,
-    SpaceAlbumSortBy,
     findSpaceAlbumSortOptionMetadata,
+    getSpaceAlbumSortLabels,
     spaceAlbumSortOptionsMetadata,
   } from '$lib/utils/space-album-sort';
   import { Button, Icon, Text } from '@immich/ui';
@@ -106,15 +106,7 @@
   );
   let isGrouped = $derived(getSelectedSpaceAlbumGroupOption($spaceAlbumViewSettings) !== SpaceAlbumGroupBy.None);
 
-  let albumSortByNames: Record<SpaceAlbumSortByValue, string> = $derived({
-    [SpaceAlbumSortBy.Title]: $t('sort_title'),
-    [SpaceAlbumSortBy.ItemCount]: $t('sort_items'),
-    [SpaceAlbumSortBy.DateModified]: $t('sort_modified'),
-    [SpaceAlbumSortBy.DateCreated]: $t('sort_created'),
-    [SpaceAlbumSortBy.MostRecentPhoto]: $t('sort_recent'),
-    [SpaceAlbumSortBy.OldestPhoto]: $t('sort_oldest'),
-    [SpaceAlbumSortBy.RecentlyLinked]: $t('sort_recently_linked'),
-  });
+  let albumSortByNames: Record<SpaceAlbumSortByValue, string> = $derived(getSpaceAlbumSortLabels($t));
 
   let spaceGroupByNames: Record<SpaceAlbumGroupBy, string> = $derived({
     [SpaceAlbumGroupBy.None]: $t('group_no'),
