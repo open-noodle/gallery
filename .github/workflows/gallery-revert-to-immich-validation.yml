@@ -178,15 +178,17 @@ jobs:
           github_token: ${{ github.token }}
 
       # The seed phase checks the PR's own sync gating, so a PR must not be tested against :main.
+      # The PR's gallery-core plugin goes in too, because the stock phase loads it from the database.
       # shortcut: overlays the PR's server dist on :main, so a PR that changes server dependencies
-      # or plugins is not covered; build the full server/Dockerfile here if that starts to matter.
+      # or plugin-core is not covered; build the full server/Dockerfile here if that starts to matter.
       - name: Build the PR's server
         if: github.event_name == 'pull_request'
         run: |
           pnpm install --frozen-lockfile
           mise //:plugins
           mise //server:build
-          printf 'FROM ghcr.io/open-noodle/immich-server:main\nRUN rm -rf /usr/src/app/server/dist\nCOPY dist /usr/src/app/server/dist\n' |
+          mkdir -p server/gallery-core && cp -r packages/plugin-gallery/dist packages/plugin-gallery/manifest.json server/gallery-core/
+          printf 'FROM ghcr.io/open-noodle/immich-server:main\nRUN rm -rf /usr/src/app/server/dist\nCOPY dist /usr/src/app/server/dist\nCOPY gallery-core /build/plugins/gallery-core\n' |
             docker build -t "$GALLERY_IMAGE" -f - server
 
       - name: Log in to GitHub Container Registry
@@ -450,7 +452,7 @@ jobs:
           # Step 9.5: stock Immich on the live Gallery database, then back
           #
           # No revert script: the trial boot the switch-back guide allows.
-          # Stock must boot with Gallery's plugin disabled and Redis
+          # Stock must boot with Gallery's plugin enabled and Redis
           # flushed, serve the owner, and leave Gallery intact.
           ############################################################
 

@@ -19,6 +19,8 @@ const AddToSpaceAlbumArgs = z.object({
   albumName: z.string().trim().min(1),
 });
 
+const GALLERY_PLUGIN = 'gallery-core';
+
 type GalleryHandler = (auth: AuthDto, args: unknown) => Promise<GalleryDispatchResult>;
 
 /** Returned by `runGuarded` when an expected, user-fixable failure was swallowed. */
@@ -27,7 +29,7 @@ export const SKIPPED = Symbol('skipped');
 /**
  * Fork-owned dispatcher for every Gallery workflow step.
  *
- * Reached from upstream's `gallery` host function. Constructed with `BaseService.create`, so it is
+ * Reached from upstream's workflow execute loop through `runStep`. Constructed with `BaseService.create`, so it is
  * deliberately NOT registered in `services/index.ts` — it has no controller, jobs or events.
  */
 export class GalleryWorkflowHostService extends BaseService {
@@ -76,6 +78,32 @@ export class GalleryWorkflowHostService extends BaseService {
 
   get methodNames(): string[] {
     return Object.keys(this.handlers);
+  }
+
+  private galleryPluginId?: Promise<string | undefined>;
+
+  /**
+   * Runs a `gallery-core` workflow step in TypeScript and returns true; returns false for any other
+   * plugin's step, which upstream's execute loop then sends to WASM. The plugin's own exports are
+   * no-ops with no custom host import, so a stock Immich server can load it (OD-18).
+   */
+  async runStep(
+    step: { pluginId: string; methodName: string; config: object | null },
+    authUserId: string,
+    data: unknown,
+  ): Promise<boolean> {
+    if (!Object.hasOwn(this.handlers, step.methodName)) {
+      return false;
+    }
+
+    this.galleryPluginId ??= this.pluginRepository.getByName(GALLERY_PLUGIN).then((plugin) => plugin?.id);
+    if (step.pluginId !== (await this.galleryPluginId)) {
+      return false;
+    }
+
+    const assetId = (data as { asset?: { id?: string } } | undefined)?.asset?.id;
+    await this.dispatch({ user: { id: authUserId } } as AuthDto, step.methodName, { ...step.config, assetId });
+    return true;
   }
 
   async dispatch(auth: AuthDto, method: string, args: unknown): Promise<GalleryDispatchResult> {

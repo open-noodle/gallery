@@ -246,12 +246,10 @@ EOF
   echo "::notice::seed: Gallery data written"
 }
 
-# What the switch-back guide asks before a trial boot of stock Immich: no Gallery jobs left in Redis
-# and Gallery's own workflow plugin disabled (stock cannot load it). Disabled, not deleted: deleting it
-# cascades to every workflow step that uses it.
+# What the switch-back guide asks before a trial boot of stock Immich: no Gallery jobs left in Redis.
+# Gallery's workflow plugin stays enabled: its WASM imports only upstream's host functions.
 stock_prepare() {
   docker exec redis valkey-cli FLUSHALL >/dev/null
-  psql_q "UPDATE plugin SET enabled = false WHERE name = 'gallery-core'" >/dev/null
   psql_q "SELECT id FROM plugin WHERE name = 'gallery-core'" >"$STATE_DIR/plugin-id"
 }
 
@@ -272,6 +270,9 @@ stock_assert() {
   failed=0
   local owner
   owner=$(login owner@example.com)
+
+  check stock "stock loads Gallery's enabled workflow plugin" \
+    "$(docker logs server 2>&1 | grep -qF 'Loaded plugin: gallery-core@' && echo yes)" yes
 
   # Stock's drift check flags only Gallery's trigger functions and Gallery's migration_overrides rows: extra
   # tables (with their constraints), columns, indexes and triggers are ignored by design. No migration
@@ -360,10 +361,9 @@ stock_assert() {
   echo "::notice::stock: Immich serves the owner on the Gallery database"
 }
 
-# The guide's steps for going back: flush what stock queued and enable Gallery's plugin again.
+# The guide's steps for going back: flush what stock queued.
 gallery_prepare() {
   docker exec redis valkey-cli FLUSHALL >/dev/null
-  psql_q "UPDATE plugin SET enabled = true WHERE name = 'gallery-core'" >/dev/null
 }
 
 # shellcheck disable=SC2153 # vars come from the sourced $STATE file

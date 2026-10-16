@@ -12,7 +12,7 @@
       "title": "Add to space",
       "description": "Add the asset to one or more shared spaces",
       "types": ["AssetV1"],
-      "hostFunctions": true,
+      "hostFunctions": false,
       "schema": {
         "type": "object",
         "properties": {
@@ -32,7 +32,7 @@
       "title": "Add to space album",
       "description": "Add the asset to an album in a shared space, creating it if needed",
       "types": ["AssetV1"],
-      "hostFunctions": true,
+      "hostFunctions": false,
       "schema": {
         "type": "object",
         "properties": {

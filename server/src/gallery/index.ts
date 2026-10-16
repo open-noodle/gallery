@@ -26,7 +26,6 @@ import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identi
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
-import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
 import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
@@ -109,7 +108,6 @@ export const galleryServices = [
   GalleryAlbumService,
   GalleryAssetService,
   GalleryPeopleService,
-  GalleryPluginService,
   GallerySearchService,
   GalleryStackService,
   LibraryManifestService,

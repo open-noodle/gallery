@@ -1,26 +1,12 @@
 import { wrapper } from '@immich/plugin-sdk';
 import type { Manifest } from '../dist/index.d.ts';
-import { gallery } from './host.js';
 
+// No-ops: Gallery's server runs these steps in TypeScript before they reach this module
+// (GalleryWorkflowHostService.runStep). The plugin imports only upstream's host functions, so a
+// stock Immich server can load it.
 const methods = wrapper<Manifest>({
-  addToSpace: ({ data, config, workflow }) => {
-    gallery(workflow.authToken)('addToSpace', {
-      assetId: data.asset.id,
-      spaceIds: config.spaceIds,
-    });
-
-    return {};
-  },
-
-  addToSpaceAlbum: ({ data, config, workflow }) => {
-    gallery(workflow.authToken)('addToSpaceAlbum', {
-      assetId: data.asset.id,
-      spaceId: config.spaceId,
-      albumName: config.albumName,
-    });
-
-    return {};
-  },
+  addToSpace: () => ({}),
+  addToSpaceAlbum: () => ({}),
 });
 
 const {
