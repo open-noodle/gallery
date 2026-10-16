@@ -99,6 +99,8 @@ features:
       - web/src/lib/gallery/people/**
       - web/src/lib/gallery/album-actions.ts
       - web/src/lib/gallery/LinkAlbumToSpaceMenuOption.svelte
+      # The sidebar's Spaces row (plan 9.6).
+      - web/src/lib/gallery/sidebar/SpacesNavItem.svelte
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -291,6 +293,8 @@ features:
       - web/src/lib/gallery/filtered-map/**
       # Video volume persistence for the asset viewer (plan 9.6).
       - web/src/lib/gallery/asset-viewer/video-volume*.ts
+      # The sidebar's footer, a storage meter on the collapsed rail (plan 9.6).
+      - web/src/lib/gallery/sidebar/SidebarBottomInfo.svelte
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
