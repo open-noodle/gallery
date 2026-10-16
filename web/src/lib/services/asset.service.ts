@@ -78,19 +78,12 @@ import { goto } from '$app/navigation';
 export const getAssetBulkActions = (
   $t: MessageFormatter,
   {
-    restrictToSpaceId,
     album,
     editableSelectedAssetIds,
   }: {
     /**
-     * Set when the selection contains assets the user does not own: the add-to-collection
-     * picker then offers only albums linked to this space, because those are the only targets
-     * that can accept the non-owned assets (#764 contribution).
-     */
-    restrictToSpaceId?: string;
-    /**
      * The album whose page is showing this selection. Upstream passed it positionally; it moved
-     * into this bag so the fork's restrictToSpaceId and it can coexist. Gates RemoveFromAlbum.
+     * into this bag next to the fork's options. Gates RemoveFromAlbum.
      */
     album?: AlbumResponseDto;
     /**
@@ -114,7 +107,7 @@ export const getAssetBulkActions = (
     title: $t('add_to_album_or_space'),
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
-    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds, restrictToSpaceId }),
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds }),
   };
 
   // Gallery (#853): `Permission.AssetShare` is owner ∪ partner only and rejects the ENTIRE request if it
@@ -242,14 +235,12 @@ export const getAssetActions = (
 
   // #889: an asset the caller does not own reaches an album only through the #764 contribution
   // path, which the server accepts solely for albums linked to a space where the caller is
-  // Owner/Editor. Offering the ordinary picker there lists nothing but targets the server must
-  // reject, so on a space surface the picker is narrowed to that space's albums — and dropped
-  // entirely for a space Viewer, who has no contribution path at all. Mirrors the multi-select
-  // rule in `getSelectionCapabilities`. Off a space surface `space` is undefined and nothing
-  // changes: partner-shared assets do land in the caller's own album (Permission.AssetShare),
-  // and the viewer cannot evaluate that from the DTO.
+  // Owner/Editor, so the action is dropped for a space Viewer, who has no contribution path at all.
+  // Mirrors the multi-select rule in `getSelectionCapabilities`. The picker itself is the timeline's
+  // (#1119): it asks the server which albums accept the asset. Off a space surface `space` is
+  // undefined and nothing changes: partner-shared assets do land in the caller's own album
+  // (Permission.AssetShare), and the viewer cannot evaluate that from the DTO.
   const canAddToAlbum = isOwner || space === undefined || space.canWrite;
-  const restrictToSpaceId = !isOwner && space?.canWrite ? space.id : undefined;
 
   const Share: ActionItem = {
     title: $t('share'),
@@ -340,7 +331,7 @@ export const getAssetActions = (
     icon: mdiPlus,
     shortcuts: [{ key: 'l' }],
     $if: () => canAddToAlbum && asset.visibility !== AssetVisibility.Locked && !asset.isTrashed,
-    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds: [asset.id], restrictToSpaceId }),
+    onAction: () => modalManager.show(AssetAddToCollectionModal, { assetIds: [asset.id] }),
   };
 
   const RemoveFromAlbum: ActionItem = {
