@@ -282,7 +282,8 @@ jobs:
             local phase=$1
             local deadline=$(( $(date +%s) + 60 ))
             while [ "$(date +%s)" -lt "$deadline" ]; do
-              if docker logs server 2>&1 | grep -qF 'Geodata import completed'; then
+              # Not grep -q: under pipefail its early exit SIGPIPEs docker logs and fails the match.
+              if docker logs server 2>&1 | grep -F 'Geodata import completed' >/dev/null; then
                 echo "::notice::${phase}: geodata import completed"
                 return 0
               fi

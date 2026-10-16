@@ -271,8 +271,10 @@ stock_assert() {
   local owner
   owner=$(login owner@example.com)
 
+  # Never `grep -q` on `docker logs`: it exits at the first match, docker logs dies of SIGPIPE, and
+  # pipefail turns the match into a failure.
   check stock "stock loads Gallery's enabled workflow plugin" \
-    "$(docker logs server 2>&1 | grep -qF 'Loaded plugin: gallery-core@' && echo yes)" yes
+    "$(docker logs server 2>&1 | grep -F 'Loaded plugin: gallery-core@' >/dev/null && echo yes)" yes
 
   # Stock's drift check flags only Gallery's trigger functions and Gallery's migration_overrides rows: extra
   # tables (with their constraints), columns, indexes and triggers are ignored by design. No migration
@@ -320,7 +322,7 @@ stock_assert() {
   bull_add backgroundTask SharedSpaceAlbumGrantReconcileSweep
   bull_add classification AssetClassifyQueueAll
   local deadline=$(($(date +%s) + 60))
-  until docker logs server 2>&1 | grep -qF 'Skipping unknown job: "SharedSpaceAlbumGrantReconcileSweep"'; do
+  until docker logs server 2>&1 | grep -F 'Skipping unknown job: "SharedSpaceAlbumGrantReconcileSweep"' >/dev/null; do
     [ "$(date +%s)" -lt "$deadline" ] || {
       echo "::error::stock: the fork job in a stock queue was not skipped within 60s"
       failed=1
