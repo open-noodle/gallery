@@ -95,6 +95,8 @@ features:
       - server/src/queries/gallery.person.repository.sql
       - web/src/lib/gallery/viewer-space.ts
       - web/src/lib/gallery/viewer-space.test-helpers.ts
+      # People list page, person page hooks and the space-aware person service (plan 9.3, OD-9).
+      - web/src/lib/gallery/people/**
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
