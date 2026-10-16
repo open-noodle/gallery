@@ -3,11 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
 import { setTimeout } from 'node:timers/promises';
-import type { Redis } from 'ioredis';
 import type { JobCounts, JobItem, JobOf } from 'src/types.js';
 import { JobConfig } from 'src/decorators.js';
 import { QueueJobResponseDto, QueueJobSearchDto } from 'src/dtos/queue.dto.js';
 import { ImmichWorker, JobName, JobStatus, MetadataKey, QueueCleanType, QueueJobStatus, QueueName } from 'src/enum.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -61,6 +61,7 @@ export class JobRepository {
     private configRepository: ConfigRepository,
     private eventRepository: EventRepository,
     private logger: LoggingRepository,
+    private queueMaintenanceRepository: QueueMaintenanceRepository,
   ) {
     this.logger.setContext(JobRepository.name);
   }
@@ -235,56 +236,12 @@ export class JobRepository {
    * the same cost for no benefit.
    */
   async getJobCountsWithRepair(name: QueueName): Promise<JobCounts> {
-    await this.removeDanglingActiveJobs(name);
+    await this.queueMaintenanceRepository.removeDanglingActiveJobs(name);
     return this.getJobCounts(name);
   }
 
   private getQueueName(name: JobName) {
     return (this.handlers[name] as JobMapItem).queueName;
-  }
-
-  private async removeDanglingActiveJobs(name: QueueName): Promise<void> {
-    const queue = this.getQueue(name);
-    const client = await queue.client;
-    const activeKey = queue.toKey('active');
-    const activeJobIds = [...new Set(await client.lrange(activeKey, 0, -1))];
-    if (activeJobIds.length === 0) {
-      return;
-    }
-
-    // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself issues; EXISTS, LREM
-    // and SREM are not among them. The concrete client is ioredis, so cast to reach them — the same
-    // approach QueueMaintenanceRepository.removeOrphanedActiveJobs takes for LREM.
-    const redis = client as unknown as Pick<Redis, 'exists' | 'lrem' | 'srem'>;
-
-    const removedIds: string[] = [];
-    let removedCount = 0;
-    for (const jobId of activeJobIds) {
-      const jobKey = queue.toKey(jobId);
-      const lockKey = `${jobKey}:lock`;
-      const [jobExists, lockExists] = await Promise.all([redis.exists(jobKey), redis.exists(lockKey)]);
-      if (jobExists > 0 || lockExists > 0) {
-        continue;
-      }
-
-      const removed = await redis.lrem(activeKey, 0, jobId);
-      if (!(removed > 0)) {
-        continue;
-      }
-
-      removedCount += removed;
-      removedIds.push(jobId);
-      await redis.srem(queue.toKey('stalled'), jobId);
-    }
-
-    // eslint-disable-next-line unicorn/prefer-early-return
-    if (removedCount > 0) {
-      const sampleIds = removedIds.slice(0, 5).join(', ');
-      const suffix = removedIds.length > 5 ? `${sampleIds}, ...` : sampleIds;
-      this.logger.warn(
-        `Removed ${removedCount} dangling active job id${removedCount === 1 ? '' : 's'} from ${name}: ${suffix}`,
-      );
-    }
   }
 
   async queueAll(items: JobItem[]): Promise<void> {
@@ -397,7 +354,7 @@ export class JobRepository {
 
   async searchJobs(name: QueueName, dto: QueueJobSearchDto): Promise<QueueJobResponseDto[]> {
     if (!dto.status || dto.status.includes(QueueJobStatus.Active)) {
-      await this.removeDanglingActiveJobs(name);
+      await this.queueMaintenanceRepository.removeDanglingActiveJobs(name);
     }
 
     const jobs = await this.getQueue(name).getJobs(dto.status ?? Object.values(QueueJobStatus), 0, 1000);

@@ -2,6 +2,7 @@ import { ModuleRef } from '@nestjs/core';
 import { setTimeout } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobName, QueueJobStatus, QueueName } from 'src/enum.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository, buildWorkerOptions } from 'src/repositories/job.repository.js';
@@ -55,7 +56,13 @@ const setup = (counts: JobCounts[] = []) => {
     warn: vi.fn(),
   } as unknown as LoggingRepository;
 
-  const sut = new JobRepository(moduleRef, {} as ConfigRepository, {} as EventRepository, logger);
+  const sut = new JobRepository(
+    moduleRef,
+    {} as ConfigRepository,
+    {} as EventRepository,
+    logger,
+    new QueueMaintenanceRepository(moduleRef, logger),
+  );
 
   return { sut, queue, client, logger };
 };

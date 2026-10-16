@@ -37,44 +37,58 @@ export class QueueMaintenanceRepository {
     this.logger.setContext(QueueMaintenanceRepository.name);
   }
 
-  /** Reconcile every queue's "active" list against its job hashes, dropping orphaned entries. */
+  /**
+   * Reconcile every queue's "active" list against its job hashes, dropping orphaned entries. Such
+   * orphans (e.g. removeOnComplete racing stalled-recovery) permanently wedge a concurrency-1 queue
+   * with no user-reachable recovery. Intended to run at bootstrap, before workers start.
+   */
   async reconcileOrphanedActiveJobs(): Promise<void> {
     for (const queueName of Object.values(QueueName)) {
-      const removed = await this.removeOrphanedActiveJobs(queueName);
-      if (removed.length > 0) {
-        this.logger.warn(`Removed ${removed.length} orphaned active job(s) from ${queueName}: ${removed.join(', ')}`);
-      }
+      await this.removeDanglingActiveJobs(queueName);
     }
   }
 
-  /**
-   * Removes job ids stuck in a queue's BullMQ "active" list that no longer have a backing job hash.
-   * These orphans (e.g. removeOnComplete racing stalled-recovery) permanently wedge a concurrency-1
-   * queue with no user-reachable recovery. We deliberately do NOT use `clean(0, _, 'active')`, which
-   * targets jobs by age and would kill legitimately-running jobs; instead we LREM only ids whose
-   * `getJob` returns nothing. A genuine in-flight job always has its hash, so it is never touched.
-   * Intended to run at bootstrap, before workers start.
-   */
-  async removeOrphanedActiveJobs(name: QueueName): Promise<string[]> {
+  async removeDanglingActiveJobs(name: QueueName): Promise<void> {
     const queue = this.getQueue(name);
-    const activeKey = queue.toKey('active');
     const client = await queue.client;
-    const activeIds = await client.lrange(activeKey, 0, -1);
+    const activeKey = queue.toKey('active');
+    const activeJobIds = [...new Set(await client.lrange(activeKey, 0, -1))];
+    if (activeJobIds.length === 0) {
+      return;
+    }
 
-    const removed: string[] = [];
-    for (const jobId of activeIds) {
-      const job = await queue.getJob(jobId);
-      if (job) {
+    // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself issues; EXISTS, LREM
+    // and SREM are not among them. The concrete client is ioredis, so cast to reach them.
+    const redis = client as unknown as Pick<Redis, 'exists' | 'lrem' | 'srem'>;
+
+    const removedIds: string[] = [];
+    let removedCount = 0;
+    for (const jobId of activeJobIds) {
+      const jobKey = queue.toKey(jobId);
+      const lockKey = `${jobKey}:lock`;
+      const [jobExists, lockExists] = await Promise.all([redis.exists(jobKey), redis.exists(lockKey)]);
+      if (jobExists > 0 || lockExists > 0) {
         continue;
       }
 
-      // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself
-      // issues, and LREM is not among them. The concrete client is ioredis, so
-      // cast to reach it rather than reimplementing LREM via a Lua script.
-      await (client as unknown as Pick<Redis, 'lrem'>).lrem(activeKey, 0, jobId);
-      removed.push(jobId);
+      const removed = await redis.lrem(activeKey, 0, jobId);
+      if (!(removed > 0)) {
+        continue;
+      }
+
+      removedCount += removed;
+      removedIds.push(jobId);
+      await redis.srem(queue.toKey('stalled'), jobId);
     }
-    return removed;
+
+    // eslint-disable-next-line unicorn/prefer-early-return
+    if (removedCount > 0) {
+      const sampleIds = removedIds.slice(0, 5).join(', ');
+      const suffix = removedIds.length > 5 ? `${sampleIds}, ...` : sampleIds;
+      this.logger.warn(
+        `Removed ${removedCount} dangling active job id${removedCount === 1 ? '' : 's'} from ${name}: ${suffix}`,
+      );
+    }
   }
 
   /**
