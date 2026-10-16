@@ -97,6 +97,12 @@ apply to Immich unchanged and can be offered upstream; Immich has not been conta
 - **Older search fields:** `search.repository.ts` keeps the flat search endpoints' fork fields next to the V3 hooks,
   because released Gallery apps send them.
 - **Generated files** (OpenAPI spec, SDK, SQL docs) still conflict and are regenerated, not merged.
+- **Mobile timeline builders:** upstream's private builders in `timeline.repository.dart` take an optional
+  `extraJoins` (the remote and place buckets, the `joinLocal` remote asset list) and `extraWhere` (the album, place and
+  person builders), each defaulting to upstream's query, so `SharedSpaceTimelineRepository` (a `part` of that file)
+  calls them instead of copying them. Real joins rather than `isInQuery` keep `.watch()` reactive to the Space tables,
+  and a joined bucket counts distinct assets. The map route keeps its own builder: it widens upstream's owner predicate
+  with an OR, which a narrowing hook cannot express.
 - **Memory overlap reconciliation** (owner decision OD-5, 2026-10-15): rule memories outrank on-this-day memories, so
   `reconcileMemoryOverlap` strips assets from upstream `on_this_day` rows or deletes them, and `backfillMemoryOverlap`
   does the same to older rows. Stock clients receive only on-this-day memories, so they see fewer and smaller cards

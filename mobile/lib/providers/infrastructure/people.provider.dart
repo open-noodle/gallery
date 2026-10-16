@@ -43,22 +43,9 @@ final driftSpaceEditableProvider = FutureProvider.family<bool, String>((ref, spa
   return true;
 });
 
-// ignore: unused-code
-final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((ref, key) async {
-  final service = ref.watch(peopleServiceProvider);
-  final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));
-  return service.getAssetPeople(key.id, ownedByCurrentUser: key.ownerId == currentUserId);
-});
-
-final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((ref, sortBy) async* {
-  final service = ref.watch(peopleServiceProvider);
-  final prefs = await ref.watch(Store.userMetadata.preferences().future);
-  yield* service.watch(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
-});
-
 /// People for the global People page AND the photos-filter People picker (see
 /// `peoplePickerAllProvider`) — the viewer's own people plus people on Space-shared assets,
-/// matching the web People page / picker. Kept distinct from [getAllPeopleProvider] so
+/// matching the web People page / picker. Kept distinct from `Store.people.all()` so
 /// the remaining owner-scoped, local-first surface (the library people card) stays local.
 /// See issue #727.
 ///
