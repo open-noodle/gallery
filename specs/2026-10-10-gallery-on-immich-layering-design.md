@@ -51,7 +51,10 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
   index is race-safe where a service check is not. Immich's person sharing stays dormant
   (`specs/2026-10-01-upstream-person-sharing-dormant-design.md`).
 - **The person files stay fork-owned.** Space people and pets run through `person.repository.ts` and `person.service.ts`, and so
-  does face identity; the upstream preflight lists Immich's changes to them every cycle.
+  does face identity; the upstream preflight lists Immich's changes to them every cycle. Their fork-only members moved
+  out (owner decision OD-8, 2026-10-16) and the files stay replay-owned: identity and merge, the face picker, admin face
+  reads, people statistics and suggestion scans to `GalleryPersonRepository`; the recognition identity helpers and the
+  shared-space reset to `FaceIdentityMaintenanceService`; the thumbnail access check to `gallery-people.service.ts`.
 - **Favorites:** `asset_favorite` is the source of truth for every user, `asset.isFavorite` is the owner's projection.
   Gallery code never writes the column; Immich's owner-only write paths (upload, copy, duplicate resolve) do, and a
   reverse trigger mirrors them. Paths a non-owner reaches (space editors hold `AssetUpdate`) write the caller's overlay
@@ -81,7 +84,7 @@ apply to Immich unchanged and can be offered upstream; Immich has not been conta
 
 ## What still diverges on purpose
 
-- **People:** the person repository and service (+1,095 and +608 lines against the tag), for the reasons above.
+- **People:** the person repository and service (+462 and +476 lines against the tag after OD-8), for the reasons above.
 - **Timeline filters:** `asset.repository.ts` and `utils/database.ts` hold the filter panel's rules in one shared
   timeline function that five queries use; restoring Immich's inline chain would repeat each rule.
 - **Older search fields:** `search.repository.ts` keeps the flat search endpoints' fork fields next to the V3 hooks,
