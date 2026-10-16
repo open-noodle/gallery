@@ -35,7 +35,8 @@ jobs:
               - 'machine-learning/mise.toml'
               - 'mise.toml'
             upstream-preflight:
-              - '.github/workflows/test.yml'
+              # every workflow file: the ci-invariants step scans all of .github/workflows
+              - '.github/workflows/**'
               - 'tools/upstream-preflight/**'
               - 'docs/fork/ownership.yml'
               - 'docs/docs/developer/upstream-rebase-process.md'
