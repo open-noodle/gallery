@@ -5,7 +5,7 @@ This guide walks through switching a Gallery instance back to upstream [Immich](
 :::danger
 **This is a one-way, destructive operation.** The cleanup script drops every Gallery-only table and column. Anything stored only in Gallery-specific features is permanently lost. At minimum, you will lose:
 
-- Shared spaces (members, assets, person clusters, libraries, activity, audit history)
+- Shared spaces (members, assets, person clusters, libraries, activity, audit history), unless you [keep them as shared albums](#optional-keep-your-spaces-as-shared-albums)
 - User groups and memberships
 - Classification categories and prompts
 - Pet detection results, and every individual pet you named through pet recognition. Pets are removed completely, so they do not come back as people.
@@ -136,6 +136,29 @@ Notes:
   ```
   NOTICE: revert-to-immich: cleanup finished. Switch your image to ghcr.io/immich-app/immich-server and start the stack.
   ```
+
+### Optional: keep your spaces as shared albums
+
+By default the script deletes shared spaces. To keep each one as an Immich shared album instead, add one more `-c` line next to the token:
+
+```bash
+docker exec immich_postgres psql -U postgres -d immich \
+  -v ON_ERROR_STOP=1 \
+  -c "SET gallery.revert_token = 'i_accept_data_loss';" \
+  -c "SET gallery.convert_spaces = 'on';" \
+  -f /tmp/revert-to-immich.sql
+```
+
+- Each space becomes one album with the same name and description. It holds the space's photos, the photos of its linked libraries as they are now (the album does not follow the library any more), the photos of its linked albums shown in the space, and the photos members added to those albums. Trashed photos are left out.
+- The space creator owns the album. If that account was deleted, the longest-standing member takes over, space owners first. Space owners and editors become album editors, viewers stay viewers. A space whose members have all been deleted is skipped.
+- Every member also gets direct access to the space's linked albums, as an editor if they owned or edited any space that linked the album, else as a viewer. Someone who already had access to such an album keeps their role.
+- Workflow steps that add photos to a space now add them to that space's album. Steps that add photos to an album inside a space have no Immich equivalent and are deleted.
+- A space person's name and birthday are copied to the matching person in each member's own people, if that person has none yet.
+- Not kept: space colours, folders, hidden albums, activity, nicknames for people.
+
+Gallery lets members favorite each other's photos; Immich only keeps favorites on your own photos. To keep those too, also add `-c "SET gallery.convert_favorites = 'on';"`: each such member gets a private album called "Favorites from shared spaces" with the photos they can still reach. The owners of those photos cannot see or remove them from that album, which is why this is off unless you ask for it.
+
+The stock Immich mobile app picks up the new albums as shared albums on its next sync.
 
 ## 5. Switch your compose file to upstream Immich
 

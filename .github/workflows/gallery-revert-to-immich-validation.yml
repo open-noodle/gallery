@@ -5,7 +5,9 @@ name: Gallery Revert-to-Immich Validation
 # where upstream Immich boots cleanly, with no schema drift warnings and no
 # stale kysely_migration rows. Before the revert, the same database goes
 # through a trial boot of stock Immich without the script and back to
-# Gallery, as the switch-back guide describes.
+# Gallery, as the switch-back guide describes. A copy of the database goes
+# through the revert with the guide's optional space conversion, and stock
+# Immich must then serve each space as a shared album.
 #
 # See specs/2026-04-14-revert-to-immich-validation-design.md for the
 # full design, the pass-criterion rationale, and the review history.
@@ -495,6 +497,25 @@ jobs:
           echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in ${ledger}"
 
           ############################################################
+          # Step 10.5: the managed rollback, on a copy of the database
+          #
+          # The guide's optional conversion turns each space into a
+          # shared album. Step 15 boots stock Immich on the copy.
+          ############################################################
+
+          CONVERT_DB=${DB_DATABASE_NAME}_convert
+          docker exec database psql -U "$DB_USERNAME" -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE \"${CONVERT_DB}\" TEMPLATE \"${DB_DATABASE_NAME}\""
+          DB_DATABASE_NAME=$CONVERT_DB .github/scripts/revert-to-immich-data.sh convert-seed
+          { echo "SET gallery.revert_token = 'i_accept_data_loss';"; \
+            echo "SET gallery.convert_spaces = 'on';"; \
+            echo "SET gallery.convert_favorites = 'on';"; \
+            cat scripts/revert-to-immich.sql; } | \
+            docker exec -i database psql \
+              -U "$DB_USERNAME" -d "$CONVERT_DB" \
+              -v ON_ERROR_STOP=1
+
+          ############################################################
           # Step 11: run revert-to-immich.sql
           ############################################################
 
@@ -556,6 +577,15 @@ jobs:
           ############################################################
 
           .github/scripts/revert-to-immich-data.sh assert
+          stop_server
+
+          ############################################################
+          # Step 15: stock Immich on the converted copy
+          ############################################################
+
+          docker exec redis valkey-cli FLUSHALL >/dev/null
+          DB_DATABASE_NAME=$CONVERT_DB boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" convert
+          DB_DATABASE_NAME=$CONVERT_DB .github/scripts/revert-to-immich-data.sh convert-assert
 
           if [ "$roundtrip" != 0 ]; then
             echo "::error::The stock round trip (step 9.5) failed; its errors are above."
