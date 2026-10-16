@@ -15,7 +15,7 @@
   import Skeleton from '$lib/elements/Skeleton.svelte';
   import type { AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { scrollTimelineToTemporalAnchor } from '$lib/gallery/timeline/timeline-anchor';
+  import { retryOnAnimationFrames, scrollTimelineToTemporalAnchor } from '$lib/gallery/timeline/timeline-anchor';
   import type { TimelineDay } from '$lib/managers/timeline-manager/timeline-day.svelte';
   import { isIntersecting } from '$lib/managers/timeline-manager/internal/intersection-support.svelte';
   import type { TimelineMonth } from '$lib/managers/timeline-manager/timeline-month.svelte';
@@ -186,42 +186,26 @@
       return;
     }
 
-    let frame: number | undefined;
-    let cancelled = false;
-    let attempts = 0;
     const anchor = temporalAnchor;
 
-    const attemptScroll = () => {
-      void tick().then(() => {
-        if (
-          cancelled ||
-          temporalAnchor !== anchor ||
-          !timelineManager.isInitialized ||
-          timelineManager.grouping !== activeGrouping ||
-          timelineManager.hasEmptyViewport
-        ) {
-          return;
-        }
-
-        if (scrollTimelineToTemporalAnchor(timelineManager, anchor)) {
-          onTemporalAnchorResolved?.();
-          return;
-        }
-
-        if (attempts++ < 120) {
-          frame = requestAnimationFrame(attemptScroll);
-        }
-      });
-    };
-
-    frame = requestAnimationFrame(attemptScroll);
-
-    return () => {
-      cancelled = true;
-      if (frame !== undefined) {
-        cancelAnimationFrame(frame);
+    return retryOnAnimationFrames(async (_frame, isCancelled) => {
+      await tick();
+      if (
+        isCancelled() ||
+        temporalAnchor !== anchor ||
+        !timelineManager.isInitialized ||
+        timelineManager.grouping !== activeGrouping ||
+        timelineManager.hasEmptyViewport
+      ) {
+        return true;
       }
-    };
+
+      if (!scrollTimelineToTemporalAnchor(timelineManager, anchor)) {
+        return false;
+      }
+      onTemporalAnchorResolved?.();
+      return true;
+    }, 120);
   });
 
   const getAssetPosition = (assetId: string, timelineMonth: TimelineMonth) =>
