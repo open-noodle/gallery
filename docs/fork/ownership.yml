@@ -271,6 +271,12 @@ features:
       - server/src/gallery/validation.ts
       - server/src/gallery/utils/database.ts
       - server/src/gallery/utils/time-bucket-filter*.ts
+      # fork routes moved out of the upstream album, search, server and timeline controllers
+      - server/src/gallery/controllers/gallery-album.controller*.ts
+      - server/src/gallery/controllers/gallery-search.controller*.ts
+      - server/src/gallery/controllers/gallery-server.controller*.ts
+      - server/src/gallery/controllers/gallery-timeline.controller*.ts
+      - server/src/gallery/utils/search-scope*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
