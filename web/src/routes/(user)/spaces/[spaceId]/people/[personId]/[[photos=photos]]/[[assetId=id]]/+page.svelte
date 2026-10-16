@@ -28,6 +28,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { locale } from '$lib/stores/preferences.store';
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/gallery/people/space-person-name-merge';
   import { toScopedPersonRef as toPersonScopedRef } from '$lib/utils/scoped-person-ref';
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
@@ -219,6 +220,22 @@
     }
 
     try {
+      // Typing a name the space already has is almost always the same identity, so offer the merge
+      // first and only rename when it is declined (#1100). A merge that was wanted but refused
+      // leaves the name alone: renaming then would create the duplicate.
+      if (editedName.trim()) {
+        const existingPerson = await findSpacePersonNamed(space.id, editedName, person.id);
+        if (existingPerson) {
+          const outcome = await mergeIntoSuggestedPerson(existingPerson);
+          if (outcome === 'failed') {
+            editedName = person.name;
+          }
+          if (outcome !== 'declined') {
+            return;
+          }
+        }
+      }
+
       const updatedPerson = await updateSpacePerson({
         id: space.id,
         personId: person.id,
@@ -238,35 +255,25 @@
     // click-outside-to-save gesture and commit an unrelated rename alongside the merge (issue #859).
     cancelEditingName();
 
-    const isConfirm = await modalManager.showDialog({ prompt: $t('merge_people_prompt') });
-    if (!isConfirm) {
-      return;
-    }
-
     try {
-      const committed = await runMergeWithCrossOwnerConfirmation(
-        (confirmCrossOwner) =>
-          mergeSpacePeople({
-            id: space.id,
-            personId: suggestedPerson.id,
-            sharedSpacePersonMergeDto: confirmCrossOwner
-              ? { ids: [person.id], confirmCrossOwner: true }
-              : { ids: [person.id] },
-          }),
-        createCrossOwnerMergeHandlers(),
-      );
-      if (!committed) {
-        // Cross-owner merge was blocked or the user declined the confirmation — nothing merged.
-        return;
-      }
-
-      toastManager.success($t('spaces_people_merged'));
-      // The current route person is the merge source and no longer exists; navigate
-      // straight to the surviving suggested person instead of reloading a deleted route.
-      await goto(getSpacePersonRoute(suggestedPerson.id), { replaceState: true });
+      await mergeIntoSuggestedPerson(suggestedPerson);
     } catch (error) {
       handleError(error, $t('cannot_merge_people'));
     }
+  };
+
+  const mergeIntoSuggestedPerson = async (suggestedPerson: SharedSpacePersonResponseDto) => {
+    const outcome = await confirmAndMergeSpacePerson({
+      spaceId: space.id,
+      sourceId: person.id,
+      targetId: suggestedPerson.id,
+    });
+    if (outcome === 'merged') {
+      // The current route person is the merge source and no longer exists; navigate
+      // straight to the surviving suggested person instead of reloading a deleted route.
+      await goto(getSpacePersonRoute(suggestedPerson.id), { replaceState: true });
+    }
+    return outcome;
   };
 
   const isSharedSpacePerson = (person: ScopedMergeCandidate): person is SharedSpacePersonResponseDto =>
