@@ -6,7 +6,9 @@ import {
   getAssetEdits,
   getAssetInfo,
   removeAssetEdits,
+  removeAssetFromAlbum,
   updateAssetFavorites,
+  type AlbumResponseDto,
   type AssetEditActionItemDto,
   type AssetResponseDto,
 } from '@immich/sdk';
@@ -41,6 +43,18 @@ export type GalleryAssetBulkActionOptions = {
    * omitted on every other surface, which keeps upstream's all-owned behaviour.
    */
   editableSelectedAssetIds?: string[];
+  /**
+   * #1018: set on a space surface where the caller is an Owner/Editor. The link is then authorized
+   * against the space rather than against asset ownership, so the whole selection goes in,
+   * including photos other members contributed.
+   */
+  shareSpaceId?: string;
+  /**
+   * Set by `SelectionToolbar` when its capability rules allow removing the selection from this
+   * album (a space album's editor included). Upstream's item, which gates on album ownership, is
+   * used otherwise.
+   */
+  removeFromAlbum?: { album: AlbumResponseDto; onRemove?: (assetIds: string[]) => void };
 };
 
 export type GalleryAssetActionOptions = {
@@ -52,10 +66,10 @@ export type GalleryAssetActionOptions = {
 };
 
 export const getGalleryAssetBulkActions = <
-  T extends { AddToAlbum: ActionItem; CreateSharedLink: ActionItem; Tag: ActionItem },
+  T extends { AddToAlbum: ActionItem; CreateSharedLink: ActionItem; RemoveFromAlbum: ActionItem; Tag: ActionItem },
 >(
   $t: MessageFormatter,
-  { editableSelectedAssetIds }: GalleryAssetBulkActionOptions = {},
+  { editableSelectedAssetIds, shareSpaceId, removeFromAlbum }: GalleryAssetBulkActionOptions = {},
   upstream: T,
 ) => {
   const assetIds = assetMultiSelectManager.assets.map((asset) => asset.id);
@@ -68,12 +82,21 @@ export const getGalleryAssetBulkActions = <
 
   // Gallery (#853): `Permission.AssetShare` is owner ∪ partner only and rejects the ENTIRE request if it
   // names one asset the caller does not own, so share the owned subset and surface what was left out.
-  // `ownedAssets` falls back to the full selection when unauthenticated, so gate on that too. Space
-  // surfaces keep the fork's CreateSharedLinkAction, which shares the whole selection against the space.
+  // `ownedAssets` falls back to the full selection when unauthenticated, so gate on that too.
   const CreateSharedLink: ActionItem = {
     ...upstream.CreateSharedLink,
     onAction: async () => {
       const ownedAssetIds = authManager.authenticated ? assetMultiSelectManager.ownedAssets.map(({ id }) => id) : [];
+      if (shareSpaceId && authManager.authenticated) {
+        // The server checks the space role and that every asset is visible in the space, so nothing
+        // needs narrowing. `contributedCount` drives the consent warning in the modal.
+        await modalManager.show(SharedLinkCreateModal, {
+          assetIds,
+          spaceId: shareSpaceId,
+          contributedCount: assetIds.length - ownedAssetIds.length,
+        });
+        return;
+      }
       if (ownedAssetIds.length === 0) {
         toastManager.warning($t('shared_link_nothing_owned_to_share'));
         return;
@@ -107,7 +130,52 @@ export const getGalleryAssetBulkActions = <
     },
   };
 
-  return { ...upstream, AddToAlbum, CreateSharedLink, Tag };
+  const RemoveFromAlbum: ActionItem = removeFromAlbum
+    ? {
+        ...upstream.RemoveFromAlbum,
+        $if: () => true,
+        onAction: () => handleRemoveFromAlbum($t, assetIds, removeFromAlbum.album, removeFromAlbum.onRemove),
+      }
+    : upstream.RemoveFromAlbum;
+
+  return { ...upstream, AddToAlbum, CreateSharedLink, RemoveFromAlbum, Tag };
+};
+
+const handleRemoveFromAlbum = async (
+  $t: MessageFormatter,
+  ids: string[],
+  album: AlbumResponseDto,
+  onRemove?: (assetIds: string[]) => void,
+) => {
+  const isConfirmed = await modalManager.showDialog({
+    prompt: $t('remove_assets_album_confirmation', { values: { count: ids.length } }),
+  });
+  if (!isConfirmed) {
+    return;
+  }
+
+  try {
+    const results = await removeAssetFromAlbum({ id: album.id, bulkIdsDto: { ids } });
+
+    // #752: the server answers per asset (a space editor may not remove another member's own
+    // album_asset rows), so prune and report only what was actually removed.
+    const removedIds = results.filter(({ success }) => success).map(({ id }) => id);
+    onRemove?.(removedIds);
+
+    if (removedIds.length === ids.length) {
+      toastManager.primary($t('assets_removed_count', { values: { count: removedIds.length } }));
+    } else if (removedIds.length > 0) {
+      toastManager.info(
+        $t('assets_removed_partial_count', { values: { removedCount: removedIds.length, totalCount: ids.length } }),
+      );
+    } else {
+      toastManager.warning($t('assets_remove_failed_count', { values: { count: ids.length } }));
+    }
+
+    assetMultiSelectManager.clear();
+  } catch (error) {
+    handleError(error, $t('errors.error_removing_assets_from_album'));
+  }
 };
 
 type UpstreamAssetActions = Record<
