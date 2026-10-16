@@ -23,7 +23,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { getParentPath } from '$lib/utils/tree-utils';
   import { AssetMediaSize, getAllAlbums, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
-  import { Icon, IconButton, Link, Text } from '@immich/ui';
+  import { Icon, IconButton, Link, LoadingSpinner, Text } from '@immich/ui';
   import {
     mdiCamera,
     mdiCameraIris,
@@ -42,7 +42,6 @@
   import UserAvatar from '../shared-components/UserAvatar.svelte';
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
   import DetailPanelPeople from '$lib/components/asset-viewer/DetailPanelPeople.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     asset: AssetResponseDto;

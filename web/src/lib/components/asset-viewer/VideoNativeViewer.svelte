@@ -16,7 +16,7 @@
   } from '$lib/stores/preferences.store';
   import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '$lib/utils';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
-  import { Icon, shortcuts } from '@immich/ui';
+  import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';
   import {
     mdiCheck,
     mdiChevronLeft,
@@ -51,7 +51,6 @@
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import './immich-time-range';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     asset: AssetResponseDto;

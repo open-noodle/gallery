@@ -437,6 +437,65 @@ patch_app_download_modal() {
 }
 
 #
+# --- Loading spinner ---
+#
+# Source keeps upstream's `import { LoadingSpinner } from '@immich/ui'` so these files stay
+# byte-identical to upstream on that line; the branded build swaps it for the Gallery spinner
+# (`/gallery-loader.svg`). Fork-only files import the branded spinner directly and are not listed.
+# A listed file that no longer has the import fails the build: upstream moved or rewrote it.
+BRANDED_SPINNER_FILES=(
+  'lib/components/asset-viewer/ActivityViewer.svelte'
+  'lib/components/asset-viewer/DetailPanel.svelte'
+  'lib/components/asset-viewer/ImagePanoramaViewer.svelte'
+  'lib/components/asset-viewer/VideoNativeViewer.svelte'
+  'lib/components/asset-viewer/VideoPanoramaViewer.svelte'
+  'lib/components/asset-viewer/VideoRemoteViewer.svelte'
+  'lib/components/assets/thumbnail/VideoThumbnail.svelte'
+  'lib/components/faces-page/AssignFaceSidePanel.svelte'
+  'lib/components/faces-page/PersonSidePanel.svelte'
+  'lib/elements/SearchBar.svelte'
+  'lib/modals/AddUsersModal.svelte'
+  'lib/modals/MapModal.svelte'
+  'lib/modals/PartnerSelectionModal.svelte'
+  'lib/modals/PeoplePickerModal.svelte'
+  'routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte'
+  'routes/(user)/memories/+page.svelte'
+  'routes/(user)/search/[[photos=photos]]/[[assetId=id]]/+page.svelte'
+  'routes/(user)/user-settings/OauthSettings.svelte'
+  'routes/(user)/utilities/geolocation/+page.svelte'
+  'routes/admin/queues/[name]/QueueGraph.svelte'
+  'routes/admin/system-settings/TemplateSettings.svelte'
+)
+
+patch_loading_spinner() {
+  echo "--- Patching loading spinner ---"
+  local ui_import="^[[:space:]]*import \{[^}]*[{ ,]LoadingSpinner[ ,}][^}]*\} from '@immich/ui';$"
+  local branded="import LoadingSpinner from '\$lib/components/shared-components/LoadingSpinner.svelte';"
+  local rel file
+  for rel in "${BRANDED_SPINNER_FILES[@]}"; do
+    file="$REPO_ROOT/web/src/$rel"
+    if [[ ! -f "$file" ]] || ! grep -qE "$ui_import" "$file"; then
+      echo "  ERROR: web/src/$rel no longer imports LoadingSpinner from @immich/ui." >&2
+      echo "  Upstream moved or rewrote it: update BRANDED_SPINNER_FILES in apply-branding.sh." >&2
+      return 1
+    fi
+    # `{ LoadingSpinner }` alone becomes the branded import; otherwise drop the name and add the import below.
+    sed -i -E "\#$ui_import#{
+      s#^([[:space:]]*)import \{ LoadingSpinner \} from '@immich/ui';\$#\1$branded#
+      t
+      s#([{ ])LoadingSpinner, #\1#
+      s#, LoadingSpinner \}# }#
+      a\\  $branded
+    }" "$file"
+    if grep -qE "$ui_import" "$file"; then
+      echo "  ERROR: could not rewrite the LoadingSpinner import in web/src/$rel" >&2
+      return 1
+    fi
+  done
+  echo "  Swapped LoadingSpinner in ${#BRANDED_SPINNER_FILES[@]} files"
+}
+
+#
 # --- Emails ---
 #
 # The notification/email templates (server/src/emails) hardcode upstream Immich
@@ -1048,6 +1107,7 @@ main() {
   patch_i18n
   patch_web
   patch_app_download_modal
+  patch_loading_spinner
   patch_emails
   patch_help_modal
   patch_assets
