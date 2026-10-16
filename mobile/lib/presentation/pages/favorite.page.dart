@@ -13,8 +13,6 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 class FavoritePage extends StatelessWidget {
   const FavoritePage({super.key});
 
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   Widget build(BuildContext context) {
     return TimelineRouteScope(

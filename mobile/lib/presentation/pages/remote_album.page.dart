@@ -36,8 +36,6 @@ class RemoteAlbumPage extends ConsumerStatefulWidget {
 
   const RemoteAlbumPage({super.key, required this.album});
 
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   ConsumerState<RemoteAlbumPage> createState() => _RemoteAlbumPageState();
 }
