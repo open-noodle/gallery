@@ -101,6 +101,9 @@ features:
       - web/src/lib/gallery/LinkAlbumToSpaceMenuOption.svelte
       # The sidebar's Spaces row (plan 9.6).
       - web/src/lib/gallery/sidebar/SpacesNavItem.svelte
+      # Detail panel People row: person tile and avatar source toggle (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/PersonTile.svelte
+      - web/src/lib/gallery/asset-viewer/AvatarSourceToggle.svelte
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
