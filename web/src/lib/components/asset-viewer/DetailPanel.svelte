@@ -8,6 +8,7 @@
   import DetailPanelRating from '$lib/components/asset-viewer/DetailPanelStarRating.svelte';
   import DetailPanelTags from '$lib/components/asset-viewer/DetailPanelTags.svelte';
   import { timeToLoadTheMap } from '$lib/constants';
+  import { getViewerSpace } from '$lib/gallery/viewer-space';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { refreshAssetPeople } from '$lib/utils/refresh-asset-people';
@@ -46,10 +47,10 @@
   interface Props {
     asset: AssetResponseDto;
     currentAlbum?: AlbumResponseDto | null;
-    spaceId?: string;
   }
 
-  let { asset, currentAlbum = null, spaceId }: Props = $props();
+  let { asset, currentAlbum = null }: Props = $props();
+  const { spaceId } = $derived.by(getViewerSpace());
   let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);

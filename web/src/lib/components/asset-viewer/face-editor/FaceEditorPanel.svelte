@@ -1,4 +1,11 @@
 <script lang="ts">
+  import { getViewerSpace } from '$lib/gallery/viewer-space';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
+  import {
+    canEditSpacePeople as resolveCanEditSpacePeople,
+    resolveEffectiveSpaceId,
+  } from '$lib/utils/asset-editability';
+  import type { AssetResponseDto } from '@immich/sdk';
   import FaceEditor from './FaceEditor.svelte';
   import SpaceFaceEditor from './SpaceFaceEditor.svelte';
 
@@ -11,6 +18,9 @@
    * side-panel swap and `DetailPanelPeople.svelte`'s affordance gate already use
    * (`canEditSpacePeople`, from `resolveCanEditSpacePeople` in `asset-editability.ts`).
    *
+   * The viewer's space comes from the `getViewerSpace` context; `asset` is the viewed asset, which
+   * for a live photo is the still (`assetId` is then its video).
+   *
    * `spaceId` is re-checked here (not just `canEditSpacePeople`) because
    * `SpaceFaceEditor`'s `spaceId` prop is a required `string`; the `{#if}` narrows it for TS even
    * though `canEditSpacePeople` true already implies a space id upstream — never render both, and
@@ -21,20 +31,20 @@
     containerWidth: number;
     containerHeight: number;
     assetId: string;
-    spaceId?: string;
-    canEditSpacePeople?: boolean;
+    asset: AssetResponseDto;
     onClose: () => void;
   };
 
-  let {
-    htmlElement,
-    containerWidth,
-    containerHeight,
-    assetId,
-    spaceId,
-    canEditSpacePeople = false,
-    onClose,
-  }: Props = $props();
+  let { htmlElement, containerWidth, containerHeight, assetId, asset, onClose }: Props = $props();
+
+  const viewerSpace = $derived.by(getViewerSpace());
+  const spaceId = $derived(resolveEffectiveSpaceId(asset, viewerSpace.spaceId));
+  const canEditSpacePeople = $derived(
+    resolveCanEditSpacePeople(asset, {
+      userId: authManager.authenticated ? authManager.user.id : undefined,
+      spaceId: viewerSpace.spaceId,
+    }),
+  );
 </script>
 
 {#if canEditSpacePeople && spaceId}
