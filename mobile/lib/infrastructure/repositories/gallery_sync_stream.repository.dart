@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/data/db/main/table/memory/asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/library.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space.drift.dart';
@@ -12,10 +13,11 @@ import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.drift
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_library.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.drift.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart' show AssetVisibility;
 import 'package:immich_mobile/infrastructure/repositories/space_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
 import 'package:logging/logging.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' hide AssetVisibility;
 
 typedef GallerySyncHandler = Future<void> Function(Iterable<Object> data);
 
@@ -82,6 +84,63 @@ Map<SyncEntityType, GallerySyncHandler> gallerySyncHandlers(
   // Per-user favorites (#763).
   SyncEntityType.assetFavoriteV1: (data) => repo.updateAssetFavoritesV1(data.cast()),
   SyncEntityType.assetFavoriteDeleteV1: (data) => repo.deleteAssetFavoritesV1(data.cast()),
+};
+
+/// Decoders for the fork sync entity types, spread into upstream's `_kResponseMap` in
+/// sync_api.repository.dart. Every type here also needs a handler in [gallerySyncHandlers].
+const gallerySyncResponseMap = <SyncEntityType, Function(Object)>{
+  // --- gallery-fork: shared-space sync types ---
+  SyncEntityType.sharedSpaceV1: SyncSharedSpaceV1.fromJson,
+  SyncEntityType.sharedSpaceDeleteV1: SyncSharedSpaceDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceMemberV1: SyncSharedSpaceMemberV1.fromJson,
+  SyncEntityType.sharedSpaceMemberBackfillV1: SyncSharedSpaceMemberV1.fromJson,
+  SyncEntityType.sharedSpaceMemberDeleteV1: SyncSharedSpaceMemberDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAssetCreateV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetUpdateV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetBackfillV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifUpdateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetV1: SyncSharedSpaceToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetBackfillV1: SyncSharedSpaceToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetDeleteV1: SyncSharedSpaceToAssetDeleteV1.fromJson,
+  // --- gallery-fork: library sync types ---
+  SyncEntityType.libraryV1: SyncLibraryV1.fromJson,
+  SyncEntityType.libraryDeleteV1: SyncLibraryDeleteV1.fromJson,
+  SyncEntityType.libraryAssetCreateV1: SyncAssetV1.fromJson,
+  SyncEntityType.libraryAssetBackfillV1: SyncAssetV1.fromJson,
+  SyncEntityType.libraryAssetDeleteV1: SyncLibraryAssetDeleteV1.fromJson,
+  SyncEntityType.libraryAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.libraryAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryV1: SyncSharedSpaceLibraryV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryBackfillV1: SyncSharedSpaceLibraryV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryDeleteV1: SyncSharedSpaceLibraryDeleteV1.fromJson,
+  // --- gallery-fork: shared-space album sync types (Phase 2B) ---
+  SyncEntityType.sharedSpaceAlbumV1: SyncAlbumV2.fromJson,
+  SyncEntityType.sharedSpaceAlbumBackfillV1: SyncAlbumV2.fromJson,
+  SyncEntityType.sharedSpaceAlbumDeleteV1: SyncAlbumDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumLinkV1: SyncSharedSpaceAlbumLinkV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumLinkBackfillV1: SyncSharedSpaceAlbumLinkV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumLinkDeleteV1: SyncSharedSpaceAlbumLinkDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderV1: SyncSharedSpaceAlbumFolderV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderBackfillV1: SyncSharedSpaceAlbumFolderV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumFolderDeleteV1: SyncSharedSpaceAlbumFolderDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumToAssetV1: SyncAlbumToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumToAssetBackfillV1: SyncAlbumToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumToAssetDeleteV1: SyncAlbumToAssetDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumAssetCreateV1: SyncAssetV2.fromJson,
+  SyncEntityType.sharedSpaceAlbumAssetUpdateV1: SyncAssetV2.fromJson,
+  SyncEntityType.sharedSpaceAlbumAssetBackfillV1: SyncAssetV2.fromJson,
+  SyncEntityType.sharedSpaceAlbumAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+  SyncEntityType.sharedSpaceAlbumHiddenV1: SyncSharedSpaceAlbumHiddenV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumHiddenBackfillV1: SyncSharedSpaceAlbumHiddenV1.fromJson,
+  SyncEntityType.sharedSpaceAlbumHiddenDeleteV1: SyncSharedSpaceAlbumHiddenDeleteV1.fromJson,
+  // --- gallery-fork: per-user favorites sync (#763) ---
+  SyncEntityType.assetFavoriteV1: SyncAssetFavoriteV1.fromJson,
+  SyncEntityType.assetFavoriteDeleteV1: SyncAssetFavoriteDeleteV1.fromJson,
 };
 
 // Same logger name the dispatch switch used, so the skip warning reads as before.
@@ -661,6 +720,155 @@ class GallerySyncStreamRepository extends DatabaseAccessor<Drift> {
       _logger.severe('Error: deleteAssetFavoritesV1', error, stack);
       rethrow;
     }
+  }
+
+  // --- gallery-fork: memory asset links and live-photo motion parts (upstream handlers call in) ---
+
+  // memory -> asset link rows whose memory or asset has not been streamed yet, held until
+  // SyncCompleteV1. Bounded by the links delivered in a single sync pass and cleared on every
+  // flush, so it never accumulates across syncs. See insertOrDeferMemoryAssetsV1.
+  final Set<(String memoryId, String assetId)> _deferredMemoryAssets = {};
+
+  void clearDeferredMemoryAssets() => _deferredMemoryAssets.clear();
+
+  // A link deleted before it could be replayed must not be resurrected by the flush.
+  void forgetDeferredMemoryAssets(Iterable<SyncMemoryAssetDeleteV1> data) {
+    for (final asset in data) {
+      _deferredMemoryAssets.remove((asset.memoryId, asset.assetId));
+    }
+  }
+
+  // memory_asset_entity carries real foreign keys on BOTH ids, and Drift sends the batch as a
+  // single statement — so one link row whose memory or asset has not been streamed yet fails the
+  // WHOLE batch with SQLITE_CONSTRAINT_FOREIGNKEY (787). That aborts /sync/stream mid-flight and,
+  // because a failed batch is never acked, the next sync replays the same checkpoint and dies the
+  // same way: a permanently wedged client, with people, faces, spaces and libraries (all streamed
+  // later) never arriving. `onConflict: DoNothing()` does not help — it only covers PK conflicts.
+  //
+  // The server streams memories after every asset-bearing type (SYNC_TYPES_ORDER), so ordinarily
+  // both parents are present. This client must also survive an OLDER fork server that still
+  // streams them early — mobile and server release independently — so park what cannot be written
+  // yet and replay it at SyncCompleteV1 rather than dropping it or letting the constraint fire.
+  //
+  // Called by SyncStreamRepository.updateMemoryAssetsV1, which logs and rethrows on failure.
+  Future<void> insertOrDeferMemoryAssetsV1(Iterable<SyncMemoryAssetV1> data) async {
+    final deferred = await _insertMemoryAssetLinks([for (final link in data) (link.memoryId, link.assetId)]);
+    if (deferred.isNotEmpty) {
+      _deferredMemoryAssets.addAll(deferred);
+      _logger.fine('Deferred ${deferred.length} memory asset link(s) until their memory/asset arrives');
+    }
+  }
+
+  // Replays the links parked by insertOrDeferMemoryAssetsV1. Called on SyncCompleteV1, by which point
+  // every stream that can deliver an asset has run, so anything still unresolvable is a link this
+  // device genuinely cannot represent (e.g. a memory pointing at an asset outside its sync scope).
+  // Those are dropped with a warning instead of being carried into the next sync pass.
+  Future<void> flushDeferredMemoryAssetsV1() async {
+    if (_deferredMemoryAssets.isEmpty) {
+      return;
+    }
+
+    final pending = Set.of(_deferredMemoryAssets);
+    try {
+      final unresolved = await _insertMemoryAssetLinks(pending);
+      // Only forget the parked links once they have actually been dealt with — on failure they
+      // stay put for the next flush.
+      _deferredMemoryAssets.clear();
+
+      final replayed = pending.length - unresolved.length;
+      if (replayed > 0) {
+        _logger.info('Replayed $replayed deferred memory asset link(s)');
+      }
+      if (unresolved.isNotEmpty) {
+        final sample = unresolved.take(10).map((link) => '${link.$1}/${link.$2}').join(', ');
+        _logger.warning(
+          'Dropping ${unresolved.length} memory asset link(s) whose memory or asset never arrived: $sample',
+        );
+      }
+    } catch (error, stack) {
+      // Never rethrow: the sync itself has completed and every other batch is already acked.
+      // Failing here would abort the stream and lose the parked links for nothing.
+      _logger.severe('Error: flushDeferredMemoryAssetsV1', error, stack);
+    }
+  }
+
+  // Writes the links whose memory AND asset already exist locally, and returns the rest instead of
+  // letting the foreign keys abort the batch.
+  //
+  // Chunked because the parent lookups bind one variable per id: a single stream batch already
+  // carries up to kSyncEventBatchSize (5000) links, and a flush replays everything parked over a
+  // whole sync pass, which can be larger still. 500 keeps the `IN (...)` clauses far below any
+  // SQLITE_MAX_VARIABLE_NUMBER a bundled sqlite3 might have.
+  static const _memoryAssetLinkChunkSize = 500;
+
+  Future<Set<(String, String)>> _insertMemoryAssetLinks(Iterable<(String, String)> links) async {
+    final pending = links.toList(growable: false);
+    if (pending.isEmpty) {
+      return const {};
+    }
+
+    final deferred = <(String, String)>{};
+    for (var start = 0; start < pending.length; start += _memoryAssetLinkChunkSize) {
+      final end = start + _memoryAssetLinkChunkSize;
+      deferred.addAll(
+        await _insertMemoryAssetLinkChunk(pending.sublist(start, end > pending.length ? pending.length : end)),
+      );
+    }
+    return deferred;
+  }
+
+  Future<Set<(String, String)>> _insertMemoryAssetLinkChunk(List<(String, String)> pending) async {
+    final memoryQuery = _db.memoryEntity.selectOnly()
+      ..addColumns([_db.memoryEntity.id])
+      ..where(_db.memoryEntity.id.isIn(pending.map((link) => link.$1).toSet()));
+    final knownMemories = (await memoryQuery.map((row) => row.read(_db.memoryEntity.id)).get()).nonNulls.toSet();
+
+    final assetQuery = _db.remoteAssetEntity.selectOnly()
+      ..addColumns([_db.remoteAssetEntity.id])
+      ..where(_db.remoteAssetEntity.id.isIn(pending.map((link) => link.$2).toSet()));
+    final knownAssets = (await assetQuery.map((row) => row.read(_db.remoteAssetEntity.id)).get()).nonNulls.toSet();
+
+    final insertable = <(String, String)>[];
+    final deferred = <(String, String)>{};
+    for (final link in pending) {
+      if (knownMemories.contains(link.$1) && knownAssets.contains(link.$2)) {
+        insertable.add(link);
+      } else {
+        deferred.add(link);
+      }
+    }
+
+    if (insertable.isNotEmpty) {
+      await _db.batch((batch) {
+        for (final link in insertable) {
+          batch.insert(
+            _db.memoryAssetEntity,
+            MemoryAssetEntityCompanion(memoryId: Value(link.$1), assetId: Value(link.$2)),
+            onConflict: DoNothing(),
+          );
+        }
+      });
+    }
+
+    return deferred;
+  }
+
+  Future<void> hideReferencedLivePhotoMotionAssets() {
+    return _db.customUpdate(
+      '''
+      UPDATE remote_asset_entity
+      SET visibility = ?
+      WHERE id IN (
+        SELECT live_photo_video_id
+        FROM remote_asset_entity
+        WHERE live_photo_video_id IS NOT NULL
+      )
+      AND visibility != ?
+      ''',
+      variables: [Variable.withInt(AssetVisibility.hidden.index), Variable.withInt(AssetVisibility.hidden.index)],
+      updates: {_db.remoteAssetEntity},
+      updateKind: UpdateKind.update,
+    );
   }
 
   Future<void> pruneAssets() async {
