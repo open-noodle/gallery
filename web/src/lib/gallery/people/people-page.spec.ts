@@ -29,7 +29,7 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import PeoplePage from './PeoplePage.svelte';
 
 const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
-  let pageValue = {
+  const pageValue = {
     url: new URL('http://localhost/people'),
     route: { id: '/(user)/people' },
   };
@@ -37,12 +37,9 @@ const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
   return {
     gotoMock: vi.fn(),
     pageStore: {
+      page: pageValue,
       setUrl: (url: string) => {
-        pageValue = { ...pageValue, url: new URL(url) };
-      },
-      subscribe: (run: (value: typeof pageValue) => void) => {
-        run(pageValue);
-        return () => {};
+        pageValue.url = new URL(url);
       },
     },
     featureFlagsMock: { value: { peopleStatistics: true } },
@@ -50,7 +47,7 @@ const { gotoMock, pageStore, featureFlagsMock } = vi.hoisted(() => {
 });
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
-vi.mock('$app/stores', () => ({ page: pageStore }));
+vi.mock('$app/state', () => ({ page: pageStore.page }));
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: featureFlagsMock,
 }));

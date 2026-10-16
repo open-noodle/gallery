@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { scrollMemory } from '$lib/actions/scroll-memory';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
   import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
@@ -86,7 +86,7 @@
   let listTotals = $state<{ total: number; hidden: number } | null>(data.peopleListTotals ?? null);
 
   onMount(() => {
-    const getSearchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
+    const getSearchedPeople = page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
     if (getSearchedPeople) {
       searchName = getSearchedPeople;
       if (searchPeopleElement) {
@@ -173,10 +173,10 @@
   };
 
   const handleSearch = async () => {
-    const getSearchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
+    const getSearchedPeople = page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
     if (getSearchedPeople !== searchName) {
-      $page.url.searchParams.set(QueryParameter.SEARCHED_PEOPLE, searchName);
-      await goto($page.url, { keepFocus: true });
+      page.url.searchParams.set(QueryParameter.SEARCHED_PEOPLE, searchName);
+      await goto(page.url, { keepFocus: true });
     }
   };
 
@@ -234,7 +234,7 @@
   };
 
   const onResetSearchBar = async () => {
-    await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, $page.url);
+    await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, page.url);
   };
 
   let people = $derived(data.people.people);
@@ -243,7 +243,7 @@
   let overviewStatistics = $derived(data.peopleStatistics);
   let peopleCountStatistics = $derived(listTotals ?? overviewStatistics ?? data.people);
   let hasUnsupportedStatsFilter = $derived(
-    !!$page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) || !!searchName.trim(),
+    !!page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) || !!searchName.trim(),
   );
   let countVisiblePeople = $derived(
     searchName ? searchedPeopleLocal.length : peopleCountStatistics.total - peopleCountStatistics.hidden,
