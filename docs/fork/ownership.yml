@@ -724,6 +724,24 @@ risk_patterns:
       - server/src/schema/migrations/**
       - server/src/schema/tables/**
     notes: Server schema change
+  # Watch: Immich's search redesign (design doc on outline.immich.cloud, no merged PR as of v3.3.3)
+  # plans POST /search/facets, suggestions that accept a filter, and a guard that keeps
+  # locked-visibility assets out of every search path (LP-1, approach not decided). That guard lands
+  # where Gallery's V3 hooks act: ownershipPredicate and albumConfinedPredicate on AssetSearchScope
+  # (searchScopeV3 in server/src/utils/viewer-scope.ts) replace upstream's owner and album
+  # predicates, so a locked filter upstream writes into either predicate disappears wherever a hook
+  # replaces it, and one written beside them must still apply under the hooks. Before taking a matching
+  # commit, check where its locked filter sits relative to the hooks and run the RBAC oracle's
+  # search surfaces; facets also decide plan step 11.1 (adopt upstream's facets if they ship first).
+  - id: upstream-search-redesign
+    risk: high
+    subject_regex: '[Ff]acets?\b|[Ll]ocked.*[Ss]earch|[Ss]earch.*[Ll]ocked'
+    path_globs:
+      - server/src/controllers/search.controller.ts
+      - server/src/dtos/search.dto.ts
+      - server/src/repositories/search.repository.ts
+      - server/src/services/search.service.ts
+    notes: Immich search redesign (facets, locked-visibility guard LP-1) meets Gallery's V3 search hooks
   - id: openapi-generated
     risk: medium
     path_globs:
