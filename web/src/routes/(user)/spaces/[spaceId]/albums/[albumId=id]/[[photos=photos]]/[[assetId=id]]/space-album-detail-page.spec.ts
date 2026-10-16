@@ -16,8 +16,9 @@ import { init, register, waitLocale } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album-actions';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions } from '$lib/services/album.service';
+import { getAlbumAssetsActions } from '$lib/services/album.service';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
@@ -179,9 +180,12 @@ vi.mock('$lib/services/album.service', async (importOriginal) => {
       },
     }),
     addAssetsToAlbums: vi.fn().mockResolvedValue(true),
-    addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
   };
 });
+
+vi.mock('$lib/gallery/album-actions', () => ({
+  addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
+}));
 
 const BASE_SPACE: SharedSpaceResponseDto = {
   id: 'space-1',
