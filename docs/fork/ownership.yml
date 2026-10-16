@@ -168,6 +168,7 @@ features:
       - web/src/routes/admin/system-settings/BackupSettings.spec.ts
       - docs/docs/features/s3-storage.md
       - docs/docs/administration/remote-database-backups.md
+      - server/src/gallery/repositories/storage-usage.repository*.ts
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
       - server/src/gallery/dtos/env.dto.ts
@@ -261,6 +262,7 @@ features:
       - mobile/test/gallery/search/**
       - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
       - mobile/test/fixtures/search_contract/**
+      - server/src/gallery/utils/smart-search.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -306,6 +308,7 @@ features:
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
       - server/src/repositories/duplicate.repository.ts
+      - server/src/gallery/repositories/gallery-duplicate.repository*.ts
     upstream_extension_paths:
       - server/src/config.ts
       - server/src/dtos/system-config.dto.ts

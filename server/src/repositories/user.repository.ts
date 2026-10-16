@@ -325,18 +325,4 @@ export class UserRepository {
 
     await query.execute();
   }
-
-  // Gallery-fork: writes an already-computed figure into the same column syncUsage above fills,
-  // so nothing downstream has to know which of the two produced it. Used when the admin has opted
-  // into counting server-generated files, where the number comes from a disk/S3 walk rather than
-  // from summing exif file sizes.
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
-  async setUsage(id: string, usage: number): Promise<void> {
-    await this.db
-      .updateTable('user')
-      .set({ quotaUsageInBytes: usage, updatedAt: new Date() })
-      .where('id', '=', asUuid(id))
-      .where('user.deletedAt', 'is', null)
-      .execute();
-  }
 }

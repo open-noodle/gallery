@@ -296,7 +296,7 @@ export class MediaService extends BaseService {
     // in another worker process) open a partial file (issue #743 item 2).
     const trimTempPath = `${outputPath}.tmp-${randomUUID()}.mp4`;
     try {
-      await this.mediaRepository.trim(inputPath, trimTempPath, params.startTime, duration);
+      await this.videoTrimRepository.trim(inputPath, trimTempPath, params.startTime, duration);
       await this.storageRepository.rename(trimTempPath, outputPath);
     } catch (error) {
       this.logger.error(`FFmpeg trim failed for asset ${asset.id}: ${error}`);
@@ -330,7 +330,7 @@ export class MediaService extends BaseService {
 
       // Extract a frame at ~10% into the trimmed video for thumbnail generation
       const frameTime = duration * 0.1;
-      await this.mediaRepository.extractFrame(outputPath, framePath, frameTime);
+      await this.videoTrimRepository.extractFrame(outputPath, framePath, frameTime);
 
       // Generate thumbnail/preview/fullsize from extracted frame
       const thumbnailResult = await this.generateImageThumbnails(

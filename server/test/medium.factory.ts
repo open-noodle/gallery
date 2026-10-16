@@ -24,6 +24,7 @@ import {
 } from 'src/enum.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -31,6 +32,7 @@ import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { PersonSidecarFields, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -690,8 +692,9 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case StackRepository:
     case SyncRepository:
     case GallerySyncRepository:
-    case VideoTrimRepository:
     case ImageAdjustRepository:
+    case StorageUsageRepository:
+    case GalleryDuplicateRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -728,7 +731,8 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     case ClassificationRepository:
-    case TagRepository: {
+    case TagRepository:
+    case VideoTrimRepository: {
       return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
 
@@ -784,6 +788,8 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case GallerySyncRepository:
     case VideoTrimRepository:
     case ImageAdjustRepository:
+    case StorageUsageRepository:
+    case GalleryDuplicateRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:

@@ -1004,7 +1004,7 @@ describe(MediaService.name, () => {
       await sut.handleGenerateThumbnails({ id: asset.id });
 
       expect(mocks.media.probe).not.toHaveBeenCalled();
-      expect(mocks.media.extractFrame).not.toHaveBeenCalled();
+      expect(mocks.videoTrim.extractFrame).not.toHaveBeenCalled();
       expect(mocks.media.decodeImage).toHaveBeenCalledOnce();
       expect(mocks.media.decodeImage).toHaveBeenCalledWith(asset.originalPath, {
         colorspace: Colorspace.Srgb,
@@ -1031,7 +1031,7 @@ describe(MediaService.name, () => {
 
       expect(ensureLocalFile).toHaveBeenCalledWith(asset.originalPath);
       expect(mocks.media.probe).not.toHaveBeenCalled();
-      expect(mocks.media.extractFrame).not.toHaveBeenCalled();
+      expect(mocks.videoTrim.extractFrame).not.toHaveBeenCalled();
       expect(mocks.media.decodeImage).toHaveBeenCalledWith('/tmp/immich-s3-heic.tmp', {
         colorspace: Colorspace.Srgb,
         processInvalidImages: false,
@@ -1622,7 +1622,7 @@ describe(MediaService.name, () => {
 
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      expect(mocks.media.trim).toHaveBeenCalledWith(expect.any(String), expect.any(String), 5, 20);
+      expect(mocks.videoTrim.trim).toHaveBeenCalledWith(expect.any(String), expect.any(String), 5, 20);
     });
 
     it('always trims the original, even if an encoded video row is present', async () => {
@@ -1643,7 +1643,7 @@ describe(MediaService.name, () => {
 
       // The encoded video is never a valid ffmpeg input: on S3 its path is a relative key.
       // The original is both readable and higher quality.
-      expect(mocks.media.trim).toHaveBeenCalledWith(asset.originalPath, expect.any(String), 5, 20);
+      expect(mocks.videoTrim.trim).toHaveBeenCalledWith(asset.originalPath, expect.any(String), 5, 20);
     });
 
     it('should record the trimmed duration after trimming', async () => {
@@ -1675,7 +1675,7 @@ describe(MediaService.name, () => {
 
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      expect(mocks.media.extractFrame).toHaveBeenCalledWith(
+      expect(mocks.videoTrim.extractFrame).toHaveBeenCalledWith(
         expect.any(String),
         expect.stringMatching(/\.frame-[\w-]+\.jpg$/),
         expect.any(Number),
@@ -1687,7 +1687,7 @@ describe(MediaService.name, () => {
       const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
       mocks.videoTrim.get.mockResolvedValue({ startTime: 5, endTime: 25 });
-      mocks.media.trim.mockRejectedValue(new Error('FFmpeg error'));
+      mocks.videoTrim.trim.mockRejectedValue(new Error('FFmpeg error'));
 
       const result = await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
@@ -1709,7 +1709,7 @@ describe(MediaService.name, () => {
 
       const order: string[] = [];
       let releaseFirstTrim!: () => void;
-      mocks.media.trim
+      mocks.videoTrim.trim
         .mockImplementationOnce(async () => {
           order.push('trim1:start');
           await new Promise<void>((resolve) => (releaseFirstTrim = resolve));
@@ -1749,7 +1749,7 @@ describe(MediaService.name, () => {
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      const framePaths = mocks.media.extractFrame.mock.calls.map(([, framePath]) => framePath);
+      const framePaths = mocks.videoTrim.extractFrame.mock.calls.map(([, framePath]) => framePath);
       expect(framePaths).toHaveLength(2);
       expect(framePaths[0]).not.toBe(framePaths[1]);
     });
@@ -1769,7 +1769,7 @@ describe(MediaService.name, () => {
 
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      const [, trimOutputPath] = mocks.media.trim.mock.calls[0];
+      const [, trimOutputPath] = mocks.videoTrim.trim.mock.calls[0];
       expect(trimOutputPath).not.toMatch(/_edited\.mp4$/);
       expect(mocks.storage.rename).toHaveBeenCalledWith(trimOutputPath, expect.stringMatching(/_edited\.mp4$/));
     });
@@ -1784,7 +1784,7 @@ describe(MediaService.name, () => {
       });
       // trim() succeeds, but a later step (frame extraction) throws. The locally-written
       // trimmed video must not be left behind — on S3 outputPath is a pod-local temp.
-      mocks.media.extractFrame.mockRejectedValue(new Error('bad frame'));
+      mocks.videoTrim.extractFrame.mockRejectedValue(new Error('bad frame'));
 
       await expect(sut.handleAssetEditThumbnailGeneration({ id: asset.id })).rejects.toThrow('bad frame');
 
@@ -1954,7 +1954,7 @@ describe(MediaService.name, () => {
         await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
         // persistFile unlinks the local file after upload, so extractFrame MUST run first.
-        const extractOrder = mocks.media.extractFrame.mock.invocationCallOrder[0];
+        const extractOrder = mocks.videoTrim.extractFrame.mock.invocationCallOrder[0];
         const putOrder = put.mock.invocationCallOrder[0];
         expect(extractOrder).toBeLessThan(putOrder);
       });
@@ -2515,7 +2515,7 @@ describe(MediaService.name, () => {
       ).resolves.toBe(JobStatus.Success);
 
       expect(mocks.media.probe).not.toHaveBeenCalled();
-      expect(mocks.media.extractFrame).not.toHaveBeenCalled();
+      expect(mocks.videoTrim.extractFrame).not.toHaveBeenCalled();
       expect(mocks.media.decodeImage).toHaveBeenCalledWith(data.originalPath, {
         colorspace: Colorspace.P3,
         processInvalidImages: false,
@@ -2548,7 +2548,7 @@ describe(MediaService.name, () => {
 
       expect(ensureLocalFile).toHaveBeenCalledWith(data.originalPath);
       expect(mocks.media.probe).not.toHaveBeenCalled();
-      expect(mocks.media.extractFrame).not.toHaveBeenCalled();
+      expect(mocks.videoTrim.extractFrame).not.toHaveBeenCalled();
       expect(mocks.media.decodeImage).toHaveBeenCalledWith('/tmp/immich-s3-person-heic.tmp', {
         colorspace: Colorspace.P3,
         processInvalidImages: false,

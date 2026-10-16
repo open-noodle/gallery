@@ -8,6 +8,7 @@ import { UserAdmin } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -15,6 +16,7 @@ import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
@@ -176,6 +178,8 @@ export const BASE_SERVICE_DEPENDENCIES = [
   GallerySyncRepository,
   VideoTrimRepository,
   ImageAdjustRepository,
+  StorageUsageRepository,
+  GalleryDuplicateRepository,
 ] as const;
 
 @Injectable()
@@ -263,6 +267,8 @@ export class BaseService {
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
     protected imageAdjustRepository: ImageAdjustRepository,
+    protected storageUsageRepository: StorageUsageRepository,
+    protected galleryDuplicateRepository: GalleryDuplicateRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -378,6 +384,8 @@ export class BaseService {
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
       ctx.imageAdjustRepository,
+      ctx.storageUsageRepository,
+      ctx.galleryDuplicateRepository,
     );
 
     service.logger.setContext(BaseService.name);
@@ -466,10 +474,10 @@ export class BaseService {
       const usage = await computePhysicalUsage({
         user,
         assetRepository: this.assetRepository,
-        storageRepository: this.storageRepository,
+        storageUsageRepository: this.storageUsageRepository,
         s3,
       });
-      await this.userRepository.setUsage(user.id, usage);
+      await this.storageUsageRepository.setUsage(user.id, usage);
     }
   }
 

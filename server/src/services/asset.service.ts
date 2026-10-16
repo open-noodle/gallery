@@ -257,7 +257,7 @@ export class AssetService extends BaseService {
 
     // A duplicateId is visible on any asset the caller can read. Joining another owner's group would block that owner's
     // resolve (their list never shows our asset) and let ours reach their keeper.
-    if (duplicateId && (await this.duplicateRepository.hasOtherOwner(duplicateId, auth.user.id))) {
+    if (duplicateId && (await this.galleryDuplicateRepository.hasOtherOwner(duplicateId, auth.user.id))) {
       throw new ForbiddenException('Duplicate grouping can only join a group of assets you own');
     }
 
