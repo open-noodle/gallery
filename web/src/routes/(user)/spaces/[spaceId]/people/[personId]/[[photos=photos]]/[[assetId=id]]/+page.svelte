@@ -16,7 +16,7 @@
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
   import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
-  import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
+  import PersonSuggestionReviewModal from '$lib/gallery/people/PersonSuggestionReviewModal.svelte';
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '$lib/route';
   import {
