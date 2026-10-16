@@ -120,6 +120,38 @@ where
   "album_space_asset"."albumId" = $1
   and "album_space_asset"."assetId" in ($2)
 
+-- SpaceAlbumRepository.getAlbumAssetIdsForViewer
+select
+  "album_members"."assetId"
+from
+  (
+    select
+      "album_asset"."albumId" as "albumId",
+      "album_asset"."assetId" as "assetId"
+    from
+      "album_asset"
+    where
+      "album_asset"."albumId" = any ($1::uuid[])
+    union
+    select
+      "album_space_asset"."albumId" as "albumId",
+      "album_space_asset"."assetId" as "assetId"
+    from
+      "shared_space_album"
+      inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+      and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+      and "linked_album"."deletedAt" is null
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+      inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
+    where
+      "shared_space_member"."userId" = $2::uuid
+      and "asset"."visibility" in ($3, $4)
+      and "album_space_asset"."albumId" = any ($5::uuid[])
+  ) as "album_members"
+where
+  "album_members"."assetId" in ($6)
+
 -- SpaceAlbumRepository.addContributedAssets
 insert into
   "album_space_asset" ("albumId", "assetId", "spaceId", "addedById")

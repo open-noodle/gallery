@@ -621,6 +621,64 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
   // FACE MATCH ENQUEUE (P1-7 / D3) — a successful contribution enqueues a targeted per-asset face
   // match job so a contribution's faces reach space People without waiting for a coarse reconcile.
   // ===============================================================================================
+  // ===============================================================================================
+  // COVER — a contribution can be the album cover, and keeps it while it is live (#1153)
+  // ===============================================================================================
+  describe('COVER (#1153)', () => {
+    // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over the shared fixture (db, albumL)
+    const coverOf = async () => {
+      const album = await db
+        .selectFrom('album')
+        .select('albumThumbnailAssetId')
+        .where('id', '=', albumL)
+        .executeTakeFirstOrThrow();
+      return album.albumThumbnailAssetId;
+    };
+
+    // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over the shared fixture (sut, actors, spaceS, albumL)
+    const contributeFresh = async () => {
+      const { ctx } = setup();
+      const { asset } = await ctx.newAsset({ ownerId: actors.carol.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: spaceS, assetId: asset.id, addedById: actors.carol.id });
+      const [res] = await sut.addAssets(authOf('albumOwner'), albumL, { ids: [asset.id] });
+      expect(res.success).toBe(true);
+      expect(await isContributionRow(asset.id)).toBeTruthy();
+      return asset.id;
+    };
+
+    it('the album owner (a space Editor) sets a contributed photo as the cover, and it survives the thumbnail refresh', async () => {
+      const assetId = await contributeFresh();
+
+      const updated = await sut.update(authOf('albumOwner'), albumL, { albumThumbnailAssetId: assetId });
+      expect(updated.albumThumbnailAssetId).toBe(assetId);
+
+      // get() runs updateThumbnails first, which used to reset any cover without an album_asset row.
+      const album = await sut.get(authOf('albumOwner'), albumL);
+      expect(album.albumThumbnailAssetId).toBe(assetId);
+      expect(await coverOf()).toBe(assetId);
+    });
+
+    it('a photo that is not in the album is still rejected as the cover', async () => {
+      await expect(sut.update(authOf('albumOwner'), albumL, { albumThumbnailAssetId: assetOnlyInT })).rejects.toThrow(
+        'Invalid album thumbnail',
+      );
+    });
+
+    it('unlinking the album from the space lets the thumbnail refresh replace the contributed cover', async () => {
+      const assetId = await contributeFresh();
+      await sut.update(authOf('albumOwner'), albumL, { albumThumbnailAssetId: assetId });
+      const albumRepo = setup().ctx.get(AlbumRepository);
+
+      await spaceRepo.removeAlbum(spaceS, albumL);
+      try {
+        await albumRepo.updateThumbnails();
+        expect(await coverOf()).not.toBe(assetId);
+      } finally {
+        await spaceRepo.addAlbum({ spaceId: spaceS, albumId: albumL, addedById: actors.spaceOwner.id });
+      }
+    });
+  });
+
   describe('FACE MATCH ENQUEUE (P1-7 / D3)', () => {
     it('a successful contribution enqueues SharedSpaceFaceMatch for its (spaceId, assetId) when the space has face recognition on', async () => {
       const { ctx: freshCtx, sut: freshSut } = setup();
