@@ -25,7 +25,6 @@ import 'package:immich_mobile/pages/common/app_log_detail.page.dart';
 import 'package:immich_mobile/pages/common/headers_settings.page.dart';
 import 'package:immich_mobile/pages/common/settings.page.dart';
 import 'package:immich_mobile/pages/common/splash_screen.page.dart';
-import 'package:immich_mobile/pages/common/tab_shell.page.dart';
 import 'package:immich_mobile/pages/library/folder/folder.page.dart';
 import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
 import 'package:immich_mobile/pages/library/partner/partner.page.dart';
@@ -130,18 +129,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SplashScreenRoute.page, initial: true),
     AutoRoute(page: LoginRoute.page),
     AutoRoute(page: ChangePasswordRoute.page),
-    AutoRoute(
-      page: TabShellRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      children: [
-        AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-
-        AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-      ],
-    ),
-    // >>> fork-only gallery-bottom-nav — rollback: remove this block and
-    // point the 5 callsites of GalleryTabShellRoute() back at TabShellRoute().
+    // >>> fork-only gallery-bottom-nav
     CustomRoute(
       page: GalleryTabShellRoute.page,
       guards: [_authGuard, _duplicateGuard],

@@ -3,7 +3,7 @@ import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 /// Fork-only tab identity. Distinct from upstream's `TabEnum`
-/// (`home/search/spaces/library`) — the bottom nav redesign keeps the
+/// (`home/search/albums/library`) — the bottom nav redesign keeps the
 /// upstream enum + constants untouched for rebase hygiene (design §4.6, §6.6).
 ///
 /// NOTE: the declaration order of this enum is NOT the nav slot order, and
