@@ -66,8 +66,9 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
 - **Spaces stay visible** in the Gallery app while the server version is unknown (0.0.0); they hide once a stock
   server is identified.
 - **No dead code:** upstream client files the fork had deleted stay deleted.
-- **Gallery does not re-enable `gallery-core` on boot** after a stock Immich trial (Immich never touches a plugin's
-  `enabled` flag); it logs a warning with the SQL instead.
+- **`gallery-core` is harmless to stock Immich** (OD-18): its WASM exports are no-ops that import only upstream's host
+  functions, and `GalleryWorkflowHostService.runStep` runs its steps in TypeScript from one hunk in upstream's
+  execute loop. Stock boots with the plugin enabled, and its Gallery steps do nothing there.
 
 ## Security fix found on the way: duplicate resolve
 
