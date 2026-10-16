@@ -16,6 +16,8 @@ const { mockPage, mockAuthManager, gotoMock, invalidateAllMock } = vi.hoisted(()
 vi.mock('$app/state', () => ({ page: mockPage }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAllMock }));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mockAuthManager }));
+// SpaceTabs gates its Map tab on the `map` feature flag (#1046); the root layout inits it in the app.
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({ featureFlagsManager: { value: { map: true } } }));
 
 // The overflow handlers call into @immich/ui's modalManager (confirm dialogs, link-libraries modal)
 // and toastManager — mock those while keeping the real Button/IconButton/Icon/TooltipProvider so the
