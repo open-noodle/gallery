@@ -61,14 +61,14 @@ mise //packages/cli:build  # Build CLI, depends on the SDK
 # Server
 cd server
 pnpm test                                    # Run all unit tests (vitest)
-pnpm test -- --run src/services/album.service.spec.ts  # Run a single test file
+pnpm test --run src/services/album.service.spec.ts  # Run a single test file (NOT `pnpm test -- --run <path>` — pnpm keeps the literal `--`, so vitest never receives the path and silently runs the whole suite)
 pnpm test:cov                                # Unit tests with coverage
 pnpm test:medium                             # Medium tests (require DB via Docker)
 
 # Web
 cd web
 pnpm test                                    # Run all unit tests (vitest)
-pnpm test -- --run src/lib/components/MyComponent.spec.ts  # Single test file
+pnpm test --run src/lib/components/MyComponent.spec.ts  # Single test file
 
 # E2E
 cd e2e

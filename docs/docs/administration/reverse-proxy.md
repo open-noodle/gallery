@@ -10,6 +10,16 @@ Gallery does not support being served on a sub-path such as `location /gallery {
 If your reverse proxy uses the [Let's Encrypt](https://letsencrypt.org/) [http-01 challenge](https://letsencrypt.org/docs/challenge-types/#http-01-challenge), you may want to verify that the Gallery well-known endpoint (`/.well-known/immich`) gets correctly routed to Gallery, otherwise it will likely be routed elsewhere and the mobile app may run into connection issues.
 :::
 
+:::info
+Gallery uses [chunked/resumable upload](/features/chunked-upload) for files larger than 32 MiB, so your reverse proxy no longer needs to accept an entire multi-gigabyte file in a single request — large files arrive as a sequence of 32 MiB chunks instead. Only the single-shot upload endpoint, still used for files at or under the chunk size, has to fit under your body-size limit. That means `client_max_body_size` (or your proxy's equivalent) can be set much lower than before, as long as it comfortably exceeds one chunk plus request overhead — the example below uses `100M`.
+:::
+
+:::warning
+**Lower this only once every client that uploads to your instance is up to date.** Chunked upload is a client-side behaviour: an older mobile app, an older CLI, or any third-party client that predates the feature will still send a large file as one request, and will fail with `413 Request Entity Too Large` against a tightened limit.
+
+If you are unsure — in particular if family members or other users may still be on an older mobile app — keep your existing larger limit. A generous `client_max_body_size` costs nothing and remains fully supported; the point of this section is that it is no longer _required_, not that it must be reduced.
+:::
+
 ### Nginx example config
 
 Below is an example config for nginx. Make sure to set `public_url` to the front-facing URL of your instance, and `backend_url` to the path of the Gallery server.
@@ -18,8 +28,10 @@ Below is an example config for nginx. Make sure to set `public_url` to the front
 server {
     server_name <public_url>;
 
-    # allow large file uploads
-    client_max_body_size 50000M;
+    # Only the single-shot upload endpoint needs headroom here — files larger than
+    # 32 MiB upload in resumable chunks. 100M comfortably covers one chunk (32 MiB)
+    # plus request overhead.
+    client_max_body_size 100M;
 
     # disable buffering uploads to prevent OOM on reverse proxy server and make uploads twice as fast (no pause)
     proxy_request_buffering off;

@@ -20,6 +20,8 @@ enum StoreKey<T> {
   readonlyModeEnabled<bool>._(138),
   filterSheetCollapsedSections<String>._(143),
   filterSheetHiddenSections<String>._(144),
+  // Server-advertised chunk size (bytes) for the chunked-upload protocol. 0/absent means unsupported.
+  uploadChunkSize<int>._(145),
 
   syncMigrationStatus<String>._(1013),
 
