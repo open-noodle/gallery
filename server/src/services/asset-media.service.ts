@@ -31,6 +31,7 @@ import {
   StorageFolder,
 } from 'src/enum.js';
 import { videoPlaybackCacheControl } from 'src/gallery/utils/video-playback.js';
+import { getRelativeNestedPath } from 'src/gallery/utils/storage-keys.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -403,7 +404,7 @@ export class AssetMediaService extends BaseService {
       // If S3 backend, upload the file and update the path
       writeBackend = StorageService.getWriteBackend();
       if (!(writeBackend instanceof DiskStorageBackend)) {
-        const relativeKey = StorageCore.getRelativeNestedPath(
+        const relativeKey = getRelativeNestedPath(
           StorageFolder.Upload,
           ownerId,
           `${asset.id}${getFilenameExtension(file.originalPath)}`,
@@ -418,7 +419,7 @@ export class AssetMediaService extends BaseService {
         await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.originalPath] } });
 
         if (sidecarFile) {
-          const sidecarKey = StorageCore.getRelativeNestedPath(StorageFolder.Upload, ownerId, `${asset.id}.xmp`);
+          const sidecarKey = getRelativeNestedPath(StorageFolder.Upload, ownerId, `${asset.id}.xmp`);
           await writeBackend.put(sidecarKey, createReadStream(sidecarFile.originalPath));
           backendFiles.push(sidecarKey);
           await this.assetRepository.upsertFile({

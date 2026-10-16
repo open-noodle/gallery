@@ -170,6 +170,7 @@ features:
       - scripts/revert-to-immich.sql
       - .github/workflows/storage-migration*.yml
       - .github/workflows/gallery-revert-to-immich-validation.yml
+      - server/src/gallery/utils/storage-keys*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts

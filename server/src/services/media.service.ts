@@ -39,6 +39,13 @@ import {
   VideoCodec,
   VideoContainer,
 } from 'src/enum.js';
+import {
+  getEditedEncodedVideoPath,
+  getRelativeEditedEncodedVideoPath,
+  getRelativeEncodedVideoPath,
+  getRelativeImagePath,
+  getRelativePersonThumbnailPath,
+} from 'src/gallery/utils/storage-keys.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -102,7 +109,7 @@ export class MediaService extends BaseService {
    */
   private async persistImageFiles(asset: ThumbnailAsset, files: UpsertFileOptions[]): Promise<void> {
     for (const file of files) {
-      const relativeKey = StorageCore.getRelativeImagePath(asset, {
+      const relativeKey = getRelativeImagePath(asset, {
         fileType: file.type,
         format: file.path.split('.').pop() as ImageFormat,
         isEdited: file.isEdited,
@@ -288,7 +295,7 @@ export class MediaService extends BaseService {
     const inputPath = localPath;
 
     // Output path for edited encoded video in EncodedVideo directory
-    const outputPath = StorageCore.getEditedEncodedVideoPath(asset);
+    const outputPath = getEditedEncodedVideoPath(asset);
     this.storageCore.ensureFolders(outputPath);
 
     // Trim to a unique temp path and atomically rename into place — ffmpeg writing
@@ -348,11 +355,7 @@ export class MediaService extends BaseService {
 
       // persistFile unlinks the local file after uploading, so this must come AFTER
       // probe() and extractFrame() have read outputPath.
-      const editedVideoPath = await this.persistFile(
-        outputPath,
-        StorageCore.getRelativeEditedEncodedVideoPath(asset),
-        'video/mp4',
-      );
+      const editedVideoPath = await this.persistFile(outputPath, getRelativeEditedEncodedVideoPath(asset), 'video/mp4');
 
       // Sync both edited encoded video and edited thumbnail files
       const editedVideoFile: UpsertFileOptions = {
@@ -684,7 +687,7 @@ export class MediaService extends BaseService {
     await this.mediaRepository.generateThumbnail(decoded, thumbnailOptions, thumbnailPath);
 
     // Persist person thumbnail to S3 if needed
-    const relativeKey = StorageCore.getRelativePersonThumbnailPath({ ownerId, personGroupId });
+    const relativeKey = getRelativePersonThumbnailPath({ ownerId, personGroupId });
     const finalPath = await this.persistFile(thumbnailPath, relativeKey, 'image/jpeg');
 
     await this.personRepository.update({ ownerId, personGroupId, thumbnailPath: finalPath });
@@ -875,7 +878,7 @@ export class MediaService extends BaseService {
     this.logger.log(`Successfully encoded ${asset.id}`);
 
     // Persist encoded video to S3 if needed
-    const relativeKey = StorageCore.getRelativeEncodedVideoPath(asset);
+    const relativeKey = getRelativeEncodedVideoPath(asset);
     const finalPath = await this.persistFile(output, relativeKey, 'video/mp4');
 
     await this.assetRepository.upsertFile({

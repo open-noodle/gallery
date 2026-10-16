@@ -1,9 +1,9 @@
 import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { CacheControl, JobName, JobStatus, UserMetadataKey } from 'src/enum.js';
+import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { UserService } from 'src/services/user.service.js';
@@ -382,7 +382,7 @@ describe(UserService.name, () => {
         const file = { path: '/data/profile/user-id/temp-file.jpg', originalname: 'avatar.jpg' } as Express.Multer.File;
         // The profile image is run through the thumbnail pipeline, which generates a
         // new file named `{uuid}.{thumbnail-format}`. The default thumbnail format is webp.
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'random-uuid.webp');
+        const relativeKey = getRelativeProfileImagePath(user.id, 'random-uuid.webp');
 
         mocks.user.get.mockResolvedValue(user);
         mocks.user.update.mockResolvedValue({ ...user, profileImagePath: relativeKey, profileChangedAt: new Date() });
@@ -406,7 +406,7 @@ describe(UserService.name, () => {
         } as Express.Multer.File;
         // Regardless of upload mime, the S3 content type matches the generated thumbnail
         // file extension (default: webp). This guards `mimeTypes.lookup(profileImagePath)`.
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'random-uuid.webp');
+        const relativeKey = getRelativeProfileImagePath(user.id, 'random-uuid.webp');
 
         mocks.user.get.mockResolvedValue(user);
         mocks.user.update.mockResolvedValue({ ...user, profileImagePath: relativeKey, profileChangedAt: new Date() });
@@ -492,7 +492,7 @@ describe(UserService.name, () => {
       it('should return response with relative S3 path', async () => {
         const user = factory.userAdmin({ profileImagePath: '' });
         const file = { path: '/data/profile/user-id/temp-file.jpg', originalname: 'avatar.jpg' } as Express.Multer.File;
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'temp-file.jpg');
+        const relativeKey = getRelativeProfileImagePath(user.id, 'temp-file.jpg');
         const profileChangedAt = new Date();
 
         mocks.user.get.mockResolvedValue(user);
