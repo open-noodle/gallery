@@ -93,6 +93,8 @@ features:
       - server/src/gallery/repositories/gallery-asset.repository.ts
       - server/src/queries/gallery.asset.repository.sql
       - server/src/queries/gallery.person.repository.sql
+      - server/src/gallery/utils/album-response-overlay.ts
+      - server/src/gallery/utils/space-album-contribution.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
