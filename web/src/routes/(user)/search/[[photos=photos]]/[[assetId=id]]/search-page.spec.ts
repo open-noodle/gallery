@@ -284,6 +284,34 @@ describe('Search page cmdk selection context', () => {
     });
   });
 
+  // A hand-typed or shared `/search?query=beach` is plain text, not the JSON the page writes itself.
+  // JSON.parse used to throw on it and blank the whole page.
+  it('treats a plain-text query parameter as a smart search instead of crashing', async () => {
+    mockFeatureFlagsManager.value.smartSearch = true;
+    mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=beach`);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockSearchSmart).toHaveBeenCalledWith({
+        smartSearchDto: expect.objectContaining({ query: 'beach' }),
+      });
+    });
+  });
+
+  it('treats non-object JSON in the query parameter as text', async () => {
+    mockFeatureFlagsManager.value.smartSearch = true;
+    mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=42`);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockSearchSmart).toHaveBeenCalledWith({
+        smartSearchDto: expect.objectContaining({ query: '42' }),
+      });
+    });
+  });
+
   it('includes shared spaces for metadata searches', async () => {
     const query = encodeURIComponent(JSON.stringify({ city: 'Berlin' }));
     mockPage.url = new URL(`https://gallery.test/search?${QueryParameter.QUERY}=${query}`);
