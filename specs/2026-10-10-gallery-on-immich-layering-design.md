@@ -69,6 +69,18 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
   enum, as `MemoryRuleGenerate` does.
 - **Search V3 is adopted** with four optional hooks on `AssetSearchScope`, each defaulting to Immich's behaviour.
   V3 follows Immich's trash rule and its `hasAlbums` reads `album_asset` only.
+- **Birthday memories are Immich's** (owner decision OD-3, 2026-10-16): `onMemoriesCreate` dispatches upstream's
+  `createBirthdayMemories` again, with the fork's on-this-day toggle as one `&&` in upstream's loop, and Gallery's
+  birthday rule is gone. Lost, as accepted: the birthday toggles, the rule budget and the cross-years fallback; a
+  pet with a birthday now gets a card, and birthdays in the first three days after the upgrade get none, because
+  upstream's cursor already passed them. Delivery follows upstream: `birthday` reaches every client on MemoriesV2,
+  MemoryToAssetsV2 and `GET /memories`, never on V1. The one Gallery exception is an app older than 5.8.0 (no
+  `x-gallery-app` header, User-Agent below 5.8.0, flagged `legacyGalleryApp` by `classifyClient` in
+  `src/gallery/utils/client-version.ts`), whose generated client cannot decode the type; `GET /memories` and its
+  statistics leave `birthday` out for it. In overlap reconciliation a `birthday` row is unmanaged: it claims its photos
+  from that day's on-this-day card and is never stripped. Rows the old rule wrote (`type = 'rule'`,
+  `ruleId = 'birthday'`) stay as they are: the rule only ever wrote days up to today, upstream's generator starts after
+  its cursor (today + 3), so the two never cover the same birthday, and retention removes the old rows.
 - **Unknown sync request types are ignored**, so stock apps from a newer Immich release keep syncing.
 - **Space links in a revert** follow Immich's rule: an album link survives only if its creator owns or edits the album.
 - **Spaces stay visible** in the Gallery app while the server version is unknown (0.0.0); they hide once a stock
