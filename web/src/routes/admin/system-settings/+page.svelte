@@ -15,7 +15,7 @@
   import NightlyTasksSettings from './NightlyTasksSettings.svelte';
   import NotificationSettings from './NotificationSettings.svelte';
   import ServerSettings from './ServerSettings.svelte';
-  import StorageTemplateSettings from '$lib/components/admin-settings/StorageTemplateSettings.svelte';
+  import StorageTemplateSettings from '#lib/components/admin-settings/StorageTemplateSettings.svelte';
   import StorageUsageSettings from './StorageUsageSettings.svelte';
   import ThemeSettings from './ThemeSettings.svelte';
   import TrashSettings from './TrashSettings.svelte';
@@ -23,6 +23,7 @@
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
   import SearchBar from '#lib/elements/SearchBar.svelte';
+  import { adminSettingsSearch } from '#lib/gallery/admin-settings-search.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAdminConfigQuery } from '#lib/queries/config-admin.query.ts';
@@ -232,12 +233,7 @@
 
   let searchQuery = $state('');
 
-  let filteredSettings = $derived(
-    settings.filter(({ title, subtitle }) => {
-      const term = searchQuery.toLowerCase();
-      return title.toLowerCase().includes(term) || subtitle.toLowerCase().includes(term);
-    }),
-  );
+  let filteredSettings = $derived(settings.filter((setting) => adminSettingsSearch.matches(setting, searchQuery, $t)));
 
   const { CopyToClipboard, Upload, Download } = $derived(getSystemConfigActions($t, featureFlagsManager.value, config));
 </script>
