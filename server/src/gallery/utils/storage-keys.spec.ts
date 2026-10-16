@@ -2,6 +2,7 @@ import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, ImageFormat, StorageFolder } from 'src/enum.js';
 import {
   getEditedEncodedVideoPath,
+  getMotionVideoPath,
   getRelativeEditedEncodedVideoPath,
   getRelativeEncodedVideoPath,
   getRelativeImagePath,
@@ -92,6 +93,18 @@ describe('storage keys', () => {
       expect(result.startsWith('/')).toBe(false);
       expect(result).toContain('thumbs/');
       expect(result).toContain('person-1.jpeg');
+    });
+  });
+
+  describe('getMotionVideoPath', () => {
+    it('should return upstream disk path beside a disk original', () => {
+      const asset = { id: 'asset-1', ownerId: 'user-1', originalPath: '/data/upload/user-1/ab/cd/asset.jpg' };
+      expect(getMotionVideoPath(asset, 'motion-1')).toBe(StorageCore.getAndroidMotionPath(asset, 'motion-1'));
+    });
+
+    it('should return a relative key beside an S3 original', () => {
+      const asset = { id: 'asset-1', ownerId: 'user-1', originalPath: 'upload/user-1/ab/cd/asset.jpg' };
+      expect(getMotionVideoPath(asset, 'motion-1')).toBe('encoded-video/user-1/mo/ti/motion-1-MP.mp4');
     });
   });
 });

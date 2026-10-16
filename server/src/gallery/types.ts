@@ -182,7 +182,10 @@ export type GalleryJobItem =
   | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob }
 
   // Rule memories
-  | { name: JobName.MemoryRuleGenerate; data?: IBaseJob };
+  | { name: JobName.MemoryRuleGenerate; data?: IBaseJob }
+
+  // Video trim
+  | { name: JobName.AssetVideoTrimGenerate; data: IEntityJob };
 
 export type RuleMemoryData = {
   ruleId: string;

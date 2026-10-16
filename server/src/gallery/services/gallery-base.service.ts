@@ -85,6 +85,8 @@ export abstract class GalleryBaseService {
     });
     this.backendMedia = new BackendMediaServer({
       assetRepository: this.assetRepository,
+      jobRepository: this.jobRepository,
+      logger: this.logger,
       mediaRepository: this.mediaRepository,
       storageRepository: this.storageRepository,
       getConfig: (options) => this.getConfig(options),

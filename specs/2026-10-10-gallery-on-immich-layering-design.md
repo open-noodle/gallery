@@ -62,6 +62,11 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
 - **Trims have their own endpoint** (`/assets/{id}/trim`) and table. Trim is not an `asset_edit` action, so Immich's
   edit code stays upstream text. Trims cut at keyframes (stream copy, no re-encode); the duration Gallery stores matches the file, and so
   does the one clients receive.
+  The trimmed encode, poster and thumbnails come from the fork job `AssetVideoTrimGenerate`
+  (`server/src/gallery/services/video-trim.service.ts`, a MediaService subclass using its protected
+  `generateImageThumbnails` and `syncFiles`); the trim endpoints queue it, and Immich's edit-thumbnail job hands it
+  every video. It sends `AssetEditReadyV2` like the edit job. The new JobName value appears in the OpenAPI `JobName`
+  enum, as `MemoryRuleGenerate` does.
 - **Search V3 is adopted** with four optional hooks on `AssetSearchScope`, each defaulting to Immich's behaviour.
   V3 follows Immich's trash rule and its `hasAlbums` reads `album_asset` only.
 - **Unknown sync request types are ignored**, so stock apps from a newer Immich release keep syncing.

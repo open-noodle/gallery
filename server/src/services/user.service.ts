@@ -1,11 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Updateable } from 'kysely';
 import { DateTime } from 'luxon';
-import { createReadStream } from 'node:fs';
-import { basename } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, UserMetadataItem } from 'src/types.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { SALT_ROUNDS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -17,7 +14,6 @@ import { UserPreferencesResponseDto, UserPreferencesUpdateDto, mapPreferences } 
 import { CreateProfileImageResponseDto } from 'src/dtos/user-profile.dto.js';
 import { UserAdminResponseDto, UserResponseDto, UserUpdateMeDto, mapUser, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { CacheControl, JobName, JobStatus, QueueName, StorageFolder, UserMetadataKey } from 'src/enum.js';
-import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { UserFindOptions } from 'src/repositories/user.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -126,17 +122,7 @@ export class UserService extends BaseService {
       throw new BadRequestException('Unable to process profile image', { cause: error });
     }
 
-    const writeBackend = StorageService.getWriteBackend();
-
-    if (!(writeBackend instanceof DiskStorageBackend)) {
-      const filename = basename(profileImagePath);
-      const relativeKey = getRelativeProfileImagePath(auth.user.id, filename);
-      const stream = createReadStream(profileImagePath);
-      await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
-      // After S3 upload, drop the local generated file and store the relative key.
-      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
-      profileImagePath = relativeKey;
-    }
+    profileImagePath = await this.backendMedia.persistProfileImage(auth.user.id, profileImagePath);
 
     const user = await this.userRepository.update(auth.user.id, {
       profileImagePath,

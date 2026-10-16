@@ -12145,7 +12145,8 @@ export enum JobName {
     SharedSpaceIdentityReconciliationSweep = "SharedSpaceIdentityReconciliationSweep",
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
     AssetClassify = "AssetClassify",
-    MemoryRuleGenerate = "MemoryRuleGenerate"
+    MemoryRuleGenerate = "MemoryRuleGenerate",
+    AssetVideoTrimGenerate = "AssetVideoTrimGenerate"
 }
 export enum QueueJobStatus {
     Active = "active",

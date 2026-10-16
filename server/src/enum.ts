@@ -1063,6 +1063,9 @@ export enum JobName {
 
   // Rule memories, queued by MemoryGenerate
   MemoryRuleGenerate = 'MemoryRuleGenerate',
+
+  // Video trim encode, poster and thumbnails (or their removal), queued by trim writes
+  AssetVideoTrimGenerate = 'AssetVideoTrimGenerate',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });

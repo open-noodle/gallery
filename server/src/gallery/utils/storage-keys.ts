@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import {
   ImagePathOptions,
   PersonThumbnailPathEntity,
@@ -43,4 +44,14 @@ export function getRelativePersonThumbnailPath(person: PersonThumbnailPathEntity
 
 export function getRelativeProfileImagePath(userId: string, filename: string): string {
   return getRelativeNestedPath(StorageFolder.Profile, userId, filename);
+}
+
+/** Where an extracted motion video goes: upstream's disk path beside a disk original, a relative key beside an S3 one. */
+export function getMotionVideoPath(
+  asset: ThumbnailPathEntity & { originalPath: string },
+  motionAssetId: string,
+): string {
+  return isDiskPath(asset.originalPath)
+    ? StorageCore.getAndroidMotionPath(asset, motionAssetId)
+    : getRelativeNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${motionAssetId}-MP.mp4`);
 }
