@@ -1,7 +1,6 @@
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AlbumUserRole, Permission } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
-import { setDifference, setUnion } from 'src/utils/set.js';
 
 type Grant = (access: AccessRepository, userId: string, ids: Set<string>) => Promise<Set<string>>;
 
@@ -45,7 +44,7 @@ export const withGalleryGrants = async (
   granted: Set<string>,
 ): Promise<Set<string>> => {
   const grant = galleryAccessGrants[permission];
-  return grant ? setUnion(granted, await grant(access, auth.user.id, setDifference(ids, granted))) : granted;
+  return grant ? granted.union(await grant(access, auth.user.id, ids.difference(granted))) : granted;
 };
 
 /**
