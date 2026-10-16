@@ -690,7 +690,6 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case StackRepository:
     case SyncRepository:
     case GallerySyncRepository:
-    case VideoTrimRepository:
     case ImageAdjustRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
@@ -728,7 +727,8 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     case ClassificationRepository:
-    case TagRepository: {
+    case TagRepository:
+    case VideoTrimRepository: {
       return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
 

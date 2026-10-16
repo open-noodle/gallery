@@ -351,7 +351,7 @@ describe(UserService.name, () => {
 
       await sut.createProfileImage(factory.auth({ user }), file);
 
-      expect(mocks.media.extractFrame).not.toHaveBeenCalled();
+      expect(mocks.videoTrim.extractFrame).not.toHaveBeenCalled();
       expect(mocks.media.decodeImage).toHaveBeenCalledWith(file.path, expect.any(Object));
       expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
         expect.anything(),

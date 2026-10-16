@@ -451,7 +451,7 @@ export const getMocks = () => {
     petFace: automock(PetFaceRepository, { strict: false }),
     faceSearch: automock(FaceSearchRepository, { strict: false }),
     gallerySync: automock(GallerySyncRepository),
-    videoTrim: automock(VideoTrimRepository, { strict: false }),
+    videoTrim: automock(VideoTrimRepository, { args: [undefined, loggerMock], strict: false }),
     imageAdjust: automock(ImageAdjustRepository, { strict: false }),
   };
 
