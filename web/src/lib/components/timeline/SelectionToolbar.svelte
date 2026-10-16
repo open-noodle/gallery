@@ -222,10 +222,10 @@
     space: spaceCtx,
     selection: selectionCtx,
     userId: currentUserId,
-    isAdmin: authManager.authenticated ? authManager.user.isAdmin : false,
+    isAdmin: authManager.authenticated && authManager.user.isAdmin,
   });
 
-  const tagsEnabled = $derived(authManager.authenticated ? authManager.preferences.tags.enabled : false);
+  const tagsEnabled = $derived(authManager.authenticated && authManager.preferences.tags.enabled);
   const caps = $derived(getSelectionCapabilities(ctx, tagsEnabled));
 
   // #1018: the same shape for sharing — when the selection reaches beyond what the caller owns and

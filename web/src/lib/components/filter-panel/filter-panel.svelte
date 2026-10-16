@@ -70,7 +70,7 @@
 
   // Respect persistCollapsed for the initial value when the parent doesn't control `collapsed`.
   if (collapsed === undefined) {
-    collapsed = persistCollapsed ? loadFilterCollapsed() : false;
+    collapsed = persistCollapsed && loadFilterCollapsed();
   }
 
   const providers = config.providers ?? {};
@@ -908,8 +908,8 @@
                     onChange={(value) => {
                       updateFilters({
                         ...filters,
-                        isInAlbum: value === 'has' ? true : undefined,
-                        isNotInAlbum: value === 'none' ? true : undefined,
+                        isInAlbum: value === 'has' || undefined,
+                        isNotInAlbum: value === 'none' || undefined,
                       });
                     }}
                   />
