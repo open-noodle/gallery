@@ -90,7 +90,7 @@
   });
 
   const Actions = $derived(
-    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, { space, album }),
+    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, album, { space }),
   );
   const StackActions = $derived(getStackActions($t, stack, asset));
   const sharedLink = getSharedLink();
