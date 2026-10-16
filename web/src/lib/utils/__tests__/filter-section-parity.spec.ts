@@ -35,7 +35,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 const DOCUMENTED_EXCLUSIONS: Record<string, { sections: FilterSection[]; reason: string }> = {
   'album detail': {
     sections: ['albums'],
-    // asset.repository.ts guards both isInAlbum and isNotInAlbum with `&& !options.albumId`, so
+    // gallery/utils/time-bucket-filter.ts guards both isInAlbum and isNotInAlbum with `&& !options.albumId`, so
     // inside a single album they are silently dropped by the server. isInAlbum would be a
     // tautology and isNotInAlbum an always-empty set — rendering them would be a dead control.
     reason: 'server drops isInAlbum/isNotInAlbum when scoped to one album',

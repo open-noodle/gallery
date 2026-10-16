@@ -838,7 +838,7 @@ describe(SearchRepository.name, () => {
     // The map and metadata search route text filters through ILIKE. Without escaping, a
     // filename filter of `IMG_0001` treats `_` as a single-char wildcard (matching
     // `IMG-0001` too) while the time-bucket/timeline path — which DOES escape
-    // (asset.repository.ts) — treats it literally. Same divergence for `%`.
+    // (gallery/utils/time-bucket-filter.ts) — treats it literally. Same divergence for `%`.
     const ESCAPE_CLAUSE = String.raw`escape '\'`;
 
     it('escapes wildcards in the originalFileName filter and pairs them with an ESCAPE clause', () => {

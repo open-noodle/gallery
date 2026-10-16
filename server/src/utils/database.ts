@@ -636,7 +636,7 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
     .$if(!!options.originalPath, (qb) =>
       // The three ILIKE text filters escape their wildcards (escapeLikePattern + `escape '\'`), so a
       // filter of `IMG_0001` matches `_` literally rather than as a single-char wildcard and a `%`
-      // matches a literal percent sign. This mirrors the time-bucket path (asset.repository.ts): the
+      // matches a literal percent sign. This mirrors the time-bucket path (gallery/utils/time-bucket-filter.ts): the
       // map and the timeline are driven by the same filter chips and must agree on what they match.
       // Escaping does not cost the trigram index. OCR (below) is unaffected — it uses the `%>>`
       // trigram operator, not ILIKE.

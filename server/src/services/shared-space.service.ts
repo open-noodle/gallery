@@ -705,7 +705,7 @@ export class SharedSpaceService extends BaseService {
   //
   // This is NOT computed by diffing two in-memory hypothetical `TimelineHiddenScope`s: the real
   // timeline predicate's "another visible path rescues this asset" arm
-  // (asset.repository.ts `withTimeBucketAssetFilters`'s `timelineSpaceIds` branch) re-checks LIVE
+  // (gallery/utils/time-bucket-filter.ts `withTimeBucketAssetFilters`'s `timelineSpaceIds` branch) re-checks LIVE
   // per-user state for some path types, so an in-memory simulation of that arm would silently
   // disagree with reality whenever a photo has more than one path into a space (S6/S4-shaped
   // cases in the design doc's truth table). Instead this performs the REAL write — flipping

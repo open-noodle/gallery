@@ -57,7 +57,7 @@ export const retryOnDeadlock = async <T>(
  * "IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match everything. Pairs
  * with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it does not double-escape
  * the wildcard escapes added afterwards. Used by both text-filter paths (the time-bucket queries in
- * asset.repository.ts and searchAssetBuilderLegacy below), which must agree: the map and the timeline
+ * gallery/utils/time-bucket-filter.ts and searchAssetBuilderLegacy below), which must agree: the map and the timeline
  * read the same filter chips.
  */
 export const escapeLikePattern = (value: string): string =>
