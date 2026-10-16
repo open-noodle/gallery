@@ -24,6 +24,7 @@ describe('paths the fork deliberately deleted stay deleted', () => {
 // above. Diff the working tree against the upstream tag the fork sits on (branding/config.json
 // upstream.version) and require every deleted path to be named, itself or by a parent directory.
 // Skipped where the tag ref is absent (CI's shallow clone); create it with the fetch in AGENTS.md.
+// Mid-rebase onto a newer upstream, upstream's own deletions show here until upstream.version moves.
 const upstreamVersion = JSON.parse(
   fs.readFileSync(path.join(REPO_ROOT, 'branding/config.json'), 'utf8'),
 ).upstream.version as string;
