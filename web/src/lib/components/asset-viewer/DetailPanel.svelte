@@ -574,27 +574,25 @@
   {/if}
 {/if}
 
-{#if assetViewerManager.isEditFacesPanelOpen}
-  <!--
-    Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
-    canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
-    endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
-    space-flavoured panel additionally needs a real space id to write into.
-  -->
-  {#if canEditSpacePeople && effectiveSpaceId}
-    <SpacePersonSidePanel
-      spaceId={effectiveSpaceId}
-      assetId={asset.id}
-      assetType={asset.type}
-      onClose={() => assetViewerManager.closeEditFacesPanel()}
-      onRefresh={() => void handleSpacePeopleChanged()}
-    />
-  {:else}
-    <PersonSidePanel
-      assetId={asset.id}
-      assetType={asset.type}
-      onClose={() => assetViewerManager.closeEditFacesPanel()}
-      onRefresh={handleRefreshPeople}
-    />
-  {/if}
+<!--
+  Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
+  canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
+  endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
+  space-flavoured panel additionally needs a real space id to write into.
+-->
+{#if assetViewerManager.isEditFacesPanelOpen && canEditSpacePeople && effectiveSpaceId}
+  <SpacePersonSidePanel
+    spaceId={effectiveSpaceId}
+    assetId={asset.id}
+    assetType={asset.type}
+    onClose={() => assetViewerManager.closeEditFacesPanel()}
+    onRefresh={() => void handleSpacePeopleChanged()}
+  />
+{:else if assetViewerManager.isEditFacesPanelOpen}
+  <PersonSidePanel
+    assetId={asset.id}
+    assetType={asset.type}
+    onClose={() => assetViewerManager.closeEditFacesPanel()}
+    onRefresh={handleRefreshPeople}
+  />
 {/if}

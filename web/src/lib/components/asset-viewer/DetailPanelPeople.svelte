@@ -160,56 +160,59 @@
 {/snippet}
 {#if !authManager.isSharedLink && (isOwner || canEditSpacePeople || visiblePeople.length > 0)}
   <section class="px-4 pt-4 text-sm" data-testid="detail-panel-people">
-    <div class="flex h-10 w-full items-center justify-between">
-      <Text size="small" color="muted">{$t('people')}</Text>
-      <div class="flex items-center gap-2">
-        {#if canChooseAvatarSource}
-          <IconButton
-            aria-label={$cropFacesFromAsset ? $t('show_profile_faces') : $t('show_faces_from_photo')}
-            icon={$cropFacesFromAsset ? mdiAccountBoxOutline : mdiCropFree}
-            size="medium"
-            shape="round"
-            color="secondary"
-            variant="ghost"
-            onclick={() => cropFacesFromAsset.set(!$cropFacesFromAsset)}
-          />
-        {/if}
-        {#if isOwner || canEditSpacePeople}
-          {#if isOwner && people.some((person) => person.isHidden)}
+    <!-- Repeats the section guard on purpose: it keeps the header at upstream's nesting. -->
+    {#if isOwner || canEditSpacePeople || visiblePeople.length > 0}
+      <div class="flex h-10 w-full items-center justify-between">
+        <Text size="small" color="muted">{$t('people')}</Text>
+        <div class="flex items-center gap-2">
+          {#if canChooseAvatarSource}
             <IconButton
-              aria-label={$t('show_hidden_people')}
-              icon={assetViewerManager.isShowingHiddenPeople ? mdiEyeOff : mdiEye}
+              aria-label={$cropFacesFromAsset ? $t('show_profile_faces') : $t('show_faces_from_photo')}
+              icon={$cropFacesFromAsset ? mdiAccountBoxOutline : mdiCropFree}
               size="medium"
               shape="round"
               color="secondary"
               variant="ghost"
-              onclick={() => assetViewerManager.toggleHiddenPeople()}
+              onclick={() => cropFacesFromAsset.set(!$cropFacesFromAsset)}
             />
           {/if}
-          <IconButton
-            aria-label={$t('tag_people')}
-            icon={mdiPlus}
-            size="medium"
-            shape="round"
-            color="secondary"
-            variant="ghost"
-            onclick={() => assetViewerManager.toggleFaceEditMode()}
-          />
+          {#if isOwner || canEditSpacePeople}
+            {#if isOwner && people.some((person) => person.isHidden)}
+              <IconButton
+                aria-label={$t('show_hidden_people')}
+                icon={assetViewerManager.isShowingHiddenPeople ? mdiEyeOff : mdiEye}
+                size="medium"
+                shape="round"
+                color="secondary"
+                variant="ghost"
+                onclick={() => assetViewerManager.toggleHiddenPeople()}
+              />
+            {/if}
+            <IconButton
+              aria-label={$t('tag_people')}
+              icon={mdiPlus}
+              size="medium"
+              shape="round"
+              color="secondary"
+              variant="ghost"
+              onclick={() => assetViewerManager.toggleFaceEditMode()}
+            />
 
-          {#if faceManager.data.length > 0}
-            <IconButton
-              aria-label={$t('edit_people')}
-              icon={mdiPencil}
-              size="medium"
-              shape="round"
-              color="secondary"
-              variant="ghost"
-              onclick={() => assetViewerManager.openEditFacesPanel()}
-            />
+            {#if faceManager.data.length > 0}
+              <IconButton
+                aria-label={$t('edit_people')}
+                icon={mdiPencil}
+                size="medium"
+                shape="round"
+                color="secondary"
+                variant="ghost"
+                onclick={() => assetViewerManager.openEditFacesPanel()}
+              />
+            {/if}
           {/if}
-        {/if}
+        </div>
       </div>
-    </div>
+    {/if}
 
     <div class="mt-2 grid {visiblePeople.length <= 6 ? 'grid-cols-3 gap-3' : 'grid-cols-4 gap-2'}">
       {#each visiblePeople as person (person.id)}
