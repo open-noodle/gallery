@@ -3,6 +3,7 @@
  * every edit call site the design grants, and none of the owner-only filing writes. Permission.AssetUpdate keeps
  * Immich's owner-only meaning; the granted sites go through requireAssetEditAccess.
  */
+import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { AssetJobName } from 'src/dtos/asset.dto.js';
 import { MemoryType } from 'src/enum.js';
@@ -149,11 +150,14 @@ describe('space editor on a member asset', () => {
       }),
     ).resolves.toMatchObject({ assets: [] });
 
+    // DuplicateDelete on the trashed asset already refuses; the keeper check is pinned in duplicate.service specs.
     await expect(
       ctx
         .getService(DuplicateService)
         .resolve(auth, { groups: [{ duplicateId, keepAssetIds: [asset.id], trashAssetIds: [other.id] }] }),
     ).rejects.toThrow();
-    await expect(ctx.getService(StackService).create(auth, { assetIds: [asset.id, other.id] })).rejects.toThrow();
+    await expect(ctx.getService(StackService).create(auth, { assetIds: [asset.id, other.id] })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });
