@@ -353,6 +353,7 @@ features:
       - web/static/gallery-*
       - .github/actions/apply-branding/**
       - mobile/lib/gallery/widgets/library_collection_cards.dart
+      - mobile/lib/gallery/widgets/demo_login_button.dart
     upstream_extension_paths:
       - mobile/lib/routing/router.dart
       - mobile/lib/routing/router.gr.dart
