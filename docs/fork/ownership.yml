@@ -351,6 +351,7 @@ features:
       - design/gallery-*
       - web/static/gallery-*
       - .github/actions/apply-branding/**
+      - mobile/lib/gallery/routing/**
     upstream_extension_paths:
       - mobile/lib/routing/router.dart
       - mobile/lib/routing/router.gr.dart
