@@ -12,6 +12,7 @@ import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
+import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
@@ -87,6 +88,7 @@ export const galleryRepositories = [
   FaceSearchRepository,
   GallerySyncRepository,
   VideoTrimRepository,
+  ImageAdjustRepository,
 ];
 
 export const galleryServices = [
