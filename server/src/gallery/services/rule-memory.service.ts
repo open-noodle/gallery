@@ -323,6 +323,7 @@ export class RuleMemoryService extends BaseService {
   private getMemoryRules(enabledKeys: Iterable<string>, memories: SystemConfig['memories']): MemoryRule[] {
     return createMemoryRules(enabledKeys, {
       personRepository: this.personRepository,
+      galleryPersonRepository: this.galleryPersonRepository,
       memoryRuleAssetRepository: this.memoryRuleAssetRepository,
       memoryRepository: this.memoryRepository,
       themeSearchPort: this.getThemeSearchPort(),

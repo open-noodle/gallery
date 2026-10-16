@@ -340,3 +340,48 @@ order by
   "asset_face"."id" asc
 limit
   $2
+
+-- GalleryPersonRepository.getDormantPeople
+select
+  "person"."personGroupId" as "id",
+  "person"."name"
+from
+  "person"
+  inner join "asset_face" on "asset_face"."personGroupId" = "person"."personGroupId"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "person"."ownerId" = $1
+  and not EXISTS (
+    SELECT
+    FROM
+      "person_pet"
+    WHERE
+      "person_pet"."personGroupId" = "person"."personGroupId"
+  )
+  and "person"."name" != $2
+  and "person"."isHidden" = $3
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" = $4
+  and "asset"."ownerId" = $5
+  and "asset"."visibility" = $6
+  and "asset"."deletedAt" is null
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $7
+  )
+group by
+  "person"."personGroupId",
+  "person"."name"
+having
+  max("asset"."localDateTime") < $8
+  and count(distinct ("asset"."id")) >= $9
+order by
+  count(distinct ("asset"."id")) desc,
+  "person"."personGroupId" asc
+limit
+  $10

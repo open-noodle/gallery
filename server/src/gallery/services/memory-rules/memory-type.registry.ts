@@ -1,4 +1,5 @@
 import { SystemConfig } from 'src/dtos/config.dto.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { BirthdayMemoryRule } from 'src/gallery/services/memory-rules/birthday.rule.js';
 import { FavoritesThrowbackMemoryRule } from 'src/gallery/services/memory-rules/favorites-throwback.rule.js';
@@ -22,6 +23,7 @@ import { PersonRepository } from 'src/repositories/person.repository.js';
 
 export interface MemoryRuleDeps {
   personRepository: PersonRepository;
+  galleryPersonRepository: GalleryPersonRepository;
   memoryRuleAssetRepository: MemoryRuleAssetRepository;
   memoryRepository: MemoryRepository;
   themeSearchPort: ThemeSearchPort;
@@ -46,7 +48,7 @@ const RULE_FACTORIES: Record<string, (deps: MemoryRuleDeps) => MemoryRule> = {
   themed: (deps) => new ThemedMemoryRule(deps.themeSearchPort),
   person_throwback: (deps) =>
     new PersonThrowbackMemoryRule(
-      deps.personRepository,
+      deps.galleryPersonRepository,
       deps.memoryRuleAssetRepository,
       deps.memories?.personThrowbackDormancyMonths ?? DEFAULT_DORMANCY_MONTHS,
     ),

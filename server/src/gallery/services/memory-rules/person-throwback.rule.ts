@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { MemoryAsset, MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import {
   CHAPTER_MAX_SPAN_DAYS,
@@ -12,7 +13,6 @@ import {
   MemoryRuleCandidate,
   MemoryRuleContext,
 } from 'src/gallery/services/memory-rules/memory-rule.interface.js';
-import { PersonRepository } from 'src/repositories/person.repository.js';
 
 export const TRIGGER_DAY = 13;
 /** Fallback when `memories.personThrowbackDormancyMonths` is absent (see `gallery/dtos/config.dto.ts`). */
@@ -44,7 +44,7 @@ export class PersonThrowbackMemoryRule implements MemoryRule {
   readonly id = 'person_throwback';
 
   constructor(
-    private personRepository: Pick<PersonRepository, 'getDormantPeople'>,
+    private personRepository: Pick<GalleryPersonRepository, 'getDormantPeople'>,
     private assetRepository: Pick<
       MemoryRuleAssetRepository,
       'getMemoryPersonDailyCounts' | 'getMemoryAssetsForPersonWindow'

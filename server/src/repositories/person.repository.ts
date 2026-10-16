@@ -55,11 +55,6 @@ export interface PersonNameResponse {
   name: string;
 }
 
-export interface DormantPerson {
-  id: string;
-  name: string;
-}
-
 export interface AssetFaceId {
   assetId: string;
   personGroupId: string;
@@ -376,53 +371,6 @@ export class PersonRepository {
       name,
       birthDate: { year: birthYear, month: birthMonth, day: birthDay },
     }));
-  }
-
-  /**
-   * Dormant people: named, non-hidden, non-pet persons whose most recent Timeline-visible,
-   * previewable asset predates `lastSeenBefore`, with at least `minAssets` such assets ever.
-   * The asset-side predicates mirror `MemoryRuleAssetRepository.getMemoryFacesForPeriod` exactly — a
-   * missing `Preview` file or an archived asset must not make a still-active person look dormant.
-   */
-  @GenerateSql({
-    params: [DummyValue.UUID, { lastSeenBefore: DummyValue.DATE, minAssets: 10, limit: 10 }],
-  })
-  getDormantPeople(
-    ownerId: string,
-    { lastSeenBefore, minAssets, limit }: { lastSeenBefore: Date; minAssets: number; limit: number },
-  ): Promise<DormantPerson[]> {
-    // Grouped by (personGroupId, name): `person`'s PK is the composite (ownerId, personGroupId),
-    // so personGroupId alone does not functionally determine `person.name` for Postgres.
-    return this.db
-      .selectFrom('person')
-      .select(['person.personGroupId as id', 'person.name'])
-      .innerJoin('asset_face', 'asset_face.personGroupId', 'person.personGroupId')
-      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-      .where('person.ownerId', '=', ownerId)
-      .where((eb) => eb.not(personIsPet()))
-      .where('person.name', '!=', '')
-      .where('person.isHidden', '=', false)
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', '=', true)
-      .where('asset.ownerId', '=', ownerId)
-      .where('asset.visibility', '=', AssetVisibility.Timeline)
-      .where('asset.deletedAt', 'is', null)
-      .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('asset_file')
-            .select('asset_file.assetId')
-            .whereRef('asset_file.assetId', '=', 'asset.id')
-            .where('asset_file.type', '=', AssetFileType.Preview),
-        ),
-      )
-      .groupBy(['person.personGroupId', 'person.name'])
-      .having((eb) => eb.fn.max('asset.localDateTime'), '<', lastSeenBefore)
-      .having((eb) => eb.fn.count(eb.fn('distinct', ['asset.id'])), '>=', minAssets)
-      .orderBy((eb) => eb.fn.count(eb.fn('distinct', ['asset.id'])), 'desc')
-      .orderBy('person.personGroupId', 'asc')
-      .limit(limit)
-      .execute();
   }
 
   @GenerateSql()
