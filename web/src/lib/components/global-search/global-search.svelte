@@ -613,6 +613,28 @@
   }
 </script>
 
+{#snippet searchBelowTopRow()}
+  {#if manager.searchBelowTopMatch}
+    <Command.Item
+      value={manager.searchBelowTopMatch.id}
+      onSelect={() => manager.searchBelowTopMatch && void manager.activateSearch(manager.searchBelowTopMatch.rawQuery)}
+      class="group"
+      data-testid="cmdk-search-below-top"
+    >
+      <div
+        class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-80 ease-out group-data-selected:bg-primary/10"
+      >
+        <div class="flex size-8 items-center justify-center rounded-md bg-subtle/40">
+          <Icon icon={mdiMagnify} size="1.125em" class="text-gray-500 dark:text-gray-400" />
+        </div>
+        <span class="min-w-0 flex-1 truncate text-sm font-medium">
+          {$t('cmdk_top_search_label', { values: { query: manager.searchBelowTopMatch.query } })}
+        </span>
+      </div>
+    </Command.Item>
+  {/if}
+{/snippet}
+
 {#if variant === 'dropdown'}
   <div
     class="relative min-w-0 flex-1"
@@ -837,6 +859,7 @@
                         pending={manager.topCommandMatch.id === manager.pendingConfirmId}
                       />
                     </Command.Item>
+                    {@render searchBelowTopRow()}
                   </Command.GroupItems>
                 </Command.Group>
               {:else if manager.topNavigationMatch}
@@ -854,6 +877,7 @@
                     >
                       <NavigationRow item={manager.topNavigationMatch} />
                     </Command.Item>
+                    {@render searchBelowTopRow()}
                   </Command.GroupItems>
                 </Command.Group>
               {/if}
