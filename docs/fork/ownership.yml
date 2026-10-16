@@ -56,6 +56,7 @@ features:
       - mobile/lib/pages/library/spaces/**
       - mobile/lib/data/db/main/table/remote/shared_space*
       - mobile/lib/data/db/main/table/remote/library*
+      - mobile/test/gallery/shared_space_timeline_drift_test.dart
       - packages/plugin-gallery/**
       - server/src/services/gallery-workflow-host.service.ts
       - server/src/services/gallery-workflow-host.service.spec.ts
