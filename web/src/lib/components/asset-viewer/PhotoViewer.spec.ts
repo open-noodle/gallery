@@ -2,8 +2,12 @@ import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderInViewerSpace } from '$lib/gallery/viewer-space.test-helpers';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
 import PhotoViewer from './PhotoViewer.svelte';
 
 // Closes the Slice 8 wiring gap: `canEditSpacePeople` made the People-row edit affordances
@@ -67,16 +71,19 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
     vi.clearAllMocks();
     assetViewerManagerMock.isFaceEditMode = true;
     assetViewerManagerMock.imgRef = { naturalWidth: 100, naturalHeight: 100 } as unknown;
+    authManager.setUser(userAdminFactory.build({ id: 'owner-1' }));
+    authManager.setPreferences(preferencesFactory.build());
   });
 
   it('renders SpaceFaceEditor and NOT FaceEditor for a non-owner space editor', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
-
-    renderWithTooltips(PhotoViewer, {
-      cursor: { current: asset },
-      spaceId: 'space-1',
-      canEditSpacePeople: true,
+    const asset = assetFactory.build({
+      id: 'asset-1',
+      ownerId: 'someone-else',
+      canEdit: true,
+      type: AssetTypeEnum.Image,
     });
+
+    renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
 
     const stub = screen.getByTestId('space-face-editor-stub');
     expect(stub).toBeInTheDocument();
@@ -86,13 +93,9 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
   });
 
   it('renders FaceEditor and NOT SpaceFaceEditor for the asset owner, even inside a space', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', type: AssetTypeEnum.Image });
+    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
-    renderWithTooltips(PhotoViewer, {
-      cursor: { current: asset },
-      spaceId: 'space-1',
-      canEditSpacePeople: false,
-    });
+    renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
 
     const stub = screen.getByTestId('face-editor-stub');
     expect(stub).toBeInTheDocument();
@@ -100,13 +103,16 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
     expect(screen.queryByTestId('space-face-editor-stub')).toBeNull();
   });
 
-  it('renders the owner FaceEditor (never both) when canEditSpacePeople is true but no space id is available', () => {
-    const asset = assetFactory.build({ id: 'asset-1', ownerId: 'someone-else', type: AssetTypeEnum.Image });
-
-    renderWithTooltips(PhotoViewer, {
-      cursor: { current: asset },
-      canEditSpacePeople: true,
+  it('renders the owner FaceEditor (never both) for an editor when no space id is available', () => {
+    const asset = assetFactory.build({
+      id: 'asset-1',
+      ownerId: 'someone-else',
+      canEdit: true,
+      resolvedSpaceId: undefined,
+      type: AssetTypeEnum.Image,
     });
+
+    renderWithTooltips(PhotoViewer, { cursor: { current: asset } });
 
     expect(screen.getByTestId('face-editor-stub')).toBeInTheDocument();
     expect(screen.queryByTestId('space-face-editor-stub')).toBeNull();
