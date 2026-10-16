@@ -90,6 +90,7 @@ features:
       - server/src/gallery/database.ts
       - server/src/gallery/types.ts
       - mobile/lib/gallery/remote_album/**
+      - mobile/lib/gallery/data/heal_date_time_columns.dart
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
