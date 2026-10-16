@@ -291,7 +291,10 @@ make upstream-sync-fork-main
 
 Never merge `origin/main` into the rolling branch. The sync command cherry-picks
 the range from the stored `integratedForkHead` to the current fork ref, then runs
-the fork checks and the last completed batch audit.
+the fork checks and the last completed batch audit. A cherry-pick that stops only
+on modify/delete conflicts for paths in `FORK_DELETED_PATHS`
+(`tools/upstream-preflight/src/fork-deletions.ts`) is resolved by keeping the
+deletion; any other conflict still stops the sync.
 
 If checks fail after cherry-picking succeeds, fix the branch and continue:
 
