@@ -991,7 +991,7 @@
   "rotated_count": "{count, plural, one {# Datei gedreht} other {# Dateien gedreht}}",
   "search_everywhere": "Überall suchen",
   "search_here": "Hier suchen",
-  "search_legacy_notice": "Nutze ⌘K für die Suche.",
+  "search_legacy_notice": "Nutze {hotkey} für die Suche.",
   "search_no_pets": "Keine Haustiere",
   "search_open_palette": "Palette öffnen",
   "search_sort_newest": "Neueste zuerst",

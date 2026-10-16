@@ -309,7 +309,7 @@ test.describe('global search palette', () => {
     await page.goto(`/search?query=${legacyQuery}`);
 
     await expect(page.locator('#search-chips')).toContainText('beach');
-    await expect(page.getByText(/use .?k to search/i)).toBeVisible();
+    await expect(page.getByText(/use (⌘|ctrl\+)k to search/i)).toBeVisible();
     await expect(page.locator('#asset-selection-app-bar input')).toHaveCount(0);
 
     await page.getByRole('button', { name: /open palette/i }).click();
