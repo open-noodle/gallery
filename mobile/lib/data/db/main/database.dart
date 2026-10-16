@@ -187,7 +187,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 41;
+  int get schemaVersion => 42;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -465,6 +465,14 @@ class Drift extends $Drift {
               },
               from40To41: (m, v41) async {
                 await _healV33DateTimes(this);
+              },
+              // Upstream immich-30262 added the group_date columns at its drift v35, which collides with
+              // the fork's shipped v35, so it is renumbered here to v42.
+              from41To42: (m, v42) async {
+                await m.addColumn(v42.remoteAssetEntity, v42.remoteAssetEntity.groupDate);
+                await m.addColumn(v42.localAssetEntity, v42.localAssetEntity.groupDate);
+                await m.createIndex(v42.idxRemoteAssetGroup);
+                await m.createIndex(v42.idxLocalAssetGroup);
               },
             ),
           );
