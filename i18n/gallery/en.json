@@ -993,7 +993,7 @@
   "search_albums_and_spaces": "Search albums and spaces",
   "search_everywhere": "Search everywhere",
   "search_here": "Search here",
-  "search_legacy_notice": "Use ⌘K to search.",
+  "search_legacy_notice": "Use {hotkey} to search.",
   "search_no_pets": "No pets",
   "search_open_palette": "Open palette",
   "search_sort_newest": "Newest first",

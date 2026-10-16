@@ -1006,7 +1006,7 @@
   "rotated_count": "Obrócono {count, plural, one {# zasób} few {# zasoby} many {# zasobów} other {# zasobów}}",
   "search_everywhere": "Szukaj wszędzie",
   "search_here": "Szukaj tutaj",
-  "search_legacy_notice": "Użyj ⌘K, aby wyszukiwać.",
+  "search_legacy_notice": "Użyj {hotkey}, aby wyszukiwać.",
   "search_no_pets": "Brak zwierząt",
   "search_open_palette": "Otwórz paletę",
   "search_sort_newest": "Od najnowszych",

@@ -1006,7 +1006,7 @@
   "rotated_count": "已旋转 {count, plural, one {# 个资源} other {# 个资源}}",
   "search_everywhere": "全局搜索",
   "search_here": "在此搜索",
-  "search_legacy_notice": "按 ⌘K 进行搜索。",
+  "search_legacy_notice": "按 {hotkey} 进行搜索。",
   "search_no_pets": "找不到宠物",
   "search_open_palette": "打开命令面板",
   "search_sort_newest": "最新优先",
