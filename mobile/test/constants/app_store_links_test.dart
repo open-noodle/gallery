@@ -9,4 +9,8 @@ void main() {
   test('Android client update link points to the Noodle Gallery Play Store listing', () {
     expect(kImmichPlayStoreLink, 'https://play.google.com/store/apps/details?id=de.opennoodle.gallery');
   });
+
+  test('server update link points to the Noodle Gallery releases (discussion #1199)', () {
+    expect(kImmichLatestRelease, 'https://github.com/open-noodle/gallery/releases/latest');
+  });
 }
