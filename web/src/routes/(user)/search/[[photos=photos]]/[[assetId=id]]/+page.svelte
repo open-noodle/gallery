@@ -17,6 +17,7 @@
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import { QueryParameter } from '#lib/constants.ts';
+  import { parseSearchTerms } from '#lib/gallery/search/parse-search-terms.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { registerSelectionContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
@@ -69,7 +70,7 @@
 
   type SearchTerms = MetadataSearchDto & Pick<SmartSearchDto, 'query' | 'queryAssetId'>;
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
-  let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
+  let terms = $derived<SearchTerms>(searchQuery ? parseSearchTerms<SearchTerms>(searchQuery) : {});
   let searchTermKeys = $derived(getVisibleSearchKeys(terms));
 
   $effect(() => {
