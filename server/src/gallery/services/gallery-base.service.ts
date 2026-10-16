@@ -1,4 +1,7 @@
 import type { GalleryRepositories } from 'src/gallery/repositories/index.js';
+import type { AssetUpdateRepositories } from 'src/gallery/utils/asset-update-hooks.js';
+import type { AccessRepository } from 'src/repositories/access.repository.js';
+import type { AlbumRepository } from 'src/repositories/album.repository.js';
 import type { AssetRepository } from 'src/repositories/asset.repository.js';
 import type { DatabaseRepository } from 'src/repositories/database.repository.js';
 import type { JobRepository } from 'src/repositories/job.repository.js';
@@ -23,6 +26,8 @@ import { ViewerScopeArgs, ViewerSurface, resolveViewerScope } from 'src/utils/vi
  */
 export abstract class GalleryBaseService {
   protected abstract logger: LoggingRepository;
+  protected abstract accessRepository: AccessRepository;
+  protected abstract albumRepository: AlbumRepository;
   protected abstract assetRepository: AssetRepository;
   protected abstract databaseRepository: DatabaseRepository;
   protected abstract jobRepository: JobRepository;
@@ -91,6 +96,20 @@ export abstract class GalleryBaseService {
       storageRepository: this.storageRepository,
       getConfig: (options) => this.getConfig(options),
     });
+  }
+
+  // For the AssetService.update/updateAll hooks in src/gallery/utils/asset-update-hooks.ts. A bag, not an instance
+  // built here: that module imports services that extend BaseService, so a runtime import from here is a cycle.
+  protected get assetUpdateRepositories(): AssetUpdateRepositories {
+    return {
+      accessRepository: this.accessRepository,
+      albumRepository: this.albumRepository,
+      assetFavoriteRepository: this.assetFavoriteRepository,
+      assetRepository: this.assetRepository,
+      galleryDuplicateRepository: this.galleryDuplicateRepository,
+      logger: this.logger,
+      sharedSpaceRepository: this.sharedSpaceRepository,
+    };
   }
 
   /** Fork: what this viewer may see on a surface — see src/utils/viewer-scope.ts. */
