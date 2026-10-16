@@ -254,6 +254,7 @@ features:
       - mobile/test/gallery/search/**
       - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
       - mobile/test/fixtures/search_contract/**
+      - server/src/gallery/utils/smart-search.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts

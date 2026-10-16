@@ -3,7 +3,7 @@ import { beforeEach, vitest } from 'vitest';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AssetOrder, AssetType, AssetVisibility } from 'src/enum.js';
-import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
+import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
 import { SearchService } from 'src/services/search.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
