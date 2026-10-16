@@ -27,7 +27,6 @@ import * as videoMoments from 'src/gallery/services/memory-rules/video-moments.r
  */
 const SMALLEST_EMITTED_SAMPLE: Record<string, number> = {
   on_this_day: 1, // no gate at all — the defect in spec §2.3
-  birthday: 4, // fallback path requires exactly 4
   recent_trip: 2, // burst-collapsed, see the dedicated test below
   month_recap: monthRecap.MIN_ASSETS,
   favorites_throwback: favoritesThrowback.MIN_FAVORITES,
@@ -56,7 +55,6 @@ describe('memory-type.metadata', () => {
     it('contains the current types with expected attributes', () => {
       expect(MEMORY_TYPE_METADATA).toEqual([
         { key: 'on_this_day', kind: 'on_this_day', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
-        { key: 'birthday', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
         { key: 'recent_trip', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 2 },
         { key: 'month_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 8 },
         { key: 'favorites_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
@@ -81,7 +79,6 @@ describe('memory-type.metadata', () => {
     it('MEMORY_TYPE_KEYS lists keys in registry order', () => {
       expect(MEMORY_TYPE_KEYS).toEqual([
         'on_this_day',
-        'birthday',
         'recent_trip',
         'month_recap',
         'favorites_throwback',
@@ -100,7 +97,6 @@ describe('memory-type.metadata', () => {
     it('returns all keys enabled', () => {
       expect(buildDefaultMemoryTypeMap()).toEqual({
         on_this_day: true,
-        birthday: true,
         recent_trip: true,
         month_recap: true,
         favorites_throwback: true,
@@ -117,11 +113,16 @@ describe('memory-type.metadata', () => {
 
   describe('getMemoryTypeMetadata', () => {
     it('returns the entry for a known key', () => {
-      expect(getMemoryTypeMetadata('birthday')?.kind).toBe('rule');
+      expect(getMemoryTypeMetadata('recent_trip')?.kind).toBe('rule');
     });
 
     it('returns undefined for an unknown key', () => {
       expect(getMemoryTypeMetadata('nope')).toBeUndefined();
+    });
+
+    // OD-3: birthday memories are upstream's MemoryType.Birthday, with no Gallery toggle.
+    it('has no birthday entry', () => {
+      expect(getMemoryTypeMetadata('birthday')).toBeUndefined();
     });
   });
 
@@ -131,7 +132,7 @@ describe('memory-type.metadata', () => {
     });
 
     it('maps Rule to its ruleId', () => {
-      expect(getMemoryTypeKeyForMemory(MemoryType.Rule, { ruleId: 'birthday' })).toBe('birthday');
+      expect(getMemoryTypeKeyForMemory(MemoryType.Rule, { ruleId: 'recent_trip' })).toBe('recent_trip');
     });
 
     it('maps Rule to people_together', () => {
@@ -150,7 +151,6 @@ describe('memory-type.metadata', () => {
       expect(getAdminAvailableMemoryTypeKeys({})).toEqual(
         new Set([
           'on_this_day',
-          'birthday',
           'recent_trip',
           'month_recap',
           'favorites_throwback',
@@ -179,26 +179,25 @@ describe('memory-type.metadata', () => {
     it('honors an explicit types override', () => {
       const result = getAdminAvailableMemoryTypeKeys({ types: { recent_trip: false } });
       expect(result.has('recent_trip')).toBe(false);
-      expect(result.has('birthday')).toBe(true);
+      expect(result.has('month_recap')).toBe(true);
       expect(result.has('on_this_day')).toBe(true);
     });
 
     it('honors a legacy bool when there is no types override', () => {
-      const result = getAdminAvailableMemoryTypeKeys({ birthday: false });
-      expect(result.has('birthday')).toBe(false);
-      expect(result.has('recent_trip')).toBe(true);
+      const result = getAdminAvailableMemoryTypeKeys({ recentTrips: false });
+      expect(result.has('recent_trip')).toBe(false);
+      expect(result.has('month_recap')).toBe(true);
     });
 
     it('prefers an explicit types value over the legacy bool', () => {
-      const result = getAdminAvailableMemoryTypeKeys({ birthday: false, types: { birthday: true } });
-      expect(result.has('birthday')).toBe(true);
+      const result = getAdminAvailableMemoryTypeKeys({ recentTrips: false, types: { recent_trip: true } });
+      expect(result.has('recent_trip')).toBe(true);
     });
 
     it('ignores unknown keys in the types map', () => {
       expect(getAdminAvailableMemoryTypeKeys({ types: { unknown_key: true } })).toEqual(
         new Set([
           'on_this_day',
-          'birthday',
           'recent_trip',
           'month_recap',
           'favorites_throwback',
@@ -216,7 +215,7 @@ describe('memory-type.metadata', () => {
 
   describe('isMemoryTypeEnabledForUser', () => {
     it('defaults to enabled for a known key', () => {
-      expect(isMemoryTypeEnabledForUser(undefined, 'birthday')).toBe(true);
+      expect(isMemoryTypeEnabledForUser(undefined, 'month_recap')).toBe(true);
     });
 
     it('defaults to enabled for people_together', () => {
@@ -224,7 +223,7 @@ describe('memory-type.metadata', () => {
     });
 
     it('honors an explicit override', () => {
-      expect(isMemoryTypeEnabledForUser({ birthday: false }, 'birthday')).toBe(false);
+      expect(isMemoryTypeEnabledForUser({ month_recap: false }, 'month_recap')).toBe(false);
     });
 
     it('falls back to the default when the key is absent from the map', () => {
@@ -261,7 +260,6 @@ describe('memory-type.metadata', () => {
 
     it('never sets a floor above the rule cap that bounds the sample', () => {
       const caps: Record<string, number> = {
-        birthday: 12, // birthday.rule.ts slices to 12
         recent_trip: recentTrip.ASSET_CAP,
         month_recap: monthRecap.ASSET_CAP,
         favorites_throwback: favoritesThrowback.ASSET_CAP,

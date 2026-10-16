@@ -789,7 +789,7 @@ export class SyncService extends BaseService {
     const upsertType = SyncEntityType.MemoryV2;
     const upserts = this.syncRepository.memory.getUpserts({ ...options, ack: checkpointMap[upsertType] });
     for await (const { updateId, ...data } of upserts) {
-      if (isSyncedMemoryType(data.type, options.forkAwareClient)) {
+      if (GallerySyncStreams.syncedMemoryTypes(options.forkAwareClient, true).includes(data.type)) {
         await send(response, { type: upsertType, ids: [updateId], data });
       }
     }
@@ -822,7 +822,7 @@ export class SyncService extends BaseService {
     const upsertType = SyncEntityType.MemoryToAssetV2;
     const upserts = this.syncRepository.memoryToAsset.getUpsertsForTypes(
       { ...options, ack: checkpointMap[upsertType] },
-      GallerySyncStreams.syncedMemoryTypes(options.forkAwareClient),
+      GallerySyncStreams.syncedMemoryTypes(options.forkAwareClient, true),
     );
     for await (const { updateId, ...data } of upserts) {
       await send(response, { type: upsertType, ids: [updateId], data });

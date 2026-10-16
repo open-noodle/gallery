@@ -53,7 +53,14 @@ export class MemoryService extends BaseService {
 
         this.logger.log(`Creating memories for ${target.toISO()}`);
         try {
-          await Promise.all(onThisDayUsers.map((owner) => this.createOnThisDayMemories(owner.id, target)));
+          await Promise.all(
+            users.map((owner) =>
+              Promise.all([
+                onThisDayUsers.includes(owner) && this.createOnThisDayMemories(owner.id, target),
+                this.createBirthdayMemories(owner.id, target),
+              ]),
+            ),
+          );
         } catch (error) {
           this.logger.error(`Failed to create memories for ${target.toISO()}: ${error}`);
         }
@@ -168,7 +175,7 @@ export class MemoryService extends BaseService {
     const userTypes = getPreferences((await this.userRepository.getMetadata(auth.user.id)) ?? []).memories.types;
 
     // Gallery: a stock or third-party client gets only the memory types it can decode, as on sync.
-    const clientTypes = GallerySyncStreams.syncedMemoryTypes(!auth.stockClient);
+    const clientTypes = GallerySyncStreams.syncedMemoryTypes(!auth.stockClient, !auth.legacyGalleryApp);
     return memories
       .filter((memory) => clientTypes.includes(memory.type))
       .filter((memory) => isMemoryTypeVisible(memory, availableTypes, userTypes))
@@ -184,7 +191,7 @@ export class MemoryService extends BaseService {
     return this.memoryRepository.statisticsAccessible(
       auth.user.id,
       dto,
-      GallerySyncStreams.syncedMemoryTypes(!auth.stockClient),
+      GallerySyncStreams.syncedMemoryTypes(!auth.stockClient, !auth.legacyGalleryApp),
     );
   }
 
@@ -192,7 +199,7 @@ export class MemoryService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.MemoryRead, ids: [id] });
     const memory = await this.findOrFail(auth, id);
     // Gallery: a stock client cannot decode a rule memory. Gallery clients keep reading any type by id.
-    if (auth.stockClient && !GallerySyncStreams.syncedMemoryTypes(false).includes(memory.type)) {
+    if (auth.stockClient && !GallerySyncStreams.syncedMemoryTypes(false, true).includes(memory.type)) {
       throw new BadRequestException('Memory not found');
     }
     return mapMemory(memory, auth);

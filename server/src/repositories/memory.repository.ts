@@ -100,14 +100,7 @@ export class MemoryRepository implements IBulkAsset {
 
   /** Serves `GET /memories`. Follows upstream's contract: `isUpcoming` alone scopes `showAt`. */
   private accessibleSearchBuilder(userId: string, dto: MemorySearchDto) {
-    return (
-      this.baseSearchBuilder(dto, { hideUnshownByDefault: false })
-        // Gallery generates birthday memories as rules; a MemoryType.Birthday row (an Immich 3.3+
-        // import, or an API create) would abort an installed app's decode. See
-        // specs/2026-09-24-birthday-memories-upstream-coexistence-design.md.
-        .where('memory.type', '!=', MemoryType.Birthday)
-        .where((eb) => memoryAccessibleTo(eb, userId))
-    );
+    return this.baseSearchBuilder(dto, { hideUnshownByDefault: false }).where((eb) => memoryAccessibleTo(eb, userId));
   }
 
   @GenerateSql(

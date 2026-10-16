@@ -29,14 +29,13 @@ const DAYS = 3;
  * whole window. Sized from the worst-case overlap of the current rules: the calendar-fixed
  * windows only ever overlap two deep (e.g. `person_throwback` 13–19 and `favorites_throwback`
  * 15–21), plus `recent_trip` and `trip_anniversary`, which can start on any day — four lingering
- * cards. The remaining two slots keep the date-anchored 1-day rules (`birthday` above all, since
- * a missed one waits a year) from ever being crowded out.
+ * cards. The remaining two slots keep the date-anchored 1-day rules from ever being crowded out.
  */
 export const RULE_DAILY_LIMIT = 6;
 
 /**
- * Claim-order bands. Offsets are far larger than any real rule score (the highest is `birthday`
- * at ~330), so type always outranks score: an `on_this_day` can never overtake a rule memory,
+ * Claim-order bands. Offsets are far larger than any real rule score (all are well under 1,000),
+ * so type always outranks score: an `on_this_day` can never overtake a rule memory,
  * and no rule memory can overtake an unmanaged one. See spec §6.3.
  */
 const RANK_UNMANAGED = 2_000_000;
@@ -322,7 +321,6 @@ export class RuleMemoryService extends BaseService {
 
   private getMemoryRules(enabledKeys: Iterable<string>, memories: SystemConfig['memories']): MemoryRule[] {
     return createMemoryRules(enabledKeys, {
-      personRepository: this.personRepository,
       galleryPersonRepository: this.galleryPersonRepository,
       memoryRuleAssetRepository: this.memoryRuleAssetRepository,
       memoryRepository: this.memoryRepository,

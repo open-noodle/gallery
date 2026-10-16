@@ -10,6 +10,10 @@ import { factory, newUuid, newUuids } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const stockAuth = (userId: string) => ({ ...factory.auth({ user: { id: userId } }), stockClient: true as const });
+const legacyAppAuth = (userId: string) => ({
+  ...factory.auth({ user: { id: userId } }),
+  legacyGalleryApp: true as const,
+});
 
 describe(MemoryService.name, () => {
   let sut: MemoryService;
@@ -22,6 +26,7 @@ describe(MemoryService.name, () => {
     mocks.memory.search.mockResolvedValue([]);
     mocks.memory.searchAccessible.mockResolvedValue([]);
     mocks.user.getMetadata.mockResolvedValue([]);
+    mocks.person.forBirthdayMemories.mockResolvedValue([]);
     // #1041: memory reads resolve the viewer's scope; default to "nothing hidden, no visible spaces".
     vi.spyOn(sut, 'resolveViewerScope').mockResolvedValue({ hiddenScope: nothingHidden, visibleSpaceIds: [] });
   });
@@ -142,6 +147,19 @@ describe(MemoryService.name, () => {
 
       expect(mocks.asset.getByDayOfYear).not.toHaveBeenCalled();
     });
+
+    // OD-3: birthday memories are Immich's own generator, with no Gallery toggle in front of it.
+    it("should run upstream's birthday generator for every user and day, even with on-this-day disabled", async () => {
+      const user = factory.userAdmin({
+        metadata: [{ key: UserMetadataKey.Preferences, value: { memories: { types: { on_this_day: false } } } }],
+      });
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue(null);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.person.forBirthdayMemories).toHaveBeenCalledWith(user.id, expect.anything());
+    });
   });
 
   describe('search', () => {
@@ -261,14 +279,14 @@ describe(MemoryService.name, () => {
       const memory = MemoryFactory.from({
         ownerId: userId,
         type: MemoryType.Rule,
-        data: { ruleId: 'birthday', dedupeKey: 'k', title: 'Happy birthday' } satisfies RuleMemoryData,
+        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
       })
         .asset(asset)
         .build();
       mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.user.getMetadata.mockResolvedValue([
-        { key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } },
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { season_recap: false } } } },
       ]);
 
       await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([]);
@@ -298,14 +316,14 @@ describe(MemoryService.name, () => {
         ownerId: userId,
         type: MemoryType.Rule,
         isSaved: true,
-        data: { ruleId: 'birthday', dedupeKey: 'k', title: 'Happy birthday' } satisfies RuleMemoryData,
+        data: { ruleId: 'season_recap', dedupeKey: 'k', title: 'Summer' } satisfies RuleMemoryData,
       })
         .asset(asset)
         .build();
       mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.user.getMetadata.mockResolvedValue([
-        { key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } },
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { season_recap: false } } } },
       ]);
 
       await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([
@@ -326,7 +344,7 @@ describe(MemoryService.name, () => {
       mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory)]);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.user.getMetadata.mockResolvedValue([
-        { key: UserMetadataKey.Preferences, value: { memories: { types: { birthday: false } } } },
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { foreign_rule: false } } } },
       ]);
 
       await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([
@@ -348,16 +366,32 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, dto, [
         MemoryType.OnThisDay,
         MemoryType.Rule,
+        MemoryType.Birthday,
       ]);
     });
 
-    it('should count only on-this-day memories for a stock client', async () => {
-      const auth = { ...factory.auth(), stockClient: true as const };
+    it('should count on-this-day and birthday memories for a stock client', async () => {
+      const auth = stockAuth(newUuid());
       mocks.memory.statisticsAccessible.mockResolvedValue({ total: 1 });
 
       await sut.statistics(auth, {});
 
-      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, {}, [MemoryType.OnThisDay]);
+      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, {}, [
+        MemoryType.OnThisDay,
+        MemoryType.Birthday,
+      ]);
+    });
+
+    it('should not count birthday memories for a Gallery app older than 5.8.0', async () => {
+      const auth = legacyAppAuth(newUuid());
+      mocks.memory.statisticsAccessible.mockResolvedValue({ total: 1 });
+
+      await sut.statistics(auth, {});
+
+      expect(mocks.memory.statisticsAccessible).toHaveBeenCalledWith(auth.user.id, {}, [
+        MemoryType.OnThisDay,
+        MemoryType.Rule,
+      ]);
     });
   });
 
@@ -395,6 +429,42 @@ describe(MemoryService.name, () => {
 
       await expect(sut.get(stockAuth(userId), rule.id)).rejects.toBeInstanceOf(BadRequestException);
       await expect(sut.get(factory.auth({ user: { id: userId } }), rule.id)).resolves.toMatchObject({ id: rule.id });
+    });
+    // OD-3: upstream lists birthday memories to every client; only a Gallery app older than 5.8.0 cannot decode one.
+    it('should list a birthday memory to stock clients and current Gallery clients, not to an older Gallery app', async () => {
+      const userId = newUuid();
+      const asset = AssetFactory.create();
+      const onThisDay = MemoryFactory.from({ ownerId: userId }).asset(asset).build();
+      const birthday = MemoryFactory.from({
+        ownerId: userId,
+        type: MemoryType.Birthday,
+        data: { personId: newUuid(), personName: 'Alice', year: 1990 },
+      })
+        .asset(asset)
+        .build();
+      mocks.memory.searchAccessible.mockResolvedValue([getForMemory(onThisDay), getForMemory(birthday)]);
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+
+      const ids = async (auth: ReturnType<typeof factory.auth>) => {
+        const memories = await sut.search(auth, {});
+        return memories.map(({ id }) => id);
+      };
+      await expect(ids(stockAuth(userId))).resolves.toEqual([onThisDay.id, birthday.id]);
+      await expect(ids(factory.auth({ user: { id: userId } }))).resolves.toEqual([onThisDay.id, birthday.id]);
+      await expect(ids(legacyAppAuth(userId))).resolves.toEqual([onThisDay.id]);
+    });
+
+    it('should return a birthday memory by id to a stock client', async () => {
+      const userId = newUuid();
+      const birthday = MemoryFactory.create({
+        ownerId: userId,
+        type: MemoryType.Birthday,
+        data: { personId: newUuid(), personName: 'Alice', year: 1990 },
+      });
+      mocks.memory.get.mockResolvedValue(getForMemory(birthday));
+      mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([birthday.id]));
+
+      await expect(sut.get(stockAuth(userId), birthday.id)).resolves.toMatchObject({ id: birthday.id });
     });
   });
 

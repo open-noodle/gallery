@@ -8,14 +8,14 @@ const ruleKeys = MEMORY_TYPE_METADATA.filter((m) => m.kind === 'rule').map((m) =
 
 describe('createMemoryRules', () => {
   it('instantiates a single rule by key', () => {
-    const rules = createMemoryRules(['birthday'], deps);
+    const rules = createMemoryRules(['recent_trip'], deps);
     expect(rules).toHaveLength(1);
-    expect(rules[0].id).toBe('birthday');
+    expect(rules[0].id).toBe('recent_trip');
   });
 
   it('instantiates multiple rules in registry order', () => {
-    const rules = createMemoryRules(['birthday', 'recent_trip'], deps);
-    expect(rules.map((r) => r.id)).toEqual(['birthday', 'recent_trip']);
+    const rules = createMemoryRules(['month_recap', 'recent_trip'], deps);
+    expect(rules.map((r) => r.id)).toEqual(['recent_trip', 'month_recap']);
   });
 
   it('instantiates video_moments by key', () => {
@@ -65,6 +65,6 @@ describe('createMemoryRules', () => {
   });
 
   it('dedupes duplicate keys', () => {
-    expect(createMemoryRules(['birthday', 'birthday'], deps)).toHaveLength(1);
+    expect(createMemoryRules(['recent_trip', 'recent_trip'], deps)).toHaveLength(1);
   });
 });
