@@ -248,9 +248,9 @@ describe('add selected to album', () => {
     expect(selection.clearSelection).not.toHaveBeenCalled();
   });
 
-  // #889 — the ⌘K / "l" shortcut must narrow the picker exactly like the selection toolbar does,
-  // or a space editor is offered personal albums the server has to reject for non-owned assets.
-  it('narrows the picker to the space when the selection is not all-owned', async () => {
+  // #1119 — the ⌘K / "l" shortcut opens the same picker as the selection toolbar and the timeline; the
+  // picker asks the server which albums accept the non-owned assets.
+  it('opens the timeline picker when the selection is not all-owned', async () => {
     const assets = [makeAsset({ id: 'mine' }), makeAsset({ id: 'theirs' })];
     const selection = makeSelection({
       assets,
@@ -264,11 +264,10 @@ describe('add selected to album', () => {
 
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
       assetIds: ['mine', 'theirs'],
-      restrictToSpaceId: 'space-1',
     });
   });
 
-  it('leaves the picker unrestricted when the space selection is all-owned', async () => {
+  it('opens the timeline picker when the space selection is all-owned', async () => {
     const selection = makeSelection({ assets: [makeAsset({ id: 'mine' })] });
 
     await handleAddSelectedToAlbum(
@@ -277,7 +276,6 @@ describe('add selected to album', () => {
 
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
       assetIds: ['mine'],
-      restrictToSpaceId: undefined,
     });
   });
 });
