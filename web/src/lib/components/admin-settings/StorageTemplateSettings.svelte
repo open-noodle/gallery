@@ -254,7 +254,7 @@
     {#if preview}
       <Text size="small" class="mt-4">
         {$t('preview')}:
-        <Code size="small"
+        <Code size="small" class="break-all"
           >{`UPLOAD_LOCATION/library/${authManager.user.storageLabel || authManager.user.id}/${preview}.jpg`}</Code
         >
       </Text>

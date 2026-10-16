@@ -31,7 +31,7 @@
 
 <div
   id="onboarding-card"
-  class="flex w-full max-w-4xl flex-col gap-4 rounded-3xl border-2 border-gray-500 bg-gray-50 p-8 text-black dark:border-gray-700 dark:bg-immich-dark-gray dark:text-immich-dark-fg"
+  class="flex w-full max-w-4xl flex-col gap-4 rounded-3xl border-2 border-gray-500 bg-gray-50 p-6 text-black sm:p-8 dark:border-gray-700 dark:bg-immich-dark-gray dark:text-immich-dark-fg"
   in:fade={{ duration: 250 }}
 >
   {#if title || icon}
@@ -48,9 +48,9 @@
   {/if}
   {@render children?.()}
 
-  <div class="flex pt-4">
+  <div class="flex flex-wrap gap-2 pt-4">
     {#if previousTitle}
-      <div class="flex w-full place-content-start">
+      <div class="flex grow place-content-start">
         <Button
           shape="round"
           leadingIcon={languageManager.rtl ? mdiArrowRight : mdiArrowLeft}
@@ -65,7 +65,7 @@
       </div>
     {/if}
 
-    <div class="flex w-full place-content-end">
+    <div class="flex grow place-content-end">
       <Button
         shape="round"
         trailingIcon={nextTitle ? (languageManager.rtl ? mdiArrowLeft : mdiArrowRight) : mdiCheck}
