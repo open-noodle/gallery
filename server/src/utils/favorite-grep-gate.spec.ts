@@ -39,6 +39,11 @@ const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
     reason:
       "search V3's upstream default when AssetSearchScope.favoriteUserId is unset; Gallery always sets it for users and rejects a favourite filter from a shared link",
   },
+  'src/utils/favorite.ts': {
+    count: 1,
+    reason:
+      "syncFavoriteFor, upstream's CASE for stock sync clients: the column only when asset.ownerId = the syncing user, false otherwise",
+  },
 };
 
 // Upstream's own column writes, kept as upstream text because the writer is provably the asset's owner. Duplicate

@@ -150,7 +150,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'Added ${assetIds.length} photos to space',
+          msg: context.t.added_to_space_count(count: assetIds.length),
           toastType: ToastType.success,
         );
       }
@@ -164,7 +164,11 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       await _refreshSpaceMetadata();
     } catch (e) {
       if (mounted) {
-        ImmichToast.show(context: context, msg: 'Failed to add photos', toastType: ToastType.error);
+        ImmichToast.show(
+          context: context,
+          msg: context.t.errors.error_adding_assets_to_space,
+          toastType: ToastType.error,
+        );
       }
     }
   }
@@ -204,12 +208,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         await ref.read(sharedSpaceApiRepositoryProvider).delete(widget.spaceId);
         ref.invalidate(sharedSpacesProvider);
         if (mounted) {
-          ImmichToast.show(context: context, msg: 'Space deleted', toastType: ToastType.success);
+          ImmichToast.show(context: context, msg: context.t.spaces_deleted, toastType: ToastType.success);
           await context.maybePop();
         }
       } catch (e) {
         if (mounted) {
-          ImmichToast.show(context: context, msg: 'Failed to delete space', toastType: ToastType.error);
+          ImmichToast.show(context: context, msg: context.t.spaces_delete_failed, toastType: ToastType.error);
         }
       }
     }
@@ -256,7 +260,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         });
         ImmichToast.show(
           context: context,
-          msg: newValue ? 'Space added to timeline' : 'Space removed from timeline',
+          msg: newValue ? context.t.spaces_added_to_timeline : context.t.spaces_removed_from_timeline,
           toastType: ToastType.success,
         );
       }
@@ -270,7 +274,11 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _togglingTimeline = false);
-        ImmichToast.show(context: context, msg: 'Failed to update timeline setting', toastType: ToastType.error);
+        ImmichToast.show(
+          context: context,
+          msg: context.t.space_album_timeline_update_failed,
+          toastType: ToastType.error,
+        );
       }
     }
   }
@@ -418,21 +426,21 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Space')),
+        appBar: AppBar(title: Text(context.t.spaces_space)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null || _space == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Space')),
+        appBar: AppBar(title: Text(context.t.spaces_space)),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.error_outline, size: 48),
               const SizedBox(height: 16),
-              Text('Failed to load space: ${_error ?? "Unknown error"}'),
+              Text(context.t.spaces_space_load_failed(error: _error ?? context.t.unknown)),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
@@ -442,7 +450,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
                   });
                   unawaited(_loadData());
                 },
-                child: const Text('Retry'),
+                child: Text(context.t.retry),
               ),
             ],
           ),

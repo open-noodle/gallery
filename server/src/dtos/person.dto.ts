@@ -115,8 +115,8 @@ const PersonSearchSchema = z
       .optional()
       .describe(
         'Filter the list. `person` returns human people. `pet` returns the individual pets that pet ' +
-          'recognition identified — species buckets, which the detector produces without an embedding, are ' +
-          'excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.',
+          'recognition identified, and the People-page minimumFaces threshold is waived. Species buckets, which ' +
+          'the detector produces without an embedding, are never listed. Omit for the unfiltered list.',
       ),
     closestPersonId: z.uuidv4().optional().describe('Closest person ID for similarity search'),
     closestAssetId: z.uuidv4().optional().describe('Closest asset ID for similarity search'),
@@ -126,6 +126,7 @@ const PersonSearchSchema = z
     sharedWithId: z.uuid().optional().describe('Only include people to which the user was given access'),
     isFavorite: stringToBool.optional().describe('Filter by favorite status'),
     isHidden: stringToBool.optional().describe('Filter by hidden status'),
+    name: z.string().optional().describe('Filter by person name'),
   })
   .meta({ id: 'PersonSearchDto' });
 

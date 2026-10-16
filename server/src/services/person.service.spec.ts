@@ -245,6 +245,59 @@ describe(PersonService.name, () => {
       );
     });
 
+    // Stock sync withholds pets, so GET /people does too when a stock client names no type.
+    it('defaults the type to person for a stock client', async () => {
+      const auth = { ...AuthFactory.create(), stockClient: true as const };
+      mocks.person.getAllForUser.mockResolvedValue({ items: [], hasNextPage: false });
+      mocks.person.getNumberOfPeople.mockResolvedValue({ total: 0, hidden: 0 });
+
+      await sut.getAll(auth, { withHidden: false, page: 1, size: 50 });
+
+      expect(mocks.person.getAllForUser).toHaveBeenCalledWith(
+        expect.anything(),
+        auth.user.id,
+        expect.objectContaining({ type: 'person' }),
+      );
+      expect(mocks.person.getNumberOfPeople).toHaveBeenCalledWith(auth.user.id, {
+        minimumFaceCount: 3,
+        type: 'person',
+      });
+    });
+
+    // OD-14: stock web's People page searches by name; Gallery clients search through their own routes.
+    it('filters by name for a stock client only', async () => {
+      const auth = AuthFactory.create();
+      mocks.person.getAllForUser.mockResolvedValue({ items: [], hasNextPage: false });
+      mocks.person.getNumberOfPeople.mockResolvedValue({ total: 0, hidden: 0 });
+
+      await sut.getAll({ ...auth, stockClient: true }, { withHidden: false, page: 1, size: 50, name: 'jose' });
+      await sut.getAll(auth, { withHidden: false, page: 1, size: 50, name: 'jose' });
+
+      expect(mocks.person.getAllForUser).toHaveBeenNthCalledWith(
+        1,
+        expect.anything(),
+        auth.user.id,
+        expect.objectContaining({ name: 'jose' }),
+      );
+      expect(mocks.person.getAllForUser).toHaveBeenNthCalledWith(2, expect.anything(), auth.user.id, {
+        withHidden: false,
+      });
+    });
+
+    it('forwards isFavorite and isHidden to the owner-scoped repository', async () => {
+      const auth = AuthFactory.create();
+      mocks.person.getAllForUser.mockResolvedValue({ items: [], hasNextPage: false });
+      mocks.person.getNumberOfPeople.mockResolvedValue({ total: 0, hidden: 0 });
+
+      await sut.getAll(auth, { withHidden: true, page: 1, size: 50, isFavorite: true, isHidden: false });
+
+      expect(mocks.person.getAllForUser).toHaveBeenCalledWith(expect.anything(), auth.user.id, {
+        withHidden: true,
+        isFavorite: true,
+        isHidden: false,
+      });
+    });
+
     it('should preserve identity-aware people ordering returned by repository', async () => {
       const auth = AuthFactory.create();
       const response = {

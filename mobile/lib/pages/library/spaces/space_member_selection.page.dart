@@ -46,14 +46,14 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: 'Added ${selectedUsers.value.length} members',
+            msg: context.t.spaces_added_members(count: selectedUsers.value.length),
             toastType: ToastType.success,
           );
           await context.maybePop();
         }
       } catch (e) {
         if (context.mounted) {
-          ImmichToast.show(context: context, msg: 'Failed to add members', toastType: ToastType.error);
+          ImmichToast.show(context: context, msg: context.t.spaces_add_members_failed, toastType: ToastType.error);
         }
       }
     }
@@ -67,7 +67,7 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Members'),
+        title: Text(context.t.spaces_add_members),
         centerTitle: false,
         leading: IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => context.maybePop()),
         actions: [
@@ -89,7 +89,7 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
           final filteredUsers = users.where((u) => !existingMemberIds.contains(u.id)).toList();
 
           if (filteredUsers.isEmpty) {
-            return const Center(child: Text('No users available to add'));
+            return Center(child: Text(context.t.spaces_no_users_to_add));
           }
 
           return ListView(

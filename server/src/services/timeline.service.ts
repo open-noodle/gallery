@@ -8,6 +8,7 @@ import {
   TimeBucketsResponseDto,
 } from 'src/dtos/time-bucket.dto.js';
 import { AssetVisibility, Permission, TimeBucketSize } from 'src/enum.js';
+import { requireTimelineTagAccess } from 'src/gallery/utils/timeline-tag-access.js';
 import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -163,6 +164,10 @@ export class TimelineService extends BaseService {
       if (dto.visibility === AssetVisibility.Locked && dto.userId !== auth.user.id) {
         throw new BadRequestException("You may not access another user's locked timeline");
       }
+    }
+
+    if (dto.tagId) {
+      await requireTimelineTagAccess(this.accessRepository, auth, dto.tagId);
     }
 
     if (auth.sharedLink && !auth.sharedLink.showExif) {

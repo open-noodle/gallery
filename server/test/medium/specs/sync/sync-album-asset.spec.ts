@@ -336,7 +336,8 @@ describe(SyncRequestType.AlbumAssetsV2, () => {
     // The viewer favorites an asset they don't own — their own stream must reflect it as true.
     await ctx.get(AssetFavoriteRepository).addAll(auth.user.id, [asset.id]);
 
-    const response = await ctx.syncStream(auth, [SyncRequestType.AlbumAssetsV2]);
+    // A Gallery client; a stock one gets upstream's owner-only value (sync-stock-client.spec.ts).
+    const response = await ctx.syncStream(auth, [SyncRequestType.AlbumAssetsV2, SyncRequestType.SharedSpacesV1]);
     expect(response).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

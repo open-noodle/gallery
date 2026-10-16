@@ -128,6 +128,8 @@ IMMICH_S3_SERVE_MODE=proxy
 
 If you change an existing deployment from `proxy` to `redirect`, treat bucket CORS as part of the same rollout.
 
+In `redirect` mode, Gallery still proxies a media request that carries its credential in a header: an API key (`x-api-key`, used by Home Assistant, Immich Kiosk and ImmichFrame), an `Authorization` bearer token, an `x-immich-user-token` or `x-immich-session-token` header, or a shared link key header. Many HTTP clients resend those headers when they follow a redirect to another host, which would hand the credential to your storage provider. Browsers and the mobile apps authenticate with a cookie, which stays on the Gallery host, so they keep the redirect.
+
 ### 4. Configure CORS For Redirect Mode
 
 Redirect mode keeps the bucket private, but browsers still need CORS headers when Gallery loads S3 media directly. Without bucket CORS, normal image viewing may appear to work while editing, face crops, video thumbnails, copy-to-clipboard, or browser canvas operations fail with a CORS error.

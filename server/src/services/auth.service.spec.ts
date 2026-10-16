@@ -362,6 +362,32 @@ describe(AuthService.name, () => {
     });
   });
 
+  const authenticateAs = (headers: Record<string, string>) => {
+    const authUser = factory.authUser();
+    mocks.apiKey.getKey.mockResolvedValue({
+      ...factory.authApiKey({ permissions: [Permission.All] }),
+      user: authUser,
+    });
+    return sut.authenticate({
+      headers: { 'x-api-key': 'my_api_key', ...headers },
+      queryParams: {},
+      metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
+    });
+  };
+
+  describe('authenticate - client class', () => {
+    it('should mark a stock or third-party client', async () => {
+      await expect(authenticateAs({ 'user-agent': 'immich-android/3.3.3' })).resolves.toMatchObject({
+        stockClient: true,
+      });
+    });
+
+    it('should not mark a Gallery client', async () => {
+      const auth = await authenticateAs({ 'x-gallery-app': '5.4.0' });
+      expect(auth.stockClient).toBeUndefined();
+    });
+  });
+
   describe('validate - socket connections', () => {
     it('should throw when token is not provided', async () => {
       await expect(
@@ -393,6 +419,7 @@ describe(AuthService.name, () => {
           metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
         }),
       ).resolves.toEqual({
+        stockClient: true,
         user: sessionWithToken.user,
         session: {
           id: session.id,
@@ -468,7 +495,7 @@ describe(AuthService.name, () => {
           queryParams: {},
           metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
         }),
-      ).resolves.toEqual({ user, sharedLink });
+      ).resolves.toEqual({ stockClient: true, user, sharedLink });
 
       expect(mocks.sharedLink.getByKey).toHaveBeenCalledWith(buffer);
     });
@@ -489,7 +516,7 @@ describe(AuthService.name, () => {
           queryParams: {},
           metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
         }),
-      ).resolves.toEqual({ user, sharedLink });
+      ).resolves.toEqual({ stockClient: true, user, sharedLink });
 
       expect(mocks.sharedLink.getByKey).toHaveBeenCalledWith(buffer);
     });
@@ -521,7 +548,7 @@ describe(AuthService.name, () => {
           queryParams: {},
           metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
         }),
-      ).resolves.toEqual({ user, sharedLink });
+      ).resolves.toEqual({ stockClient: true, user, sharedLink });
 
       expect(mocks.sharedLink.getBySlug).toHaveBeenCalledWith('slug-123');
     });
@@ -560,6 +587,7 @@ describe(AuthService.name, () => {
           metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
         }),
       ).resolves.toEqual({
+        stockClient: true,
         user: sessionWithToken.user,
         session: {
           id: session.id,
@@ -676,7 +704,11 @@ describe(AuthService.name, () => {
         queryParams: {},
         metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test', permission: false },
       });
-      await expect(result).resolves.toEqual({ user: authUser, apiKey: expect.objectContaining(authApiKey) });
+      await expect(result).resolves.toEqual({
+        stockClient: true,
+        user: authUser,
+        apiKey: expect.objectContaining(authApiKey),
+      });
     });
 
     it('should return an auth dto', async () => {
@@ -693,7 +725,7 @@ describe(AuthService.name, () => {
           queryParams: {},
           metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
         }),
-      ).resolves.toEqual({ user: authUser, apiKey: expect.objectContaining(authApiKey) });
+      ).resolves.toEqual({ stockClient: true, user: authUser, apiKey: expect.objectContaining(authApiKey) });
       expect(mocks.apiKey.getKey).toHaveBeenCalledWith(Buffer.from('auth_token (hashed)'));
     });
   });
@@ -2033,6 +2065,7 @@ describe(AuthService.name, () => {
           metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
         }),
       ).resolves.toEqual({
+        stockClient: true,
         user: sessionWithToken.user,
         session: {
           id: session.id,
@@ -2053,7 +2086,7 @@ describe(AuthService.name, () => {
           queryParams: { apiKey: 'my_api_key' },
           metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
         }),
-      ).resolves.toEqual({ user: authUser, apiKey: expect.objectContaining(authApiKey) });
+      ).resolves.toEqual({ stockClient: true, user: authUser, apiKey: expect.objectContaining(authApiKey) });
     });
 
     it('should validate shared link key from query params', async () => {
@@ -2068,7 +2101,7 @@ describe(AuthService.name, () => {
           queryParams: { key: sharedLink.key.toString('base64url') },
           metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
         }),
-      ).resolves.toEqual({ user, sharedLink });
+      ).resolves.toEqual({ stockClient: true, user, sharedLink });
     });
   });
 
@@ -2327,6 +2360,7 @@ describe(AuthService.name, () => {
           metadata: { adminRoute: false, sharedLinkRoute: false, uri: 'test' },
         }),
       ).resolves.toEqual({
+        stockClient: true,
         user: sessionWithToken.user,
         session: {
           id: session.id,

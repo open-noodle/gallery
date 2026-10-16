@@ -8,6 +8,7 @@ import { StorageMigrationController } from 'src/controllers/storage-migration.co
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
 import { GalleryAlbumController } from 'src/gallery/controllers/gallery-album.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
+import { GalleryClusterGroupController } from 'src/gallery/controllers/gallery-cluster-group.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
@@ -57,6 +58,7 @@ export const galleryControllers = [
   FaceSuggestionController,
   GalleryAlbumController,
   GalleryAssetController,
+  GalleryClusterGroupController,
   GalleryMapController,
   GalleryPeopleController,
   LibraryManifestController,

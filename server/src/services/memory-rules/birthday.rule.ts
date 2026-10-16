@@ -7,15 +7,28 @@ export class BirthdayMemoryRule implements MemoryRule {
   readonly id = 'birthday';
 
   constructor(
-    private personRepository: Pick<PersonRepository, 'getBirthdaysForDay'>,
-    private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryAssetsForPerson'>,
+    private personRepository: Pick<PersonRepository, 'forBirthdayMemories'>,
+    private assetRepository: Pick<MemoryRuleAssetRepository, 'getMemoryAssetsForPerson' | 'getPetPersonGroupIds'>,
   ) {}
 
   async evaluate({ ownerId, target }: MemoryRuleContext): Promise<MemoryRuleCandidate[]> {
-    const people = await this.personRepository.getBirthdaysForDay(ownerId, { month: target.month, day: target.day });
+    // Upstream's query, so a 29 February birthday is observed on 28 February in a non-leap year.
+    const people = await this.personRepository.forBirthdayMemories(ownerId, {
+      year: target.year,
+      month: target.month,
+      day: target.day,
+    });
+    const pets =
+      people.length > 0
+        ? await this.assetRepository.getPetPersonGroupIds(people.map(({ personGroupId }) => personGroupId))
+        : new Set<string>();
     const candidates: MemoryRuleCandidate[] = [];
 
     for (const person of people) {
+      if (pets.has(person.personGroupId)) {
+        continue;
+      }
+
       const assets = await this.assetRepository.getMemoryAssetsForPerson(
         ownerId,
         person.personGroupId,

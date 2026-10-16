@@ -530,6 +530,7 @@ describe(TimelineService.name, () => {
     });
 
     it('should pass tagId through to the query', async () => {
+      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-123']));
       const json = `[{ id: ['asset-id'] }]`;
       mocks.asset.getTimeBucket.mockResolvedValue({ assets: json });
 
@@ -977,11 +978,35 @@ describe(TimelineService.name, () => {
     });
 
     it('should accept deprecated tagId and normalize to tagIds', async () => {
+      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1']));
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { tagId: 'tag-1' });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ tagIds: ['tag-1'] }),
         authStub.admin,
+      );
+    });
+
+    // Upstream's TagRead check on the tag page's tagId, widened to the tags the tag explorer lists. The filter
+    // panel's tagIds stay unchecked: they carry partner and album tags, and the query confines them to visible assets.
+    it('should require read access to a tagId', async () => {
+      await expect(sut.getTimeBuckets(authStub.user1, { tagId: 'other-user-tag' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.asset.getTimeBuckets).not.toHaveBeenCalled();
+    });
+
+    it('should accept a tagId the caller reaches through a shared space', async () => {
+      mocks.access.sharedSpace.checkTagAccess.mockResolvedValue(new Set(['space-tag']));
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+      await sut.getTimeBuckets(authStub.user1, { tagId: 'space-tag' });
+      expect(mocks.access.sharedSpace.checkTagAccess).toHaveBeenCalledWith(
+        authStub.user1.user.id,
+        new Set(['space-tag']),
+      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ tagIds: ['space-tag'] }),
+        authStub.user1,
       );
     });
   });

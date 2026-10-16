@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Gallery is a community fork of [Immich](https://github.com/immich-app/immich), a self-hosted photo and video management solution. The fork is currently based on **Immich v3.3.3** and regularly rebased onto upstream. Source package names are still `immich` / `immich-web` so the rebase path stays clean: only branding, Docker image names, and fork-only code diverge.
 
-Fork-specific features layered on top of upstream include: shared spaces, smart search & filters, user groups, S3-compatible storage, auto-classification, video duplicate detection, pet detection, Google Photos import, image editing & video trimming, and structured JSON logging. See `README.md` for the full list and docs links.
+Fork-specific features layered on top of upstream include: shared spaces, smart search & filters, user groups, S3-compatible storage, auto-classification, video duplicate detection, pet detection, Google Photos import, and video trimming. The image editor (crop, rotate, mirror) and JSON logging (`IMMICH_LOG_FORMAT=json`) are Immich's; Gallery adds batch rotation and video trimming to the editor. See `README.md` for the full list and docs links.
 
 It's a monorepo managed with **pnpm workspaces** containing:
 

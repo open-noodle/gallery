@@ -70,6 +70,15 @@ poll() {
   fail "timed out waiting for [$2] to match /$3/, last value '$value'"
 }
 
+# seed_category TOKEN: a Gallery-only setting, as an admin would save it on Gallery.
+seed_category() {
+  local config
+  config=$(api GET /system-config "$1" | jq -c '.classification.categories = [{
+    "name": "Revert Category", "prompts": ["a dog"], "similarity": 0.3, "action": "tag", "enabled": false,
+    "faceExclusion": "off"}]')
+  api PUT /system-config "$1" "$config" >/dev/null
+}
+
 seed() {
   api POST /auth/admin-sign-up '' '{"email":"owner@example.com","password":"password","name":"Owner"}' >/dev/null
   local owner member owner_id member_id
@@ -198,6 +207,8 @@ seed() {
     "{\"trigger\":\"AssetCreate\",\"name\":\"Round trip\",\"steps\":[{\"method\":\"gallery-core#addToSpace\",\"config\":{\"spaceIds\":[\"$space\"]}}]}" \
     >/dev/null
 
+  seed_category "$owner"
+
   # The same stock request against Gallery itself: the gating, not the revert, keeps these out.
   failed=0
   stock_sync_checks seed "$owner"
@@ -308,6 +319,33 @@ stock_assert() {
   done
   check stock 'a job in a Gallery-only queue stays queued' "$(docker exec redis valkey-cli LLEN immich_bull:classification:wait)" 1
 
+  # What the guide's trial caveats say, so they stay true. A stock mobile app gets the rule memory and
+  # the pet ("stops syncing", "pets show up as people").
+  stock_sync_checks stock "$owner" true
+
+  # Person sharing fails on Gallery's person_personGroupId_key index (stock logs no constraint name, so
+  # a 200 here is what shows the index is gone). Sharing needs both users in one
+  # cluster group, which Gallery cannot set up, so the member joins the owner's for this request only.
+  local member_id member_cluster human_group
+  member_id=$(psql_q "SELECT id FROM \"user\" WHERE email = 'member@example.com'")
+  member_cluster=$(psql_q "SELECT \"clusterGroupId\" FROM \"user\" WHERE id = '$member_id'")
+  human_group=$(psql_q "SELECT \"personGroupId\" FROM person WHERE name = 'Revert Human'")
+  psql_q "UPDATE \"user\" SET \"clusterGroupId\" = (SELECT \"clusterGroupId\" FROM \"user\" WHERE id = '$OWNER_ID')
+    WHERE id = '$member_id'" >/dev/null
+  check stock 'person sharing fails with a server error' "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$API/people/users" \
+    -H "Authorization: Bearer $owner" -H 'Content-Type: application/json' \
+    --data "{\"personIds\":[\"$human_group\"],\"sharedWithIds\":[\"$member_id\"],\"role\":\"read\"}")" 500
+  check stock 'failed person sharing saved nothing' "$(psql_q "SELECT count(*) FROM person_user")" 0
+  psql_q "UPDATE \"user\" SET \"clusterGroupId\" = '$member_cluster' WHERE id = '$member_id'" >/dev/null
+
+  # A settings save keeps only the settings stock knows, so Gallery's classification category goes.
+  # Last here: nothing above depends on the config, and gallery-assert checks the loss.
+  local config
+  config=$(api GET /system-config "$owner")
+  api PUT /system-config "$owner" "$config" >/dev/null
+  check stock 'a settings save drops the Gallery settings' \
+    "$(psql_q "SELECT coalesce(bool_or(value ? 'classification'), false) FROM system_metadata WHERE key = 'system-config'")" f
+
   [ "$failed" = 0 ] || exit 1
   echo "::notice::stock: Immich serves the owner on the Gallery database"
 }
@@ -341,6 +379,10 @@ gallery_assert() {
   check gallery 'plugin workflow step kept' "$(psql_q "
     SELECT count(*) FROM workflow_step s JOIN plugin_method m ON m.id = s.\"pluginMethodId\"
       JOIN plugin p ON p.id = m.\"pluginId\" WHERE p.name = 'gallery-core'")" 1
+  # The guide's caveat: the stock settings save erased it. Saved again, for the revert to strip.
+  check gallery 'classification category lost to the stock settings save' \
+    "$(api GET /system-config "$owner" | jq '.classification.categories | length')" 0
+  seed_category "$owner"
 
   # The workflow runs again: a new upload lands in the space through the Gallery plugin.
   local uploaded
@@ -373,18 +415,20 @@ check() {
   fi
 }
 
-# stock_sync_checks PHASE TOKEN: what a stock mobile app would receive. The server streams whatever it
-# sends; the stock app is what fails to decode a value its enums lack. So check the rows themselves.
+# stock_sync_checks PHASE TOKEN [LEAKS]: what a stock mobile app would receive. The server streams
+# whatever it sends; the stock app is what fails to decode a value its enums lack. So check the rows
+# themselves. LEAKS is true for stock Immich on the unreverted database, which sends both.
 stock_sync_checks() {
-  local phase=$1 body
+  local phase=$1 leaks=${3:-false} body
   body=$(curl -fsS --max-time 120 -X POST "$API/sync/stream" -H "Authorization: Bearer $2" \
     -H 'Content-Type: application/json' --data "{\"types\":${SYNC_TYPES:?}}") || {
     echo "::error::$phase: stock /sync/stream request failed"
     failed=1
   }
   check "$phase" 'sync stream completes' "$(jq -r .type <<<"$body" | tail -n1)" SyncCompleteV1
-  check "$phase" 'sync sends no rule memory' "$(jq -c 'select((.type | startswith("MemoryV")) and .data.type == "rule")' <<<"$body")" ''
-  check "$phase" 'sync sends no pet' "$(jq -c 'select(.type == "PersonV1" and .data.name == "Revert Pet")' <<<"$body")" ''
+  check "$phase" 'sync sends a rule memory' \
+    "$(jq -s 'any(.[]; (.type | startswith("MemoryV")) and .data.type == "rule")' <<<"$body")" "$leaks"
+  check "$phase" 'sync sends the pet' "$(jq -s 'any(.[]; .type == "PersonV1" and .data.name == "Revert Pet")' <<<"$body")" "$leaks"
 }
 
 # shellcheck disable=SC2153 # vars come from the sourced $STATE file
@@ -426,6 +470,10 @@ assert() {
   check assert "space album link to the owner's album kept" "$(status GET "/shared-links/me?key=$OWNER_ALBUM_LINK")" 200
   check assert "space album link to an album the owner edits kept" "$(status GET "/shared-links/me?key=$EDITOR_ALBUM_LINK")" 200
   check assert "space album link to an album the owner only views removed" "$(status GET "/shared-links/me?key=$VIEWER_ALBUM_LINK")" 401
+
+  check assert 'Gallery settings stripped' \
+    "$(psql_q "SELECT coalesce(bool_or(value ? 'classification'), false) FROM system_metadata WHERE key = 'system-config'")" f
+  check assert 'stock finds no unknown config keys' "$(docker logs server 2>&1 | grep -c 'Unknown keys found' || true)" 0
 
   stock_sync_checks assert "$owner"
 

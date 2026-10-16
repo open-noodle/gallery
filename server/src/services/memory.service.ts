@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { shuffle } from 'lodash-es';
 import { DateTime } from 'luxon';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
@@ -17,6 +17,7 @@ import {
   mapMemory,
 } from 'src/dtos/memory.dto.js';
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum.js';
+import { GallerySyncStreams } from 'src/gallery/utils/gallery-sync.streams.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import {
@@ -550,7 +551,10 @@ export class MemoryService extends BaseService {
     const availableTypes = getAdminAvailableMemoryTypeKeys(config.memories);
     const userTypes = getPreferences((await this.userRepository.getMetadata(auth.user.id)) ?? []).memories.types;
 
+    // Gallery: a stock or third-party client gets only the memory types it can decode, as on sync.
+    const clientTypes = GallerySyncStreams.syncedMemoryTypes(!auth.stockClient);
     return memories
+      .filter((memory) => clientTypes.includes(memory.type))
       .filter((memory) => this.isMemoryTypeVisible(memory, availableTypes, userTypes))
       .map((memory) => ({
         ...memory,
@@ -586,12 +590,20 @@ export class MemoryService extends BaseService {
   }
 
   statistics(auth: AuthDto, dto: MemorySearchDto) {
-    return this.memoryRepository.statisticsAccessible(auth.user.id, dto);
+    return this.memoryRepository.statisticsAccessible(
+      auth.user.id,
+      dto,
+      GallerySyncStreams.syncedMemoryTypes(!auth.stockClient),
+    );
   }
 
   async get(auth: AuthDto, id: string): Promise<MemoryResponseDto> {
     await this.requireAccess({ auth, permission: Permission.MemoryRead, ids: [id] });
     const memory = await this.findOrFail(auth, id);
+    // Gallery: a stock client cannot decode a rule memory. Gallery clients keep reading any type by id.
+    if (auth.stockClient && !GallerySyncStreams.syncedMemoryTypes(false).includes(memory.type)) {
+      throw new BadRequestException('Memory not found');
+    }
     return mapMemory(memory, auth);
   }
 

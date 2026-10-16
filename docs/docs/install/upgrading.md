@@ -44,6 +44,12 @@ Downgrading is not supported in general: an earlier release does not know the da
 
 An earlier Gallery release refuses to start on a database that has Gallery migrations it does not ship. Undo those migrations first, with the release you are leaving, which is the one that knows how to undo them. Each step moves its data back to where the earlier release keeps it, so nothing the earlier release can show is lost. Data for features the earlier release does not have goes with the step that undoes them: going back to a 5.7 release drops favorites set by anyone other than the asset's owner, and the record of who added each face. The procedure was tested going back to `v5.8.0-rc.1` and upgrading again; going back to 5.7 was not tested.
 
+Three older Gallery migrations do not move their data back, so going back to a release from before one of them loses that data:
+
+- `1778000000000-MoveClassificationToConfig`: the classification categories. Undoing it recreates the old classification tables empty and removes the categories from the settings.
+- `1777000000000-AdminScopedClassification`: the owner and tag of each classification category, which come back empty.
+- `1775100000000-DropSpacePersonThumbnailPath`: the thumbnail of each space person, whose path comes back empty.
+
 1. Back up your database.
 2. Stop the stack with `docker compose down`, and keep the current image in your compose file for now.
 3. Find the newest Gallery migration the earlier release ships, for example for `v5.8.0-rc.1`:

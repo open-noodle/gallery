@@ -3,6 +3,7 @@ import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import {
+  sharedWithViewer,
   spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceVisibilityGate,
@@ -476,5 +477,24 @@ export class SharedSpaceAccess {
       .where('shared_space_member.userId', '=', userId)
       .execute()
       .then((rows) => new Set(rows.map((row) => row.spaceId)));
+  }
+
+  /** Tags on an asset shared with the user through a space: the non-owned half of TagRepository.getAll. */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkTagAccess(userId: string, tagIds: Set<string>) {
+    if (tagIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('tag_asset')
+      .innerJoin('asset', 'asset.id', 'tag_asset.assetId')
+      .select('tag_asset.tagId')
+      .distinct()
+      .where('tag_asset.tagId', 'in', [...tagIds])
+      .where((eb) => sharedWithViewer(eb, { scope: { memberUserId: userId }, albumTimelineGate: 'none' }))
+      .execute()
+      .then((rows) => new Set(rows.map((row) => row.tagId)));
   }
 }

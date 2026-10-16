@@ -82,7 +82,7 @@ Immich's AI covers faces and basic CLIP search. Pets go undetected, memories sho
 
 Trimming a video means exporting it to another tool. Moving off Google Photos needs CLI scripts. Storage is local disk or external libraries, with no native S3 backend, and a large existing library can't be linked into a shared collection.
 
-- [Image Editing](https://opennoodle.de/features/image-editing) rotates and crops from the asset viewer, and rotates in batches. Nothing is destructive: originals are always preserved. ([Docs](https://docs.opennoodle.de/features/editing))
+- [Image Editing](https://opennoodle.de/features/image-editing) adds batch rotation of a timeline selection to Immich's own non-destructive editor, which rotates, crops and mirrors in the asset viewer. ([Docs](https://docs.opennoodle.de/features/editing))
 - [Video Trimming](https://opennoodle.de/features/video-trimming) cuts clips in the browser. FFmpeg stream copy makes it instant and lossless, and you can restore the original at any time. ([Docs](https://docs.opennoodle.de/features/editing))
 - [Connected Libraries](https://opennoodle.de/features/connected-libraries) link external photo libraries into Shared Spaces, with no file duplication and originals left untouched. ([Docs](https://docs.opennoodle.de/features/libraries))
 - [Google Photos Import](https://opennoodle.de/features/google-photos-import) is a guided in-browser wizard for Takeout archives. It keeps dates, GPS, descriptions and album structure, and needs no CLI. ([Docs](https://docs.opennoodle.de/features/google-photos-import))
@@ -94,10 +94,6 @@ Filtering the timeline in the Immich mobile app means switching to a separate ta
 
 - [Photos Filtering on Mobile](https://opennoodle.de/features/mobile-photos-filtering) filters the timeline from a bottom sheet by people, places, tags, dates, rating and media type, without leaving the grid.
 - [iPhone](https://opennoodle.de/features/ios-app) and [Android](https://opennoodle.de/features/android-app) apps are on the [App Store](https://apps.apple.com/us/app/noodle-gallery/id6761776289) and [Google Play](https://play.google.com/store/apps/details?id=de.opennoodle.gallery), with background camera backup, on-device CLIP search, the map and Shared Spaces. They talk straight to your own server. ([Docs](https://docs.opennoodle.de/features/mobile-app))
-
-### Operations
-
-- Structured JSON logging: opt-in JSON log output (`IMMICH_LOG_FORMAT=json`) that feeds log aggregators like Grafana Loki, the ELK Stack, Datadog or Splunk.
 
 ---
 
@@ -234,7 +230,7 @@ That's it. To switch back to upstream Immich later, flip the two image names bac
 | **Video Duplicate Detection**                | No     | Yes |
 | **Pet Detection**                            | Yes    | Yes |
 | **Google Photos Import**                     | No     | Yes |
-| **Image Editing & Video Trimming**           | No     | Yes |
+| Image Editing & **Video Trimming**           | No     | Yes |
 | **S3-Compatible Storage**                    | Yes    | Yes |
 
 ## Translations

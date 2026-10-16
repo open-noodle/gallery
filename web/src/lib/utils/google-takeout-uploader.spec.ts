@@ -20,6 +20,10 @@ vi.mock('$lib/utils/album-utils', () => ({
   createAlbum: vi.fn(),
 }));
 
+vi.mock('$lib/utils/file-uploader', () => ({
+  hashFile: vi.fn(),
+}));
+
 function makeItem(overrides: Partial<TakeoutMediaItem> = {}): TakeoutMediaItem {
   const file = new File(['fake-image-data'], 'IMG_001.jpg', {
     type: 'image/jpeg',
@@ -58,6 +62,7 @@ describe('uploadTakeoutItem', () => {
   let uploadTakeoutItem: typeof import('$lib/utils/google-takeout-uploader').uploadTakeoutItem;
   let sdkMock: typeof import('@immich/sdk');
   let utilsMock: { uploadRequest: ReturnType<typeof vi.fn> };
+  let hashFileMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -65,6 +70,9 @@ describe('uploadTakeoutItem', () => {
     uploadTakeoutItem = mod.uploadTakeoutItem;
     sdkMock = await import('@immich/sdk');
     utilsMock = (await import('$lib/utils')) as unknown as typeof utilsMock;
+    const fileUploader = await import('$lib/utils/file-uploader');
+    hashFileMock = vi.mocked(fileUploader.hashFile);
+    hashFileMock.mockResolvedValue('b2953b8e364061cea5600e64ec5049d63f08efbe');
 
     // Default: checkBulkUpload accepts the asset (no duplicate)
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
@@ -157,7 +165,7 @@ describe('uploadTakeoutItem', () => {
     expect(await uploadedFile.text()).toBe('lazy-bytes');
   });
 
-  it('hashes lazy file bytes for duplicate checks at upload time', async () => {
+  it('hashes lazy file bytes in the upload hash worker for duplicate checks', async () => {
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
       results: [
         {
@@ -177,6 +185,7 @@ describe('uploadTakeoutItem', () => {
     const result = await uploadTakeoutItem(item, defaultOptions());
 
     expect(getFile).toHaveBeenCalledOnce();
+    expect(hashFileMock).toHaveBeenCalledWith(await getFile.mock.results[0].value);
     expect(sdkMock.checkBulkUpload).toHaveBeenCalledWith({
       assetBulkUploadCheckDto: {
         assets: [{ id: 'IMG_001.jpg', checksum: 'b2953b8e364061cea5600e64ec5049d63f08efbe' }],

@@ -338,6 +338,8 @@ features:
       - web/src/lib/gallery/client-header*.ts
       - mobile/lib/gallery/gallery_app_header.dart
       - mobile/test/gallery/gallery_app_header_test.dart
+      - e2e/src/gallery-client.ts
+      - e2e/src/specs/server/api/stock-client.e2e-spec.ts
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts
@@ -487,6 +489,7 @@ features:
         - server/src/schema/migrations-gallery/1798700000000-AddPersonPetTable.ts
         - server/src/schema/migrations-gallery/1798800000000-RestoreAssetIsFavoriteProjection.ts
         - server/src/schema/migrations-gallery/1798900000000-MoveVideoTrimToSidecar.ts
+        - server/src/schema/migrations-gallery/1799400000000-ScopeJitOffToDatabase.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:

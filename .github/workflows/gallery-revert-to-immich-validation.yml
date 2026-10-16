@@ -60,6 +60,7 @@ on:
       - 'packages/plugin-gallery/**'
       - '.github/workflows/gallery-revert-to-immich-validation.yml'
       - '.github/scripts/revert-to-immich-data.sh'
+      - 'docs/docs/guides/switch-back-to-immich.md'
 
 concurrency:
   group: gallery-revert-to-immich-validation
@@ -140,14 +141,15 @@ jobs:
           done < <(sed -n '/^DELETE FROM "kysely_migrations"/,/^ *);/p' scripts/revert-to-immich.sql |
             grep -oE "'[0-9]+-[A-Za-z0-9_.]+'" | tr -d "'" | sort -u)
 
-          # Fork-only enum values stored in upstream tables: Permission in api_key.permissions and
-          # SystemMetadataKey rows in system_metadata. The revert prunes each by literal value.
+          # Fork-only enum values stored in upstream tables: Permission in api_key.permissions,
+          # SystemMetadataKey rows in system_metadata and SyncEntityType rows in
+          # session_sync_checkpoint. The revert prunes each by literal value.
           # The "Run validation" step reads the same file for the stock sync request types.
           upstream_enum=$RUNNER_TEMP/upstream-enum.ts
           gh api -H 'Accept: application/vnd.github.raw' \
             "repos/immich-app/immich/contents/server/src/enum.ts?ref=${UPSTREAM_TAG}" > "$upstream_enum"
           enum_values() { awk "/^export enum $1 \\{/,/^\\}/" "$2" | grep -oE "= '[^']+'" | sed "s/^= '//; s/'\$//" | sort -u; }
-          for enum in Permission SystemMetadataKey; do
+          for enum in Permission SystemMetadataKey SyncEntityType; do
             while IFS= read -r value; do
               if ! grep -qF "'${value}'" scripts/revert-to-immich.sql; then
                 echo "::error file=scripts/revert-to-immich.sql::Gallery-only ${enum} value '${value}' is not removed by the revert"
@@ -155,6 +157,15 @@ jobs:
               fi
             done < <(comm -23 <(enum_values "$enum" server/src/enum.ts) <(enum_values "$enum" "$upstream_enum"))
           done
+
+          # The switch-back guide names the Immich release to pin. Any Immich version it names (major
+          # below 5; Gallery's own start at 5) must be the one this build is based on.
+          while IFS=: read -r line version; do
+            if [ "$version" != "$UPSTREAM_TAG" ]; then
+              echo "::error file=docs/docs/guides/switch-back-to-immich.md,line=${line}::Names Immich ${version}, but upstream.version is ${UPSTREAM_TAG}"
+              missing=1
+            fi
+          done < <(grep -noE '\bv[0-4]\.[0-9]+\.[0-9]+\b' docs/docs/guides/switch-back-to-immich.md || true)
 
           exit "$missing"
 

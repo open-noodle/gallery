@@ -207,6 +207,19 @@ describe('S3StorageBackend', () => {
       expect(getSignedUrl).toHaveBeenCalledTimes(200);
     });
 
+    it('should stream instead of redirecting when the caller asks for the proxy path', async () => {
+      mockSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('proxied')]), ContentLength: 7 });
+
+      const strategy = await backend.getServeStrategy('key.jpg', {
+        contentType: 'image/jpeg',
+        cacheControl: CacheControl.PrivateWithCache,
+        proxy: true,
+      });
+
+      expect(strategy.type).toBe('stream');
+      expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+
     it('should return stream when serveMode is proxy', async () => {
       const proxyBackend = new S3StorageBackend({
         bucket: 'test-bucket',

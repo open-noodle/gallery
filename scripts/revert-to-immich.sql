@@ -17,7 +17,9 @@
 --     activity, audit trail
 --   * User groups and their memberships
 --   * Classification categories and prompts (including the merged copy in
---     system_metadata's system-config row — that key is stripped too)
+--     system_metadata's system-config row)
+--   * Every Gallery setting in system-config and Gallery's per-type memory
+--     switches in user preferences
 --   * Pet detection results: every pet, its faces and its embeddings
 --   * Rule memories (Immich only knows on-this-day and birthday memories)
 --   * Video trims: the full-length video comes back and the trimmed copy is
@@ -277,6 +279,29 @@ UPDATE "api_key" k
  WHERE kept."id" = k."id"
    AND kept."permissions" <> k."permissions";
 
+-- Sync checkpoints for Gallery's sync streams (Gallery's SyncEntityType values
+-- minus Immich's). Immich never reads them; they would stay in its table forever.
+DELETE FROM "session_sync_checkpoint"
+ WHERE "type" IN (
+    'AssetFavoriteDeleteV1', 'AssetFavoriteV1', 'LibraryAssetBackfillV1', 'LibraryAssetCreateV1',
+    'LibraryAssetDeleteV1', 'LibraryAssetExifBackfillV1', 'LibraryAssetExifCreateV1',
+    'LibraryDeleteV1', 'LibraryV1', 'SharedSpaceAlbumAssetBackfillV1',
+    'SharedSpaceAlbumAssetCreateV1', 'SharedSpaceAlbumAssetExifBackfillV1',
+    'SharedSpaceAlbumAssetExifCreateV1', 'SharedSpaceAlbumAssetExifUpdateV1',
+    'SharedSpaceAlbumAssetUpdateV1', 'SharedSpaceAlbumBackfillV1', 'SharedSpaceAlbumDeleteV1',
+    'SharedSpaceAlbumFolderBackfillV1', 'SharedSpaceAlbumFolderDeleteV1',
+    'SharedSpaceAlbumFolderV1', 'SharedSpaceAlbumHiddenBackfillV1',
+    'SharedSpaceAlbumHiddenDeleteV1', 'SharedSpaceAlbumHiddenV1', 'SharedSpaceAlbumLinkBackfillV1',
+    'SharedSpaceAlbumLinkDeleteV1', 'SharedSpaceAlbumLinkV1', 'SharedSpaceAlbumToAssetBackfillV1',
+    'SharedSpaceAlbumToAssetDeleteV1', 'SharedSpaceAlbumToAssetV1', 'SharedSpaceAlbumV1',
+    'SharedSpaceAssetBackfillV1', 'SharedSpaceAssetCreateV1', 'SharedSpaceAssetExifBackfillV1',
+    'SharedSpaceAssetExifCreateV1', 'SharedSpaceAssetExifUpdateV1', 'SharedSpaceAssetUpdateV1',
+    'SharedSpaceDeleteV1', 'SharedSpaceLibraryBackfillV1', 'SharedSpaceLibraryDeleteV1',
+    'SharedSpaceLibraryV1', 'SharedSpaceMemberBackfillV1', 'SharedSpaceMemberDeleteV1',
+    'SharedSpaceMemberV1', 'SharedSpaceToAssetBackfillV1', 'SharedSpaceToAssetDeleteV1',
+    'SharedSpaceToAssetV1', 'SharedSpaceV1'
+ );
+
 -- -----------------------------------------------------------------------------
 -- 1. Drop Gallery-only triggers on Immich-native tables.
 --
@@ -478,13 +503,39 @@ DROP INDEX IF EXISTS "asset_face_createdBy_idx";
 ALTER TABLE "asset_face"        DROP COLUMN IF EXISTS "createdBy";
 
 -- -----------------------------------------------------------------------------
--- 5. Strip Gallery's merged 'classification' key out of system_metadata's
---    system-config row (added by migration 1778000000000).
+-- 5. Strip Gallery's settings out of system_metadata's system-config row and
+--    out of each user's preferences.
+--
+-- Stock Immich warns about every unknown key in system-config on each config
+-- load, until an admin next saves the settings. The list is every fork path in
+-- the config DTO (server/src/gallery/dtos/config.dto.ts and its spreads in
+-- server/src/dtos/config.dto.ts); revert-to-immich.spec.ts fails until a new
+-- one is added here. 'classification' holds the categories that migration
+-- 1778000000000 merged in from the dropped classification tables.
 -- -----------------------------------------------------------------------------
 UPDATE "system_metadata"
-   SET "value" = "value" - 'classification'
- WHERE "key" = 'system-config'
-   AND "value" ? 'classification';
+   SET "value" = "value"
+     #- '{classification}'
+     #- '{memories}'
+     #- '{storageUsage}'
+     #- '{job,peopleBackfill}'
+     #- '{job,petDetection}'
+     #- '{job,classification}'
+     #- '{machineLearning,clip,maxDistance}'
+     #- '{machineLearning,petDetection}'
+     #- '{machineLearning,petRecognition}'
+     #- '{machineLearning,facialRecognition,suggestions}'
+     #- '{machineLearning,facialRecognition,suggestionMaxDistance}'
+     #- '{nightlyTasks,clusterNewPets}'
+     #- '{server,mergePeopleAcrossOwners}'
+ WHERE "key" = 'system-config';
+
+-- Gallery's per-type memory switches (memories.types), which Immich's
+-- preferences do not have.
+UPDATE "user_metadata"
+   SET "value" = "value" #- '{memories,types}'
+ WHERE "key" = 'preferences'
+   AND "value" #> '{memories,types}' IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
 -- 6. Delete Gallery-added rows from migration_overrides.
@@ -645,7 +696,7 @@ END $$;
 
 -- 1782000000000-AddAssetExifDescriptionTrigramIndex added a fork-only GIN
 -- trigram index on asset_exif.description (for timeline description filtering)
--- that v2.7.5 does not have, plus its migration_overrides registration row.
+-- that upstream Immich does not have, plus its migration_overrides registration row.
 DROP INDEX IF EXISTS "idx_asset_exif_description_trigram";
 DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_description_trigram';
 
@@ -653,15 +704,36 @@ DELETE FROM "migration_overrides" WHERE "name" = 'index_idx_asset_exif_descripti
 -- asset."localDateTime" for the filter panel's taken range.
 DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 
--- 1783628194057-DisablePostgresJit set jit=off on the application role. Restore
--- the PostgreSQL default so the reverted database carries no Gallery-specific
--- planner tuning.
-ALTER ROLE CURRENT_USER RESET jit;
+-- jit=off: restore the PostgreSQL default so the reverted database carries no
+-- Gallery-specific planner tuning. 1799400000000-ScopeJitOffToDatabase keeps the
+-- setting on this database. Before it, 1783628194057-DisablePostgresJit set it on
+-- the application role, which only that role can reset here; on such a database
+-- this resets the role running the script, so run it as the application role.
+-- ALTER DATABASE needs the database owner or a superuser. Without that privilege
+-- 1799400000000 also left the setting on the role, so the role is reset instead.
+DO $$
+DECLARE
+  database_reset boolean := true;
+BEGIN
+  BEGIN
+    EXECUTE format('ALTER DATABASE %I RESET jit', current_database());
+  EXCEPTION WHEN insufficient_privilege THEN
+    database_reset := false;
+    RAISE WARNING 'jit stays as set on database %: % cannot alter it', current_database(), CURRENT_USER;
+  END;
+  IF NOT database_reset
+     OR to_regclass('public.gallery_migrations') IS NULL
+     OR NOT EXISTS (SELECT FROM "gallery_migrations" WHERE "name" = '1799400000000-ScopeJitOffToDatabase')
+  THEN
+    EXECUTE 'ALTER ROLE CURRENT_USER RESET jit';
+  END IF;
+END $$;
 
 -- No post-tag upstream migration needs reversing right now. `upstream.version` is
--- 3.3.1 and this branch's `server/src/schema/migrations/` is identical to upstream
--- v3.3.1's (same 100 files, unchanged from v3.3.0), so every upstream migration Gallery
--- carries is one the tagged release also ships. The 3.3.0 -> 3.3.1 bump removed nothing.
+-- 3.3.3 and this branch's `server/src/schema/migrations/` is identical to upstream
+-- v3.3.3's (same 100 files, unchanged from v3.3.0), so every upstream migration Gallery
+-- carries is one the tagged release also ships. The 3.3.0 -> 3.3.1 and 3.3.1 -> 3.3.3
+-- bumps removed nothing.
 -- The 3.2.4 -> 3.3.0 bump removed four more entries, for the
 -- same reason as below: 1789419229196-ConvertUserOAuthIdEmptyStringToNull,
 -- 1790587508209-RenameGeoNamesCountries, 1790616293884-PersonSharing and
@@ -799,6 +871,7 @@ DELETE FROM "kysely_migrations"
   '1798700000000-AddPersonPetTable',
   '1798800000000-RestoreAssetIsFavoriteProjection',
   '1798900000000-MoveVideoTrimToSidecar',
+  '1799400000000-ScopeJitOffToDatabase',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -826,7 +899,7 @@ DELETE FROM "kysely_migrations"
 
    -- Post-tag upstream migrations pulled in by rebase would follow here, paired with
    -- schema rollbacks in step 7 and kept timestamp-sorted. None right now:
-   -- `upstream.version` is 3.3.1 and every upstream migration this branch carries ships
+   -- `upstream.version` is 3.3.3 and every upstream migration this branch carries ships
    -- in that tag (see step 7).
  );
 

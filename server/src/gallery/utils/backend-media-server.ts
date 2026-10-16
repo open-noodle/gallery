@@ -1,15 +1,17 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { CLS_REQ, ClsServiceManager } from 'nestjs-cls';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Request } from 'express';
 import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
+import { AssetFileType, CacheControl, ImageFormat, ImmichHeader } from 'src/enum.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
@@ -23,6 +25,23 @@ import {
   getResponseSignal,
 } from 'src/utils/file.js';
 import { clamp } from 'src/utils/misc.js';
+
+// HTTP clients resend custom headers (and some resend Authorization) when they follow a redirect to another host, so a
+// request carrying its credential in one of these is proxied instead of redirected to the storage host. Cookies are
+// host-scoped and query credentials are not part of the presigned URL, so browsers and the apps keep the redirect.
+const CREDENTIAL_HEADERS = [
+  'authorization',
+  ImmichHeader.ApiKey,
+  ImmichHeader.UserToken,
+  ImmichHeader.SessionToken,
+  ImmichHeader.SharedLinkKey,
+  ImmichHeader.SharedLinkSlug,
+];
+
+const sendsHeaderCredential = () => {
+  const headers = ClsServiceManager.getClsService().get<Request | undefined>(CLS_REQ)?.headers;
+  return !!headers && CREDENTIAL_HEADERS.some((header) => headers[header]);
+};
 
 type FaceThumbnailBounds = {
   x1: number;
@@ -70,6 +89,7 @@ export class BackendMediaServer {
         disposition,
         range: options.range,
         signal: getResponseSignal(),
+        ...(sendsHeaderCredential() && { proxy: true }),
       });
     } catch (error) {
       if (error instanceof RangeNotSatisfiableError) {
