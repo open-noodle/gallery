@@ -4767,4 +4767,24 @@ export class SharedSpaceService extends BaseService {
       await this.enqueueSpaceFaceProjectionReconcile(faceEnabledSpaceIds);
     }
   }
+
+  // LibraryService.handleSyncFiles: queue face match for spaces linked to the library. Errors propagate, so a failure
+  // fails the sync job as it did when this ran inline.
+  @OnEvent({ name: 'LibraryAssetsCreate' })
+  async onLibraryAssetsCreate({ libraryId, assetIds }: ArgOf<'LibraryAssetsCreate'>): Promise<void> {
+    if (assetIds.length === 0) {
+      return;
+    }
+    const linkedSpaces = await this.sharedSpaceRepository.getSpacesLinkedToLibrary(libraryId);
+    for (const link of linkedSpaces) {
+      if (link.faceRecognitionEnabled) {
+        for (const assetId of assetIds) {
+          await this.jobRepository.queue({
+            name: JobName.SharedSpaceFaceMatch,
+            data: { spaceId: link.spaceId, assetId },
+          });
+        }
+      }
+    }
+  }
 }

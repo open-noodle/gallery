@@ -13730,6 +13730,110 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('onLibraryAssetsCreate', () => {
+    it('should queue face match jobs for spaces linked to the library', async () => {
+      const libraryId = newUuid();
+      const spaceId = newUuid();
+      const assetId = newUuid();
+      mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([
+        {
+          spaceId,
+          libraryId,
+          addedById: null,
+          createdAt: newDate(),
+          updatedAt: newDate(),
+          createId: newUuid(),
+          updateId: newUuid(),
+          faceRecognitionEnabled: true,
+        },
+      ]);
+
+      await sut.onLibraryAssetsCreate({ libraryId, assetIds: [assetId] });
+
+      expect(mocks.sharedSpace.getSpacesLinkedToLibrary).toHaveBeenCalledWith(libraryId);
+      expect(mocks.job.queue).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId },
+      });
+    });
+
+    it('should queue jobs for multiple spaces if library is linked to more than one', async () => {
+      const libraryId = newUuid();
+      const space1 = newUuid();
+      const space2 = newUuid();
+      const assetId = newUuid();
+      mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([
+        {
+          spaceId: space1,
+          libraryId,
+          addedById: null,
+          createdAt: newDate(),
+          updatedAt: newDate(),
+          createId: newUuid(),
+          updateId: newUuid(),
+          faceRecognitionEnabled: true,
+        },
+        {
+          spaceId: space2,
+          libraryId,
+          addedById: null,
+          createdAt: newDate(),
+          updatedAt: newDate(),
+          createId: newUuid(),
+          updateId: newUuid(),
+          faceRecognitionEnabled: true,
+        },
+      ]);
+
+      await sut.onLibraryAssetsCreate({ libraryId, assetIds: [assetId] });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId: space1, assetId },
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId: space2, assetId },
+      });
+    });
+
+    it('should not queue face match jobs when library is not linked to any space', async () => {
+      mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([]);
+
+      await sut.onLibraryAssetsCreate({ libraryId: newUuid(), assetIds: [newUuid()] });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should not queue face match jobs when linked space has face recognition disabled', async () => {
+      const libraryId = newUuid();
+      mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([
+        {
+          spaceId: newUuid(),
+          libraryId,
+          addedById: null,
+          createdAt: newDate(),
+          updatedAt: newDate(),
+          createId: newUuid(),
+          updateId: newUuid(),
+          faceRecognitionEnabled: false,
+        },
+      ]);
+
+      await sut.onLibraryAssetsCreate({ libraryId, assetIds: [newUuid()] });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing when the import has no new assets', async () => {
+      await sut.onLibraryAssetsCreate({ libraryId: newUuid(), assetIds: [] });
+
+      expect(mocks.sharedSpace.getSpacesLinkedToLibrary).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+  });
+
   describe('onAlbumAssetsRemove', () => {
     it('removes orphaned faces + persons and queues metadata backfill', async () => {
       const albumId = newUuid();
