@@ -89,6 +89,8 @@ features:
       - server/src/gallery/dtos/shared-link.dto.ts
       - server/src/gallery/database.ts
       - server/src/gallery/types.ts
+      - web/src/lib/gallery/viewer-space.ts
+      - web/src/lib/gallery/viewer-space.test-helpers.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
