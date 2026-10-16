@@ -3840,7 +3840,7 @@ export class SharedSpaceService extends BaseService {
     this.logger.log(`Dedup pass ${pass} for space ${job.spaceId} complete: ${passMerges} merges`);
 
     // Re-queue a fresh, short follow-up pass while merges are still happening, capped to avoid a
-    // runaway chain. The follow-up uses a pass-scoped jobId (see job.repository getJobOptions) so it
+    // runaway chain. The follow-up uses a pass-scoped jobId (see QueueMaintenanceRepository.getJobOptions) so it
     // enqueues even though this job is still "active".
     if (mergedAny) {
       if (pass < SHARED_SPACE_DEDUP_MAX_PASSES) {
