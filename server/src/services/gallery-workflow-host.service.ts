@@ -21,6 +21,13 @@ const AddToSpaceAlbumArgs = z.object({
 
 const GALLERY_PLUGIN = 'gallery-core';
 
+/**
+ * Enabled gallery-core plugin ids, read once per process: keyed by the repository, a per-process singleton.
+ * Upstream reads `enabled` only in getForLoad at boot, so a disabled gallery-core is never loaded and its
+ * steps fall through to callMethod, which fails the run as it does for any unloaded plugin.
+ */
+const enabledGalleryPluginIds = new WeakMap<object, Promise<Set<string>>>();
+
 type GalleryHandler = (auth: AuthDto, args: unknown) => Promise<GalleryDispatchResult>;
 
 /** Returned by `runGuarded` when an expected, user-fixable failure was swallowed. */
@@ -80,8 +87,6 @@ export class GalleryWorkflowHostService extends BaseService {
     return Object.keys(this.handlers);
   }
 
-  private galleryPluginId?: Promise<string | undefined>;
-
   /**
    * Runs a `gallery-core` workflow step in TypeScript and returns true; returns false for any other
    * plugin's step, which upstream's execute loop then sends to WASM. The plugin's own exports are
@@ -96,8 +101,18 @@ export class GalleryWorkflowHostService extends BaseService {
       return false;
     }
 
-    this.galleryPluginId ??= this.pluginRepository.getByName(GALLERY_PLUGIN).then((plugin) => plugin?.id);
-    if (step.pluginId !== (await this.galleryPluginId)) {
+    let pluginIds = enabledGalleryPluginIds.get(this.pluginRepository);
+    if (!pluginIds) {
+      pluginIds = this.pluginRepository
+        .getForLoad()
+        .then((plugins) => new Set(plugins.filter(({ name }) => name === GALLERY_PLUGIN).map(({ id }) => id)));
+      // A failed read is retried on the next step rather than cached for the life of the process.
+      pluginIds.catch(() => enabledGalleryPluginIds.delete(this.pluginRepository));
+      enabledGalleryPluginIds.set(this.pluginRepository, pluginIds);
+    }
+
+    const enabledIds = await pluginIds;
+    if (!enabledIds.has(step.pluginId)) {
       return false;
     }
 
