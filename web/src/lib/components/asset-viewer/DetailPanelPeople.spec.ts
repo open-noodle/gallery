@@ -4,7 +4,7 @@ import { screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { get } from 'svelte/store';
-import { cropFacesFromAsset } from '$lib/stores/preferences.store';
+import { cropFacesFromAsset } from '$lib/gallery/stores/preferences.store';
 import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import DetailPanelPeople from './DetailPanelPeople.svelte';

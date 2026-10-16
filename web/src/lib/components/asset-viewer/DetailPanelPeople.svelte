@@ -5,7 +5,8 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { faceManager } from '$lib/stores/face.svelte';
-  import { cropFacesFromAsset, locale } from '$lib/stores/preferences.store';
+  import { cropFacesFromAsset } from '$lib/gallery/stores/preferences.store';
+  import { locale } from '$lib/stores/preferences.store';
   import { getAssetUrls } from '$lib/utils';
   import {
     buildContextualFilterUrl,

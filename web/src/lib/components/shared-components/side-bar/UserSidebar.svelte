@@ -10,7 +10,8 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { Route } from '$lib/route';
-  import { recentAlbumsDropdown, recentSpacesDropdown } from '$lib/stores/preferences.store';
+  import { recentSpacesDropdown } from '$lib/gallery/stores/preferences.store';
+  import { recentAlbumsDropdown } from '$lib/stores/preferences.store';
   import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import {
     mdiAccount,

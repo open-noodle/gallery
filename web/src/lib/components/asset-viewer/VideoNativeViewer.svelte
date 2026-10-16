@@ -7,13 +7,8 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { mediaCapabilitiesManager } from '$lib/managers/media-capabilities-manager.svelte';
-  import {
-    autoPlayVideo,
-    lang,
-    loopVideo as loopVideoPreference,
-    videoViewerMuted,
-    videoViewerVolume,
-  } from '$lib/stores/preferences.store';
+  import { videoViewerMuted, videoViewerVolume } from '$lib/gallery/stores/preferences.store';
+  import { autoPlayVideo, lang, loopVideo as loopVideoPreference } from '$lib/stores/preferences.store';
   import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '$lib/utils';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
   import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';

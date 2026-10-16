@@ -6,7 +6,7 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
-  import { formatTimeAgo } from '$lib/utils/timesince';
+  import { formatTimeAgo } from '$lib/gallery/utils/time-ago';
   import {
     removeMember,
     SharedSpaceRole,

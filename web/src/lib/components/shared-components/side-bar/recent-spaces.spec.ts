@@ -4,7 +4,7 @@ import { tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
-import { recentSpaceAlbumsExpanded } from '$lib/stores/preferences.store';
+import { recentSpaceAlbumsExpanded } from '$lib/gallery/stores/preferences.store';
 import { pinnedSpaceIds } from '$lib/stores/space-view.store';
 import { userInteraction } from '$lib/stores/user.svelte';
 import { handleError } from '$lib/utils/handle-error';

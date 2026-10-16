@@ -1,8 +1,9 @@
 import { getAllSpaces } from '@immich/sdk';
 import { get } from 'svelte/store';
+import { recentSpacesDropdown } from '$lib/gallery/stores/preferences.store';
+import { loadSpaces } from '$lib/gallery/stores/spaces-cache';
 import { eventManager } from '$lib/managers/event-manager.svelte';
-import { recentSpacesDropdown } from '$lib/stores/preferences.store';
-import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
+import { userInteraction } from '$lib/stores/user.svelte';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 
 vi.mock('@immich/sdk', async (orig) => ({ ...(await orig<typeof import('@immich/sdk')>()), getAllSpaces: vi.fn() }));
