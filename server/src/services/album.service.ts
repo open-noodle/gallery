@@ -239,7 +239,11 @@ export class AlbumService extends BaseService {
     const album = await this.findOrFail(id, auth.user.id);
 
     if (dto.albumThumbnailAssetId) {
-      const results = await this.albumRepository.getAssetIds(id, [dto.albumThumbnailAssetId]);
+      const results = await this.spaceAlbumRepository.getAlbumAssetIdsForViewer(
+        id,
+        [dto.albumThumbnailAssetId],
+        auth.user.id,
+      );
       if (results.size === 0) {
         throw new BadRequestException('Invalid album thumbnail');
       }
