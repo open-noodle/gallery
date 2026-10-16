@@ -1992,9 +1992,8 @@ export class FaceIdentityRepository {
 
     // Only the uncounted path emits an accessibility predicate, so skip the lookup entirely on the
     // hot path rather than paying a round-trip for a value that is never interpolated.
-    const hasTimelineSpaces = countedIdentities
-      ? false
-      : (input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId)));
+    const hasTimelineSpaces =
+      !countedIdentities && (input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId)));
 
     // With counts supplied, carry them alongside the ids through a parallel unnest so the whole
     // accessible_faces/asset_counts pair can be dropped from the query.
