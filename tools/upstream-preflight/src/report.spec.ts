@@ -94,6 +94,13 @@ describe('renderPreflightMarkdown', () => {
           sample: ['web/src/routes/(user)/photos/+page.svelte'],
         },
       },
+      whitespaceHeavyFiles: [
+        {
+          file: 'server/src/services/metadata.service.ts',
+          changed: 120,
+          whitespaceOnly: 96,
+        },
+      ],
     });
 
     expect(markdown).toContain('# Upstream Preflight Report - 2026-05-04');
@@ -108,5 +115,9 @@ describe('renderPreflightMarkdown', () => {
     expect(markdown).toContain('Dependency And Lockfile Changes');
     expect(markdown).toContain('Server Migration Signals');
     expect(markdown).toContain('Mobile Drift Migration Check');
+    expect(markdown).toContain('Whitespace-Only Fork Diff Signals');
+    expect(markdown).toContain(
+      '- `server/src/services/metadata.service.ts`: 96 of 120 changed lines are whitespace-only (80%)',
+    );
   });
 });
