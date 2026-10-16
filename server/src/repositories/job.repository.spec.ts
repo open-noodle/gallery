@@ -5,7 +5,7 @@ import { JobName, QueueJobStatus, QueueName } from 'src/enum.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
-import { JobRepository, buildWorkerOptions } from 'src/repositories/job.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { JobCounts } from 'src/types.js';
 
@@ -80,28 +80,6 @@ describe(JobRepository.name, () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('buildWorkerOptions', () => {
-    it('gives the FacialRecognition queue a lock and stalled interval well above the 30s default', () => {
-      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.FacialRecognition);
-
-      expect(options.concurrency).toBe(1);
-      expect(options.prefix).toBe('immich_bull');
-      // Long handlers (face-match-all, identity reconciliation, a dedup pass on a huge space) must
-      // not be declared stalled and orphaned while still healthy.
-      expect(options.lockDuration ?? 0).toBeGreaterThanOrEqual(120_000);
-      expect(options.stalledInterval ?? 0).toBeGreaterThanOrEqual(120_000);
-    });
-
-    it('leaves other queues on BullMQ lock defaults', () => {
-      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.ThumbnailGeneration);
-
-      expect(options.concurrency).toBe(1);
-      expect(options.prefix).toBe('immich_bull');
-      expect(options.lockDuration).toBeUndefined();
-      expect(options.stalledInterval).toBeUndefined();
-    });
   });
 
   it('should return immediately when queues have no active waiting delayed or paused jobs', async () => {

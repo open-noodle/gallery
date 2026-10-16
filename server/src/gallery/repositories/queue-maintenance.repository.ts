@@ -1,11 +1,11 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { JobsOptions, Queue } from 'bullmq';
+import { JobsOptions, Queue, WorkerOptions } from 'bullmq';
 import { setTimeout } from 'node:timers/promises';
 import type { Redis } from 'ioredis';
 import type { JobCounts, JobItem, JobOf, JobTypeCounts } from 'src/types.js';
-import { JobName, QueueName } from 'src/enum.js';
+import { ImmichWorker, JobName, QueueName } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 
 export type QueueTelemetryStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting' | 'paused';
@@ -34,6 +34,26 @@ export interface QueueTelemetryMetrics {
 }
 
 const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
+
+/**
+ * Per-queue worker lock overrides. BullMQ defaults to a 30s lock + 30s stalled check + maxStalledCount
+ * 1, which is fine for short handlers but dangerous for queues whose handlers can legitimately run for
+ * minutes. The FacialRecognition queue (concurrency 1) runs space face-match-all, identity
+ * reconciliation, and per-pass dedup; on a large space a single healthy handler can exceed 30s, get
+ * declared stalled, and be orphaned in the "active" list — starving the whole queue, core face
+ * recognition included. A longer lock + stalled interval keeps slow-but-healthy jobs alive.
+ */
+const WORKER_OPTIONS_BY_QUEUE: Partial<Record<QueueName, Pick<WorkerOptions, 'lockDuration' | 'stalledInterval'>>> = {
+  [QueueName.FacialRecognition]: { lockDuration: 300_000, stalledInterval: 300_000 },
+};
+
+/** Builds the BullMQ worker options for a queue, layering any per-queue lock overrides on top. */
+export const buildWorkerOptions = (baseConfig: WorkerOptions, queueName: QueueName): WorkerOptions => ({
+  ...baseConfig,
+  concurrency: 1,
+  name: ImmichWorker.Microservices,
+  ...WORKER_OPTIONS_BY_QUEUE[queueName],
+});
 
 // Fork-only BullMQ queue repair and inspection, kept out of the upstream JobRepository.
 @Injectable()
