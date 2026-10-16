@@ -990,7 +990,7 @@
   "rotated_count": "{count, plural, one {# média pivoté} other {# médias pivotés}}",
   "search_everywhere": "Rechercher partout",
   "search_here": "Rechercher ici",
-  "search_legacy_notice": "Utilisez ⌘K pour rechercher.",
+  "search_legacy_notice": "Utilisez {hotkey} pour rechercher.",
   "search_no_pets": "Aucun animal",
   "search_open_palette": "Ouvrir la palette",
   "search_sort_newest": "Plus récents d'abord",
