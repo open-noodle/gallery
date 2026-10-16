@@ -23,7 +23,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { getParentPath } from '$lib/utils/tree-utils';
   import { AssetMediaSize, getAllAlbums, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
-  import { Icon, IconButton, Link, Text } from '@immich/ui';
+  import { Icon, IconButton, Link, LoadingSpinner, Text } from '@immich/ui';
   import {
     mdiCamera,
     mdiCameraIris,
@@ -42,7 +42,6 @@
   import UserAvatar from '../shared-components/UserAvatar.svelte';
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
   import DetailPanelPeople from '$lib/components/asset-viewer/DetailPanelPeople.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     asset: AssetResponseDto;
@@ -574,27 +573,25 @@
   {/if}
 {/if}
 
-{#if assetViewerManager.isEditFacesPanelOpen}
-  <!--
-    Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
-    canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
-    endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
-    space-flavoured panel additionally needs a real space id to write into.
-  -->
-  {#if canEditSpacePeople && effectiveSpaceId}
-    <SpacePersonSidePanel
-      spaceId={effectiveSpaceId}
-      assetId={asset.id}
-      assetType={asset.type}
-      onClose={() => assetViewerManager.closeEditFacesPanel()}
-      onRefresh={() => void handleSpacePeopleChanged()}
-    />
-  {:else}
-    <PersonSidePanel
-      assetId={asset.id}
-      assetType={asset.type}
-      onClose={() => assetViewerManager.closeEditFacesPanel()}
-      onRefresh={handleRefreshPeople}
-    />
-  {/if}
+<!--
+  Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
+  canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
+  endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
+  space-flavoured panel additionally needs a real space id to write into.
+-->
+{#if assetViewerManager.isEditFacesPanelOpen && canEditSpacePeople && effectiveSpaceId}
+  <SpacePersonSidePanel
+    spaceId={effectiveSpaceId}
+    assetId={asset.id}
+    assetType={asset.type}
+    onClose={() => assetViewerManager.closeEditFacesPanel()}
+    onRefresh={() => void handleSpacePeopleChanged()}
+  />
+{:else if assetViewerManager.isEditFacesPanelOpen}
+  <PersonSidePanel
+    assetId={asset.id}
+    assetType={asset.type}
+    onClose={() => assetViewerManager.closeEditFacesPanel()}
+    onRefresh={handleRefreshPeople}
+  />
 {/if}

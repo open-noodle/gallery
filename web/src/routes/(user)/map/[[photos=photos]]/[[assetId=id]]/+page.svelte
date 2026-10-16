@@ -39,7 +39,7 @@
     type MapMarkerResponseDto,
     searchSmart,
   } from '@immich/sdk';
-  import { IconButton, modalManager } from '@immich/ui';
+  import { IconButton, LoadingSpinner, modalManager } from '@immich/ui';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
   import type { SearchTerms } from '$lib/services/search.service';
   import { resolveFilterNames } from '$lib/utils/filter-name-resolution';
@@ -50,7 +50,6 @@
   import { onDestroy, onMount, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     data: PageData;
