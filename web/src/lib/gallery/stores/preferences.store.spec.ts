@@ -1,5 +1,9 @@
 import { get } from 'svelte/store';
-import { cropFacesFromAsset, recentSpaceAlbumsExpanded, setSpaceAlbumsExpanded } from '$lib/stores/preferences.store';
+import {
+  cropFacesFromAsset,
+  recentSpaceAlbumsExpanded,
+  setSpaceAlbumsExpanded,
+} from '$lib/gallery/stores/preferences.store';
 
 const CROP_KEY = 'crop-faces-from-asset';
 
@@ -25,7 +29,7 @@ describe('cropFacesFromAsset', () => {
     localStorage.setItem(CROP_KEY, 'false');
     vi.resetModules();
 
-    const reloaded = await import('$lib/stores/preferences.store');
+    const reloaded = await import('$lib/gallery/stores/preferences.store');
 
     expect(get(reloaded.cropFacesFromAsset)).toBe(false);
   });
@@ -34,7 +38,7 @@ describe('cropFacesFromAsset', () => {
     localStorage.setItem(CROP_KEY, 'not-valid-json');
     vi.resetModules();
 
-    const reloaded = await import('$lib/stores/preferences.store');
+    const reloaded = await import('$lib/gallery/stores/preferences.store');
 
     expect(get(reloaded.cropFacesFromAsset)).toBe(true);
   });

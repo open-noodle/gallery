@@ -89,8 +89,8 @@ final driftGetAllPeopleWithSharedSpacesProvider =
 ///
 /// `autoDispose` is deliberate: the route to this page (Spaces tab → space detail → app-bar
 /// face icon) invalidates nothing on entry, unlike the Library tab, which the global people
-/// providers sit behind and which the invalidation sites in `tab_shell.page.dart` /
-/// `gallery_bottom_nav.widget.dart` cover. Without `autoDispose`, this provider would keep the
+/// providers sit behind and which the invalidation site in
+/// `gallery_bottom_nav.widget.dart` covers. Without `autoDispose`, this provider would keep the
 /// list it fetched for the app's whole session, so leaving and re-entering the page would
 /// re-render a stale cache with no gesture to refresh it short of changing the sort mode or
 /// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped

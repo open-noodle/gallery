@@ -137,6 +137,10 @@ export const FORK_DELETED_PATHS: { path: string; why: string }[] = [
     why: "upstream's patrol test helpers, removed with the patrol dependency in 53d9cbb3487 (#114)",
   },
   {
+    path: 'mobile/lib/pages/common/tab_shell.page.dart',
+    why: "upstream's tab shell, replaced by GalleryTabShellPage; nothing navigated to TabShellRoute (INT-DIV-C-031)",
+  },
+  {
     path: 'mobile/lib/presentation/pages/search/paginated_search.provider.dart',
     why: MOBILE_SEARCH,
   },

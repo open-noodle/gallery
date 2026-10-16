@@ -17,8 +17,6 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 class LockedFolderPage extends ConsumerStatefulWidget {
   const LockedFolderPage({super.key});
 
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   ConsumerState<LockedFolderPage> createState() => _LockedFolderPageState();
 }

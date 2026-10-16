@@ -112,6 +112,14 @@ features:
       # The asset's space for the viewer surfaces, and the space face side panel (plan 9.6).
       - web/src/lib/gallery/asset-viewer/asset-space.ts
       - web/src/lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte
+      - mobile/lib/gallery/remote_album/**
+      - mobile/lib/gallery/data/heal_date_time_columns.dart
+      - web/src/lib/gallery/utils/time-ago.ts
+      - web/src/lib/gallery/utils/editable-assets*.ts
+      - web/src/lib/gallery/stores/spaces-cache*.ts
+      - mobile/lib/gallery/utils/person_thumbnail_url.dart
+      - mobile/test/gallery/utils/person_thumbnail_url_test.dart
+      - mobile/lib/gallery/providers/gallery_action.notifier.dart
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -316,6 +324,10 @@ features:
       - web/src/lib/gallery/asset-viewer/AppearsInAlbum.svelte
       - web/src/lib/gallery/asset-viewer/MapProviderLinks.svelte
       - web/src/lib/gallery/timeline/**
+      - mobile/lib/gallery/location_disclosure.dart
+      - mobile/test/gallery/location_disclosure_test.dart
+      - mobile/lib/gallery/search/**
+      - web/src/lib/gallery/stores/preferences.store*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -364,6 +376,7 @@ features:
       - server/src/gallery/repositories/gallery-duplicate.repository*.ts
       - server/src/gallery/utils/misc.ts
       - server/src/gallery/repositories/gallery-machine-learning.repository*.ts
+      - web/src/lib/gallery/utils/queue-jobs*.ts
     upstream_extension_paths:
       - server/src/config.ts
       - server/src/app.module.ts
@@ -407,6 +420,10 @@ features:
       - design/gallery-*
       - web/static/gallery-*
       - .github/actions/apply-branding/**
+      - mobile/lib/gallery/presentation/widgets/timeline/timeline_scroll_driver.dart
+      - mobile/lib/gallery/routing/**
+      - mobile/lib/gallery/widgets/library_collection_cards.dart
+      - mobile/lib/gallery/widgets/demo_login_button.dart
     upstream_extension_paths:
       - mobile/lib/routing/router.dart
       - mobile/lib/routing/router.gr.dart

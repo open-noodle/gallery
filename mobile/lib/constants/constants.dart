@@ -50,7 +50,7 @@ const String kImmichLatestRelease = "https://github.com/open-noodle/gallery/rele
 
 const int kPhotoTabIndex = 0;
 const int kSearchTabIndex = 1;
-const int kSpacesTabIndex = 2;
+const int kAlbumTabIndex = 2;
 // ignore: unused-code
 const int kLibraryTabIndex = 3;
 

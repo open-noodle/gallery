@@ -38,7 +38,8 @@
   import PersonSuggestions from '$lib/gallery/people/PersonSuggestions.svelte';
   import { getPersonActions } from '$lib/services/person.service';
   import { lang, locale } from '$lib/stores/preferences.store';
-  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
+  import { loadSpaces } from '$lib/gallery/stores/spaces-cache';
+  import { userInteraction } from '$lib/stores/user.svelte';
   import { websocketEvents } from '$lib/stores/websocket';
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
