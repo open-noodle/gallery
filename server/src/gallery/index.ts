@@ -24,6 +24,7 @@ import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
+import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -99,6 +100,7 @@ export const galleryServices = [
   GalleryAssetService,
   GalleryPeopleService,
   GalleryPluginService,
+  GalleryStackService,
   LibraryManifestService,
   PetDetectionService,
   PetRecognitionService,

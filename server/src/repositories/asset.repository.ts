@@ -32,6 +32,7 @@ import {
   TimeBucketSize,
 } from 'src/enum.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
+import { stackHasSeveralLiveAssets } from 'src/gallery/utils/stack-badge.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -1510,6 +1511,7 @@ export class AssetRepository {
                     .where('stacked.deletedAt', 'is', null)
                     .where('stacked.visibility', '=', AssetVisibility.Timeline)
                     .groupBy('stacked.stackId')
+                    .having(stackHasSeveralLiveAssets)
                     .as('stacked_assets'),
                 (join) => join.onTrue(),
               )
