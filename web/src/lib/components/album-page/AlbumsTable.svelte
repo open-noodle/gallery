@@ -1,6 +1,6 @@
 <script lang="ts">
   import AlbumTableHeader from '#lib/components/album-page/AlbumsTableHeader.svelte';
-  import AlbumTableRow from '#lib/components/album-page/AlbumsTableRow.svelte';
+  import LazyAlbumTableBody from '#lib/gallery/components/lazy-album-table-body.svelte';
   import { AlbumGroupBy, albumViewSettings } from '#lib/stores/preferences.store.ts';
   import {
     isAlbumGroupCollapsed,
@@ -11,7 +11,6 @@
   import { Icon } from '@immich/ui';
   import { mdiChevronRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import { slide } from 'svelte/transition';
 
   type Props = {
     groupedAlbums: AlbumGroup[];
@@ -32,11 +31,7 @@
     </tr>
   </thead>
   {#if albumGroupOption === AlbumGroupBy.None}
-    <tbody class="block w-full overflow-y-auto rounded-md border dark:border-immich-dark-gray dark:text-immich-dark-fg">
-      {#each groupedAlbums[0].albums as album (album.id)}
-        <AlbumTableRow {album} />
-      {/each}
-    </tbody>
+    <LazyAlbumTableBody albums={groupedAlbums[0].albums} />
   {:else}
     {#each groupedAlbums as albumGroup (albumGroup.id)}
       {const isCollapsed = $derived(isAlbumGroupCollapsed($albumViewSettings, albumGroup.id))}
@@ -63,14 +58,7 @@
         </tr>
       </tbody>
       {#if !isCollapsed}
-        <tbody
-          class="mt-4 block w-full overflow-y-auto rounded-md border dark:border-immich-dark-gray dark:text-immich-dark-fg"
-          transition:slide={{ duration: 300 }}
-        >
-          {#each albumGroup.albums as album (album.id)}
-            <AlbumTableRow {album} />
-          {/each}
-        </tbody>
+        <LazyAlbumTableBody albums={albumGroup.albums} class="[&:not([data-chunk]+*)]:mt-4" />
       {/if}
     {/each}
   {/if}
