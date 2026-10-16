@@ -327,8 +327,10 @@ features:
       - server/src/repositories/duplicate.repository.ts
       - server/src/gallery/repositories/gallery-duplicate.repository*.ts
       - server/src/gallery/utils/misc.ts
+      - server/src/gallery/repositories/gallery-machine-learning.repository*.ts
     upstream_extension_paths:
       - server/src/config.ts
+      - server/src/app.module.ts
       - server/src/dtos/system-config.dto.ts
       - server/src/dtos/model-config.dto.ts
       - server/src/repositories/search.repository.ts

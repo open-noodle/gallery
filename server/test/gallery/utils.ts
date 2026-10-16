@@ -4,6 +4,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { GalleryRepositories } from 'src/gallery/repositories/index.js';
@@ -55,6 +56,8 @@ export type GalleryServiceOverrides = {
   galleryDuplicate: GalleryDuplicateRepository;
   galleryAsset: GalleryAssetRepository;
   galleryPerson: GalleryPersonRepository;
+  // narrows upstream's `machineLearning` entry: the mock is the GalleryMachineLearningRepository instance
+  machineLearning: GalleryMachineLearningRepository;
 };
 
 export const getGalleryMocks = (loggerMock: { setContext: () => void }) => {
@@ -120,4 +123,5 @@ export const newGalleryRepositories = (
     overrides.galleryDuplicate || (mocks.galleryDuplicate as As<GalleryDuplicateRepository>),
     overrides.galleryAsset || (mocks.galleryAsset as As<GalleryAssetRepository>),
     overrides.galleryPerson || (mocks.galleryPerson as As<GalleryPersonRepository>),
+    overrides.machineLearning || (mocks.machineLearning as As<GalleryMachineLearningRepository>),
   );

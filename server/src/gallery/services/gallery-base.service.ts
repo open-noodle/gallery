@@ -57,6 +57,7 @@ export abstract class GalleryBaseService {
   declare protected galleryDuplicateRepository: GalleryRepositories['galleryDuplicateRepository'];
   declare protected galleryAssetRepository: GalleryRepositories['galleryAssetRepository'];
   declare protected galleryPersonRepository: GalleryRepositories['galleryPersonRepository'];
+  declare protected galleryMachineLearningRepository: GalleryRepositories['galleryMachineLearningRepository'];
 
   declare protected identityMergePropagationService: IdentityMergePropagationService;
   declare protected faceAssignmentService: FaceAssignmentService;

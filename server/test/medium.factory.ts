@@ -22,6 +22,7 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
@@ -822,7 +823,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     }
 
     case MachineLearningRepository: {
-      return automock(MachineLearningRepository, { args: [{ setContext: () => {} }] });
+      return automock(GalleryMachineLearningRepository, { args: [{ setContext: () => {} }] });
     }
 
     case MediaRepository: {

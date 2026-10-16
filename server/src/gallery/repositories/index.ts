@@ -3,6 +3,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
@@ -19,6 +20,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
@@ -49,6 +51,7 @@ export const GALLERY_REPOSITORY_DEPENDENCIES = [
   GalleryDuplicateRepository,
   GalleryAssetRepository,
   GalleryPersonRepository,
+  MachineLearningRepository,
 ] as const;
 
 // Every fork repository a service needs, injected into upstream's BaseService as one constructor parameter.
@@ -79,5 +82,6 @@ export class GalleryRepositories {
     public galleryDuplicateRepository: GalleryDuplicateRepository,
     public galleryAssetRepository: GalleryAssetRepository,
     public galleryPersonRepository: GalleryPersonRepository,
+    public galleryMachineLearningRepository: GalleryMachineLearningRepository,
   ) {}
 }

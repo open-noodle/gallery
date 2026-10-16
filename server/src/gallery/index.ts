@@ -17,6 +17,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
@@ -46,6 +47,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
@@ -111,6 +113,7 @@ export const galleryRepositories = [
   GalleryAssetRepository,
   GalleryPersonRepository,
   GalleryRepositories,
+  GalleryMachineLearningRepository,
 ];
 
 export const galleryServices = [
@@ -136,3 +139,9 @@ export const galleryServices = [
   UserGroupService,
   RuleMemoryService,
 ];
+
+// Providers that are not plain classes, so they cannot sit in the lists above (telemetry, sync-sql, the queue and the
+// event setup iterate those as classes). app.module registers them after `repositories`; Nest keeps the last
+// registration of a token, so the MachineLearningRepository token resolves to the one GalleryMachineLearningRepository
+// instance: one setup() from SystemConfigService, one health-check loop.
+export const galleryProviders = [{ provide: MachineLearningRepository, useExisting: GalleryMachineLearningRepository }];
