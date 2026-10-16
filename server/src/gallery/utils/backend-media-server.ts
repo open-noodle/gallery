@@ -5,14 +5,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Request } from 'express';
-import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
+import type { GenerateThumbnailOptions, ImageDimensions, UploadFile } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat, ImmichHeader, JobName } from 'src/enum.js';
-import { getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
+import { AssetFileType, CacheControl, ImageFormat, ImmichHeader, JobName, StorageFolder } from 'src/enum.js';
+import { getRelativeNestedPath, getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
@@ -25,6 +25,7 @@ import {
   ImmichMediaResponse,
   ImmichRedirectResponse,
   ImmichStreamResponse,
+  getFilenameExtension,
   getResponseSignal,
 } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
@@ -197,6 +198,69 @@ export class BackendMediaServer {
     // After S3 upload, drop the local generated file and store the relative key.
     await this.deps.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
     return relativeKey;
+  }
+
+  /**
+   * Moves a just-created upload (and its sidecar) to an S3 write backend: uploads each file, points the asset and its
+   * sidecar row at the key and queues the local file's deletion. A failure here deletes what it uploaded and rethrows,
+   * so the caller removes the asset row and the local files. On success `file` and `sidecarFile` name the keys, so a
+   * later failure in the caller queues the uploaded objects (not the already-queued local files) for deletion.
+   */
+  async moveUploadToBackend(asset: { id: string; ownerId: string }, file: UploadFile, sidecarFile?: UploadFile) {
+    const writeBackend = await this.getRemoteWriteBackend();
+    if (!writeBackend) {
+      return;
+    }
+
+    const { assetRepository, jobRepository } = this.deps;
+    const backendFiles: string[] = [];
+    try {
+      const relativeKey = getRelativeNestedPath(
+        StorageFolder.Upload,
+        asset.ownerId,
+        `${asset.id}${getFilenameExtension(file.originalPath)}`,
+      );
+      const stream = createReadStream(file.originalPath);
+      await writeBackend.put(relativeKey, stream, {
+        contentType: mimeTypes.lookup(file.originalPath),
+      });
+      backendFiles.push(relativeKey);
+      await assetRepository.update({ id: asset.id, originalPath: relativeKey });
+      // Clean up the temp local file
+      await jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.originalPath] } });
+
+      if (sidecarFile) {
+        const sidecarKey = getRelativeNestedPath(StorageFolder.Upload, asset.ownerId, `${asset.id}.xmp`);
+        await writeBackend.put(sidecarKey, createReadStream(sidecarFile.originalPath));
+        backendFiles.push(sidecarKey);
+        await assetRepository.upsertFile({
+          assetId: asset.id,
+          path: sidecarKey,
+          type: AssetFileType.Sidecar,
+        });
+        await jobRepository.queue({
+          name: JobName.FileDelete,
+          data: { files: [sidecarFile.originalPath] },
+        });
+      }
+    } catch (error: Error | any) {
+      for (const key of backendFiles) {
+        try {
+          await writeBackend.delete(key);
+        } catch (deleteError: Error | any) {
+          this.deps.logger.error(
+            `Failed to delete incomplete upload file ${key} for asset ${asset.id}: ${deleteError}`,
+            deleteError?.stack,
+          );
+        }
+      }
+      throw error;
+    }
+
+    file.originalPath = backendFiles[0];
+    if (sidecarFile) {
+      sidecarFile.originalPath = backendFiles[1];
+    }
   }
 
   async getFaceThumbnailSource(assetId: string): Promise<string | null> {
