@@ -16,6 +16,7 @@
     readonlyNameClass?: string;
     hasNextPage?: boolean;
     loading?: boolean;
+    loadedPages?: number;
     loadNextPage: () => void;
     canEditNames?: boolean | ((person: T) => boolean);
     canShowActions?: boolean | ((person: T) => boolean);
@@ -38,6 +39,7 @@
     readonlyNameClass = 'mt-2 truncate text-center text-sm font-medium',
     hasNextPage = false,
     loading = false,
+    loadedPages,
     loadNextPage,
     canEditNames = false,
     canShowActions = true,
@@ -163,7 +165,7 @@
   };
 </script>
 
-<PeopleGrid items={people} class={gridClass} {hasNextPage} {loading} {loadNextPage}>
+<PeopleGrid items={people} class={gridClass} {hasNextPage} {loading} {loadedPages} {loadNextPage}>
   {#snippet children(person)}
     {@const managedPerson = toManagedPerson(person)}
     <div class={cardClass}>
