@@ -267,6 +267,34 @@ describe('CollectionPickerModal — expanding a space into its albums', () => {
     expect(screen.getAllByTestId('space-pool-child-s1').length).toBeGreaterThan(0);
   });
 
+  it('finds a linked album by search without expanding its space, fetching it only once (#1114)', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Sri Lanka New Year Trip')]);
+    render(CollectionPickerModal, { assetCount: 1, onClose: vi.fn() });
+    await screen.findAllByTestId('row-space-s1');
+    expect(sdkMock.getSharedSpaceAlbums).not.toHaveBeenCalled();
+
+    await fireEvent.input(screen.getByPlaceholderText('search'), { target: { value: 'Lanka' } });
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+
+    await fireEvent.input(screen.getByPlaceholderText('search'), { target: { value: 'Lanka N' } });
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps space-linked albums out of the unsearched list (#1114)', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 1, onClose: vi.fn() });
+    await screen.findAllByTestId('row-space-s1');
+
+    await fireEvent.input(screen.getByPlaceholderText('search'), { target: { value: 'Holi' } });
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    await fireEvent.input(screen.getByPlaceholderText('search'), { target: { value: '' } });
+
+    await waitFor(() => expect(screen.queryAllByTestId('row-album-sa1')).toHaveLength(0));
+  });
+
   it('confirms with the linked album when one is chosen', async () => {
     const onClose = vi.fn();
     sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
