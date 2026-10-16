@@ -424,6 +424,9 @@ features:
       - e2e/src/gallery-client.ts
       - e2e/src/specs/server/api/stock-client.e2e-spec.ts
       - server/src/schema/gallery-functions.ts
+      - server/src/gallery/repositories/index.ts
+      - server/src/gallery/services/gallery-base.service.ts
+      - server/test/gallery/**
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts

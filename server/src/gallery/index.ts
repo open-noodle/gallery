@@ -20,6 +20,7 @@ import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.r
 import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { ImageAdjustRepository } from 'src/gallery/repositories/image-adjust.repository.js';
+import { GalleryRepositories } from 'src/gallery/repositories/index.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
@@ -109,6 +110,7 @@ export const galleryRepositories = [
   GalleryDuplicateRepository,
   GalleryAssetRepository,
   GalleryPersonRepository,
+  GalleryRepositories,
 ];
 
 export const galleryServices = [
