@@ -562,13 +562,13 @@ describe(AlbumService.name, () => {
       const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
       mocks.album.getById.mockResolvedValue(getForAlbum(album));
-      mocks.album.getAssetIds.mockResolvedValue(new Set());
+      mocks.spaceAlbum.getAlbumAssetIdsForViewer.mockResolvedValue(new Set());
 
       await expect(
         sut.update(AuthFactory.create(owner), album.id, { albumThumbnailAssetId: 'not-in-album' }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(mocks.album.getAssetIds).toHaveBeenCalledWith(album.id, ['not-in-album']);
+      expect(mocks.spaceAlbum.getAlbumAssetIdsForViewer).toHaveBeenCalledWith(album.id, ['not-in-album'], owner.id);
       expect(mocks.album.update).not.toHaveBeenCalled();
     });
 
