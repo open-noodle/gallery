@@ -133,8 +133,8 @@
     album = await getAlbumInfo({ id: album.id });
   };
 
-  // RemoveFromAlbumAction already re-fetches the album via bind:album and clears the selection
-  // before firing onRemove, so this only prunes the view and defensively clears.
+  // The remove-from-album action clears the selection after firing onRemove, so this only prunes
+  // the view and defensively clears.
   const handleRemoveAssets = (assetIds: string[]) => {
     filtered.onAssetDelete(assetIds);
     assetMultiSelectManager.clear();

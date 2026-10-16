@@ -61,10 +61,9 @@ vi.mock('$lib/components/asset-viewer/face-editor/FaceEditor.svelte', async () =
   return { default: MockComponent };
 });
 
-vi.mock('$lib/components/asset-viewer/face-editor/SpaceFaceEditor.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/space-face-editor.stub.svelte');
-  return { default: MockComponent };
-});
+vi.mock('$lib/gallery/asset-viewer/space-face-editor', () => ({
+  getFaceEditorSpace: (spaceId: string) => ({ spaceId }),
+}));
 
 describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
   beforeEach(() => {
@@ -75,7 +74,7 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
     authManager.setPreferences(preferencesFactory.build());
   });
 
-  it('renders SpaceFaceEditor and NOT FaceEditor for a non-owner space editor', () => {
+  it('renders FaceEditor in its space mode for a non-owner space editor', () => {
     const asset = assetFactory.build({
       id: 'asset-1',
       ownerId: 'someone-else',
@@ -85,14 +84,12 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
 
     renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
 
-    const stub = screen.getByTestId('space-face-editor-stub');
-    expect(stub).toBeInTheDocument();
+    const stub = screen.getByTestId('face-editor-stub');
     expect(stub).toHaveAttribute('data-space-id', 'space-1');
     expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(screen.queryByTestId('face-editor-stub')).toBeNull();
   });
 
-  it('renders FaceEditor and NOT SpaceFaceEditor for the asset owner, even inside a space', () => {
+  it('renders FaceEditor in its owner mode for the asset owner, even inside a space', () => {
     const asset = assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
     renderInViewerSpace(PhotoViewer, { cursor: { current: asset } }, { spaceId: 'space-1' });
@@ -100,7 +97,7 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
     const stub = screen.getByTestId('face-editor-stub');
     expect(stub).toBeInTheDocument();
     expect(stub).toHaveAttribute('data-asset-id', 'asset-1');
-    expect(screen.queryByTestId('space-face-editor-stub')).toBeNull();
+    expect(stub).not.toHaveAttribute('data-space-id');
   });
 
   it('renders the owner FaceEditor (never both) for an editor when no space id is available', () => {
@@ -114,7 +111,6 @@ describe('PhotoViewer face editor wiring (Slice 8 gap closure)', () => {
 
     renderWithTooltips(PhotoViewer, { cursor: { current: asset } });
 
-    expect(screen.getByTestId('face-editor-stub')).toBeInTheDocument();
-    expect(screen.queryByTestId('space-face-editor-stub')).toBeNull();
+    expect(screen.getByTestId('face-editor-stub')).not.toHaveAttribute('data-space-id');
   });
 });

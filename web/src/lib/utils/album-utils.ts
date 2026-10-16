@@ -2,7 +2,7 @@ import { AlbumUserRole, type AlbumResponseDto } from '@immich/sdk';
 import * as sdk from '@immich/sdk';
 import { orderBy } from 'lodash-es';
 import { t } from 'svelte-i18n';
-import { get } from 'svelte/store';
+import { get, type Writable } from 'svelte/store';
 import { goto } from '$app/navigation';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { Route } from '$lib/route';
@@ -175,22 +175,24 @@ export const getSelectedAlbumGroupOption = (settings: AlbumViewSettings) => {
  * Album Groups Collapse/Expand
  * ----------------------------
  */
-const getCollapsedAlbumGroups = (settings: AlbumViewSettings) => {
+// Gallery: the store parameter lets the space album list reuse these with its own settings store.
+type GroupSettings = Pick<AlbumViewSettings, 'groupBy' | 'collapsedGroups'>;
+const getCollapsedAlbumGroups = (settings: GroupSettings) => {
   settings.collapsedGroups ??= {};
   const { collapsedGroups, groupBy } = settings;
   collapsedGroups[groupBy] ??= [];
   return collapsedGroups[groupBy];
 };
 
-export const isAlbumGroupCollapsed = (settings: AlbumViewSettings, groupId: string) => {
+export const isAlbumGroupCollapsed = (settings: GroupSettings, groupId: string) => {
   if (settings.groupBy === AlbumGroupBy.None) {
     return false;
   }
   return getCollapsedAlbumGroups(settings).includes(groupId);
 };
 
-export const toggleAlbumGroupCollapsing = (groupId: string) => {
-  const settings = get(albumViewSettings);
+export const toggleAlbumGroupCollapsing = (groupId: string, store: Writable<GroupSettings> = albumViewSettings) => {
+  const settings = get(store);
   if (settings.groupBy === AlbumGroupBy.None) {
     return;
   }
@@ -203,11 +205,11 @@ export const toggleAlbumGroupCollapsing = (groupId: string) => {
     // Expand
     collapsedGroups.splice(groupIndex, 1);
   }
-  albumViewSettings.set(settings);
+  store.set(settings);
 };
 
-export const collapseAllAlbumGroups = (groupIds: string[]) => {
-  albumViewSettings.update((settings) => {
+export const collapseAllAlbumGroups = (groupIds: string[], store: Writable<GroupSettings> = albumViewSettings) => {
+  store.update((settings) => {
     const collapsedGroups = getCollapsedAlbumGroups(settings);
     collapsedGroups.length = 0;
     collapsedGroups.push(...groupIds);
@@ -215,8 +217,8 @@ export const collapseAllAlbumGroups = (groupIds: string[]) => {
   });
 };
 
-export const expandAllAlbumGroups = () => {
-  collapseAllAlbumGroups([]);
+export const expandAllAlbumGroups = (store: Writable<GroupSettings> = albumViewSettings) => {
+  collapseAllAlbumGroups([], store);
 };
 
 interface AlbumSortOption {

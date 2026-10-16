@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-import { getTimelineTopVisibleAnchor, scrollTimelineToTemporalAnchor } from './timeline-anchor';
+import { getTimelineTopVisibleAnchor, retryOnAnimationFrames, scrollTimelineToTemporalAnchor } from './timeline-anchor';
 
 function buildManager(timelineManager: Partial<TimelineManager>) {
   return timelineManager as TimelineManager;
@@ -208,5 +208,65 @@ describe('getTimelineTopVisibleAnchor', () => {
 
   it('returns undefined when the timeline is not initialized', () => {
     expect(getTimelineTopVisibleAnchor(buildManager({ isInitialized: false }))).toBeUndefined();
+  });
+});
+
+describe('retryOnAnimationFrames', () => {
+  const frames: FrameRequestCallback[] = [];
+  const flushFrame = async () => {
+    frames.shift()?.(0);
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  beforeEach(() => {
+    frames.length = 0;
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => frames.splice(0));
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('runs the step once per frame until it reports done', async () => {
+    const step = vi.fn((frame: number) => frame === 2);
+    retryOnAnimationFrames(step, 10);
+
+    expect(step).not.toHaveBeenCalled();
+    for (let i = 0; i < 5; i++) {
+      await flushFrame();
+    }
+
+    expect(step.mock.calls.map(([frame]) => frame)).toEqual([0, 1, 2]);
+  });
+
+  it('gives up after the first frame plus maxRetries more', async () => {
+    const step = vi.fn(() => false);
+    retryOnAnimationFrames(step, 2);
+    for (let i = 0; i < 5; i++) {
+      await flushFrame();
+    }
+
+    expect(step).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops on cancel and tells a step already running that it was cancelled', async () => {
+    let cancel = () => {};
+    const seen: boolean[] = [];
+    const step = vi.fn(async (_frame: number, isCancelled: () => boolean) => {
+      cancel();
+      await Promise.resolve();
+      seen.push(isCancelled());
+      return false;
+    });
+    cancel = retryOnAnimationFrames(step, 10);
+    for (let i = 0; i < 3; i++) {
+      await flushFrame();
+    }
+
+    expect(step).toHaveBeenCalledOnce();
+    expect(seen).toEqual([true]);
   });
 });

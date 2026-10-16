@@ -2,11 +2,9 @@ import { clamp } from 'lodash-es';
 import { getNaturalSize, scaleToFit, type ContentMetrics } from '$lib/utils/container-utils';
 
 /**
- * Shared face-box drag geometry -- the coordinate transform and selector-placement math used by
- * BOTH the owner's `FaceEditor.svelte` and the space-flavoured `SpaceFaceEditor.svelte` when a
- * user drags/resizes a face box over the asset. Kept as pure functions in one place because two
- * independently maintained copies of this transform would drift and silently misplace boxes
- * (Slice 8, Task 2).
+ * Face-box drag geometry -- the coordinate transform and selector-placement math `FaceEditor.svelte`
+ * uses (owner and space mode alike) when a user drags/resizes a face box over the asset, kept as
+ * pure functions so face-box-drag.spec.ts can pin them (Slice 8, Task 2).
  */
 
 export type BoundingRect = { left: number; top: number; width: number; height: number };

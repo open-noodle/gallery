@@ -108,3 +108,32 @@ export function scrollTimelineToTemporalAnchor(
   timelineManager.scrollTo(getScrollTopForTarget(timelineManager, target));
   return targetIsInViewport(timelineManager, target);
 }
+
+/**
+ * Runs `step` on the next animation frame, and again on each later frame while it returns false,
+ * at most `maxRetries` more times: the wait the timeline and the gallery viewer both need for an
+ * anchor's target to be laid out. Returns a cleanup that cancels the pending frame; a step already
+ * running sees it through `isCancelled`.
+ */
+export function retryOnAnimationFrames(
+  step: (frame: number, isCancelled: () => boolean) => boolean | Promise<boolean>,
+  maxRetries: number,
+): () => void {
+  let cancelled = false;
+  let pending: number | undefined;
+  const isCancelled = () => cancelled;
+  const run = async (frame: number) => {
+    if (cancelled || (await step(frame, isCancelled)) || cancelled || frame >= maxRetries) {
+      return;
+    }
+    pending = requestAnimationFrame(() => void run(frame + 1));
+  };
+
+  pending = requestAnimationFrame(() => void run(0));
+  return () => {
+    cancelled = true;
+    if (pending !== undefined) {
+      cancelAnimationFrame(pending);
+    }
+  };
+}

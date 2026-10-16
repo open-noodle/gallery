@@ -56,7 +56,7 @@
    * button makes. The picker used to offer only the create half, so typing a name that already
    * existed matched nothing and the only way to reach that person was to scroll the whole space
    * -- reported on #992 as "assigning to an existing person is broken". Its two siblings both
-   * search too (the owner's `AssignFaceSidePanel` against the server, `SpaceFaceEditor` over its
+   * search too (the owner's `AssignFaceSidePanel` against the server, space-mode `FaceEditor` over its
    * own loaded candidates), and the panel is too narrow to carry two text inputs.
    *
    * The field itself belongs to `PersonPickerPanel`, which is why this is bound rather than local:
@@ -197,7 +197,7 @@
 
   // Filtered here rather than through the endpoint's own `name` parameter: `loadCandidatesOnce`
   // already holds every candidate the space has, so a round trip per keystroke would buy nothing
-  // and cost a request on each one. Same matcher as `SpaceFaceEditor`, so "angela" finds
+  // and cost a request on each one. Same matcher as the space-mode `FaceEditor`, so "angela" finds
   // "Ángela".
   let visibleCandidates: PickerCandidate[] = $derived.by(() => {
     const query = normalizeSearchString(personQuery.trim());

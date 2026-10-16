@@ -77,56 +77,6 @@ export const getSelectedSpaceAlbumGroupOption = (settings: SpaceAlbumViewSetting
 };
 
 /**
- * --------------------------------
- * Space Album Groups Collapse/Expand
- * --------------------------------
- */
-
-const getCollapsedSpaceAlbumGroups = (settings: SpaceAlbumViewSettings) => {
-  settings.collapsedGroups ??= {};
-  const { collapsedGroups, groupBy: currentGroupBy } = settings;
-  collapsedGroups[currentGroupBy] ??= [];
-  return collapsedGroups[currentGroupBy];
-};
-
-export const isSpaceAlbumGroupCollapsed = (settings: SpaceAlbumViewSettings, groupId: string) => {
-  if (settings.groupBy === SpaceAlbumGroupBy.None) {
-    return false;
-  }
-  return getCollapsedSpaceAlbumGroups(settings).includes(groupId);
-};
-
-export const toggleSpaceAlbumGroupCollapsing = (groupId: string) => {
-  const settings = get(spaceAlbumViewSettings);
-  if (settings.groupBy === SpaceAlbumGroupBy.None) {
-    return;
-  }
-  const collapsedGroups = getCollapsedSpaceAlbumGroups(settings);
-  const groupIndex = collapsedGroups.indexOf(groupId);
-  if (groupIndex === -1) {
-    // Collapse
-    collapsedGroups.push(groupId);
-  } else {
-    // Expand
-    collapsedGroups.splice(groupIndex, 1);
-  }
-  spaceAlbumViewSettings.set(settings);
-};
-
-export const collapseAllSpaceAlbumGroups = (groupIds: string[]) => {
-  spaceAlbumViewSettings.update((settings) => {
-    const collapsedGroups = getCollapsedSpaceAlbumGroups(settings);
-    collapsedGroups.length = 0;
-    collapsedGroups.push(...groupIds);
-    return settings;
-  });
-};
-
-export const expandAllSpaceAlbumGroups = () => {
-  collapseAllSpaceAlbumGroups([]);
-};
-
-/**
  * -----------------------------------------------
  * Build Space Album Groups (pure — no store reads)
  * -----------------------------------------------
