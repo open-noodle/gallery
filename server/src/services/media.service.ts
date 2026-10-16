@@ -13,7 +13,6 @@ import type {
   VideoInterfaces,
   VideoStreamInfo,
 } from 'src/types.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
 import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFile } from 'src/database.js';
@@ -43,13 +42,11 @@ import {
   getEditedEncodedVideoPath,
   getRelativeEditedEncodedVideoPath,
   getRelativeEncodedVideoPath,
-  getRelativeImagePath,
   getRelativePersonThumbnailPath,
 } from 'src/gallery/utils/storage-keys.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { getAssetFile, getDimensions } from 'src/utils/asset.util.js';
 import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor.js';
 import { BaseConfig, ThumbnailConfig } from 'src/utils/media.js';
@@ -80,42 +77,6 @@ export class MediaService extends BaseService {
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap() {
     this.videoInterfaces = await this.storageCore.getVideoInterfaces();
-  }
-
-  /**
-   * After generating a file locally, uploads it to S3 if the write backend is S3.
-   * Returns the key to store in the DB.
-   */
-  private async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
-    const writeBackend = StorageService.getWriteBackend();
-    if (!writeBackend || writeBackend instanceof DiskStorageBackend) {
-      // Disk mode: the file was already written to the final path
-      return localPath;
-    }
-    // S3 mode: upload the locally-generated file
-    const stream = this.storageRepository.createPlainReadStream(localPath);
-    await writeBackend.put(relativeKey, stream, { contentType });
-    // Clean up local temp file
-    await this.storageRepository.unlink(localPath).catch(() => {
-      /* ignore */
-    });
-    return relativeKey;
-  }
-
-  /**
-   * Persists every generated image file and rewrites its path to the stored location.
-   * Every ffmpeg/sharp output path must go through this — forgetting it is how the
-   * trim thumbnails ended up unpersisted on S3 (gh#671).
-   */
-  private async persistImageFiles(asset: ThumbnailAsset, files: UpsertFileOptions[]): Promise<void> {
-    for (const file of files) {
-      const relativeKey = getRelativeImagePath(asset, {
-        fileType: file.type,
-        format: file.path.split('.').pop() as ImageFormat,
-        isEdited: file.isEdited,
-      });
-      file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
-    }
   }
 
   @OnJob({ name: JobName.AssetGenerateThumbnailsQueueAll, queue: QueueName.ThumbnailGeneration })
@@ -252,7 +213,7 @@ export class MediaService extends BaseService {
 
     // Persist output files to S3 if needed
     if (generated?.files) {
-      await this.persistImageFiles(asset, generated.files);
+      await this.backendMedia.persistImageFiles(asset, generated.files);
     }
 
     await this.syncFiles(
@@ -351,11 +312,15 @@ export class MediaService extends BaseService {
       await this.storageRepository.unlink(framePath).catch(() => {});
 
       // Persist output files to S3 if needed
-      await this.persistImageFiles(asset, thumbnailResult.files);
+      await this.backendMedia.persistImageFiles(asset, thumbnailResult.files);
 
       // persistFile unlinks the local file after uploading, so this must come AFTER
       // probe() and extractFrame() have read outputPath.
-      const editedVideoPath = await this.persistFile(outputPath, getRelativeEditedEncodedVideoPath(asset), 'video/mp4');
+      const editedVideoPath = await this.backendMedia.persistFile(
+        outputPath,
+        getRelativeEditedEncodedVideoPath(asset),
+        'video/mp4',
+      );
 
       // Sync both edited encoded video and edited thumbnail files
       const editedVideoFile: UpsertFileOptions = {
@@ -427,11 +392,11 @@ export class MediaService extends BaseService {
     }
 
     // Persist output files to S3 if needed
-    await this.persistImageFiles(asset, generated.files);
+    await this.backendMedia.persistImageFiles(asset, generated.files);
 
     const editedGenerated = await this.generateEditedThumbnails(asset, config, localPath);
     if (editedGenerated) {
-      await this.persistImageFiles(asset, editedGenerated.files);
+      await this.backendMedia.persistImageFiles(asset, editedGenerated.files);
       generated.files.push(...editedGenerated.files);
     }
 
@@ -688,7 +653,7 @@ export class MediaService extends BaseService {
 
     // Persist person thumbnail to S3 if needed
     const relativeKey = getRelativePersonThumbnailPath({ ownerId, personGroupId });
-    const finalPath = await this.persistFile(thumbnailPath, relativeKey, 'image/jpeg');
+    const finalPath = await this.backendMedia.persistFile(thumbnailPath, relativeKey, 'image/jpeg');
 
     await this.personRepository.update({ ownerId, personGroupId, thumbnailPath: finalPath });
 
@@ -879,7 +844,7 @@ export class MediaService extends BaseService {
 
     // Persist encoded video to S3 if needed
     const relativeKey = getRelativeEncodedVideoPath(asset);
-    const finalPath = await this.persistFile(output, relativeKey, 'video/mp4');
+    const finalPath = await this.backendMedia.persistFile(output, relativeKey, 'video/mp4');
 
     await this.assetRepository.upsertFile({
       assetId: asset.id,

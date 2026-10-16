@@ -53,40 +53,6 @@ describe(MediaService.name, () => {
     expect(sut).toBeDefined();
   });
 
-  describe('persistFile', () => {
-    afterEach(() => {
-      // vitest.config.mjs sets no restoreMocks and there are no setupFiles, so a
-      // getWriteBackend spy would leak into every later test in this file and
-      // silently run the disk-mode tests against S3.
-      vi.restoreAllMocks();
-    });
-
-    it('uploads to the write backend and removes the local temp (S3 mode)', async () => {
-      const put = vi.fn().mockResolvedValue(void 0);
-      const stream = makeStream([Buffer.from('data')]);
-      const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
-      mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
-
-      const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
-
-      expect(mocks.storage.createPlainReadStream).toHaveBeenCalledWith('/local/out.jpg');
-      expect(put).toHaveBeenCalledWith('thumbs/aa/bb/x.jpg', stream, { contentType: 'image/jpeg' });
-      expect(mocks.storage.unlink).toHaveBeenCalledWith('/local/out.jpg');
-      expect(result).toBe('thumbs/aa/bb/x.jpg');
-    });
-
-    it('returns the local path and deletes nothing (disk mode)', async () => {
-      // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
-      // returns undefined and persistFile takes its disk branch.
-      const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
-
-      expect(result).toBe('/local/out.jpg');
-      expect(mocks.storage.createPlainReadStream).not.toHaveBeenCalled();
-      expect(mocks.storage.unlink).not.toHaveBeenCalled();
-    });
-  });
-
   // TODO these should all become medium tests of either the service or the repository.
   // The entire logic of what to queue lives in the SQL query now
   describe('handleQueueGenerateThumbnails', () => {

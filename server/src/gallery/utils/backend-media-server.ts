@@ -9,11 +9,16 @@ import type { Request } from 'express';
 import type { GenerateThumbnailOptions, ImageDimensions, UploadFile } from 'src/types.js';
 import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
+import { ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
 import { AssetFileType, CacheControl, ImageFormat, ImmichHeader, JobName, StorageFolder } from 'src/enum.js';
-import { getRelativeNestedPath, getRelativeProfileImagePath } from 'src/gallery/utils/storage-keys.js';
+import {
+  getRelativeImagePath,
+  getRelativeNestedPath,
+  getRelativeProfileImagePath,
+} from 'src/gallery/utils/storage-keys.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
@@ -252,6 +257,45 @@ export class BackendMediaServer {
     const { StorageService } = await import('../../services/storage.service.js');
     const writeBackend = StorageService.getWriteBackend();
     return !writeBackend || writeBackend instanceof DiskStorageBackend ? undefined : writeBackend;
+  }
+
+  /**
+   * After generating a file locally, uploads it to S3 if the write backend is S3.
+   * Returns the key to store in the DB.
+   */
+  async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
+    const writeBackend = await this.getRemoteWriteBackend();
+    if (!writeBackend) {
+      // Disk mode: the file was already written to the final path
+      return localPath;
+    }
+    // S3 mode: upload the locally-generated file
+    const stream = this.deps.storageRepository.createPlainReadStream(localPath);
+    await writeBackend.put(relativeKey, stream, { contentType });
+    // Clean up local temp file
+    await this.deps.storageRepository.unlink(localPath).catch(() => {
+      /* ignore */
+    });
+    return relativeKey;
+  }
+
+  /**
+   * Persists every generated image file and rewrites its path to the stored location.
+   * Every ffmpeg/sharp output path must go through this — forgetting it is how the
+   * trim thumbnails ended up unpersisted on S3 (gh#671).
+   */
+  async persistImageFiles(
+    asset: ThumbnailPathEntity,
+    files: { path: string; type: AssetFileType; isEdited: boolean }[],
+  ): Promise<void> {
+    for (const file of files) {
+      const relativeKey = getRelativeImagePath(asset, {
+        fileType: file.type,
+        format: file.path.split('.').pop() as ImageFormat,
+        isEdited: file.isEdited,
+      });
+      file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
+    }
   }
 
   /** Uploads a locally generated profile image to an S3 write backend; returns the path to store on the user. */

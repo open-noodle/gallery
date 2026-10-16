@@ -2,7 +2,7 @@ import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
-import { ServiceMocks, newTestService } from 'test/utils.js';
+import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 describe(BackendMediaServer.name, () => {
   let sut: BackendMediaServer;
@@ -17,6 +17,32 @@ describe(BackendMediaServer.name, () => {
   afterEach(() => {
     // vitest.config.mjs sets no restoreMocks, so a StorageService spy would leak into later tests
     vi.restoreAllMocks();
+  });
+
+  describe('persistFile', () => {
+    it('uploads to the write backend and removes the local temp (S3 mode)', async () => {
+      const put = vi.fn().mockResolvedValue(void 0);
+      const stream = makeStream([Buffer.from('data')]);
+      vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue({ put } as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(stream as any);
+
+      const result = await sut.persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
+
+      expect(mocks.storage.createPlainReadStream).toHaveBeenCalledWith('/local/out.jpg');
+      expect(put).toHaveBeenCalledWith('thumbs/aa/bb/x.jpg', stream, { contentType: 'image/jpeg' });
+      expect(mocks.storage.unlink).toHaveBeenCalledWith('/local/out.jpg');
+      expect(result).toBe('thumbs/aa/bb/x.jpg');
+    });
+
+    it('returns the local path and deletes nothing (disk mode)', async () => {
+      // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
+      // returns undefined and persistFile takes its disk branch.
+      const result = await sut.persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
+
+      expect(result).toBe('/local/out.jpg');
+      expect(mocks.storage.createPlainReadStream).not.toHaveBeenCalled();
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
   });
 
   describe('writeFileIfMissing', () => {
