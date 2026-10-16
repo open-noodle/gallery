@@ -4,6 +4,7 @@ import {
   SpaceAlbumSortBy,
   findSpaceAlbumSortOptionMetadata,
   sortSpaceAlbums,
+  spaceAlbumMenuColumnStyle,
   spaceAlbumSortOptionsMetadata,
 } from '$lib/utils/space-album-sort';
 
@@ -40,6 +41,22 @@ describe('spaceAlbumSortOptionsMetadata', () => {
       AlbumSortBy.OldestPhoto,
       SpaceAlbumSortBy.RecentlyLinked,
     ]);
+  });
+
+  it('sizes the table columns to fit next to the menu column at sm and xl (#972)', () => {
+    const menu = 6;
+    // Visible columns per breakpoint: title and items always; dates from sm; photo and link dates from xl.
+    const visible = { sm: 4, xl: 7 };
+    for (const [breakpoint, count] of Object.entries(visible)) {
+      let total = menu;
+      for (const { columnStyle } of spaceAlbumSortOptionsMetadata.slice(0, count)) {
+        const match = new RegExp(String.raw`(?:^| )${breakpoint}:w-\[(\d+)%\]`).exec(columnStyle);
+        expect(match, `${breakpoint} width in "${columnStyle}"`).not.toBeNull();
+        total += Number(match![1]);
+      }
+      expect(total).toBeLessThanOrEqual(100);
+    }
+    expect(spaceAlbumMenuColumnStyle).toContain(`sm:w-[${menu}%]`);
   });
 
   it('defaults Title to ascending and every other option to descending', () => {
