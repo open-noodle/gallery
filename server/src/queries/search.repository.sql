@@ -520,6 +520,7 @@ with
           "user"."clusterGroupId" = $2
       )
       and "asset"."deletedAt" is null
+      and "asset_face"."deletedAt" is null
     order by
       "distance"
     limit

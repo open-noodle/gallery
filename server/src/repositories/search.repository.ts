@@ -263,8 +263,6 @@ export interface FaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 'userI
   numResults: number;
   maxDistance: number;
   minBirthDate?: Date | null;
-  // Gallery: skip soft-deleted faces (asset_face.deletedAt keeps its face_search row).
-  excludeDeletedFaces?: boolean;
 }
 
 export interface FaceSearchResult {
@@ -489,15 +487,7 @@ export class SearchRepository {
       },
     ],
   })
-  searchFaces({
-    clusterGroupId,
-    embedding,
-    numResults,
-    maxDistance,
-    hasPerson,
-    minBirthDate,
-    excludeDeletedFaces,
-  }: FaceEmbeddingSearch) {
+  searchFaces({ clusterGroupId, embedding, numResults, maxDistance, hasPerson, minBirthDate }: FaceEmbeddingSearch) {
     if (!z.int().min(1).max(1000).safeParse(numResults).success) {
       throw new Error(`Invalid value for 'numResults': ${numResults}`);
     }
@@ -519,7 +509,7 @@ export class SearchRepository {
               eb.selectFrom('user').select('user.id').where('user.clusterGroupId', '=', clusterGroupId),
             )
             .where('asset.deletedAt', 'is', null)
-            .$if(!!excludeDeletedFaces, (qb) => qb.where('asset_face.deletedAt', 'is', null))
+            .where('asset_face.deletedAt', 'is', null) // Gallery: a soft-deleted face keeps its face_search row
             .$if(!!hasPerson, (qb) => qb.where('asset_face.personGroupId', 'is not', null))
             .$if(!!minBirthDate, (qb) =>
               qb.where((eb) =>

@@ -14,6 +14,9 @@ const { getSpacePeopleMock, createSpaceAssetFaceMock, modalShowMock } = vi.hoist
 }));
 
 const refreshAssetPeopleMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const handleErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock('$lib/utils/handle-error', () => ({ handleError: handleErrorMock }));
 
 vi.mock('$lib/utils/refresh-asset-people', () => ({ refreshAssetPeople: refreshAssetPeopleMock }));
 
@@ -117,7 +120,16 @@ describe('FaceEditor with getFaceEditorSpace', () => {
     createSpaceAssetFaceMock.mockReset();
     modalShowMock.mockReset();
     refreshAssetPeopleMock.mockClear();
+    handleErrorMock.mockClear();
     getSpacePeopleMock.mockResolvedValue([]);
+  });
+
+  it('reports a failed space people load and leaves the candidate list empty', async () => {
+    const error = new Error('boom');
+    getSpacePeopleMock.mockRejectedValue(error);
+
+    await expect(getFaceEditorSpace('space-1', 'asset-1').loadPeople()).resolves.toEqual([]);
+    expect(handleErrorMock).toHaveBeenCalledWith(error, 'errors.cant_get_faces');
   });
 
   it('loads the space candidate list from getSpacePeople, not getAllPeople', async () => {
