@@ -104,6 +104,9 @@ features:
       # Detail panel People row: person tile and avatar source toggle (plan 9.6).
       - web/src/lib/gallery/asset-viewer/PersonTile.svelte
       - web/src/lib/gallery/asset-viewer/AvatarSourceToggle.svelte
+      # The asset's space for the viewer surfaces, and the space face side panel (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/asset-space.ts
+      - web/src/lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -300,6 +303,11 @@ features:
       - web/src/lib/gallery/sidebar/SidebarBottomInfo.svelte
       # Search page scope default, person chip names, selection context and legacy notice (plan 9.6).
       - web/src/lib/gallery/search/**
+      # Detail panel filter values, album filter, map view and map provider links (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/detail-panel-filters.ts
+      - web/src/lib/gallery/asset-viewer/FilterValue.svelte
+      - web/src/lib/gallery/asset-viewer/AppearsInAlbum.svelte
+      - web/src/lib/gallery/asset-viewer/MapProviderLinks.svelte
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
