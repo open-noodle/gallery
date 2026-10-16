@@ -98,6 +98,12 @@ export class S3StorageBackend implements StorageBackend {
       region: config.region,
       endpoint: config.endpoint,
       forcePathStyle: !!config.endpoint, // needed for MinIO and other S3-compatible services
+      // Only send and verify flexible checksums where the operation requires them, as the SDK did before it
+      // turned them on by default. S3-compatible stores such as Garage return a CRC32 header for multipart
+      // objects that is not the whole-object CRC the SDK computes, so every read of a large upload failed with
+      // "Checksum mismatch" and metadata extraction (and so transcoding) never ran (#1133).
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
       credentials:
         config.accessKeyId && config.secretAccessKey
           ? {

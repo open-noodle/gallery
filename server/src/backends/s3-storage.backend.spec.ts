@@ -83,6 +83,17 @@ describe('S3StorageBackend', () => {
     vi.clearAllMocks();
   });
 
+  describe('client', () => {
+    it('only sends and verifies flexible checksums when an operation requires them (#1133)', () => {
+      expect(S3Client).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestChecksumCalculation: 'WHEN_REQUIRED',
+          responseChecksumValidation: 'WHEN_REQUIRED',
+        }),
+      );
+    });
+  });
+
   describe('put', () => {
     it('should upload buffer using Upload (multipart-capable)', async () => {
       const { Upload } = await import('@aws-sdk/lib-storage');
