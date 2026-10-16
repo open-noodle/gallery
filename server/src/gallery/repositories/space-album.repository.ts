@@ -4,6 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
+import { albumMembership } from 'src/utils/shared-space-album-scope.js';
 
 @Injectable()
 export class SpaceAlbumRepository {
@@ -156,6 +157,25 @@ export class SpaceAlbumRepository {
       .select('album_space_asset.assetId')
       .where('album_space_asset.albumId', '=', albumId)
       .where('album_space_asset.assetId', 'in', assetIds)
+      .execute()
+      .then((results) => new Set(results.map(({ assetId }) => assetId)));
+  }
+
+  /**
+   * The ids among `assetIds` that are in the album as `viewerId` sees it: its own rows plus the contributions
+   * made through a space the viewer is a member of. Used to accept a contributed photo as the album cover (#1153).
+   */
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID], DummyValue.UUID] })
+  @ChunkedSet({ paramIndex: 1 })
+  async getAlbumAssetIdsForViewer(albumId: string, assetIds: string[], viewerId: string): Promise<Set<string>> {
+    if (assetIds.length === 0) {
+      return new Set();
+    }
+
+    return this.db
+      .selectFrom((eb) => albumMembership(eb, [albumId], { memberUserId: viewerId }).as('album_members'))
+      .select('album_members.assetId')
+      .where('album_members.assetId', 'in', assetIds)
       .execute()
       .then((results) => new Set(results.map(({ assetId }) => assetId)));
   }
