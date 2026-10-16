@@ -11,6 +11,8 @@ import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.co
 import { GalleryClusterGroupController } from 'src/gallery/controllers/gallery-cluster-group.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GallerySearchController } from 'src/gallery/controllers/gallery-search.controller.js';
+import { GalleryServerController } from 'src/gallery/controllers/gallery-server.controller.js';
+import { GalleryTimelineController } from 'src/gallery/controllers/gallery-timeline.controller.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
@@ -70,6 +72,10 @@ export const galleryControllers = [
   SharedSpaceController,
   StorageMigrationController,
   UserGroupController,
+  GalleryAlbumController,
+  GallerySearchController,
+  GalleryServerController,
+  GalleryTimelineController,
 ];
 
 export const galleryRepositories = [

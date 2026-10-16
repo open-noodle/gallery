@@ -9,9 +9,8 @@ import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.
 
 // Upstream #30715 deleted this spec because its only content was per-route
 // `should be an authenticated route` assertions, which `index.spec.ts` now covers
-// reflectively for every route. It is kept here for the fork-only
-// `GET /server/ml-health` endpoint (the cmdk palette's ML health indicator),
-// whose behavioural coverage has no upstream equivalent.
+// reflectively for every route. It is kept here for the fork's stock-client
+// version hooks, whose behavioural coverage has no upstream equivalent.
 describe(ServerController.name, () => {
   let ctx: ControllerContext;
   const serverService = mockBaseService(ServerService);
@@ -32,26 +31,6 @@ describe(ServerController.name, () => {
     versionService.resetAllMocks();
     systemMetadataService.resetAllMocks();
     ctx.reset();
-  });
-
-  describe('GET /server/ml-health', () => {
-    it('should be an authenticated route', async () => {
-      await request(ctx.getHttpServer()).get('/server/ml-health');
-      expect(ctx.authenticate).toHaveBeenCalled();
-    });
-
-    it('returns { smartSearchHealthy: true } when service reports healthy', async () => {
-      serverService.getMlHealth.mockResolvedValue({ smartSearchHealthy: true });
-      const { status, body } = await request(ctx.getHttpServer()).get('/server/ml-health');
-      expect(status).toBe(200);
-      expect(body).toEqual({ smartSearchHealthy: true });
-    });
-
-    it('returns { smartSearchHealthy: false } when service reports unhealthy', async () => {
-      serverService.getMlHealth.mockResolvedValue({ smartSearchHealthy: false });
-      const { body } = await request(ctx.getHttpServer()).get('/server/ml-health');
-      expect(body).toEqual({ smartSearchHealthy: false });
-    });
   });
 
   describe('GET /server/version', () => {

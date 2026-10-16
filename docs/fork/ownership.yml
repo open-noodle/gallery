@@ -253,6 +253,11 @@ features:
       - mobile/test/gallery/search/**
       - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
       - mobile/test/fixtures/search_contract/**
+      # fork routes moved out of the upstream album, search, server and timeline controllers
+      - server/src/gallery/controllers/gallery-album.controller*.ts
+      - server/src/gallery/controllers/gallery-search.controller*.ts
+      - server/src/gallery/controllers/gallery-server.controller*.ts
+      - server/src/gallery/controllers/gallery-timeline.controller*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
