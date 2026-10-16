@@ -1149,6 +1149,41 @@ describe('rolling fork sync', () => {
     expect(repo.git('status', '--short')).toContain('UD kept.txt');
   });
 
+  it('still stops when the rolling branch deleted a fork-deleted path the fork commit modifies', () => {
+    const { repo, outputDir, plan } = createRepoWithPlan({
+      baseFiles: { 'packages/scripts/package.json': '{"name":"scripts"}\n' },
+    });
+    const errors: string[] = [];
+    repo.write('packages/scripts/package.json', '{"name":"scripts","v":2}\n');
+    repo.commit('chore: fork edits the tooling (#2)');
+    repo.git(
+      'checkout',
+      '-b',
+      'rebase/upstream-2026-05',
+      plan.metadata.forkHead,
+    );
+    repo.git('rm', '-q', 'packages/scripts/package.json');
+    const preSyncHead = repo.commit('rolling branch drops the tooling');
+    writeRollingState(repo.path, validStateFromPlan(plan), outputDir);
+
+    const exitCode = runRollingSyncForkMainCommand({
+      repoPath: repo.path,
+      outputDir,
+      fetchFork: () => undefined,
+      runChecks: () => {
+        throw new Error('checks must not run after cherry-pick conflict');
+      },
+      writeError: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('cherry-pick');
+    expect(repo.git('rev-parse', 'HEAD')).toBe(preSyncHead);
+    expect(repo.git('status', '--short')).toContain(
+      'DU packages/scripts/package.json',
+    );
+  });
+
   it('keeps state unpromoted and recoverable when a later cherry-pick conflicts', () => {
     const { repo, outputDir, plan } = createRepoWithPlan();
     const errors: string[] = [];

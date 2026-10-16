@@ -771,8 +771,8 @@ function keepForkDeletions(
   if (
     unmerged.length === 0 ||
     !unmerged.every(
-      ({ code, file }) =>
-        (code === 'UD' || code === 'DU') && isForkDeletedPath(file),
+      // UD only: the fork commit deletes. DU (the rolling branch deleted, the fork commit edits) stays a stop.
+      ({ code, file }) => code === 'UD' && isForkDeletedPath(file),
     )
   ) {
     return false;
