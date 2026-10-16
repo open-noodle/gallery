@@ -474,6 +474,10 @@ patch_loading_spinner() {
   local rel file
   for rel in "${BRANDED_SPINNER_FILES[@]}"; do
     file="$REPO_ROOT/web/src/$rel"
+    # Already swapped by an earlier run: nothing to do.
+    if [[ -f "$file" ]] && ! grep -qE "$ui_import" "$file" && grep -qF "$branded" "$file"; then
+      continue
+    fi
     if [[ ! -f "$file" ]] || ! grep -qE "$ui_import" "$file"; then
       echo "  ERROR: web/src/$rel no longer imports LoadingSpinner from @immich/ui." >&2
       echo "  Upstream moved or rewrote it: update BRANDED_SPINNER_FILES in apply-branding.sh." >&2
