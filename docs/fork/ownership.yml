@@ -96,6 +96,7 @@ features:
       - server/src/gallery/utils/album-response-overlay.ts
       - server/src/gallery/utils/space-album-contribution.ts
       - server/src/gallery/utils/timeline-scope.ts
+      - server/src/gallery/utils/duplicate-resolve.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
