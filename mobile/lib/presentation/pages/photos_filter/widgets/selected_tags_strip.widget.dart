@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/store.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -38,7 +39,7 @@ class SelectedTagsStrip extends ConsumerWidget {
               label: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1),
               deleteIcon: const Icon(Icons.close_rounded, size: 18),
               deleteButtonTooltipMessage: context.t.remove_filter,
-              onDeleted: () => ref.read(photosFilterProvider.notifier).toggleTag(id),
+              onDeleted: () => ref.read(photosFilterProvider.notifier).removeTag(id),
             ),
           );
         },
