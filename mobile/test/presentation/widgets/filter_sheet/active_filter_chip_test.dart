@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
@@ -144,7 +146,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(ActiveFilterChip)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1'); // seed state
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1')); // seed state
       expect(container.read(photosFilterProvider).tagIds, ['t1']);
 
       await tester.tap(find.byIcon(Icons.close_rounded));
@@ -176,7 +178,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(ActiveFilterChip)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
       expect(container.read(photosFilterProvider).tagIds, ['t1']);
 
       await tester.tap(find.byIcon(Icons.close_rounded));

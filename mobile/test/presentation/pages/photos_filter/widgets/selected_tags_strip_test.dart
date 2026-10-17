@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_tags_strip.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -28,7 +29,7 @@ void main() {
         overrides: _overrides({_t('t1', 'Travel/Italy/Rome')}),
       );
       final container = ProviderScope.containerOf(tester.element(find.byType(SelectedTagsStrip)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('selected-tag-chip-t1')), findsOneWidget);
@@ -41,7 +42,7 @@ void main() {
     testWidgets('unresolved tag id falls back to filter_sheet_tag_fallback label', (tester) async {
       await tester.pumpConsumerWidget(const SelectedTagsStrip(), overrides: _overrides({}));
       final container = ProviderScope.containerOf(tester.element(find.byType(SelectedTagsStrip)));
-      container.read(photosFilterProvider.notifier).toggleTag('missing');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 'missing', value: 'missing'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('selected-tag-chip-missing')), findsOneWidget);
@@ -57,8 +58,8 @@ void main() {
         overrides: _overrides({_t('t1', 'Travel'), _t('t2', 'Food')}),
       );
       final container = ProviderScope.containerOf(tester.element(find.byType(SelectedTagsStrip)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
-      container.read(photosFilterProvider.notifier).toggleTag('t2');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't2', value: 't2'));
       await tester.pumpAndSettle();
 
       final chip = find.byKey(const Key('selected-tag-chip-t1'));
@@ -74,7 +75,7 @@ void main() {
     testWidgets('renders correctly in dark theme', (tester) async {
       await tester.pumpConsumerWidgetDark(const SelectedTagsStrip(), overrides: _overrides({_t('t1', 'Travel')}));
       final container = ProviderScope.containerOf(tester.element(find.byType(SelectedTagsStrip)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
       await tester.pumpAndSettle();
       expect(find.byType(InputChip), findsOneWidget);
     });

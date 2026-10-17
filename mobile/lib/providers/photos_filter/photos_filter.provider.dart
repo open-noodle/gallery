@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
@@ -39,6 +40,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void setSimilarTo(String assetId) =>
       state = SearchFilter.empty().copyWith(assetId: assetId, mediaType: AssetType.image);
 
+  void showTag(Tag tag) => state = SearchFilter.empty().copyWith(tags: {tag});
+
   void togglePerson(FilterPerson person) {
     final next = Set<FilterPerson>.from(state.people);
     if (!next.add(person)) {
@@ -47,17 +50,20 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     state = state.copyWith(people: next);
   }
 
-  void toggleTag(String tagId) {
-    final current = List<String>.from(state.tagIds ?? const []);
-    if (current.contains(tagId)) {
-      current.remove(tagId);
+  void toggleTag(Tag tag) {
+    final current = {...?state.tags};
+    final selected = current.any((t) => t.id == tag.id);
+    if (selected) {
+      current.removeWhere((t) => t.id == tag.id);
     } else {
-      current.add(tagId);
+      current.add(tag);
     }
-    state = state.copyWith(
-      display: state.display.copyWith(isUntagged: false),
-      tagIds: current.isEmpty ? null : current,
-    );
+    state = state.copyWith(display: state.display.copyWith(isUntagged: false), tags: current.isEmpty ? null : current);
+  }
+
+  void removeTag(String tagId) {
+    final next = {...?state.tags}..removeWhere((t) => t.id == tagId);
+    state = state.copyWith(tags: next.isEmpty ? null : next);
   }
 
   void setLocation(SearchLocationFilter? location) =>
@@ -81,16 +87,16 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void setNotInAlbum(bool v) => state = state.copyWith(display: state.display.copyWith(isNotInAlbum: v));
 
   void setUntagged(bool v) {
-    final previousTagIds = state.tagIds;
+    final previousTags = state.tags;
     state = state.copyWith(
       display: state.display.copyWith(isUntagged: v),
-      tagIds: v ? null : previousTagIds,
+      tags: v ? null : previousTags,
     );
   }
 
   void clearPeople() => state = state.copyWith(people: const {});
 
-  void clearTags() => state = state.copyWith(tagIds: null);
+  void clearTags() => state = state.copyWith(tags: null);
 
   // ignore: unused-code
   void clearDimension(Dimension d) {
@@ -123,8 +129,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
       case PersonChipId(:final personId):
         state = state.copyWith(people: state.people.where((p) => p.id != personId).toSet());
       case TagChipId(:final tagId):
-        final next = List<String>.from(state.tagIds ?? const [])..remove(tagId);
-        state = state.copyWith(tagIds: next.isEmpty ? null : next);
+        removeTag(tagId);
       case LocationChipId():
         setLocation(null);
       case CameraChipId():

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
@@ -240,7 +241,10 @@ void main() {
         camera: const SearchCameraFilter(make: 'Canon', model: 'EOS R5'),
         date: SearchDateFilter(takenAfter: after, takenBefore: before),
         rating: const SearchRatingFilter(rating: Option.some(4)),
-        tagIds: ['tag-1', 'tag-2'],
+        tags: {
+          const Tag(id: 'tag-1', value: 'tag-1'),
+          const Tag(id: 'tag-2', value: 'tag-2'),
+        },
         mediaType: AssetType.image,
       );
 
