@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
@@ -103,7 +105,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(TagsSectionDeep)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
       await tester.pumpAndSettle();
 
       final chip = tester.widget<FilterChip>(find.byKey(const Key('tag-chip-t1')));
@@ -208,7 +210,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(TagsSectionDeep)));
-      container.read(photosFilterProvider.notifier).toggleTag('t11');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't11', value: 't11'));
       await tester.pumpAndSettle();
 
       // Pinned beyond the cap because it's selected.
@@ -252,7 +254,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(TagsSectionDeep)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
       await tester.pumpAndSettle();
 
       final chip = tester.widget<FilterChip>(find.byKey(const Key('tag-chip-t1')));
