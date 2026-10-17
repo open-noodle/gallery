@@ -6,14 +6,19 @@ import { getByteUnitString } from '$lib/utils/byte-units';
 
 const mocks = vi.hoisted(() => ({
   authManager: { authenticated: true, user: { quotaSizeInBytes: null as number | null, quotaUsageInBytes: 0 } },
-  userInteraction: {
-    serverInfo: { diskSizeRaw: 0, diskUseRaw: 0 } as { diskSizeRaw: number; diskUseRaw: number } | undefined,
-  },
+  serverInfo: { diskSizeRaw: 0, diskUseRaw: 0 } as { diskSizeRaw: number; diskUseRaw: number } | undefined,
 }));
 
 vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mocks.authManager }));
-vi.mock('$lib/stores/user.svelte', () => ({ userInteraction: mocks.userInteraction }));
-vi.mock('$lib/utils/auth', () => ({ requestServerInfo: vi.fn() }));
+// Both components read the server's storage through getStorageQuery (upstream immich-32467).
+vi.mock('@tanstack/svelte-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/svelte-query')>()),
+  createQuery: () => ({
+    get data() {
+      return mocks.serverInfo;
+    },
+  }),
+}));
 
 // Spied (not stubbed): both StorageSpace and rail-storage keep computing real byte-unit
 // strings, but the parity block below inspects the spy's call arguments to compare what each
@@ -42,7 +47,7 @@ describe('rail-storage', () => {
   beforeEach(() => {
     mocks.authManager.authenticated = true;
     mocks.authManager.user = { quotaSizeInBytes: null, quotaUsageInBytes: 0 };
-    mocks.userInteraction.serverInfo = { diskSizeRaw: 50_000_000_000, diskUseRaw: 12_000_000_000 };
+    mocks.serverInfo = { diskSizeRaw: 50_000_000_000, diskUseRaw: 12_000_000_000 };
   });
 
   it('renders the storage icon with an accessible label', () => {
@@ -65,7 +70,7 @@ describe('rail-storage', () => {
     ${'zero quota is honoured'} | ${0}              | ${0}             | ${50_000_000_000} | ${12_000_000_000} | ${0}              | ${0}
   `('derives bytes for $scenario', ({ quotaSize, quotaUsed, diskSize, diskUse, used, available }) => {
     mocks.authManager.user = { quotaSizeInBytes: quotaSize, quotaUsageInBytes: quotaUsed };
-    mocks.userInteraction.serverInfo = { diskSizeRaw: diskSize, diskUseRaw: diskUse };
+    mocks.serverInfo = { diskSizeRaw: diskSize, diskUseRaw: diskUse };
 
     render(RailStorage);
 
@@ -73,7 +78,7 @@ describe('rail-storage', () => {
   });
 
   it('falls back to zero when the server info has not arrived', () => {
-    mocks.userInteraction.serverInfo = undefined;
+    mocks.serverInfo = undefined;
 
     render(RailStorage);
 
@@ -107,7 +112,7 @@ describe('rail-storage parity with StorageSpace', () => {
     ${'no quota, server disk'} | ${null}           | ${0}             | ${50_000_000_000} | ${12_000_000_000}
   `('reports identical bytes to StorageSpace for $scenario', ({ quotaSize, quotaUsed, diskSize, diskUse }) => {
     mocks.authManager.user = { quotaSizeInBytes: quotaSize, quotaUsageInBytes: quotaUsed };
-    mocks.userInteraction.serverInfo = { diskSizeRaw: diskSize, diskUseRaw: diskUse };
+    mocks.serverInfo = { diskSizeRaw: diskSize, diskUseRaw: diskUse };
 
     render(StorageSpace);
     const storageSpaceBytes = precisionThreeTitleBytes();
