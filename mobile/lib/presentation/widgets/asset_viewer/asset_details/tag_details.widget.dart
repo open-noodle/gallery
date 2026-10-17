@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/store.dart';
@@ -8,12 +5,10 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
+import 'package:immich_mobile/gallery/utils/open_tag_filter.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/actions/tag.action.dart';
-import 'package:immich_mobile/presentation/pages/search/paginated_search.provider.dart';
-import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
-import 'package:immich_mobile/routing/router.dart';
 
 const _collapsedTagsMaxHeight = 140.0;
 
@@ -30,26 +25,8 @@ class _TagDetailsState extends ConsumerState<TagDetails> {
   bool _isExpanded = false;
   bool _hasOverflow = false;
 
-  void _openTag(Tag tag) {
-    ref.invalidate(assetViewerProvider);
-    ref.invalidate(paginatedSearchProvider);
-    ref.read(searchPreFilterProvider.notifier)
-      ..clear()
-      ..setFilter(
-        .new(
-          tags: {tag},
-          people: {},
-          location: const .new(),
-          camera: const .new(),
-          date: const .new(),
-          display: const .new(isNotInAlbum: false, isArchive: false, isFavorite: false),
-          rating: const .new(),
-          mediaType: .other,
-        ),
-      );
-
-    unawaited(context.navigateTo(const SearchRoute()));
-  }
+  // gallery-fork: the photos filter replaces upstream's search page.
+  void _openTag(Tag tag) => openTagInPhotosFilter(context, ref, tag);
 
   bool _onTagsMetrics(ScrollMetricsNotification notification) {
     final hasOverflow =
