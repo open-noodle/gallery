@@ -18,7 +18,8 @@ import { AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
 import { AlbumUserRole, JobName, Permission } from 'src/enum.js';
 import { hasDirectAlbumReadAccess } from 'src/gallery/utils/access-grants.js';
-import { AlbumAssetCount, AlbumInfoOptions } from 'src/repositories/album.repository.js';
+import { albumMetadataScope } from 'src/gallery/utils/album-metadata-scope.js';
+import { AlbumAssetCount } from 'src/repositories/album.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { addAssets, removeAssets } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
@@ -103,24 +104,13 @@ export class AlbumService extends BaseService {
   async get(auth: AuthDto, id: string): Promise<AlbumResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AlbumRead, ids: [id] });
     await this.albumRepository.updateThumbnails();
-    const album = await this.findOrFail(id, auth.user.id, { withAssets: false });
-    // #1018: for a shared link the count is scoped to the ONE space the link was created from, so
-    // it matches the grid the link renders. A link with no space counts owner rows only, as before —
-    // passing the creator's id unscoped would count contributions from every space they belong to.
-    const [albumMetadataForIds] = await this.albumRepository.getMetadataForIds(
-      [album.id],
-      auth.sharedLink
-        ? auth.sharedLink.spaceId
-          ? { forUserId: auth.sharedLink.userId, spaceId: auth.sharedLink.spaceId }
-          : { forUserId: undefined }
-        : { forUserId: auth.user.id },
-    );
+    const album = await this.findOrFail(id, auth.user.id);
 
     const hasSharedUsers = album.albumUsers && album.albumUsers.length > 1;
     const hasSharedLink = album.sharedLinks && album.sharedLinks.length > 0;
     const isShared = hasSharedUsers || hasSharedLink;
 
-    const mapped = mapAlbum(album, { auth });
+    const mapped = await this.mapWithMetadata(album, auth);
 
     // security-8: a caller who reaches the album ONLY through shared-space membership (not the album owner
     // or a shared album_user) must not see other participants' PII (id / name / role / profile image /
@@ -165,10 +155,6 @@ export class AlbumService extends BaseService {
 
     return {
       ...mapped,
-      startDate: asDateTimeString(albumMetadataForIds?.startDate ?? undefined),
-      endDate: asDateTimeString(albumMetadataForIds?.endDate ?? undefined),
-      assetCount: albumMetadataForIds?.assetCount ?? 0,
-      lastModifiedAssetTimestamp: asDateTimeString(albumMetadataForIds?.lastModifiedAssetTimestamp ?? undefined),
       // L1: contributorCounts exposes contributor userIds + per-user asset counts — the same PII
       // security-8 already gated the rest of albumUsers behind. A space-only reader (hasDirectAccess
       // false) must not see it, matching the albumUsers redaction above; nor may a shared-link viewer.
@@ -230,7 +216,7 @@ export class AlbumService extends BaseService {
       await this.eventRepository.emit('AlbumInvite', { id: album.id, userId, senderName: auth.user.name });
     }
 
-    return this.mapWithMetadata(album);
+    return this.mapWithMetadata(album, auth);
   }
 
   async update(auth: AuthDto, id: string, dto: UpdateAlbumDto): Promise<AlbumResponseDto> {
@@ -262,7 +248,7 @@ export class AlbumService extends BaseService {
       auth.user.id,
     );
 
-    return this.mapWithMetadata(updatedAlbum);
+    return this.mapWithMetadata(updatedAlbum, auth);
   }
 
   async delete(auth: AuthDto, id: string): Promise<void> {
@@ -556,7 +542,7 @@ export class AlbumService extends BaseService {
       await this.eventRepository.emit('AlbumInvite', { id, userId, senderName: auth.user.name });
     }
 
-    return this.mapWithMetadata(await this.findOrFail(id, auth.user.id));
+    return this.mapWithMetadata(await this.findOrFail(id, auth.user.id), auth);
   }
 
   async removeUser(auth: AuthDto, id: string, userId: string | 'me'): Promise<void> {
@@ -603,8 +589,8 @@ export class AlbumService extends BaseService {
     return findOrFail(() => this.albumRepository.getById(id, authUserId), 'Album');
   }
 
-  private async mapWithMetadata(album: MapAlbumDto, auth?: AuthDto): Promise<AlbumResponseDto> {
-    const [metadata] = await this.albumRepository.getMetadataForIds([album.id]);
+  private async mapWithMetadata(album: MapAlbumDto, auth: AuthDto): Promise<AlbumResponseDto> {
+    const [metadata] = await this.albumRepository.getMetadataForIds([album.id], albumMetadataScope(auth));
     return { ...mapAlbum(album, { auth }), ...mapAlbumMetadata(metadata) };
   }
 }
