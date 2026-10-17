@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/tags_picker.page.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';

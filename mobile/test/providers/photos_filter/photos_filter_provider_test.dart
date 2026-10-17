@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
@@ -64,21 +66,21 @@ void main() {
   group('toggleTag', () {
     test('adding a tag sets it in state.tagIds', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('tag-1');
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
       expect(container.read(photosFilterProvider).tagIds, ['tag-1']);
     });
     test('toggling same tag twice ends with null or empty tagIds', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('tag-1');
-      notifier.toggleTag('tag-1');
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
       final tagIds = container.read(photosFilterProvider).tagIds;
       expect(tagIds == null || tagIds.isEmpty, true);
     });
     test('toggle persists null-ness on an empty list', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('tag-1');
-      notifier.toggleTag('tag-2');
-      notifier.toggleTag('tag-1');
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
+      notifier.toggleTag(const Tag(id: 'tag-2', value: 'tag-2'));
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
       expect(container.read(photosFilterProvider).tagIds, ['tag-2']);
     });
   });
@@ -213,7 +215,7 @@ void main() {
 
     test('enabling untagged clears selected tag ids', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('tag-1');
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
       notifier.setUntagged(true);
       final f = container.read(photosFilterProvider);
       expect(f.display.isUntagged, true);
@@ -223,7 +225,7 @@ void main() {
     test('selecting a tag clears untagged', () {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setUntagged(true);
-      notifier.toggleTag('tag-1');
+      notifier.toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
       final f = container.read(photosFilterProvider);
       expect(f.display.isUntagged, false);
       expect(f.tagIds, ['tag-1']);
@@ -235,7 +237,7 @@ void main() {
       final notifier = container.read(photosFilterProvider.notifier);
       const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
-      notifier.toggleTag('t1');
+      notifier.toggleTag(const Tag(id: 't1', value: 't1'));
       notifier.clearPeople();
       final f = container.read(photosFilterProvider);
       expect(f.people, isEmpty);
@@ -248,7 +250,7 @@ void main() {
       final notifier = container.read(photosFilterProvider.notifier);
       const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
-      notifier.toggleTag('t1');
+      notifier.toggleTag(const Tag(id: 't1', value: 't1'));
       notifier.clearTags();
       final f = container.read(photosFilterProvider);
       expect(f.tagIds == null || f.tagIds!.isEmpty, true);
@@ -261,7 +263,7 @@ void main() {
       final notifier = container.read(photosFilterProvider.notifier);
       const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
-      notifier.toggleTag('t1');
+      notifier.toggleTag(const Tag(id: 't1', value: 't1'));
       notifier.clearDimension(Dimension.people);
       final f = container.read(photosFilterProvider);
       expect(f.people, isEmpty);
@@ -269,7 +271,7 @@ void main() {
     });
     test('clears tags dimension', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('t1');
+      notifier.toggleTag(const Tag(id: 't1', value: 't1'));
       notifier.clearDimension(Dimension.tags);
       expect(
         container.read(photosFilterProvider).tagIds == null || container.read(photosFilterProvider).tagIds!.isEmpty,
@@ -352,14 +354,14 @@ void main() {
     });
     test('TagChipId no-op on nonexistent id', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('t1');
+      notifier.toggleTag(const Tag(id: 't1', value: 't1'));
       notifier.removeChip(const TagChipId('ghost'));
       expect(container.read(photosFilterProvider).tagIds, ['t1']);
     });
     test('TagChipId removes that tag, keeping others', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.toggleTag('t1');
-      notifier.toggleTag('t2');
+      notifier.toggleTag(const Tag(id: 't1', value: 't1'));
+      notifier.toggleTag(const Tag(id: 't2', value: 't2'));
       notifier.removeChip(const TagChipId('t1'));
       expect(container.read(photosFilterProvider).tagIds, ['t2']);
     });

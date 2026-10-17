@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:immich_mobile/data/server/api_repository.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart' hide AssetVisibility;
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/option.dart';
@@ -18,8 +19,6 @@ class SearchApiRepository extends ApiRepository {
 
   SearchApi get _api => _apiService.searchApi;
 
-  List<String> _tagIdsForSearch(SearchFilter filter) => filter.tagIds ?? const <String>[];
-
   AssetOrder? _order(SearchFilter filter) => switch (filter.sort) {
     SearchSortOrder.relevance => null,
     SearchSortOrder.newest => AssetOrder.desc,
@@ -34,9 +33,8 @@ class SearchApiRepository extends ApiRepository {
       type = AssetTypeEnum.VIDEO;
     }
 
-    final tagIds = filter.tags == null
-        ? const Optional<List<String>>.absent()
-        : Optional.present(filter.tags!.map((tag) => tag.id).toList());
+    // Always present: an empty list means no tag filter, while an explicit null means untagged (below).
+    final tagIds = Optional.present(filter.tagIds ?? const <String>[]);
 
     if ((filter.context != null && filter.context!.isNotEmpty) ||
         (filter.assetId != null && filter.assetId!.isNotEmpty)) {
@@ -60,7 +58,7 @@ class SearchApiRepository extends ApiRepository {
         isFavorite: filter.display.isFavorite ? const Optional.present(true) : const Optional.absent(),
         isNotInAlbum: filter.display.isNotInAlbum ? const Optional.present(true) : const Optional.absent(),
         personIds: Optional.present(filter.people.map((e) => e.id).toList()),
-        tagIds: Optional.present(_tagIdsForSearch(filter)),
+        tagIds: tagIds,
         type: type == null ? const Optional.absent() : Optional.present(type),
         order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)),
         page: Optional.present(page),
@@ -97,7 +95,7 @@ class SearchApiRepository extends ApiRepository {
       isFavorite: filter.display.isFavorite ? const Optional.present(true) : const Optional.absent(),
       isNotInAlbum: filter.display.isNotInAlbum ? const Optional.present(true) : const Optional.absent(),
       personIds: Optional.present(filter.people.map((e) => e.id).toList()),
-      tagIds: Optional.present(_tagIdsForSearch(filter)),
+      tagIds: tagIds,
       type: type == null ? const Optional.absent() : Optional.present(type),
       order: _order(filter) == null ? const Optional.absent() : Optional.present(_order(filter)),
       page: Optional.present(page),

@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';

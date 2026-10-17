@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 
 void main() {

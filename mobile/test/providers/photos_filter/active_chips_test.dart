@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
@@ -109,7 +110,9 @@ void main() {
     });
 
     test('tag id in suggestions → resolved label', () {
-      final f = _base().copyWith(tagIds: ['t1']);
+      final f = _base().copyWith(
+        tags: {const Tag(id: 't1', value: 't1')},
+      );
       final suggestions = FilterSuggestionsResponseDto(
         hasUnnamedPeople: false,
         hasFavorites: false,
@@ -125,7 +128,9 @@ void main() {
     });
 
     test('tag id NOT in suggestions → fallback label', () {
-      final f = _base().copyWith(tagIds: ['unknown']);
+      final f = _base().copyWith(
+        tags: {const Tag(id: 'unknown', value: 'unknown')},
+      );
       final chips = activeChipsFromFilter(f);
       expect(chips, hasLength(1));
       expect(chips.single.label, 'filter_sheet_tag_fallback');
@@ -259,7 +264,7 @@ void main() {
     test('combined filter preserves documented order', () {
       final f = _base().copyWith(
         people: {_person('p1', 'Alice')},
-        tagIds: ['t1'],
+        tags: {const Tag(id: 't1', value: 't1')},
         location: const SearchLocationFilter(country: 'France'),
         camera: const SearchCameraFilter(make: 'Canon', model: 'R5'),
         date: SearchDateFilter(takenAfter: DateTime(2024, 4, 1)),

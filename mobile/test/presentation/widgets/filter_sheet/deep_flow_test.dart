@@ -7,6 +7,7 @@ import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/city_suggestions.provider.dart';

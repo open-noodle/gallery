@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -64,7 +65,7 @@ class _TagRow extends ConsumerWidget {
       key: Key('tag-row-${tag.id}'),
       onTap: () {
         unawaited(HapticFeedback.selectionClick());
-        ref.read(photosFilterProvider.notifier).toggleTag(tag.id);
+        ref.read(photosFilterProvider.notifier).toggleTag(tag);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

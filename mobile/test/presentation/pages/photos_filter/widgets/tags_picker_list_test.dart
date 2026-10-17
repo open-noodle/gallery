@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/tags_picker_list.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -56,7 +57,7 @@ void main() {
     testWidgets('selected row shows a trailing check icon', (tester) async {
       await tester.pumpConsumerWidget(TagsPickerList(tags: [_t('t1', 'Food')]));
       final container = ProviderScope.containerOf(tester.element(find.byType(TagsPickerList)));
-      container.read(photosFilterProvider.notifier).toggleTag('t1');
+      container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 't1', value: 't1'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('tag-row-t1-check')), findsOneWidget);
