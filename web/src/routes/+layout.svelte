@@ -11,7 +11,6 @@
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
   import { globalSearchManager, type SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
-  import { serverConfigManager } from '#lib/managers/server-config-manager.svelte';
   import ServerRestartingModal from '#lib/modals/ServerRestartingModal.svelte';
   import { queryClient } from '#lib/queries/client.ts';
   import { Route } from '#lib/route.ts';
@@ -309,9 +308,9 @@
       {@render children?.()}
     {/if}
 
-  {#if showNavigationLoadingBar}
-    <NavigationLoadingBar />
-  {/if}
+    {#if showNavigationLoadingBar}
+      <NavigationLoadingBar />
+    {/if}
 
     <DownloadPanel />
     <UploadPanel />
