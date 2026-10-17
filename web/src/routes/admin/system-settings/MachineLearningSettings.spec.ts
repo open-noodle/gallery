@@ -3,7 +3,6 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import MachineLearningSettings from './MachineLearningSettings.svelte';
 
 type FacialRecognitionOverrides = Partial<
@@ -60,8 +59,7 @@ const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false, duplicateDetection: true },
   systemConfig: {} as AdminConfigDto,
   defaultSystemConfig: {} as AdminConfigDto,
-  cloneValue: vi.fn(),
-  cloneDefaultValue: vi.fn(),
+  saveConfig: vi.fn(),
   showDialog: vi.fn(),
   // Which accordion sections render their body. Mutable so a test that needs to drive a control in
   // another section (e.g. the pet-detection switch) can open it without re-mocking the manager.
@@ -76,17 +74,17 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
   } as never,
 }));
 
-vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
-  systemConfigManager: {
-    get value() {
-      return mocks.systemConfig;
+vi.mock(import('$lib/queries/client'), () => ({
+  createDefinedQuery: ((options: { queryKey: readonly unknown[] }) => ({
+    get data() {
+      return options.queryKey[1] === 'defaults' ? mocks.defaultSystemConfig : mocks.systemConfig;
     },
-    get defaultValue() {
-      return mocks.defaultSystemConfig;
-    },
-    cloneValue: mocks.cloneValue,
-    cloneDefaultValue: mocks.cloneDefaultValue,
-  } as never,
+  })) as never,
+}));
+
+vi.mock(import('@tanstack/svelte-query'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  createMutation: (() => ({ mutate: mocks.saveConfig, isPending: false })) as never,
 }));
 
 // SettingAccordion drives open/close through accordionManager (which navigates via goto);
@@ -97,10 +95,6 @@ vi.mock(import('$lib/managers/accordion-manager.svelte'), () => ({
     open: vi.fn(),
     close: vi.fn(),
   } as never,
-}));
-
-vi.mock(import('$lib/services/system-config.service'), () => ({
-  handleSystemConfigSave: vi.fn(),
 }));
 
 vi.mock('@immich/ui', async (original) => {
@@ -128,8 +122,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
     mocks.featureFlags = { configFile: false, duplicateDetection: true };
     mocks.systemConfig = makeMachineLearningConfig();
     mocks.defaultSystemConfig = makeMachineLearningConfig();
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
-    mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
   });
 
   it('does not rewrite the displayed distance in config-file (disabled) mode, even when the loaded config already violates the invariant', async () => {
@@ -140,7 +132,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
       maxDistance: 0.6,
       suggestions: { enabled: true, maxDistance: 0.5 },
     });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -154,7 +145,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
       maxDistance: 0.5,
       suggestions: { enabled: false, maxDistance: 0.3 },
     });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -169,7 +159,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
       maxDistance: 0.5,
       suggestions: { enabled: false, maxDistance: 0.9 },
     });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -186,7 +175,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
       maxDistance: 0.5,
       suggestions: { enabled: true, maxDistance: 0.7 },
     });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -215,7 +203,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
       maxDistance: 0.5,
       suggestions: { enabled: false, maxDistance: undefined as unknown as number },
     });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -230,7 +217,6 @@ describe('MachineLearningSettings face suggestions auto-fill', () => {
       maxDistance: 0.5,
       suggestions: { enabled: true, maxDistance: 0.3 },
     });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -250,8 +236,6 @@ describe('MachineLearningSettings suggestions toggle availability', () => {
     mocks.featureFlags = { configFile: false, duplicateDetection: true };
     mocks.systemConfig = makeMachineLearningConfig();
     mocks.defaultSystemConfig = makeMachineLearningConfig();
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
-    mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
   });
 
   // S12.13: the server deliberately supports suggestions with the ML master switch off
@@ -259,7 +243,6 @@ describe('MachineLearningSettings suggestions toggle availability', () => {
   it('keeps the suggestions toggle enabled when the ML master switch is off', () => {
     mocks.systemConfig = makeMachineLearningConfig();
     mocks.systemConfig.machineLearning.enabled = false;
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -268,7 +251,6 @@ describe('MachineLearningSettings suggestions toggle availability', () => {
 
   it('disables the suggestions toggle when facial recognition itself is off (positive control)', () => {
     mocks.systemConfig = makeMachineLearningConfig({ enabled: false });
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
     render(MachineLearningSettings);
 
@@ -283,8 +265,6 @@ describe('MachineLearningSettings pet recognition', () => {
     mocks.featureFlags.configFile = false;
     mocks.systemConfig = makeMachineLearningConfig();
     mocks.defaultSystemConfig = makeMachineLearningConfig();
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
-    mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
     mocks.showDialog.mockResolvedValue(true);
   });
 
@@ -295,7 +275,6 @@ describe('MachineLearningSettings pet recognition', () => {
         {},
         { petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.5 } },
       );
-      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
       render(MachineLearningSettings);
 
@@ -307,7 +286,6 @@ describe('MachineLearningSettings pet recognition', () => {
         {},
         { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5 } },
       );
-      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
       render(MachineLearningSettings);
 
@@ -323,7 +301,6 @@ describe('MachineLearningSettings pet recognition', () => {
         {},
         { petDetection: { enabled: true, modelName: 'yolo11s', minScore: 0.5 } },
       );
-      mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
       render(MachineLearningSettings);
 
@@ -332,7 +309,7 @@ describe('MachineLearningSettings pet recognition', () => {
       await user.click(screen.getByRole('switch', { name: 'admin.machine_learning_pet_detection_setting' }));
 
       await waitFor(() => expect(screen.getByText('admin.pet_recognition_requires_detection')).toBeInTheDocument());
-      expect(handleSystemConfigSave).not.toHaveBeenCalled();
+      expect(mocks.saveConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -350,7 +327,7 @@ describe('MachineLearningSettings pet recognition', () => {
       await waitFor(() => {
         expect(mocks.showDialog).toHaveBeenCalledWith({ prompt: 'admin.pet_recognition_model_change_warning' });
       });
-      expect(handleSystemConfigSave).not.toHaveBeenCalled();
+      expect(mocks.saveConfig).not.toHaveBeenCalled();
     });
 
     it('proceeds with the save once the model-change confirm is accepted', async () => {
@@ -363,7 +340,7 @@ describe('MachineLearningSettings pet recognition', () => {
       await fireEvent.click(screen.getByRole('button', { name: 'save' }));
 
       await waitFor(() => {
-        expect(handleSystemConfigSave).toHaveBeenCalled();
+        expect(mocks.saveConfig).toHaveBeenCalled();
       });
     });
 
@@ -373,7 +350,7 @@ describe('MachineLearningSettings pet recognition', () => {
       await fireEvent.click(screen.getByRole('button', { name: 'save' }));
 
       await waitFor(() => {
-        expect(handleSystemConfigSave).toHaveBeenCalled();
+        expect(mocks.saveConfig).toHaveBeenCalled();
       });
       expect(mocks.showDialog).not.toHaveBeenCalled();
     });
