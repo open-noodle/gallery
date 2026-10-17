@@ -1,11 +1,4 @@
-import type {
-  AlbumResponseDto,
-  ServerAboutResponseDto,
-  ServerStorageResponseDto,
-  ServerVersionHistoryResponseDto,
-  SharedSpaceLinkedAlbumDto,
-  SharedSpaceResponseDto,
-} from '@immich/sdk';
+import type { AlbumResponseDto, SharedSpaceLinkedAlbumDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { getAllSpaces } from '@immich/sdk';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
@@ -16,18 +9,12 @@ interface UserInteractions {
   recentAlbums?: AlbumResponseDto[];
   recentSpaces?: SharedSpaceResponseDto[];
   spaceAlbums?: Record<string, SharedSpaceLinkedAlbumDto[]>;
-  versions?: ServerVersionHistoryResponseDto[];
-  aboutInfo?: ServerAboutResponseDto;
-  serverInfo?: ServerStorageResponseDto;
 }
 
 const defaultUserInteraction: UserInteractions = {
   recentAlbums: undefined,
   recentSpaces: undefined,
   spaceAlbums: undefined,
-  versions: undefined,
-  aboutInfo: undefined,
-  serverInfo: undefined,
 };
 
 export const userInteraction = $state<UserInteractions>(defaultUserInteraction);
