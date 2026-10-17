@@ -4,7 +4,6 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import NewVersionCheckSettings from './NewVersionCheckSettings.svelte';
 
 const makeConfig = (enabled = true, channel = ReleaseChannel.Stable) =>
@@ -16,8 +15,7 @@ const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false },
   systemConfig: { newVersionCheck: { enabled: true, channel: 'stable' } },
   defaultSystemConfig: { newVersionCheck: { enabled: true, channel: 'stable' } },
-  cloneValue: vi.fn(),
-  cloneDefaultValue: vi.fn(),
+  saveConfig: vi.fn(),
 }));
 
 vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
@@ -28,21 +26,17 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
   } as never,
 }));
 
-vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
-  systemConfigManager: {
-    get value() {
-      return mocks.systemConfig as AdminConfigDto;
+vi.mock(import('$lib/queries/client'), () => ({
+  createDefinedQuery: ((options: { queryKey: readonly unknown[] }) => ({
+    get data() {
+      return options.queryKey[1] === 'defaults' ? mocks.defaultSystemConfig : mocks.systemConfig;
     },
-    get defaultValue() {
-      return mocks.defaultSystemConfig as AdminConfigDto;
-    },
-    cloneValue: mocks.cloneValue,
-    cloneDefaultValue: mocks.cloneDefaultValue,
-  } as never,
+  })) as never,
 }));
 
-vi.mock(import('$lib/services/system-config.service'), () => ({
-  handleSystemConfigSave: vi.fn(),
+vi.mock(import('@tanstack/svelte-query'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  createMutation: (() => ({ mutate: mocks.saveConfig, isPending: false })) as never,
 }));
 
 describe('NewVersionCheckSettings', () => {
@@ -51,8 +45,6 @@ describe('NewVersionCheckSettings', () => {
     mocks.featureFlags.configFile = false;
     mocks.systemConfig = makeConfig();
     mocks.defaultSystemConfig = makeConfig();
-    mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
-    mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
   });
 
   it('does not render the release-channel selector (fork override makes it a no-op, LOW #6)', () => {
@@ -73,7 +65,7 @@ describe('NewVersionCheckSettings', () => {
     await user.click(toggle);
     await user.click(screen.getByRole('button', { name: 'save' }));
 
-    expect(handleSystemConfigSave).toHaveBeenCalledWith({
+    expect(mocks.saveConfig).toHaveBeenCalledWith({
       newVersionCheck: { enabled: false, channel: ReleaseChannel.Stable },
     });
   });
