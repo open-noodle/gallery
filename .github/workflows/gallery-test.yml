@@ -93,7 +93,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
+          cache: 'pnpm' # zizmor: ignore[cache-poisoning] release branches cannot read caches written by pull requests
           cache-dependency-path: '**/pnpm-lock.yaml'
 
       - name: Install dependencies
@@ -180,6 +180,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
+          package-manager-cache: false
 
       # Merge rule self-test, then overlay entries upstream now shadows and overrides.txt lines for keys upstream dropped.
       - name: Check Gallery overlay
