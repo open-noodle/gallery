@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { randomBytes } from 'node:crypto';
 import { AlbumUserRole, SharedLinkType } from 'src/enum.js';
+import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -19,7 +20,14 @@ let defaultDatabase: Kysely<DB>;
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(SharedLinkService, {
     database: db || defaultDatabase,
-    real: [AccessRepository, AlbumRepository, DatabaseRepository, SharedLinkRepository, SharedLinkAssetRepository],
+    real: [
+      AccessRepository,
+      AlbumRepository,
+      DatabaseRepository,
+      SharedLinkRepository,
+      SharedLinkAssetRepository,
+      SpaceAlbumRepository,
+    ],
     mock: [LoggingRepository, StorageRepository],
   });
 };

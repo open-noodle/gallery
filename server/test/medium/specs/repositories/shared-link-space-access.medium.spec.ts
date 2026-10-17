@@ -11,6 +11,7 @@
 import { Kysely, sql } from 'kysely';
 import { randomBytes } from 'node:crypto';
 import { AssetVisibility, SharedLinkType, SharedSpaceRole } from 'src/enum.js';
+import { sharedLinkAlbumMetadataScope } from 'src/gallery/utils/album-metadata-scope.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -353,8 +354,10 @@ describe('SharedLinkRepository.get — payload (#1018)', () => {
     expect(result?.assets).toEqual([]);
   });
 
-  it("lists contributions among an album link's assets", async () => {
-    const { ctx, sharedLinkRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
+  // Upstream immich-32412 dropped the album's asset list from the link payload; the album's count is where the
+  // link's scope still shows, through the same scope the access gate applies.
+  it("counts contributions among an album link's assets", async () => {
+    const { ctx, albumRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
     const { album } = await ctx.newAlbum({ ownerId: sharer.id }, [ownAsset.id]);
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributedAsset.id, spaceId: space.id });
@@ -365,13 +368,16 @@ describe('SharedLinkRepository.get — payload (#1018)', () => {
       spaceId: space.id,
     });
 
-    const result = await sharedLinkRepo.get(sharer.id, sharedLink.id);
+    const [metadata] = await albumRepo.getMetadataForIds(
+      [album.id],
+      sharedLinkAlbumMetadataScope({ userId: sharedLink.userId, spaceId: space.id }),
+    );
 
-    expect(result?.album?.assets.map(({ id }) => id).sort()).toEqual([contributedAsset.id, ownAsset.id].sort());
+    expect(metadata.assetCount).toBe(2);
   });
 
-  it('drops contributions from an album link once the creator is demoted to viewer', async () => {
-    const { ctx, sharedLinkRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
+  it("drops contributions from an album link's count once the creator is demoted to viewer", async () => {
+    const { ctx, albumRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
     const { album } = await ctx.newAlbum({ ownerId: sharer.id }, [ownAsset.id]);
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributedAsset.id, spaceId: space.id });
@@ -389,14 +395,17 @@ describe('SharedLinkRepository.get — payload (#1018)', () => {
       .where('userId', '=', sharer.id)
       .execute();
 
-    const result = await sharedLinkRepo.get(sharer.id, sharedLink.id);
+    const [metadata] = await albumRepo.getMetadataForIds(
+      [album.id],
+      sharedLinkAlbumMetadataScope({ userId: sharedLink.userId, spaceId: space.id }),
+    );
 
     // The album's own asset survives; only the contributed one goes.
-    expect(result?.album?.assets.map(({ id }) => id)).toEqual([ownAsset.id]);
+    expect(metadata.assetCount).toBe(1);
   });
 
-  it('never lists a hidden contribution', async () => {
-    const { ctx, sharedLinkRepo, sharer, space, ownAsset, contributor } = await seedSpace();
+  it('never counts a hidden contribution', async () => {
+    const { ctx, albumRepo, sharer, space, ownAsset, contributor } = await seedSpace();
     const { asset: hidden } = await ctx.newAsset({ ownerId: contributor.id, visibility: AssetVisibility.Hidden });
     await ctx.newExif({ assetId: hidden.id, make: 'test' });
     const { album } = await ctx.newAlbum({ ownerId: sharer.id }, [ownAsset.id]);
@@ -409,13 +418,16 @@ describe('SharedLinkRepository.get — payload (#1018)', () => {
       spaceId: space.id,
     });
 
-    const result = await sharedLinkRepo.get(sharer.id, sharedLink.id);
+    const [metadata] = await albumRepo.getMetadataForIds(
+      [album.id],
+      sharedLinkAlbumMetadataScope({ userId: sharedLink.userId, spaceId: space.id }),
+    );
 
-    expect(result?.album?.assets.map(({ id }) => id)).toEqual([ownAsset.id]);
+    expect(metadata.assetCount).toBe(1);
   });
 
-  it("lists only the album's own assets when the link carries no space", async () => {
-    const { ctx, sharedLinkRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
+  it("counts only the album's own assets when the link carries no space", async () => {
+    const { ctx, albumRepo, sharer, space, contributedAsset, ownAsset } = await seedSpace();
     const { album } = await ctx.newAlbum({ ownerId: sharer.id }, [ownAsset.id]);
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributedAsset.id, spaceId: space.id });
@@ -426,9 +438,12 @@ describe('SharedLinkRepository.get — payload (#1018)', () => {
       spaceId: null,
     });
 
-    const result = await sharedLinkRepo.get(sharer.id, sharedLink.id);
+    const [metadata] = await albumRepo.getMetadataForIds(
+      [album.id],
+      sharedLinkAlbumMetadataScope({ userId: sharedLink.userId, spaceId: null }),
+    );
 
-    expect(result?.album?.assets.map(({ id }) => id)).toEqual([ownAsset.id]);
+    expect(metadata.assetCount).toBe(1);
   });
 });
 

@@ -158,3 +158,11 @@ insert into
 values
   ($1, $2, $3, $4)
 on conflict do nothing
+
+-- SpaceAlbumRepository.getSharedLinkSpaceId
+select
+  "shared_link_space"."spaceId"
+from
+  "shared_link_space"
+where
+  "shared_link_space"."sharedLinkId" = $1

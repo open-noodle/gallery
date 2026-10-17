@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
-import { AlbumUserRole, AssetOrder, UserMetadataKey } from 'src/enum.js';
+import { AlbumUserRole, AssetOrder, SharedSpaceRole, UserMetadataKey } from 'src/enum.js';
 import { AlbumService } from 'src/services/album.service.js';
 import { AlbumUserFactory } from 'test/factories/album-user.factory.js';
 import { AlbumFactory } from 'test/factories/album.factory.js';
@@ -30,6 +30,7 @@ describe(AlbumService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(AlbumService));
+    mocks.album.getMetadataForIds.mockResolvedValue([]);
     // #764 cross-owner contribution defaults: no denied asset is contributable / already contributed
     // unless a test opts in, so add/remove behave exactly as before for the non-space cases.
     mocks.sharedSpace.getContributableAssetSpaces.mockResolvedValue([]);
@@ -1133,6 +1134,7 @@ describe(AlbumService.name, () => {
       expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], {
         forUserId: auth.sharedLink!.userId,
         spaceId,
+        memberRole: [SharedSpaceRole.Owner, SharedSpaceRole.Editor],
       });
     });
 
