@@ -5,12 +5,14 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
@@ -48,7 +50,7 @@ void main() {
   test('Photos years activation changes the mode and anchor only', () async {
     container.read(photosFilterProvider.notifier)
       ..setText('paris')
-      ..toggleTag('tag-1')
+      ..toggleTag(const Tag(id: 'tag-1', value: 'tag-1'))
       ..setFavouritesOnly(true)
       ..setMediaType(AssetType.video);
     container.read(timelineTemporalScopeProvider.notifier).setMonth(year: 2024, month: 12);

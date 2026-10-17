@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
@@ -49,7 +51,7 @@ void main() {
     final container = ProviderScope.containerOf(tester.element(find.byType(DeepContent)));
 
     // Seed a tag selection.
-    container.read(photosFilterProvider.notifier).toggleTag('tag-1');
+    container.read(photosFilterProvider.notifier).toggleTag(const Tag(id: 'tag-1', value: 'tag-1'));
     await tester.pumpAndSettle();
     expect(container.read(photosFilterProvider).tagIds, contains('tag-1'));
     expect(find.byKey(const Key('deep-section-tags')), findsOneWidget);

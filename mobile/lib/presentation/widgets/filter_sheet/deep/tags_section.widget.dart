@@ -3,6 +3,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/gallery/utils/search_filter_tags.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
@@ -130,7 +132,7 @@ class _TagChip extends ConsumerWidget {
       ),
       onSelected: (_) {
         unawaited(HapticFeedback.selectionClick());
-        ref.read(photosFilterProvider.notifier).toggleTag(tag.id);
+        ref.read(photosFilterProvider.notifier).toggleTag(Tag(id: tag.id, value: tag.value));
       },
     );
   }
