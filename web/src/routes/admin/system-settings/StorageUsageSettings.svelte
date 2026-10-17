@@ -2,7 +2,7 @@
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import { createDefinedQuery } from '$lib/queries/client';
+  import { createPreloadedQuery } from '$lib/queries/client';
   import { getConfigQuery } from '$lib/queries/system-config.query';
   import { Icon } from '@immich/ui';
   import { mdiHelpCircleOutline } from '@mdi/js';
@@ -10,7 +10,7 @@
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
-  const query = createDefinedQuery(getConfigQuery());
+  const query = createPreloadedQuery(getConfigQuery);
 
   const disabled = $derived(featureFlagsManager.value.configFile);
   let configToEdit = $state(cloneDeep(query.data));
