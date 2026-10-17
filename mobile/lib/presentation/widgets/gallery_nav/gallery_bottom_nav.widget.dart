@@ -143,8 +143,8 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     );
   }
 
-  /// Single entry point for all tab-tap side effects. Mirrors upstream
-  /// `_onNavigationSelected` in `tab_shell.page.dart`: side effects fire on
+  /// Single entry point for all tab-tap side effects. Mirrors upstream's
+  /// `_onNavigationSelected` (`tab_shell.page.dart`, which Gallery does not ship): side effects fire on
   /// EVERY tap (including re-taps of the same tab) — the shell-level
   /// `tabsRouter.addListener` only fires on index CHANGES.
   void _onTabTap(GalleryTabEnum tab, List<GalleryTabEnum> slots) {

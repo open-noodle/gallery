@@ -1,6 +1,6 @@
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { PEOPLE_PAGE_SIZE } from '$lib/constants';
-import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/gallery/stores/preferences.store';
 import { load } from './+page';
 
 const { authenticate, getFormatter, featureFlagsMock } = vi.hoisted(() => ({

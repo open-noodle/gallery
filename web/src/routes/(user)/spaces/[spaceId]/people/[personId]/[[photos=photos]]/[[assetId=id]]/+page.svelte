@@ -12,7 +12,7 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
-  import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
+  import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
   import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
@@ -29,8 +29,7 @@
   import { locale } from '$lib/stores/preferences.store';
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { toScopedPersonRef as toPersonScopedRef } from '$lib/utils/scoped-person-ref';
-  import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
-  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
+  import { timelineGroupingProps } from '$lib/gallery/filtered-timeline/timeline-grouping.svelte';
   import {
     confirmSpacePersonFaceSuggestion,
     detachScopedPerson,
@@ -80,8 +79,7 @@
   const routeStateKey = $derived(`${data.space.id}:${data.person.id}:${data.person.updatedAt}:${data.action ?? ''}`);
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  let timelineGrouping = $state<TimelineGrouping>('day');
-  let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
+  const timelineGrouping = timelineGroupingProps(() => timelineManager);
   let personOverride = $state<SharedSpacePersonResponseDto>();
   let personOverrideKey = $state('');
   const person = $derived(personOverrideKey === routeStateKey && personOverride ? personOverride : data.person);
@@ -114,7 +112,7 @@
   });
   const options = $derived({
     ...baseTimelineOptions,
-    grouping: timelineGrouping,
+    grouping: timelineGrouping.grouping,
   });
 
   const currentMember = $derived(members.find((member) => member.userId === authManager.user.id));
@@ -367,26 +365,6 @@
     timelineManager.upsertAssets(assets);
   };
 
-  function handleTimelineGroupingChange(grouping: TimelineGrouping) {
-    const anchor = getTimelineTopVisibleAnchor(timelineManager);
-    timelineGrouping = grouping;
-    temporalAnchor = anchor;
-  }
-
-  function handleTimelineBucketActivate(bucket: ActivatableTimelineBucket) {
-    if (assetMultiSelectManager.selectionActive) {
-      return;
-    }
-
-    const result = getTimelineBucketZoomTarget(bucket);
-    if (!result) {
-      return;
-    }
-
-    timelineGrouping = result.grouping;
-    temporalAnchor = result.anchor;
-  }
-
   async function closeMergeFlow() {
     setAction(null);
     if (data.action === 'merge') {
@@ -608,10 +586,9 @@
   <!-- Sticky grouping switcher: lives outside the scrolling timeline so it stays visible (see Tags).
        mt-12 clears the taller ControlAppBar, which exceeds the --control-bar-height padding reserve. -->
   <TimelineRouteGroupingBar
-    grouping={timelineGrouping}
+    {...timelineGrouping.barProps}
     hidden={assetMultiSelectManager.selectionActive || action === 'merge'}
     class="mt-12 shrink-0"
-    onGroupingChange={handleTimelineGroupingChange}
   />
   <div class="relative min-h-0 flex-1">
     {#key person.id}
@@ -623,11 +600,7 @@
         onEscape={handleBack}
         spaceId={space.id}
         space={{ id: space.id, canWrite: isEditor }}
-        {temporalAnchor}
-        onTimelineBucketActivate={handleTimelineBucketActivate}
-        onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
-        grouping={timelineGrouping}
-        onGroupingChange={handleTimelineGroupingChange}
+        {...timelineGrouping.timelineProps}
       >
         <div
           class="relative p-4 pt-12 sm:px-6"

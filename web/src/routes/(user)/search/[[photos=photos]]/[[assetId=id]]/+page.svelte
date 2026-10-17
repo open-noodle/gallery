@@ -6,6 +6,7 @@
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
   import GalleryViewer from '$lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
+  import SearchLegacyNotice from '$lib/gallery/search/SearchLegacyNotice.svelte';
   import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
   import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
@@ -18,9 +19,13 @@
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import { QueryParameter } from '$lib/constants';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-  import { registerSelectionContext } from '$lib/managers/command-context-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+  import {
+    getScopedPersonNames,
+    isVisibleSearchKey,
+    registerSearchSelection,
+    sharedSpacesDefault,
+  } from '$lib/gallery/search/search-page';
   import type { Viewport } from '$lib/managers/timeline-manager/types';
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
@@ -38,15 +43,13 @@
     getTagById,
     type MetadataSearchDto,
     searchAssets,
-    searchPerson,
     searchSmart,
     type SmartSearchDto,
   } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, LoadingSpinner } from '@immich/ui';
   import { mdiArrowLeft, mdiClose, mdiDotsVertical, mdiImageOffOutline, mdiSelectAll } from '@mdi/js';
   import { tick, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   const viewport: Viewport = $state({ width: 0, height: 0 });
   let searchResultsElement: HTMLElement | undefined = $state();
@@ -67,7 +70,7 @@
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
   let smartSearchEnabled = $derived(featureFlagsManager.value.smartSearch);
   let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
-  let searchTermKeys = $derived(getVisibleSearchKeys(terms));
+  let searchTermKeys = $derived(getObjectKeys(terms).filter(isVisibleSearchKey));
 
   $effect(() => {
     // we want this to *only* be reactive on `terms`
@@ -116,41 +119,12 @@
     onAssetDelete(assetIds);
   };
 
-  const onFavorite = (ids: string[], isFavorite: boolean) => {
-    for (const id of ids) {
-      const asset = searchResultAssets.find((asset) => asset.id === id);
-      if (asset) {
-        asset.isFavorite = isFavorite;
-      }
-    }
-  };
-
-  const onArchive = (ids: string[], visibility: AssetVisibility) => {
-    const idSet = new Set(ids);
-    if (terms.visibility && terms.visibility !== visibility) {
-      searchResultAssets = searchResultAssets.filter((asset) => !idSet.has(asset.id));
-      return;
-    }
-    for (const id of ids) {
-      const asset = searchResultAssets.find((asset) => asset.id === id);
-      if (asset) {
-        asset.visibility = visibility;
-      }
-    }
-  };
-
-  const onUndoDelete = () => {
-    void onSearchQueryUpdate();
-  };
-
-  registerSelectionContext({
-    getAssets: () => assetMultiSelectManager.assets,
-    clearSelection: () => assetMultiSelectManager.clear(),
-    canAddToAlbum: () => true,
-    getOnFavorite: () => onFavorite,
-    getOnArchive: () => onArchive,
-    getOnDelete: () => onAssetDelete,
-    getOnUndoDelete: () => onUndoDelete,
+  const { onFavorite, onArchive } = registerSearchSelection({
+    getAssets: () => searchResultAssets,
+    setAssets: (assets) => (searchResultAssets = assets),
+    getVisibility: () => terms.visibility,
+    onDelete: onAssetDelete,
+    reload: onSearchQueryUpdate,
   });
 
   const handleSelectAll = () => {
@@ -174,14 +148,7 @@
     const searchDto: SearchTerms = {
       page: nextPage,
       withExif: true,
-      // #830: this page is Gallery's global search surface, but a URL-driven search only ever
-      // covered the caller's own (and partner) assets. A Space member who opened "Show similar
-      // photos" on a photo shared with them — or pasted the same `queryAssetId` URL — got zero
-      // results while the space owner got a long list. Opt into shared spaces the way the command
-      // palette already does (#894); the server scopes them to spaces the member has kept in their
-      // timeline. Spread before `terms` so an explicit value in the URL still wins, and skip it
-      // entirely for a space-scoped URL — the server rejects `spaceId` + `withSharedSpaces`.
-      ...(!terms.spaceId && { withSharedSpaces: true }),
+      ...sharedSpacesDefault(terms),
       ...terms,
     };
 
@@ -243,23 +210,12 @@
     return keyMap[key] || key;
   }
 
-  const isScopedPersonToken = (personId: string) =>
-    personId.startsWith('person:') || personId.startsWith('space-person:');
-
   async function getPersonName(personIds: string[]) {
-    const scopedPersonIds = personIds.filter((personId) => isScopedPersonToken(personId));
-    const scopedPeople =
-      scopedPersonIds.length > 0 ? await searchPerson({ name: '', withHidden: true, withSharedSpaces: true }) : [];
-    const scopedPeopleByFilterId = new Map(
-      scopedPeople.map((person) => [person.filterId ?? `person:${person.id}`, person]),
-    );
-
+    const scopedPersonNames = await getScopedPersonNames(personIds);
     const personNames = await Promise.all(
       personIds.map(async (personId) => {
-        if (isScopedPersonToken(personId)) {
-          const person = scopedPeopleByFilterId.get(personId);
-
-          return person?.name || $t('no_name');
+        if (scopedPersonNames.has(personId)) {
+          return scopedPersonNames.get(personId) || $t('no_name');
         }
 
         const person = await getPerson({ id: personId });
@@ -301,10 +257,6 @@
 
   function getObjectKeys<T extends object>(obj: T): (keyof T)[] {
     return Object.keys(obj) as (keyof T)[];
-  }
-
-  function getVisibleSearchKeys(terms: SearchTerms) {
-    return getObjectKeys(terms).filter((key) => key !== 'withSharedSpaces');
   }
 
   function removeFilter(key: keyof SearchTerms) {
@@ -449,18 +401,7 @@
       <div class="fixed inset-s-0 top-0 z-2 w-full">
         <ControlAppBar onClose={() => goto(previousRoute)} backIcon={mdiArrowLeft}>
           <div class="mx-auto w-full max-w-2xl pe-2">
-            <div
-              class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200/80 bg-white/90 px-4 py-2 text-sm text-gray-700 shadow-sm dark:border-gray-700 dark:bg-immich-dark-gray/90 dark:text-gray-200"
-            >
-              <span>{$t('search_legacy_notice')}</span>
-              <button
-                type="button"
-                class="font-medium text-primary hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-primary"
-                onclick={() => globalSearchManager.open()}
-              >
-                {$t('search_open_palette')}
-              </button>
-            </div>
+            <SearchLegacyNotice />
           </div>
         </ControlAppBar>
       </div>

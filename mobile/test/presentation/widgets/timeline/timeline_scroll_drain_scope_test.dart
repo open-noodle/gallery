@@ -7,13 +7,21 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
+import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/timeline/highlighted_asset.provider.dart';
+import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 
 import '../../../fixtures/asset.stub.dart';
+
+class _MonthsOverviewNotifier extends TimelineOverviewModeNotifier {
+  @override
+  TimelineOverviewMode build() => TimelineOverviewMode.months;
+}
 
 /// #1047: a Space timeline is pushed OVER the main one, which stays mounted and
 /// listening on the same global latch. These pump a real [Timeline] to prove the scope
@@ -29,7 +37,7 @@ void main() {
   setUp(() => scrollToAssetNotifierProvider.consume());
   tearDown(() => scrollToAssetNotifierProvider.consume());
 
-  Future<ScrollPosition> pumpTimeline(WidgetTester tester, {String? spaceId}) async {
+  Future<ScrollPosition> pumpTimeline(WidgetTester tester, {String? spaceId, bool monthsOverview = false}) async {
     tester.view.devicePixelRatio = 3.0;
     tester.view.physicalSize = const Size(1206, 2622);
     addTearDown(tester.view.reset);
@@ -50,7 +58,8 @@ void main() {
             builder: (_) => Timeline(
               withScrubber: false,
               readOnly: true,
-              groupBy: GroupAssetsBy.none,
+              // A pinned groupBy forces the photo grid; the overview case needs it unset.
+              groupBy: monthsOverview ? null : GroupAssetsBy.none,
               appBar: const SliverToBoxAdapter(child: SizedBox.shrink()),
               spaceId: spaceId,
             ),
@@ -64,6 +73,7 @@ void main() {
         overrides: [
           timelineServiceProvider.overrideWithValue(service),
           appConfigProvider.overrideWithValue(const AppConfig()),
+          if (monthsOverview) timelineOverviewModeProvider.overrideWith(_MonthsOverviewNotifier.new),
         ],
         child: MaterialApp.router(routerConfig: router.config()),
       ),
@@ -121,5 +131,23 @@ void main() {
 
     expect(position.pixels, greaterThan(0));
     expect(scrollToAssetNotifierProvider.value, isNull);
+  });
+
+  testWidgets('a request latched before mount on a Months overview drills into the grid and lands on the photo', (
+    tester,
+  ) async {
+    // The request survives the timeline mounting fresh; the overview cards have no tiles,
+    // so the drain switches to the photo grid, waits out the segment reload, then scrolls.
+    scrollToAssetNotifierProvider.scrollToAsset(target);
+    await pumpTimeline(tester, monthsOverview: true);
+    await tester.pumpAndSettle();
+    tester.takeException();
+
+    final container = ProviderScope.containerOf(tester.element(find.byType(Scrollable).first));
+    expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.all);
+    expect(scrollToAssetNotifierProvider.value, isNull, reason: 'the request is consumed once honoured');
+    final position = tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+    expect(position.pixels, greaterThan(0));
+    expect(container.read(timelineHighlightedAssetProvider)?.id, target.id);
   });
 }

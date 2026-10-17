@@ -30,20 +30,18 @@ export type SharedLinkSearchOptions = {
 };
 
 const withSharedAssets = (eb: ExpressionBuilder<DB, 'shared_link'>) => {
-  return (
-    eb
-      .selectFrom('shared_link_asset')
-      .whereRef('shared_link.id', '=', 'shared_link_asset.sharedLinkId')
-      .innerJoin('asset', 'asset.id', 'shared_link_asset.assetId')
-      .where('asset.deletedAt', 'is', null)
-      // #1018: the payload must list exactly what the access gate serves, or the visitor's grid
-      // renders holes. Assets the creator does not own are tethered to the link's space, so one
-      // withdrawn contribution drops out of both at the same moment.
-      .where((eb) => sharedLinkAssetIsServable(asBaseEb(eb)))
-      .selectAll('asset')
-      .select(projectedDuration)
-      .orderBy('asset.fileCreatedAt', 'asc')
-  );
+  // #1018: the payload must list exactly what the access gate serves, or the visitor's grid
+  // renders holes. Assets the creator does not own are tethered to the link's space, so one
+  // withdrawn contribution drops out of both at the same moment.
+  return eb
+    .selectFrom('shared_link_asset')
+    .whereRef('shared_link.id', '=', 'shared_link_asset.sharedLinkId')
+    .innerJoin('asset', 'asset.id', 'shared_link_asset.assetId')
+    .where('asset.deletedAt', 'is', null)
+    .where((eb) => sharedLinkAssetIsServable(asBaseEb(eb)))
+    .selectAll('asset')
+    .select(projectedDuration)
+    .orderBy('asset.fileCreatedAt', 'asc');
 };
 
 export const withExifInfo = (eb: ExpressionBuilder<DB, 'asset'>) => {

@@ -11,6 +11,7 @@ import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/gallery/routing/gallery_routes.dart';
 import 'package:immich_mobile/models/folder/recursive_folder.model.dart';
 import 'package:immich_mobile/models/shared_link/shared_link.model.dart';
 import 'package:immich_mobile/models/upload/share_intent_attachment.model.dart';
@@ -24,20 +25,11 @@ import 'package:immich_mobile/pages/common/app_log_detail.page.dart';
 import 'package:immich_mobile/pages/common/headers_settings.page.dart';
 import 'package:immich_mobile/pages/common/settings.page.dart';
 import 'package:immich_mobile/pages/common/splash_screen.page.dart';
-import 'package:immich_mobile/pages/common/tab_shell.page.dart';
 import 'package:immich_mobile/pages/library/folder/folder.page.dart';
 import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
 import 'package:immich_mobile/pages/library/partner/partner.page.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link.page.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link_edit.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_album_detail.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_albums.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_link_album.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_members.page.dart';
-import 'package:immich_mobile/pages/library/spaces/space_people.page.dart';
-import 'package:immich_mobile/pages/library/spaces/spaces.page.dart';
 import 'package:immich_mobile/pages/login/change_password.page.dart';
 import 'package:immich_mobile/pages/login/login.page.dart';
 import 'package:immich_mobile/pages/search/map/map_location_picker.page.dart';
@@ -50,7 +42,6 @@ import 'package:immich_mobile/presentation/pages/archive.page.dart';
 import 'package:immich_mobile/presentation/pages/asset_selection_timeline.page.dart';
 import 'package:immich_mobile/presentation/pages/asset_troubleshoot.page.dart';
 import 'package:immich_mobile/presentation/pages/cleanup_preview.page.dart';
-import 'package:immich_mobile/presentation/pages/common/gallery_tab_shell.page.dart';
 import 'package:immich_mobile/presentation/pages/create_album.page.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
 import 'package:immich_mobile/presentation/pages/dev/media_stat.page.dart';
@@ -68,11 +59,6 @@ import 'package:immich_mobile/presentation/pages/memory_list.page.dart';
 import 'package:immich_mobile/presentation/pages/partner_detail.page.dart';
 import 'package:immich_mobile/presentation/pages/people_collection.page.dart';
 import 'package:immich_mobile/presentation/pages/person.page.dart';
-import 'package:immich_mobile/presentation/pages/photos_filter/camera_picker.page.dart';
-import 'package:immich_mobile/presentation/pages/photos_filter/person_picker.page.dart';
-import 'package:immich_mobile/presentation/pages/photos_filter/places_picker.page.dart';
-import 'package:immich_mobile/presentation/pages/photos_filter/tags_picker.page.dart';
-import 'package:immich_mobile/presentation/pages/photos_filter/when_picker.page.dart';
 import 'package:immich_mobile/presentation/pages/place.page.dart';
 import 'package:immich_mobile/presentation/pages/place_detail.page.dart';
 import 'package:immich_mobile/presentation/pages/profile/profile_picture_crop.page.dart';
@@ -88,7 +74,6 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/routing/auth_guard.dart';
 import 'package:immich_mobile/routing/duplicate_guard.dart';
 import 'package:immich_mobile/routing/locked_guard.dart';
-import 'package:immich_mobile/routing/space_albums_duplicate_guard.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
 import 'package:immich_mobile/services/local_auth.service.dart';
@@ -112,7 +97,6 @@ class AppRouter extends RootStackRouter {
   late final AuthGuard _authGuard;
   late final DuplicateGuard _duplicateGuard;
   late final LockedGuard _lockedGuard;
-  late final SpaceAlbumsDuplicateGuard _spaceAlbumsDuplicateGuard;
 
   AppRouter(
     ApiService apiService,
@@ -123,7 +107,6 @@ class AppRouter extends RootStackRouter {
     _authGuard = AuthGuard(apiService, authService);
     _duplicateGuard = const DuplicateGuard();
     _lockedGuard = LockedGuard(apiService, secureStorageService, localAuthService);
-    _spaceAlbumsDuplicateGuard = const SpaceAlbumsDuplicateGuard();
   }
 
   @override
@@ -134,67 +117,13 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SplashScreenRoute.page, initial: true),
     AutoRoute(page: LoginRoute.page),
     AutoRoute(page: ChangePasswordRoute.page),
-    AutoRoute(
-      page: TabShellRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      children: [
-        AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-
-        AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-      ],
-    ),
-    // >>> fork-only gallery-bottom-nav — rollback: remove this block and
-    // point the 5 callsites of GalleryTabShellRoute() back at TabShellRoute().
-    AutoRoute(
-      page: GalleryTabShellRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      children: [
-        AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: AlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
-        // Declared but not always a tab: the `routes:` list in
-        // GalleryTabShellPage picks three of these four per the user's
-        // navShowSpaces preference. AlbumsRoute stays declared even when
-        // Spaces occupies slot 1 — the Library tab pushes it directly.
-        AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-      ],
-    ),
-    // <<< fork-only gallery-bottom-nav
+    ...galleryRoutes(_authGuard, _duplicateGuard),
     AutoRoute(page: ProfilePictureCropRoute.page),
     AutoRoute(page: SettingsRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: SettingsSubRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: WhatsNewRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: AppLogRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: AppLogDetailRoute.page, guards: [_duplicateGuard]),
-    // Keep the platform page transition: a CustomRoute would render its own
-    // transitionsBuilder instead of the PageTransitionsTheme, and iOS would
-    // never install the Cupertino edge swipe-back gesture (#899).
-    AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SpaceMembersRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SpacePeopleRoute.page, guards: [_authGuard, _duplicateGuard]),
-    // No _duplicateGuard: this route is legitimately self-recursive — drilling into a folder
-    // pushes SpaceAlbumsRoute onto SpaceAlbumsRoute with a different folderId. DuplicateGuard
-    // compares route NAMES only, so it would treat every folder tap as a duplicate and block it.
-    // _spaceAlbumsDuplicateGuard (space_albums_duplicate_guard.dart) is the args-aware
-    // replacement: it compares `spaceId` + `folderId` off the pending/current route's args
-    // directly (auto_route 11.1.0 exposes both via `resolver.route.args` / `router.current.args`),
-    // so a folder tap with a different folderId still pushes while a double-tap producing an
-    // IDENTICAL spaceId+folderId is blocked — closing the double-push regression this route would
-    // otherwise have reintroduced by dropping _duplicateGuard entirely.
-    AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _spaceAlbumsDuplicateGuard]),
-    AutoRoute(page: SpaceAlbumDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
-    CustomRoute(
-      page: SpaceLinkAlbumRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      transitionsBuilder: TransitionsBuilders.slideBottom,
-    ),
-    CustomRoute(
-      page: SpaceMemberSelectionRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      transitionsBuilder: TransitionsBuilders.slideBottom,
-    ),
     AutoRoute(page: FolderRoute.page, guards: [_authGuard]),
     AutoRoute(page: SharedLinkRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SharedLinkEditRoute.page, guards: [_authGuard, _duplicateGuard]),
@@ -234,7 +163,6 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: RecentlyTakenRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: RecentlyAddedRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: LocalAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: AlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: CreateAlbumRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: PlaceRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: PlaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
@@ -243,11 +171,6 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: UploadDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SyncStatusRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: PeopleCollectionRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: PersonPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: WhenPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: PlacesPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: TagsPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: CameraPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: PersonRoute.page, guards: [_authGuard]),
     AutoRoute(page: BackupOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: AlbumOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),

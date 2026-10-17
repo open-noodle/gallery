@@ -14,7 +14,8 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
-  import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+  import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/gallery/stores/preferences.store';
+  import { locale } from '$lib/stores/preferences.store';
   import { handlePromiseError } from '$lib/utils';
   import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
   import { getSpacePersonThumbnailUrl } from '$lib/utils/global-person-route';

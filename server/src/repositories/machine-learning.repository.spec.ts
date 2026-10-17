@@ -1,3 +1,4 @@
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MachineLearningRepository, ModelTask, ModelType } from 'src/repositories/machine-learning.repository.js';
 import { automock } from 'test/utils.js';
@@ -17,7 +18,7 @@ vi.stubGlobal('fetch', mockFetch);
 const clipConfig = { modelName: 'ViT-B-32__openai', enabled: true, maxDistance: 0 };
 
 describe(MachineLearningRepository.name, () => {
-  let sut: MachineLearningRepository;
+  let sut: GalleryMachineLearningRepository;
   let originalCloseConnections: string | undefined;
 
   const mlUrl = 'http://ml-server:3003';
@@ -61,7 +62,7 @@ describe(MachineLearningRepository.name, () => {
   };
 
   const createSut = () =>
-    new MachineLearningRepository(
+    new GalleryMachineLearningRepository(
       // eslint-disable-next-line no-sparse-arrays
       automock(LoggingRepository, { args: [, { getEnv: () => ({}) }], strict: false }),
     );

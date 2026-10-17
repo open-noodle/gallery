@@ -19,6 +19,8 @@ export type AuthDto = {
   session?: AuthSession;
   /** Gallery: set by `AuthService.authenticate` for a stock Immich or third-party client (src/gallery/utils/client-version.ts). */
   stockClient?: true;
+  /** Gallery: a Gallery app before 5.8.0, which cannot decode a `birthday` memory (src/gallery/utils/client-version.ts). */
+  legacyGalleryApp?: true;
 };
 
 const LoginCredentialSchema = z

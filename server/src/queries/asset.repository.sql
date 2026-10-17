@@ -165,32 +165,6 @@ group by
 order by
   ("localDateTime" at time zone 'UTC')::date desc
 
--- AssetRepository.getOwnedManifestAssets
-select
-  "asset"."id",
-  "asset"."originalPath",
-  "asset"."originalFileName",
-  "asset"."checksum",
-  "asset"."checksumAlgorithm",
-  "asset"."type",
-  "asset"."fileCreatedAt",
-  "asset"."fileModifiedAt",
-  "asset_exif"."fileSizeInByte" as "size"
-from
-  "asset"
-  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
-where
-  "asset"."ownerId" = $1::uuid
-  and "asset"."deletedAt" is null
-  and "asset"."status" = $2
-  and "asset"."libraryId" is null
-  and "asset"."isExternal" = $3
-  and "asset"."id" > $4::uuid
-order by
-  "asset"."id"
-limit
-  $5
-
 -- AssetRepository.getByIds
 select
   "asset".*,
@@ -451,67 +425,6 @@ delete from "asset"
 where
   "ownerId" = $1
 
--- AssetRepository.getByLibraryIdWithFaces
-select
-  "asset"."id"
-from
-  "asset"
-  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
-where
-  "asset"."libraryId" = $1
-  and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $2
-group by
-  "asset"."id"
-order by
-  "asset"."id"
-limit
-  $3
-offset
-  $4
-
--- AssetRepository.getByAlbumIdWithFaces
-select
-  "asset"."id"
-from
-  "asset"
-  inner join (
-    select
-      "album_asset"."albumId" as "albumId",
-      "album_asset"."assetId" as "assetId"
-    from
-      "album_asset"
-    where
-      "album_asset"."albumId" = any ($1::uuid[])
-    union
-    select
-      "album_space_asset"."albumId" as "albumId",
-      "album_space_asset"."assetId" as "assetId"
-    from
-      "shared_space_album"
-      inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-      and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-      and "linked_album"."deletedAt" is null
-      inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
-    where
-      "shared_space_album"."spaceId" = $2::uuid
-      and "asset"."visibility" in ($3, $4)
-      and "album_space_asset"."albumId" = any ($5::uuid[])
-  ) as "album_members" on "album_members"."assetId" = "asset"."id"
-  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."isOffline" = $6
-group by
-  "asset"."id"
-order by
-  "asset"."id"
-limit
-  $7
-offset
-  $8
-
 -- AssetRepository.getByLibraryIdAndOriginalPath
 select
   "asset".*
@@ -678,15 +591,6 @@ where
 limit
   $3
 
--- AssetRepository.getChecksumsByIds
-select
-  "id",
-  "checksum"
-from
-  "asset"
-where
-  "id" in ($1::uuid)
-
 -- AssetRepository.getCalendarHeatmap
 select
   date_trunc('DAY', "asset"."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' as "date",
@@ -789,15 +693,6 @@ from
   "bucket_counts"
 order by
   "bucket_counts"."timeBucket" desc
-
--- AssetRepository.getTimelineAssetCount
-select
-  count(*) as "count"
-from
-  "asset"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" in ('archive', 'timeline')
 
 -- AssetRepository.getTimeBucket
 with
@@ -1435,12 +1330,3 @@ from
   "asset"
 where
   "asset"."id" = $1
-
--- AssetRepository.getExternalAssetIds
-select
-  "asset"."id"
-from
-  "asset"
-where
-  "asset"."ownerId" = $1::uuid
-  and "asset"."libraryId" is not null

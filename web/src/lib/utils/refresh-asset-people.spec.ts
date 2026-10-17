@@ -15,7 +15,7 @@ const { refreshAssetPeople } = await import('./refresh-asset-people');
 describe('refreshAssetPeople', () => {
   /**
    * The People row and the face boxes over the photo are two DIFFERENT stale surfaces after a face
-   * edit, refreshed by two different means. The on-photo SpaceFaceEditor originally did neither and
+   * edit, refreshed by two different means. The on-photo space face editor originally did neither and
    * simply closed itself, so a newly tagged person stayed invisible until a full page reload.
    *
    * Asserting all three calls is the point: covering only the emit would still let the photo's face

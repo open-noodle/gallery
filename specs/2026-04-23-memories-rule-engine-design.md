@@ -79,6 +79,8 @@ Add a second generation path for rule-based memories:
 
 - `server/src/services/memory-rules/`
 
+Since the layering wave 7 move, `RuleMemoryService` (`server/src/gallery/services/rule-memory.service.ts`) runs this flow as its own `MemoryRuleGenerate` job, which upstream's `MemoryGenerate` queues once its on-this-day pass is done; the rules live in `server/src/gallery/services/memory-rules/`.
+
 Recommended structure:
 
 - `memory-rule.interface.ts`

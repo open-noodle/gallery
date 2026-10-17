@@ -61,6 +61,7 @@ type EventMap = {
   AssetTrashAll: [{ assetIds: string[]; userId: string }];
   AssetDeleteAll: [{ assetIds: string[]; userId: string }];
   AssetRestoreAll: [{ assetIds: string[]; userId: string }];
+  LibraryAssetsCreate: [{ libraryId: string; assetIds: string[] }];
 
   /** a worker receives a job and emits this event to run it */
   JobRun: [QueueName, JobItem];

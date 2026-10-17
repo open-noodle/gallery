@@ -2368,4 +2368,41 @@ describe(PersonService.name, () => {
       expect(row.personGroupId).toBe(person.personGroupId);
     });
   });
+
+  describe('handleRecognizeFaces soft-deleted faces', () => {
+    it('never assigns a face to a person through a soft-deleted face', async () => {
+      const { sut, ctx } = setupRecognition();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Deleted' });
+      const embedding = newEmbedding();
+
+      // The person's only face was deleted (asset_face.deletedAt set, personGroupId and face_search row kept).
+      const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: deletedFace } = await ctx.newAssetFace({
+        assetId: deletedAsset.id,
+        personGroupId: person.personGroupId,
+        sourceType: SourceType.MachineLearning,
+        deletedAt: new Date(),
+      });
+      await ctx.database.insertInto('face_search').values({ faceId: deletedFace.id, embedding }).execute();
+
+      const { asset: queryAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: queryFace } = await ctx.newAssetFace({
+        assetId: queryAsset.id,
+        personGroupId: null,
+        sourceType: SourceType.MachineLearning,
+      });
+      await ctx.database.insertInto('face_search').values({ faceId: queryFace.id, embedding }).execute();
+
+      await sut.handleRecognizeFaces({ id: queryFace.id, deferred: true });
+
+      const row = await ctx.database
+        .selectFrom('asset_face')
+        .select('personGroupId')
+        .where('id', '=', queryFace.id)
+        .executeTakeFirstOrThrow();
+      expect(row.personGroupId).not.toBeNull();
+      expect(row.personGroupId).not.toBe(person.personGroupId);
+    });
+  });
 });

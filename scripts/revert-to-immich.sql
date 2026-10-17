@@ -115,6 +115,212 @@ BEGIN
 END $$;
 
 -- -----------------------------------------------------------------------------
+-- 0a. Optional: keep each shared space as an Immich shared album.
+--
+-- Off unless the session sets  SET gallery.convert_spaces = 'on';  (next to
+-- gallery.revert_token). Each space becomes one album holding every photo a
+-- member could open through it: its own photos, the online photos of its linked
+-- libraries (a snapshot), the photos of its linked albums shown in the space,
+-- and the photos members added to those albums from the space. Nothing becomes
+-- more visible than it was:
+--   * the creator owns the album while the account is live, else the
+--     longest-standing live member, owners first; a space with no live member
+--     is skipped. Space owners and editors become editors, viewers viewers.
+--   * linked albums get a direct grant for each member (strongest role across
+--     spaces); a user who already has a row on that album keeps it.
+--   * 'Add to space' workflow steps add to the new albums through Immich's
+--     'Add to Album(s)'. 'Add to space album' has no Immich equivalent and goes.
+--   * a space person's name and birth date go onto the matching unnamed
+--     personal person when exactly one value maps.
+-- Others' photos a user favorited become a private album only when the session
+-- also sets  SET gallery.convert_favorites = 'on';  that album is a grant the
+-- photo's owner can neither see nor revoke.
+-- Lost: colour and crop, co-owners, folders, hidden albums, activity, aliases.
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  core_method uuid;
+  n_spaces int; n_skipped int; n_assets int; n_grants int; n_favorites int; n_names int;
+  n_steps int; n_steps_dropped int;
+BEGIN
+  IF current_setting('gallery.convert_spaces', true) IS DISTINCT FROM 'on'
+     OR to_regclass('public.shared_space') IS NULL THEN
+    RETURN;
+  END IF;
+  IF to_regclass('public.person_identity') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'revert-to-immich.sql refused: converting spaces needs the current Gallery schema. Start the latest Gallery release once so its migrations run, stop it, then run this script again.';
+  END IF;
+
+  CREATE TEMP TABLE conv_space ON COMMIT DROP AS
+  SELECT s."id" AS "spaceId", gen_random_uuid() AS "albumId", s."name", s."description",
+         s."thumbnailAssetId", s."createdAt", o."userId" AS "ownerId"
+    FROM "shared_space" s
+    CROSS JOIN LATERAL (
+      SELECT c."userId"
+        FROM (SELECT m."userId", m."role", m."joinedAt"
+                FROM "shared_space_member" m
+               WHERE m."spaceId" = s."id"
+              UNION ALL
+              SELECT s."createdById", 'owner', s."createdAt") c
+        JOIN "user" u ON u."id" = c."userId" AND u."deletedAt" IS NULL
+       ORDER BY c."userId" = s."createdById" DESC,
+                CASE c."role" WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END,
+                c."joinedAt", c."userId"
+       LIMIT 1) o;
+  SELECT count(*) INTO n_spaces FROM conv_space;
+  SELECT count(*) - n_spaces INTO n_skipped FROM "shared_space";
+
+  INSERT INTO "album" ("id", "albumName", "description", "createdAt")
+  SELECT "albumId", "name", "description", "createdAt" FROM conv_space;
+
+  INSERT INTO "album_user" ("albumId", "userId", "role")
+  SELECT "albumId", "ownerId", 'owner'::album_user_role_enum FROM conv_space;
+
+  INSERT INTO "album_user" ("albumId", "userId", "role")
+  SELECT cs."albumId", m."userId",
+         (CASE WHEN m."role" IN ('owner', 'editor') THEN 'editor' ELSE 'viewer' END)::album_user_role_enum
+    FROM conv_space cs
+    JOIN "shared_space_member" m ON m."spaceId" = cs."spaceId"
+    JOIN "user" u ON u."id" = m."userId" AND u."deletedAt" IS NULL
+   WHERE m."userId" <> cs."ownerId"
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO "album_asset" ("albumId", "assetId")
+  SELECT DISTINCT cs."albumId", a."id"
+    FROM conv_space cs
+    CROSS JOIN LATERAL (
+      SELECT ssa."assetId" FROM "shared_space_asset" ssa WHERE ssa."spaceId" = cs."spaceId"
+      UNION
+      SELECT la."id"
+        FROM "shared_space_library" ssl
+        JOIN "asset" la ON la."libraryId" = ssl."libraryId" AND NOT la."isOffline"
+       WHERE ssl."spaceId" = cs."spaceId"
+      UNION
+      SELECT aa."assetId"
+        FROM "shared_space_album" l
+        JOIN "album" al ON al."id" = l."albumId" AND al."deletedAt" IS NULL
+        JOIN "album_asset" aa ON aa."albumId" = l."albumId"
+       WHERE l."spaceId" = cs."spaceId" AND l."showInTimeline"
+      UNION
+      SELECT asa."assetId"
+        FROM "album_space_asset" asa
+        JOIN "shared_space_album" l ON l."albumId" = asa."albumId" AND l."spaceId" = asa."spaceId"
+        JOIN "album" al ON al."id" = l."albumId" AND al."deletedAt" IS NULL
+       WHERE asa."spaceId" = cs."spaceId") x
+    JOIN "asset" a ON a."id" = x."assetId"
+                  AND a."deletedAt" IS NULL
+                  AND a."visibility" IN ('timeline', 'archive')
+  ON CONFLICT DO NOTHING;
+  GET DIAGNOSTICS n_assets = ROW_COUNT;
+
+  UPDATE "album" al
+     SET "albumThumbnailAssetId" = COALESCE(
+           (SELECT aa."assetId" FROM "album_asset" aa
+             WHERE aa."albumId" = al."id" AND aa."assetId" = cs."thumbnailAssetId"),
+           (SELECT aa."assetId" FROM "album_asset" aa JOIN "asset" a ON a."id" = aa."assetId"
+             WHERE aa."albumId" = al."id" ORDER BY a."fileCreatedAt" DESC, a."id" LIMIT 1))
+    FROM conv_space cs
+   WHERE cs."albumId" = al."id";
+
+  INSERT INTO "album_user" ("albumId", "userId", "role")
+  SELECT l."albumId", m."userId",
+         (CASE WHEN bool_or(m."role" IN ('owner', 'editor')) THEN 'editor' ELSE 'viewer' END)::album_user_role_enum
+    FROM "shared_space_album" l
+    JOIN "album" al ON al."id" = l."albumId" AND al."deletedAt" IS NULL
+    JOIN "shared_space_member" m ON m."spaceId" = l."spaceId"
+    JOIN "user" u ON u."id" = m."userId" AND u."deletedAt" IS NULL
+   GROUP BY l."albumId", m."userId"
+  ON CONFLICT ("albumId", "userId") DO NOTHING;
+  GET DIAGNOSTICS n_grants = ROW_COUNT;
+
+  -- Workflow steps. Section 6b deletes Gallery's plugin, and every step wired to it with it.
+  IF to_regclass('public.workflow_step') IS NOT NULL THEN
+    SELECT pm."id" INTO core_method
+      FROM "plugin_method" pm JOIN "plugin" p ON p."id" = pm."pluginId"
+     WHERE p."name" = 'immich-plugin-core' AND pm."name" = 'assetAddToAlbums';
+    UPDATE "workflow_step" ws
+       SET "pluginMethodId" = core_method, "config" = jsonb_build_object('albumIds', mapped."albumIds")
+      FROM (SELECT ws2."id", jsonb_agg(cs."albumId" ORDER BY sp."n") AS "albumIds"
+              FROM "workflow_step" ws2
+              JOIN "plugin_method" gm ON gm."id" = ws2."pluginMethodId" AND gm."name" = 'addToSpace'
+              JOIN "plugin" gp ON gp."id" = gm."pluginId" AND gp."name" = 'gallery-core'
+              CROSS JOIN LATERAL jsonb_array_elements_text(ws2."config" -> 'spaceIds') WITH ORDINALITY sp("spaceId", "n")
+              JOIN conv_space cs ON cs."spaceId"::text = sp."spaceId"
+             GROUP BY ws2."id") mapped
+     WHERE ws."id" = mapped."id" AND core_method IS NOT NULL;
+    GET DIAGNOSTICS n_steps = ROW_COUNT;
+    SELECT count(*) INTO n_steps_dropped
+      FROM "workflow_step" ws
+      JOIN "plugin_method" gm ON gm."id" = ws."pluginMethodId"
+      JOIN "plugin" gp ON gp."id" = gm."pluginId" AND gp."name" = 'gallery-core';
+    IF n_steps_dropped > 0 THEN
+      RAISE NOTICE 'convert-spaces: % Gallery workflow step(s) have no Immich equivalent and will be deleted (Add to space album, or a space that was skipped)', n_steps_dropped;
+    END IF;
+  END IF;
+
+  IF current_setting('gallery.convert_favorites', true) = 'on'
+     AND to_regclass('public.asset_favorite') IS NOT NULL THEN
+    CREATE TEMP TABLE conv_favorite ON COMMIT DROP AS
+    SELECT f."userId", f."assetId"
+      FROM "asset_favorite" f
+      JOIN "asset" a ON a."id" = f."assetId" AND a."ownerId" <> f."userId" AND a."deletedAt" IS NULL
+      JOIN "user" u ON u."id" = f."userId" AND u."deletedAt" IS NULL
+     WHERE EXISTS (SELECT FROM "album_user" au
+                     JOIN "album" al ON al."id" = au."albumId" AND al."deletedAt" IS NULL
+                     JOIN "album_asset" aa ON aa."albumId" = au."albumId"
+                    WHERE au."userId" = f."userId" AND aa."assetId" = f."assetId")
+        OR EXISTS (SELECT FROM "partner" p
+                    WHERE p."sharedById" = a."ownerId" AND p."sharedWithId" = f."userId"
+                      AND a."visibility" IN ('timeline', 'hidden'));
+    CREATE TEMP TABLE conv_favorite_album ON COMMIT DROP AS
+    SELECT "userId", gen_random_uuid() AS "albumId" FROM (SELECT DISTINCT "userId" FROM conv_favorite) u;
+    INSERT INTO "album" ("id", "albumName", "description")
+    SELECT "albumId", 'Favorites from shared spaces', 'Other people''s photos you favorited in Gallery.'
+      FROM conv_favorite_album;
+    INSERT INTO "album_user" ("albumId", "userId", "role")
+    SELECT "albumId", "userId", 'owner'::album_user_role_enum FROM conv_favorite_album;
+    INSERT INTO "album_asset" ("albumId", "assetId")
+    SELECT fa."albumId", f."assetId" FROM conv_favorite f JOIN conv_favorite_album fa USING ("userId")
+    ON CONFLICT DO NOTHING;
+    GET DIAGNOSTICS n_favorites = ROW_COUNT;
+  END IF;
+
+  -- A space person maps to a member's personal person through its faces or its face identity.
+  CREATE TEMP TABLE conv_person ON COMMIT DROP AS
+  SELECT op."personGroupId", nullif(btrim(ssp."name"), '') AS "name", ssp."birthDate"
+    FROM "shared_space_person" ssp
+    JOIN "shared_space_person_face" f ON f."personId" = ssp."id"
+    JOIN "asset_face" af ON af."id" = f."assetFaceId" AND af."deletedAt" IS NULL
+    JOIN "person" op ON op."personGroupId" = af."personGroupId"
+    JOIN "shared_space_member" m ON m."spaceId" = ssp."spaceId" AND m."userId" = op."ownerId"
+   WHERE NOT ssp."isHidden" AND ssp."type" = 'person'
+  UNION
+  SELECT op."personGroupId", nullif(btrim(ssp."name"), ''), ssp."birthDate"
+    FROM "shared_space_person" ssp
+    JOIN "person_identity" pi ON pi."identityId" = ssp."identityId"
+    JOIN "person" op ON op."personGroupId" = pi."personGroupId" AND op."ownerId" = pi."ownerId"
+    JOIN "shared_space_member" m ON m."spaceId" = ssp."spaceId" AND m."userId" = op."ownerId"
+   WHERE NOT ssp."isHidden" AND ssp."type" = 'person';
+
+  UPDATE "person" p
+     SET "name" = n."name"
+    FROM (SELECT "personGroupId", min("name") AS "name" FROM conv_person WHERE "name" IS NOT NULL
+           GROUP BY "personGroupId" HAVING count(DISTINCT "name") = 1) n
+   WHERE p."personGroupId" = n."personGroupId" AND btrim(p."name") = '';
+  GET DIAGNOSTICS n_names = ROW_COUNT;
+
+  UPDATE "person" p
+     SET "birthDate" = n."birthDate"
+    FROM (SELECT "personGroupId", min("birthDate") AS "birthDate" FROM conv_person WHERE "birthDate" IS NOT NULL
+           GROUP BY "personGroupId" HAVING count(DISTINCT "birthDate") = 1) n
+   WHERE p."personGroupId" = n."personGroupId" AND p."birthDate" IS NULL;
+
+  RAISE NOTICE 'convert-spaces: % space(s) became albums (% skipped: no live member), % album photo(s), % linked-album grant(s), % workflow step(s) moved to Add to Album(s), % favorite(s) kept, % person name(s) kept',
+    n_spaces, n_skipped, n_assets, n_grants, coalesce(n_steps, 0), coalesce(n_favorites, 0), n_names;
+END $$;
+
+-- -----------------------------------------------------------------------------
 -- 0b. Remove Gallery data that stock Immich would misread.
 --
 -- These rows sit in upstream tables, so dropping the fork tables and columns
@@ -200,8 +406,10 @@ DELETE FROM "asset_edit" WHERE "action" = 'trim';
 -- Immich (own assets, and partners' assets under the same conditions as
 -- Immich's asset share permission), drop album links to albums the creator
 -- neither owns nor edits (Immich's album share permission), and drop asset
--- links this leaves empty. Space access to an album lives in the dropped
--- shared_space_album* tables, never in album_user.
+-- links this leaves empty. Without 0a, space access to an album lives only in
+-- the dropped shared_space_album* tables, never in album_user. With 0a, every
+-- member holds an album_user row on the space's linked albums, so a link a space
+-- owner or editor made on a linked album survives as an Immich album editor's.
 -- The asset prune covers every link, not only those made from a space: deleting
 -- a space drops the link's space row but keeps the other members' asset rows. It
 -- also drops assets of partners removed since the link was made.
@@ -641,14 +849,16 @@ DELETE FROM "migration_overrides"
 -- 6b. Delete Gallery's own workflow plugin.
 --
 -- Plugins are stored IN THE DATABASE (`plugin.wasmBytes`), not just on disk, and the server loads
--- every row from `getForLoad()` at boot. Gallery ships `gallery-core`, whose wasm imports the
--- fork-only `gallery` host function. Upstream Immich does not register that function, so leaving
--- the row behind makes its microservices worker die on startup with
+-- every enabled row from `getForLoad()` at boot. Current Gallery ships `gallery-core` as a no-op
+-- wasm with no custom host import (its steps run in Gallery's TypeScript), so stock Immich loads it
+-- but every Gallery step would do nothing. Gallery releases before that change shipped a wasm that
+-- imports the fork-only `gallery` host function. A database last booted by one of those still holds
+-- that wasm (the row keeps version 1.0.0 and is rewritten in place only by a newer Gallery boot), and
+-- stock Immich's microservices worker then dies on startup with
 --
 --   cannot resolve import "extism:host/user" "gallery"
 --
--- and the server never answers /api/server/ping. Unlike the migration_overrides cleanup above, this
--- one is load-bearing: skip it and upstream Immich does not boot at all.
+-- so for such a database this delete is load-bearing.
 --
 -- `plugin_method` cascades from `plugin`, and `workflow_step.pluginMethodId` cascades from
 -- `plugin_method`, so this also removes any workflow step wired to a Gallery action. Those steps

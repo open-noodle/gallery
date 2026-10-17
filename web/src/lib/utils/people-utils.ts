@@ -1,6 +1,6 @@
 import { AssetTypeEnum } from '@immich/sdk';
+import { PeopleSortBy } from '$lib/gallery/stores/preferences.store';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
-import { PeopleSortBy } from '$lib/stores/preferences.store';
 import { createUrl, getAssetMediaUrl } from '$lib/utils';
 import { mapNormalizedRectToContent, type ContentMetrics, type Rect, type Size } from '$lib/utils/container-utils';
 

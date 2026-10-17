@@ -1,9 +1,9 @@
 import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { StorageFolder } from 'src/enum.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
-import { AssetRepository } from 'src/repositories/asset.repository.js';
-import { StorageRepository } from 'src/repositories/storage.repository.js';
 
 const UUID_LENGTH = 36;
 const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
@@ -38,8 +38,8 @@ export const getDerivativeAssetId = (filename: string): string | null => {
 
 type PhysicalUsageDeps = {
   user: Pick<UserAdmin, 'id' | 'storageLabel'>;
-  assetRepository: AssetRepository;
-  storageRepository: StorageRepository;
+  assetRepository: GalleryAssetRepository;
+  storageUsageRepository: StorageUsageRepository;
   s3: StorageBackend | undefined;
 };
 
@@ -52,7 +52,7 @@ type PhysicalUsageDeps = {
 export const computePhysicalUsage = async ({
   user,
   assetRepository,
-  storageRepository,
+  storageUsageRepository,
   s3,
 }: PhysicalUsageDeps): Promise<number> => {
   const externalAssetIds = await assetRepository.getExternalAssetIds(user.id);
@@ -63,11 +63,14 @@ export const computePhysicalUsage = async ({
 
   // Originals (library/, upload/) and profile images are never external, so they are unfiltered.
   const disk = await Promise.all([
-    storageRepository.getFolderSize(StorageCore.getLibraryFolder(user)),
-    storageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.Upload, user.id)),
-    storageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.Profile, user.id)),
-    storageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.Thumbnails, user.id), shouldCount),
-    storageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.EncodedVideo, user.id), shouldCount),
+    storageUsageRepository.getFolderSize(StorageCore.getLibraryFolder(user)),
+    storageUsageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.Upload, user.id)),
+    storageUsageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.Profile, user.id)),
+    storageUsageRepository.getFolderSize(StorageCore.getFolderLocation(StorageFolder.Thumbnails, user.id), shouldCount),
+    storageUsageRepository.getFolderSize(
+      StorageCore.getFolderLocation(StorageFolder.EncodedVideo, user.id),
+      shouldCount,
+    ),
   ]);
   let total = disk.reduce((total, value) => total + value, 0);
 

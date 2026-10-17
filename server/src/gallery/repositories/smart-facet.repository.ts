@@ -8,8 +8,9 @@ import {
   FilterSuggestionsResult,
   getFilteredIdentityPeople,
 } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { isActiveDistanceThreshold } from 'src/gallery/utils/smart-search.js';
 import { probes } from 'src/repositories/database.repository.js';
-import { SmartSearchOptions, isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
+import { SmartSearchOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFilter, withAssetFilter } from 'src/utils/asset-filter.js';
 import { asUuid, hasPeople, hasTags, searchAssetBuilderLegacy, truncatedDate } from 'src/utils/database.js';

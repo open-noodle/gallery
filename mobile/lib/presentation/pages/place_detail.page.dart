@@ -13,9 +13,6 @@ class PlaceDetailPage extends StatelessWidget {
 
   const PlaceDetailPage({super.key, required this.place});
 
-  // ignore: unused-code
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   Widget build(BuildContext context) {
     return TimelineRouteScope(

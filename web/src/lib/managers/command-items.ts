@@ -42,6 +42,7 @@ import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
 import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
+import { showAddSpaceMembersModal } from '$lib/gallery/spaces/add-space-members';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import type { CommandContext } from '$lib/managers/command-context-manager.svelte';
@@ -62,7 +63,6 @@ import {
 import AlbumEditModal from '$lib/modals/AlbumEditModal.svelte';
 import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
-import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
 import SpaceMembersModal from '$lib/modals/SpaceMembersModal.svelte';
 import { Route } from '$lib/route';
@@ -423,10 +423,10 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
       if (!ctx?.space) {
         return;
       }
-      return modalManager.show(SpaceAddMemberModal, {
-        spaceId: ctx.space.id,
-        existingMemberIds: ctx.space.members.map((m) => m.userId),
-      });
+      return showAddSpaceMembersModal(
+        ctx.space.id,
+        ctx.space.members.map((m) => m.userId),
+      );
     },
   },
   {

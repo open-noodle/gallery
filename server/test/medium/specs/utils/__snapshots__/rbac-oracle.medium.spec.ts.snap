@@ -6,6 +6,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
     "albums": {
       "ownAlbum": 2,
     },
+    "canEdit": [],
     "detail": [
       "ownArchived",
       "ownAsset",
@@ -30,6 +31,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 2,
     },
+    "canEdit": [],
     "detail": [
       "ownArchived",
       "ownAsset",
@@ -66,6 +68,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
     "albums": {
       "ownAlbum": 2,
     },
+    "canEdit": [],
     "detail": [
       "ownArchived",
       "ownAsset*",
@@ -90,6 +93,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 2,
     },
+    "canEdit": [],
     "detail": [
       "ownArchived",
       "ownAsset",
@@ -127,6 +131,24 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 2,
     },
+    "canEdit": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "dupAsset",
+      "dupAsset2",
+      "editorAsset",
+      "libraryAsset",
+      "ownArchived",
+      "ownAsset",
+      "ownHidden",
+      "ownTrashed",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+      "spaceHidden",
+      "spaceTrashed",
+      "stackAsset",
+    ],
     "detail": [
       "albumSpaceAsset",
       "contributedAsset*",
@@ -178,6 +200,26 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 2,
     },
+    "canEdit": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "dupAsset",
+      "dupAsset2",
+      "editorAsset",
+      "libraryAsset",
+      "ownArchived",
+      "ownAsset",
+      "ownHidden",
+      "ownLocked",
+      "ownTrashed",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+      "spaceHidden",
+      "spaceLocked",
+      "spaceTrashed",
+      "stackAsset",
+    ],
     "detail": [
       "albumSpaceAsset",
       "contributedAsset*",
@@ -228,6 +270,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
   },
   "partner": {
     "albums": {},
+    "canEdit": [],
     "detail": [
       "albumSpaceAsset",
       "dupAsset",
@@ -260,6 +303,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 2,
     },
+    "canEdit": [],
     "detail": [
       "albumSpaceAsset",
       "contributedAsset",
@@ -294,6 +338,15 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
   },
   "spaceEditor": {
     "albums": {},
+    "canEdit": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "editorAsset",
+      "libraryAsset",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+    ],
     "detail": [
       "albumSpaceAsset",
       "contributedAsset",
@@ -323,6 +376,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 2,
     },
+    "canEdit": [],
     "detail": [
       "editorAsset",
       "spaceAsset",
@@ -357,6 +411,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
   },
   "spaceViewer": {
     "albums": {},
+    "canEdit": [],
     "detail": [
       "albumSpaceAsset*",
       "contributedAsset",
@@ -383,6 +438,7 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
   },
   "spaceViewerOff": {
     "albums": {},
+    "canEdit": [],
     "detail": [
       "albumSpaceAsset",
       "contributedAsset",
@@ -412,6 +468,24 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
       "ownAlbum": 2,
       "spaceAlbum": 1,
     },
+    "canEdit": [
+      "albumSpaceAsset",
+      "contributedAsset",
+      "dupAsset",
+      "dupAsset2",
+      "editorAsset",
+      "libraryAsset",
+      "ownArchived",
+      "ownAsset",
+      "ownHidden",
+      "ownTrashed",
+      "petAsset",
+      "spaceArchived",
+      "spaceAsset",
+      "spaceHidden",
+      "spaceTrashed",
+      "stackAsset",
+    ],
     "detail": [
       "albumSpaceAsset",
       "contributedAsset*",
@@ -460,6 +534,9 @@ exports[`viewer-scope RBAC oracle > asset detail, statistics, albums, duplicates
   },
   "stranger": {
     "albums": {},
+    "canEdit": [
+      "strangerAsset",
+    ],
     "detail": [
       "strangerAsset*",
     ],
@@ -6003,6 +6080,9 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       "memOwner": "error:BadRequestException",
       "memViewer": "error:BadRequestException",
       "search": {
+        "memBirthday": [
+          "ownAsset*",
+        ],
         "memOwner": [
           "ownAsset*",
         ],
@@ -6011,7 +6091,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6030,6 +6110,9 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       "memOwner": "error:BadRequestException",
       "memViewer": "error:BadRequestException",
       "search": {
+        "memBirthday": [
+          "ownAsset*",
+        ],
         "memOwner": [
           "ownAsset*",
         ],
@@ -6038,7 +6121,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6050,6 +6133,9 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       ],
       "memViewer": "error:BadRequestException",
       "search": {
+        "memBirthday": [
+          "ownAsset*",
+        ],
         "memOwner": [
           "ownAsset*",
           "spaceAsset*",
@@ -6064,7 +6150,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6076,6 +6162,9 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       ],
       "memViewer": "error:BadRequestException",
       "search": {
+        "memBirthday": [
+          "ownAsset*",
+        ],
         "memOwner": [
           "ownAsset*",
           "spaceAsset*",
@@ -6090,7 +6179,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6099,6 +6188,9 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       "memOwner": "error:BadRequestException",
       "memViewer": "error:BadRequestException",
       "search": {
+        "memBirthday": [
+          "ownAsset*",
+        ],
         "memOwner": [
           "ownAsset*",
           "spaceAsset",
@@ -6113,7 +6205,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6123,7 +6215,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       "memViewer": "error:BadRequestException",
       "search": {},
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6159,7 +6251,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 3,
+        "total": 4,
       },
     },
   },
@@ -6213,6 +6305,9 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
       ],
       "memViewer": "error:BadRequestException",
       "search": {
+        "memBirthday": [
+          "ownAsset*",
+        ],
         "memOwner": [
           "ownAsset*",
           "spaceAsset*",
@@ -6224,7 +6319,7 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
         ],
       },
       "statistics": {
-        "total": 2,
+        "total": 3,
       },
     },
   },

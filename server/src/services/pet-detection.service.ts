@@ -48,7 +48,7 @@ export class PetDetectionService extends BaseService {
     }
 
     let jobs: JobItem[] = [];
-    const assets = this.assetJobRepository.streamForPetDetectionJob(force);
+    const assets = this.petFaceRepository.streamForPetDetectionJob(force);
 
     for await (const asset of assets) {
       jobs.push({ name: JobName.PetDetection, data: { id: asset.id } });
@@ -72,7 +72,7 @@ export class PetDetectionService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const asset = await this.assetJobRepository.getForPetDetection(id);
+    const asset = await this.petFaceRepository.getForPetDetection(id);
     // onJobSuccess queues without re-reading the asset, so one hard-deleted since is skipped, not failed.
     if (!asset) {
       return JobStatus.Skipped;
@@ -87,7 +87,7 @@ export class PetDetectionService extends BaseService {
 
     try {
       const recognitionEnabled = isPetRecognitionEnabled(machineLearning);
-      const { pets, imageHeight, imageWidth } = await this.machineLearningRepository.detectPets(
+      const { pets, imageHeight, imageWidth } = await this.galleryMachineLearningRepository.detectPets(
         asset.previewFile,
         machineLearning.petDetection,
         recognitionEnabled ? { modelName: machineLearning.petRecognition.modelName } : undefined,

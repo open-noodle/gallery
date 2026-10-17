@@ -22,15 +22,10 @@ import {
   SyncEntityType,
   SyncRequestType,
 } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
-import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
-import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
+import { GALLERY_REPOSITORY_DEPENDENCIES } from 'src/gallery/repositories/index.js';
 import { PersonSidecarFields, writePersonSidecars } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
@@ -38,11 +33,9 @@ import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
-import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -52,11 +45,6 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
-import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -76,7 +64,6 @@ import { SearchRepository } from 'src/repositories/search.repository.js';
 import { SessionRepository } from 'src/repositories/session.repository.js';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
@@ -109,6 +96,12 @@ import { BASE_SERVICE_DEPENDENCIES, BaseService } from 'src/services/base.servic
 import { MetadataService } from 'src/services/metadata.service.js';
 import { SyncService } from 'src/services/sync.service.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
+import {
+  Dep,
+  newGalleryMockRepository,
+  newGalleryRealRepository,
+  withGalleryRepositories,
+} from 'test/gallery/medium.factory.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
 import { factory, newDate, newEmbedding, newUuid } from 'test/small.factory.js';
@@ -117,8 +110,8 @@ import { automock, wait } from 'test/utils.js';
 export const testAssetsDir = resolve(import.meta.dirname, '../../e2e/test-assets');
 
 type MediumTestOptions = {
-  mock: Array<(typeof BASE_SERVICE_DEPENDENCIES)[number]>;
-  real: Array<(typeof BASE_SERVICE_DEPENDENCIES)[number]>;
+  mock: Array<Dep>;
+  real: Array<Dep>;
   database: Kysely<DB>;
 };
 
@@ -134,6 +127,7 @@ export const newMediumService = <S extends ClassConstructor<typeof BaseService>>
 
 export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = ClassConstructor<typeof BaseService>> {
   private repoCache: Record<string, any> = {};
+  private instances = new Map<Dep, unknown>();
   private sutDeps: ClassConstructorsToInstances<BaseServiceDeps>;
 
   sut: InstanceType<S>;
@@ -164,7 +158,15 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
   }
 
   private makeDeps(options: MediumTestOptions) {
-    const deps = BASE_SERVICE_DEPENDENCIES;
+    const deps = [...BASE_SERVICE_DEPENDENCIES, ...GALLERY_REPOSITORY_DEPENDENCIES];
+    // GalleryPersonRepository holds the fork methods moved out of PersonRepository, so it follows PersonRepository.
+    const withGalleryPerson = (list: MediumTestOptions['real']) =>
+      list.includes(PersonRepository) ? [...list, GalleryPersonRepository] : list;
+    this.options = options = {
+      ...options,
+      real: withGalleryPerson(options.real),
+      mock: withGalleryPerson(options.mock),
+    };
 
     for (const dep of options.mock) {
       if (!deps.includes(dep)) {
@@ -177,7 +179,7 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
         throw new Error(`Real repository ${dep.name} is not a valid dependency`);
       }
     }
-    return deps.map((dep) => {
+    const instances = deps.map((dep) => {
       if (options.real.includes(dep)) {
         return this.get(dep);
       }
@@ -185,10 +187,15 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
       if (options.mock.includes(dep)) {
         return newMockRepository(dep);
       }
-    }) as unknown as ClassConstructorsToInstances<BaseServiceDeps>;
+    });
+
+    this.instances = withGalleryRepositories(deps, instances);
+    return BASE_SERVICE_DEPENDENCIES.map((dep) =>
+      this.instances.get(dep),
+    ) as unknown as ClassConstructorsToInstances<BaseServiceDeps>;
   }
 
-  get<T extends BaseServiceDeps[number]>(key: T): InstanceType<T> {
+  get<T extends Dep>(key: T): InstanceType<T> {
     if (!Object.hasOwn(this.repoCache, key.name)) {
       const real = newRealRepository(key, this.options.database);
       this.repoCache[key.name] = real;
@@ -197,13 +204,12 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
     return this.repoCache[key.name];
   }
 
-  getMock<T extends BaseServiceDeps[number], R = Mocked<InstanceType<T>>>(key: T): R {
-    const index = BASE_SERVICE_DEPENDENCIES.indexOf(key);
-    if (index === -1 || !this.options.mock.includes(key)) {
+  getMock<T extends Dep, R = Mocked<InstanceType<T>>>(key: T): R {
+    if (!this.options.mock.includes(key)) {
       throw new Error(`getMock called with a key that is not a mock: ${key.name}`);
     }
 
-    return this.sutDeps[index] as R;
+    return this.instances.get(key) as R;
   }
 
   async newUser(dto: Partial<Insertable<UserTable>> = {}) {
@@ -647,7 +653,7 @@ export class ExifTestContext extends MediumTestContext<typeof MetadataService> {
   }
 }
 
-const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely<DB>): InstanceType<T> => {
+const newRealRepository = <T extends Dep>(key: T, db: Kysely<DB>): InstanceType<T> => {
   switch (key) {
     case AccessRepository:
     case AlbumRepository:
@@ -656,23 +662,11 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case ApiKeyRepository:
     case AssetRepository:
     case AssetEditRepository:
-    case AssetFavoriteRepository:
     case AssetFileRepository:
     case AssetJobRepository:
     case ClusterGroupRepository:
     case DownloadRepository:
     case DuplicateRepository:
-    case FaceIdentityRepository:
-    case FaceRepairDeclineRepository:
-    case FilterSuggestionRepository:
-    case MemoryRuleAssetRepository:
-    case SmartFacetRepository:
-    case SpaceAlbumRepository:
-    case PetFaceRepository:
-    case FaceSearchRepository:
-    case FaceRepairRepository:
-    case FaceRepairScanRepository:
-    case FacePersonVerdictRepository:
     case IntegrityRepository:
     case MemoryRepository:
     case LibraryRepository:
@@ -685,11 +679,8 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case SessionRepository:
     case SharedLinkRepository:
     case SharedLinkAssetRepository:
-    case SharedSpaceRepository:
     case StackRepository:
     case SyncRepository:
-    case GallerySyncRepository:
-    case VideoTrimRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -725,7 +716,6 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
       return new key(LoggingRepository.create()) as InstanceType<T>;
     }
 
-    case ClassificationRepository:
     case TagRepository: {
       return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
@@ -748,7 +738,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     default: {
-      throw new Error(`Unable to create repository instance for key: ${key?.name || key}`);
+      return newGalleryRealRepository(key, db);
     }
   }
 };
@@ -759,17 +749,8 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case AlbumRepository:
     case AssetRepository:
     case AssetJobRepository:
-    case ClassificationRepository:
     case ConfigRepository:
     case CryptoRepository:
-    case FaceIdentityRepository:
-    case FacePersonVerdictRepository:
-    case FilterSuggestionRepository:
-    case MemoryRuleAssetRepository:
-    case SmartFacetRepository:
-    case SpaceAlbumRepository:
-    case PetFaceRepository:
-    case FaceSearchRepository:
     case LibraryRepository:
     case MemoryRepository:
     case IntegrityRepository:
@@ -779,8 +760,6 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case PersonRepository:
     case SessionRepository:
     case SyncRepository:
-    case GallerySyncRepository:
-    case VideoTrimRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -835,17 +814,13 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
       return jobRepository;
     }
 
-    case QueueMaintenanceRepository: {
-      return automock(QueueMaintenanceRepository, { args: [undefined, { setContext: () => {} }] });
-    }
-
     case LoggingRepository as unknown as ClassConstructor<T>: {
       const configMock = { getEnv: () => ({ noColor: false }) };
       return automock(LoggingRepository, { args: [undefined, configMock], strict: false });
     }
 
     case MachineLearningRepository: {
-      return automock(MachineLearningRepository, { args: [{ setContext: () => {} }] });
+      return automock(GalleryMachineLearningRepository, { args: [{ setContext: () => {} }] });
     }
 
     case StorageRepository: {
@@ -860,7 +835,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     }
 
     default: {
-      throw new Error(`Invalid repository key: ${key}`);
+      return newGalleryMockRepository(key);
     }
   }
 };

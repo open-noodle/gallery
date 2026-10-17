@@ -135,39 +135,38 @@ export class AlbumRepository {
           .where((e) => spaceVisibilityGate(e)),
       );
 
-    return (
-      this.db
-        .selectFrom('album')
-        .selectAll('album')
+    // The `album.deletedAt` filter is the A1 invariant, covering both arms of the share check: a
+    // soft-deleted album is never returned.
+    return this.db
+      .selectFrom('album')
+      .selectAll('album')
+      .where((eb) =>
         // The asset is in the album as an own row, or as a contribution made through a space the caller
         // is a member of (a contribution is only reachable through the one space it was made to).
-        .where((eb) =>
-          eb.exists(
-            eb
-              .selectFrom(albumMembership(eb, 'album.id', { memberUserId: ownerId }).as('album_members'))
-              .select(eb.lit(1).as('exists'))
-              .where('album_members.assetId', '=', asUuid(assetId)),
-          ),
-        )
+        eb.exists(
+          eb
+            .selectFrom(albumMembership(eb, 'album.id', { memberUserId: ownerId }).as('album_members'))
+            .select(eb.lit(1).as('exists'))
+            .where('album_members.assetId', '=', asUuid(assetId)),
+        ),
+      )
+      .where((eb) =>
         // ...and the caller can open the album: a direct share, or a link into a space they can access.
         // A contribution implies the latter, and is space-shareable by construction.
-        .where((eb) =>
-          eb.or([
-            eb.exists(
-              eb
-                .selectFrom('album_user')
-                .whereRef('album_user.albumId', '=', 'album.id')
-                .where('album_user.userId', '=', ownerId),
-            ),
-            eb.and([eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)), isSpaceShareable(eb)]),
-          ]),
-        )
-        // The A1 invariant, covering both arms above — a soft-deleted album is never returned.
-        .where('album.deletedAt', 'is', null)
-        .select(withAlbumUsers(ownerId))
-        .orderBy('album.createdAt', 'desc')
-        .execute()
-    );
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('album_user')
+              .whereRef('album_user.albumId', '=', 'album.id')
+              .where('album_user.userId', '=', ownerId),
+          ),
+          eb.and([eb('album.id', 'in', (e) => accessibleSpaceAlbums(e, ownerId)), isSpaceShareable(eb)]),
+        ]),
+      )
+      .where('album.deletedAt', 'is', null)
+      .select(withAlbumUsers(ownerId))
+      .orderBy('album.createdAt', 'desc')
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })

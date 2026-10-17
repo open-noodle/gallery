@@ -63,7 +63,19 @@
     "background_task_prefix": "de.opennoodle.gallery.background",
     "apple_team_id": "77MWNP37MV",
     "app_store_url": "https://apps.apple.com/us/app/noodle-gallery/id6761776289",
-    "play_store_url": "https://play.google.com/store/apps/details?id=de.opennoodle.gallery"
+    "play_store_url": "https://play.google.com/store/apps/details?id=de.opennoodle.gallery",
+    "_comment_ios_usage_descriptions": "The nine iOS permission prompts (Info.plist NS*UsageDescription). patch_ios writes them into the upstream Info.plist at build time and verify-branding.sh asserts them.",
+    "ios_usage_descriptions": {
+      "NSCameraUsageDescription": "Noodle Gallery uses the camera so you can capture photos and videos in the app. For example, a photo you take is uploaded to your own self-hosted Gallery server and is not sent to any third party.",
+      "NSFaceIDUsageDescription": "Noodle Gallery uses Face ID to unlock your private content. For example, Face ID is checked locally on your device to open the locked folder and is never sent off-device.",
+      "NSLocalNetworkUsageDescription": "Noodle Gallery uses the local network to reach your self-hosted Gallery server. For example, your device connects directly to the server's local IP to sync photos and cast to a TV; no data is sent to third-party servers.",
+      "NSLocationAlwaysAndWhenInUseUsageDescription": "Noodle Gallery uses your location in the background only to read the current Wi-Fi network name, so backups run only on networks you trust. For example, uploads continue on your home Wi-Fi and pause elsewhere. Your location is used on-device and never uploaded.",
+      "NSLocationUsageDescription": "Noodle Gallery uses your location only to read the current Wi-Fi network name, so backups run only on networks you trust. For example, uploads continue on your home Wi-Fi. Your location is used on-device and never uploaded.",
+      "NSLocationWhenInUseUsageDescription": "Noodle Gallery uses your location only to read the current Wi-Fi network name, so backups run only on networks you trust. For example, uploads continue on your home Wi-Fi. Your location is used on-device and never uploaded.",
+      "NSMicrophoneUsageDescription": "Noodle Gallery uses the microphone to record audio when you capture video in the app. For example, the resulting video is uploaded to your own self-hosted Gallery server and is not sent to any third party.",
+      "NSPhotoLibraryAddUsageDescription": "Noodle Gallery saves photos and videos to your photo library. For example, when you download an asset from your Gallery server, it is added to the Photos app and stays on your device.",
+      "NSPhotoLibraryUsageDescription": "Noodle Gallery reads your photo library to back up selected photos and videos. For example, chosen albums are uploaded to your own self-hosted Gallery server and are not sent to any third party."
+    }
   },
 
   "email": {

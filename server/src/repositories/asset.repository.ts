@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import {
-  Expression,
   type ExpressionBuilder,
   type Insertable,
   type Kysely,
@@ -8,8 +7,6 @@ import {
   type SelectQueryBuilder,
   type Selectable,
   type ShallowDehydrateObject,
-  type SqlBool,
-  type Transaction,
   UpdateResult,
   type Updateable,
   expressionBuilder,
@@ -32,6 +29,7 @@ import {
   TimeBucketSize,
 } from 'src/enum.js';
 import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
+import { withTimeBucketAssetFilters } from 'src/gallery/utils/time-bucket-filter.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -39,19 +37,13 @@ import { AssetFileTable } from 'src/schema/tables/asset-file.table.js';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table.js';
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
-import { withAssetFilter } from 'src/utils/asset-filter.js';
 import {
   anyUuid,
   asUuid,
-  escapeLikePattern,
-  hasPeople,
-  inSharedAlbum,
   isStaleAssetForeignKeyConstraint,
   removeUndefinedKeys,
-  tokenizeForSearch,
   truncatedDate,
   unnest,
-  withAnyTagId,
   withDefaultVisibility,
   withEdits,
   withExif,
@@ -65,17 +57,7 @@ import {
 } from 'src/utils/database.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { globToPostgresRegex } from 'src/utils/misc.js';
-import { hasFaceIdentities, hasSpacePeople } from 'src/utils/people-filter.js';
-import {
-  type TimelineHiddenScope,
-  type TimelineRescue,
-  albumMembership,
-  hiddenFromOwnTimeline,
-  ownedOrSharedWithViewer,
-  spaceAssetPathBranches,
-  spaceVisibilityGate,
-  timelineHiddenScopeIsEmpty,
-} from 'src/utils/shared-space-album-scope.js';
+import { type TimelineHiddenScope, ownedOrSharedWithViewer } from 'src/utils/shared-space-album-scope.js';
 
 export type AssetStats = Record<AssetType, number>;
 
@@ -198,13 +180,6 @@ export interface TimeBucketItem {
   count: number;
 }
 
-export interface TimeBucketCoverItem {
-  timeBucket: string;
-  representativeAssetId: string;
-  representativeThumbhash: string | null;
-  representativeRatio: number;
-}
-
 export interface YearMonthDay {
   day: number;
   month: number;
@@ -251,7 +226,7 @@ type UpsertExifOptions = {
 const distinctLocked = <T extends LockableProperty[] | null>(eb: ExpressionBuilder<DB, 'asset_exif'>, columns: T) =>
   sql<T>`nullif(array(select distinct unnest(${eb.ref('asset_exif.lockedProperties')} || ${columns})), '{}')`;
 
-const getBoundingCircle = (bbox: BoundingBox) => {
+export const getBoundingCircle = (bbox: BoundingBox) => {
   const { west, south, east, north } = bbox;
   const eastUnwrapped = west <= east ? east : east + 360;
   const centerLongitude = (((west + eastUnwrapped) / 2 + 540) % 360) - 180;
@@ -266,7 +241,7 @@ const getBoundingCircle = (bbox: BoundingBox) => {
   return { centerLatitude, centerLongitude, radius };
 };
 
-const withBoundingBox = <T>(qb: SelectQueryBuilder<DB, 'asset' | 'asset_exif', T>, bbox: BoundingBox) => {
+export const withBoundingBox = <T>(qb: SelectQueryBuilder<DB, 'asset' | 'asset_exif', T>, bbox: BoundingBox) => {
   const { west, south, east, north } = bbox;
   const withLatitude = qb.where('asset_exif.latitude', '>=', south).where('asset_exif.latitude', '<=', north);
 
@@ -278,255 +253,6 @@ const withBoundingBox = <T>(qb: SelectQueryBuilder<DB, 'asset' | 'asset_exif', T
     eb.or([eb('asset_exif.longitude', '>=', west), eb('asset_exif.longitude', '<=', east)]),
   );
 };
-
-// Postgres writes years past 9999 unsigned (`12345-01-01`), while `toISOString()` uses the ISO 8601
-// expanded-year form (`+012346-01-01`) — six digits plus a sign, so a fixed 10-character slice cuts
-// the day off. Take the whole date part and drop the sign to land back on Postgres's own spelling.
-const formatUtcDate = (date: Date) => date.toISOString().split('T', 1)[0].replace(/^\+0*/, '');
-
-// Advance a YYYY-MM-DD bucket-start date by one bucket interval (the exclusive
-// upper bound of the requested range).
-const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): string => {
-  const [year, month, day] = bucketStart.split('-').map(Number);
-  switch (bucketSize) {
-    case TimeBucketSize.Year: {
-      // Anchor to Jan 1 of the next year regardless of input day/month.
-      return formatUtcDate(new Date(Date.UTC(year + 1, 0, 1)));
-    }
-    case TimeBucketSize.Month: {
-      // Anchor to the first of the next month regardless of input day.
-      // month is 1-based, so Date.UTC(year, month, 1) is the 1st of month+1.
-      return formatUtcDate(new Date(Date.UTC(year, month, 1)));
-    }
-    default: {
-      return formatUtcDate(new Date(Date.UTC(year, month - 1, day + 1)));
-    }
-  }
-};
-
-/**
- * #1041 §6.4: the caller's-own-timeline arm, with the "hidden from my own timeline" subtraction
- * attached ONLY to the caller's own id — never to the whole `userIds` set, which also carries
- * partner ids (`timeline.service.ts` pushes `getMyPartnerIds` into it). AND-ing the subtraction
- * across `userIds` would remove a PARTNER's photos based on the CALLER's flags — the "partner trap"
- * E10 pins.
- *
- * When there is nothing to subtract (no `callerId`, no `hiddenScope`, or an empty scope — the common
- * case, a viewer who has hidden nothing), this emits EXACTLY the pre-#1041 predicate,
- * `ownerId = ANY(userIds)`, so that caller pays nothing and the SQL is unchanged.
- */
-function ownerArmWithHiddenSubtraction(
-  eb: ExpressionBuilder<DB, 'asset'>,
-  options: TimeBucketOptions,
-  rescue: TimelineRescue,
-): Expression<SqlBool> {
-  const userIds = options.userIds!;
-  const subtraction =
-    options.callerId && options.hiddenScope && !timelineHiddenScopeIsEmpty(options.hiddenScope)
-      ? hiddenFromOwnTimeline(eb, options.hiddenScope, rescue)
-      : undefined;
-
-  if (!subtraction || !options.callerId) {
-    return eb('asset.ownerId', '=', anyUuid(userIds));
-  }
-
-  // Never a partner: `userIds` minus the caller is exactly the partner (or other-viewed-user) set,
-  // unaffected by the caller's own hidden scope.
-  const otherIds = userIds.filter((id) => id !== options.callerId);
-  return eb.or([
-    eb.and([eb('asset.ownerId', '=', asUuid(options.callerId)), subtraction]),
-    ...(otherIds.length > 0 ? [eb('asset.ownerId', '=', anyUuid(otherIds))] : []),
-  ]);
-}
-
-export function withTimeBucketAssetFilters<O>(
-  qb: SelectQueryBuilder<DB, 'asset', O>,
-  options: TimeBucketOptions,
-  // Upstream (immich-30739) widens the owner check for person-scoped timelines so a viewer also sees
-  // the person's faces on assets shared with them through an album. The fork normalises upstream's
-  // single `personId` to `personIds` in timeline.service (see "Normalize deprecated single-value
-  // fields"), so the scoping signal to test here is the ARRAY — testing `options.personId` made this
-  // branch permanently unreachable, because nothing ever sets it.
-  // `getTimeBucketCovers` has no auth in hand and is fork-only, so it passes nothing and keeps the
-  // plain owner check.
-  viewerId?: string,
-): SelectQueryBuilder<DB, 'asset', O> {
-  return (
-    qb
-      .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
-      .$if(!!options.isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
-      .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
-      .$if(!!options.bbox || !!options.description, (qb) => {
-        let q = qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId');
-
-        if (options.bbox) {
-          const circle = getBoundingCircle(options.bbox);
-          q = q.where(
-            sql`earth_box(ll_to_earth_public(${circle.centerLatitude}, ${circle.centerLongitude}), ${circle.radius})`,
-            '@>',
-            sql`ll_to_earth_public(asset_exif.latitude, asset_exif.longitude)`,
-          ) as any;
-          q = withBoundingBox(q, options.bbox) as any;
-        }
-
-        if (options.description) {
-          q = q.where(
-            sql`f_unaccent(asset_exif.description)`,
-            'ilike',
-            sql`'%' || f_unaccent(${escapeLikePattern(options.description)}) || '%' escape '\\'`,
-          ) as any;
-        }
-
-        return q;
-      })
-      .$if(options.visibility === undefined, withDefaultVisibility)
-      .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
-      .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
-      .$if(!!options.albumId, (qb) =>
-        qb
-          // Fork RBAC (Slice 1 / security-3 defense-in-depth): an explicit visibility=HIDDEN/LOCKED
-          // bypasses the top-level withDefaultVisibility (which only fires when visibility is
-          // undefined). Flat-gate the album arm so Hidden/Locked album assets never surface via the
-          // timeline bucket, even if the service-level guard is bypassed. Idempotent for the default
-          // album grid view (withDefaultVisibility is the same Archive+Timeline predicate).
-          //
-          // Applied BEFORE the innerJoin below (WHERE is conjunctive, so the SQL is identical either
-          // order) so `eb` here stays `ExpressionBuilder<DB, 'asset'>` — spaceVisibilityGate expects
-          // `ExpressionBuilder<DB, keyof DB>`, which the post-join builder (extended with the
-          // `album_members` subquery alias) no longer satisfies.
-          .where((eb) => spaceVisibilityGate(eb))
-          // Fork RBAC (Slice 1 / H1 defense-in-depth): the top-level `options.isTrashed` ternary
-          // (line 253) flips `deletedAt IS NOT NULL` for the whole query, and the service-layer
-          // guard (timeline.service.ts timeBucketChecks) already rejects isTrashed=true on an
-          // album/space browse — but flat-gate here too so the album arm never surfaces a trashed
-          // asset even if that guard is bypassed.
-          .where('asset.deletedAt', 'is', null)
-          // #764: contributions come in only when the service resolved albumSpaceIds (the viewer's
-          // live member-spaces linking this album); album_user shares and departed members resolve none.
-          .innerJoin(
-            (eb) =>
-              albumMembership(
-                eb,
-                [options.albumId!],
-                options.albumSpaceIds?.length ? { spaceIds: options.albumSpaceIds } : undefined,
-              ).as('album_members'),
-            (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
-          ),
-      )
-      .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
-        ),
-      )
-      .$if(!!options.isInAlbum && !options.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
-        ),
-      )
-      .$if(!!options.spaceId, (qb) =>
-        qb.where((eb) =>
-          // Fork RBAC (Fix A): the space-membership predicate is intersected with an
-          // INDEPENDENT visibility gate — `own OR (Archive|Timeline)` — so an explicit
-          // `visibility=HIDDEN`/`LOCKED` cannot surface OTHER members' Hidden/Locked in-space
-          // assets. Mirrors searchAssetBuilder. `userIds` may be undefined (pure spaceId browse):
-          // then the `own` term is absent and the gate is purely other-members-Archive/Timeline.
-          eb.and([
-            eb.or(
-              spaceAssetPathBranches(eb, {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceId: options.spaceId! },
-                albumTimelineGate: 'space-tab',
-              }),
-            ),
-            eb.or([
-              ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
-              spaceVisibilityGate(eb),
-            ]),
-          ]),
-        ),
-      )
-      .$if(!!options.personIds?.length, (qb) => hasPeople(qb, options.personIds!))
-      .$if(!!options.spacePersonIds?.length, (qb) =>
-        hasSpacePeople(qb, options.spacePersonIds!).where((eb) =>
-          // The space-person face narrowing must ALSO carry the independent visibility gate:
-          // a space person's face on ANOTHER member's Hidden/Locked asset must not surface it
-          // via an explicit `visibility=HIDDEN`. Caller's own rows follow the resolved visibility.
-          eb.or([
-            ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
-            spaceVisibilityGate(eb),
-          ]),
-        ),
-      )
-      .$if(!!options.identityIds?.length, (qb) => hasFaceIdentities(qb, options.identityIds!))
-      .$if(!!options.withStacked, (qb) =>
-        qb
-          .leftJoin('stack', (join) =>
-            join.onRef('stack.id', '=', 'asset.stackId').onRef('stack.primaryAssetId', '=', 'asset.id'),
-          )
-          // #763 §5.4 (E31): favorites are per (user, asset). Under an isFavorite:true filter every
-          // row is already one of the caller's favorites, and a favorited stack CHILD must surface
-          // standalone instead of staying collapsed behind a primary the caller may not have
-          // favorited — so the primary-only collapse is skipped for favorite-filtered timelines.
-          .$if(options.isFavorite !== true, (qb) =>
-            qb.where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
-          ),
-      )
-      // #1041: the caller's own id carries the own-timeline subtraction, never a partner's (see
-      // ownerArmWithHiddenSubtraction). With timeline spaces, §3's rescue is the shared arm the
-      // viewer-scope predicate ORs in; without them (E12: the subtraction still applies with
-      // `withSharedSpaces: false`) there is no sibling arm, so the rescue is built inline from
-      // `visibleSpaceIds`. immich-30739's person-scoped shared-album widening (keyed on `personIds`,
-      // see `viewerId` above) is an independent admission path, so it ORs with the owner arm. The
-      // shared arm's album gate is the viewer's own per-user hide ('personal'), not the space flag.
-      .$if(!!options.userIds, (qb) =>
-        qb.where((eb) => {
-          const viewer = options.callerId ?? options.userIds![0];
-          const ownerArm = ownerArmWithHiddenSubtraction(
-            eb,
-            options,
-            options.timelineSpaceIds
-              ? { kind: 'sibling-arm' }
-              : { kind: 'inline', visibleSpaceIds: options.visibleSpaceIds ?? [], viewerId: viewer },
-          );
-          return ownedOrSharedWithViewer(
-            eb,
-            options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(eb, viewerId)]) : ownerArm,
-            options.timelineSpaceIds && {
-              scope: { spaceIds: options.timelineSpaceIds },
-              albumTimelineGate: 'personal',
-              viewerId: viewer,
-            },
-          );
-        }),
-      )
-      .$if(options.isFavorite !== undefined, (qb) =>
-        qb.where((eb) =>
-          options.isFavorite
-            ? favoriteExistsFor(eb, options.authUserId!)
-            : eb.not(favoriteExistsFor(eb, options.authUserId!)),
-        ),
-      )
-      .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
-      .$if(options.isDuplicate !== undefined, (qb) =>
-        qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
-      )
-      .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!))
-      .$if(!!options.originalFileName, (qb) =>
-        qb.where(
-          sql`f_unaccent(asset."originalFileName")`,
-          'ilike',
-          sql`'%' || f_unaccent(${escapeLikePattern(options.originalFileName!)}) || '%' escape '\\'`,
-        ),
-      )
-      .$if(!!options.ocr, (qb) =>
-        qb
-          .innerJoin('ocr_search', 'asset.id', 'ocr_search.assetId')
-          .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
-      )
-      .$call((qb) => withAssetFilter(qb, options))
-  );
-}
 
 @Injectable()
 export class AssetRepository {
@@ -882,33 +608,6 @@ export class AssetRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, 1000, DummyValue.UUID] })
-  getOwnedManifestAssets(ownerId: string, limit: number, cursor?: string) {
-    return this.db
-      .selectFrom('asset')
-      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select([
-        'asset.id',
-        'asset.originalPath',
-        'asset.originalFileName',
-        'asset.checksum',
-        'asset.checksumAlgorithm',
-        'asset.type',
-        'asset.fileCreatedAt',
-        'asset.fileModifiedAt',
-      ])
-      .select('asset_exif.fileSizeInByte as size')
-      .where('asset.ownerId', '=', asUuid(ownerId))
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.status', '=', AssetStatus.Active)
-      .where('asset.libraryId', 'is', null)
-      .where('asset.isExternal', '=', false)
-      .$if(!!cursor, (qb) => qb.where('asset.id', '>', asUuid(cursor!)))
-      .orderBy('asset.id')
-      .limit(limit)
-      .execute();
-  }
-
   // #763: updateAll maps these rows into on_asset_update, so they carry the trimmed duration and, given
   // the caller's id, the caller's favorite (asset."isFavorite" is the owner's).
   @GenerateSql(
@@ -932,67 +631,26 @@ export class AssetRepository {
   )
   @ChunkedArray({ paramIndex: 0 })
   getByIdsWithAllRelationsButStacks(ids: string[], viewingUserId?: string, authUserId?: string) {
-    return (
-      this.db
-        .selectFrom('asset')
-        .selectAll('asset')
-        .select(projectedDuration)
-        .select(withFacesAndPeople({ viewingUserId }))
-        .select(withTags)
-        .$call(withExif)
-        // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
-        // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
-        // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
-        // It is a SEPARATE parameter from viewingUserId (face/people ordering) on purpose: the two
-        // are the same value for a real caller, but notification.service must set only the former.
-        .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
-        .where('asset.id', '=', anyUuid(ids))
-        .execute()
-    );
+    // #763: authUserId is optional and deliberately omitted by job.service.ts (background job)
+    // and notification.service.ts (synthetic partial auth) — see the comments at their mapAsset
+    // call sites. Only search.service.ts's getExploreData passes it (real caller identity).
+    // It is a SEPARATE parameter from viewingUserId (face/people ordering) on purpose: the two
+    // are the same value for a real caller, but notification.service must set only the former.
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .select(projectedDuration)
+      .select(withFacesAndPeople({ viewingUserId }))
+      .select(withTags)
+      .$call(withExif)
+      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+      .where('asset.id', '=', anyUuid(ids))
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
   async deleteAll(ownerId: string): Promise<void> {
     await this.db.deleteFrom('asset').where('ownerId', '=', ownerId).execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID] })
-  getByLibraryIdWithFaces(libraryId: string, limit = 1000, offset = 0) {
-    return this.db
-      .selectFrom('asset')
-      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-      .select('asset.id')
-      .where('asset.libraryId', '=', libraryId)
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.isOffline', '=', false)
-      .groupBy('asset.id')
-      .orderBy('asset.id')
-      .limit(limit)
-      .offset(offset)
-      .execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, 1000, 0] })
-  getByAlbumIdWithFaces(albumId: string, spaceId: string, limit = 1000, offset = 0) {
-    return (
-      this.db
-        .selectFrom('asset')
-        // #752 P1-7 / D1-b: link-time face sync must also page retained contributions on re-link, and
-        // only those made through the syncing space, so an S2 link-sync never pages an S1 contribution.
-        .innerJoin(
-          (eb) => albumMembership(eb, [albumId], { spaceId }).as('album_members'),
-          (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
-        )
-        .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-        .select('asset.id')
-        .where('asset.deletedAt', 'is', null)
-        .where('asset.isOffline', '=', false)
-        .groupBy('asset.id')
-        .orderBy('asset.id')
-        .limit(limit)
-        .offset(offset)
-        .execute()
-    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
@@ -1217,23 +875,6 @@ export class AssetRepository {
     return tombstone?.assetId;
   }
 
-  @GenerateSql({ params: [[DummyValue.UUID]] })
-  async getChecksumsByIds(ids: string[]): Promise<{ id: string; checksum: Buffer }[]> {
-    if (ids.length === 0) {
-      return [];
-    }
-
-    return this.db
-      .selectFrom('asset')
-      .select(['id', 'checksum'])
-      .where(
-        'id',
-        'in',
-        ids.map((id) => asUuid(id)),
-      )
-      .execute();
-  }
-
   findLivePhotoMatch(options: LivePhotoSearchOptions) {
     const { ownerId, otherAssetId, livePhotoCID, type } = options;
     return this.db
@@ -1321,98 +962,6 @@ export class AssetRepository {
       .select('bucket_counts.count')
       .orderBy('bucket_counts.timeBucket', order)
       .execute() as any as Promise<TimeBucketItem[]>;
-  }
-
-  // #1041 slice 12: a plain COUNT variant of getTimeBuckets, reusing the exact same
-  // `withTimeBucketAssetFilters` predicate (no separate counting logic to drift out of sync with the
-  // real timeline). Used by the hide-preview endpoints, which run this twice — once with the caller's
-  // current `hiddenScope`, once with a hypothetical scope that adds the switch being considered — and
-  // diff the two totals. Cheaper than bucketing since there is no GROUP BY.
-  // Optional trx handle so the #1041 slice 12 preview endpoints can re-run this INSIDE a
-  // rolled-back transaction that has just performed the hypothetical hide — see
-  // SharedSpaceRepository.previewInRolledBackTransaction. Every other caller omits it.
-  @GenerateSql({ params: [{}] })
-  async getTimelineAssetCount(options: TimeBucketOptions, db: Kysely<DB> | Transaction<DB> = this.db): Promise<number> {
-    const result = await db
-      .selectFrom('asset')
-      .$call((qb) => withTimeBucketAssetFilters(qb, options))
-      .select((eb) => eb.fn.countAll<number>().as('count'))
-      .executeTakeFirstOrThrow();
-    return Number(result.count);
-  }
-
-  async getTimeBucketCovers(options: TimeBucketOptions): Promise<TimeBucketCoverItem[]> {
-    const requestedBuckets = options.timeBuckets ?? [];
-    if (requestedBuckets.length === 0) {
-      return [];
-    }
-
-    const bucketSize = options.bucketSize ?? TimeBucketSize.Month;
-    const order = options.order === AssetOrder.Asc ? AssetOrder.Asc : AssetOrder.Desc;
-
-    // Narrow the scan to the requested bucket range so this is an index-friendly
-    // scan rather than a full-library sort.
-    const sorted = requestedBuckets.toSorted();
-    const minStart = sorted[0];
-    const maxStart = sorted.at(-1)!;
-    const maxEnd = addBucketInterval(maxStart, bucketSize);
-
-    // The CTE `timeBucket` is the truncated timestamptz at UTC midnight; the requested YYYY-MM-DD
-    // strings correspond to those exact values. Bound as text and cast in SQL, never as a `Date`: a bucket
-    // past year 9999 is unparseable by `Date` in Postgres's unsigned spelling, and the signed
-    // spelling `Date` does emit is rejected by Postgres as a timezone displacement — so the
-    // round-trip is lossy in both directions. The explicit `Z` keeps the comparison pinned to UTC.
-    const requestedBucketStarts = requestedBuckets.map((tb) => sql<Date>`${`${tb}T00:00:00Z`}::timestamptz`);
-
-    // Narrow on the same column the buckets are derived from (createdAt for the
-    // "date added" timeline, localDateTime otherwise) so createdAt-grouped covers
-    // are not dropped by a localDateTime range filter.
-    const bucketDateColumn =
-      options.orderBy === AssetOrderBy.CreatedAt ? sql.ref('asset.createdAt') : sql.ref('localDateTime');
-
-    return this.db
-      .with('asset', (qb) =>
-        withTimeBucketAssetFilters(
-          qb
-            .selectFrom('asset')
-            .select((eb) => [
-              truncatedDate<Date>(options.orderBy, bucketSize).as('timeBucket'),
-              'asset.id',
-              'asset.localDateTime', // projected for ORDER BY only
-              'asset.fileCreatedAt', // projected for ORDER BY only
-              sql<string | null>`encode("thumbhash", 'base64')`.as('representativeThumbhash'),
-              eb.fn
-                .coalesce(
-                  eb
-                    .case()
-                    .when(
-                      sql`asset."height" = 0 or asset."width" = 0 or asset."height" is null or asset."width" is null`,
-                    )
-                    .then(eb.lit(1))
-                    .else(sql`round(asset."width"::numeric / asset."height"::numeric, 3)::float`)
-                    .end(),
-                  eb.lit(1),
-                )
-                .as('ratio'),
-            ])
-            .where(sql`(${bucketDateColumn} AT TIME ZONE 'UTC')::date`, '>=', minStart)
-            .where(sql`(${bucketDateColumn} AT TIME ZONE 'UTC')::date`, '<', maxEnd),
-          options,
-        ),
-      )
-      .selectFrom('asset')
-      .distinctOn('timeBucket')
-      .where('timeBucket', 'in', requestedBucketStarts)
-      .select([
-        sql<string>`("timeBucket" AT TIME ZONE 'UTC')::date::text`.as('timeBucket'),
-        'id as representativeAssetId',
-        'representativeThumbhash',
-        'ratio as representativeRatio',
-      ])
-      .orderBy('timeBucket', order)
-      .orderBy(sql`("localDateTime" AT TIME ZONE 'UTC')::date`, order)
-      .orderBy('fileCreatedAt', order)
-      .execute() as any as Promise<TimeBucketCoverItem[]>;
   }
 
   @GenerateSql(
@@ -1835,17 +1384,6 @@ export class AssetRepository {
       .executeTakeFirst();
   }
 
-  // No @GenerateSql: undecorated repository methods are not documented; several already are.
-  async getEditedEncodedVideo(assetId: string) {
-    return this.db
-      .selectFrom('asset_file')
-      .select(['asset_file.id', 'asset_file.path'])
-      .where('asset_file.assetId', '=', assetId)
-      .where('asset_file.type', '=', AssetFileType.EncodedVideo)
-      .where('asset_file.isEdited', '=', true)
-      .executeTakeFirst();
-  }
-
   @GenerateSql({ params: [DummyValue.UUID] })
   async getForOcr(id: string) {
     return this.db
@@ -1916,20 +1454,5 @@ export class AssetRepository {
     const existingAssetIds = new Set(existingAssets.map(({ id }) => id));
 
     return rows.filter(({ assetId }) => existingAssetIds.has(assetId));
-  }
-
-  // Gallery-fork: derivative files are stored by ownerId with no library dimension, so the
-  // physical-usage walk needs the owner's external asset ids to exclude their thumbnails and
-  // transcodes — upstream excludes external assets from quota entirely.
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async getExternalAssetIds(ownerId: string): Promise<Set<string>> {
-    const rows = await this.db
-      .selectFrom('asset')
-      .select('asset.id')
-      .where('asset.ownerId', '=', asUuid(ownerId))
-      .where('asset.libraryId', 'is not', null)
-      .execute();
-
-    return new Set(rows.map((row) => row.id));
   }
 }

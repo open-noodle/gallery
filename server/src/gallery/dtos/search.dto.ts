@@ -1,9 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { HistoryBuilder } from 'src/decorators.js';
-import { ScopedPrimaryProfileSchema } from 'src/dtos/person.dto.js';
 import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto.js';
 import { AssetOrderSchema, AssetTypeSchema } from 'src/enum.js';
+import { ScopedPrimaryProfileSchema } from 'src/gallery/dtos/person.dto.js';
 import { IsNotSiblingOf, boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation.js';
 
 // Fork search request fields, merged into upstream's schemas in src/dtos/search.dto.ts with one `.extend(...)` each

@@ -10,6 +10,8 @@
 #   revert-to-immich-data.sh gallery-assert  Gallery running again on the same database
 #   revert-to-immich-data.sh s3-guard        no server running; the script must refuse an S3 path
 #   revert-to-immich-data.sh assert          stock Immich server running on :2283, after the revert
+#   revert-to-immich-data.sh convert-seed    no server running; DB_DATABASE_NAME names a copy of the Gallery database
+#   revert-to-immich-data.sh convert-assert  stock Immich running on that copy, after the revert converted its spaces
 #
 # Expects containers named `server`, `database` and `redis`. SYNC_TYPES (seed, assert) is a JSON array of the
 # request types a stock mobile app sends: the newest version of each stock SyncRequestType (a
@@ -95,7 +97,7 @@ seed() {
   # Media is generated with the server image's own ffmpeg; distinct sizes keep checksums distinct.
   local media=$STATE_DIR/media
   mkdir -p "$media"
-  for size in 64x48 80x60 96x72 112x84 128x96 144x108; do
+  for size in 64x48 80x60 96x72 112x84 128x96 144x108 160x120; do
     docker exec server ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=$size" -frames:v 1 "/tmp/$size.jpg"
     docker cp "server:/tmp/$size.jpg" "$media/$size.jpg"
   done
@@ -228,6 +230,8 @@ MEMBER_ALBUM_LINK=$member_album_link
 OWNER_ALBUM_LINK=$owner_album_link
 EDITOR_ALBUM_LINK=$editor_album_link
 VIEWER_ALBUM_LINK=$viewer_album_link
+MEMBER_ALBUM=$member_album
+VIEWER_ALBUM=$viewer_album
 PARTNER_PHOTO=$partner_photo
 PARTNER_ARCHIVED=$partner_archived
 PARTNER_LINK=$partner_link
@@ -236,12 +240,10 @@ EOF
   echo "::notice::seed: Gallery data written"
 }
 
-# What the switch-back guide asks before a trial boot of stock Immich: no Gallery jobs left in Redis
-# and Gallery's own workflow plugin disabled (stock cannot load it). Disabled, not deleted: deleting it
-# cascades to every workflow step that uses it.
+# What the switch-back guide asks before a trial boot of stock Immich: no Gallery jobs left in Redis.
+# Gallery's workflow plugin stays enabled: its WASM imports only upstream's host functions.
 stock_prepare() {
   docker exec redis valkey-cli FLUSHALL >/dev/null
-  psql_q "UPDATE plugin SET enabled = false WHERE name = 'gallery-core'" >/dev/null
   psql_q "SELECT id FROM plugin WHERE name = 'gallery-core'" >"$STATE_DIR/plugin-id"
 }
 
@@ -262,6 +264,11 @@ stock_assert() {
   failed=0
   local owner
   owner=$(login owner@example.com)
+
+  # Never `grep -q` on `docker logs`: it exits at the first match, docker logs dies of SIGPIPE, and
+  # pipefail turns the match into a failure.
+  check stock "stock loads Gallery's enabled workflow plugin" \
+    "$(docker logs server 2>&1 | grep -F 'Loaded plugin: gallery-core@' >/dev/null && echo yes)" yes
 
   # Stock's drift check flags only Gallery's trigger functions and Gallery's migration_overrides rows: extra
   # tables (with their constraints), columns, indexes and triggers are ignored by design. No migration
@@ -309,7 +316,7 @@ stock_assert() {
   bull_add backgroundTask SharedSpaceAlbumGrantReconcileSweep
   bull_add classification AssetClassifyQueueAll
   local deadline=$(($(date +%s) + 60))
-  until docker logs server 2>&1 | grep -qF 'Skipping unknown job: "SharedSpaceAlbumGrantReconcileSweep"'; do
+  until docker logs server 2>&1 | grep -F 'Skipping unknown job: "SharedSpaceAlbumGrantReconcileSweep"' >/dev/null; do
     [ "$(date +%s)" -lt "$deadline" ] || {
       echo "::error::stock: the fork job in a stock queue was not skipped within 60s"
       failed=1
@@ -350,10 +357,9 @@ stock_assert() {
   echo "::notice::stock: Immich serves the owner on the Gallery database"
 }
 
-# The guide's steps for going back: flush what stock queued and enable Gallery's plugin again.
+# The guide's steps for going back: flush what stock queued.
 gallery_prepare() {
   docker exec redis valkey-cli FLUSHALL >/dev/null
-  psql_q "UPDATE plugin SET enabled = true WHERE name = 'gallery-core'" >/dev/null
 }
 
 # shellcheck disable=SC2153 # vars come from the sourced $STATE file
@@ -477,8 +483,76 @@ assert() {
 
   stock_sync_checks assert "$owner"
 
+  check assert 'no space converted without the setting' \
+    "$(psql_q "SELECT count(*) FROM album WHERE \"albumName\" IN ('Revert test', 'Favorites from shared spaces')")" 0
+
   [ "$failed" = 0 ] || exit 1
   echo "::notice::assert: reverted data checks passed on stock Immich"
+}
+
+# On the copy only, as they would trip the main run's checks: the partner joins the space as a viewer,
+# and the owner's video moves into a library linked to the space. The album must then hold the space's
+# photos (the gallery phase's upload among them) and the video; the linked albums add none of their own.
+# shellcheck disable=SC2153 # vars come from the sourced $STATE file
+convert_seed() {
+  # shellcheck source=/dev/null
+  . "$STATE"
+  psql_q "
+    INSERT INTO shared_space_member (\"spaceId\", \"userId\", role)
+    SELECT '$SPACE', id, 'viewer' FROM \"user\" WHERE email = 'partner@example.com';
+    WITH l AS (INSERT INTO library (\"ownerId\", name, \"importPaths\", \"exclusionPatterns\")
+               VALUES ('$OWNER_ID', 'Revert library', '{}', '{}') RETURNING id),
+         s AS (INSERT INTO shared_space_library (\"spaceId\", \"libraryId\") SELECT '$SPACE', id FROM l)
+    UPDATE asset SET \"libraryId\" = (SELECT id FROM l) WHERE id = '$VIDEO';
+  " >/dev/null
+  psql_q "SELECT \"assetId\" FROM shared_space_asset WHERE \"spaceId\" = '$SPACE' UNION SELECT '$VIDEO'" |
+    jq -R . | jq -sc sort >"$STATE_DIR/convert-photos"
+}
+
+# shellcheck disable=SC2153 # vars come from the sourced $STATE file
+convert_assert() {
+  # shellcheck source=/dev/null
+  . "$STATE"
+  failed=0
+  local owner member partner album photos user
+  owner=$(login owner@example.com)
+  member=$(login member@example.com)
+  partner=$(login partner@example.com)
+
+  check convert 'one album for the space' "$(psql_q "SELECT count(*) FROM album WHERE \"albumName\" = 'Revert test'")" 1
+  album=$(psql_q "SELECT id FROM album WHERE \"albumName\" = 'Revert test' LIMIT 1")
+  check convert 'space members keep their roles' \
+    "$(api GET "/albums/$album" "$owner" | jq -c '[.albumUsers[] | [.user.email, .role]] | sort')" \
+    '[["member@example.com","editor"],["owner@example.com","owner"],["partner@example.com","viewer"]]'
+  photos=$(cat "$STATE_DIR/convert-photos")
+  for user in "$owner" "$member" "$partner"; do
+    check convert 'every member sees the space photos' \
+      "$(api GET "/timeline/bucket?albumId=$album&timeBucket=2024-01-01" "$user" | jq -c '[.id[]] | sort')" "$photos"
+  done
+
+  album_roles() {
+    psql_q "SELECT string_agg(u.email || ':' || au.role, ',' ORDER BY u.email)
+      FROM album_user au JOIN \"user\" u ON u.id = au.\"userId\" WHERE au.\"albumId\" = '$1'"
+  }
+  check convert 'linked album granted to the space members' "$(album_roles "$MEMBER_ALBUM")" \
+    'member@example.com:owner,owner@example.com:editor,partner@example.com:viewer'
+  check convert 'an existing album role is left alone' "$(album_roles "$VIEWER_ALBUM")" \
+    'member@example.com:owner,owner@example.com:viewer,partner@example.com:viewer'
+
+  check convert "the member's favorites of the owner's photos kept" \
+    "$(api GET /albums "$member" | jq -c '[.[] | select(.albumName == "Favorites from shared spaces") | .assetCount]')" '[2]'
+  check convert 'only the member gets a favorites album' \
+    "$(psql_q "SELECT count(*) FROM album WHERE \"albumName\" = 'Favorites from shared spaces'")" 1
+
+  check convert 'Add to space step moved to Add to Album(s)' "$(psql_q "
+    SELECT m.name || ' ' || (s.config -> 'albumIds')::text FROM workflow_step s JOIN plugin_method m ON m.id = s.\"pluginMethodId\"")" \
+    "assetAddToAlbums [\"$album\"]"
+  local uploaded
+  uploaded=$(upload "$owner" "$STATE_DIR/media/160x120.jpg")
+  poll 120 "SELECT count(*) FROM album_asset WHERE \"albumId\" = '$album' AND \"assetId\" = '$uploaded'" '^1$' >/dev/null
+
+  [ "$failed" = 0 ] || exit 1
+  echo "::notice::convert: the space is a shared album on stock Immich"
 }
 
 case ${1:-} in
@@ -489,5 +563,7 @@ case ${1:-} in
   gallery-assert) gallery_assert ;;
   s3-guard) s3_guard "${2:?path to revert-to-immich.sql}" ;;
   assert) assert ;;
-  *) fail "usage: $0 seed | stock-prepare | stock-assert <drift> <baseline> <revert-to-immich.sql> | gallery-prepare | gallery-assert | s3-guard <revert-to-immich.sql> | assert" ;;
+  convert-seed) convert_seed ;;
+  convert-assert) convert_assert ;;
+  *) fail "usage: $0 seed | stock-prepare | stock-assert <drift> <baseline> <revert-to-immich.sql> | gallery-prepare | gallery-assert | s3-guard <revert-to-immich.sql> | assert | convert-seed | convert-assert" ;;
 esac

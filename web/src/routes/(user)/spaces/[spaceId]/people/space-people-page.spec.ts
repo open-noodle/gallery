@@ -15,8 +15,8 @@ import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observe
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
+import { PeopleSortBy, peopleViewSettings } from '$lib/gallery/stores/preferences.store';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import SpacePeoplePage from './+page.svelte';

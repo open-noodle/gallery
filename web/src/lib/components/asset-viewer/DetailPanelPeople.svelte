@@ -1,100 +1,30 @@
 <script lang="ts">
-  import { page } from '$app/state';
-  import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import AvatarSourceToggle from '$lib/gallery/asset-viewer/AvatarSourceToggle.svelte';
+  import PersonTile from '$lib/gallery/asset-viewer/PersonTile.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { Route } from '$lib/route';
   import { faceManager } from '$lib/stores/face.svelte';
-  import { cropFacesFromAsset, locale } from '$lib/stores/preferences.store';
-  import { getAssetUrls } from '$lib/utils';
-  import {
-    buildContextualFilterUrl,
-    buildPersonFilterPatch,
-    rememberContextualPersonName,
-  } from '$lib/utils/filter-target';
-  import { getPetBadgeLabel } from '$lib/utils/pet-species';
-  import { zoomImageToBase64 } from '$lib/utils/people-utils';
-  import { getRepresentativeThumbnailUrl, resolvePersonAvatar } from '$lib/utils/person-avatar';
+  import { locale } from '$lib/stores/preferences.store';
   import { type AssetResponseDto } from '@immich/sdk';
-  import { Icon, IconButton, Text } from '@immich/ui';
-  import {
-    mdiAccountBoxOutline,
-    mdiCropFree,
-    mdiEye,
-    mdiEyeOff,
-    mdiOpenInNew,
-    mdiPaw,
-    mdiPencil,
-    mdiPlus,
-  } from '@mdi/js';
+  import { IconButton, Text } from '@immich/ui';
+  import { mdiEye, mdiEyeOff, mdiPencil, mdiPlus } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
 
   type Props = {
     asset: AssetResponseDto;
     isOwner: boolean;
-    /**
-     * #734-style sibling of `isOwner`, never a widening of it (see DetailPanelTags' `canEdit`).
-     * True iff the viewer is Owner/Editor of the space this asset is being viewed through AND is
-     * not the asset's owner. The owner path keeps rendering the owner's own people through the
-     * owner components regardless of this prop — these are two different code paths that merely
-     * look similar. The hidden-people toggle inside the affordance block stays gated on `isOwner`
-     * alone: a space editor has no business toggling the owner's hidden people, and the server
-     * refuses it.
-     */
+    /** Space Owner/Editor who does not own the asset: the space face affordances (see `canEditSpacePeople`). */
     canEditSpacePeople?: boolean;
     previousRoute: string;
-    /**
-     * R4/E2 — false on a shared link. (People are already shared-link-suppressed by the section gate
-     * below; this is belt-and-braces, and keeps the row's gate identical to every other row's.)
-     */
     canFilter?: boolean;
     spaceId?: string;
   };
 
   const { asset, isOwner, canEditSpacePeople = false, previousRoute, canFilter = false, spaceId }: Props = $props();
 
-  type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
-
   const isSpaceMember = $derived(!!spaceId);
   const people = $derived(isSpaceMember && !isOwner ? asset.people || [] : Array.from(faceManager.people));
-
-  // A non-owner has no access to the owner-scoped person page, so their name is rendered as plain
-  // text rather than a link into a 404.
-  const getPersonPageHref = (person: AssetPerson) => {
-    if (spaceId && person.spacePersonId) {
-      return Route.viewSpacePerson(spaceId, person.spacePersonId);
-    }
-    return isOwner ? Route.viewPerson(person, { previousRoute }) : undefined;
-  };
-
-  /**
-   * R8 — the person patch is TARGET-DEPENDENT, and getting it wrong 400s the Space timeline. All of
-   * that lives in buildPersonFilterPatch; null means "there is nothing honest to filter by here", so
-   * the chip falls back to being the person-page link it is today.
-   */
-  const getPersonFilterHref = (person: AssetPerson) => {
-    if (!canFilter) {
-      return undefined;
-    }
-
-    const patch = buildPersonFilterPatch(page.url, person);
-    return patch ? buildContextualFilterUrl(page.url, patch) : undefined;
-  };
-
-  /**
-   * The destination's chip and filter panel resolve a person id to a name through the
-   * filter-suggestions response, which is a round-trip late and does not always carry THIS token
-   * (see rememberContextualPersonName). Bank the name we already have on the way out, so the chip
-   * never renders a raw id.
-   */
-  const rememberPersonName = (person: AssetPerson, href: string) => {
-    const patch = buildPersonFilterPatch(page.url, person);
-    const personId = patch?.personIds?.[0];
-    if (personId) {
-      rememberContextualPersonName(href, personId, person.name);
-    }
-  };
   const visiblePeople = $derived(
     people
       .filter((p) => assetViewerManager.isShowingHiddenPeople || !p.isHidden)
@@ -129,162 +59,70 @@
         return { formattedBirthDate, formattedAge, ...person };
       }),
   );
-
-  // Only offer the switch where it can actually do something. A viewer reaching this asset through
-  // an album or partner share has no profile face to switch to, so for them the crop is the only
-  // option and the button would be dead.
-  const canChooseAvatarSource = $derived(
-    visiblePeople.some((person) => getRepresentativeThumbnailUrl(person, { isOwner, spaceId }) !== undefined),
-  );
 </script>
 
-<!--
-  Who is in a photo is read-only metadata: anyone with read access to the asset sees the panel
-  (#796) — `GET /faces` already authorizes on AssetRead (owner ∪ album ∪ partner ∪ space), so a
-  non-owner reaching this panel is entitled to the data. Only the affordances below (hidden-people
-  toggle, add-face, edit-faces) stay owner-gated. A non-owner with nobody to show gets no empty
-  section; the owner keeps it so the add-face affordance stays reachable on a face-less asset.
--->
-{#snippet avatar(url: string, person: AssetPerson, isHighlighted: boolean)}
-  <ImageThumbnail
-    curve
-    shadow
-    {url}
-    altText={person.name}
-    title={person.name}
-    widthStyle="100%"
-    hidden={person.isHidden}
-    highlighted={isHighlighted}
-    class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
-  />
-{/snippet}
+<!-- Anyone who can read the asset sees who is in it (#796); only the affordances stay owner or editor gated. -->
 {#if !authManager.isSharedLink && (isOwner || canEditSpacePeople || visiblePeople.length > 0)}
   <section class="px-4 pt-4 text-sm" data-testid="detail-panel-people">
-    <div class="flex h-10 w-full items-center justify-between">
-      <Text size="small" color="muted">{$t('people')}</Text>
-      <div class="flex items-center gap-2">
-        {#if canChooseAvatarSource}
-          <IconButton
-            aria-label={$cropFacesFromAsset ? $t('show_profile_faces') : $t('show_faces_from_photo')}
-            icon={$cropFacesFromAsset ? mdiAccountBoxOutline : mdiCropFree}
-            size="medium"
-            shape="round"
-            color="secondary"
-            variant="ghost"
-            onclick={() => cropFacesFromAsset.set(!$cropFacesFromAsset)}
-          />
-        {/if}
-        {#if isOwner || canEditSpacePeople}
-          {#if isOwner && people.some((person) => person.isHidden)}
+    <!-- Repeats the section guard on purpose: it keeps the header at upstream's nesting. -->
+    {#if isOwner || canEditSpacePeople || visiblePeople.length > 0}
+      <div class="flex h-10 w-full items-center justify-between">
+        <Text size="small" color="muted">{$t('people')}</Text>
+        <div class="flex items-center gap-2">
+          <AvatarSourceToggle people={visiblePeople} {isOwner} {spaceId} />
+          {#if isOwner || canEditSpacePeople}
+            {#if isOwner && people.some((person) => person.isHidden)}
+              <IconButton
+                aria-label={$t('show_hidden_people')}
+                icon={assetViewerManager.isShowingHiddenPeople ? mdiEyeOff : mdiEye}
+                size="medium"
+                shape="round"
+                color="secondary"
+                variant="ghost"
+                onclick={() => assetViewerManager.toggleHiddenPeople()}
+              />
+            {/if}
             <IconButton
-              aria-label={$t('show_hidden_people')}
-              icon={assetViewerManager.isShowingHiddenPeople ? mdiEyeOff : mdiEye}
+              aria-label={$t('tag_people')}
+              icon={mdiPlus}
               size="medium"
               shape="round"
               color="secondary"
               variant="ghost"
-              onclick={() => assetViewerManager.toggleHiddenPeople()}
+              onclick={() => assetViewerManager.toggleFaceEditMode()}
             />
-          {/if}
-          <IconButton
-            aria-label={$t('tag_people')}
-            icon={mdiPlus}
-            size="medium"
-            shape="round"
-            color="secondary"
-            variant="ghost"
-            onclick={() => assetViewerManager.toggleFaceEditMode()}
-          />
 
-          {#if faceManager.data.length > 0}
-            <IconButton
-              aria-label={$t('edit_people')}
-              icon={mdiPencil}
-              size="medium"
-              shape="round"
-              color="secondary"
-              variant="ghost"
-              onclick={() => assetViewerManager.openEditFacesPanel()}
-            />
+            {#if faceManager.data.length > 0}
+              <IconButton
+                aria-label={$t('edit_people')}
+                icon={mdiPencil}
+                size="medium"
+                shape="round"
+                color="secondary"
+                variant="ghost"
+                onclick={() => assetViewerManager.openEditFacesPanel()}
+              />
+            {/if}
           {/if}
-        {/if}
+        </div>
       </div>
-    </div>
+    {/if}
 
     <div class="mt-2 grid {visiblePeople.length <= 6 ? 'grid-cols-3 gap-3' : 'grid-cols-4 gap-2'}">
       {#each visiblePeople as person (person.id)}
         {@const personFaces = faceManager.facesByPersonId.get(person.id) ?? []}
         {@const isHighlighted = personFaces.some((f) => assetViewerManager.highlightedFaces.some((b) => b.id === f.id))}
-        {@const avatarSource = resolvePersonAvatar({
-          person,
-          isOwner,
-          spaceId,
-          hasFaceInAsset: personFaces.length > 0,
-          cropFacesFromAsset: $cropFacesFromAsset,
-          assetThumbnailUrl: getAssetUrls(asset).thumbnail,
-        })}
-        {@const filterHref = getPersonFilterHref(person)}
-        {@const personPageHref = getPersonPageHref(person)}
-        <!--
-        R6 — the chip IS the <a>, and it carries the four face-highlight handlers that drive the face
-        overlay. The ↗ person-page link cannot nest inside it (a link inside a link), so it is a
-        SIBLING overlay control on a relative wrapper. When there is no honest filter to offer
-        (buildPersonFilterPatch → null, e.g. a Space person with no spacePersonId, or a shared link),
-        the chip stays the person-page link it is today and no ↗ renders.
-      -->
-        <div class="relative">
-          <a
-            class="group relative block outline-none"
-            href={filterHref ?? personPageHref}
-            aria-label={filterHref ? `${$t('filter_by_person')}: ${person.name}` : undefined}
-            onclick={filterHref ? () => rememberPersonName(person, filterHref) : undefined}
-            onfocus={() => assetViewerManager.setHighlightedFaces(personFaces)}
-            onblur={() => assetViewerManager.clearHighlightedFaces()}
-            onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
-            onpointerleave={() => assetViewerManager.clearHighlightedFaces()}
-          >
-            {#if avatarSource.kind === 'assetFace'}
-              {#await zoomImageToBase64(personFaces[0]!, asset.id, asset.type, assetViewerManager.imgRef)}
-                {@render avatar(avatarSource.fallbackUrl, person, isHighlighted)}
-              {:then faceThumbnailUrl}
-                {@render avatar(faceThumbnailUrl ?? avatarSource.fallbackUrl, person, isHighlighted)}
-              {/await}
-            {:else}
-              {@render avatar(avatarSource.url, person, isHighlighted)}
-            {/if}
-            {#if person.type === 'pet'}
-              {@const petBadgeLabel = getPetBadgeLabel(person.species, $t)}
-              <div
-                class="absolute right-1 bottom-1 rounded-full bg-immich-primary p-1 text-white"
-                data-testid="pet-badge"
-                role="img"
-                aria-label={petBadgeLabel}
-                title={petBadgeLabel}
-              >
-                <Icon icon={mdiPaw} size="16" class="text-white" />
-              </div>
-            {/if}
-            <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
-            {#if person.birthDate && person.formattedAge}
-              <p class="font-light {visiblePeople.length > 6 ? 'text-xs' : ''}" title={person.formattedBirthDate!}>
-                {person.formattedAge}
-              </p>
-            {/if}
-          </a>
-          {#if filterHref && personPageHref}
-            <div class="absolute top-1 right-1 rounded-full bg-light/80">
-              <IconButton
-                href={personPageHref}
-                icon={mdiOpenInNew}
-                aria-label="{$t('view_person')}: {person.name}"
-                size="small"
-                shape="round"
-                color="secondary"
-                variant="ghost"
-              />
-            </div>
-          {/if}
-        </div>
+        <PersonTile
+          {asset}
+          {person}
+          {personFaces}
+          {isHighlighted}
+          {isOwner}
+          {spaceId}
+          {canFilter}
+          {previousRoute}
+          compact={visiblePeople.length > 6}
+        />
       {/each}
     </div>
   </section>

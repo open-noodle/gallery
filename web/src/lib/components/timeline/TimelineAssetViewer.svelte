@@ -1,5 +1,6 @@
 <script lang="ts">
   import { lazyComponent } from '$lib/utils/lazy-component.svelte';
+  import { setViewerSpace, type ViewerSpace } from '$lib/gallery/viewer-space';
   import type { Action } from '$lib/components/asset-viewer/actions/action';
   import type { AssetCursor } from '$lib/components/asset-viewer/AssetViewer.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
@@ -28,8 +29,7 @@
     person?: PersonResponseDto;
     removeAction?: AssetAction.UNARCHIVE | AssetAction.ARCHIVE | AssetAction.SET_VISIBILITY_TIMELINE | null;
     spaceId?: string;
-    /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
-    space?: { id: string; canWrite: boolean };
+    space?: ViewerSpace['space'];
   }
 
   let {
@@ -44,6 +44,7 @@
     spaceId,
     space,
   }: Props = $props();
+  setViewerSpace(() => ({ spaceId, space }));
 
   const getAsset = (id: string) => {
     return handleErrorAsync(
@@ -203,8 +204,6 @@
     {isShared}
     {album}
     {person}
-    {spaceId}
-    {space}
     onAssetChange={(asset) => {
       timelineManager?.upsertAssets([toTimelineAsset(asset)]);
     }}

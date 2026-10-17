@@ -5,7 +5,9 @@
  * A new upstream Permission adds a snapshot entry: review it, then update with `-u`.
  */
 import { Kysely } from 'kysely';
+import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AlbumUserRole, AssetVisibility, Permission, SharedLinkType } from 'src/enum.js';
+import { checkAssetEditAccess } from 'src/gallery/utils/access-grants.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -180,21 +182,32 @@ beforeAll(async () => {
   world = await seed();
 });
 
+const grantedBy = async (check: (auth: AuthDto, ids: string[]) => Promise<Set<string>>) => {
+  const { labels, actors } = world;
+  const granted: Record<string, string[]> = {};
+  for (const [actor, auth] of Object.entries(actors)) {
+    const ids = await check(auth, labels.keys().toArray());
+    const names = ids
+      .values()
+      .map((id) => labels.get(id) ?? `unknown:${id}`)
+      .toArray()
+      .toSorted();
+    if (names.length > 0) {
+      granted[actor] = names;
+    }
+  }
+  return granted;
+};
+
 describe('checkAccess oracle', () => {
   it.each(Object.values(Permission))('%s', async (permission) => {
-    const { accessRepo, labels, actors } = world;
-    const granted: Record<string, string[]> = {};
-    for (const [actor, auth] of Object.entries(actors)) {
-      const ids = await checkAccess(accessRepo, { auth, permission, ids: labels.keys().toArray() });
-      const names = ids
-        .values()
-        .map((id) => labels.get(id) ?? `unknown:${id}`)
-        .toArray()
-        .toSorted();
-      if (names.length > 0) {
-        granted[actor] = names;
-      }
-    }
+    const granted = await grantedBy((auth, ids) => checkAccess(world.accessRepo, { auth, permission, ids }));
+    expect(granted).toMatchSnapshot();
+  });
+
+  // The space editor's asset edits (owner, then space Owner/Editor), granted at the call sites that want them.
+  it('requireAssetEditAccess', async () => {
+    const granted = await grantedBy((auth, ids) => checkAssetEditAccess(world.accessRepo, { auth, ids }));
     expect(granted).toMatchSnapshot();
   });
 });

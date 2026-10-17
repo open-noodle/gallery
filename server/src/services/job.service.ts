@@ -4,6 +4,7 @@ import { OnEvent } from 'src/decorators.js';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { JobCreateDto } from 'src/dtos/job.dto.js';
 import { AssetType, AssetVisibility, IntegrityReport, JobName, JobStatus, ManualJobName } from 'src/enum.js';
+import { isSkippedOnS3 } from 'src/gallery/utils/s3-job-skip.js';
 import { ArgsOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { hexOrBufferToBase64 } from 'src/utils/bytes.js';
@@ -98,7 +99,9 @@ export class JobService extends BaseService {
   async onJobRun(...[queueName, job]: ArgsOf<'JobRun'>) {
     try {
       await this.eventRepository.emit('JobStart', queueName, job);
-      const response = await this.jobRepository.run(job);
+      const response = isSkippedOnS3(queueName, job, this.logger)
+        ? JobStatus.Skipped
+        : await this.jobRepository.run(job);
       await this.eventRepository.emit('JobSuccess', { job, response });
       if (response && typeof response === 'string' && [JobStatus.Success, JobStatus.Skipped].includes(response)) {
         await this.onDone(job);
@@ -141,6 +144,7 @@ export class JobService extends BaseService {
         break;
       }
 
+      case JobName.AssetVideoTrimGenerate:
       case JobName.AssetEditThumbnailGeneration: {
         const asset = await this.assetRepository.getById(item.data.id);
         const edits = await this.assetEditRepository.getWithSyncInfo(item.data.id);

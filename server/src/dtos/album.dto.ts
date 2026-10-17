@@ -8,8 +8,9 @@ import { BulkIdErrorReasonSchema } from 'src/dtos/asset-ids.response.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { UserResponseSchema, mapUser } from 'src/dtos/user.dto.js';
 import { AlbumUserRole, AlbumUserRoleSchema, AssetOrder, AssetOrderSchema } from 'src/enum.js';
+import { GalleryAlbumResponseExtension, GalleryUpdateAlbumExtension } from 'src/gallery/dtos/album.dto.js';
 import { asDateTimeString } from 'src/utils/date.js';
-import { isoDatetimeToDate, stringToBool } from 'src/validation.js';
+import { stringToBool } from 'src/validation.js';
 
 const AlbumUserAddSchema = z
   .object({
@@ -88,9 +89,7 @@ const UpdateAlbumSchema = z
           )
           .getExtensions(),
       }),
-    createdAt: isoDatetimeToDate
-      .optional()
-      .describe('Album creation date. Must include a timezone designator (Z or ±HH:MM).'),
+    ...GalleryUpdateAlbumExtension,
     albumThumbnailAssetId: z.uuidv4().optional().describe('Album thumbnail asset ID'),
     isActivityEnabled: z.boolean().optional().describe('Enable activity feed'),
     order: AssetOrderSchema.optional(),
@@ -138,15 +137,6 @@ const ContributorCountResponseSchema = z
     assetCount: z.int().min(0).describe('Number of assets contributed'),
   })
   .meta({ id: 'ContributorCountResponseDto' });
-
-const AlbumSharedSpaceLinkResponseSchema = z
-  .object({
-    spaceId: z.uuidv4().describe('Shared space ID this album is linked into'),
-    spaceName: z.string().describe('Shared space name'),
-    linkedById: z.uuidv4().nullable().describe('User who linked the album into the space'),
-    showInTimeline: z.boolean().describe('Whether the album appears in the aggregated space timeline'),
-  })
-  .meta({ id: 'AlbumSharedSpaceLinkResponseDto' });
 
 export const AlbumResponseSchema = z
   .object({
@@ -199,8 +189,7 @@ export const AlbumResponseSchema = z
     isActivityEnabled: z.boolean().describe('Activity feed enabled'),
     order: AssetOrderSchema.optional(),
     contributorCounts: z.array(ContributorCountResponseSchema).optional(),
-    // rbac-6: shared-space links for this album — populated ONLY when the caller owns the album.
-    sharedSpaceLinks: z.array(AlbumSharedSpaceLinkResponseSchema).optional(),
+    ...GalleryAlbumResponseExtension,
   })
   .meta({ id: 'AlbumResponseDto' });
 
@@ -227,8 +216,9 @@ export class GetAlbumsDto extends createZodDto(GetAlbumsSchema) {}
 export class AlbumStatisticsResponseDto extends createZodDto(AlbumStatisticsResponseSchema) {}
 export class UpdateAlbumUserDto extends createZodDto(UpdateAlbumUserSchema) {}
 export class AlbumResponseDto extends createZodDto(AlbumResponseSchema) {}
-export class AlbumSharedSpaceLinkResponseDto extends createZodDto(AlbumSharedSpaceLinkResponseSchema) {}
 class AlbumUserResponseDto extends createZodDto(AlbumUserResponseSchema) {}
+
+export * from 'src/gallery/dtos/album.dto.js';
 
 export type MapAlbumDto = {
   albumUsers?: AlbumUser[];

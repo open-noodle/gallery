@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { SharedSpaceRole, SourceType } from 'src/enum.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
@@ -47,6 +48,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     jobRepository,
     logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),
+    galleryPersonRepository: ctx.get(GalleryPersonRepository),
     sharedSpaceRepository: ctx.get(SharedSpaceRepository),
   });
   return {

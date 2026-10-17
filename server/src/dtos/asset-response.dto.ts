@@ -18,6 +18,7 @@ import {
   AssetVisibilitySchema,
   ChecksumAlgorithm,
 } from 'src/enum.js';
+import { GalleryAssetResponseExtension } from 'src/gallery/dtos/asset-response.dto.js';
 import { hexOrBufferToBase64 } from 'src/utils/bytes.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
@@ -113,13 +114,7 @@ export const AssetResponseSchema = SanitizedAssetResponseSchema.extend(
       .boolean()
       .describe('Is edited')
       .meta(new HistoryBuilder().added('v2.5.0').beta('v2.5.0').getExtensions()),
-    resolvedSpaceId: z.string().optional().describe('Resolved space ID (when server auto-detects space context)'),
-    canEdit: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether the caller may edit this asset (owner, or Owner/Editor of a space whose member owns it). Present only on single-asset reads; absent from list responses, where resolving it per asset would be an N+1 access check.',
-      ),
+    ...GalleryAssetResponseExtension,
   }).shape,
 ).meta({ id: 'AssetResponseDto' });
 

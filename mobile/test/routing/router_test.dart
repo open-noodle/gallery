@@ -52,6 +52,23 @@ void main() {
     return route.type ?? router.defaultRouteType;
   }
 
+  group('AppRouter route table', () {
+    // auto_route keys each level's routes by name and throws 'Route name must be unique' when it
+    // builds that level, so a duplicate crashes the router. The same page under different parents
+    // is fine and intended: SpacesRoute is a GalleryTabShellRoute tab and a pushed root route.
+    test('route names are unique within each level', () {
+      void expectUniqueNames(List<AutoRoute> routes, String level) {
+        final names = routes.map((route) => route.name).toList();
+        expect(names.toSet(), hasLength(names.length), reason: 'duplicate route name under $level: $names');
+        for (final route in routes) {
+          expectUniqueNames(route.children ?? const [], route.name);
+        }
+      }
+
+      expectUniqueNames(router.routes, 'the root');
+    });
+  });
+
   group('AppRouter page transitions', () {
     // A CustomRouteType renders its own transitionsBuilder instead of
     // delegating to the platform PageTransitionsTheme, so iOS never wraps the

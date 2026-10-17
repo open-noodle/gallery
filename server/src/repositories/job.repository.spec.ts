@@ -2,9 +2,10 @@ import { ModuleRef } from '@nestjs/core';
 import { setTimeout } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobName, QueueJobStatus, QueueName } from 'src/enum.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
-import { JobRepository, buildWorkerOptions } from 'src/repositories/job.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { JobCounts } from 'src/types.js';
 
@@ -55,7 +56,13 @@ const setup = (counts: JobCounts[] = []) => {
     warn: vi.fn(),
   } as unknown as LoggingRepository;
 
-  const sut = new JobRepository(moduleRef, {} as ConfigRepository, {} as EventRepository, logger);
+  const sut = new JobRepository(
+    moduleRef,
+    {} as ConfigRepository,
+    {} as EventRepository,
+    logger,
+    new QueueMaintenanceRepository(moduleRef, logger),
+  );
 
   return { sut, queue, client, logger };
 };
@@ -73,28 +80,6 @@ describe(JobRepository.name, () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('buildWorkerOptions', () => {
-    it('gives the FacialRecognition queue a lock and stalled interval well above the 30s default', () => {
-      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.FacialRecognition);
-
-      expect(options.concurrency).toBe(1);
-      expect(options.prefix).toBe('immich_bull');
-      // Long handlers (face-match-all, identity reconciliation, a dedup pass on a huge space) must
-      // not be declared stalled and orphaned while still healthy.
-      expect(options.lockDuration ?? 0).toBeGreaterThanOrEqual(120_000);
-      expect(options.stalledInterval ?? 0).toBeGreaterThanOrEqual(120_000);
-    });
-
-    it('leaves other queues on BullMQ lock defaults', () => {
-      const options = buildWorkerOptions({ prefix: 'immich_bull' } as any, QueueName.ThumbnailGeneration);
-
-      expect(options.concurrency).toBe(1);
-      expect(options.prefix).toBe('immich_bull');
-      expect(options.lockDuration).toBeUndefined();
-      expect(options.stalledInterval).toBeUndefined();
-    });
   });
 
   it('should return immediately when queues have no active waiting delayed or paused jobs', async () => {
@@ -201,8 +186,8 @@ describe(JobRepository.name, () => {
   // Slice 14 (fork isolation): getJobCounts is upstream's pure delegate — every read-only caller (the
   // admin queue poll, media.service.ts, person.service.ts's recognition-queue checks,
   // storage-migration.service.ts, and this repository's own getTelemetryMetrics) must never see a read
-  // mutate Redis. The dangling-active repair moved to getJobCountsWithRepair, whose only caller is
-  // waitForQueueCompletion.
+  // mutate Redis. The dangling-active repair runs only in waitForQueueCompletion (through
+  // QueueMaintenanceRepository.getJobCountsWithRepair) and searchJobs.
   it('getJobCounts performs no Redis writes, even with a dangling active entry present', async () => {
     const { sut, client, queue } = setup([emptyCounts()]);
     client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
@@ -217,12 +202,12 @@ describe(JobRepository.name, () => {
     expect(queue.getJobCounts).toHaveBeenCalledWith('active', 'completed', 'failed', 'delayed', 'waiting', 'paused');
   });
 
-  it('getJobCountsWithRepair removes active queue ids whose job hash and lock are both gone before counting jobs', async () => {
+  it('waitForQueueCompletion removes active queue ids whose job hash and lock are both gone before counting jobs', async () => {
     const { sut, client, queue, logger } = setup([emptyCounts()]);
     client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
     client.lrem.mockResolvedValue(1);
 
-    await sut.getJobCountsWithRepair(QueueName.PeopleBackfill);
+    await sut.waitForQueueCompletion(QueueName.PeopleBackfill);
 
     expect(client.lrange).toHaveBeenCalledWith('queue:active', 0, -1);
     expect(client.exists).toHaveBeenCalledWith('queue:face-identity-backfill/space-person/orphan');

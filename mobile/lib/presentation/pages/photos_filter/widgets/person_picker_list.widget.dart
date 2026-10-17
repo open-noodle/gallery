@@ -3,12 +3,12 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/utils/person_thumbnail_url.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/alpha_scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:immich_mobile/utils/image_url_builder.dart';
 
 const double _kRowHeight = 56;
 const double _kHeaderHeight = 32;

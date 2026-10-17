@@ -15,15 +15,7 @@ import { PNG } from 'pngjs';
 import { Mock, Mocked, assert, vitest } from 'vitest';
 import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
-import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
-import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
-import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
-import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
-import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
-import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
-import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
-import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { AssetUploadInterceptor } from 'src/middleware/asset-upload.interceptor.js';
 import { AuthGuard } from 'src/middleware/auth.guard.js';
 import { FileUploadInterceptor } from 'src/middleware/file-upload.interceptor.js';
@@ -35,11 +27,9 @@ import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { ApiKeyRepository } from 'src/repositories/api-key.repository.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
-import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
-import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -49,11 +39,6 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
-import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
-import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
-import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -77,9 +62,7 @@ import { ServerInfoRepository } from 'src/repositories/server-info.repository.js
 import { SessionRepository } from 'src/repositories/session.repository.js';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
-import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
 import { SyncRepository } from 'src/repositories/sync.repository.js';
@@ -87,7 +70,6 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { TagRepository } from 'src/repositories/tag.repository.js';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository.js';
 import { TrashRepository } from 'src/repositories/trash.repository.js';
-import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { VersionHistoryRepository } from 'src/repositories/version-history.repository.js';
 import { VideoStreamRepository } from 'src/repositories/video-stream.repository.js';
@@ -99,6 +81,7 @@ import { AuthService } from 'src/services/auth.service.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getKyselyConfig } from 'src/utils/database.js';
 import { ClusterGroupFactory } from 'test/factories/cluster-group.factory.js';
+import { GalleryServiceOverrides, getGalleryMocks, newGalleryRepositories } from 'test/gallery/utils.js';
 import { IAccessRepositoryMock, newAccessRepositoryMock } from 'test/repositories/access.repository.mock.js';
 import { newAssetRepositoryMock } from 'test/repositories/asset.repository.mock.js';
 import { newConfigRepositoryMock } from 'test/repositories/config.repository.mock.js';
@@ -254,7 +237,7 @@ export const automock = <T>(
   return result;
 };
 
-export type ServiceOverrides = {
+export type ServiceOverrides = GalleryServiceOverrides & {
   access: AccessRepository;
   activity: ActivityRepository;
   album: AlbumRepository;
@@ -311,26 +294,6 @@ export type ServiceOverrides = {
   view: ViewRepository;
   websocket: WebsocketRepository;
   workflow: WorkflowRepository;
-  // Gallery fork repositories: keep last, in the same order in every positional list
-  assetFavorite: AssetFavoriteRepository;
-  classification: ClassificationRepository;
-  faceIdentity: FaceIdentityRepository;
-  faceRepair: FaceRepairRepository;
-  faceRepairScan: FaceRepairScanRepository;
-  faceRepairDecline: FaceRepairDeclineRepository;
-  facePersonVerdict: FacePersonVerdictRepository;
-  sharedSpace: SharedSpaceRepository;
-  storageMigration: StorageMigrationRepository;
-  userGroup: UserGroupRepository;
-  filterSuggestion: FilterSuggestionRepository;
-  memoryRuleAsset: MemoryRuleAssetRepository;
-  queueMaintenance: QueueMaintenanceRepository;
-  smartFacet: SmartFacetRepository;
-  spaceAlbum: SpaceAlbumRepository;
-  petFace: PetFaceRepository;
-  faceSearch: FaceSearchRepository;
-  gallerySync: GallerySyncRepository;
-  videoTrim: VideoTrimRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -390,7 +353,7 @@ export const getMocks = () => {
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
     library: automock(LibraryRepository, { strict: false }),
-    machineLearning: automock(MachineLearningRepository, { args: [loggerMock], strict: false }),
+    machineLearning: automock(GalleryMachineLearningRepository, { args: [loggerMock], strict: false }),
     map: automock(MapRepository, { args: [undefined, undefined, { setContext: () => {} }] }),
     media: newMediaRepositoryMock(),
     memory: automock(MemoryRepository),
@@ -427,28 +390,7 @@ export const getMocks = () => {
     // eslint-disable-next-line no-sparse-arrays
     websocket: automock(WebsocketRepository, { args: [, loggerMock], strict: false }),
     workflow: automock(WorkflowRepository, { strict: true }),
-    // Gallery fork repositories: keep last, in the same order in every positional list
-    assetFavorite: automock(AssetFavoriteRepository),
-    // eslint-disable-next-line no-sparse-arrays
-    classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
-    faceIdentity: automock(FaceIdentityRepository, { strict: false }),
-    faceRepair: automock(FaceRepairRepository, { strict: false }),
-    faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
-    faceRepairDecline: automock(FaceRepairDeclineRepository, { strict: false }),
-    facePersonVerdict: automock(FacePersonVerdictRepository, { strict: false }),
-    sharedSpace: automock(SharedSpaceRepository),
-    storageMigration: automock(StorageMigrationRepository),
-    userGroup: automock(UserGroupRepository),
-    filterSuggestion: automock(FilterSuggestionRepository, { strict: false }),
-    memoryRuleAsset: automock(MemoryRuleAssetRepository, { strict: false }),
-    // eslint-disable-next-line no-sparse-arrays
-    queueMaintenance: automock(QueueMaintenanceRepository, { args: [, loggerMock], strict: false }),
-    smartFacet: automock(SmartFacetRepository, { strict: false }),
-    spaceAlbum: automock(SpaceAlbumRepository, { strict: false }),
-    petFace: automock(PetFaceRepository, { strict: false }),
-    faceSearch: automock(FaceSearchRepository, { strict: false }),
-    gallerySync: automock(GallerySyncRepository),
-    videoTrim: automock(VideoTrimRepository, { strict: false }),
+    ...getGalleryMocks(loggerMock),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -520,26 +462,7 @@ export const newTestService = <T extends BaseService>(
     overrides.view || (mocks.view as As<ViewRepository>),
     overrides.websocket || (mocks.websocket as As<WebsocketRepository>),
     overrides.workflow || (mocks.workflow as As<WorkflowRepository>),
-    // Gallery fork repositories: keep last, in the same order in every positional list
-    overrides.assetFavorite || (mocks.assetFavorite as As<AssetFavoriteRepository>),
-    overrides.classification || (mocks.classification as As<ClassificationRepository>),
-    overrides.faceIdentity || (mocks.faceIdentity as As<FaceIdentityRepository>),
-    overrides.faceRepair || (mocks.faceRepair as As<FaceRepairRepository>),
-    overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
-    overrides.faceRepairDecline || (mocks.faceRepairDecline as As<FaceRepairDeclineRepository>),
-    overrides.facePersonVerdict || (mocks.facePersonVerdict as As<FacePersonVerdictRepository>),
-    overrides.sharedSpace || (mocks.sharedSpace as As<SharedSpaceRepository>),
-    overrides.storageMigration || (mocks.storageMigration as As<StorageMigrationRepository>),
-    overrides.userGroup || (mocks.userGroup as As<UserGroupRepository>),
-    overrides.filterSuggestion || (mocks.filterSuggestion as As<FilterSuggestionRepository>),
-    overrides.memoryRuleAsset || (mocks.memoryRuleAsset as As<MemoryRuleAssetRepository>),
-    overrides.queueMaintenance || (mocks.queueMaintenance as As<QueueMaintenanceRepository>),
-    overrides.smartFacet || (mocks.smartFacet as As<SmartFacetRepository>),
-    overrides.spaceAlbum || (mocks.spaceAlbum as As<SpaceAlbumRepository>),
-    overrides.petFace || (mocks.petFace as As<PetFaceRepository>),
-    overrides.faceSearch || (mocks.faceSearch as As<FaceSearchRepository>),
-    overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
-    overrides.videoTrim || (mocks.videoTrim as As<VideoTrimRepository>),
+    newGalleryRepositories(mocks, overrides),
   );
 
   return {

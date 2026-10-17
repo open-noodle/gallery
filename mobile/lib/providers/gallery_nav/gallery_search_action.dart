@@ -5,9 +5,10 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
 
-// Coupled to AutoTabsRouter transition — see tab_shell.page.dart (upstream's
-// 600 ms FadeTransition). 20 ms buffer lets MainTimelinePage finish its first-
-// build pass so FilterSheetSearchBar can accept focus.
+// Coupled to AutoTabsRouter transition — see gallery_tab_shell.page.dart (its
+// 600 ms FadeTransition, copied from upstream's tab shell). 20 ms buffer lets
+// MainTimelinePage finish its first-build pass so FilterSheetSearchBar can
+// accept focus.
 const Duration kGalleryTabTransitionDelay = Duration(milliseconds: 620);
 
 /// Reader is the common shape across WidgetRef, Ref, and ProviderContainer's

@@ -131,7 +131,7 @@ describe(GalleryAssetService.name, () => {
     });
 
     describe('setTrim', () => {
-      it('stores the trim, marks the asset edited and queues the edit job', async () => {
+      it('stores the trim, marks the asset edited and queues the trim job', async () => {
         mocks.videoTrim.getForTrim.mockResolvedValue(video());
         mocks.media.probe.mockResolvedValue(videoStream);
 
@@ -144,7 +144,7 @@ describe(GalleryAssetService.name, () => {
         expect(mocks.videoTrim.upsert).toHaveBeenCalledWith(assetId, 5, 25);
         expect(mocks.asset.update).toHaveBeenCalledWith({ id: assetId, isEdited: true });
         expect(mocks.job.queue).toHaveBeenCalledWith({
-          name: JobName.AssetEditThumbnailGeneration,
+          name: JobName.AssetVideoTrimGenerate,
           data: { id: assetId },
         });
       });
@@ -182,7 +182,7 @@ describe(GalleryAssetService.name, () => {
         expect(mocks.videoTrim.delete).toHaveBeenCalledWith(assetId);
         expect(mocks.asset.update).toHaveBeenCalledWith({ id: assetId, isEdited: false });
         expect(mocks.job.queue).toHaveBeenCalledWith({
-          name: JobName.AssetEditThumbnailGeneration,
+          name: JobName.AssetVideoTrimGenerate,
           data: { id: assetId },
         });
       });
@@ -306,7 +306,7 @@ describe(GalleryAssetService.name, () => {
     });
 
     describe('removeTrim', () => {
-      it('deletes the trim, clears isEdited and queues the edit job', async () => {
+      it('deletes the trim, clears isEdited and queues the trim job', async () => {
         mocks.videoTrim.delete.mockResolvedValue(true);
 
         await sut.removeTrim(authStub.admin, assetId);
@@ -314,7 +314,7 @@ describe(GalleryAssetService.name, () => {
         expect(mocks.videoTrim.delete).toHaveBeenCalledWith(assetId);
         expect(mocks.asset.update).toHaveBeenCalledWith({ id: assetId, isEdited: false });
         expect(mocks.job.queue).toHaveBeenCalledWith({
-          name: JobName.AssetEditThumbnailGeneration,
+          name: JobName.AssetVideoTrimGenerate,
           data: { id: assetId },
         });
       });

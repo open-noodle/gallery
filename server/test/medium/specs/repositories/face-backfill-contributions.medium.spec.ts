@@ -2,7 +2,7 @@
 // the link-time face-sync pager. Face fixtures are seeded with direct inserts (no factory).
 import { Kysely } from 'kysely';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
-import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
@@ -57,7 +57,7 @@ describe('P1-7: contributed-only assets in the face pipeline', () => {
   it('getByAlbumIdWithFaces pages a contributed asset for its tether space (re-link face sync, D1-b)', async () => {
     const { ctx } = setup();
     const s = await seedContributionWithFace(ctx);
-    const sut = ctx.get(AssetRepository);
+    const sut = ctx.get(GalleryAssetRepository);
     const rows = await sut.getByAlbumIdWithFaces(s.album.id, s.space.id);
     expect(rows.map((r) => r.id)).toContain(s.asset.id);
   });
@@ -69,7 +69,7 @@ describe('P1-7: contributed-only assets in the face pipeline', () => {
     const s = await seedContributionWithFace(ctx);
     const { space: other } = await ctx.newSharedSpace({ createdById: s.owner.id, faceRecognitionEnabled: true });
     await ctx.newSharedSpaceAlbum({ spaceId: other.id, albumId: s.album.id });
-    const sut = ctx.get(AssetRepository);
+    const sut = ctx.get(GalleryAssetRepository);
     const rows = await sut.getByAlbumIdWithFaces(s.album.id, other.id);
     expect(rows.map((r) => r.id)).not.toContain(s.asset.id);
   });

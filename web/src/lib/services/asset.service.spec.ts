@@ -1,11 +1,4 @@
-import {
-  AssetEditAction,
-  getAssetInfo,
-  updateAsset,
-  updateAssetFavorites,
-  type AssetEditActionItemDto,
-  type AssetResponseDto,
-} from '@immich/sdk';
+import { getAssetInfo, updateAsset, updateAssetFavorites, type AssetResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
@@ -14,13 +7,7 @@ import { eventManager } from '$lib/managers/event-manager.svelte';
 import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
 import AssetTagModal from '$lib/modals/AssetTagModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
-import {
-  getAssetActions,
-  getAssetBulkActions,
-  handleDownloadAsset,
-  mergeRotation,
-  normalizeAngle,
-} from '$lib/services/asset.service';
+import { getAssetActions, getAssetBulkActions, handleDownloadAsset } from '$lib/services/asset.service';
 import { setSharedLink } from '$lib/utils';
 import { getFormatter } from '$lib/utils/i18n';
 import { assetFactory } from '@test-data/factories/asset-factory';
@@ -145,92 +132,6 @@ describe('AssetService', () => {
     });
   });
 
-  describe('normalizeAngle', () => {
-    it('should return 0 for 0', () => {
-      expect(normalizeAngle(0)).toBe(0);
-    });
-
-    it('should return 90 for 90', () => {
-      expect(normalizeAngle(90)).toBe(90);
-    });
-
-    it('should convert -90 to 270', () => {
-      expect(normalizeAngle(-90)).toBe(270);
-    });
-
-    it('should convert 360 to 0', () => {
-      expect(normalizeAngle(360)).toBe(0);
-    });
-
-    it('should convert 450 to 90', () => {
-      expect(normalizeAngle(450)).toBe(90);
-    });
-
-    it('should convert -180 to 180', () => {
-      expect(normalizeAngle(-180)).toBe(180);
-    });
-  });
-
-  describe('mergeRotation', () => {
-    it('should add rotation to empty edits', () => {
-      const result = mergeRotation([], 90);
-      expect(result).toEqual([{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }]);
-    });
-
-    it('should merge rotation with existing rotation', () => {
-      const existing: AssetEditActionItemDto[] = [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }];
-      const result = mergeRotation(existing, 90);
-      expect(result).toEqual([{ action: AssetEditAction.Rotate, parameters: { angle: 180 } }]);
-    });
-
-    it('should remove rotation when merged angle is 0 (full circle)', () => {
-      const existing: AssetEditActionItemDto[] = [{ action: AssetEditAction.Rotate, parameters: { angle: 270 } }];
-      const result = mergeRotation(existing, 90);
-      expect(result).toEqual([]);
-    });
-
-    it('should preserve other edit actions when merging', () => {
-      const existing: AssetEditActionItemDto[] = [
-        { action: AssetEditAction.Crop, parameters: { x: 0, y: 0, width: 100, height: 100 } },
-        { action: AssetEditAction.Rotate, parameters: { angle: 90 } },
-      ];
-      const result = mergeRotation(existing, 90);
-      expect(result).toEqual([
-        { action: AssetEditAction.Crop, parameters: { x: 0, y: 0, width: 100, height: 100 } },
-        { action: AssetEditAction.Rotate, parameters: { angle: 180 } },
-      ]);
-    });
-
-    it('should preserve other edit actions when rotation cancels out', () => {
-      const existing: AssetEditActionItemDto[] = [
-        { action: AssetEditAction.Crop, parameters: { x: 0, y: 0, width: 100, height: 100 } },
-        { action: AssetEditAction.Rotate, parameters: { angle: 270 } },
-      ];
-      const result = mergeRotation(existing, 90);
-      expect(result).toEqual([{ action: AssetEditAction.Crop, parameters: { x: 0, y: 0, width: 100, height: 100 } }]);
-    });
-
-    it('should handle rotate left (270 degrees)', () => {
-      const result = mergeRotation([], 270);
-      expect(result).toEqual([{ action: AssetEditAction.Rotate, parameters: { angle: 270 } }]);
-    });
-
-    it('should handle 180 degree rotation', () => {
-      const result = mergeRotation([], 180);
-      expect(result).toEqual([{ action: AssetEditAction.Rotate, parameters: { angle: 180 } }]);
-    });
-
-    it('should handle multiple successive rotations correctly', () => {
-      let edits: AssetEditActionItemDto[] = [];
-      edits = mergeRotation(edits, 90); // 90
-      edits = mergeRotation(edits, 90); // 180
-      edits = mergeRotation(edits, 90); // 270
-      expect(edits).toEqual([{ action: AssetEditAction.Rotate, parameters: { angle: 270 } }]);
-      edits = mergeRotation(edits, 90); // 360 -> 0 -> removed
-      expect(edits).toEqual([]);
-    });
-  });
-
   describe('handleDownloadAsset', () => {
     it('should use the asset originalFileName when showing toasts', async () => {
       const $t = vitest.fn().mockReturnValue('formatter');
@@ -285,7 +186,9 @@ describe('add to album/space entry points', () => {
   });
 
   it('bulk "+" carries the space restriction through to the modal when the selection is not all-owned', () => {
-    const action = getAssetBulkActions(((k: string) => k) as never, { restrictToSpaceId: 'space-1' }).AddToAlbum;
+    const action = getAssetBulkActions(((k: string) => k) as never, undefined, {
+      restrictToSpaceId: 'space-1',
+    }).AddToAlbum;
     action.onAction({ action, event: new Event('click') });
     expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, {
       assetIds: ['x1', 'x2'],
@@ -314,7 +217,9 @@ describe('add to album/space entry points', () => {
       authManager.setUser(userAdminFactory.build({ id: 'editor-1' }));
       const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
 
-      const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
+      const action = getAssetActions(() => '', asset, undefined, {
+        space: { id: 'space-1', canWrite: true },
+      }).AddToAlbum;
       action.onAction({ action, event: new Event('click') });
 
       expect(action.$if?.()).toBe(true);
@@ -328,7 +233,9 @@ describe('add to album/space entry points', () => {
       authManager.setUser(userAdminFactory.build({ id: 'editor-1' }));
       const asset = assetFactory.build({ id: 'mine', ownerId: 'editor-1' });
 
-      const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: true } }).AddToAlbum;
+      const action = getAssetActions(() => '', asset, undefined, {
+        space: { id: 'space-1', canWrite: true },
+      }).AddToAlbum;
       action.onAction({ action, event: new Event('click') });
 
       expect(action.$if?.()).toBe(true);
@@ -342,7 +249,9 @@ describe('add to album/space entry points', () => {
       authManager.setUser(userAdminFactory.build({ id: 'viewer-1' }));
       const asset = assetFactory.build({ id: 'not-mine', ownerId: 'someone-else' });
 
-      const action = getAssetActions(() => '', asset, { space: { id: 'space-1', canWrite: false } }).AddToAlbum;
+      const action = getAssetActions(() => '', asset, undefined, {
+        space: { id: 'space-1', canWrite: false },
+      }).AddToAlbum;
 
       expect(action.$if?.()).toBe(false);
     });
@@ -403,7 +312,7 @@ describe('bulk CreateSharedLink action', () => {
 describe('bulk Tag action', () => {
   const selection = assetMultiSelectManager as unknown as { isAllUserOwned?: boolean };
   const tagAction = (options?: { editableSelectedAssetIds?: string[] }) =>
-    getAssetBulkActions(((k: string) => k) as never, options).Tag;
+    getAssetBulkActions(((k: string) => k) as never, undefined, options).Tag;
 
   beforeEach(() => {
     vitest.mocked(modalManager.show).mockClear();

@@ -7,11 +7,13 @@ import type { Component } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { showAddSpaceMembersModal } from '$lib/gallery/spaces/add-space-members';
 import MembersPage from './+page.svelte';
 
 const { mockAuthManager } = vi.hoisted(() => ({ mockAuthManager: { user: { id: 'u1', isAdmin: false } } }));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: mockAuthManager }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('$lib/gallery/spaces/add-space-members', () => ({ showAddSpaceMembersModal: vi.fn() }));
 
 // The page drives @immich/ui's modalManager (invite modal + remove-confirm dialog). It also renders
 // the @immich/ui <Select> for role changes, whose real bits-ui listbox cannot have an option selected
@@ -191,35 +193,28 @@ describe('Members tab', () => {
   });
 
   describe('invite', () => {
-    it('opens the add-member modal and revalidates when it resolves truthy', async () => {
-      vi.mocked(modalManager.show).mockResolvedValue(true as never);
+    it('opens the add-member modal and revalidates when it added someone', async () => {
+      vi.mocked(showAddSpaceMembersModal).mockResolvedValue([member({ userId: 'u3' })]);
       renderPage(SharedSpaceRole.Owner, [
         member(),
         member({ userId: 'u2', role: SharedSpaceRole.Editor, name: 'Ann' }),
       ]);
       const { invalidateAll } = await import('$app/navigation');
-      const addMemberModalModule = await import('$lib/modals/SpaceAddMemberModal.svelte');
-      const SpaceAddMemberModal = addMemberModalModule.default;
 
       await fireEvent.click(screen.getByTestId('members-invite'));
 
-      await waitFor(() =>
-        expect(modalManager.show).toHaveBeenCalledWith(SpaceAddMemberModal, {
-          spaceId: 's1',
-          existingMemberIds: ['u1', 'u2'],
-        }),
-      );
+      await waitFor(() => expect(showAddSpaceMembersModal).toHaveBeenCalledWith('s1', ['u1', 'u2']));
       await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
-    it('does not revalidate when the add-member modal resolves falsy', async () => {
-      vi.mocked(modalManager.show).mockResolvedValue(false as never);
+    it('does not revalidate when the add-member modal added no one', async () => {
+      vi.mocked(showAddSpaceMembersModal).mockResolvedValue([]);
       renderPage(SharedSpaceRole.Owner);
       const { invalidateAll } = await import('$app/navigation');
 
       await fireEvent.click(screen.getByTestId('members-invite'));
 
-      await waitFor(() => expect(modalManager.show).toHaveBeenCalled());
+      await waitFor(() => expect(showAddSpaceMembersModal).toHaveBeenCalled());
       expect(invalidateAll).not.toHaveBeenCalled();
     });
   });

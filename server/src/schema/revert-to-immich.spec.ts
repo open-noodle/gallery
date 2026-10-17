@@ -175,6 +175,19 @@ describe('revert-to-immich.sql', () => {
     expect(guard).toBeLessThan(firstWrite);
   });
 
+  it('runs the opt-in space conversion (0a) after the S3 guard and before 0b', () => {
+    const guard = sql.indexOf('Storage Migration to disk');
+    const convert = sql.indexOf(`current_setting('gallery.convert_spaces', true)`);
+    const favorites = sql.indexOf(`current_setting('gallery.convert_favorites', true) = 'on'`);
+    const hygiene = sql.indexOf('-- 0b. ');
+    expect(guard).toBeGreaterThan(-1);
+    expect(convert).toBeGreaterThan(guard);
+    expect(favorites).toBeGreaterThan(convert);
+    expect(hygiene).toBeGreaterThan(favorites);
+    // A per-viewer nickname, never a name for the person.
+    expect(sql.slice(convert, hygiene)).not.toContain('shared_space_person_alias');
+  });
+
   it('drops the fork migration ledger and its lock table', () => {
     expect(sql).toContain('DROP TABLE IF EXISTS "gallery_migrations";');
     expect(sql).toContain('DROP TABLE IF EXISTS "gallery_migrations_lock";');

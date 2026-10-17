@@ -16,8 +16,9 @@ import { init, register, waitLocale } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album-actions';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions } from '$lib/services/album.service';
+import { getAlbumAssetsActions } from '$lib/services/album.service';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
@@ -36,11 +37,6 @@ vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
 
 vi.mock('$lib/components/timeline/AssetSelectControlBar.svelte', async () => {
   const { default: MockComponent } = await import('./mock-asset-select-control-bar.test-wrapper.svelte');
-  return { default: MockComponent };
-});
-
-vi.mock('$lib/components/timeline/actions/RemoveFromAlbumAction.svelte', async () => {
-  const { default: MockComponent } = await import('./mock-remove-from-album.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
@@ -85,7 +81,7 @@ vi.mock('$lib/components/timeline/TimelineGroupingControl.svelte', async () => {
   return { default: MockComponent };
 });
 
-vi.mock('$lib/managers/timeline-manager/timeline-anchor', () => ({
+vi.mock('$lib/gallery/timeline/timeline-anchor', () => ({
   getTimelineTopVisibleAnchor: vi.fn().mockReturnValue(undefined),
 }));
 
@@ -179,9 +175,12 @@ vi.mock('$lib/services/album.service', async (importOriginal) => {
       },
     }),
     addAssetsToAlbums: vi.fn().mockResolvedValue(true),
-    addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
   };
 });
+
+vi.mock('$lib/gallery/album-actions', () => ({
+  addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
+}));
 
 const BASE_SPACE: SharedSpaceResponseDto = {
   id: 'space-1',
@@ -567,9 +566,9 @@ describe('Space album detail page', () => {
     // AssetSelectControlBar renders its children
     expect(screen.getByTestId('asset-select-control-bar')).toBeInTheDocument();
 
-    // RemoveFromAlbumAction and DownloadAction are now menu items inside the "⋮" overflow menu.
+    // Remove-from-album and DownloadAction are menu items inside the "⋮" overflow menu.
     await openOverflowMenu();
-    expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
+    expect(screen.getByText('Remove from album')).toBeInTheDocument();
     // DownloadAction is rendered for all members
     expect(screen.getByTestId('download-action')).toBeInTheDocument();
   });
@@ -593,8 +592,8 @@ describe('Space album detail page', () => {
     await openOverflowMenu();
     // DownloadAction is available to all members (bar is not empty for viewers)
     expect(screen.getByTestId('download-action')).toBeInTheDocument();
-    // But RemoveFromAlbumAction is NOT rendered
-    expect(screen.queryByTestId('album-remove-from-album')).not.toBeInTheDocument();
+    // But remove-from-album is NOT rendered
+    expect(screen.queryByText('Remove from album')).not.toBeInTheDocument();
   });
 
   // ── Picker source toggle ────────────────────────────────────────────────────
@@ -1097,14 +1096,14 @@ describe('Space album detail page', () => {
       }),
     });
     await openOverflowMenu();
-    expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
+    expect(screen.getByText('Remove from album')).toBeInTheDocument();
   });
 
   it('space=Owner + default album + selection active: RemoveFromAlbum is present', async () => {
     mockAssetMultiSelectManager.selectionActive = true;
     renderPage({ members: [makeMember(SharedSpaceRole.Owner)] });
     await openOverflowMenu();
-    expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
+    expect(screen.getByText('Remove from album')).toBeInTheDocument();
   });
 
   // Slice 6 — rbac-5/albums-8 REVERSED: the browse control bar now renders the full
@@ -1130,7 +1129,7 @@ describe('Space album detail page', () => {
 
       await openOverflowMenu();
       expect(screen.getByTestId('download-action')).toBeInTheDocument();
-      expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
+      expect(screen.getByText('Remove from album')).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Change date' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Change location' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
@@ -1158,7 +1157,7 @@ describe('Space album detail page', () => {
       expect(screen.getByTestId('download-action')).toBeInTheDocument();
       // canRemoveFromAlbum / canSetCover key off canManage (space.canWrite || album.isEditor),
       // NOT ownership — both stay visible even though the selection isn't owned.
-      expect(screen.getByTestId('album-remove-from-album')).toBeInTheDocument();
+      expect(screen.getByText('Remove from album')).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
       // Ownership-gated actions are hidden regardless of manager status.
       expect(screen.queryByRole('menuitem', { name: 'Change date' })).not.toBeInTheDocument();
@@ -1194,7 +1193,7 @@ describe('Space album detail page', () => {
 
       // canManage is false for a plain album/space Viewer — Remove and Set-cover stay hidden
       // even though the selection is entirely their own.
-      expect(screen.queryByTestId('album-remove-from-album')).not.toBeInTheDocument();
+      expect(screen.queryByText('Remove from album')).not.toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
     });
 
@@ -1223,7 +1222,7 @@ describe('Space album detail page', () => {
 
       await openOverflowMenu();
       expect(screen.getByTestId('download-action')).toBeInTheDocument();
-      expect(screen.queryByTestId('album-remove-from-album')).not.toBeInTheDocument();
+      expect(screen.queryByText('Remove from album')).not.toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Set as album cover' })).not.toBeInTheDocument();
     });

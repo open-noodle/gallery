@@ -1,11 +1,11 @@
 import { TimeBucketSize, getTimeBucket } from '@immich/sdk';
+import { getTimelineAlbumQueryOptions, mergeTimeBucketAssets } from '$lib/gallery/timeline/album-picker-support';
+import { toTimeBucketRequest } from '$lib/gallery/timeline/request-options';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { toISOYearMonthUTC } from '$lib/utils/timeline-util';
 import { TimelineManager } from '../timeline-manager.svelte';
 import type { TimelineMonth } from '../timeline-month.svelte';
 import type { TimelineManagerOptions } from '../types';
-import { getTimelineAlbumQueryOptions, mergeTimeBucketAssets } from './album-picker-support';
-import { toTimeBucketRequest } from './request-options';
 
 export async function loadFromTimeBuckets(
   timelineManager: TimelineManager,

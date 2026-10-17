@@ -1292,7 +1292,7 @@ export class FaceRepairService extends BaseService {
   async getAdminFaceThumbnail(assetFaceId: string): Promise<ImmichMediaResponse> {
     let face: AssetFace;
     try {
-      face = await this.personRepository.getFaceByIdIncludingTombstoned(assetFaceId);
+      face = await this.galleryPersonRepository.getFaceByIdIncludingTombstoned(assetFaceId);
     } catch {
       throw new NotFoundException();
     }
@@ -1315,7 +1315,7 @@ export class FaceRepairService extends BaseService {
     try {
       // NOT getFaceByIdIncludingTombstoned: that one serves faces on trashed assets, which is tolerable for
       // a face crop and not for a whole photo.
-      face = await this.personRepository.getFaceByIdOnLiveAsset(assetFaceId);
+      face = await this.galleryPersonRepository.getFaceByIdOnLiveAsset(assetFaceId);
     } catch {
       throw new NotFoundException();
     }

@@ -1,5 +1,5 @@
 // M12: sql-tools compares `migration_overrides` rows by exact string equality against the
-// DDL `registerFunction(...)` in src/schema/functions.ts would emit (via its internal
+// DDL `registerFunction(...)` in src/schema/gallery-functions.ts would emit (via its internal
 // asFunctionExpression helper, surfaced here as DatabaseFunction.expression). If a
 // migration's executed CREATE OR REPLACE FUNCTION / its migration_overrides `sql` value
 // ever drifts from that registered expression (e.g. a hand-edit that drops comment lines
@@ -60,12 +60,12 @@ describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parit
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the function with DDL byte-identical to gallery-functions.ts', async () => {
     await upAlbumSoftDelete({} as any);
 
     const [executedFunctionDdl, , functionOverrideInsert] = capturedSql;
 
-    // The registered function's DDL (functions.ts) is the source of truth `migrations:generate`
+    // The registered function's DDL (gallery-functions.ts) is the source of truth `migrations:generate`
     // diffs against — both the migration's executed statement and its override row must match it
     // byte-for-byte, or a scratch-DB `migrations:generate` run emits a spurious diff.
     expect(executedFunctionDdl).toBe(album_soft_delete_shared_space_album.expression);
@@ -77,18 +77,18 @@ describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parit
   });
 });
 
-// This migration REPLACED the body registered in functions.ts (ON CONFLICT DO NOTHING ->
+// This migration REPLACED the body registered in gallery-functions.ts (ON CONFLICT DO NOTHING ->
 // DO UPDATE SET createId/createdAt, fixing #752 review F-A: a re-added member whose grant
 // survived removal kept its original createId, so the grant-keyed backfill never re-fired and
 // contributions made during the absence stayed undeliverable). Its sibling 1782100000000 updated
-// functions.ts to match; this one did not, so every DB that ran it reports FunctionCreate +
+// gallery-functions.ts to match; this one did not, so every DB that ran it reports FunctionCreate +
 // OverrideUpdate forever — and `migrations:generate` would emit a migration REVERTING the fix.
 describe('1783700000000-FixSharedSpaceMemberJoinGrantCreateId override parity', () => {
   beforeEach(() => {
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the function with DDL byte-identical to gallery-functions.ts', async () => {
     await upMemberJoinGrantCreateId({} as any);
 
     const [executedFunctionDdl, functionOverrideUpdate] = capturedSql;
@@ -119,7 +119,7 @@ const parseOverrideValue = (statement: string): { type: string; name: string; sq
   JSON.parse(statement.match(/'(\{.+\})'::jsonb/s)![1]) as { type: string; name: string; sql: string };
 
 // This migration created album_space_asset_delete_audit (function + statement AFTER DELETE
-// trigger) but nothing was ever registered in functions.ts / on AlbumSpaceAssetTable, so every DB
+// trigger) but nothing was ever registered in gallery-functions.ts / on AlbumSpaceAssetTable, so every DB
 // that ran it reported FunctionDrop + two OverrideDrops. The two tools differ in how dangerous
 // their suggested remediation is: `schema-check` (and the boot warning) pass
 // `triggers: { ignoreExtra: true }`, so they emit no DROP TRIGGER and the bare `DROP FUNCTION`
@@ -131,7 +131,7 @@ describe('1783100000000-AddAlbumSpaceAssetSyncAndAudit override parity', () => {
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the delete-audit function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the delete-audit function with DDL byte-identical to gallery-functions.ts', async () => {
     await upAlbumSpaceAssetSyncAndAudit({} as any);
 
     const executedFunctionDdl = findSql('the delete-audit CREATE FUNCTION', (s) =>
@@ -145,7 +145,7 @@ describe('1783100000000-AddAlbumSpaceAssetSyncAndAudit override parity', () => {
     expect(parseOverrideValue(functionOverrideInsert).sql).toBe(album_space_asset_delete_audit.expression);
   });
 
-  // The trigger half. functions.ts has no counterpart to compare against (a trigger is declared by
+  // The trigger half. gallery-functions.ts has no counterpart to compare against (a trigger is declared by
   // the @AfterDeleteTrigger decorator on AlbumSpaceAssetTable, and importing src/schema under this
   // file's `kysely` mock blows up), so this pins the migration's two strings to each other and
   // trigger-override-parity.spec.ts pins the decorator's generated DDL to the same text. Together
@@ -174,13 +174,13 @@ describe('1783100000000-AddAlbumSpaceAssetSyncAndAudit override parity', () => {
 // per-member grants, so the function only inserts the tombstone row). Space album folders (mobile
 // parity) Task 1. Guards against the same drift class documented on
 // 1783100000000-AddAlbumSpaceAssetSyncAndAudit: nothing else in the suite would notice if the
-// migration's executed DDL or its migration_overrides row ever rotted away from functions.ts.
+// migration's executed DDL or its migration_overrides row ever rotted away from gallery-functions.ts.
 describe('1793200000000-SharedSpaceAlbumFolderAuditTable override parity', () => {
   beforeEach(() => {
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the delete-audit function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the delete-audit function with DDL byte-identical to gallery-functions.ts', async () => {
     await upSharedSpaceAlbumFolderAuditTable({} as any);
 
     const executedFunctionDdl = findSql('the delete-audit CREATE FUNCTION', (s) =>
@@ -194,7 +194,7 @@ describe('1793200000000-SharedSpaceAlbumFolderAuditTable override parity', () =>
     expect(parseOverrideValue(functionOverrideInsert).sql).toBe(shared_space_album_folder_delete_audit.expression);
   });
 
-  // The trigger half. functions.ts has no counterpart to compare against (a trigger is declared by
+  // The trigger half. gallery-functions.ts has no counterpart to compare against (a trigger is declared by
   // the @AfterDeleteTrigger decorator on SharedSpaceAlbumFolderTable, and importing src/schema
   // under this file's `kysely` mock blows up), so this pins the migration's two strings to each
   // other and trigger-override-parity.spec.ts pins the decorator's generated DDL to the same text.
@@ -219,7 +219,7 @@ describe('1793200000000-SharedSpaceAlbumFolderAuditTable override parity', () =>
 });
 
 // Same shape as 1783100000000 above: this migration creates asset_favorite_delete_audit (function +
-// statement AFTER DELETE trigger) and both override rows, so functions.ts / AssetFavoriteTable must
+// statement AFTER DELETE trigger) and both override rows, so gallery-functions.ts / AssetFavoriteTable must
 // declare them or every DB that runs it reports FunctionDrop + two OverrideDrops — and
 // `migrations:generate` emits DROP TRIGGER + DROP FUNCTION, silently killing #763's favorite delete
 // sync stream.
@@ -228,7 +228,7 @@ describe('1794000000000-AddAssetFavoriteTables override parity', () => {
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the delete-audit function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the delete-audit function with DDL byte-identical to gallery-functions.ts', async () => {
     await upAddAssetFavoriteTables({} as any);
 
     const executedFunctionDdl = findSql('the delete-audit CREATE FUNCTION', (s) =>
@@ -261,13 +261,13 @@ describe('1794000000000-AddAssetFavoriteTables override parity', () => {
 
 // The repair migration re-asserts all three objects for v5.2.0-rc.0 installs whose admin acted on
 // the (wrong-way) drift advice. Because it writes migration_overrides rows, its DDL must match
-// functions.ts byte-for-byte too — otherwise the repair would itself introduce fresh drift.
+// gallery-functions.ts byte-for-byte too — otherwise the repair would itself introduce fresh drift.
 describe('1784800000000-RepairSharedSpaceAlbumGrantDrift override parity', () => {
   beforeEach(() => {
     capturedSql.length = 0;
   });
 
-  it('re-asserts every object with DDL byte-identical to functions.ts', async () => {
+  it('re-asserts every object with DDL byte-identical to gallery-functions.ts', async () => {
     await upRepairDrift({} as any);
 
     const memberFn = findSql('the member-join CREATE FUNCTION', (s) =>
@@ -333,7 +333,7 @@ describe('1793000000000-AddSharedSpaceAlbumHidden override parity', () => {
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the delete-audit function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the delete-audit function with DDL byte-identical to gallery-functions.ts', async () => {
     await upSharedSpaceAlbumHidden({} as any);
 
     const executedFunctionDdl = findSql('the delete-audit CREATE FUNCTION', (s) =>
@@ -347,7 +347,7 @@ describe('1793000000000-AddSharedSpaceAlbumHidden override parity', () => {
     expect(parseOverrideValue(functionOverrideInsert).sql).toBe(shared_space_album_hidden_delete_audit.expression);
   });
 
-  // The trigger half. functions.ts has no counterpart to compare against (a trigger is declared by
+  // The trigger half. gallery-functions.ts has no counterpart to compare against (a trigger is declared by
   // the @AfterDeleteTrigger decorator on SharedSpaceAlbumHiddenTable, and importing src/schema under
   // this file's `kysely` mock blows up), so this pins the migration's two strings to each other and
   // trigger-override-parity.spec.ts pins the decorator's generated DDL to the same text. Together
@@ -377,7 +377,7 @@ describe('1798200000000-DropLibraryCreateId override parity', () => {
     capturedSql.length = 0;
   });
 
-  it('executes and overrides the function with DDL byte-identical to functions.ts', async () => {
+  it('executes and overrides the function with DDL byte-identical to gallery-functions.ts', async () => {
     await upDropLibraryCreateId({} as any);
 
     const [executedFunctionDdl, functionOverrideUpdate] = capturedSql;
@@ -399,7 +399,7 @@ describe('1798800000000-RestoreAssetIsFavoriteProjection override parity', () =>
   });
 
   it.each([asset_favorite_after_insert, asset_favorite_after_delete, asset_is_favorite_after_write])(
-    'executes and overrides $name with DDL byte-identical to functions.ts',
+    'executes and overrides $name with DDL byte-identical to gallery-functions.ts',
     async (fn) => {
       await upRestoreAssetIsFavorite({} as any);
 

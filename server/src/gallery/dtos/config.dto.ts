@@ -56,7 +56,7 @@ export const GalleryClassificationSchema = z
 export const GalleryMemoriesSchema = z
   .object({
     retentionDays: z.coerce.number().int().min(0).describe('Retention days'),
-    /** @deprecated superseded by `types['birthday']`; kept for back-compat */
+    /** @deprecated inert since birthday memories moved to Immich's generator (OD-3); kept so existing configs validate */
     birthday: galleryConfigBool.describe('Birthday memories'),
     /** @deprecated superseded by `types['recent_trip']`; kept for back-compat */
     recentTrips: galleryConfigBool.describe('Recent trip memories'),
@@ -115,7 +115,7 @@ export const GalleryPetRecognitionSchema = z
       .min(0.1)
       .max(2)
       .describe('Maximum distance threshold for pet recognition'),
-    // Upper bound mirrors SearchRepository.searchPets's own `numResults` guard (1..1000): minFaces
+    // Upper bound mirrors PetFaceRepository.searchPets's own `numResults` guard (1..1000): minFaces
     // is passed straight through as the NN window size, so a larger value would make every
     // recognition job throw rather than being rejected at save time.
     minFaces: z.int().min(1).max(1000).describe('Minimum number of faces required for recognition'),

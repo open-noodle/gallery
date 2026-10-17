@@ -3,11 +3,8 @@
   import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { SortOrder, locale } from '$lib/stores/preferences.store';
   import { spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-  import {
-    isSpaceAlbumGroupCollapsed,
-    toggleSpaceAlbumGroupCollapsing,
-    type SpaceAlbumGroup,
-  } from '$lib/utils/space-album-grouping';
+  import { type SpaceAlbumGroup } from '$lib/utils/space-album-grouping';
+  import { isAlbumGroupCollapsed, toggleAlbumGroupCollapsing } from '$lib/utils/album-utils';
   import { buildFolderSummaries, EMPTY_FOLDER_SUMMARY, getFolderContents } from '$lib/utils/space-album-folders';
   import { dateFormats } from '$lib/constants';
   import { Route } from '$lib/route';
@@ -183,12 +180,12 @@
   {/if}
   {#if grouped}
     {#each groups as group (group.id)}
-      {@const collapsed = isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
+      {@const collapsed = isAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
       {@const iconRotation = collapsed ? 'rotate-0' : 'rotate-90'}
       <tbody class="mt-4 block w-full">
         <tr
           class="flex w-full place-items-center p-2 md:py-3 md:ps-5 md:pe-5"
-          onclick={() => toggleSpaceAlbumGroupCollapsing(group.id)}
+          onclick={() => toggleAlbumGroupCollapsing(group.id, spaceAlbumViewSettings)}
           aria-expanded={!collapsed}
           data-testid="space-album-group-header-{group.id}"
         >

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, NotNull, Transaction, type Updateable, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { PeopleFaceStatistics } from 'src/repositories/person.repository.js';
+import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository.js';
 import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import {
@@ -498,7 +498,7 @@ export class SharedSpaceRepository {
       .execute();
   }
 
-  // Unhiding is a row DELETE — shared_space_album_hidden_delete_audit (schema/functions.ts) records
+  // Unhiding is a row DELETE — shared_space_album_hidden_delete_audit (schema/gallery-functions.ts) records
   // it so mobile's Drift sync learns about the unhide (§5.1). A no-op delete (nothing was hidden) is
   // not an error.
   async unhideAlbumForUser(spaceId: string, albumId: string, userId: string): Promise<void> {
@@ -5041,5 +5041,43 @@ export class SharedSpaceRepository {
       .select('combined.spaceId')
       .limit(1)
       .executeTakeFirst();
+  }
+
+  /**
+   * Expand a set of asset ids to include every other (non-deleted) asset that
+   * shares a stack with any of them. Assets with no stack map to themselves.
+   * Used to keep shared-space membership stack-atomic: adding/removing any
+   * member of a stack must add/remove the whole stack, otherwise a stack child
+   * can end up contributed to a space while its collapse-primary is not — the
+   * asset then counts toward the space but never renders in the (stack-collapsed)
+   * timeline. See discussion #751.
+   */
+  async getStackedAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
+    if (assetIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.deletedAt', 'is', null)
+      .$if(!!visibilities && visibilities.length > 0, (qb) => qb.where('asset.visibility', 'in', visibilities!))
+      .where((eb) =>
+        eb.or([
+          eb('asset.id', 'in', assetIds),
+          eb(
+            'asset.stackId',
+            'in',
+            eb
+              .selectFrom('asset as seed')
+              .select('seed.stackId')
+              .where('seed.id', 'in', assetIds)
+              .where('seed.stackId', 'is not', null),
+          ),
+        ]),
+      )
+      .execute();
+
+    return rows.map((row) => row.id);
   }
 }

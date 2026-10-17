@@ -43,22 +43,9 @@ final driftSpaceEditableProvider = FutureProvider.family<bool, String>((ref, spa
   return true;
 });
 
-// ignore: unused-code
-final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((ref, key) async {
-  final service = ref.watch(peopleServiceProvider);
-  final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));
-  return service.getAssetPeople(key.id, ownedByCurrentUser: key.ownerId == currentUserId);
-});
-
-final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((ref, sortBy) async* {
-  final service = ref.watch(peopleServiceProvider);
-  final prefs = await ref.watch(Store.userMetadata.preferences().future);
-  yield* service.watch(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
-});
-
 /// People for the global People page AND the photos-filter People picker (see
 /// `peoplePickerAllProvider`) — the viewer's own people plus people on Space-shared assets,
-/// matching the web People page / picker. Kept distinct from [getAllPeopleProvider] so
+/// matching the web People page / picker. Kept distinct from `Store.people.all()` so
 /// the remaining owner-scoped, local-first surface (the library people card) stays local.
 /// See issue #727.
 ///
@@ -89,8 +76,8 @@ final driftGetAllPeopleWithSharedSpacesProvider =
 ///
 /// `autoDispose` is deliberate: the route to this page (Spaces tab → space detail → app-bar
 /// face icon) invalidates nothing on entry, unlike the Library tab, which the global people
-/// providers sit behind and which the invalidation sites in `tab_shell.page.dart` /
-/// `gallery_bottom_nav.widget.dart` cover. Without `autoDispose`, this provider would keep the
+/// providers sit behind and which the invalidation site in
+/// `gallery_bottom_nav.widget.dart` covers. Without `autoDispose`, this provider would keep the
 /// list it fetched for the app's whole session, so leaving and re-entering the page would
 /// re-render a stale cache with no gesture to refresh it short of changing the sort mode or
 /// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped

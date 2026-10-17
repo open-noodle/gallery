@@ -10,8 +10,8 @@ import { DB } from 'src/schema/index.js';
 import { anyUuid } from 'src/utils/database.js';
 import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
-// Owner- or Space-scoped face KNN. Upstream's SearchRepository.searchFaces scopes by cluster group, which
-// Gallery keeps inert.
+// Owner- or Space-scoped face KNN for suggestions, face repair and space matching. Owner recognition runs
+// upstream's SearchRepository.searchFaces: under Option M a cluster group holds exactly one user.
 export interface ScopedFaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 'userIds' | 'maxDistance'> {
   userIds?: string[];
   spaceId?: string;
@@ -21,9 +21,8 @@ export interface ScopedFaceEmbeddingSearch extends Omit<SearchEmbeddingOptions, 
   minBirthDate?: Date | null;
   /**
    * Restricts candidate faces to assets whose visibility is in this set (Slice 1, F1/F2). Defaults to
-   * undefined — no predicate — so the two recognition callers (person.service.ts:1436, :1485) and the
-   * space-face-match caller (shared-space.service.ts:2063) emit byte-identical SQL to before this option
-   * existed. Only the suggestion scans and the cleanup scan's KNN pass pass this.
+   * undefined — no predicate — so the space-face-match caller (shared-space.service.ts) emits byte-identical
+   * SQL to before this option existed. Only the suggestion scans and the cleanup scan's KNN pass pass this.
    */
   visibility?: AssetVisibility[];
 }
@@ -125,9 +124,8 @@ export class FaceSearchRepository {
             )
             .where('asset.deletedAt', 'is', null)
             // Slice 1 (F2): opt-in visibility gate for the owner-scoped branch. Defaults to undefined (no
-            // predicate) so recognition (person.service.ts:1436, :1485) and space-face-match
-            // (shared-space.service.ts:2063) keep emitting byte-identical SQL — only the suggestion scans
-            // and the cleanup scan's KNN pass pass this.
+            // predicate) so space-face-match (shared-space.service.ts) keeps emitting byte-identical SQL —
+            // only the suggestion scans and the cleanup scan's KNN pass pass this.
             .$if(!!visibility?.length, (qb) => qb.where('asset.visibility', 'in', visibility!))
             // Exclude soft-deleted faces. The Face Cleanup "not a face" action tombstones a face by setting
             // asset_face.deletedAt (personId is also nulled), and every recognition/suggestion candidate must

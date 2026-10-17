@@ -3,7 +3,7 @@ import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 import { getVisualViewportMock } from '$lib/__mocks__/visual-viewport.mock';
-import { cropFacesFromAsset } from '$lib/stores/preferences.store';
+import { cropFacesFromAsset } from '$lib/gallery/stores/preferences.store';
 import { renderWithTooltips } from '$tests/helpers';
 import AppSettings from './AppSettings.svelte';
 

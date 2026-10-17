@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 
@@ -33,7 +34,7 @@ void main() {
                   filterBy: PeopleFilterBy.all,
                 )),
               );
-              ref.watch(getAllPeopleProvider(PeopleSortBy.photoCount));
+              ref.watch(Store.people.all());
               return const SizedBox.shrink();
             },
           ),
@@ -55,9 +56,9 @@ void main() {
           spacePeople++;
           return <Person>[];
         }),
-        // The local list is a StreamProvider now, so the override returns a Stream; the counter
-        // still increments once per subscription, which is what this test distinguishes.
-        getAllPeopleProvider.overrideWith((ref, sortBy) {
+        // The local list (Store.people.all()) is a StreamProvider, so the override returns a
+        // Stream; the counter increments once per subscription, which is what this test distinguishes.
+        Store.people.all().overrideWith((ref) {
           local++;
           return Stream.value(<Person>[]);
         }),

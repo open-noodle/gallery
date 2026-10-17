@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-import { toggleSpaceAlbumGroupCollapsing } from '$lib/utils/space-album-grouping';
+import { toggleAlbumGroupCollapsing } from '$lib/utils/album-utils';
 import { renderWithTooltips } from '$tests/helpers';
 
 function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSpaceLinkedAlbumDto {
@@ -179,7 +179,7 @@ describe('SpaceAlbumsTable', () => {
         grouped: true,
       });
       expect(screen.getByTestId('space-album-group-header-2024')).toHaveAttribute('aria-expanded', 'true');
-      toggleSpaceAlbumGroupCollapsing('2024');
+      toggleAlbumGroupCollapsing('2024', spaceAlbumViewSettings);
       await waitFor(() =>
         expect(screen.getByTestId('space-album-group-header-2024')).toHaveAttribute('aria-expanded', 'false'),
       );

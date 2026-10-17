@@ -83,11 +83,11 @@ describe(StackService.name, () => {
     it('S-26: rejects stacking an asset the caller does not own', async () => {
       const auth = AuthFactory.create();
       const assetId = newUuid();
-      // AssetUpdate passes via space-edit, but the asset is not owned.
+      // A space edit grant does not reach AssetUpdate, which is owner-only.
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
       mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
 
-      await expect(sut.create(auth, { assetIds: [assetId] })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(sut.create(auth, { assetIds: [assetId] })).rejects.toBeInstanceOf(BadRequestException);
 
       expect(mocks.stack.create).not.toHaveBeenCalled();
     });
@@ -96,8 +96,10 @@ describe(StackService.name, () => {
       const auth = AuthFactory.create();
       const mine = newUuid();
       const theirs = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([mine]));
-      mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set([theirs]));
+      // The owner guard itself, reached if AssetUpdate ever admits a non-owner again.
+      mocks.access.asset.checkOwnerAccess
+        .mockResolvedValueOnce(new Set([mine, theirs]))
+        .mockResolvedValue(new Set([mine]));
 
       await expect(sut.create(auth, { assetIds: [mine, theirs] })).rejects.toBeInstanceOf(ForbiddenException);
 

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/server_capability.model.dart';
 import 'package:immich_mobile/domain/models/sync_event.model.dart';
+import 'package:immich_mobile/infrastructure/repositories/gallery_sync_stream.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/utils/semver.dart';
@@ -332,58 +333,7 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.assetOcrV1: SyncAssetOcrV1.fromJson,
   SyncEntityType.assetOcrDeleteV1: SyncAssetOcrDeleteV1.fromJson,
   SyncEntityType.syncCompleteV1: _SyncEmptyDto.fromJson,
-  // --- gallery-fork: shared-space sync types ---
-  SyncEntityType.sharedSpaceV1: SyncSharedSpaceV1.fromJson,
-  SyncEntityType.sharedSpaceDeleteV1: SyncSharedSpaceDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceMemberV1: SyncSharedSpaceMemberV1.fromJson,
-  SyncEntityType.sharedSpaceMemberBackfillV1: SyncSharedSpaceMemberV1.fromJson,
-  SyncEntityType.sharedSpaceMemberDeleteV1: SyncSharedSpaceMemberDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAssetCreateV1: SyncAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAssetUpdateV1: SyncAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAssetBackfillV1: SyncAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAssetExifCreateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceAssetExifUpdateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceAssetExifBackfillV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceToAssetV1: SyncSharedSpaceToAssetV1.fromJson,
-  SyncEntityType.sharedSpaceToAssetBackfillV1: SyncSharedSpaceToAssetV1.fromJson,
-  SyncEntityType.sharedSpaceToAssetDeleteV1: SyncSharedSpaceToAssetDeleteV1.fromJson,
-  // --- gallery-fork: library sync types ---
-  SyncEntityType.libraryV1: SyncLibraryV1.fromJson,
-  SyncEntityType.libraryDeleteV1: SyncLibraryDeleteV1.fromJson,
-  SyncEntityType.libraryAssetCreateV1: SyncAssetV1.fromJson,
-  SyncEntityType.libraryAssetBackfillV1: SyncAssetV1.fromJson,
-  SyncEntityType.libraryAssetDeleteV1: SyncLibraryAssetDeleteV1.fromJson,
-  SyncEntityType.libraryAssetExifCreateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.libraryAssetExifBackfillV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceLibraryV1: SyncSharedSpaceLibraryV1.fromJson,
-  SyncEntityType.sharedSpaceLibraryBackfillV1: SyncSharedSpaceLibraryV1.fromJson,
-  SyncEntityType.sharedSpaceLibraryDeleteV1: SyncSharedSpaceLibraryDeleteV1.fromJson,
-  // --- gallery-fork: shared-space album sync types (Phase 2B) ---
-  SyncEntityType.sharedSpaceAlbumV1: SyncAlbumV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumBackfillV1: SyncAlbumV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumDeleteV1: SyncAlbumDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumLinkV1: SyncSharedSpaceAlbumLinkV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumLinkBackfillV1: SyncSharedSpaceAlbumLinkV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumLinkDeleteV1: SyncSharedSpaceAlbumLinkDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumFolderV1: SyncSharedSpaceAlbumFolderV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumFolderBackfillV1: SyncSharedSpaceAlbumFolderV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumFolderDeleteV1: SyncSharedSpaceAlbumFolderDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumToAssetV1: SyncAlbumToAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumToAssetBackfillV1: SyncAlbumToAssetV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumToAssetDeleteV1: SyncAlbumToAssetDeleteV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetCreateV1: SyncAssetV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetUpdateV1: SyncAssetV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetBackfillV1: SyncAssetV2.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetExifCreateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetExifUpdateV1: SyncAssetExifV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumAssetExifBackfillV1: SyncAssetExifV1.fromJson,
-  // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
-  SyncEntityType.sharedSpaceAlbumHiddenV1: SyncSharedSpaceAlbumHiddenV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumHiddenBackfillV1: SyncSharedSpaceAlbumHiddenV1.fromJson,
-  SyncEntityType.sharedSpaceAlbumHiddenDeleteV1: SyncSharedSpaceAlbumHiddenDeleteV1.fromJson,
-  // --- gallery-fork: per-user favorites sync (#763) ---
-  SyncEntityType.assetFavoriteV1: SyncAssetFavoriteV1.fromJson,
-  SyncEntityType.assetFavoriteDeleteV1: SyncAssetFavoriteDeleteV1.fromJson,
+  ...gallerySyncResponseMap,
 };
 
 class _SyncEmptyDto {

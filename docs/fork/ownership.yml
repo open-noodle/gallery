@@ -14,12 +14,20 @@ fork_surface:
   preferred_namespaces:
     server:
       - server/src/gallery/**
+      # fork tests of upstream code, beside the upstream spec (AGENTS.md rule 6)
+      - server/src/**/*.gallery.spec.ts
+      - server/test/medium/specs/gallery/**
     web:
       - web/src/lib/gallery/**
+      - web/src/**/*.gallery.spec.ts
       # the i18n overlay; web and mobile both read it, i18n/*.json stay upstream's
       - i18n/gallery/**
     mobile:
       - mobile/lib/gallery/**
+      - mobile/test/gallery/**
+    ml:
+      - machine-learning/test_pet_detection.py
+      - machine-learning/test_metrics.py
     database:
       - server/src/schema/migrations-gallery/**
     ci:
@@ -61,7 +69,8 @@ features:
       - server/src/services/gallery-workflow-host.service.spec.ts
       # Replay-owned: upstream files the fork owns outright. The fork-only people code lives in
       # server/src/gallery/ (GalleryPeopleService/Controller, FaceIdentityMaintenanceService,
-      # PetFaceRepository); what remains here is upstream code rewritten for Option M and Spaces.
+      # GalleryPersonRepository, PetFaceRepository); what remains here is upstream code rewritten for
+      # Option M and Spaces.
       # Upstream changes to these files are not merged by conflict resolution: the preflight report
       # lists every upstream commit touching them ("Touches shared-spaces owned path"), and each one
       # is replayed by hand and recorded in that cycle's specs/upstream-reports/ entry.
@@ -75,6 +84,42 @@ features:
       - web/src/lib/components/SchemaSpaceAlbumPicker.spec.ts
       - web/src/lib/components/SchemaConfiguration.spec.ts
       - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
+      - server/src/gallery/dtos/sync.dto.ts
+      - server/src/gallery/dtos/person.dto.ts
+      - server/src/gallery/dtos/album.dto.ts
+      - server/src/gallery/dtos/shared-link.dto.ts
+      - server/src/gallery/database.ts
+      - server/src/gallery/types.ts
+      - server/src/gallery/repositories/gallery-asset.repository.ts
+      - server/src/queries/gallery.asset.repository.sql
+      - server/src/queries/gallery.person.repository.sql
+      - server/src/gallery/utils/asset-update-hooks.ts
+      - server/src/gallery/utils/album-response-overlay.ts
+      - server/src/gallery/utils/space-album-contribution.ts
+      - server/src/gallery/utils/timeline-scope.ts
+      - server/src/gallery/utils/duplicate-resolve.ts
+      - web/src/lib/gallery/viewer-space.ts
+      - web/src/lib/gallery/viewer-space.test-helpers.ts
+      # People list page, person page hooks and the space-aware person service (plan 9.3, OD-9).
+      - web/src/lib/gallery/people/**
+      - web/src/lib/gallery/album-actions.ts
+      - web/src/lib/gallery/LinkAlbumToSpaceMenuOption.svelte
+      # The sidebar's Spaces row (plan 9.6).
+      - web/src/lib/gallery/sidebar/SpacesNavItem.svelte
+      # Detail panel People row: person tile and avatar source toggle (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/PersonTile.svelte
+      - web/src/lib/gallery/asset-viewer/AvatarSourceToggle.svelte
+      # The asset's space for the viewer surfaces, and the space face side panel (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/asset-space.ts
+      - web/src/lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte
+      - mobile/lib/gallery/remote_album/**
+      - mobile/lib/gallery/data/heal_date_time_columns.dart
+      - web/src/lib/gallery/utils/time-ago.ts
+      - web/src/lib/gallery/utils/editable-assets*.ts
+      - web/src/lib/gallery/stores/spaces-cache*.ts
+      - mobile/lib/gallery/utils/person_thumbnail_url.dart
+      - mobile/test/gallery/utils/person_thumbnail_url_test.dart
+      - mobile/lib/gallery/providers/gallery_action.notifier.dart
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -104,18 +149,29 @@ features:
         - server/src/schema/migrations-gallery/*Library*.ts
     mobile:
       drift_versions:
-        owned: [23, 24, 25]
+        # Every step on the fork's ladder that has no upstream step of its own. mobile-drift-check
+        # renumbers an incoming upstream vN to vN + len(owned), so a missing entry puts the hint on
+        # a version that already exists. v30 carries the index half of upstream's v25, which upstream
+        # added to its released step after the fork had shipped v25-v29 (7141d5a9fc3); the fork had
+        # to append it. v36-v38 are the Space album tables (renumbered off v35, see database.dart).
+        owned: [23, 24, 25, 30, 36, 37, 38]
         shipped: true
         owner: gallery
         expected_callbacks:
           23: [sharedSpaceEntity, sharedSpaceAssetEntity]
           24: [libraryEntity, sharedSpaceLibraryEntity]
           25: [idxSharedSpaceAssetAssetSpace, idxSharedSpaceLibraryLibrarySpace]
+          36: [sharedSpaceAlbumEntity, sharedSpaceAlbumLinkEntity, sharedSpaceAlbumAssetEntity]
+          37: [sharedSpaceAlbumHiddenEntity]
+          38: [sharedSpaceAlbumFolderEntity]
       paths:
         - mobile/lib/data/db/main/database.dart
         - mobile/drift_schemas/main/drift_schema_v23.json
         - mobile/drift_schemas/main/drift_schema_v24.json
         - mobile/drift_schemas/main/drift_schema_v25.json
+        - mobile/drift_schemas/main/drift_schema_v36.json
+        - mobile/drift_schemas/main/drift_schema_v37.json
+        - mobile/drift_schemas/main/drift_schema_v38.json
     required_checks: [e2e-rebase-smoke, mobile-drift-rebase-check]
 
   storage-and-media:
@@ -137,21 +193,28 @@ features:
       - server/src/backends/s3-storage.backend.ts
       - server/src/gallery/services/storage-usage.service*.ts
       - server/src/gallery/utils/storage-usage*.ts
+      - server/src/gallery/repositories/storage-usage.repository*.ts
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
+      - server/src/gallery/dtos/env.dto.ts
+      - server/src/gallery/dtos/queue.dto.ts
       - web/src/lib/managers/import-manager.svelte.ts
       - web/src/lib/utils/google-takeout-*.ts
       - web/src/routes/admin/system-settings/StorageUsageSettings.svelte
       - scripts/revert-to-immich.sql
       - .github/workflows/storage-migration*.yml
       - .github/workflows/gallery-revert-to-immich-validation.yml
+      - server/src/gallery/utils/storage-keys*.ts
+      - server/src/gallery/utils/s3-job-skip*.ts
+      - server/src/gallery/services/video-trim.service*.ts
+      - web/src/lib/gallery/asset-actions*.ts
     upstream_extension_paths:
       - server/src/services/base.service.ts
       - server/src/services/media.service.ts
       - server/src/services/metadata.service.ts
       - server/src/services/auth.service.ts
       - server/src/services/user.service.ts
-      - server/src/services/integrity.service.ts
+      - server/src/services/job.service.ts
       - server/src/services/index.ts
       - server/src/repositories/user.repository.ts
       - server/src/repositories/asset.repository.ts
@@ -160,8 +223,8 @@ features:
       - server/Dockerfile
       - e2e/docker-compose.yml
     expected_symbols:
-      server/src/services/integrity.service.ts:
-        - skipIfS3Configured
+      server/src/services/job.service.ts:
+        - isSkippedOnS3
     optional_paths:
       - e2e/**
       - server/src/backends/**
@@ -200,6 +263,37 @@ features:
       - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
       - server/src/dtos/gallery-map.dto.ts
+      - server/src/gallery/utils/smart-search.ts
+      - server/src/gallery/validation.ts
+      - server/src/gallery/utils/database.ts
+      - server/src/gallery/utils/time-bucket-filter*.ts
+      # fork routes moved out of the upstream album, search, server and timeline controllers
+      - server/src/gallery/controllers/gallery-album.controller*.ts
+      - server/src/gallery/controllers/gallery-search.controller*.ts
+      - server/src/gallery/controllers/gallery-server.controller*.ts
+      - server/src/gallery/controllers/gallery-timeline.controller*.ts
+      - server/src/gallery/utils/search-scope*.ts
+      - server/src/gallery/services/memory-rules/**
+      - server/src/gallery/services/rule-memory.service*.ts
+      - server/src/gallery/utils/memory-access.ts
+      - web/src/lib/gallery/filtered-timeline/timeline-grouping.svelte*.ts
+      - web/src/lib/gallery/filtered-map/**
+      # Video volume persistence for the asset viewer (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/video-volume*.ts
+      # The sidebar's footer, a storage meter on the collapsed rail (plan 9.6).
+      - web/src/lib/gallery/sidebar/SidebarBottomInfo.svelte
+      # Search page scope default, person chip names, selection context and legacy notice (plan 9.6).
+      - web/src/lib/gallery/search/**
+      # Detail panel filter values, album filter, map view and map provider links (plan 9.6).
+      - web/src/lib/gallery/asset-viewer/detail-panel-filters.ts
+      - web/src/lib/gallery/asset-viewer/FilterValue.svelte
+      - web/src/lib/gallery/asset-viewer/AppearsInAlbum.svelte
+      - web/src/lib/gallery/asset-viewer/MapProviderLinks.svelte
+      - web/src/lib/gallery/timeline/**
+      - mobile/lib/gallery/location_disclosure.dart
+      - mobile/test/gallery/location_disclosure_test.dart
+      - mobile/lib/gallery/search/**
+      - web/src/lib/gallery/stores/preferences.store*.ts
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts
@@ -211,6 +305,9 @@ features:
       - web/src/routes/(user)/albums/**
       - web/src/routes/(user)/memories/**
       - patches/@immich__ui@*.patch
+      - server/src/gallery/dtos/time-bucket.dto.ts
+      - server/src/gallery/dtos/asset-response.dto.ts
+      - server/src/gallery/dtos/server.dto.ts
     optional_paths:
       - web/src/lib/**
       - web/src/routes/**
@@ -236,12 +333,19 @@ features:
       - machine-learning/immich_ml/models/pet_detection/**
       - machine-learning/immich_ml/models/pet_recognition/**
       - machine-learning/immich_ml/models/gallery_hosted.py
+      - machine-learning/test_pet_detection.py
+      - machine-learning/test_metrics.py
       - server/src/services/pet-detection.service.ts
       - server/src/services/classification.service.ts
       - server/src/services/duplicate.service.ts
       - server/src/repositories/duplicate.repository.ts
+      - server/src/gallery/repositories/gallery-duplicate.repository*.ts
+      - server/src/gallery/utils/misc.ts
+      - server/src/gallery/repositories/gallery-machine-learning.repository*.ts
+      - web/src/lib/gallery/utils/queue-jobs*.ts
     upstream_extension_paths:
       - server/src/config.ts
+      - server/src/app.module.ts
       - server/src/dtos/system-config.dto.ts
       - server/src/dtos/model-config.dto.ts
       - server/src/repositories/search.repository.ts
@@ -281,11 +385,14 @@ features:
       - mobile/lib/presentation/widgets/filter_sheet/**
       - mobile/lib/providers/gallery_nav/**
       - mobile/lib/presentation/widgets/gallery_nav/**
-      - mobile/ios/Runner/Info.plist
       - branding/**
       - design/gallery-*
       - web/static/gallery-*
       - .github/actions/apply-branding/**
+      - mobile/lib/gallery/presentation/widgets/timeline/timeline_scroll_driver.dart
+      - mobile/lib/gallery/routing/**
+      - mobile/lib/gallery/widgets/library_collection_cards.dart
+      - mobile/lib/gallery/widgets/demo_login_button.dart
     upstream_extension_paths:
       - mobile/lib/routing/router.dart
       - mobile/lib/routing/router.gr.dart
@@ -340,6 +447,10 @@ features:
       - mobile/test/gallery/gallery_app_header_test.dart
       - e2e/src/gallery-client.ts
       - e2e/src/specs/server/api/stock-client.e2e-spec.ts
+      - server/src/schema/gallery-functions.ts
+      - server/src/gallery/repositories/index.ts
+      - server/src/gallery/services/gallery-base.service.ts
+      - server/test/gallery/**
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts
@@ -531,6 +642,16 @@ ci_invariants:
     paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
     exceptions:
       - .github/workflows/merge-translations.yml
+      # Upstream's release-line workflows, kept as upstream's text (OD-4) so upstream edits to them
+      # apply cleanly instead of stopping the replay on a modify/delete. None of them can run here:
+      # draft-release/prepare-release are workflow_dispatch only (draft-release also passes two
+      # app-token secrets the fork's build-mobile.yml no longer declares, so a manual run fails at
+      # validation), backport needs a `backport:release/*` label, and docs-destroy is disabled in
+      # the repository settings (see the docs-destroy note below).
+      - .github/workflows/backport.yml
+      - .github/workflows/docs-destroy.yml
+      - .github/workflows/draft-release.yml
+      - .github/workflows/prepare-release.yml
   # Upstream builds some ML variants on its own self-hosted `pokedex-*` runners (immich-32020 put
   # OpenVINO on `pokedex-large` when it moved to an onnxruntime source build). The fork has no such
   # runners, so a merged mapping leaves that matrix job queued forever with zero conflict.
@@ -552,6 +673,13 @@ ci_invariants:
     forbidden_patterns: ['workflow_run:']
     paths: [.github/workflows/docs-deploy.yml]
     exceptions: []
+  # docs-destroy.yml (OD-4) is upstream's text, unedited, and triggers on every closed pull request
+  # (`pull_request_target: types: [closed]`); without Immich's Cloudflare and app secrets each run
+  # fails. Editing the trigger would bring back the modify/delete stops OD-4 removed, so the workflow
+  # is switched off in GitHub instead, by hand, once per repository:
+  #   gh workflow disable docs-destroy.yml --repo open-noodle/gallery
+  # A forbidden pattern cannot see a repository setting, so this is a record, not a check.
+
   # Option M: a person_group holds exactly one person row — the owner's. Upstream filters its person
   # joins to the VIEWER's row, which is meaningful with cluster groups on and a silent nullifier here:
   # every non-owner gets `person: null` on faces they may see, and hidden people stop being hidden.
@@ -594,19 +722,6 @@ ci_invariants:
     paths:
       - server/src/services/person.service.ts
       - server/src/controllers/person.controller.ts
-    exceptions: []
-
-  # immich-30831 added a first-class MemoryType.Birthday generator. Gallery already ships a
-  # birthday memory (BirthdayMemoryRule), so upstream's createBirthdayMemories is pulled but never
-  # dispatched (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). A rebase that
-  # resolves onMemoriesCreate toward upstream re-enables it with no conflict and no type error.
-  # Adopting upstream's birthday is a deliberate project: delete this invariant in the same change.
-  - id: birthday-memory-generator-not-dispatched
-    title: Upstream's birthday memory generator stays undispatched
-    forbidden_patterns:
-      - 'this.createBirthdayMemories('
-    paths:
-      - server/src/services/memory.service.ts
     exceptions: []
 
   # memory_entity.type is an index-persisted intEnum; installed apps hold the fork's `rule` at
@@ -664,6 +779,24 @@ risk_patterns:
       - server/src/schema/migrations/**
       - server/src/schema/tables/**
     notes: Server schema change
+  # Watch: Immich's search redesign (design doc on outline.immich.cloud, no merged PR as of v3.3.3)
+  # plans POST /search/facets, suggestions that accept a filter, and a guard that keeps
+  # locked-visibility assets out of every search path (LP-1, approach not decided). That guard lands
+  # where Gallery's V3 hooks act: ownershipPredicate and albumConfinedPredicate on AssetSearchScope
+  # (searchScopeV3 in server/src/utils/viewer-scope.ts) replace upstream's owner and album
+  # predicates, so a locked filter upstream writes into either predicate disappears wherever a hook
+  # replaces it, and one written beside them must still apply under the hooks. Before taking a matching
+  # commit, check where its locked filter sits relative to the hooks and run the RBAC oracle's
+  # search surfaces; facets also decide plan step 11.1 (adopt upstream's facets if they ship first).
+  - id: upstream-search-redesign
+    risk: high
+    subject_regex: '[Ff]acets?\b|[Ll]ocked.*[Ss]earch|[Ss]earch.*[Ll]ocked'
+    path_globs:
+      - server/src/controllers/search.controller.ts
+      - server/src/dtos/search.dto.ts
+      - server/src/repositories/search.repository.ts
+      - server/src/services/search.service.ts
+    notes: Immich search redesign (facets, locked-visibility guard LP-1) meets Gallery's V3 search hooks
   - id: openapi-generated
     risk: medium
     path_globs:

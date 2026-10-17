@@ -51,7 +51,12 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
   index is race-safe where a service check is not. Immich's person sharing stays dormant
   (`specs/2026-10-01-upstream-person-sharing-dormant-design.md`).
 - **The person files stay fork-owned.** Space people and pets run through `person.repository.ts` and `person.service.ts`, and so
-  does face identity; the upstream preflight lists Immich's changes to them every cycle.
+  does face identity; the upstream preflight lists Immich's changes to them every cycle. Their fork-only members moved
+  out (owner decision OD-8, 2026-10-16) and the files stay replay-owned: identity and merge, the face picker, admin face
+  reads, people statistics and suggestion scans to `GalleryPersonRepository`; the recognition identity helpers and the
+  shared-space reset to `FaceIdentityMaintenanceService`; the thumbnail access check to `gallery-people.service.ts`.
+  Recognition's face KNN runs Immich's `SearchRepository.searchFaces` (one user per cluster group under Option M) with
+  one hook, `excludeDeletedFaces`, because a soft-deleted face keeps its `face_search` row (INT-DUP-005, 2026-10-16).
 - **Favorites:** `asset_favorite` is the source of truth for every user, `asset.isFavorite` is the owner's projection.
   Gallery code never writes the column; Immich's owner-only write paths (upload, copy, duplicate resolve) do, and a
   reverse trigger mirrors them. Paths a non-owner reaches (space editors hold `AssetUpdate`) write the caller's overlay
@@ -59,15 +64,33 @@ Measured against Immich v3.3.1 (before on `main` at 2026-10-10, after at the #11
 - **Trims have their own endpoint** (`/assets/{id}/trim`) and table. Trim is not an `asset_edit` action, so Immich's
   edit code stays upstream text. Trims cut at keyframes (stream copy, no re-encode); the duration Gallery stores matches the file, and so
   does the one clients receive.
+  The trimmed encode, poster and thumbnails come from the fork job `AssetVideoTrimGenerate`
+  (`server/src/gallery/services/video-trim.service.ts`, a MediaService subclass using its protected
+  `generateImageThumbnails` and `syncFiles`); the trim endpoints queue it, and Immich's edit-thumbnail job hands it
+  every video. It sends `AssetEditReadyV2` like the edit job. The new JobName value appears in the OpenAPI `JobName`
+  enum, as `MemoryRuleGenerate` does.
 - **Search V3 is adopted** with four optional hooks on `AssetSearchScope`, each defaulting to Immich's behaviour.
   V3 follows Immich's trash rule and its `hasAlbums` reads `album_asset` only.
+- **Birthday memories are Immich's** (owner decision OD-3, 2026-10-16): `onMemoriesCreate` dispatches upstream's
+  `createBirthdayMemories` again, with the fork's on-this-day toggle as one `&&` in upstream's loop, and Gallery's
+  birthday rule is gone. Lost, as accepted: the birthday toggles, the rule budget and the cross-years fallback; a
+  pet with a birthday now gets a card, and birthdays in the first three days after the upgrade get none, because
+  upstream's cursor already passed them. Delivery follows upstream: `birthday` reaches every client on MemoriesV2,
+  MemoryToAssetsV2 and `GET /memories`, never on V1. The one Gallery exception is an app older than 5.8.0 (no
+  `x-gallery-app` header, User-Agent below 5.8.0, flagged `legacyGalleryApp` by `classifyClient` in
+  `src/gallery/utils/client-version.ts`), whose generated client cannot decode the type; `GET /memories` and its
+  statistics leave `birthday` out for it. In overlap reconciliation a `birthday` row is unmanaged: it claims its photos
+  from that day's on-this-day card and is never stripped. Rows the old rule wrote (`type = 'rule'`,
+  `ruleId = 'birthday'`) stay as they are: the rule only ever wrote days up to today, upstream's generator starts after
+  its cursor (today + 3), so the two never cover the same birthday, and retention removes the old rows.
 - **Unknown sync request types are ignored**, so stock apps from a newer Immich release keep syncing.
 - **Space links in a revert** follow Immich's rule: an album link survives only if its creator owns or edits the album.
 - **Spaces stay visible** in the Gallery app while the server version is unknown (0.0.0); they hide once a stock
   server is identified.
 - **No dead code:** upstream client files the fork had deleted stay deleted.
-- **Gallery does not re-enable `gallery-core` on boot** after a stock Immich trial (Immich never touches a plugin's
-  `enabled` flag); it logs a warning with the SQL instead.
+- **`gallery-core` is harmless to stock Immich** (OD-18): its WASM exports are no-ops that import only upstream's host
+  functions, and `GalleryWorkflowHostService.runStep` runs its steps in TypeScript from one hunk in upstream's
+  execute loop. Stock boots with the plugin enabled, and its Gallery steps do nothing there.
 
 ## Security fix found on the way: duplicate resolve
 
@@ -80,17 +103,26 @@ apply to Immich unchanged and can be offered upstream; Immich has not been conta
 
 ## What still diverges on purpose
 
-- **People:** the person repository and service (+1,095 and +608 lines against the tag), for the reasons above.
+- **People:** the person repository and service (+462 and +476 lines against the tag after OD-8), for the reasons above.
 - **Timeline filters:** `asset.repository.ts` and `utils/database.ts` hold the filter panel's rules in one shared
   timeline function that five queries use; restoring Immich's inline chain would repeat each rule.
 - **Older search fields:** `search.repository.ts` keeps the flat search endpoints' fork fields next to the V3 hooks,
   because released Gallery apps send them.
 - **Generated files** (OpenAPI spec, SDK, SQL docs) still conflict and are regenerated, not merged.
+- **Mobile timeline builders:** upstream's private builders in `timeline.repository.dart` take an optional
+  `extraJoins` (the remote and place buckets, the `joinLocal` remote asset list) and `extraWhere` (the album, place and
+  person builders), each defaulting to upstream's query, so `SharedSpaceTimelineRepository` (a `part` of that file)
+  calls them instead of copying them. Real joins rather than `isInQuery` keep `.watch()` reactive to the Space tables,
+  and a joined bucket counts distinct assets. The map route keeps its own builder: it widens upstream's owner predicate
+  with an OR, which a narrowing hook cannot express.
 - **Memory overlap reconciliation** (owner decision OD-5, 2026-10-15): rule memories outrank on-this-day memories, so
   `reconcileMemoryOverlap` strips assets from upstream `on_this_day` rows or deletes them, and `backfillMemoryOverlap`
   does the same to older rows. Stock clients receive only on-this-day memories, so they see fewer and smaller cards
   than Immich would make, and a stock server after a rollback keeps the reduced set. The alternative, a fork
   reservation table applied per client, touches the generator, search, four sync streams and audit synthesis.
+- **The memories union** (`memoryAccessibleTo`, `server/src/gallery/utils/memory-access.ts`): `GET /memories` lists
+  a memory through a hand-written owner/partner/Space union rather than `ownedOrSharedWithViewer`, because that helper
+  would admit archived Space assets and drop the offline-library filter.
 - **Fork facts in upstream rows.** Rule 1 holds for the schema, not for the data. Pets are `person` and `asset_face`
   rows, and their faces carry `sourceType = 'machine-learning'`, so a stock face re-detect deletes them (the
   switch-back guide warns against it during a trial). Also in upstream rows: `memory.type = 'rule'`,

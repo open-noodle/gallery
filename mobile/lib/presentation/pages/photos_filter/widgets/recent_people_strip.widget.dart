@@ -2,12 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/utils/person_thumbnail_url.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:immich_mobile/utils/image_url_builder.dart';
 
 /// Horizontal strip of the 7 most-recently-updated people. Tapping an avatar
 /// toggles that person in `photosFilterProvider.people` (matches Deep People

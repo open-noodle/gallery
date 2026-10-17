@@ -3,12 +3,11 @@
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { getAllGroups, searchUsers, type UserGroupResponseDto, type UserResponseDto } from '@immich/sdk';
-  import { FormModal, ListButton, Stack, Text } from '@immich/ui';
+  import { FormModal, ListButton, LoadingSpinner, Stack, Text } from '@immich/ui';
   import { sortBy } from 'lodash-es';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   type Props = {
     excludedUserIds: string[];

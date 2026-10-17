@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
+import { getViewerSpace, type ViewerSpace } from '$lib/gallery/viewer-space';
 
 const getAssetInfoMock = vi.fn();
 vi.mock('@immich/sdk', async (importOriginal) => {
@@ -19,12 +20,15 @@ vi.mock('$lib/components/shared-components/gallery-viewer/GalleryViewer.svelte',
 });
 
 // Spy on the props forwarded to AssetViewer. The component dynamic-imports asset-viewer.svelte,
-// so we mock the module and record each invocation's props on this array. Tests assert against it.
+// so we mock the module and record each invocation's props on this array, plus the viewer space
+// context the viewer reads. Tests assert against them.
 const assetViewerPropsCalls: Array<Record<string, unknown>> = [];
+const viewerSpaceCalls: ViewerSpace[] = [];
 vi.mock('$lib/components/asset-viewer/AssetViewer.svelte', () => {
   return {
     default: function MockAssetViewer(_node: unknown, props: Record<string, unknown>) {
       assetViewerPropsCalls.push(props);
+      viewerSpaceCalls.push(getViewerSpace()());
       return { destroy: () => {} };
     },
   };
@@ -48,6 +52,7 @@ describe('SpaceSearchResults', () => {
     getAssetInfoMock.mockReset();
     getAssetInfoMock.mockResolvedValue({ id: 'asset-1', originalFileName: 'photo1.jpg' } as AssetResponseDto);
     assetViewerPropsCalls.length = 0;
+    viewerSpaceCalls.length = 0;
   });
 
   it('should render search results through the gallery viewer', () => {
@@ -343,7 +348,7 @@ describe('SpaceSearchResults', () => {
 
     // #889 — the viewer opened from space search results has to know it is on a space surface,
     // or add-to-album offers personal albums the server cannot accept a non-owned photo into.
-    it('should forward the space capability to AssetViewer', async () => {
+    it('should hand the space scope to AssetViewer through the viewer space context', async () => {
       render(SpaceSearchResults, {
         props: {
           results: mockAssets,
@@ -362,8 +367,8 @@ describe('SpaceSearchResults', () => {
 
       await vi.waitFor(() => expect(assetViewerPropsCalls.length).toBeGreaterThan(0));
 
-      const props = assetViewerPropsCalls.at(-1)!;
-      expect(props.space).toEqual({ id: 'space-1', canWrite: true });
+      expect(viewerSpaceCalls.at(-1)).toEqual({ spaceId: 'space-1', space: { id: 'space-1', canWrite: true } });
+      expect(assetViewerPropsCalls.at(-1)).not.toHaveProperty('space');
     });
 
     it('should call getAssetInfo WITH spaceId when spaceId prop is set', async () => {

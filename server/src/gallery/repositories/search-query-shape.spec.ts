@@ -5,6 +5,7 @@ import type { DB } from 'src/schema/index.js';
 import { AssetOrder, AssetVisibility } from 'src/enum.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
+import { buildSearchSmartQueries } from 'src/gallery/utils/smart-search.js';
 import { SearchRepository } from 'src/repositories/search.repository.js';
 import { searchAssetBuilderWithLocalTaken } from 'src/utils/asset-filter.js';
 import { searchAssetBuilderLegacy } from 'src/utils/database.js';
@@ -20,13 +21,8 @@ const offlineKysely = () =>
     },
   });
 
-// Access the private helper via `any` — private methods are implementation
-// detail, but testing SQL shape is the whole point of this spec.
-const buildQueries = (
-  sut: SearchRepository,
-  pagination: { page: number; size: number },
-  options: Record<string, unknown>,
-) => (sut as any).buildSearchSmartQueries(offlineKysely(), pagination, options);
+const buildQueries = (pagination: { page: number; size: number }, options: Record<string, unknown>) =>
+  buildSearchSmartQueries(offlineKysely(), pagination, options as any);
 
 const compileAssetSearch = (options: Record<string, unknown>) =>
   searchAssetBuilderLegacy(offlineKysely(), options as any)
@@ -107,7 +103,6 @@ const countMatches = (compiledSql: string, pattern: RegExp): number => {
 };
 
 describe(SearchRepository.name, () => {
-  const sut = new SearchRepository(offlineKysely());
   const facets = new SmartFacetRepository(offlineKysely());
   const suggestions = new FilterSuggestionRepository(offlineKysely());
 
@@ -244,7 +239,6 @@ describe(SearchRepository.name, () => {
   describe('searchSmart query shape', () => {
     it('applies rating as an inclusive threshold when combined with other filters', () => {
       const { base } = buildQueries(
-        sut,
         { page: 1, size: 100 },
         {
           ...baseOptions,
@@ -259,7 +253,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('keeps unrated smart-search filters as IS NULL', () => {
-      const { base } = buildQueries(sut, { page: 1, size: 100 }, { ...baseOptions, rating: null });
+      const { base } = buildQueries({ page: 1, size: 100 }, { ...baseOptions, rating: null });
       const innerSql = base.compile().sql;
 
       expect(innerSql).toMatch(/rating"?\s+is\s+null/i);
@@ -269,7 +263,6 @@ describe(SearchRepository.name, () => {
 
     it('keeps the inner smart-search ORDER BY single-key when rating uses the CTE path', () => {
       const { base, outer } = buildQueries(
-        sut,
         { page: 1, size: 100 },
         { ...baseOptions, orderDirection: AssetOrder.Desc, rating: 4 },
       );
@@ -283,7 +276,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('non-CTE inner ORDER BY: exactly one expression AND primary key is smart_search.embedding', () => {
-      const { base } = buildQueries(sut, { page: 1, size: 100 }, baseOptions);
+      const { base } = buildQueries({ page: 1, size: 100 }, baseOptions);
       const innerSql = base.compile().sql;
 
       const keys = countOrderByExpressions(innerSql + ' limit', 'limit');
@@ -295,11 +288,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('CTE path orderDirection=desc: inner single key is embedding, outer has fileCreatedAt + candidates.id', () => {
-      const { base, outer } = buildQueries(
-        sut,
-        { page: 1, size: 100 },
-        { ...baseOptions, orderDirection: AssetOrder.Desc },
-      );
+      const { base, outer } = buildQueries({ page: 1, size: 100 }, { ...baseOptions, orderDirection: AssetOrder.Desc });
 
       // Inner query (subject to vchord): single-key ORDER BY on embedding.
       const innerSql = base.compile().sql;
@@ -319,11 +308,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('CTE path orderDirection=asc: inner single key is embedding, outer sorts ascending', () => {
-      const { base, outer } = buildQueries(
-        sut,
-        { page: 1, size: 100 },
-        { ...baseOptions, orderDirection: AssetOrder.Asc },
-      );
+      const { base, outer } = buildQueries({ page: 1, size: 100 }, { ...baseOptions, orderDirection: AssetOrder.Asc });
 
       const innerSql = base.compile().sql;
       expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
@@ -338,7 +323,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('no-maxDistance path: single key is embedding, no distance WHERE predicate', () => {
-      const { base } = buildQueries(sut, { page: 1, size: 100 }, { ...baseOptions, maxDistance: undefined });
+      const { base } = buildQueries({ page: 1, size: 100 }, { ...baseOptions, maxDistance: undefined });
       const innerSql = base.compile().sql;
 
       expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
@@ -351,7 +336,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('personIds path uses correlated EXISTS instead of joining grouped asset_face rows', () => {
-      const { base } = buildQueries(sut, { page: 1, size: 100 }, { ...baseOptions, personIds: ['person-1'] });
+      const { base } = buildQueries({ page: 1, size: 100 }, { ...baseOptions, personIds: ['person-1'] });
       const innerSql = base.compile().sql;
 
       expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
@@ -362,11 +347,7 @@ describe(SearchRepository.name, () => {
     });
 
     it('personIds all-match path emits one correlated EXISTS per person', () => {
-      const { base } = buildQueries(
-        sut,
-        { page: 1, size: 100 },
-        { ...baseOptions, personIds: ['person-1', 'person-2'] },
-      );
+      const { base } = buildQueries({ page: 1, size: 100 }, { ...baseOptions, personIds: ['person-1', 'person-2'] });
       const innerSql = base.compile().sql;
 
       expect(countMatches(innerSql, /exists\s*\(select\b[\s\S]+?from\s+"asset_face"/gi)).toBe(2);
@@ -375,7 +356,6 @@ describe(SearchRepository.name, () => {
 
     it('personIds any-match path uses a single correlated EXISTS with any(uuid[])', () => {
       const { base } = buildQueries(
-        sut,
         { page: 1, size: 100 },
         { ...baseOptions, personIds: ['person-1', 'person-2'], personMatchAny: true },
       );
@@ -387,7 +367,6 @@ describe(SearchRepository.name, () => {
 
     it('identityIds path filters through face_identity_face with correlated EXISTS', () => {
       const { base } = buildQueries(
-        sut,
         { page: 1, size: 100 },
         { ...baseOptions, identityIds: ['00000000-0000-0000-0000-000000000001'] },
       );
@@ -859,7 +838,7 @@ describe(SearchRepository.name, () => {
     // The map and metadata search route text filters through ILIKE. Without escaping, a
     // filename filter of `IMG_0001` treats `_` as a single-char wildcard (matching
     // `IMG-0001` too) while the time-bucket/timeline path — which DOES escape
-    // (asset.repository.ts) — treats it literally. Same divergence for `%`.
+    // (gallery/utils/time-bucket-filter.ts) — treats it literally. Same divergence for `%`.
     const ESCAPE_CLAUSE = String.raw`escape '\'`;
 
     it('escapes wildcards in the originalFileName filter and pairs them with an ESCAPE clause', () => {
@@ -897,7 +876,7 @@ describe(SearchRepository.name, () => {
     });
   });
 
-  // #763 E10 — sibling of the withTimeBucketAssetFilters block in asset.repository.spec.ts, for
+  // #763 E10 — sibling of the withTimeBucketAssetFilters block in time-bucket-filter.spec.ts, for
   // the search builder. `asset_favorite` rows outlive access loss by design (spec §5.2), so an
   // `isFavorite` search is only safe because the favorite predicate is ANDed with a scope
   // recomputed from live membership: the timelineSpaceIds arm while the caller has member-spaces,

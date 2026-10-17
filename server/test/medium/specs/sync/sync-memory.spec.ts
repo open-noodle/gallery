@@ -49,23 +49,49 @@ describe(SyncEntityType.MemoryV1, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.MemoriesV1]);
   });
 
-  it('should not sync a birthday memory to a fork-aware client, and still complete', async () => {
+  // OD-3: each client class gets the memory types, and the photo links of those types, that it can decode. Upstream
+  // keeps `birthday` off V1; `rule` is Gallery's and reaches fork-aware clients (those requesting SharedSpacesV1) only.
+  it.each([
+    ['a stock client on V1', [SyncRequestType.MemoriesV1, SyncRequestType.MemoryToAssetsV1], ['on_this_day']],
+    [
+      'a stock client on V2',
+      [SyncRequestType.MemoriesV2, SyncRequestType.MemoryToAssetsV2],
+      ['birthday', 'on_this_day'],
+    ],
+    [
+      'a Gallery client on V1',
+      [SyncRequestType.MemoriesV1, SyncRequestType.MemoryToAssetsV1, SyncRequestType.SharedSpacesV1],
+      ['on_this_day', 'rule'],
+    ],
+    [
+      'a Gallery client on V2',
+      [SyncRequestType.MemoriesV2, SyncRequestType.MemoryToAssetsV2, SyncRequestType.SharedSpacesV1],
+      ['birthday', 'on_this_day', 'rule'],
+    ],
+  ])('should sync %s only the memory types it can decode, and still complete', async (_, types, expected) => {
     const { auth, user, ctx } = await setup();
-    const { memory } = await ctx.newMemory({ ownerId: user.id });
-    await ctx.newMemory({
-      ownerId: user.id,
-      type: MemoryType.Birthday,
-      data: { personId: 'person-1', personName: 'Alice', year: 1990 },
-    });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const memoryTypes = new Map<string, string>();
+    for (const dto of [
+      { type: MemoryType.OnThisDay, data: { year: 2020 } },
+      { type: MemoryType.Rule, data: { ruleId: 'season_recap', dedupeKey: 'k' } },
+      { type: MemoryType.Birthday, data: { personId: 'person-1', personName: 'Alice', year: 1990 } },
+    ]) {
+      const { memory } = await ctx.newMemory({ ownerId: user.id, ...dto });
+      await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+      memoryTypes.set(memory.id, dto.type);
+    }
 
-    const types = [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1];
-    const response = await ctx.syncStream(auth, types);
-    expect(response).toEqual([
-      expect.objectContaining({ type: SyncEntityType.MemoryV1, data: expect.objectContaining({ id: memory.id }) }),
-      expect.objectContaining({ type: SyncEntityType.SyncCompleteV1 }),
-    ]);
+    const response = (await ctx.syncStream(auth, types)) as { type: string; data: Record<string, string> }[];
+    const sent = (entityTypes: SyncEntityType[], key: string) =>
+      response
+        .filter(({ type }) => entityTypes.includes(type as SyncEntityType))
+        .map(({ data }) => memoryTypes.get(data[key]) ?? 'unknown')
+        .toSorted((a, b) => a.localeCompare(b));
+    expect(sent([SyncEntityType.MemoryV1, SyncEntityType.MemoryV2], 'id')).toEqual(expected);
+    expect(sent([SyncEntityType.MemoryToAssetV1, SyncEntityType.MemoryToAssetV2], 'memoryId')).toEqual(expected);
 
-    await ctx.syncAckAll(auth, response);
+    await ctx.syncAckAll(auth, response as never);
     await ctx.assertSyncIsComplete(auth, types);
   });
 

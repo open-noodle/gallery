@@ -2,6 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { HistoryBuilder } from 'src/decorators.js';
 import { JobNameSchema, QueueCommandSchema, QueueJobStatusSchema, QueueNameSchema } from 'src/enum.js';
+import { GalleryQueueResponseExtension } from 'src/gallery/dtos/queue.dto.js';
 
 const QueueNameParamSchema = z
   .object({
@@ -58,22 +59,12 @@ export const QueueStatisticsSchema = z
   })
   .meta({ id: 'QueueStatisticsDto' });
 
-const QueueJobTypeCountsSchema = z
-  .object({
-    name: JobNameSchema,
-    active: z.int().describe('Number of sampled active jobs with this name'),
-    waiting: z.int().describe('Number of sampled waiting jobs with this name'),
-    delayed: z.int().describe('Number of sampled delayed jobs with this name'),
-    paused: z.int().describe('Number of sampled paused jobs with this name'),
-  })
-  .meta({ id: 'QueueJobTypeCountsDto' });
-
 const QueueResponseSchema = z
   .object({
     name: QueueNameSchema,
     isPaused: z.boolean().describe('Whether the queue is paused'),
     statistics: QueueStatisticsSchema,
-    jobTypes: z.array(QueueJobTypeCountsSchema).optional().describe('Sampled job type counts for display purposes'),
+    ...GalleryQueueResponseExtension,
   })
   .meta({ id: 'QueueResponseDto' });
 
@@ -83,6 +74,7 @@ export class QueueUpdateDto extends createZodDto(QueueUpdateSchema) {}
 export class QueueDeleteDto extends createZodDto(QueueDeleteSchema) {}
 export class QueueJobSearchDto extends createZodDto(QueueJobSearchSchema) {}
 export class QueueJobResponseDto extends createZodDto(QueueJobResponseSchema) {}
-export class QueueJobTypeCountsDto extends createZodDto(QueueJobTypeCountsSchema) {}
 export class QueueStatisticsDto extends createZodDto(QueueStatisticsSchema) {}
 export class QueueResponseDto extends createZodDto(QueueResponseSchema) {}
+
+export * from 'src/gallery/dtos/queue.dto.js';

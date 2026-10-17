@@ -3,12 +3,8 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
   import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-  import {
-    buildSpaceAlbumGroups,
-    getSelectedSpaceAlbumGroupOption,
-    isSpaceAlbumGroupCollapsed,
-    toggleSpaceAlbumGroupCollapsing,
-  } from '$lib/utils/space-album-grouping';
+  import { buildSpaceAlbumGroups, getSelectedSpaceAlbumGroupOption } from '$lib/utils/space-album-grouping';
+  import { isAlbumGroupCollapsed, toggleAlbumGroupCollapsing } from '$lib/utils/album-utils';
   import { sortSpaceAlbums } from '$lib/utils/space-album-sort';
   import {
     buildFolderSummaries,
@@ -243,12 +239,12 @@
     {#if levelAlbums.length > 0}
       {#if isGrouped}
         {#each groups as group (group.id)}
-          {@const collapsed = isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
+          {@const collapsed = isAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}
           {@const iconRotation = collapsed ? 'rotate-0' : 'rotate-90'}
           <div class="grid">
             <button
               type="button"
-              onclick={() => toggleSpaceAlbumGroupCollapsing(group.id)}
+              onclick={() => toggleAlbumGroupCollapsing(group.id, spaceAlbumViewSettings)}
               class="mt-2 w-full cursor-pointer rounded-md py-2 pe-2 text-start transition-colors hover:bg-subtle hover:text-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray"
               aria-expanded={!collapsed}
               data-testid="space-album-group-{group.id}"

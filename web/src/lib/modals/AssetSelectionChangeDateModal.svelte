@@ -4,7 +4,7 @@
   import DurationInput from '$lib/elements/DurationInput.svelte';
   import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
   import { getPreferredTimeZone, getTimezones, toIsoDate, type ZoneOption } from '$lib/modals/timezone-utils';
-  import { getEditableAssetsWithWarning } from '$lib/utils/asset-utils';
+  import { getEditableAssetsWithWarning } from '$lib/gallery/utils/editable-assets';
   import { handleError } from '$lib/utils/handle-error';
   import { updateAssets } from '@immich/sdk';
   import { Field, FormModal, Label, Switch } from '@immich/ui';

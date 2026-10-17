@@ -28,6 +28,7 @@
   import { AlbumPageViewMode } from '$lib/constants';
   import { createAlbumPickerFilters, createAlbumTimeline } from '$lib/gallery/filtered-timeline/album-timeline';
   import FilteredTimeline from '$lib/gallery/filtered-timeline/FilteredTimeline.svelte';
+  import LinkAlbumToSpaceMenuOption from '$lib/gallery/LinkAlbumToSpaceMenuOption.svelte';
   import { activityManager } from '$lib/managers/activity-manager.svelte';
   import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
@@ -42,7 +43,6 @@
     getAlbumActions,
     getAlbumAssetsActions,
     handleDeleteAlbum,
-    handleLinkAlbumToSpace,
     isAlbumEditor,
     isAlbumOwner,
   } from '$lib/services/album.service';
@@ -64,7 +64,6 @@
     mdiImageOutline,
     mdiImagePlusOutline,
     mdiLink,
-    mdiLinkVariantPlus,
     mdiPlus,
     mdiPresentationPlay,
   } from '@mdi/js';
@@ -519,7 +518,7 @@
 
     {#if assetMultiSelectManager.selectionActive}
       <AssetSelectControlBar>
-        {@const Actions = getAssetBulkActions($t, { album })}
+        {@const Actions = getAssetBulkActions($t, album)}
         <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
         <ActionButton action={Actions.CreateSharedLink} />
         <SelectAllAssets
@@ -624,17 +623,7 @@
                   />
                 {/if}
 
-                {#if isOwned}
-                  <MenuOption
-                    icon={mdiLinkVariantPlus}
-                    text={$t('link_album_to_space')}
-                    onClick={async () => {
-                      if (await handleLinkAlbumToSpace(album)) {
-                        await refreshAlbum();
-                      }
-                    }}
-                  />
-                {/if}
+                <LinkAlbumToSpaceMenuOption {album} onLinked={refreshAlbum} />
                 <ActionMenuItem action={Actions.Delete} />
                 <ActionMenuItem action={Actions.Leave} />
               </ButtonContextMenu>

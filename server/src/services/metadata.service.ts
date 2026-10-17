@@ -4,12 +4,9 @@ import { Insertable } from 'kysely';
 import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration, FixedOffsetZone } from 'luxon';
 import { Stats } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join, parse } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf } from 'src/types.js';
-import { isDiskPath } from 'src/backends/disk-storage.backend.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { Asset, AssetFile } from 'src/database.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import {
@@ -24,8 +21,8 @@ import {
   JobStatus,
   QueueName,
   SourceType,
-  StorageFolder,
 } from 'src/enum.js';
+import { getMotionVideoPath } from 'src/gallery/utils/storage-keys.js';
 import { ReverseGeocodeResult } from 'src/repositories/map.repository.js';
 import { ImmichTags } from 'src/repositories/metadata.repository.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -471,8 +468,7 @@ export class MetadataService extends BaseService {
 
     let sidecarPath = null;
     for (const candidate of this.getSidecarCandidates(asset)) {
-      const backend = await this.backendMedia.backendFor(candidate);
-      const isExists = await backend.exists(candidate, { readable: true });
+      const isExists = await this.backendMedia.exists(candidate, { readable: true });
       if (!isExists) {
         continue;
       }
@@ -557,38 +553,7 @@ export class MetadataService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    if (isDiskPath(sidecarPath)) {
-      await this.metadataRepository.writeTags(sidecarPath, exif);
-    } else {
-      // S3 mode: work against a local temp file, then always upload the result to S3.
-      // If an existing sidecar is in S3, download it first so we preserve its contents;
-      // otherwise exiftool will create a fresh XMP at the temp path.
-      const backend = await this.backendMedia.backendFor(sidecarPath);
-      const sidecarExists = await backend.exists(sidecarPath);
-      let localSidecar: { localPath: string; cleanup: () => Promise<void> };
-      if (sidecarExists) {
-        localSidecar = await this.backendMedia.ensureLocalFile(sidecarPath);
-      } else {
-        const tempPath = join(tmpdir(), `immich-sidecar-${this.cryptoRepository.randomUUID()}.xmp`);
-        localSidecar = {
-          localPath: tempPath,
-          cleanup: async () => {
-            try {
-              await this.storageRepository.unlink(tempPath);
-            } catch {
-              // ignore — file may never have been created if writeTags failed
-            }
-          },
-        };
-      }
-      try {
-        await this.metadataRepository.writeTags(localSidecar.localPath, exif);
-        const stream = this.storageRepository.createPlainReadStream(localSidecar.localPath);
-        await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
-      } finally {
-        await localSidecar.cleanup();
-      }
-    }
+    await this.backendMedia.writeSidecar(sidecarPath, (path) => this.metadataRepository.writeTags(path, exif));
 
     if (asset.files.length === 0) {
       await this.assetRepository.upsertFile({ assetId: id, type: AssetFileType.Sidecar, path: sidecarPath });
@@ -711,7 +676,7 @@ export class MetadataService extends BaseService {
         ? String(tag)
         : tag
             .split('|')
-            .map((t) => t.replaceAll('/', '|'))
+            .map((tag) => tag.replaceAll('/', '|'))
             .join('/'),
     );
 
@@ -774,7 +739,6 @@ export class MetadataService extends BaseService {
     this.logger.debug(`Starting motion photo video extraction for asset ${asset.id}: ${asset.originalPath}`);
 
     const effectiveOriginalPath = localOriginal || asset.originalPath;
-    const isS3Asset = !isDiskPath(asset.originalPath);
 
     try {
       const position = stats.size - length - padding;
@@ -814,9 +778,6 @@ export class MetadataService extends BaseService {
       if (!motionAsset) {
         try {
           const motionAssetId = this.cryptoRepository.randomUUID();
-          const motionPath = isS3Asset
-            ? StorageCore.getRelativeNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${motionAssetId}-MP.mp4`)
-            : StorageCore.getAndroidMotionPath(asset, motionAssetId);
           motionAsset = await this.assetRepository.create({
             id: motionAssetId,
             libraryId: asset.libraryId,
@@ -827,7 +788,7 @@ export class MetadataService extends BaseService {
             checksum,
             checksumAlgorithm: ChecksumAlgorithm.sha1File,
             ownerId: asset.ownerId,
-            originalPath: motionPath,
+            originalPath: getMotionVideoPath(asset, motionAssetId),
             originalFileName: `${parse(asset.originalFileName).name}.mp4`,
             visibility: AssetVisibility.Hidden,
           });
@@ -893,29 +854,13 @@ export class MetadataService extends BaseService {
         }
       }
 
-      // write extracted motion video to storage
-      if (isDiskPath(motionAsset.originalPath)) {
-        // Disk mode
-        const existsOnDisk = await this.storageRepository.checkFileExists(motionAsset.originalPath);
-        if (!existsOnDisk) {
-          this.storageCore.ensureFolders(motionAsset.originalPath);
-          await this.storageRepository.createFile(motionAsset.originalPath, video);
-          this.logger.log(`Wrote motion photo video to ${motionAsset.originalPath}`);
+      // write extracted motion video to disk, especially if the encoded-video folder has been deleted
+      const isWritten = await this.backendMedia.writeFileIfMissing(motionAsset.originalPath, video, 'video/mp4');
+      if (isWritten) {
+        this.logger.log(`Wrote motion photo video to ${motionAsset.originalPath}`);
 
-          await this.handleMetadataExtraction({ id: motionAsset.id });
-          await this.jobRepository.queue({ name: JobName.AssetEncodeVideo, data: { id: motionAsset.id } });
-        }
-      } else {
-        // S3 mode — upload via backend
-        const backend = await this.backendMedia.backendFor(motionAsset.originalPath);
-        const exists = await backend.exists(motionAsset.originalPath);
-        if (!exists) {
-          await backend.put(motionAsset.originalPath, video, { contentType: 'video/mp4' });
-          this.logger.log(`Uploaded motion photo video to ${motionAsset.originalPath}`);
-
-          await this.handleMetadataExtraction({ id: motionAsset.id });
-          await this.jobRepository.queue({ name: JobName.AssetEncodeVideo, data: { id: motionAsset.id } });
-        }
+        await this.handleMetadataExtraction({ id: motionAsset.id });
+        await this.jobRepository.queue({ name: JobName.AssetEncodeVideo, data: { id: motionAsset.id } });
       }
 
       this.logger.debug(`Finished motion photo video extraction for asset ${asset.id}: ${asset.originalPath}`);

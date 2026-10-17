@@ -47,7 +47,6 @@ void main() {
       expect(PhotosTimelineAppBar.actions.first, isA<TimelineGroupingSelector>());
       expect((PhotosTimelineAppBar.actions.first as TimelineGroupingSelector).compact, isTrue);
       expect(PhotosTimelineAppBar.actions.whereType<SortIconButton>(), isEmpty);
-      expect(MainTimelinePage.timelineOverviewControlsEnabled, isTrue);
     });
 
     testWidgets('app bar renders the compact grouping selector, without sort or a filter icon', (tester) async {

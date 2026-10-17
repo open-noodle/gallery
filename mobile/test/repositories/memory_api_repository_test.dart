@@ -101,6 +101,7 @@ void main() {
     apiClient = api.ApiClient(basePath: 'http://gallery.test/api');
     final apiService = MockApiService();
     when(() => apiService.apiClient).thenReturn(apiClient);
+    when(() => apiService.memoriesApi).thenReturn(api.MemoriesApi(apiClient));
     sut = MemoryApiRepository(apiService);
   });
 

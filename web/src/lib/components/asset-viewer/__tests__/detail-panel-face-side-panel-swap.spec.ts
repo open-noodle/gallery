@@ -2,6 +2,7 @@ import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderInViewerSpace } from '$lib/gallery/viewer-space.test-helpers';
 import { renderWithTooltips } from '$tests/helpers';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import DetailPanel from '../DetailPanel.svelte';
@@ -138,7 +139,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
       type: AssetTypeEnum.Image,
     });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     expect(screen.getByTestId('space-person-side-panel-stub')).toBeInTheDocument();
     expect(screen.queryByTestId('person-side-panel-stub')).toBeNull();
@@ -151,7 +152,7 @@ describe('DetailPanel face side-panel wiring (Slice 8 gap closure)', () => {
   it('renders PersonSidePanel and NOT SpacePersonSidePanel for the asset owner, even inside a space', () => {
     const asset = assetFactory.build({ id: 'asset-1', ownerId: 'owner-1', canEdit: true, type: AssetTypeEnum.Image });
 
-    renderWithTooltips(DetailPanel, { asset, currentAlbum: null, spaceId: 'space-1' });
+    renderInViewerSpace(DetailPanel, { asset, currentAlbum: null }, { spaceId: 'space-1' });
 
     expect(screen.getByTestId('person-side-panel-stub')).toBeInTheDocument();
     expect(screen.queryByTestId('space-person-side-panel-stub')).toBeNull();

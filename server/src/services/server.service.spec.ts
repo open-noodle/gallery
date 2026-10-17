@@ -199,7 +199,6 @@ describe(ServerService.name, () => {
         minFaces: 3,
         availableMemoryTypes: [
           'on_this_day',
-          'birthday',
           'recent_trip',
           'month_recap',
           'favorites_throwback',
@@ -240,7 +239,6 @@ describe(ServerService.name, () => {
 
       expect(result.availableMemoryTypes).toEqual([
         'on_this_day',
-        'birthday',
         'month_recap',
         'favorites_throwback',
         'on_this_day_place',

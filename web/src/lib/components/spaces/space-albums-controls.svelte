@@ -2,13 +2,12 @@
   import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
   import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
   import {
-    collapseAllSpaceAlbumGroups,
-    expandAllSpaceAlbumGroups,
     findSpaceGroupOptionMetadata,
     getSelectedSpaceAlbumGroupOption,
     spaceGroupOptionsMetadata,
     type SpaceAlbumGroupOptionMetadata,
   } from '$lib/utils/space-album-grouping';
+  import { collapseAllAlbumGroups, expandAllAlbumGroups } from '$lib/utils/album-utils';
   import {
     type SpaceAlbumSortByValue,
     type SpaceAlbumSortOptionMetadata,
@@ -222,7 +221,7 @@
         aria-label={$t('expand_all')}
         class="flex items-center rounded-lg p-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
         data-testid="space-albums-expand-all"
-        onclick={() => expandAllSpaceAlbumGroups()}
+        onclick={() => expandAllAlbumGroups(spaceAlbumViewSettings)}
       >
         <Icon icon={mdiUnfoldMoreHorizontal} size="18" />
       </button>
@@ -232,7 +231,7 @@
         aria-label={$t('collapse_all')}
         class="flex items-center rounded-lg p-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
         data-testid="space-albums-collapse-all"
-        onclick={() => collapseAllSpaceAlbumGroups(groupIds)}
+        onclick={() => collapseAllAlbumGroups(groupIds, spaceAlbumViewSettings)}
       >
         <Icon icon={mdiUnfoldLessHorizontal} size="18" />
       </button>

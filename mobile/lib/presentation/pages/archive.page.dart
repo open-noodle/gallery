@@ -12,9 +12,6 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 class ArchivePage extends StatelessWidget {
   const ArchivePage({super.key});
 
-  // ignore: unused-code
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   Widget build(BuildContext context) {
     return TimelineRouteScope(

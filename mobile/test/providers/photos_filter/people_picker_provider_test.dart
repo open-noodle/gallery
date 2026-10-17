@@ -11,7 +11,7 @@ Person _d(String id, String name, {int? numberOfAssets, String? spaceId}) =>
 FilterPerson _p(String id, String name) => FilterPerson(id: id, name: name);
 
 // peoplePickerAllProvider sources driftGetAllPeopleWithSharedSpacesProvider (not the
-// owner-scoped-only getAllPeopleProvider) so the picker includes shared-space people,
+// owner-scoped-only Store.people.all()) so the picker includes shared-space people,
 // mirroring the web People picker. See slice 3 plan.
 ProviderContainer _containerWith(List<Person> people) {
   return ProviderContainer(

@@ -6,6 +6,7 @@ import { MapAsset, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { DuplicateResolveDto, DuplicateResolveGroupDto, DuplicateResponseDto } from 'src/dtos/duplicate.dto.js';
 import { AssetStatus, AssetVisibility, JobName, JobStatus, Permission, QueueName } from 'src/enum.js';
+import { afterDuplicateGroupResolve, beforeDuplicateGroupResolve } from 'src/gallery/utils/duplicate-resolve.js';
 import { AssetDuplicateResult } from 'src/repositories/search.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { suggestDuplicateKeepAssetIds } from 'src/utils/duplicate.js';
@@ -155,54 +156,16 @@ export class DuplicateService extends BaseService {
       }
     }
 
-    // Gallery: a group can hold another owner's asset (joined through PUT /assets before it checked the group). Every
-    // write below lands on the keepers, and the merged data comes from them and the trashed copies checked above, so
-    // all must be the caller's own. AssetDelete is the owner-only arm; AssetUpdate also admits a space editor, whose
-    // favorite and visibility would land on the owner's columns.
-    const ownedKeepIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: idsToKeep });
-    if (ownedKeepIds.size !== new Set(idsToKeep).size) {
-      return {
-        id: duplicateId,
-        success: false,
-        error: BulkIdErrorReason.NO_PERMISSION,
-        errorMessage: 'No permission to update assets',
-      };
-    }
-
-    // Sync shared space membership: add the keeper(s) to any space the group's
-    // assets were in, provided the auth user has Editor+ role there. Placed
-    // before any other mutation so partial-failure blast radius is minimal —
-    // if addAssets throws, nothing else has been written yet.
-    //
-    // Caveat: if addAssets succeeds but queueAll throws, the keeper is in the
-    // space but no SharedSpaceFaceMatch jobs were queued. The outer try/catch
-    // reports the group as failed, so the user retries — addAssets is
-    // idempotent and queueAll runs again. Self-healing on retry.
-    //
-    // Runs for every keeper (idsToKeep.length > 0), independent of the
-    // metadata-merge gate below — space membership must follow the keeper
-    // regardless of how many assets survive the group.
-    if (idsToKeep.length > 0) {
-      const editableSpaceIds = await this.sharedSpaceRepository.getEditableByAssetIds(auth.user.id, groupAssetIds);
-
-      if (editableSpaceIds.size > 0) {
-        const spaceIds = [...editableSpaceIds];
-        await this.sharedSpaceRepository.addAssets(
-          spaceIds.flatMap((spaceId) => idsToKeep.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id }))),
-        );
-
-        // Queue face match jobs unconditionally — handleSharedSpaceFaceMatch
-        // short-circuits when space.faceRecognitionEnabled is false, so a
-        // wasted queue entry is cheaper than a pre-filter query.
-        await this.jobRepository.queueAll(
-          spaceIds.flatMap((spaceId) =>
-            idsToKeep.map((assetId) => ({
-              name: JobName.SharedSpaceFaceMatch,
-              data: { spaceId, assetId },
-            })),
-          ),
-        );
-      }
+    const galleryDeps = {
+      access: this.accessRepository,
+      job: this.jobRepository,
+      logger: this.logger,
+      gallery: this.galleryRepositories,
+    };
+    const galleryGroup = { auth, duplicateId, groupAssetIds, idsToKeep, idsToTrash };
+    const galleryFailure = await beforeDuplicateGroupResolve(galleryDeps, galleryGroup);
+    if (galleryFailure) {
+      return galleryFailure;
     }
 
     // Only merge metadata into the keeper when exactly one asset can absorb trashed duplicates.
@@ -213,10 +176,6 @@ export class DuplicateService extends BaseService {
         duplicateGroup.assets,
         assetAlbumMap,
       );
-
-      // Carries other users' favorites (space members, partners) of the trashed copies to the keeper; the owner's
-      // comes through upstream's assetUpdate.isFavorite below.
-      await this.assetFavoriteRepository.mergeOnto(idsToKeep[0], idsToTrash);
 
       if (mergedAlbumIds.length > 0) {
         const allowedAlbumIds = await this.checkAccess({
@@ -287,25 +246,7 @@ export class DuplicateService extends BaseService {
       });
     }
 
-    // Create checksum tombstones so the mobile app won't re-upload trashed duplicates
-    if (idsToTrash.length > 0 && idsToKeep.length > 0) {
-      try {
-        const trashedChecksums = await this.assetRepository.getChecksumsByIds(idsToTrash);
-        const keepAssetId = idsToKeep[0];
-        await this.duplicateRepository.createChecksumTombstones(
-          trashedChecksums.map(({ checksum }) => ({
-            assetId: keepAssetId,
-            ownerId: auth.user.id,
-            checksum,
-          })),
-        );
-      } catch (error: Error | any) {
-        this.logger.error(
-          `Failed to create checksum tombstones for duplicate group ${duplicateId}: ${error}`,
-          error?.stack,
-        );
-      }
-    }
+    await afterDuplicateGroupResolve(galleryDeps, galleryGroup);
 
     return { id: duplicateId, success: true };
   }
@@ -325,14 +266,11 @@ export class DuplicateService extends BaseService {
 
     response.assetUpdate.isFavorite = assets.some((asset) => asset.isFavorite);
 
-    // R1: `assets` always comes from duplicateRepository.get, which applies withDefaultVisibility
-    // (Archive+Timeline only) — a duplicate group/keeper can never contain a Locked or Hidden asset, so
-    // there is no branch for either here. Follow-up (out of scope for this cleanup): route the
-    // visibility write through the shared applyVisibilityTransitionSideEffects-style transition helper
-    // instead of a raw assetRepository.updateAll to close the TOCTOU window between this read and the
-    // write below.
-    const visibilityOrder = [AssetVisibility.Archive, AssetVisibility.Timeline];
-    const visibility = visibilityOrder.find((level) => assets.some((asset) => asset.visibility === level));
+    const visibilityOrder = [AssetVisibility.Locked, AssetVisibility.Archive, AssetVisibility.Timeline];
+    let visibility = visibilityOrder.find((level) => assets.some((asset) => asset.visibility === level));
+    if (!visibility && assets.some((asset) => asset.visibility === AssetVisibility.Hidden)) {
+      visibility = AssetVisibility.Hidden;
+    }
     if (visibility) {
       response.assetUpdate.visibility = visibility;
     }

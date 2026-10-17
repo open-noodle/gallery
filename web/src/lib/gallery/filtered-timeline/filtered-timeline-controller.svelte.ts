@@ -4,7 +4,8 @@ import {
   type AssetVisibility,
   type SmartSearchFacetsResponseDto,
 } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
+import { modalManager, type ActionItem } from '@immich/ui';
+import { mapValues } from 'lodash-es';
 import { untrack } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { get } from 'svelte/store';
@@ -19,13 +20,13 @@ import {
   type FilterState,
   type FilterSuggestionsResponse,
 } from '$lib/components/filter-panel/filter-panel';
+import { getTimelineTopVisibleAnchor } from '$lib/gallery/timeline/timeline-anchor';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import {
   registerSelectionContext,
   type RegisterSelectionContextOptions,
 } from '$lib/managers/command-context-manager.svelte';
 import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
-import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
 import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import type {
   TimelineAsset,
@@ -36,6 +37,7 @@ import type {
 import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
 import type { SearchTerms } from '$lib/services/search.service';
 import { lang } from '$lib/stores/preferences.store';
+import { isEnabled } from '$lib/utils';
 import { withNameCapture } from '$lib/utils/filter-name-capture';
 import { resolveFilterNames } from '$lib/utils/filter-name-resolution';
 import { buildFilterStateUrl, isFilterStateUrlUnchanged, withoutAtParam } from '$lib/utils/filter-target';
@@ -334,6 +336,10 @@ export class FilteredTimelineController {
   };
 
   // --- bulk actions: the timeline is unmounted while results show (#908) ------------------------
+
+  /** Stack/unstack act on the browse timeline only: hidden while search results show. */
+  browseOnly = <T extends Record<string, ActionItem>>(actions: T) =>
+    mapValues(actions, (action) => ({ ...action, $if: () => !this.showSearchResults && isEnabled(action) })) as T;
 
   onFavorite = (ids: string[], isFavorite: boolean) => {
     if (this.showSearchResults) {

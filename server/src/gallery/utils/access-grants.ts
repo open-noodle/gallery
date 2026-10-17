@@ -1,6 +1,8 @@
+import { BadRequestException } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { AlbumUserRole, Permission } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
+import { checkAccess } from 'src/utils/access.js';
 import { setDifference, setUnion } from 'src/utils/set.js';
 
 type Grant = (access: AccessRepository, userId: string, ids: Set<string>) => Promise<Set<string>>;
@@ -20,13 +22,12 @@ export const galleryAccessGrants: Partial<Record<Permission, Grant>> = {
   [Permission.AssetView]: spaceAssetRead,
   [Permission.AssetDownload]: spaceAssetRead,
 
-  // #734: asset edits (rotate/crop/trim and revert) follow AssetUpdate: owner OR space Owner/Editor over a member's
-  // asset. AssetEditGet is included for consistency, not because a call site needs it today:
+  // #734: asset edits (rotate/crop/trim and revert): owner OR space Owner/Editor over a member's asset, the same rule
+  // as requireAssetEditAccess below. AssetEditGet is included for consistency, not because a call site needs it today:
   // AssetService.getAssetEdits gates per-asset on AssetRead (which already admits space members), and AssetEditGet
   // currently reaches only the controller's route-scope decorator, never checkAccess. Leaving it owner-only would make
   // it narrower than the read path it names, so a future call site routed through it would silently disagree with
   // Create and Delete.
-  [Permission.AssetUpdate]: spaceAssetEdit,
   [Permission.AssetEditGet]: spaceAssetEdit,
   [Permission.AssetEditCreate]: spaceAssetEdit,
   [Permission.AssetEditDelete]: spaceAssetEdit,
@@ -46,6 +47,28 @@ export const withGalleryGrants = async (
 ): Promise<Set<string>> => {
   const grant = galleryAccessGrants[permission];
   return grant ? setUnion(granted, await grant(access, auth.user.id, setDifference(ids, granted))) : granted;
+};
+
+/**
+ * #734: the asset edits a space Owner/Editor may make on a member's asset (specs/2026-08-14-space-editor-asset-
+ * permissions-design.md): Permission.AssetUpdate (owner only, Immich's meaning), then the space edit grant over the
+ * rest. Called at each edit site the design grants, so a new upstream AssetUpdate call site stays owner-only.
+ */
+export const checkAssetEditAccess = async (
+  access: AccessRepository,
+  { auth, ids }: { auth: AuthDto; ids: string[] },
+): Promise<Set<string>> => {
+  const owned = await checkAccess(access, { auth, permission: Permission.AssetUpdate, ids });
+  return auth.sharedLink
+    ? owned
+    : setUnion(owned, await spaceAssetEdit(access, auth.user.id, setDifference(new Set(ids), owned)));
+};
+
+export const requireAssetEditAccess = async (access: AccessRepository, request: { auth: AuthDto; ids: string[] }) => {
+  const allowed = await checkAssetEditAccess(access, request);
+  if (request.ids.some((id) => !allowed.has(id))) {
+    throw new BadRequestException(`Not found or no ${Permission.AssetUpdate} access`);
+  }
 };
 
 /**

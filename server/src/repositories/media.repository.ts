@@ -5,7 +5,6 @@ import { camelCase, upperFirst } from 'lodash-es';
 import { Duration } from 'luxon';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { Writable } from 'node:stream';
 import sharp, { Sharp } from 'sharp';
 import type {
@@ -395,33 +394,6 @@ export class MediaRepository {
     });
   }
 
-  async extractVideoFrames(input: string, timestamps: number[], outputDir: string): Promise<string[]> {
-    const results: string[] = [];
-    for (const timestamp of timestamps) {
-      const output = path.join(outputDir, `frame-${timestamp.toFixed(3)}.jpg`);
-      try {
-        await new Promise<void>((resolve, reject) => {
-          ffmpeg(input)
-            .inputOptions([`-ss ${timestamp}`])
-            .outputOptions(['-frames:v 1', '-q:v 2'])
-            .output(output)
-            .on('error', reject)
-            .on('end', () => resolve())
-            .run();
-        });
-        results.push(output);
-      } catch (error) {
-        this.logger.warn(`Failed to extract frame at ${timestamp}s from ${input}: ${error}`);
-      }
-    }
-
-    if (results.length === 0) {
-      throw new Error(`Failed to extract any frames from ${input}`);
-    }
-
-    return results;
-  }
-
   transcode(input: string, output: string | Writable, options: TranscodeCommand): Promise<void> {
     if (!options.twoPass) {
       return new Promise((resolve, reject) => {
@@ -456,39 +428,6 @@ export class MediaRepository {
             .on('end', () => resolve())
             .run();
         })
-        .run();
-    });
-  }
-
-  trim(input: string, output: string, startTime: number, duration: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      ffmpeg(input, { niceness: 10 })
-        .inputOptions(['-ss', String(startTime)])
-        .outputOptions(['-t', String(duration), '-c', 'copy', '-avoid_negative_ts', 'make_zero'])
-        .output(output)
-        .on('start', (command: string) => this.logger.debug(command))
-        .on('error', (error, _, stderr) => {
-          this.logger.error(stderr || error);
-          reject(error);
-        })
-        .on('end', () => resolve())
-        .run();
-    });
-  }
-
-  extractFrame(input: string, output: string, timeSeconds: number, streamIndex?: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const outputOptions = streamIndex === undefined ? [] : ['-map', `0:${streamIndex}`];
-      ffmpeg(input, { niceness: 10 })
-        .inputOptions(['-ss', String(timeSeconds)])
-        .outputOptions([...outputOptions, '-frames:v', '1', '-q:v', '2'])
-        .output(output)
-        .on('start', (command: string) => this.logger.debug(command))
-        .on('error', (error, _, stderr) => {
-          this.logger.error(stderr || error);
-          reject(error);
-        })
-        .on('end', () => resolve())
         .run();
     });
   }

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ExpressionBuilder, Insertable, Kysely, RawBuilder, Selectable, Transaction, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import type { PeopleFaceStatistics, PersonStatistics } from 'src/repositories/person.repository.js';
+import type { PeopleFaceStatistics } from 'src/gallery/repositories/gallery-person.repository.js';
+import type { PersonStatistics } from 'src/repositories/person.repository.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { PeopleResponseDto, PersonResponseDto, ScopedPersonProfileRefDto } from 'src/dtos/person.dto.js';
 import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum.js';

@@ -1,15 +1,10 @@
 import {
-  getPersonFaces,
-  getSpacePersonFaces,
-  SharedSpaceRole,
+  getPerson,
+  PersonUpdateStrategy,
   updatePerson,
-  updateRepresentativeFace,
-  updateSpacePerson,
-  updateSpacePersonRepresentativeFace,
   type AssetResponseDto,
-  type PersonFacePageResponseDto,
   type PersonResponseDto,
-  type SharedSpaceResponseDto,
+  type PersonUpdateDto,
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
@@ -21,25 +16,13 @@ import {
   mdiHeartOutline,
 } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
+import { updatePersonVisibility } from '$lib/gallery/people/person.service';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
 import { getSpaceProfile } from '$lib/utils/global-person-route';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
-import { getPersonFaceThumbnailUrl, getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
-
-// The role is the viewer's own row in the spaces list (`getAllSpaces` embeds `members`, see
-// loadSpaces). The server enforces the role on every write, so this fails open: while the list is
-// unknown (loading or failed), or when it lacks the space (joined since it was cached), the actions
-// stay offered rather than hidden from an editor.
-export const isSpaceEditor = (spaces: SharedSpaceResponseDto[] | undefined, spaceId: string, userId: string) => {
-  const space = spaces?.find(({ id }) => id === spaceId);
-  if (!space) {
-    return true;
-  }
-  const role = space.members?.find((member) => member.userId === userId)?.role;
-  return role === SharedSpaceRole.Owner || role === SharedSpaceRole.Editor;
-};
 
 export const getPersonActions = (
   $t: MessageFormatter,
@@ -121,19 +104,6 @@ const handleUnfavoritePerson = async (person: { id: string }) => {
   }
 };
 
-const updatePersonVisibility = async (person: PersonResponseDto, isHidden: boolean): Promise<PersonResponseDto> => {
-  const profile = getSpaceProfile(person);
-  if (profile) {
-    const updated = await updateSpacePerson({
-      id: profile.spaceId,
-      personId: profile.id,
-      sharedSpacePersonUpdateDto: { isHidden },
-    });
-    return { ...person, isHidden: updated.isHidden };
-  }
-  return updatePerson({ id: person.id, personUpdateDto: { isHidden } });
-};
-
 const handleHidePerson = async (person: PersonResponseDto) => {
   const $t = await getFormatter();
 
@@ -143,6 +113,19 @@ const handleHidePerson = async (person: PersonResponseDto) => {
     eventManager.emit('PersonUpdate', response);
   } catch (error) {
     handleError(error, $t('errors.unable_to_hide_person'));
+  }
+};
+
+export const handleUpdatePerson = async ({ id, ...personUpdateDto }: { id: string } & PersonUpdateDto) => {
+  const $t = await getFormatter();
+
+  try {
+    const response = await updatePerson({ id, personUpdateDto });
+    const isOtherUser = !!personUpdateDto.userId && personUpdateDto.userId !== authManager.user.id;
+    eventManager.emit('PersonUpdate', isOtherUser ? await getPerson({ id }) : response);
+    return response;
+  } catch (error) {
+    handleError(error, $t('errors.something_went_wrong'));
   }
 };
 
@@ -158,82 +141,22 @@ const handleShowPerson = async (person: PersonResponseDto) => {
   }
 };
 
-export const getPersonFacesPage = (
-  person: PersonResponseDto,
-  { page, size }: { page: number; size: number },
-): Promise<PersonFacePageResponseDto> => {
-  const profile = getSpaceProfile(person);
-  return profile
-    ? getSpacePersonFaces({ id: profile.spaceId, personId: profile.id, page, size })
-    : getPersonFaces({ id: person.id, page, size });
-};
+export const withUpdateStrategy = (dto: PersonUpdateDto): PersonUpdateDto =>
+  authManager.preferences.people?.updateStrategy === PersonUpdateStrategy.Self
+    ? { ...dto, userId: authManager.user.id }
+    : dto;
 
-export const updatePersonRepresentativeFace = async (
-  person: PersonResponseDto,
-  assetFaceId: string,
-): Promise<PersonResponseDto> => {
-  const profile = getSpaceProfile(person);
-  if (profile) {
-    const updated = await updateSpacePersonRepresentativeFace({
-      id: profile.spaceId,
-      personId: profile.id,
-      spaceRepresentativeFaceUpdateDto: { assetFaceId },
-    });
-    return { ...person, updatedAt: updated.updatedAt };
+export const handleUpdatePersonName = async (
+  { id, name }: { id: string; name: string },
+  options?: { notify: boolean },
+) => {
+  const response = await handleUpdatePerson({ id, ...withUpdateStrategy({ name }) });
+  if (response && options?.notify) {
+    const $t = await getFormatter();
+    toastManager.primary($t('change_name_successfully'));
   }
-  return updateRepresentativeFace({ id: person.id, representativeFaceUpdateDto: { assetFaceId } });
-};
 
-export const getPersonFaceThumbnail = (person: PersonResponseDto, faceId: string): string => {
-  const profile = getSpaceProfile(person);
-  return profile
-    ? getSpacePersonFaceThumbnailUrl(profile.spaceId, profile.id, faceId, person.updatedAt)
-    : getPersonFaceThumbnailUrl(person.id, faceId, person.updatedAt);
-};
-
-export const updatePersonName = async (person: PersonResponseDto, name: string): Promise<PersonResponseDto> => {
-  const profile = getSpaceProfile(person);
-  if (profile) {
-    const updated = await updateSpacePerson({
-      id: profile.spaceId,
-      personId: profile.id,
-      sharedSpacePersonUpdateDto: { name },
-    });
-    return {
-      ...person,
-      name: updated.name,
-      birthDate: updated.birthDate ?? person.birthDate,
-      isHidden: updated.isHidden,
-      updatedAt: updated.updatedAt,
-      type: updated.type ?? person.type,
-      numberOfAssets: updated.assetCount,
-    };
-  }
-  return updatePerson({ id: person.id, personUpdateDto: { name } });
-};
-
-export const handleUpdatePersonBirthDate = async (person: PersonResponseDto, birthDate: string | null) => {
-  const $t = await getFormatter();
-
-  try {
-    const profile = getSpaceProfile(person);
-    let response: PersonResponseDto;
-    if (profile) {
-      const updated = await updateSpacePerson({
-        id: profile.spaceId,
-        personId: profile.id,
-        sharedSpacePersonUpdateDto: { birthDate },
-      });
-      response = { ...person, birthDate: updated.birthDate ?? null };
-    } else {
-      response = await updatePerson({ id: person.id, personUpdateDto: { birthDate } });
-    }
-    toastManager.primary($t('date_of_birth_saved'));
-    eventManager.emit('PersonUpdate', response);
-    return true;
-  } catch (error) {
-    handleError(error, $t('errors.unable_to_save_date_of_birth'));
-  }
+  return response;
 };
 
 const handleSetFeaturedPhoto = async (person: PersonResponseDto, featureFaceAssetId: string) => {

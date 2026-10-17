@@ -19,8 +19,6 @@ class PartnerDetailPage extends StatelessWidget {
 
   const PartnerDetailPage({super.key, required this.partner});
 
-  // ignore: unused-code
-  static const timelineOverviewControlsEnabled = true;
   static const partnerInfoBoxTopSliverHeight = 110.0;
 
   @override

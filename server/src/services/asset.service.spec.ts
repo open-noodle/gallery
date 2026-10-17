@@ -1194,24 +1194,24 @@ describe(AssetService.name, () => {
     it("rejects joining another owner's duplicate group", async () => {
       const auth = AuthFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.duplicateRepository.hasOtherOwner.mockResolvedValue(true);
+      mocks.galleryDuplicate.hasOtherOwner.mockResolvedValue(true);
 
       await expect(sut.updateAll(auth, { ids: ['asset-1'], duplicateId: 'group-1' })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
 
-      expect(mocks.duplicateRepository.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
+      expect(mocks.galleryDuplicate.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
       expect(mocks.asset.updateAll).not.toHaveBeenCalled();
     });
 
     it('joins a duplicate group that holds only assets the caller owns', async () => {
       const auth = AuthFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
-      mocks.duplicateRepository.hasOtherOwner.mockResolvedValue(false);
+      mocks.galleryDuplicate.hasOtherOwner.mockResolvedValue(false);
 
       await sut.updateAll(auth, { ids: ['asset-1'], duplicateId: 'group-1' });
 
-      expect(mocks.duplicateRepository.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
+      expect(mocks.galleryDuplicate.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
       expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-1'], { duplicateId: 'group-1' });
     });
 

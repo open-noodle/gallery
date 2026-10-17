@@ -150,7 +150,6 @@ describe('/server', () => {
         minFaces: 3,
         availableMemoryTypes: [
           'on_this_day',
-          'birthday',
           'recent_trip',
           'month_recap',
           'favorites_throwback',

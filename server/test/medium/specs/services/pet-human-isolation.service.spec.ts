@@ -1,5 +1,7 @@
 import { Kysely } from 'kysely';
+import { Mocked } from 'vitest';
 import { AssetFileType, AssetVisibility, JobName, SharedSpaceRole, SourceType, SystemMetadataKey } from 'src/enum.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { personType } from 'src/gallery/utils/person-sidecar.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
@@ -209,7 +211,7 @@ describe('human face reset isolation from pet data (medium)', () => {
     });
 
     ctx
-      .getMock(MachineLearningRepository)
+      .getMock<typeof MachineLearningRepository, Mocked<GalleryMachineLearningRepository>>(MachineLearningRepository)
       .detectFaces.mockResolvedValue({ imageHeight: 500, imageWidth: 400, faces: [] });
 
     await sut.handleDetectFaces({ id: asset.id });

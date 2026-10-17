@@ -700,7 +700,7 @@ export class SharedSpaceService extends BaseService {
   //
   // This is NOT computed by diffing two in-memory hypothetical `TimelineHiddenScope`s: the real
   // timeline predicate's "another visible path rescues this asset" arm
-  // (asset.repository.ts `withTimeBucketAssetFilters`'s `timelineSpaceIds` branch) re-checks LIVE
+  // (gallery/utils/time-bucket-filter.ts `withTimeBucketAssetFilters`'s `timelineSpaceIds` branch) re-checks LIVE
   // per-user state for some path types, so an in-memory simulation of that arm would silently
   // disagree with reality whenever a photo has more than one path into a space (S6/S4-shaped
   // cases in the design doc's truth table). Instead this performs the REAL write — flipping
@@ -775,7 +775,7 @@ export class SharedSpaceService extends BaseService {
   ): Promise<number> {
     const callerId = auth.user.id;
     const scope = await this.resolveViewerScope(auth, 'timeline', { userId: callerId, withSharedSpaces: true }, db);
-    return this.assetRepository.getTimelineAssetCount(
+    return this.galleryAssetRepository.getTimelineAssetCount(
       {
         userIds: [callerId],
         callerId,
@@ -902,7 +902,7 @@ export class SharedSpaceService extends BaseService {
    * live stack members only.
    */
   private async expandStackAssetIds(assetIds: string[], visibilities?: AssetVisibility[]): Promise<string[]> {
-    const stacked = await this.stackRepository.getStackedAssetIds(assetIds, visibilities);
+    const stacked = await this.sharedSpaceRepository.getStackedAssetIds(assetIds, visibilities);
     return [...new Set([...assetIds, ...stacked])];
   }
 
@@ -918,7 +918,7 @@ export class SharedSpaceService extends BaseService {
     const assetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
     // rbac-2: AssetRead's space arm (checkSpaceAccess) includes an un-role-gated shared_space_album branch,
     // so a space Viewer of a space linking album X could read X's assets and re-add them as DIRECT assets
-    // into a space they own — gaining AssetUpdate over the owner's assets via checkSpaceEditAccess. AssetShare
+    // into a space they own — gaining edit access over the owner's assets via checkSpaceEditAccess. AssetShare
     // (owner ∪ partner only, no album/space arm) is the same permission album-add already requires and closes
     // the read→re-share→write escalation.
     await this.requireAccess({ auth, permission: Permission.AssetShare, ids: assetIds });
@@ -2004,7 +2004,7 @@ export class SharedSpaceService extends BaseService {
     if (!ownerLink?.ownerIsSpaceMember) {
       return;
     }
-    const ownerPerson = await this.personRepository.getOrCreateOwnerPersonForIdentity(
+    const ownerPerson = await this.galleryPersonRepository.getOrCreateOwnerPersonForIdentity(
       {
         ownerId: ownerLink.assetOwnerId,
         identityId: identity.id,
@@ -2013,7 +2013,10 @@ export class SharedSpaceService extends BaseService {
       },
       trx,
     );
-    await this.personRepository.setFaceOwnerPerson({ assetFaceId, personGroupId: ownerPerson.personGroupId }, trx);
+    await this.galleryPersonRepository.setFaceOwnerPerson(
+      { assetFaceId, personGroupId: ownerPerson.personGroupId },
+      trx,
+    );
   }
 
   /**
@@ -2175,7 +2178,7 @@ export class SharedSpaceService extends BaseService {
         person.identityId &&
         ownerLink.identityId === person.identityId
       ) {
-        await this.personRepository.setFaceOwnerPerson(
+        await this.galleryPersonRepository.setFaceOwnerPerson(
           { assetFaceId, personGroupId: null, expectedPersonGroupId: ownerLink.personGroupId },
           trx,
         );
@@ -3443,7 +3446,7 @@ export class SharedSpaceService extends BaseService {
         break;
       }
 
-      const assets = await this.assetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
+      const assets = await this.galleryAssetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
       if (assets.length === 0) {
         break;
       }
@@ -3493,7 +3496,12 @@ export class SharedSpaceService extends BaseService {
         break;
       }
 
-      const assets = await this.assetRepository.getByAlbumIdWithFaces(job.albumId, job.spaceId, batchSize, offset);
+      const assets = await this.galleryAssetRepository.getByAlbumIdWithFaces(
+        job.albumId,
+        job.spaceId,
+        batchSize,
+        offset,
+      );
       if (assets.length === 0) {
         break;
       }
@@ -3811,7 +3819,7 @@ export class SharedSpaceService extends BaseService {
     this.logger.log(`Dedup pass ${pass} for space ${job.spaceId} complete: ${passMerges} merges`);
 
     // Re-queue a fresh, short follow-up pass while merges are still happening, capped to avoid a
-    // runaway chain. The follow-up uses a pass-scoped jobId (see job.repository getJobOptions) so it
+    // runaway chain. The follow-up uses a pass-scoped jobId (see QueueMaintenanceRepository.getJobOptions) so it
     // enqueues even though this job is still "active".
     if (mergedAny) {
       if (pass < SHARED_SPACE_DEDUP_MAX_PASSES) {
@@ -4736,6 +4744,26 @@ export class SharedSpaceService extends BaseService {
     } catch (error) {
       this.logger.error(`Failed to sync space people after removing assets from album ${albumId}: ${error}`);
       await this.enqueueSpaceFaceProjectionReconcile(faceEnabledSpaceIds);
+    }
+  }
+
+  // LibraryService.handleSyncFiles: queue face match for spaces linked to the library. Errors propagate, so a failure
+  // fails the sync job as it did when this ran inline.
+  @OnEvent({ name: 'LibraryAssetsCreate' })
+  async onLibraryAssetsCreate({ libraryId, assetIds }: ArgOf<'LibraryAssetsCreate'>): Promise<void> {
+    if (assetIds.length === 0) {
+      return;
+    }
+    const linkedSpaces = await this.sharedSpaceRepository.getSpacesLinkedToLibrary(libraryId);
+    for (const link of linkedSpaces) {
+      if (link.faceRecognitionEnabled) {
+        for (const assetId of assetIds) {
+          await this.jobRepository.queue({
+            name: JobName.SharedSpaceFaceMatch,
+            data: { spaceId: link.spaceId, assetId },
+          });
+        }
+      }
     }
   }
 }

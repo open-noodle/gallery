@@ -6,11 +6,9 @@
   import ChangeDescription from '$lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '$lib/components/timeline/actions/ChangeLocationAction.svelte';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
-  import CreateSharedLink from '$lib/components/timeline/actions/CreateSharedLinkAction.svelte';
   import DeleteAssets from '$lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '$lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '$lib/components/timeline/actions/FavoriteAction.svelte';
-  import RemoveFromAlbum from '$lib/components/timeline/actions/RemoveFromAlbumAction.svelte';
   import RemoveFromSpaceAction from '$lib/components/timeline/actions/RemoveFromSpaceAction.svelte';
   import RotateAction from '$lib/components/timeline/actions/RotateAction.svelte';
   import SelectAllAssets from '$lib/components/timeline/actions/SelectAllAction.svelte';
@@ -92,17 +90,6 @@
     onAssetDelete,
     onUndoDelete,
   }: Props = $props();
-
-  // RemoveFromAlbumAction's `album` prop is `$bindable()` — it reassigns it locally
-  // after re-fetching album info post-removal. Mirror that with a writable $derived
-  // rather than binding the prop directly (props aren't guaranteed assignable
-  // targets, and this keeps the fallback well-typed when `album` is undefined).
-  // Reassigning a $derived locally overrides it until `album` itself changes again.
-  // The fallback branch is never actually rendered/read: RemoveFromAlbum only
-  // renders when the real `album` prop is present (see the `{:else if ... &&
-  // album}` gate below).
-  const EMPTY_ALBUM = {} as AlbumResponseDto;
-  let localAlbum = $derived(album ?? EMPTY_ALBUM);
 
   const currentUserId = $derived(authManager.authenticated ? authManager.user.id : null);
 
@@ -241,10 +228,15 @@
 
 {#if assetInteraction.selectionActive}
   <AssetSelectControlBar>
-    {@const Actions = getAssetBulkActions($t, { restrictToSpaceId, editableSelectedAssetIds })}
+    {@const Actions = getAssetBulkActions($t, undefined, {
+      restrictToSpaceId,
+      editableSelectedAssetIds,
+      shareSpaceId,
+      removeFromAlbum: caps.canRemoveFromAlbum && album ? { album, onRemove } : undefined,
+    })}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
     {#if caps.canShare}
-      <CreateSharedLink spaceId={shareSpaceId} />
+      <ActionButton action={Actions.CreateSharedLink} />
     {/if}
     {#if caps.canSelectAll}
       <SelectAllAssets {timelineManager} {assetInteraction} {onSelectAll} />
@@ -291,7 +283,7 @@
         <ActionMenuItem action={Actions.Tag} />
       {/if}
       {#if caps.canRemoveFromAlbum && album}
-        <RemoveFromAlbum menuItem bind:album={localAlbum} {onRemove} />
+        <ActionMenuItem action={Actions.RemoveFromAlbum} />
       {/if}
       {#if caps.canDelete && onAssetDelete}
         <DeleteAssets menuItem {onAssetDelete} {onUndoDelete} />

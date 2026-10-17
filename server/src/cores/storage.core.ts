@@ -321,6 +321,10 @@ export class StorageCore {
     this.storageRepository.mkdirSync(dirname(input));
   }
 
+  removeEmptyDirs(folder: StorageFolder) {
+    return this.storageRepository.removeEmptyDirs(StorageCore.getBaseFolder(folder));
+  }
+
   async getVideoInterfaces(): Promise<VideoInterfaces> {
     const [dri, mali] = await Promise.all([this.getDevices(), this.hasMaliOpenCL()]);
     return { dri, mali };
@@ -355,49 +359,6 @@ export class StorageCore {
         return;
       }
     }
-  }
-
-  // --- Relative key methods (for S3 / backend-agnostic paths) ---
-
-  static getRelativeNestedPath(folder: StorageFolder, ownerId: string, filename: string): string {
-    return join(folder, ownerId, filename.slice(0, 2), filename.slice(2, 4), filename);
-  }
-
-  static getRelativeImagePath(asset: ThumbnailPathEntity, { fileType, format, isEdited }: ImagePathOptions): string {
-    const filename = `${asset.id}_${fileType}${isEdited ? '_edited' : ''}.${format}`;
-    return StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, asset.ownerId, filename);
-  }
-
-  static getRelativeEncodedVideoPath(asset: ThumbnailPathEntity): string {
-    return StorageCore.getRelativeNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${asset.id}.mp4`);
-  }
-
-  private static getEditedEncodedVideoFilename(asset: ThumbnailPathEntity): string {
-    return `${asset.id}_edited.mp4`;
-  }
-
-  static getEditedEncodedVideoPath(asset: ThumbnailPathEntity): string {
-    return StorageCore.getNestedPath(
-      StorageFolder.EncodedVideo,
-      asset.ownerId,
-      StorageCore.getEditedEncodedVideoFilename(asset),
-    );
-  }
-
-  static getRelativeEditedEncodedVideoPath(asset: ThumbnailPathEntity): string {
-    return StorageCore.getRelativeNestedPath(
-      StorageFolder.EncodedVideo,
-      asset.ownerId,
-      StorageCore.getEditedEncodedVideoFilename(asset),
-    );
-  }
-
-  static getRelativePersonThumbnailPath(person: PersonThumbnailPathEntity): string {
-    return StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, person.ownerId, `${person.personGroupId}.jpeg`);
-  }
-
-  static getRelativeProfileImagePath(userId: string, filename: string): string {
-    return StorageCore.getRelativeNestedPath(StorageFolder.Profile, userId, filename);
   }
 
   static getNestedFolder(folder: StorageFolder, ownerId: string, filename: string): string {

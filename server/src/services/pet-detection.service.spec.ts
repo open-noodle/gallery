@@ -49,7 +49,7 @@ describe(PetDetectionService.name, () => {
     ({ sut, mocks } = newTestService(PetDetectionService));
 
     mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
-    mocks.assetJob.getForPetDetection.mockResolvedValue({
+    mocks.petFace.getForPetDetection.mockResolvedValue({
       ownerId: 'owner-id',
       visibility: AssetVisibility.Timeline,
       previewFile: '/uploads/user-id/thumbs/path.jpg',
@@ -106,7 +106,7 @@ describe(PetDetectionService.name, () => {
     it('should not queue pet jobs when pet detection is disabled', async () => {
       expect(await sut.handleQueuePetDetection({ force: false })).toEqual(JobStatus.Skipped);
 
-      expect(mocks.assetJob.streamForPetDetectionJob).not.toHaveBeenCalled();
+      expect(mocks.petFace.streamForPetDetectionJob).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -115,12 +115,12 @@ describe(PetDetectionService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { enabled: true, petDetection: { enabled: true } },
       });
-      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+      mocks.petFace.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
 
       expect(await sut.handleQueuePetDetection({ force: false })).toEqual(JobStatus.Success);
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PetDetection, data: { id: asset.id } }]);
-      expect(mocks.assetJob.streamForPetDetectionJob).toHaveBeenCalledWith(false);
+      expect(mocks.petFace.streamForPetDetectionJob).toHaveBeenCalledWith(false);
       expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
     });
 
@@ -129,11 +129,11 @@ describe(PetDetectionService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { enabled: true, petDetection: { enabled: true } },
       });
-      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+      mocks.petFace.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
 
       expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Success);
 
-      expect(mocks.assetJob.streamForPetDetectionJob).toHaveBeenCalledWith(true);
+      expect(mocks.petFace.streamForPetDetectionJob).toHaveBeenCalledWith(true);
     });
 
     it('should queue pet detection jobs with force asset selection when force is true', async () => {
@@ -141,11 +141,11 @@ describe(PetDetectionService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { enabled: true, petDetection: { enabled: true } },
       });
-      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+      mocks.petFace.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
 
       expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Success);
 
-      expect(mocks.assetJob.streamForPetDetectionJob).toHaveBeenCalledWith(true);
+      expect(mocks.petFace.streamForPetDetectionJob).toHaveBeenCalledWith(true);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PetDetection, data: { id: asset.id } }]);
       expectNoQueuedJobNames(mocks, petFaceIsolationJobNames);
@@ -156,7 +156,7 @@ describe(PetDetectionService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { enabled: true, petDetection: { enabled: true } },
       });
-      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+      mocks.petFace.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
 
       expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Success);
 
@@ -172,7 +172,7 @@ describe(PetDetectionService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         machineLearning: { enabled: true, petDetection: { enabled: true } },
       });
-      mocks.assetJob.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
+      mocks.petFace.streamForPetDetectionJob.mockReturnValue(makeStream([asset]));
 
       expect(await sut.handleQueuePetDetection({ force: false })).toEqual(JobStatus.Success);
 
@@ -200,7 +200,7 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handleQueuePetDetection({ force: true })).toEqual(JobStatus.Skipped);
 
       expect(mocks.petFace.deleteAllPets).toHaveBeenCalledTimes(1);
-      expect(mocks.assetJob.streamForPetDetectionJob).not.toHaveBeenCalled();
+      expect(mocks.petFace.streamForPetDetectionJob).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
@@ -211,7 +211,7 @@ describe(PetDetectionService.name, () => {
 
       expect(mocks.petFace.deleteAllPets).not.toHaveBeenCalled();
       expect(mocks.sharedSpace.deleteAllPets).not.toHaveBeenCalled();
-      expect(mocks.assetJob.streamForPetDetectionJob).not.toHaveBeenCalled();
+      expect(mocks.petFace.streamForPetDetectionJob).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
   });
@@ -244,7 +244,7 @@ describe(PetDetectionService.name, () => {
 
     it('should skip if the asset was deleted after its thumbnail run', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
-      mocks.assetJob.getForPetDetection.mockResolvedValue(void 0);
+      mocks.petFace.getForPetDetection.mockResolvedValue(void 0);
 
       expect(await sut.handlePetDetection({ id: 'non-existent' })).toEqual(JobStatus.Skipped);
 
@@ -255,7 +255,7 @@ describe(PetDetectionService.name, () => {
 
     it('should fail if asset has no preview file', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
-      mocks.assetJob.getForPetDetection.mockResolvedValue({
+      mocks.petFace.getForPetDetection.mockResolvedValue({
         ownerId: 'owner-id',
         visibility: AssetVisibility.Timeline,
         previewFile: null,
@@ -270,7 +270,7 @@ describe(PetDetectionService.name, () => {
 
     it('should skip hidden assets', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
-      mocks.assetJob.getForPetDetection.mockResolvedValue({
+      mocks.petFace.getForPetDetection.mockResolvedValue({
         ownerId: 'owner-id',
         visibility: AssetVisibility.Hidden,
         previewFile: '/uploads/user-id/thumbs/path.jpg',

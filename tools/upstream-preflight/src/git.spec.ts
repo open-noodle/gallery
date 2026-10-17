@@ -5,6 +5,7 @@ import {
   collectGitRange,
   commitSubjects,
   currentBranch,
+  findWhitespaceHeavyFiles,
   getGitPath,
   getMergeBase,
   hasGitOperationInProgress,
@@ -161,5 +162,28 @@ describe('git range collection', () => {
     expect(result.raw).toEqual([`- ${equivalent}`, `+ ${missing}`]);
     expect(result.equivalent).toEqual([equivalent]);
     expect(result.missing).toEqual([missing]);
+  });
+});
+
+describe('findWhitespaceHeavyFiles', () => {
+  it('reports files whose diff is mostly whitespace, with the share it measured', () => {
+    const repo = createTempRepo();
+    const lines = (count: number, prefix = '') =>
+      Array.from({ length: count }, (_, i) => `${prefix}line ${i}`).join('\n') +
+      '\n';
+    repo.write('reindented.ts', lines(20));
+    repo.write('rewritten.ts', lines(20));
+    repo.write('tiny.ts', lines(3));
+    const base = repo.commit('base');
+    // 18 re-indented lines and 2 real edits
+    repo.write('reindented.ts', lines(18, '  ') + 'changed 18\nchanged 19\n');
+    repo.write('rewritten.ts', lines(20, 'new '));
+    repo.write('tiny.ts', lines(3, '  '));
+    repo.write('added.ts', lines(30));
+    const head = repo.commit('fork');
+
+    expect(findWhitespaceHeavyFiles(repo.path, base, head)).toEqual([
+      { file: 'reindented.ts', changed: 40, whitespaceOnly: 36 },
+    ]);
   });
 });

@@ -353,7 +353,6 @@ The `memories` section configures generated memory retention and which memory ty
 - `retentionDays` is the number of days to keep unsaved generated memory records. Set it to `0` to keep memory records forever. Saved memories are not removed by retention cleanup.
 - `types` is a per-type global availability map. Each key is a memory-type key; the value enables (`true`) or disables (`false`) that type for everyone. Omitted keys default to on. Valid keys are:
   - `on_this_day`: "N years ago" memories
-  - `birthday`: birthday memories for named people
   - `recent_trip`: recent trip memories
   - `month_recap`: a past year's photos from this calendar month
   - `favorites_throwback`: your favorite photos from this calendar month in a past year
@@ -385,7 +384,7 @@ The config file only controls **global availability**. Within each available typ
 
 The per-type switches do not control whether the nightly task runs. To disable all generated memories, set `nightlyTasks.generateMemories` to `false`.
 
-The older `memories.birthday` and `memories.recentTrips` booleans are deprecated but still honored as aliases for `types["birthday"]` and `types["recent_trip"]`. An explicit `types` entry takes precedence over the matching legacy field.
+The older `memories.recentTrips` boolean is deprecated but still honored as an alias for `types["recent_trip"]`; an explicit `types` entry takes precedence over it. The older `memories.birthday` boolean is accepted and ignored: birthday memories are Immich's and have no switch.
 
 See the [Memories docs](/features/memories) for details about how retention and generated-memory types work.
 :::

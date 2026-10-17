@@ -168,7 +168,7 @@ export class PetRecognitionService extends BaseService {
     const embedding = face.petSearch.embedding;
     const ownerId = face.asset.ownerId;
 
-    const matches = await this.searchRepository.searchPets({
+    const matches = await this.petFaceRepository.searchPets({
       userIds: [ownerId],
       embedding,
       maxDistance,
@@ -195,7 +195,7 @@ export class PetRecognitionService extends BaseService {
       // result (distance 0 to itself), so it alone fills the window and a genuinely matching
       // sibling face is never returned. Mirrors handleRecognizeFaces's second, hasPerson-scoped
       // search (person.service.ts), which exists for exactly this reason.
-      const matchWithPerson = await this.searchRepository.searchPets({
+      const matchWithPerson = await this.petFaceRepository.searchPets({
         userIds: [ownerId],
         embedding,
         maxDistance,

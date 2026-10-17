@@ -2,11 +2,36 @@ import { Injectable } from '@nestjs/common';
 import { type ExpressionBuilder, type Insertable, type Kysely, type Transaction, sql } from 'kysely';
 import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
+import z from 'zod';
 import type { PetSearchTable } from 'src/schema/tables/pet-search.table.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
+import { AssetFileType, AssetVisibility, VectorIndex } from 'src/enum.js';
 import { personIdentityId, personSidecarColumns } from 'src/gallery/utils/person-sidecar.js';
+import { probes } from 'src/repositories/database.repository.js';
+import { SearchEmbeddingOptions } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { anyUuid, withFilePath } from 'src/utils/database.js';
+
+// Pet equivalent of FaceEmbeddingSearch, scoped to pet_search instead of face_search. Deliberately
+// drops `minBirthDate` — a person's birthdate has no pet analogue, so the filter is meaningless here.
+export interface PetEmbeddingSearch extends SearchEmbeddingOptions {
+  hasPerson?: boolean;
+  numResults: number;
+  maxDistance: number;
+  /**
+   * Required here, unlike the optional base: pet recognition has no album- or space-scoped caller,
+   * so every `searchPets` scan is owner-scoped and the `asset.ownerId` predicate below is
+   * unconditional. (`FaceSearchRepository.searchFaces` can drop it because a space scope replaces it.)
+   */
+  userIds: string[];
+}
+
+export interface PetSearchResult {
+  distance: number;
+  id: string;
+  personId: string | null;
+}
 
 const withPetSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
   return jsonObjectFrom(
@@ -255,5 +280,74 @@ export class PetFaceRepository {
       .where('person.ownerId', '=', ownerId)
       .where('person_pet.species', '=', species)
       .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getForPetDetection(id: string) {
+    return this.db
+      .selectFrom('asset')
+      .select((eb) => ['asset.ownerId', 'asset.visibility', withFilePath(eb, AssetFileType.Preview).as('previewFile')])
+      .where('asset.id', '=', id)
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [], stream: true })
+  streamForPetDetectionJob(force?: boolean) {
+    return this.db
+      .selectFrom('asset')
+      .select(['asset.id'])
+      .$if(!force, (qb) =>
+        qb
+          .innerJoin('asset_job_status', 'asset_job_status.assetId', 'asset.id')
+          .leftJoin('asset_job_status_gallery', 'asset_job_status_gallery.assetId', 'asset.id')
+          .where('asset_job_status_gallery.petsDetectedAt', 'is', null),
+      )
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', '!=', AssetVisibility.Hidden)
+      .stream();
+  }
+
+  // Copy of FaceSearchRepository.searchFaces scoped to pet_search instead of face_search — see the isolation
+  // decision in PetEmbeddingSearch's comment. No `person` join / `minBirthDate` filter: pets have
+  // no birthdate concept, and hasPerson only needs asset_face.personId, already on the base table.
+  @GenerateSql({
+    params: [
+      {
+        userIds: [DummyValue.UUID],
+        embedding: DummyValue.VECTOR,
+        numResults: 10,
+        maxDistance: 0.6,
+      },
+    ],
+  })
+  searchPets({ userIds, embedding, numResults, maxDistance, hasPerson }: PetEmbeddingSearch) {
+    if (!z.int().min(1).max(1000).safeParse(numResults).success) {
+      throw new Error(`Invalid value for 'numResults': ${numResults}`);
+    }
+
+    return this.db.transaction().execute(async (trx) => {
+      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Pet])}`.execute(trx);
+      return await trx
+        .with('cte', (qb) =>
+          qb
+            .selectFrom('asset_face')
+            .select([
+              'asset_face.id',
+              'asset_face.personGroupId',
+              sql<number>`pet_search.embedding <=> ${embedding}`.as('distance'),
+            ])
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .innerJoin('pet_search', 'pet_search.faceId', 'asset_face.id')
+            .where('asset.ownerId', '=', anyUuid(userIds))
+            .where('asset.deletedAt', 'is', null)
+            .$if(!!hasPerson, (qb) => qb.where('asset_face.personGroupId', 'is not', null))
+            .orderBy('distance')
+            .limit(numResults),
+        )
+        .selectFrom('cte')
+        .selectAll()
+        .where('cte.distance', '<=', maxDistance)
+        .execute();
+    });
   }
 }

@@ -325,14 +325,12 @@ fi
 
 info_plist="$REPO_ROOT/mobile/ios/Runner/Info.plist"
 if [[ -f "$info_plist" ]]; then
-  # CFBundleURLSchemes entries sit at 4-tab indent; anchor to that to avoid matching
-  # CFBundleName (<string>${NAME_SLUG}</string>) at 1-tab indent.
-  # Use $'\t' ANSI-C quoting for literal tabs — BSD grep (macOS) lacks -P.
-  indent=$'\t\t\t\t'
-  if ! grep -q "^${indent}<string>immich</string>" "$info_plist"; then
+  # The branded scheme must sit on the line after the legacy one: CFBundleName also reads
+  # <string>${NAME_SLUG}</string>, which can equal the scheme. Indentation is not checked.
+  if ! grep -qE '^[[:space:]]*<string>immich</string>$' "$info_plist"; then
     echo "  FAIL: Info.plist missing <string>immich</string> in CFBundleURLSchemes (legacy scheme must remain)"
     EXIT_CODE=1
-  elif ! grep -q "^${indent}<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
+  elif ! grep -A1 -E '^[[:space:]]*<string>immich</string>$' "$info_plist" | grep -qE "^[[:space:]]*<string>${DEEP_LINK_SCHEME}</string>\$"; then
     echo "  FAIL: Info.plist missing <string>${DEEP_LINK_SCHEME}</string> in CFBundleURLSchemes"
     EXIT_CODE=1
   else
@@ -342,6 +340,19 @@ fi
 
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo "Open-in-app scheme registration verified"
+fi
+
+# The iOS permission prompts are upstream's text in source; patch_ios writes the branded ones.
+echo "--- Checking iOS permission prompts ---"
+if [[ -f "$info_plist" ]]; then
+  while IFS=$'\t' read -r usage_key usage_text; do
+    if grep -A1 "<key>${usage_key}</key>" "$info_plist" | grep -qF "<string>${usage_text}</string>"; then
+      echo "  OK: Info.plist ${usage_key} is branded"
+    else
+      echo "  FAIL: Info.plist ${usage_key} does not read config.json mobile.ios_usage_descriptions"
+      EXIT_CODE=1
+    fi
+  done < <(jq -r '.mobile.ios_usage_descriptions | to_entries[] | "\(.key)\t\(.value)"' "$CONFIG")
 fi
 
 # OAuth mobile callback: the scheme the app SENDS, the scheme Android REGISTERS and the

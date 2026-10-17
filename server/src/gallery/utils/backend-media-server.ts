@@ -1,19 +1,28 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { CLS_REQ, ClsServiceManager } from 'nestjs-cls';
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { Request } from 'express';
-import type { GenerateThumbnailOptions, ImageDimensions } from 'src/types.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import type { GenerateThumbnailOptions, ImageDimensions, UploadFile } from 'src/types.js';
+import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { FACE_THUMBNAIL_SIZE } from 'src/constants.js';
+import { ThumbnailPathEntity } from 'src/cores/storage.core.js';
 import { AssetFace } from 'src/database.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto.js';
-import { AssetFileType, CacheControl, ImageFormat, ImmichHeader } from 'src/enum.js';
+import { AssetFileType, CacheControl, ImageFormat, ImmichHeader, JobName, StorageFolder } from 'src/enum.js';
+import {
+  getRelativeImagePath,
+  getRelativeNestedPath,
+  getRelativeProfileImagePath,
+} from 'src/gallery/utils/storage-keys.js';
 import { RangeNotSatisfiableError, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import {
@@ -22,8 +31,10 @@ import {
   ImmichMediaResponse,
   ImmichRedirectResponse,
   ImmichStreamResponse,
+  getFilenameExtension,
   getResponseSignal,
 } from 'src/utils/file.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
 import { clamp } from 'src/utils/misc.js';
 
 // HTTP clients resend custom headers (and some resend Authorization) when they follow a redirect to another host, so a
@@ -52,6 +63,8 @@ type FaceThumbnailBounds = {
 
 type BackendMediaServerDependencies = {
   assetRepository: AssetRepository;
+  jobRepository: JobRepository;
+  logger: LoggingRepository;
   mediaRepository: MediaRepository;
   storageRepository: StorageRepository;
   getConfig: (options: { withCache: boolean }) => Promise<SystemConfig>;
@@ -168,6 +181,199 @@ export class BackendMediaServer {
     const { StorageService } = await import('../../services/storage.service.js');
     // no media location: this backend only ever receives absolute paths
     return StorageService.backendFor(key, new DiskStorageBackend('', this.deps.storageRepository));
+  }
+
+  /** Whether `path` exists on its backend; with `readable`, a disk file must also be readable. */
+  async exists(path: string, options?: { readable?: boolean }): Promise<boolean> {
+    const backend = await this.backendFor(path);
+    return backend.exists(path, options);
+  }
+
+  /**
+   * Writes `data` to `path` unless something is already there, on the disk (creating its folder) or the S3 backend.
+   * Returns whether it wrote.
+   */
+  async writeFileIfMissing(path: string, data: Buffer, contentType: string): Promise<boolean> {
+    const { storageRepository } = this.deps;
+    if (isDiskPath(path)) {
+      if (await storageRepository.checkFileExists(path)) {
+        return false;
+      }
+      storageRepository.mkdirSync(dirname(path));
+      await storageRepository.createFile(path, data);
+      return true;
+    }
+
+    const backend = await this.backendFor(path);
+    if (await backend.exists(path)) {
+      return false;
+    }
+    await backend.put(path, data, { contentType });
+    return true;
+  }
+
+  /**
+   * Runs `write` on the sidecar at `sidecarPath`: in place on disk; for an S3 key against a local temp file that is
+   * then uploaded. An existing S3 sidecar is downloaded first so its contents are kept; otherwise `write` creates a
+   * fresh XMP at the temp path.
+   */
+  async writeSidecar(sidecarPath: string, write: (localPath: string) => Promise<unknown>): Promise<void> {
+    if (isDiskPath(sidecarPath)) {
+      await write(sidecarPath);
+      return;
+    }
+
+    const { storageRepository } = this.deps;
+    const backend = await this.backendFor(sidecarPath);
+    const sidecarExists = await backend.exists(sidecarPath);
+    let localSidecar: { localPath: string; cleanup: () => Promise<void> };
+    if (sidecarExists) {
+      localSidecar = await this.ensureLocalFile(sidecarPath);
+    } else {
+      const tempPath = join(tmpdir(), `immich-sidecar-${randomUUID()}.xmp`);
+      localSidecar = {
+        localPath: tempPath,
+        cleanup: async () => {
+          try {
+            await storageRepository.unlink(tempPath);
+          } catch {
+            // ignore — file may never have been created if the write failed
+          }
+        },
+      };
+    }
+    try {
+      await write(localSidecar.localPath);
+      const stream = storageRepository.createPlainReadStream(localSidecar.localPath);
+      await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
+    } finally {
+      await localSidecar.cleanup();
+    }
+  }
+
+  /** The configured write backend when it is not the disk: a locally written file then has to be uploaded to it. */
+  private async getRemoteWriteBackend(): Promise<StorageBackend | undefined> {
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('../../services/storage.service.js');
+    const writeBackend = StorageService.getWriteBackend();
+    return !writeBackend || writeBackend instanceof DiskStorageBackend ? undefined : writeBackend;
+  }
+
+  /**
+   * After generating a file locally, uploads it to S3 if the write backend is S3.
+   * Returns the key to store in the DB.
+   */
+  async persistFile(localPath: string, relativeKey: string, contentType?: string): Promise<string> {
+    const writeBackend = await this.getRemoteWriteBackend();
+    if (!writeBackend) {
+      // Disk mode: the file was already written to the final path
+      return localPath;
+    }
+    // S3 mode: upload the locally-generated file
+    const stream = this.deps.storageRepository.createPlainReadStream(localPath);
+    await writeBackend.put(relativeKey, stream, { contentType });
+    // Clean up local temp file
+    await this.deps.storageRepository.unlink(localPath).catch(() => {
+      /* ignore */
+    });
+    return relativeKey;
+  }
+
+  /**
+   * Persists every generated image file and rewrites its path to the stored location.
+   * Every ffmpeg/sharp output path must go through this — forgetting it is how the
+   * trim thumbnails ended up unpersisted on S3 (gh#671).
+   */
+  async persistImageFiles(
+    asset: ThumbnailPathEntity,
+    files: { path: string; type: AssetFileType; isEdited: boolean }[],
+  ): Promise<void> {
+    for (const file of files) {
+      const relativeKey = getRelativeImagePath(asset, {
+        fileType: file.type,
+        format: file.path.split('.').pop() as ImageFormat,
+        isEdited: file.isEdited,
+      });
+      file.path = await this.persistFile(file.path, relativeKey, mimeTypes.lookup(file.path));
+    }
+  }
+
+  /** Uploads a locally generated profile image to an S3 write backend; returns the path to store on the user. */
+  async persistProfileImage(userId: string, profileImagePath: string): Promise<string> {
+    const writeBackend = await this.getRemoteWriteBackend();
+    if (!writeBackend) {
+      return profileImagePath;
+    }
+
+    const relativeKey = getRelativeProfileImagePath(userId, basename(profileImagePath));
+    const stream = createReadStream(profileImagePath);
+    await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
+    // After S3 upload, drop the local generated file and store the relative key.
+    await this.deps.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
+    return relativeKey;
+  }
+
+  /**
+   * Moves a just-created upload (and its sidecar) to an S3 write backend: uploads each file, points the asset and its
+   * sidecar row at the key and queues the local file's deletion. A failure here deletes what it uploaded and rethrows,
+   * so the caller removes the asset row and the local files. On success `file` and `sidecarFile` name the keys, so a
+   * later failure in the caller queues the uploaded objects (not the already-queued local files) for deletion.
+   */
+  async moveUploadToBackend(asset: { id: string; ownerId: string }, file: UploadFile, sidecarFile?: UploadFile) {
+    const writeBackend = await this.getRemoteWriteBackend();
+    if (!writeBackend) {
+      return;
+    }
+
+    const { assetRepository, jobRepository } = this.deps;
+    const backendFiles: string[] = [];
+    try {
+      const relativeKey = getRelativeNestedPath(
+        StorageFolder.Upload,
+        asset.ownerId,
+        `${asset.id}${getFilenameExtension(file.originalPath)}`,
+      );
+      const stream = createReadStream(file.originalPath);
+      await writeBackend.put(relativeKey, stream, {
+        contentType: mimeTypes.lookup(file.originalPath),
+      });
+      backendFiles.push(relativeKey);
+      await assetRepository.update({ id: asset.id, originalPath: relativeKey });
+      // Clean up the temp local file
+      await jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.originalPath] } });
+
+      if (sidecarFile) {
+        const sidecarKey = getRelativeNestedPath(StorageFolder.Upload, asset.ownerId, `${asset.id}.xmp`);
+        await writeBackend.put(sidecarKey, createReadStream(sidecarFile.originalPath));
+        backendFiles.push(sidecarKey);
+        await assetRepository.upsertFile({
+          assetId: asset.id,
+          path: sidecarKey,
+          type: AssetFileType.Sidecar,
+        });
+        await jobRepository.queue({
+          name: JobName.FileDelete,
+          data: { files: [sidecarFile.originalPath] },
+        });
+      }
+    } catch (error: Error | any) {
+      for (const key of backendFiles) {
+        try {
+          await writeBackend.delete(key);
+        } catch (deleteError: Error | any) {
+          this.deps.logger.error(
+            `Failed to delete incomplete upload file ${key} for asset ${asset.id}: ${deleteError}`,
+            deleteError?.stack,
+          );
+        }
+      }
+      throw error;
+    }
+
+    file.originalPath = backendFiles[0];
+    if (sidecarFile) {
+      sidecarFile.originalPath = backendFiles[1];
+    }
   }
 
   async getFaceThumbnailSource(assetId: string): Promise<string | null> {

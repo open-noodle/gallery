@@ -1,4 +1,5 @@
 import type { AuditResult, ClassifiedCommit } from './types';
+import type { WhitespaceHeavyFile } from './git';
 import type { ForkSurfaceSignals } from './signals';
 
 export type ExtensionHotspot = {
@@ -40,6 +41,7 @@ export type PreflightReportInput = {
   auditResults: AuditResult[];
   extensionHotspots: ExtensionHotspot[];
   forkSurfaceSignals?: ForkSurfaceSignals;
+  whitespaceHeavyFiles?: WhitespaceHeavyFile[];
 };
 
 export function renderPreflightMarkdown(input: PreflightReportInput): string {
@@ -159,6 +161,21 @@ ${listOrNone(input.ciWorkflowChanges)}
 ## Broad Refactor Hints
 
 ${input.broadRefactorHints.length > 0 ? input.broadRefactorHints.map((hint) => `- ${hint}`).join('\n') : '- None'}
+
+## Whitespace-Only Fork Diff Signals
+
+Fork diffs that \`git diff -w\` mostly drops: re-indents that conflict at each rebase and carry no fork logic. Advisory.
+
+${
+  input.whitespaceHeavyFiles?.length
+    ? input.whitespaceHeavyFiles
+        .map(
+          ({ file, changed, whitespaceOnly }) =>
+            `- \`${file}\`: ${whitespaceOnly} of ${changed} changed lines are whitespace-only (${Math.round((whitespaceOnly / changed) * 100)}%)`,
+        )
+        .join('\n')
+    : '- None'
+}
 
 ## Audit Signals
 

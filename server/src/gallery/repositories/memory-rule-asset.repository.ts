@@ -63,36 +63,6 @@ export interface MemoryPeriodOptions {
 export class MemoryRuleAssetRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.DATE] })
-  getMemoryAssetsForPerson(ownerId: string, personId: string, takenBefore: Date): Promise<MemoryAsset[]> {
-    return this.db
-      .selectFrom('asset')
-      .select(['asset.id', 'asset.localDateTime'])
-      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-      .innerJoin('asset_job_status', 'asset_job_status.assetId', 'asset.id')
-      .where('asset.ownerId', '=', ownerId)
-      .where('asset_face.personGroupId', '=', personId)
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', 'is', true)
-      .where('asset.visibility', '=', AssetVisibility.Timeline)
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.localDateTime', '<=', takenBefore)
-      .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('asset_file')
-            .select('asset_file.assetId')
-            .whereRef('asset_file.assetId', '=', 'asset.id')
-            .where('asset_file.type', '=', AssetFileType.Preview),
-        ),
-      )
-      .distinctOn(['asset.id'])
-      .orderBy('asset.id')
-      .orderBy('asset.localDateTime', 'desc')
-      .limit(60)
-      .execute();
-  }
-
   @GenerateSql({ params: [DummyValue.UUID, { takenAfter: DummyValue.DATE, takenBefore: DummyValue.DATE }] })
   getMemoryLocationClusters(
     ownerId: string,
@@ -308,8 +278,8 @@ export class MemoryRuleAssetRepository {
   /**
    * Assets of one person inside an inclusive `[from, to]` day window (`to` is a calendar day, so
    * the upper bound is exclusive of the following day). Bounded by a ≤14-day window — no `LIMIT`.
-   * Do not copy `getMemoryAssetsForPerson`'s `ORDER BY asset.id … LIMIT 60` — that returns the 60
-   * lowest UUIDs, an arbitrary sample, not the most recent assets.
+   * Do not add an `ORDER BY asset.id … LIMIT n` — that returns the n lowest UUIDs, an arbitrary
+   * sample, not the most recent assets.
    */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { from: DummyValue.DATE, to: DummyValue.DATE }] })
   getMemoryAssetsForPersonWindow(
@@ -445,20 +415,5 @@ export class MemoryRuleAssetRepository {
       .executeTakeFirst();
 
     return !!result;
-  }
-
-  /** The pets among `personGroupIds`: upstream's forBirthdayMemories has no notion of pets, so the birthday rule asks. */
-  @GenerateSql({ params: [[DummyValue.UUID]] })
-  async getPetPersonGroupIds(personGroupIds: string[]) {
-    if (personGroupIds.length === 0) {
-      return new Set<string>();
-    }
-
-    const rows = await this.db
-      .selectFrom('person_pet')
-      .select('personGroupId')
-      .where('personGroupId', 'in', personGroupIds)
-      .execute();
-    return new Set(rows.map(({ personGroupId }) => personGroupId));
   }
 }

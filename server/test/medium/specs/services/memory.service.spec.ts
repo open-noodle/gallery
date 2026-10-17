@@ -1,13 +1,23 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
-import type { ThemeSearchAsset, ThemeSearchPort } from 'src/services/memory-rules/theme-search.port.js';
+import type { ThemeSearchAsset, ThemeSearchPort } from 'src/gallery/services/memory-rules/theme-search.port.js';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
-import { AssetFileType, AssetType, AssetVisibility, MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum.js';
+import {
+  AssetFileType,
+  AssetType,
+  AssetVisibility,
+  JobName,
+  MemoryType,
+  SystemMetadataKey,
+  UserMetadataKey,
+} from 'src/enum.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
+import { RULE_DAILY_LIMIT, RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { MemoryRepository } from 'src/repositories/memory.repository.js';
 import { PartnerRepository } from 'src/repositories/partner.repository.js';
@@ -16,7 +26,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 import { UserRepository } from 'src/repositories/user.repository.js';
 import { DB } from 'src/schema/index.js';
-import { MemoryService, RULE_DAILY_LIMIT } from 'src/services/memory.service.js';
+import { MemoryService } from 'src/services/memory.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
@@ -24,7 +34,7 @@ import { getKyselyDB } from 'test/utils.js';
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
-  return newMediumService(MemoryService, {
+  const { sut, ctx } = newMediumService(MemoryService, {
     database: db || defaultDatabase,
     real: [
       AccessRepository,
@@ -41,8 +51,16 @@ const setup = (db?: Kysely<DB>) => {
       PartnerRepository,
       PersonRepository,
     ],
-    mock: [LoggingRepository],
+    mock: [JobRepository, LoggingRepository],
   });
+  // The nightly run end to end: MemoryGenerate queues the rule-memory job, run inline here.
+  const ruleSut = ctx.getService(RuleMemoryService);
+  ctx.getMock(JobRepository).queue.mockImplementation(async (item) => {
+    if (item.name === JobName.MemoryRuleGenerate) {
+      await ruleSut.onRuleMemoriesCreate();
+    }
+  });
+  return { sut, ctx, ruleSut };
 };
 
 const create = async (ctx: ReturnType<typeof setup>['ctx']) => {
@@ -138,28 +156,6 @@ const seedDormantPersonChapter = async (
   }
 
   return { person, chapterAssetIds };
-};
-
-// Four photos of one person in one year: enough for the birthday rule's fallback card.
-const addPersonAssets = async (ctx: ReturnType<typeof setup>['ctx'], ownerId: string, personGroupId: string) => {
-  const assetRepo = ctx.get(AssetRepository);
-  for (const localDateTime of [
-    '2024-06-01T12:00:00Z',
-    '2024-06-02T12:00:00Z',
-    '2024-06-03T12:00:00Z',
-    '2024-06-04T12:00:00Z',
-  ]) {
-    const { asset } = await ctx.newAsset({ ownerId, localDateTime });
-    await Promise.all([
-      ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
-      ctx.newJobStatus({ assetId: asset.id }),
-      ctx.newAssetFace({ assetId: asset.id, personGroupId }),
-      assetRepo.upsertFiles([
-        { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
-        { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
-      ]),
-    ]);
-  }
 };
 
 describe(MemoryService.name, () => {
@@ -477,9 +473,9 @@ describe(MemoryService.name, () => {
       ]);
     });
 
-    // specs/2026-09-24-birthday-memories-upstream-coexistence-design.md: installed Gallery apps
-    // cannot decode MemoryType.Birthday, so no birthday row may reach the list or the count.
-    it('should exclude birthday memories from search and statistics, including saved ones', async () => {
+    // OD-3: birthday memories reach every client upstream sends them to; only a Gallery app older than 5.8.0, whose
+    // generated client lacks the type, is spared them in the list and the count.
+    it('should list and count birthday memories, saved or not, except to a Gallery app older than 5.8.0', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
@@ -500,16 +496,30 @@ describe(MemoryService.name, () => {
         await ctx.newMemoryAsset({ memoryId: id!, assetId: asset.id });
       }
 
-      const results = await sut.search(auth, {});
-      expect(results.map(({ id }) => id)).toEqual([onThisDay.id]);
+      const ids = async (searchAuth: typeof auth) => {
+        const memories = await sut.search(searchAuth, {});
+        return memories.map(({ id }) => id).toSorted();
+      };
       // countAll comes back from Postgres as a bigint string; compare numerically.
-      const statistics = await sut.statistics(auth, {});
-      expect(Number(statistics.total)).toBe(1);
-      await expect(sut.search(auth, { type: MemoryType.Birthday })).resolves.toEqual([]);
-      await expect(sut.get(auth, birthday.id!)).resolves.toEqual(expect.objectContaining({ id: birthday.id }));
+      const total = async (searchAuth: typeof auth) => {
+        const statistics = await sut.statistics(searchAuth, {});
+        return Number(statistics.total);
+      };
+
+      await expect(ids(auth)).resolves.toEqual([onThisDay.id, birthday.id, savedBirthday.id].toSorted());
+      await expect(total(auth)).resolves.toBe(3);
+      await expect(ids({ ...auth, stockClient: true })).resolves.toEqual(
+        [onThisDay.id, birthday.id, savedBirthday.id].toSorted(),
+      );
+      await expect(total({ ...auth, stockClient: true })).resolves.toBe(3);
+
+      const legacyApp = { ...auth, legacyGalleryApp: true as const };
+      await expect(ids(legacyApp)).resolves.toEqual([onThisDay.id]);
+      await expect(total(legacyApp)).resolves.toBe(1);
+      await expect(sut.get(legacyApp, birthday.id!)).resolves.toEqual(expect.objectContaining({ id: birthday.id }));
     });
 
-    it('should exclude a birthday memory reached through a shared space', async () => {
+    it('should list a birthday memory reached through a shared space', async () => {
       const { sut, ctx } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: member } = await ctx.newUser();
@@ -524,7 +534,9 @@ describe(MemoryService.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
 
-      await expect(sut.search(factory.auth({ user: member }), {})).resolves.toEqual([]);
+      await expect(sut.search(factory.auth({ user: member }), {})).resolves.toEqual([
+        expect.objectContaining({ id: memory.id, type: MemoryType.Birthday }),
+      ]);
     });
 
     // #763 slice 1b Task 2 — mapMemory feeds mapAsset, which now reads `isFavoriteForUser`
@@ -714,7 +726,7 @@ describe(MemoryService.name, () => {
 
     it('sweeps an on_this_day memory that holds fewer photos than its floor', async () => {
       // on_this_day's floor is 3 (`minAssets` on the 'on_this_day' entry in
-      // `src/services/memory-rules/memory-type.metadata.ts`), applied unconditionally per spec
+      // `src/gallery/services/memory-rules/memory-type.metadata.ts`), applied unconditionally per spec
       // §6.2/P3 -- even with nothing else visible that day. This is deliberately what removes
       // the reporter's original 2-photo card, so pin it here rather than leaving it as an
       // incidental side effect of the overlap-reconciliation tests below.
@@ -740,10 +752,10 @@ describe(MemoryService.name, () => {
       expect(memories).toEqual([]);
     });
 
-    it('creates a birthday rule memory on the birthday itself', async () => {
+    // OD-3: Immich's own generator writes the birthday memory; Gallery's birthday rule is gone.
+    it("writes upstream's birthday memory and no birthday rule memory", async () => {
       const { sut, ctx } = setup();
       const assetRepo = ctx.get(AssetRepository);
-      const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2026, month: 4, day: 23 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({
@@ -752,7 +764,7 @@ describe(MemoryService.name, () => {
         birthDate: new Date('1990-04-23T00:00:00Z'),
       });
 
-      const addBirthdayAsset = async (localDateTime: string) => {
+      for (const localDateTime of ['2025-04-01T12:00:00Z', '2024-04-01T12:00:00Z', '2019-04-23T12:00:00Z']) {
         const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
         await Promise.all([
           ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
@@ -763,138 +775,20 @@ describe(MemoryService.name, () => {
             { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
           ]),
         ]);
-      };
-
-      await addBirthdayAsset('2025-04-01T12:00:00Z');
-      await addBirthdayAsset('2024-04-01T12:00:00Z');
-      await addBirthdayAsset('2023-04-01T12:00:00Z');
-      await addBirthdayAsset('2022-04-01T12:00:00Z');
-      await addBirthdayAsset('2021-04-01T12:00:00Z');
-      await addBirthdayAsset('2020-04-01T12:00:00Z');
-      await addBirthdayAsset('2019-04-23T12:00:00Z');
+      }
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
 
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
-      expect(memories).toEqual([
-        expect.objectContaining({
-          type: MemoryType.Rule,
-          data: expect.objectContaining({
-            ruleId: 'birthday',
-            context: expect.objectContaining({ personName: 'Alice', variant: 'across_years' }),
-          }),
-        }),
-      ]);
-
-      // Upstream's MemoryType.Birthday generator must not run alongside the rule (spec
-      // 2026-09-24). Alice satisfies upstream's criteria (named, birthDate set, a photo on a past
-      // birthday), so a dispatched upstream generator would write a second card here.
-      const upstreamBirthdays = await ctx.database
+      const memories = await ctx.database
         .selectFrom('memory')
-        .select('id')
+        .select(['type', 'data'])
         .where('ownerId', '=', user.id)
-        .where('type', '=', MemoryType.Birthday)
+        .where('type', 'in', [MemoryType.Birthday, MemoryType.Rule])
         .execute();
-      expect(upstreamBirthdays).toEqual([]);
-    });
-
-    it('creates a fallback birthday memory from four single-year Pierre photos', async () => {
-      const { sut, ctx } = setup();
-      const assetRepo = ctx.get(AssetRepository);
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2026, month: 4, day: 24 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({
-        ownerId: user.id,
-        name: 'Pierre',
-        birthDate: new Date('2025-04-24T00:00:00Z'),
-      });
-      const pierreAssetIds: string[] = [];
-
-      const addPierreAsset = async (localDateTime: string) => {
-        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
-        pierreAssetIds.push(asset.id);
-        await Promise.all([
-          ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
-          ctx.newJobStatus({ assetId: asset.id }),
-          ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId }),
-          assetRepo.upsertFiles([
-            { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
-            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
-          ]),
-        ]);
-      };
-
-      await addPierreAsset('2026-04-18T15:25:07.335Z');
-      await addPierreAsset('2026-04-18T15:25:08.244Z');
-      await addPierreAsset('2026-04-18T15:25:09.803Z');
-      await addPierreAsset('2026-04-18T15:25:11.543Z');
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
       expect(memories).toEqual([
-        expect.objectContaining({
-          type: MemoryType.Rule,
-          data: expect.objectContaining({
-            ruleId: 'birthday',
-            context: expect.objectContaining({ personName: 'Pierre', variant: 'recent' }),
-          }),
-        }),
+        { type: MemoryType.Birthday, data: { personId: person.personGroupId, personName: 'Alice', year: 1990 } },
       ]);
-      expect(memories[0]?.assets).toHaveLength(4);
-      expect(memories[0]?.assets.map(({ id }) => id).toSorted()).toEqual([...pierreAssetIds].toSorted());
-    });
-
-    // F16: the rule runs upstream's forBirthdayMemories, which observes a 29 February birthday on 28 February in a
-    // non-leap year, and still skips pets through person_pet.
-    describe('birthday rule on upstream birthday query', () => {
-      it('creates the memory for a 29 February birthday on 28 February of a non-leap year', async () => {
-        const { sut, ctx } = setup();
-        const now = DateTime.fromObject({ year: 2025, month: 2, day: 28 }, { zone: 'utc' }) as DateTime<true>;
-        const { user } = await ctx.newUser();
-        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Leap', birthDate: new Date('1992-02-29') });
-        await addPersonAssets(ctx, user.id, person.personGroupId);
-
-        vi.setSystemTime(now.toJSDate());
-        await sut.onMemoriesCreate();
-
-        const memories = await ctx
-          .get(MemoryRepository)
-          .search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
-        expect(memories).toEqual([
-          expect.objectContaining({
-            data: expect.objectContaining({
-              ruleId: 'birthday',
-              context: expect.objectContaining({ personName: 'Leap' }),
-            }),
-          }),
-        ]);
-      });
-
-      it('does not create a birthday memory for a pet', async () => {
-        const { sut, ctx } = setup();
-        const now = DateTime.fromObject({ year: 2025, month: 7, day: 10 }, { zone: 'utc' }) as DateTime<true>;
-        const { user } = await ctx.newUser();
-        const { person: pet } = await ctx.newPerson({
-          ownerId: user.id,
-          name: 'Rex',
-          type: 'pet',
-          species: 'dog',
-          birthDate: new Date('2020-07-10'),
-        });
-        await addPersonAssets(ctx, user.id, pet.personGroupId);
-
-        vi.setSystemTime(now.toJSDate());
-        await sut.onMemoriesCreate();
-
-        const memories = await ctx
-          .get(MemoryRepository)
-          .search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
-        expect(memories.filter(({ data }) => (data as { ruleId?: string }).ruleId === 'birthday')).toEqual([]);
-      });
     });
 
     it('creates a recent-trip rule memory for a dense non-home cluster', async () => {
@@ -1158,12 +1052,7 @@ describe(MemoryService.name, () => {
     });
   });
 
-  // Gallery keeps its own BirthdayMemoryRule as the only birthday generator; upstream's
-  // createBirthdayMemories is pulled but deliberately never dispatched
-  // (specs/2026-09-24-birthday-memories-upstream-coexistence-design.md). These cases assert
-  // upstream's generator, so they are skipped until the fork adopts it — re-enable them in the
-  // same change that deletes the `birthday-memory-generator-not-dispatched` invariant.
-  describe.skip('onMemoryCreate (birthday)', () => {
+  describe('onMemoryCreate (birthday)', () => {
     it('should create a memory for the 3 days leading up to a birthday', async () => {
       const { sut, ctx } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
@@ -1879,7 +1768,7 @@ describe(MemoryService.name, () => {
     });
 
     it('creates a themed rule memory from a stubbed theme search port (day 22)', async () => {
-      const { sut, ctx } = setup();
+      const { sut, ctx, ruleSut } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2026, month: 7, day: 22 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
@@ -1908,7 +1797,7 @@ describe(MemoryService.name, () => {
       };
       // Instance-override of the protected factory seam: getThemeSearchPort() memoizes lazily on
       // first use, so the override must land before the first onMemoriesCreate() call.
-      (sut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
+      (ruleSut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -1927,7 +1816,7 @@ describe(MemoryService.name, () => {
     });
 
     it('does not create a themed rule memory when the theme search port resolves no embedding', async () => {
-      const { sut, ctx } = setup();
+      const { sut, ctx, ruleSut } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2026, month: 7, day: 22 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
@@ -1937,7 +1826,7 @@ describe(MemoryService.name, () => {
         resolveEmbedding: vi.fn().mockResolvedValue(null),
         searchByEmbedding,
       };
-      (sut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
+      (ruleSut as unknown as { createThemeSearchPort: () => ThemeSearchPort }).createThemeSearchPort = () => stub;
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();

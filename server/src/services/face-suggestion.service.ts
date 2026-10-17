@@ -232,7 +232,10 @@ export class FaceSuggestionService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const embeddings = await this.personRepository.getAssignedFaceEmbeddings(id, PERSON_SUGGESTION_EMBEDDING_SAMPLE);
+    const embeddings = await this.galleryPersonRepository.getAssignedFaceEmbeddings(
+      id,
+      PERSON_SUGGESTION_EMBEDDING_SAMPLE,
+    );
     if (embeddings.length === 0) {
       return JobStatus.Skipped;
     }
@@ -306,7 +309,7 @@ export class FaceSuggestionService extends BaseService {
     }
 
     let jobs: { name: JobName.PersonSuggestionScan; data: { id: string } }[] = [];
-    for await (const person of this.personRepository.getScannablePeopleWithUnassignedFaces()) {
+    for await (const person of this.galleryPersonRepository.getScannablePeopleWithUnassignedFaces()) {
       jobs.push({ name: JobName.PersonSuggestionScan, data: { id: person.personGroupId } });
       if (jobs.length !== JOBS_ASSET_PAGINATION_SIZE) {
         continue;

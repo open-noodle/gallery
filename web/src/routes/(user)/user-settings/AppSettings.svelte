@@ -4,11 +4,11 @@
   import SidebarSettings from './sidebar-settings.svelte';
   import SettingsLanguageSelector from '$lib/components/shared-components/settings/SettingsLanguageSelector.svelte';
   import { fallbackLocale, locales } from '$lib/constants';
+  import { cropFacesFromAsset } from '$lib/gallery/stores/preferences.store';
   import {
     alwaysLoadOriginalFile,
     alwaysLoadOriginalVideo,
     autoPlayVideo,
-    cropFacesFromAsset,
     locale,
     loopVideo,
     playVideoThumbnailOnHover,
