@@ -58,7 +58,7 @@
     currentFolderId = null,
     canManage,
     members = [],
-    // eslint-disable-next-line no-useless-assignment
+    // eslint-disable-next-line no-useless-assignment, @typescript-eslint/no-unused-vars -- a $bindable output, written for the parent
     groupIds = $bindable([]),
     searchQuery = '',
     onUnlink,
