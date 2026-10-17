@@ -53,7 +53,7 @@ describe(ServerController.name, () => {
 
   describe('GET /server/version', () => {
     it('passes the client headers to the service and varies the response on them', async () => {
-      versionService.getVersion.mockReturnValue({ major: 3, minor: 3, patch: 1, prerelease: null });
+      versionService.getVersion.mockReturnValue({ major: 3, minor: 3, patch: 1, prerelease: null, featureLevel: 1 });
       const { status, headers } = await request(ctx.getHttpServer())
         .get('/server/version')
         .set('User-Agent', 'immich-android/3.3.1');
