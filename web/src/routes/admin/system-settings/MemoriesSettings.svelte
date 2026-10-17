@@ -4,7 +4,9 @@
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import { SettingInputFieldType } from '$lib/constants';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
+  import { createDefinedQuery } from '$lib/queries/client';
+  import { getConfigQuery } from '$lib/queries/system-config.query';
+  import { cloneDeep } from 'lodash-es';
   import { t, type Translations } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
@@ -24,9 +26,11 @@
     'person_throwback',
   ];
 
+  const query = createDefinedQuery(getConfigQuery());
+  const config = $derived(query.data);
+
   const disabled = $derived(featureFlagsManager.value.configFile);
-  const config = $derived(systemConfigManager.value);
-  let configToEdit = $state(systemConfigManager.cloneValue());
+  let configToEdit = $state(cloneDeep(config));
 
   // Seed the availability map so every known type renders with its effective value
   // (unset keys default to enabled, matching the registry default). `memoryTypes` shares
