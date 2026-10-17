@@ -18,7 +18,7 @@ Saved memories stay available after their normal display window. Hidden or delet
 
 ## Birthday memories
 
-Birthday memories are Immich's own, so the stock Immich apps show them too. They are generated for every named, visible person or pet in your own people with a birthday set, from the year after they were born.
+Birthday memories use the upstream memory type, so stock upstream apps show them too. They are generated for every named, visible person or pet in your own people with a birthday set, from the year after they were born.
 
 - The card appears 3 days before the birthday and stays until the end of the day.
 - It holds photos of that person taken on their past birthdays: up to 5 per year and 25 in total. With more than 25 birthdays on record, it takes one photo from each of 25 random ones.
