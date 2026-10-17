@@ -211,4 +211,15 @@ export class SpaceAlbumRepository {
       .where('album_space_asset.assetId', 'in', assetIds)
       .execute();
   }
+
+  /** #1018: the space a shared link was created from, which scopes its album's count. Null for a plain link. */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getSharedLinkSpaceId(sharedLinkId: string): Promise<string | null> {
+    const row = await this.db
+      .selectFrom('shared_link_space')
+      .select('shared_link_space.spaceId')
+      .where('shared_link_space.sharedLinkId', '=', sharedLinkId)
+      .executeTakeFirst();
+    return row?.spaceId ?? null;
+  }
 }

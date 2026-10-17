@@ -13,6 +13,7 @@ import {
   mapSharedLink,
 } from 'src/dtos/shared-link.dto.js';
 import { Permission, SharedLinkType, SharedSpaceRole } from 'src/enum.js';
+import { AlbumMetadataScope, sharedLinkAlbumMetadataScope } from 'src/gallery/utils/album-metadata-scope.js';
 import { BaseService } from 'src/services/base.service.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { OpenGraphTags, findOrFail, getExternalDomain } from 'src/utils/misc.js';
@@ -45,7 +46,11 @@ export class SharedLinkService extends BaseService {
 
     return {
       // Anonymous visitor path — redact who owns what (#1018).
-      sharedLink: mapSharedLink(sharedLink, { auth, redactAssetOwners: true }),
+      sharedLink: await this.mapWithAlbumMetadata(
+        sharedLink,
+        { auth, redactAssetOwners: true },
+        sharedLinkAlbumMetadataScope(auth.sharedLink),
+      ),
       token: this.asToken({ id, password }),
     };
   }
@@ -63,12 +68,21 @@ export class SharedLinkService extends BaseService {
     }
 
     // Anonymous visitor path — redact who owns what (#1018).
-    return mapSharedLink(sharedLink, { auth, redactAssetOwners: true });
+    return this.mapWithAlbumMetadata(
+      sharedLink,
+      { auth, redactAssetOwners: true },
+      sharedLinkAlbumMetadataScope(auth.sharedLink),
+    );
   }
 
   async get(auth: AuthDto, id: string): Promise<SharedLinkResponseDto> {
     const sharedLink = await this.findOrFail(auth.user.id, id);
-    return this.mapWithAlbumMetadata(sharedLink, { auth });
+    const spaceId = await this.spaceAlbumRepository.getSharedLinkSpaceId(id);
+    return this.mapWithAlbumMetadata(
+      sharedLink,
+      { auth },
+      sharedLinkAlbumMetadataScope({ userId: sharedLink.userId, spaceId }),
+    );
   }
 
   async create(auth: AuthDto, dto: SharedLinkCreateDto): Promise<SharedLinkResponseDto> {
@@ -272,7 +286,12 @@ export class SharedLinkService extends BaseService {
     const config = await this.getConfig({ withCache: true });
     const sharedLink = await this.findOrFail(auth.sharedLink.userId, auth.sharedLink.id);
     const assetId = sharedLink.album?.albumThumbnailAssetId || sharedLink.assets[0]?.id;
-    const [albumMetadata] = sharedLink.album ? await this.albumRepository.getMetadataForIds([sharedLink.album.id]) : [];
+    const [albumMetadata] = sharedLink.album
+      ? await this.albumRepository.getMetadataForIds(
+          [sharedLink.album.id],
+          sharedLinkAlbumMetadataScope(auth.sharedLink),
+        )
+      : [];
     const assetCount = sharedLink.assets.length > 0 ? sharedLink.assets.length : albumMetadata?.assetCount || 0;
     const imagePath = assetId
       ? `/api/assets/${assetId}/thumbnail?key=${sharedLink.key.toString('base64url')}`
@@ -285,10 +304,14 @@ export class SharedLinkService extends BaseService {
     };
   }
 
-  private async mapWithAlbumMetadata(sharedLink: SharedLink, { auth }: { auth: AuthDto }) {
-    const response = mapSharedLink(sharedLink, { auth });
+  private async mapWithAlbumMetadata(
+    sharedLink: SharedLink,
+    options: Parameters<typeof mapSharedLink>[1],
+    scope: AlbumMetadataScope,
+  ) {
+    const response = mapSharedLink(sharedLink, options);
     if (response.album) {
-      const [metadata] = await this.albumRepository.getMetadataForIds([response.album.id]);
+      const [metadata] = await this.albumRepository.getMetadataForIds([response.album.id], scope);
       response.album.startDate = asDateTimeString(metadata?.startDate ?? undefined);
       response.album.endDate = asDateTimeString(metadata?.endDate ?? undefined);
       response.album.assetCount = metadata?.assetCount ?? 0;

@@ -5,9 +5,8 @@ import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database.js';
 import { Chunked, ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserCreateDto, MapAlbumDto } from 'src/dtos/album.dto.js';
-import { AlbumUserRole } from 'src/enum.js';
+import { AlbumUserRole, SharedSpaceRole } from 'src/enum.js';
 import { albumCoverIsLiveContribution } from 'src/gallery/utils/album-cover.js';
-import { projectedDuration } from 'src/gallery/utils/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
 import { asUuid, dummy, withDefaultVisibility } from 'src/utils/database.js';
@@ -40,28 +39,6 @@ const withSharedLink = (eb: ExpressionBuilder<DB, 'album'>) =>
   jsonArrayFrom(
     eb.selectFrom('shared_link').selectAll('shared_link').whereRef('shared_link.albumId', '=', 'album.id'),
   ).as('sharedLinks');
-
-const withAssets = (eb: ExpressionBuilder<DB, 'album'>) => {
-  return eb
-    .selectFrom((eb) =>
-      eb
-        .selectFrom('asset')
-        .selectAll('asset')
-        .select(projectedDuration)
-        .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .select((eb) =>
-          eb.table('asset_exif').$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>().as('exifInfo'),
-        )
-        .innerJoin('album_asset', 'album_asset.assetId', 'asset.id')
-        .whereRef('album_asset.albumId', '=', 'album.id')
-        .where('asset.deletedAt', 'is', null)
-        .$call(withDefaultVisibility)
-        .orderBy('asset.fileCreatedAt', 'desc')
-        .as('asset'),
-    )
-    .select((eb) => eb.fn.jsonAgg('asset').as('assets'))
-    .as('assets');
-};
 
 const isAlbumOwned = (ownerId: string) => (eb: ExpressionBuilder<DB, 'album'>) =>
   eb.exists(
@@ -195,9 +172,10 @@ export class AlbumRepository {
   async getMetadataForIds(
     ids: string[],
     // #1018: `spaceId` narrows the contributed arm to a single space instead of every space
-    // `forUserId` belongs to. Set for shared-link reads, where widening would count another
-    // space's contributions into a public link's total.
-    { forUserId, spaceId }: { forUserId?: string; spaceId?: string } = {},
+    // `forUserId` belongs to, and `memberRole` requires that membership to hold one of those roles.
+    // Both are set for shared-link reads, where widening would count another space's contributions,
+    // or a demoted creator's, into a public link's total.
+    { forUserId, spaceId, memberRole }: { forUserId?: string; spaceId?: string; memberRole?: SharedSpaceRole[] } = {},
   ): Promise<AlbumAssetCount[]> {
     // Guard against running invalid query when ids list is empty.
     if (ids.length === 0) {
@@ -215,7 +193,9 @@ export class AlbumRepository {
             albumMembership(
               eb,
               ids,
-              forUserId ? { memberUserId: forUserId, ...(spaceId && { spaceId }) } : undefined,
+              forUserId
+                ? { memberUserId: forUserId, ...(spaceId && { spaceId }), ...(memberRole && { memberRole }) }
+                : undefined,
             ).as('album_members'),
           (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
         )
