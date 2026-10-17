@@ -1,35 +1,26 @@
 <script lang="ts">
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { locale } from '$lib/stores/preferences.store';
-  import { userInteraction } from '$lib/stores/user.svelte';
-  import { requestServerInfo } from '$lib/utils/auth';
+  import { getStorageQuery } from '$lib/queries/server.query';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { Icon } from '@immich/ui';
   import { mdiCloudOutline } from '@mdi/js';
-  import { onMount } from 'svelte';
+  import { createQuery } from '@tanstack/svelte-query';
   import { t } from 'svelte-i18n';
 
   // Duplicated from StorageSpace.svelte because giving that upstream component a
   // `compact` prop would add a fifth upstream file. The derivation is mirrored line for
   // line, and rail-storage.spec.ts pins it against a table of expected byte values.
+  const query = createQuery(() => getStorageQuery());
+  const serverInfo = $derived(query.data);
+
   let hasQuota = $derived(authManager.user.quotaSizeInBytes !== null);
   let availableBytes = $derived(
-    (hasQuota && authManager.authenticated
-      ? authManager.user.quotaSizeInBytes
-      : userInteraction.serverInfo?.diskSizeRaw) || 0,
+    (hasQuota && authManager.authenticated ? authManager.user.quotaSizeInBytes : serverInfo?.diskSizeRaw) || 0,
   );
   let usedBytes = $derived(
-    (hasQuota && authManager.authenticated
-      ? authManager.user.quotaUsageInBytes
-      : userInteraction.serverInfo?.diskUseRaw) || 0,
+    (hasQuota && authManager.authenticated ? authManager.user.quotaUsageInBytes : serverInfo?.diskUseRaw) || 0,
   );
-
-  onMount(async () => {
-    if (userInteraction.serverInfo && authManager.authenticated) {
-      return;
-    }
-    await requestServerInfo();
-  });
 </script>
 
 <div
