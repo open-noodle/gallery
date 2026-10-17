@@ -739,6 +739,10 @@ describe(SharedLinkService.name, () => {
   });
 
   describe('getMetadataTags', () => {
+    beforeEach(() => {
+      mocks.album.getMetadataForIds.mockResolvedValue([]);
+    });
+
     it('should return null when auth is not a shared link', async () => {
       await expect(sut.getMetadataTags(authStub.admin)).resolves.toBe(null);
 
@@ -822,19 +826,23 @@ describe(SharedLinkService.name, () => {
       expect(result).toMatchObject({ description: 'My custom description' });
     });
 
-    it('should use album assets count when shared link has an album', async () => {
+    it('should use the album asset count when shared link has an album', async () => {
       const album = AlbumFactory.from({ albumName: 'Test Album' }).build();
-      const assets = [AssetFactory.create(), AssetFactory.create(), AssetFactory.create()];
       const sharedLink = {
         ...sharedLinkStub.individual,
-        album: { ...album, albumThumbnailAssetId: null, assets },
+        album: { ...album, albumThumbnailAssetId: null },
         assets: [],
       };
       mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
+      mocks.album.getMetadataForIds.mockResolvedValue([
+        { albumId: album.id, assetCount: 3, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+      ]);
 
       const result = await sut.getMetadataTags(authStub.adminSharedLink);
 
       expect(result).toMatchObject({ description: '3 shared photos & videos' });
+      // A link with no space counts the album's own rows only (#1018).
+      expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], {});
     });
 
     it('should use defaultDomain when provided', async () => {

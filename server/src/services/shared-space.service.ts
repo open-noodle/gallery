@@ -889,7 +889,7 @@ export class SharedSpaceService extends BaseService {
     unlinkedAlbumIds: string[],
   ): Promise<void> {
     for (const albumId of unlinkedAlbumIds) {
-      const album = await this.albumRepository.getById(albumId, { withAssets: false });
+      const album = await this.albumRepository.getById(albumId);
       await this.sharedSpaceRepository.logActivity({
         spaceId,
         userId: actingUserId,
@@ -1031,7 +1031,7 @@ export class SharedSpaceService extends BaseService {
           data: { spaceId, albumId },
         });
       }
-      const album = await this.albumRepository.getById(albumId, { withAssets: false });
+      const album = await this.albumRepository.getById(albumId);
       await this.sharedSpaceRepository.logActivity({
         spaceId,
         userId: auth.user.id,
@@ -1078,7 +1078,7 @@ export class SharedSpaceService extends BaseService {
       throw new NotFoundException('Album is not linked to this space');
     }
 
-    const album = await this.albumRepository.getById(albumId, { withAssets: false });
+    const album = await this.albumRepository.getById(albumId);
     const orphanedAssetIds = await this.sharedSpaceRepository.getAlbumAssetIdsWithoutOtherSpacePath(spaceId, albumId);
     await this.sharedSpaceRepository.removeAlbum(spaceId, albumId);
     await this.sharedSpaceRepository.logActivity({

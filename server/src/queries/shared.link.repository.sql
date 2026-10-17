@@ -176,102 +176,15 @@ from
       ) as "albumUsers"
     from
       "album"
-      left join lateral (
-        select
-          "album_asset"."albumId" as "albumId",
-          "album_asset"."assetId" as "assetId"
-        from
-          "album_asset"
-        where
-          "album_asset"."albumId" = "album"."id"
-        union
-        select
-          "album_space_asset"."albumId" as "albumId",
-          "album_space_asset"."assetId" as "assetId"
-        from
-          "shared_space_album"
-          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-          and "linked_album"."deletedAt" is null
-          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
-          inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
-        where
-          "shared_space_member"."userId" = $5::uuid
-          and "shared_space_member"."role" in ($6, $7)
-          and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
-          and "asset"."visibility" in ($8, $9)
-          and "album_space_asset"."albumId" = "album"."id"
-      ) as "album_asset" on true
-      left join lateral (
-        select
-          "asset".*,
-          coalesce(
-            (
-              select
-                "asset_video_trim"."duration"
-              from
-                "asset_video_trim"
-              where
-                "asset_video_trim"."assetId" = "asset"."id"
-            ),
-            "asset"."duration"
-          ) as "duration",
-          to_json("exifInfo") as "exifInfo"
-        from
-          "asset"
-          inner join lateral (
-            select
-              "asset_exif"."assetId",
-              "asset_exif"."autoStackId",
-              "asset_exif"."bitsPerSample",
-              "asset_exif"."city",
-              "asset_exif"."colorspace",
-              "asset_exif"."country",
-              "asset_exif"."dateTimeOriginal",
-              "asset_exif"."description",
-              "asset_exif"."exifImageHeight",
-              "asset_exif"."exifImageWidth",
-              "asset_exif"."exposureTime",
-              "asset_exif"."fileSizeInByte",
-              "asset_exif"."fNumber",
-              "asset_exif"."focalLength",
-              "asset_exif"."fps",
-              "asset_exif"."iso",
-              "asset_exif"."latitude",
-              "asset_exif"."lensModel",
-              "asset_exif"."livePhotoCID",
-              "asset_exif"."longitude",
-              "asset_exif"."make",
-              "asset_exif"."model",
-              "asset_exif"."modifyDate",
-              "asset_exif"."orientation",
-              "asset_exif"."profileDescription",
-              "asset_exif"."projectionType",
-              "asset_exif"."rating",
-              "asset_exif"."state",
-              "asset_exif"."tags",
-              "asset_exif"."timeZone"
-            from
-              "asset_exif"
-            where
-              "asset_exif"."assetId" = "asset"."id"
-          ) as "exifInfo" on true
-        where
-          "album_asset"."assetId" = "asset"."id"
-          and "asset"."deletedAt" is null
-        order by
-          "asset"."fileCreatedAt" asc
-      ) as "assets" on true
     where
       "album"."id" = "shared_link"."albumId"
       and "album"."deletedAt" is null
   ) as "album" on true
 where
-  "shared_link"."id" = $10
-  and "shared_link"."userId" = $11
+  "shared_link"."id" = $5
+  and "shared_link"."userId" = $6
   and (
-    "shared_link"."type" = $12
+    "shared_link"."type" = $7
     or "album"."id" is not null
   )
 order by

@@ -20,8 +20,7 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { dummy } from 'src/utils/database.js';
-import { asBaseEb, sharedLinkAssetIsServable, sharedLinkPublisherRoles } from 'src/utils/shared-link-space-tether.js';
-import { albumMembership } from 'src/utils/shared-space-album-scope.js';
+import { asBaseEb, sharedLinkAssetIsServable } from 'src/utils/shared-link-space-tether.js';
 
 export type SharedLinkSearchOptions = {
   userId: string;
@@ -93,50 +92,7 @@ export class SharedLinkRepository {
         ).as('assets'),
       )
       .leftJoinLateral(
-        (eb) =>
-          withSharedLinkAlbum(eb)
-            // #1018: album contents = the album's own rows plus the cross-owner contributions (#764) made
-            // to the space this link was created from, while its creator (`userId`, pinned below) may
-            // still publish there. LATERAL so that arm can correlate to `shared_link_space.spaceId`; a
-            // link with no space reads `album_asset` alone.
-            .leftJoinLateral(
-              (eb) =>
-                albumMembership(eb, 'album.id', {
-                  memberUserId: userId,
-                  memberRole: sharedLinkPublisherRoles,
-                  spaceIdRef: 'shared_link_space.spaceId',
-                }).as('album_asset'),
-              (join) => join.onTrue(),
-            )
-            .leftJoinLateral(
-              (eb) =>
-                eb
-                  .selectFrom('asset')
-                  .selectAll('asset')
-                  .select(projectedDuration)
-                  .whereRef('album_asset.assetId', '=', 'asset.id')
-                  .where('asset.deletedAt', 'is', null)
-                  .innerJoinLateral(withExifInfo, (join) => join.onTrue())
-                  .select((eb) => eb.fn.toJson(eb.table('exifInfo')).as('exifInfo'))
-                  .orderBy('asset.fileCreatedAt', 'asc')
-                  .as('assets'),
-              (join) => join.onTrue(),
-            )
-            .select(withAlbumOwner)
-            .select((eb) =>
-              eb.fn
-                .coalesce(
-                  eb.fn
-                    .jsonAgg('assets')
-                    .orderBy('assets.fileCreatedAt', 'asc')
-                    .filterWhere('assets.id', 'is not', null),
-
-                  sql`'[]'`,
-                )
-                .as('assets'),
-            )
-            .groupBy('album.id')
-            .as('album'),
+        (eb) => withSharedLinkAlbum(eb).select(withAlbumOwner).as('album'),
         (join) => join.onTrue(),
       )
       .select((eb) => eb.fn.toJson(eb.table('album')).$castTo<ShallowDehydrateObject<Album> | null>().as('album'))

@@ -125,25 +125,126 @@ where
   and "asset"."id" in ($2)
 
 -- AccessRepository.asset.checkSharedLinkAccess
+with
+  "target" as (
+    select
+      array[$1]::uuid[] as "ids"
+  ),
+  "link" as (
+    select
+      "shared_link"."id",
+      "shared_link"."albumId"
+    from
+      "shared_link"
+    where
+      "shared_link"."id" = $2
+  )
 select
-  "asset"."id" as "assetId",
-  "asset"."livePhotoVideoId" as "assetLivePhotoVideoId",
-  "albumAssets"."id" as "albumAssetId",
-  "albumAssets"."livePhotoVideoId" as "albumAssetLivePhotoVideoId",
-  "contributedAssets"."id" as "contributedAssetId",
-  "contributedAssets"."livePhotoVideoId" as "contributedAssetLivePhotoVideoId"
+  "asset"."id",
+  "asset"."livePhotoVideoId"
 from
-  "shared_link"
-  left join "album" on "album"."id" = "shared_link"."albumId"
-  and "album"."deletedAt" is null
-  left join "shared_link_space" on "shared_link_space"."sharedLinkId" = "shared_link"."id"
-  left join "shared_link_asset" on "shared_link_asset"."sharedLinkId" = "shared_link"."id"
-  left join "asset" on "asset"."id" = "shared_link_asset"."assetId"
-  and "asset"."deletedAt" is null
-  and (
-    "asset"."ownerId" = "shared_link"."userId"
-    or (
-      "shared_link_space"."spaceId" is not null
+  "asset"
+  cross join "target"
+  inner join lateral (
+    select
+      1 as "match"
+    from
+      "link"
+      inner join "shared_link_asset" on "shared_link_asset"."sharedLinkId" = "link"."id"
+      inner join "shared_link" on "shared_link"."id" = "link"."id"
+      left join "shared_link_space" on "shared_link_space"."sharedLinkId" = "link"."id"
+    where
+      "shared_link_asset"."assetId" = "asset"."id"
+      and (
+        "asset"."ownerId" = "shared_link"."userId"
+        or (
+          "shared_link_space"."spaceId" is not null
+          and exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_member"
+            where
+              "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
+              and "shared_space_member"."userId" = "shared_link"."userId"
+              and "shared_space_member"."role" in ($3, $4)
+          )
+          and "asset"."visibility" in ($5, $6)
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = "shared_link_space"."spaceId"
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = "shared_link_space"."spaceId"
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+              )
+            )
+          )
+        )
+      )
+    union all
+    select
+      1 as "match"
+    from
+      "link"
+      inner join "album" on "album"."id" = "link"."albumId"
+      and "album"."deletedAt" is null
+      inner join "album_asset" on "album_asset"."albumId" = "album"."id"
+    where
+      "album_asset"."assetId" = "asset"."id"
+    union all
+    select
+      1 as "match"
+    from
+      "link"
+      inner join "shared_link" on "shared_link"."id" = "link"."id"
+      inner join "shared_link_space" on "shared_link_space"."sharedLinkId" = "link"."id"
+      inner join "album" on "album"."id" = "link"."albumId"
+      and "album"."deletedAt" is null
+      inner join "album_space_asset" on "album_space_asset"."albumId" = "album"."id"
+      and "album_space_asset"."spaceId" = "shared_link_space"."spaceId"
+      inner join "shared_space_album" on "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+    where
+      "album_space_asset"."assetId" = "asset"."id"
+      and "asset"."visibility" in ($7, $8)
       and exists (
         select
           1 as "exists"
@@ -152,95 +253,17 @@ from
         where
           "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
           and "shared_space_member"."userId" = "shared_link"."userId"
-          and "shared_space_member"."role" in ($1, $2)
+          and "shared_space_member"."role" in ($9, $10)
       )
-      and "asset"."visibility" in ($3, $4)
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = "shared_link_space"."spaceId"
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = "shared_link_space"."spaceId"
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
-          )
-        )
-      )
-    )
-  )
-  left join "album_asset" on "album_asset"."albumId" = "album"."id"
-  left join "asset" as "albumAssets" on "albumAssets"."id" = "album_asset"."assetId"
-  and "albumAssets"."deletedAt" is null
-  left join "album_space_asset" on "album_space_asset"."albumId" = "album"."id"
-  and "album_space_asset"."spaceId" = "shared_link_space"."spaceId"
-  and exists (
-    select
-      1 as "exists"
-    from
-      "shared_space_album"
-    where
-      "shared_space_album"."albumId" = "album_space_asset"."albumId"
-      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
-  )
-  and exists (
-    select
-      1 as "exists"
-    from
-      "shared_space_member"
-    where
-      "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
-      and "shared_space_member"."userId" = "shared_link"."userId"
-      and "shared_space_member"."role" in ($5, $6)
-  )
-  left join "asset" as "contributedAssets" on "contributedAssets"."id" = "album_space_asset"."assetId"
-  and "contributedAssets"."deletedAt" is null
-  and "contributedAssets"."visibility" in ($7, $8)
+    limit
+      $11
+  ) as "membership" on true
 where
-  "shared_link"."id" = $9
-  and array[
-    "asset"."id",
-    "asset"."livePhotoVideoId",
-    "albumAssets"."id",
-    "albumAssets"."livePhotoVideoId",
-    "contributedAssets"."id",
-    "contributedAssets"."livePhotoVideoId"
-  ] && array[$10]::uuid[]
+  "asset"."deletedAt" is null
+  and (
+    "asset"."id" = any ("target"."ids")
+    or "asset"."livePhotoVideoId" = any ("target"."ids")
+  )
 
 -- AccessRepository.assetFile.checkOwnerAccess
 select
