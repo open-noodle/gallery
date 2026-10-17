@@ -9,10 +9,9 @@
   import { SettingInputFieldType } from '#lib/constants.ts';
   import FormatMessage from '#lib/elements/FormatMessage.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
-  import { systemConfigManager } from '#lib/managers/system-config-manager.svelte';
   import { Button, IconButton, modalManager, Text } from '@immich/ui';
   import { mdiPlus, mdiTrashCanOutline } from '@mdi/js';
-  import { isEqual } from 'lodash-es';
+  import { isEqual, cloneDeep } from 'lodash-es';
   import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -21,8 +20,7 @@
   const config = $derived(query.data);
 
   const disabled = $derived(featureFlagsManager.value.configFile);
-  const config = $derived(systemConfigManager.value);
-  let configToEdit = $state(systemConfigManager.cloneValue());
+  let configToEdit = $state(cloneDeep(config));
 
   $effect(() => {
     if (disabled) {
