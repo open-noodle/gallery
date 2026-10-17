@@ -300,21 +300,23 @@
   ]}
 />
 
-<TooltipProvider>
-  <OpenInAppBanner />
-  {#if page.data.error}
-    <ErrorLayout error={page.data.error}></ErrorLayout>
-  {:else}
-    {@render children?.()}
-  {/if}
+<QueryClientProvider client={queryClient}>
+  <TooltipProvider>
+    <OpenInAppBanner />
+    {#if page.data.error}
+      <ErrorLayout error={page.data.error}></ErrorLayout>
+    {:else}
+      {@render children?.()}
+    {/if}
 
   {#if showNavigationLoadingBar}
     <NavigationLoadingBar />
   {/if}
 
-  <DownloadPanel />
-  <UploadPanel />
-  {#if globalSearchManager.isOpen && globalSearchManager.presentation === 'modal'}
-    <GlobalSearch manager={globalSearchManager} />
-  {/if}
-</TooltipProvider>
+    <DownloadPanel />
+    <UploadPanel />
+    {#if globalSearchManager.isOpen && globalSearchManager.presentation === 'modal'}
+      <GlobalSearch manager={globalSearchManager} />
+    {/if}
+  </TooltipProvider>
+</QueryClientProvider>
