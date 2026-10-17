@@ -1727,7 +1727,7 @@ describe(AssetService.name, () => {
       ]);
     });
 
-    it('should set deleteOnDisk to false for offline assets', async () => {
+    it('should queue offline assets like any other (handleAssetDeletion keeps their files)', async () => {
       const asset = AssetFactory.create({ isOffline: true });
 
       mocks.assetJob.streamForDeletedJob.mockReturnValue(makeStream([asset]));
@@ -1736,7 +1736,7 @@ describe(AssetService.name, () => {
       await expect(sut.handleAssetDeletionCheck()).resolves.toBe(JobStatus.Success);
 
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
-        { name: JobName.AssetDelete, data: { id: asset.id, deleteOnDisk: false } },
+        { name: JobName.AssetDelete, data: { id: asset.id, deleteOnDisk: true } },
       ]);
     });
 
