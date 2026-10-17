@@ -793,7 +793,7 @@ jobs:
           token: ${{ github.token }}
 
       - name: Setup Mise
-        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        uses: immich-app/devtools/actions/use-mise@caac7f7e4298458a14238959504f411fc6cc7f06 # use-mise-action-v3.2.3
         with:
           github_token: ${{ github.token }}
 

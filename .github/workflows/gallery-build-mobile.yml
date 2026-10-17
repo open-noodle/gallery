@@ -117,10 +117,18 @@ jobs:
           version: ${{ inputs.version }}
 
       - name: Setup Mise
-        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        uses: immich-app/devtools/actions/use-mise@caac7f7e4298458a14238959504f411fc6cc7f06 # use-mise-action-v3.2.3
         with:
           github_token: ${{ github.token }}
           working_directory: ./mobile
+
+      # The native core's build hook runs rustup through the mise shims without this workflow's environment,
+      # so MISE_TRUSTED_CONFIG_PATHS does not reach it: save the trust to disk (upstream's Fastfile does the same).
+      - name: Trust mise configs
+        run: |
+          for config in ./mise.toml ./mobile/mise.toml ./native/mise.toml; do
+            mise trust "$config"
+          done
 
       - name: Create the Keystore
         env:
@@ -358,10 +366,18 @@ jobs:
           version: ${{ inputs.version }}
 
       - name: Setup Mise
-        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        uses: immich-app/devtools/actions/use-mise@caac7f7e4298458a14238959504f411fc6cc7f06 # use-mise-action-v3.2.3
         with:
           github_token: ${{ github.token }}
           working_directory: ./mobile
+
+      # The native core's build hook runs rustup through the mise shims without this workflow's environment,
+      # so MISE_TRUSTED_CONFIG_PATHS does not reach it: save the trust to disk (upstream's Fastfile does the same).
+      - name: Trust mise configs
+        run: |
+          for config in ./mise.toml ./mobile/mise.toml ./native/mise.toml; do
+            mise trust "$config"
+          done
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
