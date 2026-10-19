@@ -8,6 +8,7 @@ import app.alextran.immich.background.BackgroundEngineLock
 import app.alextran.immich.background.BackgroundWorkerApiImpl
 import app.alextran.immich.background.BackgroundWorkerFgHostApi
 import app.alextran.immich.background.BackgroundWorkerLockApi
+import app.alextran.immich.camerabubble.CameraBubblePlugin
 import app.alextran.immich.connectivity.ConnectivityApi
 import app.alextran.immich.connectivity.ConnectivityApiImpl
 import app.alextran.immich.core.HttpClientManager
@@ -65,6 +66,7 @@ class MainActivity : FlutterFragmentActivity() {
       ConnectivityApi.setUp(messenger, ConnectivityApiImpl(ctx))
 
       flutterEngine.plugins.add(ViewIntentPlugin())
+      flutterEngine.plugins.add(CameraBubblePlugin(ctx))
       flutterEngine.plugins.add(backgroundEngineLockImpl)
       flutterEngine.plugins.add(nativeSyncApiImpl)
       flutterEngine.plugins.add(permissionApiImpl)
