@@ -122,7 +122,7 @@ export class ServerService extends BaseService {
     // slower CPUs. Cache invalidates on ConfigUpdate.
     const { reverseGeocoding, metadata, map, machineLearning, trash, oauth, passwordLogin, notifications, ffmpeg } =
       await this.getConfig({ withCache: true });
-    const { configFile, peopleStatistics } = this.configRepository.getEnv();
+    const { configFile, peopleStatistics, storage } = this.configRepository.getEnv();
 
     return {
       smartSearch: isSmartSearchEnabled(machineLearning),
@@ -143,6 +143,7 @@ export class ServerService extends BaseService {
       configFile: !!configFile,
       email: notifications.smtp.enabled,
       realtimeTranscoding: ffmpeg.realtime.enabled,
+      s3Storage: !!storage.s3.bucket,
       peopleStatistics,
       // Capability signal for mobile sync gating: /sync/stream 400s the whole request on any
       // type outside this enum, so clients must know the accepted set before asking. Version
