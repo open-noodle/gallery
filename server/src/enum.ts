@@ -965,6 +965,7 @@ export enum JobName {
   LibraryScanQueueAll = 'LibraryScanQueueAll',
 
   HlsSessionCleanup = 'HlsSessionCleanup',
+  UploadSessionCleanup = 'UploadSessionCleanup',
 
   MemoryCleanup = 'MemoryCleanup',
   MemoryGenerate = 'MemoryGenerate',
@@ -1116,6 +1117,7 @@ export enum DatabaseLock {
   VersionCheck = 800,
   HlsSessionCleanup = 850,
   PetRecognitionModelSwitch = 860,
+  UploadSessionCleanup = 870,
 }
 
 export enum MaintenanceAction {
