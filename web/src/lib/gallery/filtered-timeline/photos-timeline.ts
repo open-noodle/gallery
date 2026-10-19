@@ -8,7 +8,7 @@ import { FilteredTimelineController } from './filtered-timeline-controller.svelt
 
 const scope = { withSharedSpaces: true };
 // The map's panel config is the same suggestion scope: every section, own + partners + shown spaces.
-const browseConfig = buildMapFilterConfig();
+const browseConfig = buildMapFilterConfig(undefined, { offerLocationPresence: true });
 
 /** `/photos`: my timeline plus partners and the spaces I show on it. */
 export const createPhotosTimeline = (getTimelineManager: () => TimelineManager | undefined) =>

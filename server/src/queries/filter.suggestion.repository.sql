@@ -1035,3 +1035,94 @@ where
   )
 limit
   $12
+select
+  count(
+    case
+      when "asset_exif"."latitude" is null then 1
+    end
+  ) as "noGps",
+  count(
+    case
+      when "asset_exif"."latitude" is not null
+      and "asset_exif"."city" is null then 1
+    end
+  ) as "noPlaceName"
+from
+  "asset"
+  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."id" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."deletedAt" is null
+      and (
+        "asset"."ownerId" = any ($1::uuid[])
+        or (
+          "asset"."visibility" = $2
+          and (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_asset"
+              where
+                "shared_space_asset"."assetId" = "asset"."id"
+                and "shared_space_asset"."spaceId" = any ($3::uuid[])
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_library"
+              where
+                "shared_space_library"."libraryId" = "asset"."libraryId"
+                and "shared_space_library"."spaceId" = any ($4::uuid[])
+            )
+            or (
+              exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($5::uuid[])
+                  and "shared_space_album"."showInTimeline" = $6
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album"
+                  inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                  and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                  inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+                  and "linked_album"."deletedAt" is null
+                where
+                  "album_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_album"."spaceId" = any ($7::uuid[])
+                  and "shared_space_album"."showInTimeline" = $8
+              )
+            )
+          )
+        )
+      )
+      and "asset"."localDateTime" >= $9
+      and exists (
+        select
+        from
+          "asset_face"
+          inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
+          and "face_identity_face"."identityId" = $10::uuid
+      )
+  )

@@ -23,6 +23,8 @@ FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsPersonDto>? people}) =
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   people: people ?? const [],
 );
 

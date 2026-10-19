@@ -6,6 +6,7 @@ import { AssetType, VectorIndex } from 'src/enum.js';
 import {
   FilterSuggestionPerson,
   FilterSuggestionsResult,
+  computeLocationPresenceFlags,
   getFilteredIdentityPeople,
 } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { probes } from 'src/repositories/database.repository.js';
@@ -34,7 +35,7 @@ type SmartFacetExclude =
 
 const smartFacetFilterExcludes: Partial<Record<SmartFacetExclude, (keyof AssetFilter)[]>> = {
   time: ['takenAfter', 'takenBefore'],
-  location: ['country', 'city'],
+  location: ['country', 'city', 'locationPresence'],
   city: ['city'],
   camera: ['make', 'model'],
   cameraModel: ['model'],
@@ -56,6 +57,8 @@ export interface SmartSearchFacetsResult {
   hasFavorites: boolean;
   hasAssetsInAlbum: boolean;
   hasAssetsNotInAlbum: boolean;
+  hasNoGpsAssets: boolean;
+  hasNoPlaceNameAssets: boolean;
 }
 
 @Injectable()
@@ -96,6 +99,7 @@ export class SmartFacetRepository {
       const mediaTypes = await this.getSmartFacetMediaTypes(trx, options);
       const hasFavorites = await this.getSmartFacetHasFavorites(trx, options);
       const albumMembership = await this.getSmartFacetAlbumMembership(trx, options);
+      const locationPresenceFlags = await this.getSmartFacetLocationPresenceFlags(trx, options);
 
       return {
         total,
@@ -111,6 +115,7 @@ export class SmartFacetRepository {
         hasUnnamedPeople: peopleResult.hasUnnamedPeople,
         hasFavorites,
         ...albumMembership,
+        ...locationPresenceFlags,
       };
     });
   }
@@ -123,6 +128,11 @@ export class SmartFacetRepository {
         options,
         'city',
         'country',
+        // A location-group member, like city/country above: it must stay out of the shared candidate
+        // table so per-facet calls can exclude it via `buildSmartFacetFilteredAssetIds`'s `exclude:
+        // 'location'` (otherwise the flags/country list computed with the location group "excluded"
+        // would still be narrowed by it here, and the sibling entry would vanish on selection).
+        'locationPresence',
         'make',
         'model',
         'rating',
@@ -223,6 +233,15 @@ export class SmartFacetRepository {
         qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),
       )
       .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`));
+  }
+
+  private async getSmartFacetLocationPresenceFlags(
+    trx: Kysely<DB>,
+    options: SmartSearchFacetsOptions,
+  ): Promise<{ hasNoGpsAssets: boolean; hasNoPlaceNameAssets: boolean }> {
+    // Same reasoning as FilterSuggestionRepository.getLocationPresenceFlags: the location group
+    // excludes itself so the sibling entry does not vanish once one is selected.
+    return computeLocationPresenceFlags(trx, this.buildSmartFacetFilteredAssetIds(trx, options, 'location'));
   }
 
   private async getSmartFacetTotal(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<number> {

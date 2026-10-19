@@ -826,4 +826,60 @@ where
   )
 limit
   $9
+select
+  count(
+    case
+      when "asset_exif"."latitude" is null then 1
+    end
+  ) as "noGps",
+  count(
+    case
+      when "asset_exif"."latitude" is not null
+      and "asset_exif"."city" is null then 1
+    end
+  ) as "noPlaceName"
+from
+  "asset"
+  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."id" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+      inner join (
+        select
+          "assetId"
+        from
+          "tag_asset"
+          inner join "tag_closure" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+        where
+          "tag_closure"."id_ancestor" = any ($1::uuid[])
+        group by
+          "assetId"
+        having
+          count(distinct "tag_closure"."id_ancestor") >= $2
+      ) as "has_tags" on "has_tags"."assetId" = "asset"."id"
+    where
+      "asset"."id" in (
+        select
+          "candidates"."id"
+        from
+          smart_search_facet_candidates as "candidates"
+      )
+      and "asset"."localDateTime" >= $3
+      and "asset"."localDateTime" < $4
+      and exists (
+        select
+        from
+          "asset_exif"
+        where
+          "asset_exif"."assetId" = "asset"."id"
+          and (
+            "asset_exif"."make" = $5
+            and "asset_exif"."rating" >= $6
+          )
+      )
+      and "asset"."type" = $7
+  )
 commit
