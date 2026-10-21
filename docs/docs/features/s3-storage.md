@@ -16,7 +16,7 @@ When S3 storage is enabled:
 
 - **New uploads** (photos, videos, thumbnails, transcoded videos, profile images) are written to your S3 bucket.
 - **Existing files** on disk keep being served from disk. Both backends run at the same time.
-- The [Storage Template](/administration/storage-template) determines the S3 object key at upload time.
+- The [Storage Template](/administration/storage-template) works as it does on disk: uploads land under `upload/` in the bucket, and with the template enabled Gallery then moves them to their template path under `library/`. See [Storage Template on S3](#storage-template-on-s3).
 
 Gallery supports two modes for serving files from S3:
 
@@ -69,12 +69,14 @@ All S3 variables are set on the `immich-server` container.
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket"],
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket", "s3:AbortMultipartUpload"],
       "Resource": ["arn:aws:s3:::my-gallery-storage", "arn:aws:s3:::my-gallery-storage/*"]
     }
   ]
 }
 ```
+
+`s3:AbortMultipartUpload` lets Gallery cancel a large upload or copy that fails partway. Without it, the parts already sent stay in the bucket, where you pay for them but do not see them in a normal object listing.
 
 6. Note the **Access Key ID** and **Secret Access Key**.
 
@@ -355,6 +357,35 @@ IMMICH_S3_ACCESS_KEY_ID=your-r2-access-key
 IMMICH_S3_SECRET_ACCESS_KEY=your-r2-secret-key
 ```
 
+## Storage Template on S3
+
+The [Storage Template](/administration/storage-template) organizes the bucket the way it organizes the disk, and the same **Enable storage template engine** setting turns it on for both.
+
+- **New uploads** are written to `upload/<user>/…` in the bucket first. Once metadata extraction has read the file's date and other details, Gallery moves the object to its template path under `library/<storage label>/…`, together with its XMP sidecar if it has one.
+- **Existing objects** move when an admin runs the **Storage template migration** job from **Administration > Job Queues**. Starting that job by hand also moves the S3 thumbnails, previews, full-size images, encoded videos and person thumbnails to the paths the current settings give them. The **Migration** job does the same, for S3 files as well as files on disk.
+- **Files never move between disk and S3.** A file on disk is moved on disk, and an object in the bucket stays in the bucket. To move files from one backend to the other, use [Storage Migration](/features/storage-migration).
+
+### Why a Move Is a Copy and a Delete
+
+S3 has no rename operation for ordinary buckets: AWS offers one only for S3 Express One Zone directory buckets, and MinIO, Cloudflare R2 and Backblaze B2 have none. Gallery therefore moves an object in four steps:
+
+1. Copy it to the new key. The copy happens inside the bucket, so no file data passes through Gallery.
+2. Check that the copy has the expected size.
+3. Point the asset at the new key.
+4. Delete the old object.
+
+If the copy or the size check fails, the asset stays at its old key and a later run tries again. If the delete fails, the asset is already at its new key and only the old object is left behind; Gallery logs a warning.
+
+### Costs and Caveats
+
+- **Requests.** Each moved object costs one copy request and one delete request, plus a few small metadata requests. An XMP sidecar is a second object. Check your provider's request pricing: many bill a copy like an upload.
+- **First run on a large library.** The first **Storage template migration** run on an existing S3 library makes several requests per asset and moves one asset at a time, so it takes a while on a large library. Later runs make no requests for assets that are already in place.
+- **Large objects.** A single copy request stops at 5 GiB, so larger objects are copied in parts with a multipart copy. If one fails partway, Gallery cancels it so no parts are left in the bucket.
+- **Versioned buckets.** Deleting the old object only hides it: it stays in the bucket as a noncurrent version, and you pay for it, until a lifecycle rule removes it. Add a rule that expires noncurrent versions if you do not need them.
+- **Object Lock and retention.** A locked object cannot be removed before its retention period ends. Depending on the provider, the delete either leaves the old object as a noncurrent version or fails. When it fails, Gallery logs a warning and does not try again, so the old object stays until you remove it. Either way, the asset itself has already moved.
+- **Archive storage classes.** The copy is written in the standard storage class. An object that a lifecycle rule moved to an archive class, such as S3 Glacier Flexible Retrieval or Deep Archive, cannot be copied until it is restored, so it stays at its old key.
+- **Links in flight.** In `redirect` mode, a presigned link Gallery handed out just before the object moved stops working, for example under a video that is already playing. Reloading the page fetches a link to the new key.
+
 ## FAQ
 
 **Can I migrate existing files from disk to S3?**
@@ -380,6 +411,8 @@ S3 support is built on a `StorageBackend` interface that both the disk and S3 ba
                     ├── put(key, source)
                     ├── get(key) → stream
                     ├── exists(key)
+                    ├── copy(fromKey, toKey)
+                    ├── stat(key) → size
                     ├── delete(key)
                     ├── getServeStrategy(key) → file | redirect | stream
                     └── downloadToTemp(key) → tempPath + cleanup
@@ -429,10 +462,10 @@ The S3 backend uses `forcePathStyle: true` when a custom endpoint is configured,
 When S3 is the write backend, uploads follow this path:
 
 1. File is uploaded to a local temp directory (standard NestJS multipart handling).
-2. The storage template generates a relative key for the S3 object.
-3. The file is uploaded to S3 using the `@aws-sdk/lib-storage` `Upload` class (supports automatic multipart for large files).
-4. The database is updated with the relative path.
-5. A cleanup job deletes the local temp file.
+2. The file is uploaded to S3 under `upload/<user>/…` using the `@aws-sdk/lib-storage` `Upload` class (supports automatic multipart for large files).
+3. The database is updated with the relative path.
+4. A cleanup job deletes the local temp file.
+5. After metadata extraction, if the storage template is enabled, the object and its sidecar are moved to their template keys under `library/<storage label>/…` with a server-side copy, a size check and a delete (see [Why a Move Is a Copy and a Delete](#why-a-move-is-a-copy-and-a-delete)).
 
 Profile images (both user-uploaded and OAuth-synced) follow the same pattern: the file is written to disk first, then uploaded to S3 if the write backend is S3, and the local temp file is cleaned up.
 

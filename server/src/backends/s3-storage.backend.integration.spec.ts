@@ -1,4 +1,5 @@
-import { CreateBucketCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, HeadObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
@@ -330,5 +331,82 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
     it('should reject an unsatisfiable range', async () => {
       await expect(readRange('bytes=9999-10000')).rejects.toBeInstanceOf(RangeNotSatisfiableError);
     });
+  });
+
+  describe('copy and stat', () => {
+    // template names: spaces, Unicode, the `+N` duplicate suffix and reserved URL characters, in nested folders
+    const awkwardSource = 'test/copy/Café Trip/IMG_0001+1 (50% off) #2.jpg';
+    const awkwardTarget = 'test/copy/library/admin/2024/Crème brûlée & co/IMG_0001+1.jpg';
+
+    it('should copy an object whose key needs encoding, keeping the source and its content type', async () => {
+      const content = Buffer.from('copy with awkward characters');
+      await backend.put(awkwardSource, content, { contentType: 'image/jpeg' });
+
+      await backend.copy(awkwardSource, awkwardTarget);
+
+      await expect(backend.readAll(awkwardTarget)).resolves.toEqual(content);
+      await expect(backend.stat(awkwardTarget)).resolves.toEqual({ size: content.length });
+      const { stream, contentType } = await backend.get(awkwardTarget);
+      stream.destroy();
+      expect(contentType).toBe('image/jpeg');
+      expect(await backend.exists(awkwardSource)).toBe(true);
+    });
+
+    it('should overwrite an existing target', async () => {
+      await backend.put('test/copy/overwrite-source.txt', Buffer.from('new'));
+      await backend.put('test/copy/overwrite-target.txt', Buffer.from('stale content'));
+
+      await backend.copy('test/copy/overwrite-source.txt', 'test/copy/overwrite-target.txt');
+
+      await expect(backend.readAll('test/copy/overwrite-target.txt')).resolves.toEqual(Buffer.from('new'));
+    });
+
+    it('should reject stat and copy for a missing object', async () => {
+      await expect(backend.stat('test/copy/missing.txt')).rejects.toBeDefined();
+      await expect(backend.copy('test/copy/missing.txt', 'test/copy/missing-target.txt')).rejects.toBeDefined();
+      expect(await backend.exists('test/copy/missing-target.txt')).toBe(false);
+    });
+
+    it('should copy part by part above a lowered threshold', async () => {
+      // 5 MiB is the smallest part S3 and MinIO accept; 12 MiB makes parts of 5, 5 and 2 MiB
+      const MiB = 1024 ** 2;
+      const endpoint = `http://${container.getHost()}:${container.getMappedPort(9000)}`;
+      const multipartBackend = new S3StorageBackend({
+        bucket,
+        region: 'us-east-1',
+        endpoint,
+        accessKeyId: 'minioadmin',
+        secretAccessKey: 'minioadmin',
+        presignedUrlExpiry: 3600,
+        serveMode: 'redirect',
+        multipartCopyThreshold: 5 * MiB,
+        multipartCopyPartSize: 5 * MiB,
+      });
+      const content = randomBytes(12 * MiB);
+      const source = 'test/copy/Café Trip/clip+1.mp4';
+      const target = 'test/copy/library/admin/2024/Café Trip/clip+1.mp4';
+      await backend.put(source, content, { contentType: 'video/mp4' });
+
+      await multipartBackend.copy(source, target);
+
+      await expect(multipartBackend.stat(target)).resolves.toEqual({ size: content.length });
+      // equals rather than toEqual: a failing 12 MiB toEqual would print both buffers
+      const copied = await multipartBackend.readAll(target);
+      expect(copied.equals(content)).toBe(true);
+      const { stream, contentType } = await multipartBackend.get(target);
+      stream.destroy();
+      expect(contentType).toBe('video/mp4');
+
+      // a multipart object's ETag ends in its part count, so this proves the copy went part by part
+      const verifyClient = new S3Client({
+        region: 'us-east-1',
+        endpoint,
+        forcePathStyle: true,
+        credentials: { accessKeyId: 'minioadmin', secretAccessKey: 'minioadmin' },
+      });
+      const { ETag } = await verifyClient.send(new HeadObjectCommand({ Bucket: bucket, Key: target }));
+      verifyClient.destroy();
+      expect(ETag).toMatch(/-3"$/);
+    }, 60_000);
   });
 });

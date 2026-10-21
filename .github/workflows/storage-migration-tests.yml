@@ -64,7 +64,8 @@ jobs:
         run: pnpm tsx src/storage-migration.ts estimate
 
       # ---------------------------------------------------------------
-      # Phase group 2: backend=s3 — migrate to S3, verify
+      # Phase group 2: backend=s3 — migrate to S3, storage template
+      # moves inside the bucket, verify
       # ---------------------------------------------------------------
       - name: Restart server (backend=s3)
         run: |
@@ -74,20 +75,23 @@ jobs:
       - name: 'Phase: migrate-to-s3'
         run: pnpm tsx src/storage-migration.ts migrate-to-s3
 
-      - name: 'Phase: template-s3-bulk-skipped'
-        run: pnpm tsx src/storage-migration.ts template-s3-bulk-skipped
+      - name: 'Phase: template-s3-bulk'
+        run: pnpm tsx src/storage-migration.ts template-s3-bulk
 
-      - name: 'Phase: template-s3-upload-skipped'
-        run: pnpm tsx src/storage-migration.ts template-s3-upload-skipped
+      - name: 'Phase: template-s3-upload'
+        run: pnpm tsx src/storage-migration.ts template-s3-upload
 
-      - name: 'Phase: template-s3-live-photo-skipped'
-        run: pnpm tsx src/storage-migration.ts template-s3-live-photo-skipped
+      - name: 'Phase: template-s3-live-photo'
+        run: pnpm tsx src/storage-migration.ts template-s3-live-photo
 
-      - name: 'Phase: template-s3-sidecar-skipped'
-        run: pnpm tsx src/storage-migration.ts template-s3-sidecar-skipped
+      - name: 'Phase: template-s3-sidecar'
+        run: pnpm tsx src/storage-migration.ts template-s3-sidecar
 
-      - name: 'Phase: template-s3-queue-migration-skipped'
-        run: pnpm tsx src/storage-migration.ts template-s3-queue-migration-skipped
+      - name: 'Phase: template-s3-queue-migration'
+        run: pnpm tsx src/storage-migration.ts template-s3-queue-migration
+
+      - name: 'Phase: template-s3-manual-derivatives'
+        run: pnpm tsx src/storage-migration.ts template-s3-manual-derivatives
 
       - name: 'Phase: copy-asset-sidecar-s3'
         run: pnpm tsx src/storage-migration.ts copy-asset-sidecar-s3

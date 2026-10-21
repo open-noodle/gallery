@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Mock } from 'vitest';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto.js';
 import { PersonUserRole, mapFaces, mapPerson } from 'src/dtos/person.dto.js';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto.js';
@@ -8,6 +9,7 @@ import {
   CacheControl,
   JobName,
   JobStatus,
+  PersonPathType,
   QueueName,
   SourceType,
   SystemMetadataKey,
@@ -15,6 +17,7 @@ import {
 } from 'src/enum.js';
 import { FaceSearchResult } from 'src/repositories/search.repository.js';
 import { PersonService } from 'src/services/person.service.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
@@ -49,6 +52,10 @@ const recognitionCounts = (overrides: Partial<QueueStatisticsDto> = {}) =>
 
 const prefsMetadata = (minimumFaces: number) =>
   [{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces } } }] as any;
+
+/** StorageCore.getPersonThumbnailPath with the media location stripped: where a person thumbnail lives as an S3 key */
+const expectedThumbnailKey = ({ ownerId, personGroupId }: { ownerId: string; personGroupId: string }) =>
+  `thumbs/${ownerId}/${personGroupId.slice(0, 2)}/${personGroupId.slice(2, 4)}/${personGroupId}.jpeg`;
 
 /** The cross-owner authorizer each merge entry point hands to the planner (src/utils/merge-policy.ts). */
 type MergeAuthorizerFn = (plan: {
@@ -1169,17 +1176,70 @@ describe(PersonService.name, () => {
       await expect(sut.handlePersonMigration(PersonFactory.create())).resolves.toBe(JobStatus.Failed);
     });
 
-    it('should leave a relative S3 thumbnail where it is', async () => {
-      const person = PersonFactory.create({ thumbnailPath: 'thumbs/user/ab/cd/person.jpeg' });
-      mocks.person.getByGroupId.mockResolvedValue(person);
+    describe('with an S3 thumbnail', () => {
+      let s3Backend: { exists: Mock; copy: Mock; stat: Mock; delete: Mock };
+      let previousS3Backend: unknown;
 
-      await expect(
-        sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
-      ).resolves.toBe(JobStatus.Success);
+      beforeEach(() => {
+        previousS3Backend = (StorageService as any).s3Backend;
+        s3Backend = {
+          exists: vi.fn().mockResolvedValue(true),
+          copy: vi.fn().mockResolvedValue(void 0),
+          stat: vi.fn().mockResolvedValue({ size: 1024 }),
+          delete: vi.fn().mockResolvedValue(void 0),
+        };
+        (StorageService as any).s3Backend = s3Backend;
+      });
 
-      expect(mocks.move.create).not.toHaveBeenCalled();
-      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      afterEach(() => {
+        (StorageService as any).s3Backend = previousS3Backend;
+      });
+
+      it('should move a relative S3 thumbnail within S3 to its expected key', async () => {
+        const oldPath = 'thumbs/user/ab/cd/person.jpeg';
+        const person = PersonFactory.create({ thumbnailPath: oldPath });
+        const newPath = expectedThumbnailKey(person);
+        mocks.person.getByGroupId.mockResolvedValue(person);
+        mocks.move.create.mockImplementation((move) => Promise.resolve({ id: 'move-id', ...move }));
+
+        await expect(
+          sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
+        ).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.move.create).toHaveBeenCalledWith({
+          entityId: person.personGroupId,
+          pathType: PersonPathType.Face,
+          oldPath,
+          newPath,
+        });
+        expect(s3Backend.copy).toHaveBeenCalledWith(oldPath, newPath);
+        expect(mocks.person.update).toHaveBeenCalledWith({
+          ownerId: person.ownerId,
+          personGroupId: person.personGroupId,
+          thumbnailPath: newPath,
+        });
+        expect(s3Backend.delete).toHaveBeenCalledWith(oldPath);
+        expect(mocks.move.delete).toHaveBeenCalledWith('move-id');
+        expect(mocks.storage.mkdirSync).not.toHaveBeenCalled();
+        expect(mocks.storage.rename).not.toHaveBeenCalled();
+      });
+
+      it('should make no S3 calls for a thumbnail already at its expected key', async () => {
+        const person = PersonFactory.create();
+        person.thumbnailPath = expectedThumbnailKey(person);
+        mocks.person.getByGroupId.mockResolvedValue(person);
+
+        await expect(
+          sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
+        ).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+        expect(mocks.move.create).not.toHaveBeenCalled();
+        expect(mocks.person.update).not.toHaveBeenCalled();
+        for (const call of Object.values(s3Backend)) {
+          expect(call).not.toHaveBeenCalled();
+        }
+      });
     });
 
     it('should move nothing for a person without a thumbnail', async () => {

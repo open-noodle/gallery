@@ -1,20 +1,33 @@
 import { Stats } from 'node:fs';
+import { Mock } from 'vitest';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
-import { AssetPathType, AssetType, JobStatus } from 'src/enum.js';
+import { AssetFileType, AssetPathType, AssetType, JobStatus } from 'src/enum.js';
 import { StorageTemplateService } from 'src/services/storage-template.service.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { AlbumFactory } from 'test/factories/album.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { UserFactory } from 'test/factories/user.factory.js';
 import { userStub } from 'test/fixtures/user.stub.js';
 import { getForAlbum, getForStorageTemplate } from 'test/mappers.js';
+import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 const motionAsset = AssetFactory.from({ type: AssetType.Video }).exif().build();
 const stillAsset = AssetFactory.from({ livePhotoVideoId: motionAsset.id }).exif().build();
 
+const order = (fn: { mock: { invocationCallOrder: number[] } }, call = 0) => fn.mock.invocationCallOrder[call];
+
 describe(StorageTemplateService.name, () => {
   let sut: StorageTemplateService;
   let mocks: ServiceMocks;
+
+  const expectNoDiskMove = () => {
+    expect(mocks.storage.mkdirSync).not.toHaveBeenCalled();
+    expect(mocks.storage.rename).not.toHaveBeenCalled();
+    expect(mocks.storage.copyFile).not.toHaveBeenCalled();
+    expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    expect(mocks.storage.utimes).not.toHaveBeenCalled();
+  };
 
   it('should work', () => {
     expect(sut).toBeDefined();
@@ -108,50 +121,6 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.update).not.toHaveBeenCalled();
       expect(mocks.storage.stat).not.toHaveBeenCalled();
-    });
-
-    it('should leave an S3 asset where it is', async () => {
-      const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' }).exif().build();
-      mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
-
-      await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
-      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
-      expect(mocks.asset.update).not.toHaveBeenCalled();
-    });
-
-    it('should migrate a disk still photo and skip its S3 motion video', async () => {
-      const motion = AssetFactory.from({
-        type: AssetType.Video,
-        originalPath: 'upload/user/ab/cd/motion.mp4', // relative — on S3
-        fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
-      })
-        .exif()
-        .build();
-      const still = AssetFactory.from({
-        livePhotoVideoId: motion.id,
-        originalPath: '/data/upload/user/ab/cd/still.jpg', // absolute — on disk
-        fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
-      })
-        .exif()
-        .build();
-
-      mocks.user.get.mockResolvedValue(userStub.user1);
-      mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(still));
-      mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motion));
-      mocks.move.create.mockResolvedValueOnce({
-        id: 'move-1',
-        entityId: still.id,
-        pathType: AssetPathType.Original,
-        oldPath: still.originalPath,
-        newPath: `/data/library/${still.ownerId}/2022/2022-06-19/${still.originalFileName}`,
-      });
-
-      await expect(sut.handleMigrationSingle({ id: still.id })).resolves.toBe(JobStatus.Success);
-      expect(mocks.storage.rename).toHaveBeenCalledTimes(1); // only the still
-      expect(mocks.storage.rename).toHaveBeenCalledWith(still.originalPath, expect.any(String));
-      expect(mocks.move.create).toHaveBeenCalledTimes(1);
     });
 
     it('should migrate single moving picture', async () => {
@@ -655,16 +624,6 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.assetJob.streamForStorageTemplateJob).toHaveBeenCalled();
     });
 
-    it('should not throw when library folder does not exist on S3 deployments', async () => {
-      mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([]));
-      mocks.user.getList.mockResolvedValue([]);
-      mocks.storage.checkFileExists.mockResolvedValue(false);
-
-      await expect(sut.handleMigration()).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.storage.removeEmptyDirs).not.toHaveBeenCalled();
-    });
-
     it('should handle an asset with a duplicate destination', async () => {
       const asset = AssetFactory.from({
         fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
@@ -731,21 +690,6 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.storage.rename).not.toHaveBeenCalled();
       expect(mocks.storage.copyFile).not.toHaveBeenCalled();
       expect(mocks.asset.update).not.toHaveBeenCalled();
-    });
-
-    it('should skip S3 assets with relative paths during bulk migration', async () => {
-      const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' }).exif().build();
-
-      mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([getForStorageTemplate(asset)]));
-      mocks.user.getList.mockResolvedValue([userStub.user1]);
-
-      await sut.handleMigration();
-
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
-      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
-      expect(mocks.asset.update).not.toHaveBeenCalled();
-      expect(mocks.move.create).not.toHaveBeenCalled();
-      expect(mocks.storage.stat).not.toHaveBeenCalled();
     });
 
     it('should move an asset', async () => {
@@ -1143,6 +1087,657 @@ describe(StorageTemplateService.name, () => {
         expect.stringContaining(`/data/library/${user.id}/2022/2022-06-19/IMG_7065.JPG`),
         expect.stringContaining(`/data/library/${user.id}/2022/2022-06-19/IMG_7065.jpg`),
       );
+    });
+  });
+
+  describe('S3 originals', () => {
+    const fileCreatedAt = new Date('2022-06-19T23:41:36.910Z');
+    const size = 5000;
+
+    let s3: { exists: Mock; copy: Mock; stat: Mock; delete: Mock; downloadToTemp: Mock };
+    let previousS3Backend: unknown;
+
+    const expectNothingMoved = () => {
+      expect(s3.copy).not.toHaveBeenCalled();
+      expect(s3.stat).not.toHaveBeenCalled();
+      expect(s3.delete).not.toHaveBeenCalled();
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.asset.update).not.toHaveBeenCalled();
+      expectNoDiskMove();
+    };
+
+    beforeEach(() => {
+      s3 = {
+        exists: vi.fn().mockResolvedValue(false),
+        copy: vi.fn().mockResolvedValue(void 0),
+        stat: vi.fn().mockResolvedValue({ size }),
+        delete: vi.fn().mockResolvedValue(void 0),
+        downloadToTemp: vi.fn(),
+      };
+      previousS3Backend = (StorageService as any).s3Backend;
+      (StorageService as any).s3Backend = s3;
+
+      // move_history hands back the row it stored
+      mocks.move.create.mockImplementation(({ entityId, pathType, oldPath, newPath }) =>
+        Promise.resolve({ id: `move-${pathType}-${entityId}`, entityId, pathType, oldPath, newPath }),
+      );
+    });
+
+    afterEach(() => {
+      (StorageService as any).s3Backend = previousS3Backend;
+    });
+
+    describe('handleMigrationSingle', () => {
+      it('should move an S3 original to its library key with a server-side copy', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.move.create).toHaveBeenCalledExactlyOnceWith({
+          entityId: asset.id,
+          pathType: AssetPathType.Original,
+          oldPath: asset.originalPath,
+          newPath: newKey,
+        });
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(s3.stat).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(asset.originalPath);
+        expect(mocks.move.delete).toHaveBeenCalledExactlyOnceWith(`move-original-${asset.id}`);
+        // the database points at the new key before the old key is deleted
+        expect(order(s3.copy)).toBeLessThan(order(s3.stat));
+        expect(order(s3.stat)).toBeLessThan(order(mocks.asset.update));
+        expect(order(mocks.asset.update)).toBeLessThan(order(s3.delete));
+        expect(order(s3.delete)).toBeLessThan(order(mocks.move.delete));
+        // the size check is the whole verification: the copy is not read back
+        expect(s3.downloadToTemp).not.toHaveBeenCalled();
+        expect(mocks.crypto.hashFile).not.toHaveBeenCalled();
+        expectNoDiskMove();
+      });
+
+      it('should move an S3 sidecar to the new key of its original', async () => {
+        const user = UserFactory.create();
+        const sidecarKey = `upload/${user.id}/ab/cd/file.jpg.xmp`;
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .file({ type: AssetFileType.Sidecar, path: sidecarKey })
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.copy.mock.calls).toEqual([
+          [asset.originalPath, newKey],
+          [sidecarKey, `${newKey}.xmp`],
+        ]);
+        // a sidecar has no recorded size, so its copy is checked against the object it was copied from
+        expect(s3.stat).toHaveBeenCalledWith(sidecarKey);
+        expect(s3.stat).toHaveBeenCalledWith(`${newKey}.xmp`);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
+        expect(mocks.asset.upsertFile).toHaveBeenCalledExactlyOnceWith({
+          assetId: asset.id,
+          type: AssetFileType.Sidecar,
+          path: `${newKey}.xmp`,
+        });
+        expect(s3.delete.mock.calls).toEqual([[asset.originalPath], [sidecarKey]]);
+        expect(mocks.move.delete).toHaveBeenCalledWith(`move-sidecar-${asset.id}`);
+        expectNoDiskMove();
+      });
+
+      it('should move the disk sidecar of an S3 original on disk, to the disk path of its new key', async () => {
+        const user = UserFactory.create();
+        const sidecarPath = `/data/upload/${user.id}/ab/cd/file.jpg.xmp`;
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .file({ type: AssetFileType.Sidecar, path: sidecarPath })
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+        const newSidecarPath = `/data/library/${user.id}/2022/2022-06-19/${asset.originalFileName}.xmp`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(asset.originalPath);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
+        expect(mocks.move.create).toHaveBeenCalledWith({
+          entityId: asset.id,
+          pathType: AssetFileType.Sidecar,
+          oldPath: sidecarPath,
+          newPath: newSidecarPath,
+        });
+        expect(mocks.storage.mkdirSync).toHaveBeenCalledExactlyOnceWith(`/data/library/${user.id}/2022/2022-06-19`);
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(sidecarPath, newSidecarPath);
+        expect(mocks.asset.upsertFile).toHaveBeenCalledExactlyOnceWith({
+          assetId: asset.id,
+          type: AssetFileType.Sidecar,
+          path: newSidecarPath,
+        });
+      });
+
+      it('should move the S3 sidecar of a disk original to the key of its new disk path', async () => {
+        const user = UserFactory.create();
+        const sidecarKey = `upload/${user.id}/ab/cd/file.jpg.xmp`;
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `/data/upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .file({ type: AssetFileType.Sidecar, path: sidecarKey })
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newPath = `/data/library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+        const newSidecarKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}.xmp`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newPath);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newPath });
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(sidecarKey, newSidecarKey);
+        expect(mocks.asset.upsertFile).toHaveBeenCalledExactlyOnceWith({
+          assetId: asset.id,
+          type: AssetFileType.Sidecar,
+          path: newSidecarKey,
+        });
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(sidecarKey);
+        expect(mocks.move.delete).toHaveBeenCalledWith(`move-sidecar-${asset.id}`);
+      });
+
+      it('should move both parts of an S3 live photo, the motion video by the still photo date and album', async () => {
+        const user = UserFactory.create();
+        const motion = AssetFactory.from({
+          type: AssetType.Video,
+          fileCreatedAt: new Date('2023-02-23T05:06:29.716Z'),
+          originalPath: `upload/${user.id}/ef/gh/motion.mp4`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const still = AssetFactory.from({
+          livePhotoVideoId: motion.id,
+          fileCreatedAt,
+          originalPath: `upload/${user.id}/ab/cd/still.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const album = AlbumFactory.from()
+          .asset({}, (builder) => builder.exif())
+          .build();
+        const config = structuredClone(defaults);
+        config.storageTemplate.template = '{{y}}/{{#if album}}{{album}}{{else}}other/{{MM}}{{/if}}/{{filename}}';
+        sut.onConfigInit({ newConfig: config });
+
+        const stillKey = `library/${user.id}/2022/${album.albumName}/${still.originalFileName}`;
+        const motionKey = `library/${user.id}/2022/${album.albumName}/${still.originalFileName.slice(0, -4)}.mp4`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(still));
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motion));
+        mocks.album.getByAssetId.mockResolvedValue([getForAlbum(album)]);
+
+        await expect(sut.handleMigrationSingle({ id: still.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.album.getByAssetId).toHaveBeenCalledTimes(2);
+        expect(mocks.album.getByAssetId).toHaveBeenNthCalledWith(2, still.ownerId, still.id);
+        expect(s3.copy.mock.calls).toEqual([
+          [still.originalPath, stillKey],
+          [motion.originalPath, motionKey],
+        ]);
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: still.id, originalPath: stillKey });
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: motion.id, originalPath: motionKey });
+        expect(s3.delete.mock.calls).toEqual([[still.originalPath], [motion.originalPath]]);
+        expectNoDiskMove();
+      });
+
+      it('should move a disk still photo on disk and its S3 motion video inside S3', async () => {
+        const user = UserFactory.create();
+        const motion = AssetFactory.from({
+          type: AssetType.Video,
+          fileCreatedAt,
+          originalPath: `upload/${user.id}/ab/cd/motion.mp4`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const still = AssetFactory.from({
+          livePhotoVideoId: motion.id,
+          fileCreatedAt,
+          originalPath: `/data/upload/${user.id}/ab/cd/still.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const stillPath = `/data/library/${user.id}/2022/2022-06-19/${still.originalFileName}`;
+        const motionKey = `library/${user.id}/2022/2022-06-19/${still.originalFileName.slice(0, -4)}.mp4`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(still));
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motion));
+
+        await expect(sut.handleMigrationSingle({ id: still.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(still.originalPath, stillPath);
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: still.id, originalPath: stillPath });
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(motion.originalPath, motionKey);
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(motion.originalPath);
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: motion.id, originalPath: motionKey });
+        expect(mocks.move.create).toHaveBeenCalledTimes(2);
+      });
+
+      it('should not move an S3 Android embedded motion video', async () => {
+        const user = UserFactory.create();
+        const motionId = newUuid();
+        const motion = AssetFactory.from({
+          id: motionId,
+          type: AssetType.Video,
+          fileCreatedAt,
+          originalPath: `encoded-video/${user.id}/${motionId.slice(0, 2)}/${motionId.slice(2, 4)}/${motionId}-MP.mp4`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const still = AssetFactory.from({
+          livePhotoVideoId: motion.id,
+          fileCreatedAt,
+          originalPath: `upload/${user.id}/ab/cd/still.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const stillKey = `library/${user.id}/2022/2022-06-19/${still.originalFileName}`;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(still));
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motion));
+
+        await expect(sut.handleMigrationSingle({ id: still.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.assetJob.getForStorageTemplateJob).toHaveBeenCalledWith(motion.id, { includeHidden: true });
+        expect(mocks.move.create).toHaveBeenCalledOnce();
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(still.originalPath, stillKey);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: still.id, originalPath: stillKey });
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(still.originalPath);
+      });
+
+      it('should leave an S3 asset that is already at its library key where it is', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `library/${user.id}/2022/2022-06-19/IMG_0001.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
+        expect(s3.exists).not.toHaveBeenCalled();
+        expectNothingMoved();
+      });
+
+      it('should not move an S3 original to a key outside its library folder', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const config = structuredClone(defaults);
+        config.storageTemplate.template = '{{y}}/../../other-user/{{filename}}';
+        sut.onConfigInit({ newConfig: config });
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.logger.warn).toHaveBeenCalledWith(
+          `Skipped attempt to access an invalid path: library/other-user/IMG_0001. Path should start with library/${user.id}`,
+        );
+        expect(s3.exists).not.toHaveBeenCalled();
+        expectNothingMoved();
+      });
+
+      it('should not move an S3 original without a file size', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: null })
+          .build();
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.logger.error).toHaveBeenCalledWith(
+          `Asset ${asset.id} missing exif info, skipping storage template migration`,
+        );
+        expectNothingMoved();
+      });
+
+      it('should keep an S3 original at its key when the copy fails', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+
+        s3.copy.mockRejectedValue(Object.assign(new Error('Access Denied'), { code: 'AccessDenied' }));
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(s3.stat).not.toHaveBeenCalled();
+        expect(mocks.asset.update).not.toHaveBeenCalled();
+        expect(s3.delete).not.toHaveBeenCalled();
+        // the move_history row stays for the next attempt
+        expect(mocks.move.delete).not.toHaveBeenCalled();
+      });
+
+      it('should delete the copy and keep an S3 original at its key on a size mismatch', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+
+        s3.stat.mockResolvedValue({ size: 100 });
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(s3.stat).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.asset.update).not.toHaveBeenCalled();
+        expect(mocks.move.delete).not.toHaveBeenCalled();
+      });
+
+      it('should finish an interrupted S3 move from the key it reached, after checking its size and checksum', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const previousKey = `library/${user.id}/2022/June/${asset.originalFileName}`;
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+        const cleanup = vi.fn().mockResolvedValue(void 0);
+        const move = {
+          id: 'move-1',
+          entityId: asset.id,
+          pathType: AssetPathType.Original,
+          oldPath: asset.originalPath,
+          newPath: previousKey,
+        };
+
+        s3.exists.mockImplementation((key: string) => Promise.resolve(key === previousKey));
+        s3.downloadToTemp.mockResolvedValue({ tempPath: '/tmp/staged.jpg', cleanup });
+        mocks.crypto.hashFile.mockResolvedValue(asset.checksum);
+        mocks.move.getByEntity.mockResolvedValue(move);
+        mocks.move.update.mockResolvedValue({ ...move, oldPath: previousKey, newPath: newKey });
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.exists).toHaveBeenCalledWith(asset.originalPath);
+        expect(s3.exists).toHaveBeenCalledWith(previousKey);
+        expect(s3.stat).toHaveBeenCalledWith(previousKey);
+        expect(s3.downloadToTemp).toHaveBeenCalledExactlyOnceWith(previousKey);
+        expect(mocks.crypto.hashFile).toHaveBeenCalledExactlyOnceWith('/tmp/staged.jpg');
+        expect(cleanup).toHaveBeenCalledOnce();
+        expect(mocks.move.create).not.toHaveBeenCalled();
+        expect(mocks.move.update).toHaveBeenCalledWith('move-1', {
+          id: 'move-1',
+          oldPath: previousKey,
+          newPath: newKey,
+        });
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(previousKey, newKey);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(previousKey);
+        expect(mocks.move.delete).toHaveBeenCalledExactlyOnceWith('move-1');
+        expectNoDiskMove();
+      });
+    });
+
+    describe('destination collisions', () => {
+      it('should add +1 when S3 already holds the destination key', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/IMG_0001.jpg`;
+        const newKey1 = `library/${user.id}/2022/2022-06-19/IMG_0001+1.jpg`;
+
+        s3.exists.mockImplementation((key: string) => Promise.resolve(key === newKey));
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.checkFileExists.mock.calls).toEqual([[`/data/${newKey}`], [`/data/${newKey1}`]]);
+        expect(s3.exists.mock.calls).toEqual([[newKey], [newKey1]]);
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey1);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey1 });
+      });
+
+      it('should add +1 when the disk holds the destination key under the media location', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/IMG_0001.jpg`;
+        const newKey1 = `library/${user.id}/2022/2022-06-19/IMG_0001+1.jpg`;
+
+        mocks.storage.checkFileExists.mockImplementation((path) => Promise.resolve(path === `/data/${newKey}`));
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        // the disk answer is enough for the first destination
+        expect(s3.exists).toHaveBeenCalledExactlyOnceWith(newKey1);
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey1);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey1 });
+        expectNoDiskMove();
+      });
+
+      it('should add +1 to a disk original whose destination is held in S3 under its key', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `/data/upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newPath1 = `/data/library/${user.id}/2022/2022-06-19/IMG_0001+1.jpg`;
+
+        s3.exists.mockImplementation((key: string) =>
+          Promise.resolve(key === `library/${user.id}/2022/2022-06-19/IMG_0001.jpg`),
+        );
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.exists).toHaveBeenCalledTimes(2);
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newPath1);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newPath1 });
+        expect(s3.copy).not.toHaveBeenCalled();
+      });
+
+      it('should check only the disk without S3 configured', async () => {
+        (StorageService as any).s3Backend = undefined;
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `/data/upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newPath = `/data/library/${user.id}/2022/2022-06-19/IMG_0001.jpg`;
+        const newPath1 = `/data/library/${user.id}/2022/2022-06-19/IMG_0001+1.jpg`;
+
+        mocks.storage.checkFileExists.mockResolvedValueOnce(true);
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.checkFileExists.mock.calls).toEqual([[newPath], [newPath1]]);
+        expect(s3.exists).not.toHaveBeenCalled();
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newPath1);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newPath1 });
+      });
+    });
+
+    describe('handleMigration', () => {
+      it('should move S3 originals during bulk migration', async () => {
+        const user = UserFactory.create({ storageLabel: 'label-1' });
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/label-1/2022/2022-06-19/${asset.originalFileName}`;
+
+        mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([getForStorageTemplate(asset)]));
+        mocks.user.getList.mockResolvedValue([user]);
+
+        await expect(sut.handleMigration()).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.move.create).toHaveBeenCalledExactlyOnceWith({
+          entityId: asset.id,
+          pathType: AssetPathType.Original,
+          oldPath: asset.originalPath,
+          newPath: newKey,
+        });
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(s3.stat).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(asset.originalPath);
+        expect(mocks.move.delete).toHaveBeenCalledExactlyOnceWith(`move-original-${asset.id}`);
+        expectNoDiskMove();
+      });
+
+      it('should move the disk and S3 originals of one library each in its own namespace', async () => {
+        const user = UserFactory.create({ storageLabel: 'label-1' });
+        const diskAsset = AssetFactory.from({ fileCreatedAt, originalPath: `/data/upload/${user.id}/ab/cd/disk.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const s3Asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ef/gh/s3.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const diskPath = `/data/library/label-1/2022/2022-06-19/${diskAsset.originalFileName}`;
+        const s3Key = `library/label-1/2022/2022-06-19/${s3Asset.originalFileName}`;
+
+        mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(
+          makeStream([getForStorageTemplate(diskAsset), getForStorageTemplate(s3Asset)]),
+        );
+        mocks.user.getList.mockResolvedValue([user]);
+
+        await expect(sut.handleMigration()).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(diskAsset.originalPath, diskPath);
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(s3Asset.originalPath, s3Key);
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(s3Asset.originalPath);
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: diskAsset.id, originalPath: diskPath });
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: s3Asset.id, originalPath: s3Key });
+      });
+
+      it('should not clean up disk folders when the library folder does not exist on S3 deployments', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+
+        mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([getForStorageTemplate(asset)]));
+        mocks.user.getList.mockResolvedValue([user]);
+        mocks.storage.checkFileExists.mockResolvedValue(false);
+
+        await expect(sut.handleMigration()).resolves.toBe(JobStatus.Success);
+
+        expect(s3.copy).toHaveBeenCalledOnce();
+        expect(mocks.storage.checkFileExists).toHaveBeenLastCalledWith('/data/library');
+        expect(mocks.storage.removeEmptyDirs).not.toHaveBeenCalled();
+      });
+
+      it('should make no S3 requests for S3 assets already at their library key', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `library/${user.id}/2022/2022-06-19/IMG_0001.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        // an earlier run gave it +7 because other IMG_0002.jpg files held the destination
+        const duplicate = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0002.jpg',
+          originalPath: `library/${user.id}/2022/2022-06-19/IMG_0002+7.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+
+        mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(
+          makeStream([getForStorageTemplate(asset), getForStorageTemplate(duplicate)]),
+        );
+        mocks.user.getList.mockResolvedValue([user]);
+
+        await expect(sut.handleMigration()).resolves.toBe(JobStatus.Success);
+
+        expect(s3.exists).not.toHaveBeenCalled();
+        expectNothingMoved();
+      });
     });
   });
 });

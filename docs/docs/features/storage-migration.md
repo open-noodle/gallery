@@ -163,6 +163,8 @@ Admin clicks "Start"
 
 The orchestrator job streams file records from 8 sources (assets, asset files by type, person thumbnails and user profile images), batches them and queues one migration job per file. Worker concurrency follows the value you set, from 1 to 20, default 5.
 
+A file already at the target (from an earlier, interrupted run) is reused only when its size matches the source. A different size fails that file with an error naming both paths, rather than pointing the asset at the wrong file. A copy that fails partway removes what it wrote, so the next run starts clean.
+
 ### Path Transformation
 
 The migration converts between absolute disk paths and relative S3 keys:
@@ -178,4 +180,4 @@ Each per-file job uses **optimistic concurrency** when updating the database: th
 
 ### Rollback
 
-Rollback reads every log entry for a given `batchId` and reverses each path update with the same optimistic concurrency pattern (UPDATE WHERE path = newPath, SET path = oldPath). If all reversals succeed, the log entries for that batch are deleted. If any fail, the log is kept for debugging. Rollback never moves files. It only reverts database paths, so if source files were deleted during the migration you need a migration in the opposite direction to bring the files back.
+Rollback reads every log entry for a given `batchId` and reverses each path update with the same optimistic concurrency pattern (UPDATE WHERE path = newPath, SET path = oldPath). If all reversals succeed, the log entries for that batch are deleted. If any fail, the log is kept for debugging. A file the [storage template](/features/s3-storage#storage-template-on-s3) moved after the migration no longer has the migrated path, so rollback skips it. Rollback never moves files. It only reverts database paths, so if source files were deleted during the migration you need a migration in the opposite direction to bring the files back.
