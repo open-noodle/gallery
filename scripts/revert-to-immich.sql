@@ -284,7 +284,8 @@ DELETE FROM "system_metadata"
    'classification-config-state',
    'shared-space-face-job-cleanup-state',
    'face-suggestion-default-on-state',
-   'person-suggestion-scan-job-cleanup-state'
+   'person-suggestion-scan-job-cleanup-state',
+   'storage-template-s3-state'
  );
 
 -- Gallery-only API key permissions (Gallery's Permission enum minus Immich's).

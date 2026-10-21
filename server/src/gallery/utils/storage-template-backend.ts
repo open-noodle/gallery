@@ -1,10 +1,12 @@
 import { join } from 'node:path';
+import type { StorageAsset } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
-import { StorageFolder } from 'src/enum.js';
+import { StorageFolder, SystemMetadataKey } from 'src/enum.js';
 import { toBackendKey } from 'src/gallery/utils/backend-file-move.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 
 /**
  * The library folder a storage template renders into, in the namespace that holds the original: a disk file gets
@@ -20,6 +22,28 @@ export const getTemplateLibraryRoot = (originalPath: string, user: { id: string;
     ? StorageCore.getLibraryFolder(user)
     : join(StorageFolder.Library, user.storageLabel || user.id);
   return `${root}/`;
+};
+
+/**
+ * Whether the per-asset template job, which runs after every metadata extraction, must leave this asset to a manual
+ * run. An install that upgraded with files in S3 and the template enabled had the template do nothing in the bucket;
+ * moving its new uploads the moment it upgrades would be a surprise. Until an admin finishes one Storage Template
+ * Migration by hand (`StorageTemplateS3State.pending`, decided on the first start of this version), its S3 files keep
+ * their upload keys. Disk files, and every file once the flag is cleared or on a fresh install, move as upstream does.
+ * An asset counts when its original or its sidecar is a key; its disk files then wait for the same manual run, so an
+ * original and its sidecar are never split by the automatic job.
+ */
+export const isManualOnlyTemplateMove = async (
+  { originalPath, files }: StorageAsset,
+  systemMetadataRepository: SystemMetadataRepository,
+): Promise<boolean> => {
+  const hasBackendFile = !isDiskPath(originalPath) || (files ?? []).some(({ path }) => !isDiskPath(path));
+  if (!hasBackendFile) {
+    return false;
+  }
+
+  const state = await systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State);
+  return !!state?.pending;
 };
 
 /**

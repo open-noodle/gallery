@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
-import { ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { BootstrapEventPriority, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { batched } from 'src/utils/misc.js';
@@ -14,6 +14,52 @@ import { batched } from 'src/utils/misc.js';
  */
 @Injectable()
 export class BackendFileMigrationService extends BaseService {
+  /**
+   * Decides, once, whether this install's S3 files wait for a manual Storage Template Migration (see
+   * isManualOnlyTemplateMove): yes when the first start of this version finds originals in S3 and the template
+   * enabled, so an upgrade does not start moving bucket objects by itself; no on a fresh install, or when the template
+   * was off (enabling it later is the admin's own choice). It runs before the job workers start (JobService), so no
+   * per-asset job reads an undecided state, and in every worker, so uploads to the API worker find it decided too.
+   */
+  @OnEvent({ name: 'AppBootstrap', priority: BootstrapEventPriority.JobService - 1 })
+  async onBootstrap() {
+    let state = await this.systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State);
+    if (!state) {
+      const { storageTemplate } = await this.getConfig({ withCache: false });
+      const pending = storageTemplate.enabled && (await this.storageMigrationRepository.hasBackendOriginals());
+      state = { pending, decidedAt: new Date().toISOString() };
+      await this.systemMetadataRepository.set(SystemMetadataKey.StorageTemplateS3State, state);
+    }
+
+    if (state.pending) {
+      this.logger.warn(
+        'The storage template does not move files in S3 until an admin runs Storage Template Migration from ' +
+          'Administration > Job Queues; uploads keep their upload/ keys until then',
+      );
+    }
+  }
+
+  // the first manual run that finishes lets the per-asset job move S3 files from then on; JobSuccess is emitted in
+  // the worker that ran the job, and the bulk job is queued only by an admin starting the queue
+  @OnEvent({ name: 'JobSuccess', workers: [ImmichWorker.Microservices] })
+  async onJobSuccess({ job, response }: ArgOf<'JobSuccess'>) {
+    if (job.name !== JobName.StorageTemplateMigration || response !== JobStatus.Success) {
+      return;
+    }
+
+    const state = await this.systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State);
+    if (!state?.pending) {
+      return;
+    }
+
+    await this.systemMetadataRepository.set(SystemMetadataKey.StorageTemplateS3State, {
+      ...state,
+      pending: false,
+      clearedAt: new Date().toISOString(),
+    });
+    this.logger.log('Storage template migration finished: new uploads in S3 now move to their template path');
+  }
+
   // QueueService.start emits QueueStart locally, so it reaches only the API worker that took the admin's request
   @OnEvent({ name: 'QueueStart', workers: [ImmichWorker.Api] })
   async onQueueStart({ name }: ArgOf<'QueueStart'>) {

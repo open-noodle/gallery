@@ -420,6 +420,7 @@ export enum SystemMetadataKey {
   SharedSpaceFaceJobCleanupState = 'shared-space-face-job-cleanup-state',
   FaceSuggestionDefaultOnState = 'face-suggestion-default-on-state',
   PersonSuggestionScanJobCleanupState = 'person-suggestion-scan-job-cleanup-state',
+  StorageTemplateS3State = 'storage-template-s3-state',
 }
 
 export enum UserMetadataKey {
