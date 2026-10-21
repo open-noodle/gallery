@@ -45,6 +45,9 @@ export class BackendFileMigrationService extends BaseService {
   }
 
   private async decideS3State() {
+    // logged first, so a start that waits on the lock or fails on the query below can be told apart
+    this.logger.log('Deciding whether files in S3 wait for a manual storage template migration');
+
     // the other worker may have decided while this one waited for the lock: the first decision stands, or a worker
     // that started after the API accepted an S3 upload would count that upload and decide differently
     const decided = await this.systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State);

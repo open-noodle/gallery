@@ -16,7 +16,7 @@ When S3 storage is enabled:
 
 - **New uploads** (photos, videos, thumbnails, transcoded videos, profile images) are written to your S3 bucket.
 - **Existing files** on disk keep being served from disk. Both backends run at the same time.
-- The [Storage Template](/administration/storage-template) works as it does on disk: uploads land under `upload/` in the bucket, and with the template enabled Gallery then moves them to their template path under `library/`. See [Storage Template on S3](#storage-template-on-s3).
+- The [Storage Template](/administration/storage-template) works as it does on disk: uploads land under `upload/` in the bucket, and with the template enabled Gallery then moves them to their template path under `library/`. One exception: a server that already had photos or videos in S3 and the template enabled when it was upgraded waits until an admin has run the template migration once. See [Storage Template on S3](#storage-template-on-s3).
 
 Gallery supports two modes for serving files from S3:
 
@@ -361,9 +361,28 @@ IMMICH_S3_SECRET_ACCESS_KEY=your-r2-secret-key
 
 The [Storage Template](/administration/storage-template) organizes the bucket the way it organizes the disk, and the same **Enable storage template engine** setting turns it on for both.
 
-- **New uploads** are written to `upload/<user id>/…` in the bucket first. Once metadata extraction has read the file's date and other details, Gallery moves the object to its template path under `library/<storage label or user id>/…`, together with its XMP sidecar if it has one.
+- **New uploads** are written to `upload/<user id>/…` in the bucket first. Once metadata extraction has read the file's date and other details, Gallery moves the object to its template path under `library/<storage label or user id>/…`, together with its XMP sidecar if it has one. The one exception is a server upgraded with photos or videos already in S3 and the template enabled, where this waits for one manual run of **Storage template migration**: see [After Upgrading With Files Already in S3](#after-upgrading-with-files-already-in-s3).
 - **Existing objects** move when an admin runs the **Storage template migration** job from **Administration > Job Queues**. Starting that job by hand also moves the S3 thumbnails, previews, full-size images, encoded videos and person thumbnails to the paths the current settings give them, unless the **Migration** job is running at that moment: start **Storage template migration** again once it has finished. The **Migration** job does the same, for S3 files as well as files on disk.
 - **Files never move between disk and S3.** A file on disk is moved on disk, and an object in the bucket stays in the bucket. To move files from one backend to the other, use [Storage Migration](/features/storage-migration).
+
+### After Upgrading With Files Already in S3
+
+Earlier Gallery versions did not apply the storage template in S3: the template never moved objects in the bucket, so S3 uploads stayed at their `upload/` keys, even with the template enabled. So that an upgrade does not start moving objects in your bucket on its own, Gallery checks once, the first time a version that applies the template in S3 starts:
+
+- **If the storage template was enabled and the bucket already held photos or videos**, photos and videos in S3 (and their sidecars) stay where they are, and new uploads stay at their `upload/` keys, until an admin runs **Storage template migration** once from **Administration > Job Queues**. The **Migration** job still re-paths thumbnails, previews and encoded videos in S3 as before. That run moves the existing objects and the uploads that waited, and from then on new uploads move automatically.
+- **Otherwise**, on a new server, on one with no photos or videos in S3 yet, or on one that had the storage template disabled, new uploads move automatically from the start. If you enable the template later, new uploads move from then on, and existing objects move when you run the job, as on disk.
+
+While Gallery waits:
+
+- Uploads work normally. Each one is stored in the bucket at its `upload/` key and served, thumbnailed and transcoded from there.
+- Photos and videos whose files are all on disk are not affected: they move to their template path automatically, as before. The one exception is the motion part of a live photo whose still is in S3: it stays where it is on disk and waits with the still, and the manual run moves both.
+- The server log shows this warning each time the server starts:
+
+  ```
+  The storage template does not move files in S3 until an admin runs Storage Template Migration from Administration > Job Queues; uploads keep their upload/ keys until then
+  ```
+
+The wait ends when a **Storage template migration** run finishes with the template enabled. The log then shows `Storage template migration finished: new uploads in S3 now move to their template path`, and the warning no longer appears. The wait ends even if some or all files could not be moved during that run: each failure is logged, and the file stays at its old key until a later run moves it, so check the log after that run.
 
 ### Why a Move Is a Copy and a Delete
 
@@ -396,6 +415,9 @@ Yes. Use the built-in [Storage Migration](/features/storage-migration) tool. It 
 
 **Do I need to make my S3 bucket public?**
 No. Gallery uses presigned URLs (in `redirect` mode) or proxies the files through the server (in `proxy` mode). The bucket should remain private.
+
+**Why do new uploads stay under `upload/` in my bucket after upgrading?**
+Your server already had photos or videos in S3 and the storage template enabled when it was upgraded, so Gallery waits for an admin to run **Storage template migration** once from **Administration > Job Queues** before it moves files in the bucket. The server log says so each time the server starts. See [After Upgrading With Files Already in S3](#after-upgrading-with-files-already-in-s3).
 
 **What happens if I switch back to disk storage?**
 Files already stored in S3 will continue to be served from S3. Only new uploads will go to disk. Both backends are always active.
@@ -468,7 +490,7 @@ When S3 is the write backend, uploads follow this path:
 2. The file is uploaded to S3 under `upload/<user id>/…` using the `@aws-sdk/lib-storage` `Upload` class (supports automatic multipart for large files).
 3. The database is updated with the relative path.
 4. A cleanup job deletes the local temp file.
-5. After metadata extraction, if the storage template is enabled, the object and its sidecar are moved to their template keys under `library/<storage label or user id>/…` with a server-side copy, a size check and a delete (see [Why a Move Is a Copy and a Delete](#why-a-move-is-a-copy-and-a-delete)).
+5. After metadata extraction, if the storage template is enabled, the object and its sidecar are moved to their template keys under `library/<storage label or user id>/…` with a server-side copy, a size check and a delete (see [Why a Move Is a Copy and a Delete](#why-a-move-is-a-copy-and-a-delete)). On a server that is waiting for its first manual template migration after an upgrade, this step is skipped and the object stays under `upload/` until that run (see [After Upgrading With Files Already in S3](#after-upgrading-with-files-already-in-s3)).
 
 Profile images (both user-uploaded and OAuth-synced) follow the same pattern: the file is written to disk first, then uploaded to S3 if the write backend is S3, and the local temp file is cleaned up.
 
