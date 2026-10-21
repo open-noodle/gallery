@@ -101,6 +101,17 @@ export class StorageMigrationRepository {
       .stream();
   }
 
+  /** whether any asset, trashed or not, has its original stored as a storage-backend key */
+  async hasBackendOriginals(): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.originalPath', 'not like', '/%')
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
   /** people whose thumbnail is a storage-backend key */
   streamPeopleWithBackendThumbnails() {
     return this.db

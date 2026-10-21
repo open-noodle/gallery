@@ -18,7 +18,11 @@ import {
   QueueName,
   StorageFolder,
 } from 'src/enum.js';
-import { getTemplateLibraryRoot, isTemplateDestinationTaken } from 'src/gallery/utils/storage-template-backend.js';
+import {
+  getTemplateLibraryRoot,
+  isManualOnlyTemplateMove,
+  isTemplateDestinationTaken,
+} from 'src/gallery/utils/storage-template-backend.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getAssetFile } from 'src/utils/asset.util.js';
 import { getFilenameExtension, getLivePhotoMotionFilename } from 'src/utils/file.js';
@@ -154,6 +158,10 @@ export class StorageTemplateService extends BaseService {
       return JobStatus.Failed;
     }
 
+    if (await isManualOnlyTemplateMove(asset, this.systemMetadataRepository)) {
+      return JobStatus.Skipped;
+    }
+
     const user = await this.userRepository.get(asset.ownerId, {});
     const storageLabel = user?.storageLabel || null;
     const filename = asset.originalFileName || asset.id;
@@ -168,7 +176,9 @@ export class StorageTemplateService extends BaseService {
         return JobStatus.Failed;
       }
       const motionFilename = getLivePhotoMotionFilename(filename, livePhotoVideo.originalPath);
-      await this.moveAsset(livePhotoVideo, { storageLabel, filename: motionFilename }, asset);
+      if (!(await isManualOnlyTemplateMove(livePhotoVideo, this.systemMetadataRepository))) {
+        await this.moveAsset(livePhotoVideo, { storageLabel, filename: motionFilename }, asset);
+      }
     }
     return JobStatus.Success;
   }
