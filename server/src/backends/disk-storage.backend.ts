@@ -14,7 +14,7 @@ import { StorageRepository } from 'src/repositories/storage.repository.js';
 export const isDiskPath = (key: string) => isAbsolute(key);
 
 /**
- * exists / readAll / delete go through StorageRepository: they replace direct StorageRepository
+ * exists / readAll / copy / stat / delete go through StorageRepository: they replace direct StorageRepository
  * calls in upstream code paths, which keeps those paths (and the specs that mock the repository)
  * unchanged for disk files.
  */
@@ -66,6 +66,18 @@ export class DiskStorageBackend implements StorageBackend {
       this.resolvePath(key),
       options?.readable ? constants.R_OK : constants.F_OK,
     );
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<void> {
+    const source = this.resolvePath(fromKey);
+    const target = this.resolvePath(toKey);
+    this.storageRepository.mkdirSync(dirname(target));
+    await this.storageRepository.copyFile(source, target);
+  }
+
+  async stat(key: string): Promise<{ size: number }> {
+    const { size } = await this.storageRepository.stat(this.resolvePath(key));
+    return { size };
   }
 
   delete(key: string): Promise<void> {

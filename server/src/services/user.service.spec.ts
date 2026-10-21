@@ -863,18 +863,36 @@ describe(UserService.name, () => {
         (StorageService as any).s3Backend = void 0;
       });
 
-      it('should delete the four user-scoped S3 prefixes in addition to disk folders', async () => {
+      it('should delete the five user-scoped S3 prefixes in addition to disk folders', async () => {
         const user = { id: 'deleted-s3-user', deletedAt: makeDeletedAt(10) } as UserAdmin;
         mocks.user.get.mockResolvedValue(user);
 
         await sut.handleUserDelete({ id: user.id });
 
         expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
-        expect(mockS3Backend.deletePrefix).toHaveBeenCalledTimes(4);
-        expect(mockS3Backend.deletePrefix).toHaveBeenCalledWith(`upload/${user.id}/`);
-        expect(mockS3Backend.deletePrefix).toHaveBeenCalledWith(`profile/${user.id}/`);
-        expect(mockS3Backend.deletePrefix).toHaveBeenCalledWith(`thumbs/${user.id}/`);
-        expect(mockS3Backend.deletePrefix).toHaveBeenCalledWith(`encoded-video/${user.id}/`);
+        expect(mockS3Backend.deletePrefix.mock.calls).toEqual([
+          [`library/${user.id}/`],
+          [`upload/${user.id}/`],
+          [`profile/${user.id}/`],
+          [`thumbs/${user.id}/`],
+          [`encoded-video/${user.id}/`],
+        ]);
+      });
+
+      it('should delete the S3 library prefix under the storage label, as the disk library folder', async () => {
+        // the storage template and a disk-to-S3 storage migration write originals to library/<label>/
+        const user = { id: 'deleted-s3-user', deletedAt: makeDeletedAt(10), storageLabel: 'admin' } as UserAdmin;
+        mocks.user.get.mockResolvedValue(user);
+
+        await sut.handleUserDelete({ id: user.id });
+
+        expect(mocks.storage.unlinkDir).toHaveBeenCalledWith(expect.stringContaining('data/library/admin'), {
+          force: true,
+          recursive: true,
+        });
+        expect(mockS3Backend.deletePrefix).toHaveBeenCalledWith('library/admin/');
+        expect(mockS3Backend.deletePrefix).not.toHaveBeenCalledWith(`library/${user.id}/`);
+        expect(mockS3Backend.deletePrefix).not.toHaveBeenCalledWith(expect.stringMatching(/^backups/));
       });
 
       it('should still attempt remaining prefixes, disk deletion, and DB cleanup when one S3 prefix fails', async () => {
@@ -884,11 +902,12 @@ describe(UserService.name, () => {
           .mockResolvedValueOnce(void 0)
           .mockRejectedValueOnce(new Error('throttled'))
           .mockResolvedValueOnce(void 0)
+          .mockResolvedValueOnce(void 0)
           .mockResolvedValueOnce(void 0);
 
         await sut.handleUserDelete({ id: user.id });
 
-        expect(mockS3Backend.deletePrefix).toHaveBeenCalledTimes(4);
+        expect(mockS3Backend.deletePrefix).toHaveBeenCalledTimes(5);
         expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
         expect(mocks.album.deleteAll).toHaveBeenCalledWith(user.id);
         expect(mocks.user.delete).toHaveBeenCalledWith(user, true);
@@ -967,7 +986,8 @@ describe(UserService.name, () => {
           .mockResolvedValueOnce(100)
           .mockResolvedValueOnce(200)
           .mockResolvedValueOnce(300)
-          .mockResolvedValueOnce(400),
+          .mockResolvedValueOnce(400)
+          .mockResolvedValueOnce(500),
       };
       (StorageService as any).s3Backend = s3Backend;
       mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
@@ -991,12 +1011,13 @@ describe(UserService.name, () => {
         ['/data/encoded-video/user-id', expect.any(Function)],
       ]);
       expect(s3Backend.getPrefixUsage.mock.calls).toEqual([
+        ['library/storage-label/'],
         ['upload/user-id/'],
         ['profile/user-id/'],
         ['thumbs/user-id/', expect.any(Function)],
         ['encoded-video/user-id/', expect.any(Function)],
       ]);
-      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 1150);
+      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 1650);
     });
 
     it('should sync disk usage from all managed user folders', async () => {

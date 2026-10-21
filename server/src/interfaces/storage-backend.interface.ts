@@ -57,6 +57,16 @@ export interface StorageBackend {
    */
   exists(key: string, options?: { readable?: boolean }): Promise<boolean>;
 
+  /**
+   * Copy the content at `fromKey` to `toKey` in this backend, overwriting `toKey`. S3 copies server-side (a
+   * multipart copy above the 5 GiB CopyObject limit), so no bytes pass through the server; S3 has no rename, so a
+   * move is this copy followed by `delete`.
+   */
+  copy(fromKey: string, toKey: string): Promise<void>;
+
+  /** The size in bytes of the content at `key`. Rejects when nothing is stored there. */
+  stat(key: string): Promise<{ size: number }>;
+
   /** Delete the content at the given key */
   delete(key: string): Promise<void>;
 

@@ -260,10 +260,31 @@ export class StorageMigrationService extends BaseService {
 
       // Idempotency: check if target already exists
       const targetExists = await targetBackend.exists(targetPath);
-      if (!targetExists) {
+      if (targetExists) {
+        // Trust an existing target only when it matches the source: a different file there (an interrupted copy,
+        // or another asset's file at the same key) would re-point this asset at it and, with deleteSource, delete
+        // the only copy of the original.
+        const [{ size: sourceSize }, { size: targetSize }] = await Promise.all([
+          sourceBackend.stat(sourcePath),
+          targetBackend.stat(targetPath),
+        ]);
+        if (sourceSize !== targetSize) {
+          this.logger.error(
+            `Target already exists with a different size, not migrating: ${sourcePath} (${sourceSize} bytes) -> ${targetPath} (${targetSize} bytes)`,
+          );
+          return JobStatus.Failed;
+        }
+      } else {
         // Copy: get stream from source, put to target
         const { stream } = await sourceBackend.get(sourcePath);
-        await targetBackend.put(targetPath, stream);
+        try {
+          await targetBackend.put(targetPath, stream);
+        } catch (error) {
+          // the target did not exist, so whatever is there is this put's partial write (a disk put is not atomic);
+          // left in place, it would fail the size check above on every retry
+          await targetBackend.delete(targetPath).catch(() => {});
+          throw error;
+        }
       }
 
       // Update DB path with optimistic concurrency

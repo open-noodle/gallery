@@ -75,6 +75,41 @@ export class StorageMigrationRepository {
       .stream();
   }
 
+  /** assets holding a non-edited derivative under a storage-backend key, otherwise filtered as streamForMigrationJob */
+  streamAssetsWithBackendDerivatives() {
+    return this.db
+      .selectFrom('asset')
+      .select(['asset.id'])
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_file')
+            .select('asset_file.id')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', 'in', [
+              AssetFileType.Thumbnail,
+              AssetFileType.Preview,
+              AssetFileType.FullSize,
+              AssetFileType.EncodedVideo,
+            ])
+            .where('asset_file.isEdited', '=', false)
+            .where('asset_file.path', 'not like', '/%'),
+        ),
+      )
+      .stream();
+  }
+
+  /** people whose thumbnail is a storage-backend key */
+  streamPeopleWithBackendThumbnails() {
+    return this.db
+      .selectFrom('person')
+      .select(['ownerId', 'personGroupId'])
+      .where('thumbnailPath', '!=', '')
+      .where('thumbnailPath', 'not like', '/%')
+      .stream();
+  }
+
   // --- Estimate queries ---
 
   async getOriginalsSizeEstimate(direction: StorageMigrationDirection): Promise<number> {

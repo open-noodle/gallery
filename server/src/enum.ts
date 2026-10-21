@@ -1031,6 +1031,7 @@ export enum JobName {
   // Storage Backend Migration
   StorageBackendMigrationQueueAll = 'StorageBackendMigrationQueueAll',
   StorageBackendMigrationSingle = 'StorageBackendMigrationSingle',
+  StorageBackendFileMigrationQueueAll = 'StorageBackendFileMigrationQueueAll',
 
   // Shared Space Face Recognition
   SharedSpaceFaceMatch = 'SharedSpaceFaceMatch',

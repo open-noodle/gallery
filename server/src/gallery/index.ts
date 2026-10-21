@@ -20,6 +20,7 @@ import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repos
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
+import { BackendFileMigrationService } from 'src/gallery/services/backend-file-migration.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
@@ -94,6 +95,7 @@ export const galleryRepositories = [
 export const galleryServices = [
   AppMetricsService,
   AssetVisibilityTransitionService,
+  BackendFileMigrationService,
   ClassificationService,
   FaceIdentityMaintenanceService,
   FaceRepairService,

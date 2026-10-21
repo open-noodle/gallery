@@ -613,6 +613,7 @@ export type JobItem =
   // Storage Backend Migration
   | { name: JobName.StorageBackendMigrationQueueAll; data: IStorageMigrationQueueAllJob }
   | { name: JobName.StorageBackendMigrationSingle; data: IStorageMigrationJob }
+  | { name: JobName.StorageBackendFileMigrationQueueAll; data?: IBaseJob }
 
   // Shared Space Face Recognition
   | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
