@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
-import { BootstrapEventPriority, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
+import {
+  BootstrapEventPriority,
+  DatabaseLock,
+  ImmichWorker,
+  JobName,
+  JobStatus,
+  QueueName,
+  SystemMetadataKey,
+} from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { batched } from 'src/utils/misc.js';
@@ -19,17 +27,14 @@ export class BackendFileMigrationService extends BaseService {
    * isManualOnlyTemplateMove): yes when the first start of this version finds originals in S3 and the template
    * enabled, so an upgrade does not start moving bucket objects by itself; no on a fresh install, or when the template
    * was off (enabling it later is the admin's own choice). It runs before the job workers start (JobService), so no
-   * per-asset job reads an undecided state, and in every worker, so uploads to the API worker find it decided too.
+   * per-asset job reads an undecided state, and in every worker, so the API worker cannot accept an upload (which would
+   * count as an S3 original) before the decision is made.
    */
   @OnEvent({ name: 'AppBootstrap', priority: BootstrapEventPriority.JobService - 1 })
   async onBootstrap() {
-    let state = await this.systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State);
-    if (!state) {
-      const { storageTemplate } = await this.getConfig({ withCache: false });
-      const pending = storageTemplate.enabled && (await this.storageMigrationRepository.hasBackendOriginals());
-      state = { pending, decidedAt: new Date().toISOString() };
-      await this.systemMetadataRepository.set(SystemMetadataKey.StorageTemplateS3State, state);
-    }
+    const state =
+      (await this.systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State)) ??
+      (await this.databaseRepository.withLock(DatabaseLock.StorageTemplateMigration, () => this.decideS3State()));
 
     if (state.pending) {
       this.logger.warn(
@@ -37,6 +42,21 @@ export class BackendFileMigrationService extends BaseService {
           'Administration > Job Queues; uploads keep their upload/ keys until then',
       );
     }
+  }
+
+  private async decideS3State() {
+    // the other worker may have decided while this one waited for the lock: the first decision stands, or a worker
+    // that started after the API accepted an S3 upload would count that upload and decide differently
+    const decided = await this.systemMetadataRepository.get(SystemMetadataKey.StorageTemplateS3State);
+    if (decided) {
+      return decided;
+    }
+
+    const { storageTemplate } = await this.getConfig({ withCache: false });
+    const pending = storageTemplate.enabled && (await this.storageMigrationRepository.hasBackendOriginals());
+    const state = { pending, decidedAt: new Date().toISOString() };
+    await this.systemMetadataRepository.set(SystemMetadataKey.StorageTemplateS3State, state);
+    return state;
   }
 
   // the first manual run that finishes lets the per-asset job move S3 files from then on; JobSuccess is emitted in

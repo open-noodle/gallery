@@ -1,6 +1,12 @@
 import { Mock } from 'vitest';
+import type { StorageAsset, SystemMetadata } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
-import { getTemplateLibraryRoot, isTemplateDestinationTaken } from 'src/gallery/utils/storage-template-backend.js';
+import { AssetFileType, SystemMetadataKey } from 'src/enum.js';
+import {
+  getTemplateLibraryRoot,
+  isManualOnlyTemplateMove,
+  isTemplateDestinationTaken,
+} from 'src/gallery/utils/storage-template-backend.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { getMocks } from 'test/utils.js';
 
@@ -173,5 +179,75 @@ describe('isTemplateDestinationTaken', () => {
         expect(s3.exists).not.toHaveBeenCalled();
       },
     );
+  });
+});
+
+const sidecar = (path: string) => ({ type: AssetFileType.Sidecar, path });
+
+// the two fields isManualOnlyTemplateMove reads; files is left undefined to cover an asset read without its files
+const storageAsset = (originalPath: string, files?: Array<{ type: AssetFileType; path: string }>) =>
+  ({ originalPath, files }) as unknown as StorageAsset;
+
+describe('isManualOnlyTemplateMove', () => {
+  const decidedAt = '2026-10-20T08:00:00.000Z';
+  const diskOriginal = '/data/upload/user-1/as/se/asset-1.jpg';
+  const keyOriginal = 'upload/user-1/as/se/asset-1.jpg';
+
+  let mocks: ReturnType<typeof getMocks>;
+
+  const mockState = (state: SystemMetadata[SystemMetadataKey.StorageTemplateS3State] | null) =>
+    mocks.systemMetadata.get.mockImplementation((key: SystemMetadataKey) =>
+      Promise.resolve((key === SystemMetadataKey.StorageTemplateS3State ? state : null) as any),
+    );
+
+  beforeEach(() => {
+    mocks = getMocks();
+    mockState({ pending: true, decidedAt });
+  });
+
+  it.each([
+    { label: 'a disk original without files', files: [] },
+    { label: 'a disk original with files undefined', files: undefined },
+    { label: 'a disk original with a disk sidecar', files: [sidecar(`${diskOriginal}.xmp`)] },
+  ])('should be false for $label without reading the state', async ({ files }) => {
+    await expect(
+      isManualOnlyTemplateMove(storageAsset(diskOriginal, files), mocks.systemMetadata as any),
+    ).resolves.toBe(false);
+
+    expect(mocks.systemMetadata.get).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'a key original without files', originalPath: keyOriginal, files: [] },
+    { label: 'a key original with files undefined', originalPath: keyOriginal, files: undefined },
+    { label: 'a key original with a disk sidecar', originalPath: keyOriginal, files: [sidecar(`${diskOriginal}.xmp`)] },
+    { label: 'the key sidecar of a disk original', originalPath: diskOriginal, files: [sidecar(`${keyOriginal}.xmp`)] },
+  ])('should be true for $label while the state is pending', async ({ originalPath, files }) => {
+    await expect(
+      isManualOnlyTemplateMove(storageAsset(originalPath, files), mocks.systemMetadata as any),
+    ).resolves.toBe(true);
+
+    expect(mocks.systemMetadata.get).toHaveBeenCalledExactlyOnceWith(SystemMetadataKey.StorageTemplateS3State);
+  });
+
+  it.each([
+    { label: 'cleared by a manual run', state: { pending: false, decidedAt, clearedAt: '2026-10-21T09:00:00.000Z' } },
+    { label: 'decided not pending', state: { pending: false, decidedAt } },
+    { label: 'absent', state: null },
+  ])('should be false for a key original or key sidecar when the state is $label', async ({ state }) => {
+    mockState(state);
+
+    await expect(isManualOnlyTemplateMove(storageAsset(keyOriginal, []), mocks.systemMetadata as any)).resolves.toBe(
+      false,
+    );
+    await expect(
+      isManualOnlyTemplateMove(
+        storageAsset(diskOriginal, [sidecar(`${keyOriginal}.xmp`)]),
+        mocks.systemMetadata as any,
+      ),
+    ).resolves.toBe(false);
+
+    expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(2);
+    expect(mocks.systemMetadata.get).toHaveBeenCalledWith(SystemMetadataKey.StorageTemplateS3State);
   });
 });
