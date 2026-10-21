@@ -1,4 +1,11 @@
-import { CreateBucketCommand, HeadObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  HeadObjectCommand,
+  ListMultipartUploadsCommand,
+  ListObjectsV2Command,
+  S3Client,
+  S3ServiceException,
+} from '@aws-sdk/client-s3';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -408,5 +415,68 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
       verifyClient.destroy();
       expect(ETag).toMatch(/-3"$/);
     }, 60_000);
+
+    it('should abort its upload and copy with one CopyObject on a gateway without UploadPartCopy', async () => {
+      // Storj's gateway answers UploadPartCopy with 501 NotImplemented. MinIO implements it, so the backend's own
+      // client refuses it the same way before the request leaves; every other request reaches MinIO.
+      const endpoint = `http://${container.getHost()}:${container.getMappedPort(9000)}`;
+      const fallbackBackend = new S3StorageBackend({
+        bucket,
+        region: 'us-east-1',
+        endpoint,
+        accessKeyId: 'minioadmin',
+        secretAccessKey: 'minioadmin',
+        presignedUrlExpiry: 3600,
+        serveMode: 'redirect',
+        multipartCopyThreshold: 1024,
+      });
+      const sent: string[] = [];
+      const fallbackClient: S3Client = (fallbackBackend as any).client;
+      fallbackClient.middlewareStack.add(
+        (next, context) => (args) => {
+          sent.push(context.commandName ?? 'unknown');
+          if (context.commandName === 'UploadPartCopyCommand') {
+            throw new S3ServiceException({
+              name: 'NotImplemented',
+              $fault: 'server',
+              $metadata: { httpStatusCode: 501 },
+              message: 'A header you provided implies functionality that is not implemented',
+            });
+          }
+          return next(args);
+        },
+        { step: 'initialize', name: 'refuseUploadPartCopy' },
+      );
+      const content = randomBytes(64 * 1024);
+      const source = 'test/copy/no-part-copy/Café clip+1.mp4';
+      const target = 'test/copy/library/admin/2024/no-part-copy/Café clip+1.mp4';
+      await backend.put(source, content, { contentType: 'video/mp4' });
+
+      await fallbackBackend.copy(source, target);
+
+      expect(sent).toEqual([
+        'HeadObjectCommand',
+        'CreateMultipartUploadCommand',
+        'UploadPartCopyCommand',
+        'AbortMultipartUploadCommand',
+        'CopyObjectCommand',
+      ]);
+      const copied = await backend.readAll(target);
+      expect(copied.equals(content)).toBe(true);
+      const { stream, contentType } = await backend.get(target);
+      stream.destroy();
+      expect(contentType).toBe('video/mp4');
+
+      // the aborted upload holds no parts
+      const verifyClient = new S3Client({
+        region: 'us-east-1',
+        endpoint,
+        forcePathStyle: true,
+        credentials: { accessKeyId: 'minioadmin', secretAccessKey: 'minioadmin' },
+      });
+      const { Uploads } = await verifyClient.send(new ListMultipartUploadsCommand({ Bucket: bucket, Prefix: target }));
+      verifyClient.destroy();
+      expect(Uploads ?? []).toEqual([]);
+    });
   });
 });

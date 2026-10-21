@@ -26,6 +26,13 @@ export class BackendFileMigrationService extends BaseService {
       return;
     }
 
+    // upstream refuses to start the Migration queue while it runs ("Job is already running"); file migration jobs
+    // have no dedup, so queueing now would move the same files twice
+    if (await this.jobRepository.isActive(QueueName.Migration)) {
+      this.logger.log('Migration queue is already running, not queueing the storage-backend file migration');
+      return;
+    }
+
     await this.jobRepository.queue({ name: JobName.StorageBackendFileMigrationQueueAll });
   }
 

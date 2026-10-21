@@ -13,6 +13,7 @@ import {
   HeadObjectCommandOutput,
   ListObjectsV2Command,
   S3Client,
+  StorageClass,
   UploadPartCopyCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
@@ -67,6 +68,19 @@ const toCopySource = (bucket: string, key: string) =>
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/')}`;
+
+const S3_STORAGE_CLASSES = new Set<string>(Object.values(StorageClass));
+
+/**
+ * The storage class a copy is given. A copy is written in STANDARD unless told otherwise, which would undo the
+ * transition a lifecycle rule made, so the source's class is kept; STANDARD itself is the default and not sent, and
+ * neither is a class the SDK does not list: MinIO reports an ILM-transitioned object's tier name (e.g. `WARM-TIER`) in
+ * HeadObject, and rejects it on CopyObject and CreateMultipartUpload with InvalidStorageClass.
+ */
+const toCopyStorageClass = (storageClass?: StorageClass) =>
+  storageClass && storageClass !== StorageClass.STANDARD && S3_STORAGE_CLASSES.has(storageClass)
+    ? storageClass
+    : undefined;
 
 class AsyncLimiter {
   private active = 0;
@@ -215,24 +229,34 @@ export class S3StorageBackend implements StorageBackend {
     const head = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: fromKey }));
     const size = head.ContentLength ?? 0;
     const copySource = toCopySource(this.bucket, fromKey);
-
-    // a copy is written in STANDARD unless told otherwise; keep the class a lifecycle rule may have moved the source to
-    const { ContentType, StorageClass } = head;
+    const storageClass = toCopyStorageClass(head.StorageClass);
 
     if (size <= this.multipartCopyThreshold) {
-      await this.client.send(
-        new CopyObjectCommand({
-          Bucket: this.bucket,
-          Key: toKey,
-          CopySource: copySource,
-          MetadataDirective: 'COPY',
-          StorageClass,
-        }),
-      );
+      await this.copyObject(copySource, toKey, storageClass);
       return;
     }
 
-    await this.copyMultipart(copySource, toKey, size, { ContentType, StorageClass });
+    try {
+      await this.copyMultipart(copySource, toKey, size, { ContentType: head.ContentType, StorageClass: storageClass });
+    } catch (error: any) {
+      // Storj's gateway answers UploadPartCopy with 501 NotImplemented, and its CopyObject has no 5 GiB limit
+      if (error?.name !== 'NotImplemented' && error?.$metadata?.httpStatusCode !== 501) {
+        throw error;
+      }
+      await this.copyObject(copySource, toKey, storageClass);
+    }
+  }
+
+  private async copyObject(copySource: string, toKey: string, storageClass?: StorageClass): Promise<void> {
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: toKey,
+        CopySource: copySource,
+        MetadataDirective: 'COPY',
+        StorageClass: storageClass,
+      }),
+    );
   }
 
   /**

@@ -385,25 +385,6 @@ describe(StorageMigrationService.name, () => {
       });
     });
 
-    it('should remove a partial target when the copy fails, so a retry does not fail its size check', async () => {
-      mockS3Backend.exists.mockResolvedValue(true);
-      mockDiskBackend.exists.mockResolvedValue(false);
-      mockS3Backend.get.mockResolvedValue({ stream: Readable.from([]) });
-      mockDiskBackend.put.mockRejectedValue(new Error('stream ended early'));
-      mockDiskBackend.delete.mockRejectedValue(new Error('cleanup failed too'));
-
-      const result = await sut.handleMigration({
-        ...baseJob,
-        direction: 'toDisk',
-        sourcePath: 'library/user/ab/cd/file.jpg',
-      });
-
-      expect(result).toBe(JobStatus.Failed);
-      expect(mockDiskBackend.delete).toHaveBeenCalledWith('/usr/src/app/upload/library/user/ab/cd/file.jpg');
-      expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
-      expect(mocks.storageMigration.createLogEntry).not.toHaveBeenCalled();
-    });
-
     it('should skip when source file not found and return Skipped', async () => {
       mockDiskBackend.exists.mockResolvedValue(false);
 

@@ -11,9 +11,12 @@ import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interfa
 // vi.mock() calls are hoisted above every import by Vitest's transform regardless of where they
 // appear textually, so the imports above already see the mocked modules — this ordering is just
 // for readability (mocks grouped together before the test body that uses them).
-vi.mock('@aws-sdk/client-s3', () => {
+vi.mock('@aws-sdk/client-s3', async (importOriginal) => {
+  const { StorageClass } = await importOriginal<typeof import('@aws-sdk/client-s3')>();
   const mockSend = vi.fn();
   return {
+    // the backend only forwards a storage class the SDK knows, so it reads the real list
+    StorageClass,
     // Vitest 4 invokes a mocked constructor via Reflect.construct when the code under test `new`s
     // it; an arrow function has no [[Construct]] slot, so this must be a function expression.
     S3Client: vi.fn(function () {
@@ -288,13 +291,17 @@ describe('S3StorageBackend', () => {
       expect(inputsOf('CreateMultipartUploadCommand')).toEqual([]);
     });
 
-    it('should keep the storage class of the source, which a copy would otherwise reset to STANDARD', async () => {
-      const respond = asS3(1024, 'image/jpeg');
-      mockSend.mockImplementation((command: SentCommand) =>
+    /** asS3, with HeadObject also reporting the source's storage class */
+    const asS3InClass = (size: number, storageClass: string, contentType = 'video/mp4') => {
+      const respond = asS3(size, contentType);
+      return (command: SentCommand) =>
         command._type === 'HeadObjectCommand'
-          ? Promise.resolve({ ContentLength: 1024, ContentType: 'image/jpeg', StorageClass: 'STANDARD_IA' })
-          : respond(command),
-      );
+          ? Promise.resolve({ ContentLength: size, ContentType: contentType, StorageClass: storageClass })
+          : respond(command);
+    };
+
+    it('should keep the storage class of the source, which a copy would otherwise reset to STANDARD', async () => {
+      mockSend.mockImplementation(asS3InClass(1024, 'STANDARD_IA', 'image/jpeg'));
 
       await backend.copy('upload/user1/ab/cd/photo.jpg', 'library/admin/2024/photo.jpg');
 
@@ -304,12 +311,7 @@ describe('S3StorageBackend', () => {
     });
 
     it('should keep the storage class of the source on a multipart copy', async () => {
-      const respond = asS3(120);
-      mockSend.mockImplementation((command: SentCommand) =>
-        command._type === 'HeadObjectCommand'
-          ? Promise.resolve({ ContentLength: 120, ContentType: 'video/mp4', StorageClass: 'INTELLIGENT_TIERING' })
-          : respond(command),
-      );
+      mockSend.mockImplementation(asS3InClass(120, 'INTELLIGENT_TIERING'));
 
       await lowCopyThresholdBackend().copy('upload/user1/ab/cd/video.mp4', 'library/admin/2024/video.mp4');
 
@@ -321,6 +323,37 @@ describe('S3StorageBackend', () => {
           StorageClass: 'INTELLIGENT_TIERING',
         },
       ]);
+    });
+
+    it.each([
+      ['a MinIO tier name', 'WARM-TIER'],
+      ['STANDARD, the default', 'STANDARD'],
+    ])('should not send a storage class that is %s', async (_, storageClass) => {
+      // MinIO reports an ILM-transitioned object's tier there and rejects it on a copy with InvalidStorageClass
+      mockSend.mockImplementation(asS3InClass(1024, storageClass, 'image/jpeg'));
+
+      await backend.copy('upload/user1/ab/cd/photo.jpg', 'library/admin/2024/photo.jpg');
+
+      expect(inputsOf('CopyObjectCommand')).toEqual([
+        {
+          Bucket: 'test-bucket',
+          Key: 'library/admin/2024/photo.jpg',
+          CopySource: 'test-bucket/upload/user1/ab/cd/photo.jpg',
+          MetadataDirective: 'COPY',
+          StorageClass: undefined,
+        },
+      ]);
+    });
+
+    it('should not send a MinIO tier name on a multipart copy', async () => {
+      mockSend.mockImplementation(asS3InClass(120, 'WARM-TIER'));
+
+      await lowCopyThresholdBackend().copy('upload/user1/ab/cd/video.mp4', 'library/admin/2024/video.mp4');
+
+      const [createInput] = inputsOf('CreateMultipartUploadCommand');
+      expect(createInput).toMatchObject({ Key: 'library/admin/2024/video.mp4', ContentType: 'video/mp4' });
+      expect(createInput.StorageClass).toBeUndefined();
+      expect(inputsOf('CompleteMultipartUploadCommand')).toHaveLength(1);
     });
 
     it('should copy an object of exactly 5 GiB, the CopyObject limit, in one request', async () => {
@@ -417,6 +450,84 @@ describe('S3StorageBackend', () => {
       expect(inputsOf('AbortMultipartUploadCommand')).toEqual([
         { Bucket: 'test-bucket', Key: 'library/a.mov', UploadId: 'upload-1' },
       ]);
+      // only a gateway without UploadPartCopy falls back to one CopyObject
+      expect(inputsOf('CopyObjectCommand')).toEqual([]);
+    });
+
+    describe('on a gateway without UploadPartCopy', () => {
+      // plain objects instead of Errors (unicorn/no-error-property-assignment), shaped as the SDK reports a 501
+      const notImplemented = { name: 'NotImplemented', $metadata: { httpStatusCode: 501 } };
+      const unnamed501 = { name: 'Unknown', $metadata: { httpStatusCode: 501 } };
+
+      it.each([
+        ['NotImplemented', notImplemented],
+        ['an unnamed 501', unnamed501],
+      ])('should abort the upload and copy with one CopyObject on %s', async (_, failure) => {
+        const respond = asS3InClass(250, 'STANDARD_IA', 'video/quicktime');
+        mockSend.mockImplementation((command: SentCommand) =>
+          command._type === 'UploadPartCopyCommand' ? Promise.reject(failure) : respond(command),
+        );
+
+        await lowCopyThresholdBackend().copy('library/admin/2023/Café clip+1.mov', 'library/admin/2024/clip.mov');
+
+        expect(mockSend.mock.calls.map(([command]) => command._type)).toEqual([
+          'HeadObjectCommand',
+          'CreateMultipartUploadCommand',
+          'UploadPartCopyCommand',
+          'AbortMultipartUploadCommand',
+          'CopyObjectCommand',
+        ]);
+        expect(inputsOf('CopyObjectCommand')).toEqual([
+          {
+            Bucket: 'test-bucket',
+            Key: 'library/admin/2024/clip.mov',
+            CopySource: 'test-bucket/library/admin/2023/Caf%C3%A9%20clip%2B1.mov',
+            MetadataDirective: 'COPY',
+            StorageClass: 'STANDARD_IA',
+          },
+        ]);
+      });
+
+      it('should fall back when completing the upload is not implemented either', async () => {
+        const respond = asS3(250);
+        mockSend.mockImplementation((command: SentCommand) =>
+          command._type === 'CompleteMultipartUploadCommand' ? Promise.reject(notImplemented) : respond(command),
+        );
+
+        await lowCopyThresholdBackend().copy('upload/a.mov', 'library/a.mov');
+
+        expect(inputsOf('AbortMultipartUploadCommand')).toHaveLength(1);
+        expect(inputsOf('CopyObjectCommand')).toHaveLength(1);
+      });
+
+      it('should reject with the CopyObject error, without retrying again, when the fallback fails', async () => {
+        const tooLarge = { name: 'InvalidRequest', $metadata: { httpStatusCode: 400 } };
+        const respond = asS3(250);
+        mockSend.mockImplementation((command: SentCommand) => {
+          if (command._type === 'UploadPartCopyCommand') {
+            return Promise.reject(notImplemented);
+          }
+          if (command._type === 'CopyObjectCommand') {
+            return Promise.reject(tooLarge);
+          }
+          return respond(command);
+        });
+
+        await expect(lowCopyThresholdBackend().copy('upload/a.mov', 'library/a.mov')).rejects.toBe(tooLarge);
+        expect(inputsOf('CreateMultipartUploadCommand')).toHaveLength(1);
+        expect(inputsOf('CopyObjectCommand')).toHaveLength(1);
+      });
+
+      it('should not retry a CopyObject below the threshold that is not implemented', async () => {
+        const respond = asS3(100);
+        mockSend.mockImplementation((command: SentCommand) =>
+          command._type === 'CopyObjectCommand' ? Promise.reject(notImplemented) : respond(command),
+        );
+
+        await expect(lowCopyThresholdBackend().copy('upload/a.mov', 'library/a.mov')).rejects.toBe(notImplemented);
+        expect(inputsOf('CopyObjectCommand')).toHaveLength(1);
+        expect(inputsOf('CreateMultipartUploadCommand')).toEqual([]);
+      });
     });
 
     it('should abort the upload when completing it fails', async () => {

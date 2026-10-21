@@ -3,6 +3,8 @@ import { UserAdmin } from 'src/database.js';
 import { StorageFolder } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 
 const UUID_LENGTH = 36;
@@ -49,6 +51,25 @@ export const getUserS3Prefixes = (user: Pick<UserAdmin, 'id' | 'storageLabel'>) 
   thumbnails: `${StorageFolder.Thumbnails}/${user.id}/`,
   encodedVideo: `${StorageFolder.EncodedVideo}/${user.id}/`,
 });
+
+/**
+ * The S3 prefixes user deletion removes. library/<label>/ is kept while an asset of another owner is stored under it:
+ * an admin can change a storage label without running the template migration and give the old label to another user,
+ * whose library then shares the prefix with the first user's originals. The id-keyed prefixes are the user's alone.
+ */
+export const getDeletableUserS3Prefixes = async (
+  user: Pick<UserAdmin, 'id' | 'storageLabel'>,
+  storageMigrationRepository: StorageMigrationRepository,
+  logger: LoggingRepository,
+): Promise<string[]> => {
+  const { library, ...owned } = getUserS3Prefixes(user);
+  if (await storageMigrationRepository.hasOtherOwnerFilesUnderPrefix(library, user.id)) {
+    logger.warn(`Skipped S3 prefix ${library} for user ${user.id}: it holds files of another user's assets`);
+    return Object.values(owned);
+  }
+
+  return [library, ...Object.values(owned)];
+};
 
 type PhysicalUsageDeps = {
   user: Pick<UserAdmin, 'id' | 'storageLabel'>;

@@ -220,21 +220,34 @@ describe('moveBackendFile', () => {
       expect(deps.savePath).toHaveBeenCalledWith(key);
     });
 
-    it('should delete the copy and keep the old key of a derivative whose size does not match', async () => {
-      const oldPath = 'thumbs/user-1/asset-1_thumbnail.webp';
-      const key = 'thumbs/user-1/as/se/asset-1_thumbnail.webp';
-      backend.stat.mockImplementation((path: string) => Promise.resolve({ size: path === oldPath ? 42 : 41 }));
+    it.each([
+      {
+        label: 'a derivative',
+        pathType: AssetFileType.Thumbnail,
+        oldPath: 'thumbs/user-1/asset-1_thumbnail.webp',
+        key: 'thumbs/user-1/as/se/asset-1_thumbnail.webp',
+      },
+      {
+        label: 'a sidecar',
+        pathType: AssetFileType.Sidecar,
+        oldPath: 'upload/user-1/as/se/asset-1.jpg.xmp',
+        key: `${newKey}.xmp`,
+      },
+    ])(
+      'should keep the old key and the copy of $label whose size does not match',
+      async ({ pathType, oldPath, key }) => {
+        // another job (a regenerated thumbnail) may have just written that key
+        backend.stat.mockImplementation((path: string) => Promise.resolve({ size: path === oldPath ? 42 : 41 }));
 
-      await moveBackendFile(
-        request({ pathType: AssetFileType.Thumbnail, oldPath, newPath: `/data/${key}`, assetInfo: undefined }),
-        deps,
-      );
+        await moveBackendFile(request({ pathType, oldPath, newPath: key, assetInfo: undefined }), deps);
 
-      expect(backend.delete).toHaveBeenCalledTimes(1);
-      expect(backend.delete).toHaveBeenCalledWith(key);
-      expect(deps.savePath).not.toHaveBeenCalled();
-      expect(mocks.move.delete).not.toHaveBeenCalled();
-    });
+        expect(backend.copy).toHaveBeenCalledWith(oldPath, key);
+        expect(mocks.logger.warn).toHaveBeenCalledWith('Skipping move due to file size mismatch: 41 !== 42');
+        expect(backend.delete).not.toHaveBeenCalled();
+        expect(deps.savePath).not.toHaveBeenCalled();
+        expect(mocks.move.delete).not.toHaveBeenCalled();
+      },
+    );
 
     it.each([
       { label: 'outside the media location', newPath: '/mnt/photos/IMG_1.jpg' },
@@ -280,7 +293,7 @@ describe('moveBackendFile', () => {
       expect(mocks.move.delete).not.toHaveBeenCalled();
     });
 
-    it('should delete the copy, keep the old key and keep the move row on a size mismatch', async () => {
+    it('should delete the copy of an original, keep the old key and keep the move row on a size mismatch', async () => {
       backend.stat.mockResolvedValue({ size: assetInfo.sizeInBytes - 1 });
 
       await moveBackendFile(request(), deps);
@@ -336,10 +349,80 @@ describe('moveBackendFile', () => {
       await moveBackendFile(sidecar, deps);
 
       expect(deps.moveDiskFile).toHaveBeenCalledWith({ ...sidecar, newPath: `/data/${newKey}.xmp` });
-      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+      // only the original's row is read; the disk mover keeps the sidecar's own
+      expect(mocks.move.getByEntity).toHaveBeenCalledExactlyOnceWith('asset-1', AssetPathType.Original);
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(backend.exists).not.toHaveBeenCalled();
       expectNothingMoved();
+    });
+  });
+
+  describe('a sidecar', () => {
+    const sidecarKey = 'upload/user-1/as/se/asset-1.jpg.xmp';
+
+    it('should move a sidecar whose original has no move row', async () => {
+      await moveBackendFile(
+        request({
+          pathType: AssetFileType.Sidecar,
+          oldPath: sidecarKey,
+          newPath: `${newKey}.xmp`,
+          assetInfo: undefined,
+        }),
+        deps,
+      );
+
+      expect(mocks.move.getByEntity.mock.calls).toEqual([
+        ['asset-1', AssetPathType.Original],
+        ['asset-1', AssetFileType.Sidecar],
+      ]);
+      expect(backend.exists).toHaveBeenCalledWith(`${newKey}.xmp`);
+      expect(backend.copy).toHaveBeenCalledWith(sidecarKey, `${newKey}.xmp`);
+      expect(deps.savePath).toHaveBeenCalledWith(`${newKey}.xmp`);
+      expect(backend.delete).toHaveBeenCalledWith(sidecarKey);
+    });
+
+    it('should not overwrite a sidecar already at its destination', async () => {
+      // another asset's sidecar, left at `<name>.xmp` when its own move failed after its original had moved on
+      backend.exists.mockImplementation((key: string) => Promise.resolve(key === `${newKey}.xmp`));
+
+      await moveBackendFile(
+        request({
+          pathType: AssetFileType.Sidecar,
+          oldPath: sidecarKey,
+          newPath: `${newKey}.xmp`,
+          assetInfo: undefined,
+        }),
+        deps,
+      );
+
+      expect(mocks.logger.warn).toHaveBeenCalledWith(`Not moving the sidecar of asset-1: ${newKey}.xmp is taken`);
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expectNothingMoved();
+    });
+
+    it.each([
+      { label: 'a key sidecar', oldPath: sidecarKey },
+      { label: 'a disk sidecar', oldPath: `/data/${sidecarKey}` },
+    ])('should not move $label while the move of its original is unfinished', async ({ oldPath }) => {
+      mocks.move.getByEntity.mockImplementation((_, pathType) =>
+        Promise.resolve(pathType === AssetPathType.Original ? row(oldKey, newKey) : undefined),
+      );
+
+      await moveBackendFile(
+        request({ pathType: AssetFileType.Sidecar, oldPath, newPath: `${newKey}.xmp`, assetInfo: undefined }),
+        deps,
+      );
+
+      expect(mocks.logger.warn).toHaveBeenCalledWith(
+        'Not moving the sidecar of asset-1: the move of its original is unfinished',
+      );
+      expect(mocks.move.getByEntity).toHaveBeenCalledExactlyOnceWith('asset-1', AssetPathType.Original);
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.move.update).not.toHaveBeenCalled();
+      expect(deps.moveDiskFile).not.toHaveBeenCalled();
+      expect(backend.exists).not.toHaveBeenCalled();
+      expectNothingMoved();
+      expectNoDiskCalls();
     });
   });
 
@@ -494,6 +577,89 @@ describe('moveBackendFile', () => {
       );
       expect(mocks.move.update).not.toHaveBeenCalled();
       expectNothingMoved();
+    });
+
+    describe('a row the database has moved on from', () => {
+      const laterKey = 'library/admin/2025/IMG_1.jpg';
+      const finalKey = 'library/admin/2026/IMG_1.jpg';
+
+      it('should move from the database path when an earlier move saved it but did not clean up', async () => {
+        // the earlier move saved newKey, then stopped before deleting oldKey and the row
+        mocks.move.getByEntity.mockResolvedValue(row(oldKey, newKey));
+        backend.exists.mockResolvedValue(true);
+
+        await moveBackendFile(request({ oldPath: newKey, newPath: laterKey }), deps);
+
+        expect(backend.exists).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.move.update).toHaveBeenCalledExactlyOnceWith('move-1', {
+          id: 'move-1',
+          oldPath: newKey,
+          newPath: laterKey,
+        });
+        expect(backend.copy).toHaveBeenCalledExactlyOnceWith(newKey, laterKey);
+        expect(deps.savePath).toHaveBeenCalledWith(laterKey);
+        // the earlier move's leftover stays: its name may since belong to another asset
+        expect(backend.delete).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.move.delete).toHaveBeenCalledWith('move-1');
+        expect(backend.downloadToTemp).not.toHaveBeenCalled();
+        expectNoDiskCalls();
+      });
+
+      it('should move a sidecar rewritten at its database path, not the outdated one at the row old path', async () => {
+        const outdated = 'upload/user-1/as/se/asset-1.jpg.xmp';
+        const current = `${newKey}.xmp`;
+        mocks.move.getByEntity.mockImplementation((_, pathType) =>
+          Promise.resolve(pathType === AssetFileType.Sidecar ? row(outdated, current, pathType) : undefined),
+        );
+        backend.exists.mockResolvedValue(true);
+        backend.stat.mockImplementation((key: string) => Promise.resolve({ size: key === outdated ? 32 : 64 }));
+
+        await moveBackendFile(
+          request({
+            pathType: AssetFileType.Sidecar,
+            oldPath: current,
+            newPath: `${laterKey}.xmp`,
+            assetInfo: undefined,
+          }),
+          deps,
+        );
+
+        expect(mocks.move.update).toHaveBeenCalledExactlyOnceWith('move-1', {
+          id: 'move-1',
+          oldPath: current,
+          newPath: `${laterKey}.xmp`,
+        });
+        expect(backend.copy).toHaveBeenCalledExactlyOnceWith(current, `${laterKey}.xmp`);
+        expect(backend.stat).not.toHaveBeenCalledWith(outdated);
+        expect(deps.savePath).toHaveBeenCalledWith(`${laterKey}.xmp`);
+        expect(backend.delete).toHaveBeenCalledExactlyOnceWith(current);
+      });
+
+      it.each([
+        { label: 'old', at: newKey },
+        { label: 'new', at: laterKey },
+      ])(
+        'should fall back to upstream recovery at the row $label path when the database path is gone',
+        async ({ at }) => {
+          // an interrupted recovery moved the row on to newKey => laterKey; the database still has oldKey, since removed
+          mocks.move.getByEntity.mockResolvedValue(row(newKey, laterKey));
+          backend.exists.mockImplementation((key: string) => Promise.resolve(key === at));
+          mocks.crypto.hashFile.mockResolvedValue(checksum);
+
+          await moveBackendFile(request({ oldPath: oldKey, newPath: finalKey }), deps);
+
+          expect(backend.exists.mock.calls).toEqual([[oldKey], [newKey], [laterKey]]);
+          expect(mocks.move.update).toHaveBeenCalledExactlyOnceWith('move-1', {
+            id: 'move-1',
+            oldPath: at,
+            newPath: finalKey,
+          });
+          expect(backend.copy).toHaveBeenCalledExactlyOnceWith(at, finalKey);
+          expect(deps.savePath).toHaveBeenCalledWith(finalKey);
+          expect(backend.delete).toHaveBeenCalledExactlyOnceWith(at);
+          expect(mocks.move.delete).toHaveBeenCalledWith('move-1');
+        },
+      );
     });
 
     it('should fail the move when the backend cannot be reached', async () => {

@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative } from 'node:path';
 import type { MoveRequest } from 'src/cores/storage.core.js';
-import { AssetPathType } from 'src/enum.js';
+import { AssetFileType, AssetPathType } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
@@ -58,6 +58,16 @@ export const moveBackendFile = async (request: MoveRequest, deps: BackendMoveDep
     return;
   }
 
+  // A sidecar follows its original to `<original>.xmp`. A move of the original that stops without throwing (copy
+  // error, size mismatch, missing asset info, file at neither location, failed verification) keeps its row; moving
+  // the sidecar anyway would put it beside a file the original never reached, where a later asset of that name
+  // overwrites it. A row left by a crash between savePath and the row delete also keeps the sidecar where it is
+  // (safe, not beside its original) until the original moves again.
+  if (pathType === AssetFileType.Sidecar && (await moveRepository.getByEntity(entityId, AssetPathType.Original))) {
+    logger.warn(`Not moving the sidecar of ${entityId}: the move of its original is unfinished`);
+    return;
+  }
+
   if (isAbsolute(oldPath)) {
     return deps.moveDiskFile({ ...request, newPath: join(mediaLocation, request.newPath) });
   }
@@ -81,7 +91,15 @@ export const moveBackendFile = async (request: MoveRequest, deps: BackendMoveDep
     // left by a disk move from before this file reached the backend: the database now has it at oldPath
     logger.log(`Replacing a stale disk move (${move.oldPath} => ${move.newPath}) with ${oldPath} => ${newPath}`);
     move = await moveRepository.update(move.id, { id: move.id, oldPath, newPath });
+  } else if (move && move.oldPath !== oldPath && (await backend.exists(oldPath))) {
+    // the database has moved on from this row (an earlier move saved its new path but stopped before cleaning up, or
+    // the file was rewritten in place): move what the database points at. move.oldPath is not deleted: an admin may
+    // have removed that orphan by hand and its name may since belong to another asset.
+    logger.log(`Replacing an outdated move (${move.oldPath} => ${move.newPath}) with ${oldPath} => ${newPath}`);
+    move = await moveRepository.update(move.id, { id: move.id, oldPath, newPath });
   } else if (move) {
+    // upstream's recovery, also for a database path that is gone: an interrupted recovery may have moved the row
+    // on to a file the database never pointed at
     logger.log(`Attempting to finish incomplete move: ${move.oldPath} => ${move.newPath}`);
     const isOldPathExists = await backend.exists(move.oldPath);
     const isNewPathExists = await backend.exists(move.newPath);
@@ -104,6 +122,13 @@ export const moveBackendFile = async (request: MoveRequest, deps: BackendMoveDep
 
     move = await moveRepository.update(move.id, { id: move.id, oldPath: actualPath, newPath });
   } else {
+    // the template probes only the original's destination, and a copy overwrites: a sidecar left behind by its own
+    // failed move still holds `<name>.xmp` for an asset that has since moved on, and must not be replaced by another's
+    if (pathType === AssetFileType.Sidecar && (await backend.exists(newPath))) {
+      logger.warn(`Not moving the sidecar of ${entityId}: ${newPath} is taken`);
+      return;
+    }
+
     move = await moveRepository.create({ entityId, pathType, oldPath, newPath });
   }
 
@@ -130,7 +155,12 @@ export const moveBackendFile = async (request: MoveRequest, deps: BackendMoveDep
     logger.debug(`File size check: ${size} === ${expectedSize}`);
     if (size !== expectedSize) {
       logger.warn(`Skipping move due to file size mismatch: ${size} !== ${expectedSize}`);
-      await backend.delete(newPath);
+      // an original's destination was picked as free under the template lock, so the copy there is this one. A
+      // derivative's or sidecar's may have just been written by another job (a regenerated thumbnail): it stays,
+      // and the row makes the next attempt redo the copy.
+      if (assetInfo) {
+        await backend.delete(newPath);
+      }
       return;
     }
   }
