@@ -2083,6 +2083,211 @@ async function phaseTemplateS3ManualDerivatives(): Promise<void> {
   console.log(`=== Phase: ${tag} complete ===`);
 }
 
+// The once-decided gate on automatic S3 moves (BackendFileMigrationService.onBootstrap, isManualOnlyTemplateMove)
+const TEMPLATE_S3_STATE_KEY = 'storage-template-s3-state';
+
+interface TemplateS3State {
+  pending: boolean;
+  decidedAt: string;
+  clearedAt?: string;
+}
+
+async function getTemplateS3State(): Promise<TemplateS3State | undefined> {
+  const [row] = await queryDb<{ value: TemplateS3State }>('SELECT value FROM system_metadata WHERE key = $1', [
+    TEMPLATE_S3_STATE_KEY,
+  ]);
+  return row?.value;
+}
+
+async function setTemplateS3State(state: TemplateS3State): Promise<void> {
+  await queryDb(
+    `INSERT INTO system_metadata (key, value) VALUES ($1, $2::jsonb)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [TEMPLATE_S3_STATE_KEY, JSON.stringify(state)],
+  );
+}
+
+// The warning each worker logs on every start while the state is pending (BackendFileMigrationService.onBootstrap)
+const TEMPLATE_S3_PENDING_WARNING =
+  'The storage template does not move files in S3 until an admin runs Storage Template Migration from ' +
+  'Administration > Job Queues; uploads keep their upload/ keys until then';
+
+// What the manual run that lifts the gate logs (BackendFileMigrationService.onJobSuccess)
+const TEMPLATE_S3_CLEARED_LOG =
+  'Storage template migration finished: new uploads in S3 now move to their template path';
+
+// The template the earlier phases left every S3 original at, so the manual run in template-s3-upgrade-pending has
+// only that phase's upload to move
+const TEMPLATE_S3_UPGRADE_TEMPLATE = '{{y}}/{{MMMM}}/{{filename}}';
+
+// ---------------------------------------------------------------------------
+// Phase: Sets up an upgrade's first start for template-s3-upgrade-pending. Deletes the state this database's first
+// start decided ("not pending": the harness starts from an empty database, hence the automatic moves the phases
+// above assert) and enables the template while the originals those phases left are in S3. The workflow then
+// restarts the server, whose BackendFileMigrationService.onBootstrap finds no row and decides again, as the first
+// start of this version does on an install that upgrades with originals in S3 and the template enabled.
+// Precondition: S3 backend, the template-s3-* phases above run
+// Leaves the row deleted and the template enabled for the restart; template-s3-upgrade-pending puts both back.
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3UpgradePrepare(): Promise<void> {
+  const tag = 'template-s3-upgrade-prepare';
+  console.log(`=== Phase: ${tag} ===`);
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+
+  const preState = await getTemplateS3State();
+  assert.ok(preState, `[${tag}] precondition: no ${TEMPLATE_S3_STATE_KEY} row, which every server start decides`);
+  assert.equal(
+    preState.pending,
+    false,
+    `[${tag}] precondition: an empty database's first start must decide "not pending"`,
+  );
+  // what StorageMigrationRepository.hasBackendOriginals asks (trashed assets count too)
+  const [{ c }] = await queryDb<{ c: string }>(`SELECT COUNT(*)::text c FROM asset WHERE "originalPath" NOT LIKE '/%'`);
+  const backendOriginals = Number(c);
+  assert.ok(backendOriginals > 0, `[${tag}] precondition: no original in S3 — run the template-s3-* phases first`);
+
+  // saved before anything changes, so template-s3-upgrade-pending can put it back
+  saveState({ templateS3PreState: preState });
+  try {
+    await setStorageTemplate(token, { enabled: true, template: TEMPLATE_S3_UPGRADE_TEMPLATE });
+    await queryDb('DELETE FROM system_metadata WHERE key = $1', [TEMPLATE_S3_STATE_KEY]);
+  } catch (error) {
+    await setTemplateS3State(preState);
+    await setStorageTemplate(token, { enabled: false });
+    throw error;
+  }
+  // the restart's decision and its warning both come after this moment
+  saveState({ templateS3RestartAfterMs: Date.now() });
+
+  console.log(
+    `  Deleted ${TEMPLATE_S3_STATE_KEY} and enabled the template with ${backendOriginals} originals in S3; ` +
+      'restart the server (backend=s3) before template-s3-upgrade-pending.',
+  );
+  console.log(`=== Phase: ${tag} complete ===`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase: After an upgrade that found originals in S3 with the template enabled, a new S3 upload keeps its
+// upload/ key until an admin finishes one Storage Template Migration by hand; that run moves it and lifts the gate
+// Precondition: template-s3-upgrade-prepare, then a server restart (backend=s3), whose first start decided the state
+// again: the decision under test (onBootstrap and the hasBackendOriginals query). `finally` puts back the state the
+// database's first start decided and disables the template.
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3UpgradePending(): Promise<void> {
+  const tag = 'template-s3-upgrade-pending';
+  console.log(`=== Phase: ${tag} ===`);
+  const saved = loadState();
+  const preState: TemplateS3State | undefined = saved.templateS3PreState;
+  const restartAfterMs: number | undefined = saved.templateS3RestartAfterMs;
+  assert.ok(
+    preState && restartAfterMs,
+    `[${tag}] no saved state — run template-s3-upgrade-prepare, then restart the server (backend=s3)`,
+  );
+  const token = await loginAdmin();
+  // the restart's decision is in its row: the template setting no longer changes it
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+  const startMs = Date.now();
+  const preCount = await countMoveHistory();
+  minioSetupAlias();
+
+  // past setup's PNGs and the other template phases' (checksum dedup, see template-s3-upload)
+  for (let i = 0; i < 320; i++) {
+    createPng();
+  }
+
+  try {
+    // The restart found no row, the template enabled and originals in S3, and decided as an upgrade's first start does
+    const decided = await getTemplateS3State();
+    assert.ok(decided, `[${tag}] the restart did not decide ${TEMPLATE_S3_STATE_KEY}`);
+    assert.deepEqual(
+      decided,
+      { pending: true, decidedAt: decided.decidedAt },
+      `[${tag}] expected the restart to decide {"pending": true}, got ${JSON.stringify(decided)}`,
+    );
+    const decidedMs = Date.parse(decided.decidedAt);
+    assert.ok(
+      decidedMs >= restartAfterMs && decidedMs <= Date.now(),
+      `[${tag}] decidedAt ${decided.decidedAt} is not from the restart (after ${new Date(restartAfterMs).toISOString()})`,
+    );
+
+    // the admin's only notice, logged on start while pending
+    const bootLogs = captureContainerLogsSince('immich-server', restartAfterMs);
+    const warnings = bootLogs.split('\n').filter((line) => line.includes(TEMPLATE_S3_PENDING_WARNING));
+    assert.ok(warnings.length > 0, `[${tag}] no "${TEMPLATE_S3_PENDING_WARNING}" in the server logs since the restart`);
+
+    await setStorageTemplate(token, { enabled: true, template: TEMPLATE_S3_UPGRADE_TEMPLATE });
+
+    const png = createPng();
+    const upload = await uploadAsset(token, 'template-pending.png', png);
+    assert.equal(upload.status, 201, `[${tag}] upload ${upload.id} was deduplicated against an existing asset`);
+    await waitForProcessing(token);
+
+    // The per-asset template job left it alone; the upload is stored, served and thumbnailed from its upload key
+    const [pending] = await getTemplateAssets([upload.id]);
+    assert.ok(pending, `Asset ${upload.id} not found`);
+    assert.ok(
+      pending.originalPath.startsWith(`upload/${pending.ownerId}/`),
+      `[${tag}] the template moved ${pending.id} while pending: ${pending.originalPath}`,
+    );
+    assert.equal(minioObjectSize(pending.originalPath), png.length, `[${tag}] size changed for ${pending.id}`);
+    const served = await downloadAssetOriginal(token, pending.id);
+    assert.equal(sha256(served), sha256(png), `[${tag}] original of ${pending.id} not served from its upload key`);
+
+    // thumbnail generation follows the template job when it skips too
+    const thumbnails = await queryDb<{ path: string }>(
+      `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'thumbnail' AND "isEdited" = false`,
+      [pending.id],
+    );
+    assert.equal(thumbnails.length, 1, `[${tag}] expected a thumbnail for ${pending.id}, got ${thumbnails.length}`);
+    assert.ok(minioFileExists(thumbnails[0].path), `[${tag}] thumbnail missing from MinIO: ${thumbnails[0].path}`);
+
+    const pendingCount = await countMoveHistory();
+    assert.equal(pendingCount, preCount, `[${tag}] move_history delta while pending: ${preCount} → ${pendingCount}`);
+    const stillPending = await getTemplateS3State();
+    assert.equal(stillPending?.pending, true, `[${tag}] the gate lifted without a manual run`);
+
+    // The admin starts Storage Template Migration by hand: the bulk job moves the upload, and its success lifts the gate
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    const [moved] = await getTemplateAssets([upload.id]);
+    assert.ok(moved, `Asset ${upload.id} disappeared`);
+    assertTemplatedKey(moved, TEMPLATE_YEAR_MONTH_NAME, 'template-pending.png', tag);
+    assert.equal(minioObjectSize(moved.originalPath), png.length, `[${tag}] size changed for ${moved.id}`);
+    assert.ok(!minioFileExists(pending.originalPath), `[${tag}] old key still in MinIO: ${pending.originalPath}`);
+    assertUploadKeyGone(moved, tag);
+
+    const cleared = await getTemplateS3State();
+    assert.ok(cleared, `[${tag}] ${TEMPLATE_S3_STATE_KEY} row disappeared`);
+    assert.equal(cleared.pending, false, `[${tag}] the manual run did not lift the gate`);
+    assert.equal(cleared.decidedAt, decided.decidedAt, `[${tag}] lifting the gate rewrote decidedAt`);
+    assert.ok(
+      cleared.clearedAt && !Number.isNaN(Date.parse(cleared.clearedAt)),
+      `[${tag}] expected a clearedAt timestamp, got ${cleared.clearedAt}`,
+    );
+
+    const postCount = await countMoveHistory();
+    assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, tag);
+    assert.ok(logs.includes(TEMPLATE_S3_CLEARED_LOG), `[${tag}] no "${TEMPLATE_S3_CLEARED_LOG}" in the server logs`);
+
+    console.log(
+      `  The restart decided "pending" (${warnings.length} startup warning(s)); upload ${moved.id} waited at its ` +
+        `upload key, then the manual run moved it to ${moved.originalPath} and lifted the gate.`,
+    );
+  } finally {
+    // the state as this database's first start decided it ("not pending", checked by template-s3-upgrade-prepare),
+    // so the phases after this one see automatic moves; a rerun has to prepare and restart again
+    await setTemplateS3State(preState);
+    await setStorageTemplate(token, { enabled: false });
+    saveState({ templateS3PreState: undefined, templateS3RestartAfterMs: undefined });
+  }
+  console.log(`=== Phase: ${tag} complete ===`);
+}
+
 async function phaseTemplateDiskBaseline(): Promise<void> {
   console.log('=== Phase: template-disk-baseline ===');
   const token = await loginAdmin();
@@ -2103,7 +2308,7 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
   await api('PUT', `/admin/users/${me.id}`, { body: { storageLabel: 'admin' }, token });
 
   // Only assert against assets created in phaseSetup — later phases
-  // (template-s3-upload, template-s3-live-photo, copy-asset-sidecar-s3)
+  // (template-s3-upload, template-s3-live-photo, template-s3-upgrade-pending, copy-asset-sidecar-s3)
   // upload additional test assets whose paths depend on what those phases
   // did, which is not the regression we're guarding here. The seeded assets
   // arrive already templated: the S3 template phases moved them to
@@ -2582,6 +2787,14 @@ async function main() {
         await phaseTemplateS3ManualDerivatives();
         break;
       }
+      case 'template-s3-upgrade-prepare': {
+        await phaseTemplateS3UpgradePrepare();
+        break;
+      }
+      case 'template-s3-upgrade-pending': {
+        await phaseTemplateS3UpgradePending();
+        break;
+      }
       case 'template-disk-baseline': {
         await phaseTemplateDiskBaseline();
         break;
@@ -2600,7 +2813,7 @@ async function main() {
       }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk, template-s3-upload, template-s3-live-photo, template-s3-sidecar, template-s3-queue-migration, template-s3-manual-derivatives, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk, template-s3-upload, template-s3-live-photo, template-s3-sidecar, template-s3-queue-migration, template-s3-manual-derivatives, template-s3-upgrade-prepare, template-s3-upgrade-pending, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3`,
         );
       }
     }

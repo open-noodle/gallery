@@ -5,5 +5,9 @@ import StorageTemplate from '/docs/partials/_storage-template.md';
 <StorageTemplate />
 
 :::info S3 storage
-The storage template also applies to files stored in [S3-compatible storage](/features/s3-storage). New uploads move to their template path inside the bucket, and the `Storage Template Migration` job moves existing objects. See [Storage Template on S3](/features/s3-storage#storage-template-on-s3) for how a move works there and what it costs.
+The storage template also applies to files stored in [S3-compatible storage](/features/s3-storage). New uploads move to their template path inside the bucket, as on disk, and the `Storage Template Migration` job moves existing objects.
+
+One exception: if the server already had photos or videos in S3 and the storage template enabled when it was upgraded to the first Gallery version that applies the template in S3, photos and videos in S3 stay where they are, and new uploads keep their upload path, until an admin runs the `Storage Template Migration` job once from **Administration > Job Queues**. From then on, new uploads move automatically. Photos and videos stored entirely on disk keep moving as before, except the motion part of a live photo whose still is in S3, which waits with the still. Uploads keep working normally in the meantime, and a warning in the server log says when this applies. See [After Upgrading With Files Already in S3](/features/s3-storage#after-upgrading-with-files-already-in-s3).
+
+See [Storage Template on S3](/features/s3-storage#storage-template-on-s3) for how a move works there and what it costs.
 :::
