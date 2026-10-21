@@ -277,14 +277,7 @@ export class StorageMigrationService extends BaseService {
       } else {
         // Copy: get stream from source, put to target
         const { stream } = await sourceBackend.get(sourcePath);
-        try {
-          await targetBackend.put(targetPath, stream);
-        } catch (error) {
-          // the target did not exist, so whatever is there is this put's partial write (a disk put is not atomic);
-          // left in place, it would fail the size check above on every retry
-          await targetBackend.delete(targetPath).catch(() => {});
-          throw error;
-        }
+        await targetBackend.put(targetPath, stream);
       }
 
       // Update DB path with optimistic concurrency

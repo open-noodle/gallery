@@ -41,7 +41,9 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: '**/pnpm-lock.yaml'
 
+      # installs the whole workspace (pnpm's recursive-install default), server included
       - name: Install e2e dependencies
+        id: install
         run: pnpm install --frozen-lockfile
 
       # ---------------------------------------------------------------
@@ -175,6 +177,19 @@ jobs:
 
       - name: 'Phase: template-disk-baseline'
         run: pnpm tsx src/storage-migration.ts template-disk-baseline
+
+      # ---------------------------------------------------------------
+      # S3 backend against a real MinIO (testcontainers, same image as
+      # the stack): put/get, copy, multipart copy and its fallback, key
+      # encoding. The spec skips itself without IMMICH_TEST_DOCKER, and
+      # no other workflow sets it. Runs even when a phase failed.
+      # ---------------------------------------------------------------
+      - name: S3 backend integration tests (MinIO)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: ./server
+        env:
+          IMMICH_TEST_DOCKER: 'true'
+        run: pnpm exec vitest run --config test/vitest.config.mjs src/backends/s3-storage.backend.integration.spec.ts
 
       # ---------------------------------------------------------------
       # Cleanup and logs

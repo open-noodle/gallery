@@ -857,6 +857,7 @@ describe(UserService.name, () => {
       beforeEach(() => {
         mockS3Backend = { deletePrefix: vi.fn().mockResolvedValue(void 0) };
         (StorageService as any).s3Backend = mockS3Backend;
+        mocks.storageMigration.hasOtherOwnerFilesUnderPrefix.mockResolvedValue(false);
       });
 
       afterEach(() => {
@@ -870,6 +871,10 @@ describe(UserService.name, () => {
         await sut.handleUserDelete({ id: user.id });
 
         expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
+        expect(mocks.storageMigration.hasOtherOwnerFilesUnderPrefix).toHaveBeenCalledExactlyOnceWith(
+          `library/${user.id}/`,
+          user.id,
+        );
         expect(mockS3Backend.deletePrefix.mock.calls).toEqual([
           [`library/${user.id}/`],
           [`upload/${user.id}/`],
@@ -893,6 +898,29 @@ describe(UserService.name, () => {
         expect(mockS3Backend.deletePrefix).toHaveBeenCalledWith('library/admin/');
         expect(mockS3Backend.deletePrefix).not.toHaveBeenCalledWith(`library/${user.id}/`);
         expect(mockS3Backend.deletePrefix).not.toHaveBeenCalledWith(expect.stringMatching(/^backups/));
+      });
+
+      it('should keep the S3 library prefix while another user has assets stored under the label', async () => {
+        // the label was changed without running the template migration and handed to this user: library/admin/
+        // still holds the first user's live originals
+        const user = { id: 'deleted-s3-user', deletedAt: makeDeletedAt(10), storageLabel: 'admin' } as UserAdmin;
+        mocks.user.get.mockResolvedValue(user);
+        mocks.storageMigration.hasOtherOwnerFilesUnderPrefix.mockResolvedValue(true);
+
+        await sut.handleUserDelete({ id: user.id });
+
+        expect(mocks.storageMigration.hasOtherOwnerFilesUnderPrefix).toHaveBeenCalledExactlyOnceWith(
+          'library/admin/',
+          user.id,
+        );
+        expect(mockS3Backend.deletePrefix.mock.calls).toEqual([
+          [`upload/${user.id}/`],
+          [`profile/${user.id}/`],
+          [`thumbs/${user.id}/`],
+          [`encoded-video/${user.id}/`],
+        ]);
+        expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('Skipped S3 prefix library/admin/'));
+        expect(mocks.user.delete).toHaveBeenCalledWith(user, true);
       });
 
       it('should still attempt remaining prefixes, disk deletion, and DB cleanup when one S3 prefix fails', async () => {
@@ -924,6 +952,7 @@ describe(UserService.name, () => {
 
       expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
       expect((StorageService as any).s3Backend).toBeUndefined();
+      expect(mocks.storageMigration.hasOtherOwnerFilesUnderPrefix).not.toHaveBeenCalled();
     });
 
     it('should emit AlbumDelete for each owned album before albumRepository.deleteAll (faces F2)', async () => {

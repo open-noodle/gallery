@@ -17,7 +17,7 @@ import { UserPreferencesResponseDto, UserPreferencesUpdateDto, mapPreferences } 
 import { CreateProfileImageResponseDto } from 'src/dtos/user-profile.dto.js';
 import { UserAdminResponseDto, UserResponseDto, UserUpdateMeDto, mapUser, mapUserAdmin } from 'src/dtos/user.dto.js';
 import { CacheControl, JobName, JobStatus, QueueName, StorageFolder, UserMetadataKey } from 'src/enum.js';
-import { getUserS3Prefixes } from 'src/gallery/utils/storage-usage.js';
+import { getDeletableUserS3Prefixes } from 'src/gallery/utils/storage-usage.js';
 import { UserFindOptions } from 'src/repositories/user.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { BaseService } from 'src/services/base.service.js';
@@ -309,10 +309,10 @@ export class UserService extends BaseService {
     }
 
     // S3: clean the keys of the folders above, library/<label>/ included (storage templates and disk-to-S3
-    // migrations write there). Backups is admin/global scope.
+    // migrations write there) unless another user's assets are stored under it. Backups is admin/global scope.
     const s3 = StorageService.getS3Backend();
     if (s3) {
-      for (const prefix of Object.values(getUserS3Prefixes(user))) {
+      for (const prefix of await getDeletableUserS3Prefixes(user, this.storageMigrationRepository, this.logger)) {
         try {
           await s3.deletePrefix(prefix);
           this.logger.log(`Cleaned S3 prefix ${prefix}`);

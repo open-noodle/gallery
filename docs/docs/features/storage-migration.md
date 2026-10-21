@@ -163,7 +163,7 @@ Admin clicks "Start"
 
 The orchestrator job streams file records from 8 sources (assets, asset files by type, person thumbnails and user profile images), batches them and queues one migration job per file. Worker concurrency follows the value you set, from 1 to 20, default 5.
 
-A file already at the target (from an earlier, interrupted run) is reused only when its size matches the source. A different size fails that file with an error naming both paths, rather than pointing the asset at the wrong file. A copy that fails partway removes what it wrote, so the next run starts clean.
+A file already at the target (from an earlier, interrupted run) is reused only when its size matches the source. A different size fails that file with an error naming both paths, and the asset keeps its current file rather than being pointed at the wrong one. To fix it, first open the target file named in the error. If it shows the same photo or video as the source, it is left over from an earlier run: delete it and start the migration again. If it shows a different one, it belongs to another asset: leave it where it is. The asset that failed keeps working from its current location. Interrupted copies never leave a partial target: disk writes go to a temporary file that is renamed into place, and S3 uploads are atomic.
 
 ### Path Transformation
 

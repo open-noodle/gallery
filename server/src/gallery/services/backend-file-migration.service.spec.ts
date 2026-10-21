@@ -22,12 +22,25 @@ describe(BackendFileMigrationService.name, () => {
     beforeEach(() => {
       (StorageService as any).s3Backend = {};
       mocks.systemMetadata.get.mockResolvedValue({ storageTemplate: { enabled: true } });
+      mocks.job.isActive.mockResolvedValue(false);
     });
 
     it('queues the derivative migration when the storage template migration is started with S3', async () => {
       await sut.onQueueStart({ name: QueueName.StorageTemplateMigration });
 
+      expect(mocks.job.isActive).toHaveBeenCalledWith(QueueName.Migration);
       expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({ name: JobName.StorageBackendFileMigrationQueueAll });
+    });
+
+    it('does nothing while the Migration queue is running, as upstream refuses a second Migration start', async () => {
+      // file migration jobs have no dedup: queueing them again would move the same files twice
+      mocks.job.isActive.mockResolvedValue(true);
+
+      await sut.onQueueStart({ name: QueueName.StorageTemplateMigration });
+
+      expect(mocks.job.isActive).toHaveBeenCalledWith(QueueName.Migration);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.logger.log).toHaveBeenCalledWith(expect.stringContaining('Migration queue is already running'));
     });
 
     it('does nothing when another queue is started', async () => {

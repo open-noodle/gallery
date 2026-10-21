@@ -1117,14 +1117,26 @@ describe(StorageTemplateService.name, () => {
       previousS3Backend = (StorageService as any).s3Backend;
       (StorageService as any).s3Backend = s3;
 
-      // move_history hands back the row it stored
-      mocks.move.create.mockImplementation(({ entityId, pathType, oldPath, newPath }) =>
-        Promise.resolve({ id: `move-${pathType}-${entityId}`, entityId, pathType, oldPath, newPath }),
+      // move_history keeps the rows it stored, so a sidecar sees whether the move of its original finished
+      const moveHistory = new Map<string, Awaited<ReturnType<typeof mocks.move.create>>>();
+      mocks.move.create.mockImplementation(({ entityId, pathType, oldPath, newPath }) => {
+        const row = { id: `move-${pathType}-${entityId}`, entityId, pathType, oldPath, newPath };
+        moveHistory.set(row.id, row);
+        return Promise.resolve(row);
+      });
+      mocks.move.getByEntity.mockImplementation((entityId, pathType) =>
+        Promise.resolve(moveHistory.get(`move-${pathType}-${entityId}`)),
       );
+      mocks.move.delete.mockImplementation((id) => {
+        const row = moveHistory.get(id);
+        moveHistory.delete(id);
+        return Promise.resolve(row as any);
+      });
     });
 
     afterEach(() => {
       (StorageService as any).s3Backend = previousS3Backend;
+      vi.restoreAllMocks();
     });
 
     describe('handleMigrationSingle', () => {
@@ -1416,8 +1428,39 @@ describe(StorageTemplateService.name, () => {
         await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
         expect(mocks.logger.warn).toHaveBeenCalledWith(
-          `Skipped attempt to access an invalid path: library/other-user/IMG_0001. Path should start with library/${user.id}`,
+          `Skipped attempt to access an invalid path: library/other-user/IMG_0001. Path should start with library/${user.id}/`,
         );
+        expect(s3.exists).not.toHaveBeenCalled();
+        expectNothingMoved();
+      });
+
+      it.each([
+        { label: 'an S3 original', prefix: '' },
+        { label: 'a disk original', prefix: '/data/' },
+      ])('should not let EXIF data move $label into a sibling library folder', async ({ prefix }) => {
+        const user = UserFactory.create({ storageLabel: 'admin' });
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `${prefix}upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size, make: '../admin2' })
+          .build();
+        const config = structuredClone(defaults);
+        config.storageTemplate.template = '{{make}}/{{filename}}';
+        sut.onConfigInit({ newConfig: config });
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        // `library/admin2` starts with `library/admin`: the guard needs the separator
+        expect(mocks.logger.warn).toHaveBeenCalledWith(
+          `Skipped attempt to access an invalid path: ${prefix}library/admin2/IMG_0001. Path should start with ${prefix}library/admin/`,
+        );
+        expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
         expect(s3.exists).not.toHaveBeenCalled();
         expectNothingMoved();
       });
@@ -1481,6 +1524,82 @@ describe(StorageTemplateService.name, () => {
         expect(s3.delete).toHaveBeenCalledExactlyOnceWith(newKey);
         expect(mocks.asset.update).not.toHaveBeenCalled();
         expect(mocks.move.delete).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        { failure: 'the copy fails', sidecar: 'an S3 sidecar', prefix: '' },
+        { failure: 'the copy fails', sidecar: 'a disk sidecar', prefix: '/data/' },
+        { failure: 'the sizes differ', sidecar: 'an S3 sidecar', prefix: '' },
+        { failure: 'the sizes differ', sidecar: 'a disk sidecar', prefix: '/data/' },
+      ])('should not move $sidecar when $failure for its original', async ({ failure, prefix }) => {
+        const user = UserFactory.create();
+        const sidecarPath = `${prefix}upload/${user.id}/ab/cd/file.jpg.xmp`;
+        const asset = AssetFactory.from({ fileCreatedAt, originalPath: `upload/${user.id}/ab/cd/file.jpg` })
+          .owner(user)
+          .file({ type: AssetFileType.Sidecar, path: sidecarPath })
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/${asset.originalFileName}`;
+
+        if (failure === 'the copy fails') {
+          s3.copy.mockRejectedValue(Object.assign(new Error('Access Denied'), { code: 'AccessDenied' }));
+        } else {
+          s3.stat.mockResolvedValue({ size: 100 });
+        }
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        // beside a key the original never reached, a later asset of the same name would overwrite the sidecar
+        expect(mocks.logger.warn).toHaveBeenCalledWith(
+          `Not moving the sidecar of ${asset.id}: the move of its original is unfinished`,
+        );
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(mocks.move.create).toHaveBeenCalledExactlyOnceWith({
+          entityId: asset.id,
+          pathType: AssetPathType.Original,
+          oldPath: asset.originalPath,
+          newPath: newKey,
+        });
+        expect(s3.delete).not.toHaveBeenCalledWith(sidecarPath);
+        expect(mocks.asset.update).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertFile).not.toHaveBeenCalled();
+        expect(mocks.move.delete).not.toHaveBeenCalled();
+        expectNoDiskMove();
+      });
+
+      it('should normalise a .JPEG key to .jpg under the storage label', async () => {
+        const user = UserFactory.create({ storageLabel: 'label-1' });
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.JPEG',
+          originalPath: `upload/${user.id}/ab/cd/file.JPEG`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = 'library/label-1/2022/2022-06-19/IMG_0001.jpg';
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.checkFileExists).toHaveBeenCalledExactlyOnceWith(`/data/${newKey}`);
+        expect(s3.exists).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.move.create).toHaveBeenCalledExactlyOnceWith({
+          entityId: asset.id,
+          pathType: AssetPathType.Original,
+          oldPath: asset.originalPath,
+          newPath: newKey,
+        });
+        expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
+        expect(s3.stat).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
+        expect(s3.delete).toHaveBeenCalledExactlyOnceWith(asset.originalPath);
+        expect(mocks.move.delete).toHaveBeenCalledExactlyOnceWith(`move-original-${asset.id}`);
+        expectNoDiskMove();
       });
 
       it('should finish an interrupted S3 move from the key it reached, after checking its size and checksum', async () => {
@@ -1606,6 +1725,59 @@ describe(StorageTemplateService.name, () => {
         expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newPath1);
         expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newPath1 });
         expect(s3.copy).not.toHaveBeenCalled();
+      });
+
+      it('should still move a disk original when S3 cannot be asked about its destination', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `/data/upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+        const newKey = `library/${user.id}/2022/2022-06-19/IMG_0001.jpg`;
+
+        s3.exists.mockRejectedValue(new Error('ExpiredToken'));
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(s3.exists).toHaveBeenCalledExactlyOnceWith(newKey);
+        expect(mocks.logger.warn).toHaveBeenCalledWith(
+          `Unable to check whether S3 holds ${newKey}, treating /data/${newKey} as free: ExpiredToken`,
+        );
+        expect(mocks.storage.rename).toHaveBeenCalledExactlyOnceWith(asset.originalPath, `/data/${newKey}`);
+        expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: `/data/${newKey}` });
+        expect(s3.copy).not.toHaveBeenCalled();
+      });
+
+      it('should not move an S3 original when S3 cannot be asked about its destination', async () => {
+        const user = UserFactory.create();
+        const asset = AssetFactory.from({
+          fileCreatedAt,
+          originalFileName: 'IMG_0001.jpg',
+          originalPath: `upload/${user.id}/ab/cd/file.jpg`,
+        })
+          .owner(user)
+          .exif({ fileSizeInByte: size })
+          .build();
+
+        s3.exists.mockRejectedValue(new Error('ExpiredToken'));
+        mocks.user.get.mockResolvedValue(user);
+        mocks.assetJob.getForStorageTemplateJob.mockResolvedValue(getForStorageTemplate(asset));
+
+        await expect(sut.handleMigrationSingle({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        // S3 is the real check for a key, so the template keeps the asset where it is
+        expect(s3.exists).toHaveBeenCalledExactlyOnceWith(`library/${user.id}/2022/2022-06-19/IMG_0001.jpg`);
+        expect(mocks.logger.error).toHaveBeenCalledWith(
+          'Unable to get template path for IMG_0001.jpg: Error: ExpiredToken',
+        );
+        expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+        expectNothingMoved();
       });
 
       it('should check only the disk without S3 configured', async () => {

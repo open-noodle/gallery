@@ -381,7 +381,7 @@ export class StorageTemplateService extends BaseService {
       let duplicateCount = 0;
 
       while (true) {
-        const isExists = await isTemplateDestinationTaken(destination, this.storageRepository);
+        const isExists = await isTemplateDestinationTaken(destination, this.storageRepository, this.logger);
         if (!isExists) {
           break;
         }
