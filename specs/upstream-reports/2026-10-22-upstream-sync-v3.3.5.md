@@ -118,7 +118,26 @@ Deferred to CI plus the reviewer's pass at Checkpoint 3.
 
 ## Remote CI Verification
 
-Pending. Nothing has been pushed.
+- **Test branch**: `rebase/upstream-rolling-v3.3.5`
+- **Commit validated**: `9582a1d2415` (after the fork sync of #1230). A first round on `61f3e4cb82d` is noted where it differed.
+
+| Workflow | Status | Notes |
+| --- | --- | --- |
+| `test.yml` | GREEN | |
+| `docker.yml` | GREEN | server image built on amd64 and arm64; all ML variants built |
+| `static_analysis.yml` | GREEN | |
+| `gallery-build-mobile.yml` | GREEN | |
+| `gallery-mobile-smoke.yml` | GREEN | |
+| `gallery-ml-smoke.yml` | GREEN | |
+| `gallery-rebase-smoke.yml` | GREEN | |
+| `storage-migration-tests.yml` | GREEN | failed once on the first round with a socket drop (`fetch failed … other side closed`); green on re-run, treated as a flake |
+| `storage-migration-e2e.yml` | GREEN | |
+| `gallery-revert-to-immich-validation.yml` | GREEN | run with `gallery_image=ghcr.io/open-noodle/gallery-server:main-v335-rc1` |
+| PR-only (codeql / zizmor / docs-build / cli) | not run | no branch PR opened; the change is chores plus one additive migration |
+
+- **Dispatch note**: a plain dispatch of the revert validation tests `:main` (base 3.3.3) and correctly fails once the stock v3.3.5 round trip applies `1792213725597`. It must be given the branch's RC image.
+- **RC image**: `main-v335-rc1`, server only, built from `61f3e4cb82d`. Later commits touch only the report, the manifest and `merge.mjs`, so it still matches the server code.
+- **Failures fixed**: none were needed on the branch.
 
 ## Post-Rebase Verification
 
