@@ -929,7 +929,7 @@ where
         inner join "album" on "album"."id" = "album_asset"."albumId"
         and "album"."deletedAt" is null
         inner join "album_user" on "album_user"."albumId" = "album"."id"
-        and "album_user"."userId" = $3::uuid
+        and "album_user"."userId" = $3
       where
         "album_asset"."assetId" = "asset"."id"
     )
@@ -959,7 +959,7 @@ where
         inner join "album" on "album"."id" = "album_asset"."albumId"
         and "album"."deletedAt" is null
         inner join "album_user" on "album_user"."albumId" = "album"."id"
-        and "album_user"."userId" = $3::uuid
+        and "album_user"."userId" = $3
       where
         "album_asset"."assetId" = "asset"."id"
     )
