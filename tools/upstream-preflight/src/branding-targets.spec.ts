@@ -80,10 +80,13 @@ describe('branding target paths', () => {
   // The 3.3.0→3.3.1 bump removes none: v3.3.1 carries no `server/src/schema/`
   // change, so neither direction of the coverage detector moves. The 3.3.1→3.3.3
   // bump removes none either: v3.3.2 and v3.3.3 carry no `server/src/schema/` change
-  // (a mobile fix, two base-image bumps and a people-query rewrite).
+  // (a mobile fix, two base-image bumps and a people-query rewrite). The 3.3.3→3.3.5
+  // bump removes none: v3.3.4 ships one new migration (AddAssetFaceAssetState), but
+  // this branch carried it only from this very cycle, so revert-to-immich.sql never
+  // had an entry for it and the tagged release now owns it.
   //
   // Keep this pinned to the base Immich version.
-  it('M8: config.json upstream.version is 3.3.3 (base is immich v3.3.3)', () => {
-    expect(CONFIG.upstream.version).toBe('3.3.3');
+  it('M8: config.json upstream.version is 3.3.5 (base is immich v3.3.5)', () => {
+    expect(CONFIG.upstream.version).toBe('3.3.5');
   });
 });
