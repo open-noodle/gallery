@@ -20,13 +20,13 @@ import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repos
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-visibility-transition.service.js';
-import { BackendFileMigrationService } from 'src/gallery/services/backend-file-migration.service.js';
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { GalleryPluginService } from 'src/gallery/services/gallery-plugin.service.js';
 import { GalleryStackService } from 'src/gallery/services/gallery-stack.service.js';
+import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -95,7 +95,6 @@ export const galleryRepositories = [
 export const galleryServices = [
   AppMetricsService,
   AssetVisibilityTransitionService,
-  BackendFileMigrationService,
   ClassificationService,
   FaceIdentityMaintenanceService,
   FaceRepairService,
@@ -110,6 +109,7 @@ export const galleryServices = [
   PetRecognitionService,
   SharedSpaceService,
   StorageMigrationService,
+  StorageTemplateS3Service,
   StorageUsageService,
   UserGroupService,
 ];

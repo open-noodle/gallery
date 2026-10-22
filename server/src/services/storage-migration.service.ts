@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import type { JobOf } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { toS3Key } from 'src/gallery/utils/s3-key.js';
 import { StorageMigrationDirection } from 'src/repositories/storage-migration.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -261,9 +263,16 @@ export class StorageMigrationService extends BaseService {
       // Idempotency: check if target already exists
       const targetExists = await targetBackend.exists(targetPath);
       if (targetExists) {
-        // Trust an existing target only when it matches the source: a different file there (an interrupted copy,
-        // or another asset's file at the same key) would re-point this asset at it and, with deleteSource, delete
-        // the only copy of the original.
+        // Reuse an existing target only at the source's size. Usually it is this file's own copy: from a run of this
+        // migration that stopped before saving, or from a migration the other way with deleteSource off, stale if the
+        // source was rewritten in place since (a regenerated thumbnail or encoded video, a re-trim, a sidecar write).
+        // It can also be a partial or different file left by a build before atomic disk writes, by a host crash before
+        // a disk write was flushed, or by a thumbnail or encoded video for S3 whose render at this disk path stopped or
+        // whose upload failed (MediaService.persistFile); or, under library/, another asset's file (a template name
+        // given out by a build that checked disk only, or while S3 could not be asked).
+        // Adopting a different file would re-point this entity at it and, with deleteSource, delete the only current
+        // copy; overwriting it could destroy another asset's file or one a job just wrote here. So a mismatch fails.
+        // An equal size is not proof: a sidecar rewritten at the same length passes.
         const [{ size: sourceSize }, { size: targetSize }] = await Promise.all([
           sourceBackend.stat(sourcePath),
           targetBackend.stat(targetPath),
@@ -376,23 +385,15 @@ export class StorageMigrationService extends BaseService {
   }
 
   private computeTargetPath(sourcePath: string, direction: StorageMigrationDirection): string {
+    const mediaLocation = StorageCore.getMediaLocation();
     if (direction === 'toS3') {
-      // Strip media location prefix to get relative key
-      // e.g. /usr/src/app/upload/library/user/file.jpg -> library/user/file.jpg
-      const mediaLocation = StorageCore.getMediaLocation();
-      const prefix = mediaLocation.endsWith('/') ? mediaLocation : `${mediaLocation}/`;
-      if (sourcePath.startsWith(prefix)) {
-        return sourcePath.slice(prefix.length);
-      }
-      // If path doesn't start with media location, strip leading slash as fallback
-      return sourcePath.startsWith('/') ? sourcePath.slice(1) : sourcePath;
+      // e.g. /usr/src/app/upload/library/user/file.jpg -> library/user/file.jpg. A path outside the media location (an
+      // external library) has no key of its own: it keeps the whole path without its leading slash, as it always has
+      return toS3Key(sourcePath, mediaLocation) ?? sourcePath.slice(1);
     }
 
-    // toDisk: prepend media location
-    // e.g. library/user/file.jpg -> /usr/src/app/upload/library/user/file.jpg
-    const mediaLocation = StorageCore.getMediaLocation();
-    const prefix = mediaLocation.endsWith('/') ? mediaLocation : `${mediaLocation}/`;
-    return `${prefix}${sourcePath}`;
+    // toDisk: e.g. library/user/file.jpg -> /usr/src/app/upload/library/user/file.jpg
+    return join(mediaLocation, sourcePath);
   }
 
   private async updatePath(

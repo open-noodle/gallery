@@ -23,6 +23,7 @@ import {
   TranscodePolicy,
   VideoCodec,
 } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { MediaService } from 'src/services/media.service.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -78,7 +79,7 @@ describe(MediaService.name, () => {
     });
 
     it('returns the local path and deletes nothing (disk mode)', async () => {
-      // StorageService.diskBackend is undefined in this spec file, so getWriteBackend()
+      // storageBackends.diskBackend is undefined in this spec file, so getWriteBackend()
       // returns undefined and persistFile takes its disk branch.
       const result = await (sut as any).persistFile('/local/out.jpg', 'thumbs/aa/bb/x.jpg', 'image/jpeg');
 
@@ -372,22 +373,20 @@ describe(MediaService.name, () => {
       let s3Backend: { exists: Mock; copy: Mock; stat: Mock; delete: Mock };
       let previousS3Backend: unknown;
 
-      beforeEach(async () => {
-        const { StorageService } = await import('src/services/storage.service.js');
-        previousS3Backend = (StorageService as any).s3Backend;
+      beforeEach(() => {
+        previousS3Backend = (storageBackends as any).s3Backend;
         s3Backend = {
           exists: vi.fn().mockResolvedValue(true),
           copy: vi.fn().mockResolvedValue(void 0),
           stat: vi.fn().mockResolvedValue({ size: 1024 }),
           delete: vi.fn().mockResolvedValue(void 0),
         };
-        (StorageService as any).s3Backend = s3Backend;
+        (storageBackends as any).s3Backend = s3Backend;
         mocks.move.create.mockImplementation((move) => Promise.resolve({ id: `move-${move.pathType}`, ...move }));
       });
 
-      afterEach(async () => {
-        const { StorageService } = await import('src/services/storage.service.js');
-        (StorageService as any).s3Backend = previousS3Backend;
+      afterEach(() => {
+        (storageBackends as any).s3Backend = previousS3Backend;
       });
 
       it('should move the files of an S3 asset within S3 to their expected keys', async () => {
@@ -2139,7 +2138,7 @@ describe(MediaService.name, () => {
       });
 
       it('keeps disk-mode trim paths absolute and uploads nothing (regression guard)', async () => {
-        // No getWriteBackend spy: StorageService.diskBackend is undefined in this spec file,
+        // No getWriteBackend spy: storageBackends.diskBackend is undefined in this spec file,
         // so persistFile takes its disk branch. Nothing here may become a relative key.
         const asset = AssetFactory.from({ type: AssetType.Video }).exif().build();
         mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));

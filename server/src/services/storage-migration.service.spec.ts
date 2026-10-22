@@ -385,6 +385,30 @@ describe(StorageMigrationService.name, () => {
       });
     });
 
+    it.each([
+      { label: 'an external library path', sourcePath: '/mnt/photos/2024/IMG_1.jpg' },
+      { label: 'a sibling of the media location', sourcePath: '/usr/src/app/upload2/library/user/file.jpg' },
+    ])(
+      'should key $label outside the media location by its whole path without the leading /',
+      async ({ sourcePath }) => {
+        const mockStream = Readable.from([]);
+        const key = sourcePath.slice(1);
+        mockDiskBackend.exists.mockResolvedValue(true);
+        mockS3Backend.exists.mockResolvedValue(false);
+        mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
+        mockS3Backend.put.mockResolvedValue(void 0);
+        mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
+        mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+        const result = await sut.handleMigration({ ...baseJob, sourcePath });
+
+        expect(result).toBe(JobStatus.Success);
+        expect(mockS3Backend.exists).toHaveBeenCalledWith(key);
+        expect(mockS3Backend.put).toHaveBeenCalledWith(key, mockStream);
+        expect(mocks.storageMigration.updateAssetOriginalPath).toHaveBeenCalledWith('asset-1', sourcePath, key);
+      },
+    );
+
     it('should skip when source file not found and return Skipped', async () => {
       mockDiskBackend.exists.mockResolvedValue(false);
 

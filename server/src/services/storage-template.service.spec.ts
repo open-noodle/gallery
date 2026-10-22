@@ -3,8 +3,8 @@ import { Mock } from 'vitest';
 import type { SystemMetadata } from 'src/types.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { AssetFileType, AssetPathType, AssetType, JobStatus, SystemMetadataKey } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageTemplateService } from 'src/services/storage-template.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { AlbumFactory } from 'test/factories/album.factory.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { UserFactory } from 'test/factories/user.factory.js';
@@ -1131,8 +1131,8 @@ describe(StorageTemplateService.name, () => {
         delete: vi.fn().mockResolvedValue(void 0),
         downloadToTemp: vi.fn(),
       };
-      previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3;
+      previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3;
 
       // move_history keeps the rows it stored, so a sidecar sees whether the move of its original finished
       const moveHistory = new Map<string, Awaited<ReturnType<typeof mocks.move.create>>>();
@@ -1152,7 +1152,7 @@ describe(StorageTemplateService.name, () => {
     });
 
     afterEach(() => {
-      (StorageService as any).s3Backend = previousS3Backend;
+      (storageBackends as any).s3Backend = previousS3Backend;
       vi.restoreAllMocks();
     });
 
@@ -1798,7 +1798,7 @@ describe(StorageTemplateService.name, () => {
       });
 
       it('should check only the disk without S3 configured', async () => {
-        (StorageService as any).s3Backend = undefined;
+        (storageBackends as any).s3Backend = undefined;
         const user = UserFactory.create();
         const asset = AssetFactory.from({
           fileCreatedAt,
@@ -1930,7 +1930,7 @@ describe(StorageTemplateService.name, () => {
     });
 
     // an install that upgraded with originals in S3 and the template enabled: its S3 files wait for an admin to run
-    // Storage Template Migration by hand (BackendFileMigrationService decides and clears the state)
+    // Storage Template Migration by hand (StorageTemplateS3Service decides and clears the state)
     describe('while an upgrade waits for a manual migration', () => {
       const decidedAt = '2026-10-20T08:00:00.000Z';
 
@@ -2150,7 +2150,7 @@ describe(StorageTemplateService.name, () => {
           expect(s3.copy).toHaveBeenCalledExactlyOnceWith(asset.originalPath, newKey);
           expect(mocks.asset.update).toHaveBeenCalledExactlyOnceWith({ id: asset.id, originalPath: newKey });
           expect(s3.delete).toHaveBeenCalledExactlyOnceWith(asset.originalPath);
-          // the bulk job neither reads nor clears the state: BackendFileMigrationService.onJobSuccess clears it
+          // the bulk job neither reads nor clears the state: StorageTemplateS3Service.onJobSuccess clears it
           expect(stateReads()).toBe(0);
           expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
         });

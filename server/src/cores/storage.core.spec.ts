@@ -1,7 +1,7 @@
 import { Mock, vitest } from 'vitest';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, AssetPathType, ImageFormat, PersonPathType, StorageFolder } from 'src/enum.js';
-import { StorageService } from 'src/services/storage.service.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { getMocks } from 'test/utils.js';
 
 vitest.mock('src/constants', () => ({
@@ -286,8 +286,8 @@ describe('StorageCore', () => {
         delete: vitest.fn().mockResolvedValue(void 0),
         downloadToTemp: vitest.fn(),
       };
-      previousS3Backend = (StorageService as any).s3Backend;
-      (StorageService as any).s3Backend = s3Backend;
+      previousS3Backend = (storageBackends as any).s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
 
       mocks.move.getByEntity.mockResolvedValue(void 0);
       mocks.move.create.mockImplementation((entity) => Promise.resolve({ id: 'move-1', ...entity } as any));
@@ -295,7 +295,7 @@ describe('StorageCore', () => {
     });
 
     afterEach(() => {
-      (StorageService as any).s3Backend = previousS3Backend;
+      (storageBackends as any).s3Backend = previousS3Backend;
     });
 
     it('should move a key original inside its backend', async () => {
