@@ -493,7 +493,7 @@ export function withTimeBucketAssetFilters<O>(
           );
           return ownedOrSharedWithViewer(
             eb,
-            options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(eb, viewerId)]) : ownerArm,
+            options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(viewerId, 'asset.id')]) : ownerArm,
             options.timelineSpaceIds && {
               scope: { spaceIds: options.timelineSpaceIds },
               albumTimelineGate: 'personal',
