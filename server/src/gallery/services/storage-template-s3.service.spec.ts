@@ -3,7 +3,7 @@ import { DatabaseLock, JobName, JobStatus, QueueName, SystemMetadataKey } from '
 import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
 import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { factory } from 'test/small.factory.js';
-import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 type S3State = SystemMetadata[SystemMetadataKey.StorageTemplateS3State];
 
@@ -252,11 +252,11 @@ describe(StorageTemplateS3Service.name, () => {
       mocks.job.isActive.mockResolvedValue(false);
     });
 
-    it('queues the derivative migration when the storage template migration is started with S3', async () => {
+    it("queues upstream's Migration job when the storage template migration is started with S3", async () => {
       await sut.onQueueStart({ name: QueueName.StorageTemplateMigration });
 
       expect(mocks.job.isActive).toHaveBeenCalledWith(QueueName.Migration);
-      expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({ name: JobName.S3FileMigrationQueueAll });
+      expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({ name: JobName.FileMigrationQueueAll });
     });
 
     it('does nothing while the Migration queue is running, as upstream refuses a second Migration start', async () => {
@@ -292,36 +292,6 @@ describe(StorageTemplateS3Service.name, () => {
 
       await sut.onQueueStart({ name: QueueName.StorageTemplateMigration });
 
-      expect(mocks.job.queue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('handleQueueFileMigration', () => {
-    it('queues a file migration for every streamed asset and person', async () => {
-      const assets = [{ id: factory.uuid() }, { id: factory.uuid() }];
-      const person = { ownerId: factory.uuid(), personGroupId: factory.uuid() };
-      mocks.storageMigration.streamAssetsWithS3Derivatives.mockReturnValue(makeStream(assets));
-      mocks.storageMigration.streamPeopleWithS3Thumbnails.mockReturnValue(makeStream([person]));
-
-      await expect(sut.handleQueueFileMigration()).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.job.queueAll).toHaveBeenCalledTimes(2);
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([
-        { name: JobName.AssetFileMigration, data: { id: assets[0].id } },
-        { name: JobName.AssetFileMigration, data: { id: assets[1].id } },
-      ]);
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([
-        { name: JobName.PersonFileMigration, data: { ownerId: person.ownerId, personGroupId: person.personGroupId } },
-      ]);
-    });
-
-    it('queues nothing when no derivative is stored under a key', async () => {
-      mocks.storageMigration.streamAssetsWithS3Derivatives.mockReturnValue(makeStream([]));
-      mocks.storageMigration.streamPeopleWithS3Thumbnails.mockReturnValue(makeStream([]));
-
-      await expect(sut.handleQueueFileMigration()).resolves.toBe(JobStatus.Success);
-
-      expect(mocks.job.queueAll).not.toHaveBeenCalled();
       expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });

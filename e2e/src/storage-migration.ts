@@ -2062,7 +2062,7 @@ async function phaseTemplateS3ManualDerivatives(): Promise<void> {
     // moves derivatives only. The derivative re-path needs the template enabled.
     await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
 
-    // Started by hand, so QueueStart queues the derivative migration; the Migration queue is not started here
+    // Started by hand, so QueueStart queues upstream's Migration job (FileMigrationQueueAll), not started by hand here
     await triggerQueueCommand(token, 'storageTemplateMigration');
     await waitForProcessing(token);
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { ArgOf } from 'src/repositories/event.repository.js';
-import { OnEvent, OnJob } from 'src/decorators.js';
+import { OnEvent } from 'src/decorators.js';
 import {
   BootstrapEventPriority,
   DatabaseLock,
@@ -12,13 +12,12 @@ import {
 } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
-import { batched } from 'src/utils/misc.js';
 
 /**
- * Re-paths the derivatives an S3 backend holds when an admin starts the Storage Template Migration job by hand: the
- * thumbnails, previews, full-size images, encoded videos and person thumbnails that upstream's Migration job moves on
- * disk. The moves themselves are upstream's AssetFileMigration / PersonFileMigration, which reach S3 through
- * StorageCore.moveFile; disk derivatives are left to the Migration job, as before.
+ * The storage template's S3 side: whether an upgraded install's S3 files wait for a manual run, and, when an admin
+ * starts the Storage Template Migration job by hand on an S3 install, upstream's Migration job (FileMigrationQueueAll)
+ * to re-path the thumbnails, previews, full-size images, encoded videos and person thumbnails. Its AssetFileMigration
+ * and PersonFileMigration reach S3 through StorageCore.moveFile; it re-paths files on disk too, as it always does.
  */
 @Injectable()
 export class StorageTemplateS3Service extends BaseService {
@@ -98,28 +97,10 @@ export class StorageTemplateS3Service extends BaseService {
     // upstream refuses to start the Migration queue while it runs ("Job is already running"); file migration jobs
     // have no dedup, so queueing now would move the same files twice
     if (await this.jobRepository.isActive(QueueName.Migration)) {
-      this.logger.log('Migration queue is already running, not queueing the S3 file migration');
+      this.logger.log('Migration queue is already running, not queueing another file migration');
       return;
     }
 
-    await this.jobRepository.queue({ name: JobName.S3FileMigrationQueueAll });
-  }
-
-  @OnJob({ name: JobName.S3FileMigrationQueueAll, queue: QueueName.Migration })
-  async handleQueueFileMigration(): Promise<JobStatus> {
-    for await (const assets of batched(this.storageMigrationRepository.streamAssetsWithS3Derivatives())) {
-      await this.jobRepository.queueAll(assets.map(({ id }) => ({ name: JobName.AssetFileMigration, data: { id } })));
-    }
-
-    for await (const people of batched(this.storageMigrationRepository.streamPeopleWithS3Thumbnails())) {
-      await this.jobRepository.queueAll(
-        people.map(({ ownerId, personGroupId }) => ({
-          name: JobName.PersonFileMigration,
-          data: { ownerId, personGroupId },
-        })),
-      );
-    }
-
-    return JobStatus.Success;
+    await this.jobRepository.queue({ name: JobName.FileMigrationQueueAll });
   }
 }
