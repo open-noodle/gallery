@@ -76,31 +76,6 @@ export class StorageMigrationRepository {
       .stream();
   }
 
-  /** assets holding a non-edited derivative under an S3 key, otherwise filtered as streamForMigrationJob */
-  streamAssetsWithS3Derivatives() {
-    return this.db
-      .selectFrom('asset')
-      .select(['asset.id'])
-      .where('asset.deletedAt', 'is', null)
-      .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('asset_file')
-            .select('asset_file.id')
-            .whereRef('asset_file.assetId', '=', 'asset.id')
-            .where('asset_file.type', 'in', [
-              AssetFileType.Thumbnail,
-              AssetFileType.Preview,
-              AssetFileType.FullSize,
-              AssetFileType.EncodedVideo,
-            ])
-            .where('asset_file.isEdited', '=', false)
-            .where('asset_file.path', 'not like', '/%'),
-        ),
-      )
-      .stream();
-  }
-
   /** whether any asset, trashed or not, has its original stored as an S3 key */
   async hasS3Originals(): Promise<boolean> {
     const row = await this.db
@@ -110,16 +85,6 @@ export class StorageMigrationRepository {
       .limit(1)
       .executeTakeFirst();
     return !!row;
-  }
-
-  /** people whose thumbnail is an S3 key */
-  streamPeopleWithS3Thumbnails() {
-    return this.db
-      .selectFrom('person')
-      .select(['ownerId', 'personGroupId'])
-      .where('thumbnailPath', '!=', '')
-      .where('thumbnailPath', 'not like', '/%')
-      .stream();
   }
 
   /** whether an asset not owned by ownerId has its original, or a file of its own (a sidecar), under the key prefix */
