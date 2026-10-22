@@ -53,7 +53,7 @@
 | Storage Migration | OK | No overlap. |
 | Pet Detection | OK | Pet-face inserts target real assets; the new trigger fills `ownerId`. |
 | Image Editing | OK | `1799000000000` migration runs and is now in the manifest. |
-| Branding | ISSUE (pre-existing) | `gallery-branding-check.sh` fails 2 `en_GB` assertions on `main` itself. |
+| Branding | OK | `Test Branding` is green on `main` in CI. Two `en_GB` failures seen locally were a macOS-only artifact (see Inconsistencies). |
 | Google Photos Import | OK | No overlap. |
 
 ## CI and Infrastructure Verification
@@ -91,8 +91,8 @@ No upstream mobile migration in the range. `mobile-drift-rebase-check BATCH=09` 
 
 ## Inconsistencies Found
 
-1. **`main` regression (fixed here)**: `1799000000000-AddAssetImageAdjustTable` (from #1124) was missing from `docs/fork/ownership.yml`, so Gallery Migration Count read 79 against 78 on `main` itself.
-2. **`main` regression (not fixed)**: `en_GB[background_location_permission_content]` and `en_GB[location_permission_content]` keep stale text after the fork reworded the English. Reproduced on an untouched `main` checkout.
+1. **`main` regression (fixed here and in #1230)**: `1799000000000-AddAssetImageAdjustTable` (from #1124) was missing from `docs/fork/ownership.yml`, so Gallery Migration Count read 79 against 78 on `main` itself.
+2. **Not a `main` regression (local macOS artifact)**: `gallery-branding-check.sh` reported two `en_GB` failures on a clean `main` checkout. Cause: `i18n/gallery/merge.mjs` exits 0 without running when a parent directory is a symlink (macOS `mktemp` under `/var`), so the check folded no overlay. CI on Linux is unaffected and `Test Branding` is green on `main`. The first draft of this report called it a `main` regression; that was wrong. The CLI guard is fixed in #1230.
 3. **Generated queries**: `person.repository.sql` changed by two lines, exactly upstream's dropped `::uuid` cast.
 
 ## Code Review Findings
