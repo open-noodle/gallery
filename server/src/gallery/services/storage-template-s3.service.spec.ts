@@ -1,14 +1,14 @@
 import type { JobItem, SystemMetadata } from 'src/types.js';
 import { DatabaseLock, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum.js';
-import { BackendFileMigrationService } from 'src/gallery/services/backend-file-migration.service.js';
-import { StorageService } from 'src/services/storage.service.js';
+import { StorageTemplateS3Service } from 'src/gallery/services/storage-template-s3.service.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { factory } from 'test/small.factory.js';
 import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 type S3State = SystemMetadata[SystemMetadataKey.StorageTemplateS3State];
 
-describe(BackendFileMigrationService.name, () => {
-  let sut: BackendFileMigrationService;
+describe(StorageTemplateS3Service.name, () => {
+  let sut: StorageTemplateS3Service;
   let mocks: ServiceMocks;
   let previousS3Backend: unknown;
 
@@ -38,12 +38,12 @@ describe(BackendFileMigrationService.name, () => {
     mocks.systemMetadata.get.mock.calls.filter(([key]) => key === SystemMetadataKey.StorageTemplateS3State).length;
 
   beforeEach(() => {
-    ({ sut, mocks } = newTestService(BackendFileMigrationService));
-    previousS3Backend = (StorageService as any).s3Backend;
+    ({ sut, mocks } = newTestService(StorageTemplateS3Service));
+    previousS3Backend = (storageBackends as any).s3Backend;
   });
 
   afterEach(() => {
-    (StorageService as any).s3Backend = previousS3Backend;
+    (storageBackends as any).s3Backend = previousS3Backend;
     vi.useRealTimers();
   });
 
@@ -54,13 +54,13 @@ describe(BackendFileMigrationService.name, () => {
       systemConfig = { storageTemplate: { enabled: true } };
       s3State = null;
       mockSystemMetadata();
-      mocks.storageMigration.hasBackendOriginals.mockResolvedValue(true);
+      mocks.storageMigration.hasS3Originals.mockResolvedValue(true);
     });
 
     it('should decide pending on an upgrade with originals in S3 and the template enabled, and warn', async () => {
       await sut.onBootstrap();
 
-      expect(mocks.storageMigration.hasBackendOriginals).toHaveBeenCalledOnce();
+      expect(mocks.storageMigration.hasS3Originals).toHaveBeenCalledOnce();
       expect(mocks.systemMetadata.set).toHaveBeenCalledExactlyOnceWith(SystemMetadataKey.StorageTemplateS3State, {
         pending: true,
         decidedAt: now.toISOString(),
@@ -83,7 +83,7 @@ describe(BackendFileMigrationService.name, () => {
         DatabaseLock.StorageTemplateMigration,
         expect.any(Function),
       );
-      expect(mocks.storageMigration.hasBackendOriginals).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.hasS3Originals).not.toHaveBeenCalled();
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
       expect(mocks.logger.warn).not.toHaveBeenCalled();
     });
@@ -97,11 +97,11 @@ describe(BackendFileMigrationService.name, () => {
     });
 
     it('should decide not pending when no original is in S3', async () => {
-      mocks.storageMigration.hasBackendOriginals.mockResolvedValue(false);
+      mocks.storageMigration.hasS3Originals.mockResolvedValue(false);
 
       await sut.onBootstrap();
 
-      expect(mocks.storageMigration.hasBackendOriginals).toHaveBeenCalledOnce();
+      expect(mocks.storageMigration.hasS3Originals).toHaveBeenCalledOnce();
       expect(mocks.systemMetadata.set).toHaveBeenCalledExactlyOnceWith(SystemMetadataKey.StorageTemplateS3State, {
         pending: false,
         decidedAt: now.toISOString(),
@@ -118,7 +118,7 @@ describe(BackendFileMigrationService.name, () => {
 
       await sut.onBootstrap();
 
-      expect(mocks.storageMigration.hasBackendOriginals).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.hasS3Originals).not.toHaveBeenCalled();
       expect(mocks.systemMetadata.set).toHaveBeenCalledExactlyOnceWith(SystemMetadataKey.StorageTemplateS3State, {
         pending: false,
         decidedAt: now.toISOString(),
@@ -134,13 +134,13 @@ describe(BackendFileMigrationService.name, () => {
       s3State = state;
       // a later start sees the template disabled and no S3 originals: neither is consulted
       systemConfig = { storageTemplate: { enabled: false } };
-      mocks.storageMigration.hasBackendOriginals.mockResolvedValue(false);
+      mocks.storageMigration.hasS3Originals.mockResolvedValue(false);
 
       await sut.onBootstrap();
 
       expect(stateReads()).toBe(1);
       expect(mocks.systemMetadata.get).not.toHaveBeenCalledWith(SystemMetadataKey.SystemConfig);
-      expect(mocks.storageMigration.hasBackendOriginals).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.hasS3Originals).not.toHaveBeenCalled();
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
       expect(s3State).toBe(state);
     });
@@ -150,7 +150,7 @@ describe(BackendFileMigrationService.name, () => {
       await sut.onBootstrap();
       await sut.onBootstrap();
 
-      expect(mocks.storageMigration.hasBackendOriginals).toHaveBeenCalledOnce();
+      expect(mocks.storageMigration.hasS3Originals).toHaveBeenCalledOnce();
       expect(mocks.systemMetadata.set).toHaveBeenCalledOnce();
       expect(mocks.logger.warn).toHaveBeenCalledTimes(3);
     });
@@ -247,7 +247,7 @@ describe(BackendFileMigrationService.name, () => {
 
   describe('onQueueStart', () => {
     beforeEach(() => {
-      (StorageService as any).s3Backend = {};
+      (storageBackends as any).s3Backend = {};
       mocks.systemMetadata.get.mockResolvedValue({ storageTemplate: { enabled: true } });
       mocks.job.isActive.mockResolvedValue(false);
     });
@@ -256,7 +256,7 @@ describe(BackendFileMigrationService.name, () => {
       await sut.onQueueStart({ name: QueueName.StorageTemplateMigration });
 
       expect(mocks.job.isActive).toHaveBeenCalledWith(QueueName.Migration);
-      expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({ name: JobName.StorageBackendFileMigrationQueueAll });
+      expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({ name: JobName.S3FileMigrationQueueAll });
     });
 
     it('does nothing while the Migration queue is running, as upstream refuses a second Migration start', async () => {
@@ -280,7 +280,7 @@ describe(BackendFileMigrationService.name, () => {
     });
 
     it('does nothing without an S3 backend, where the Migration job covers every derivative', async () => {
-      (StorageService as any).s3Backend = undefined;
+      (storageBackends as any).s3Backend = undefined;
 
       await sut.onQueueStart({ name: QueueName.StorageTemplateMigration });
 
@@ -300,8 +300,8 @@ describe(BackendFileMigrationService.name, () => {
     it('queues a file migration for every streamed asset and person', async () => {
       const assets = [{ id: factory.uuid() }, { id: factory.uuid() }];
       const person = { ownerId: factory.uuid(), personGroupId: factory.uuid() };
-      mocks.storageMigration.streamAssetsWithBackendDerivatives.mockReturnValue(makeStream(assets));
-      mocks.storageMigration.streamPeopleWithBackendThumbnails.mockReturnValue(makeStream([person]));
+      mocks.storageMigration.streamAssetsWithS3Derivatives.mockReturnValue(makeStream(assets));
+      mocks.storageMigration.streamPeopleWithS3Thumbnails.mockReturnValue(makeStream([person]));
 
       await expect(sut.handleQueueFileMigration()).resolves.toBe(JobStatus.Success);
 
@@ -316,8 +316,8 @@ describe(BackendFileMigrationService.name, () => {
     });
 
     it('queues nothing when no derivative is stored under a key', async () => {
-      mocks.storageMigration.streamAssetsWithBackendDerivatives.mockReturnValue(makeStream([]));
-      mocks.storageMigration.streamPeopleWithBackendThumbnails.mockReturnValue(makeStream([]));
+      mocks.storageMigration.streamAssetsWithS3Derivatives.mockReturnValue(makeStream([]));
+      mocks.storageMigration.streamPeopleWithS3Thumbnails.mockReturnValue(makeStream([]));
 
       await expect(sut.handleQueueFileMigration()).resolves.toBe(JobStatus.Success);
 

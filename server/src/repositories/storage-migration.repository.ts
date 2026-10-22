@@ -76,8 +76,8 @@ export class StorageMigrationRepository {
       .stream();
   }
 
-  /** assets holding a non-edited derivative under a storage-backend key, otherwise filtered as streamForMigrationJob */
-  streamAssetsWithBackendDerivatives() {
+  /** assets holding a non-edited derivative under an S3 key, otherwise filtered as streamForMigrationJob */
+  streamAssetsWithS3Derivatives() {
     return this.db
       .selectFrom('asset')
       .select(['asset.id'])
@@ -101,8 +101,8 @@ export class StorageMigrationRepository {
       .stream();
   }
 
-  /** whether any asset, trashed or not, has its original stored as a storage-backend key */
-  async hasBackendOriginals(): Promise<boolean> {
+  /** whether any asset, trashed or not, has its original stored as an S3 key */
+  async hasS3Originals(): Promise<boolean> {
     const row = await this.db
       .selectFrom('asset')
       .select('asset.id')
@@ -112,8 +112,8 @@ export class StorageMigrationRepository {
     return !!row;
   }
 
-  /** people whose thumbnail is a storage-backend key */
-  streamPeopleWithBackendThumbnails() {
+  /** people whose thumbnail is an S3 key */
+  streamPeopleWithS3Thumbnails() {
     return this.db
       .selectFrom('person')
       .select(['ownerId', 'personGroupId'])

@@ -97,7 +97,7 @@ jobs:
 
       # An upgrade's first start. The empty database's first start decided "not pending", so the phases above see
       # automatic moves. The prepare phase deletes that decision and enables the template while the originals those
-      # phases left are in S3; the restart then decides again (BackendFileMigrationService.onBootstrap), as the first
+      # phases left are in S3; the restart then decides again (StorageTemplateS3Service.onBootstrap), as the first
       # start of this version does on an install that upgrades with originals in S3. The pending phase asserts the
       # restart decided "pending" and logged its warning, runs the manual migration that lifts it, and restores the
       # first decision and disables the template when it finishes.

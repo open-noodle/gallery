@@ -353,7 +353,7 @@ export function captureContainerLogsSince(service: string, sinceMs: number): str
   });
 }
 
-// How a move gives up, in upstream's disk move and the S3 mover (src/gallery/utils/backend-file-move.ts) alike:
+// How a move gives up, in upstream's disk move and the S3 mover (src/gallery/utils/s3-file-move.ts) alike:
 // a failed rename/copy, a size or checksum mismatch, an old file left behind, or a throw out of the template's move.
 const MOVE_FAILURE_MARKERS = [
   'Unable to complete move',
@@ -2083,7 +2083,7 @@ async function phaseTemplateS3ManualDerivatives(): Promise<void> {
   console.log(`=== Phase: ${tag} complete ===`);
 }
 
-// The once-decided gate on automatic S3 moves (BackendFileMigrationService.onBootstrap, isManualOnlyTemplateMove)
+// The once-decided gate on automatic S3 moves (StorageTemplateS3Service.onBootstrap, isManualOnlyTemplateMove)
 const TEMPLATE_S3_STATE_KEY = 'storage-template-s3-state';
 
 interface TemplateS3State {
@@ -2107,12 +2107,12 @@ async function setTemplateS3State(state: TemplateS3State): Promise<void> {
   );
 }
 
-// The warning each worker logs on every start while the state is pending (BackendFileMigrationService.onBootstrap)
+// The warning each worker logs on every start while the state is pending (StorageTemplateS3Service.onBootstrap)
 const TEMPLATE_S3_PENDING_WARNING =
   'The storage template does not move files in S3 until an admin runs Storage Template Migration from ' +
   'Administration > Job Queues; uploads keep their upload/ keys until then';
 
-// What the manual run that lifts the gate logs (BackendFileMigrationService.onJobSuccess)
+// What the manual run that lifts the gate logs (StorageTemplateS3Service.onJobSuccess)
 const TEMPLATE_S3_CLEARED_LOG =
   'Storage template migration finished: new uploads in S3 now move to their template path';
 
@@ -2124,7 +2124,7 @@ const TEMPLATE_S3_UPGRADE_TEMPLATE = '{{y}}/{{MMMM}}/{{filename}}';
 // Phase: Sets up an upgrade's first start for template-s3-upgrade-pending. Deletes the state this database's first
 // start decided ("not pending": the harness starts from an empty database, hence the automatic moves the phases
 // above assert) and enables the template while the originals those phases left are in S3. The workflow then
-// restarts the server, whose BackendFileMigrationService.onBootstrap finds no row and decides again, as the first
+// restarts the server, whose StorageTemplateS3Service.onBootstrap finds no row and decides again, as the first
 // start of this version does on an install that upgrades with originals in S3 and the template enabled.
 // Precondition: S3 backend, the template-s3-* phases above run
 // Leaves the row deleted and the template enabled for the restart; template-s3-upgrade-pending puts both back.
@@ -2142,10 +2142,10 @@ async function phaseTemplateS3UpgradePrepare(): Promise<void> {
     false,
     `[${tag}] precondition: an empty database's first start must decide "not pending"`,
   );
-  // what StorageMigrationRepository.hasBackendOriginals asks (trashed assets count too)
+  // what StorageMigrationRepository.hasS3Originals asks (trashed assets count too)
   const [{ c }] = await queryDb<{ c: string }>(`SELECT COUNT(*)::text c FROM asset WHERE "originalPath" NOT LIKE '/%'`);
-  const backendOriginals = Number(c);
-  assert.ok(backendOriginals > 0, `[${tag}] precondition: no original in S3 — run the template-s3-* phases first`);
+  const s3Originals = Number(c);
+  assert.ok(s3Originals > 0, `[${tag}] precondition: no original in S3 — run the template-s3-* phases first`);
 
   // saved before anything changes, so template-s3-upgrade-pending can put it back
   saveState({ templateS3PreState: preState });
@@ -2161,7 +2161,7 @@ async function phaseTemplateS3UpgradePrepare(): Promise<void> {
   saveState({ templateS3RestartAfterMs: Date.now() });
 
   console.log(
-    `  Deleted ${TEMPLATE_S3_STATE_KEY} and enabled the template with ${backendOriginals} originals in S3; ` +
+    `  Deleted ${TEMPLATE_S3_STATE_KEY} and enabled the template with ${s3Originals} originals in S3; ` +
       'restart the server (backend=s3) before template-s3-upgrade-pending.',
   );
   console.log(`=== Phase: ${tag} complete ===`);
@@ -2171,7 +2171,7 @@ async function phaseTemplateS3UpgradePrepare(): Promise<void> {
 // Phase: After an upgrade that found originals in S3 with the template enabled, a new S3 upload keeps its
 // upload/ key until an admin finishes one Storage Template Migration by hand; that run moves it and lifts the gate
 // Precondition: template-s3-upgrade-prepare, then a server restart (backend=s3), whose first start decided the state
-// again: the decision under test (onBootstrap and the hasBackendOriginals query). `finally` puts back the state the
+// again: the decision under test (onBootstrap and the hasS3Originals query). `finally` puts back the state the
 // database's first start decided and disables the template.
 // ---------------------------------------------------------------------------
 async function phaseTemplateS3UpgradePending(): Promise<void> {

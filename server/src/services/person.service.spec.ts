@@ -15,9 +15,9 @@ import {
   SystemMetadataKey,
   UserMetadataKey,
 } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { FaceSearchResult } from 'src/repositories/search.repository.js';
 import { PersonService } from 'src/services/person.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
 import { CROSS_OWNER_MERGE_ERROR_CODE } from 'src/utils/merge-policy.js';
 import { AssetFaceFactory } from 'test/factories/asset-face.factory.js';
@@ -1181,18 +1181,18 @@ describe(PersonService.name, () => {
       let previousS3Backend: unknown;
 
       beforeEach(() => {
-        previousS3Backend = (StorageService as any).s3Backend;
+        previousS3Backend = (storageBackends as any).s3Backend;
         s3Backend = {
           exists: vi.fn().mockResolvedValue(true),
           copy: vi.fn().mockResolvedValue(void 0),
           stat: vi.fn().mockResolvedValue({ size: 1024 }),
           delete: vi.fn().mockResolvedValue(void 0),
         };
-        (StorageService as any).s3Backend = s3Backend;
+        (storageBackends as any).s3Backend = s3Backend;
       });
 
       afterEach(() => {
-        (StorageService as any).s3Backend = previousS3Backend;
+        (storageBackends as any).s3Backend = previousS3Backend;
       });
 
       it('should move a relative S3 thumbnail within S3 to its expected key', async () => {

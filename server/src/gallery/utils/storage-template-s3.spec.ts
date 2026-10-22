@@ -2,12 +2,12 @@ import { Mock } from 'vitest';
 import type { StorageAsset, SystemMetadata } from 'src/types.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetFileType, SystemMetadataKey } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import {
   getTemplateLibraryRoot,
   isManualOnlyTemplateMove,
   isTemplateDestinationTaken,
-} from 'src/gallery/utils/storage-template-backend.js';
-import { StorageService } from 'src/services/storage.service.js';
+} from 'src/gallery/utils/storage-template-s3.js';
 import { getMocks } from 'test/utils.js';
 
 describe('getTemplateLibraryRoot', () => {
@@ -61,17 +61,17 @@ describe('isTemplateDestinationTaken', () => {
     StorageCore.setMediaLocation('/data');
     s3 = { exists: vi.fn().mockResolvedValue(false) };
     mocks.storage.checkFileExists.mockResolvedValue(false);
-    previousS3Backend = (StorageService as any).s3Backend;
+    previousS3Backend = (storageBackends as any).s3Backend;
   });
 
   afterEach(() => {
-    (StorageService as any).s3Backend = previousS3Backend;
+    (storageBackends as any).s3Backend = previousS3Backend;
     vi.restoreAllMocks();
   });
 
   describe('without S3', () => {
     beforeEach(() => {
-      (StorageService as any).s3Backend = undefined;
+      (storageBackends as any).s3Backend = undefined;
     });
 
     it.each([true, false])('should be upstream disk check alone (%s)', async (exists) => {
@@ -99,7 +99,7 @@ describe('isTemplateDestinationTaken', () => {
 
   describe('with S3', () => {
     beforeEach(() => {
-      (StorageService as any).s3Backend = s3;
+      (storageBackends as any).s3Backend = s3;
     });
 
     it('should check the disk equivalent of a key destination first, then S3', async () => {

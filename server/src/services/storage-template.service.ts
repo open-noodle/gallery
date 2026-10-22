@@ -22,7 +22,7 @@ import {
   getTemplateLibraryRoot,
   isManualOnlyTemplateMove,
   isTemplateDestinationTaken,
-} from 'src/gallery/utils/storage-template-backend.js';
+} from 'src/gallery/utils/storage-template-s3.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getAssetFile } from 'src/utils/asset.util.js';
 import { getFilenameExtension, getLivePhotoMotionFilename } from 'src/utils/file.js';

@@ -21,7 +21,7 @@ import { batched } from 'src/utils/misc.js';
  * StorageCore.moveFile; disk derivatives are left to the Migration job, as before.
  */
 @Injectable()
-export class BackendFileMigrationService extends BaseService {
+export class StorageTemplateS3Service extends BaseService {
   /**
    * Decides, once, whether this install's S3 files wait for a manual Storage Template Migration (see
    * isManualOnlyTemplateMove): yes when the first start of this version finds originals in S3 and the template
@@ -56,7 +56,7 @@ export class BackendFileMigrationService extends BaseService {
     }
 
     const { storageTemplate } = await this.getConfig({ withCache: false });
-    const pending = storageTemplate.enabled && (await this.storageMigrationRepository.hasBackendOriginals());
+    const pending = storageTemplate.enabled && (await this.storageMigrationRepository.hasS3Originals());
     const state = { pending, decidedAt: new Date().toISOString() };
     await this.systemMetadataRepository.set(SystemMetadataKey.StorageTemplateS3State, state);
     return state;
@@ -98,20 +98,20 @@ export class BackendFileMigrationService extends BaseService {
     // upstream refuses to start the Migration queue while it runs ("Job is already running"); file migration jobs
     // have no dedup, so queueing now would move the same files twice
     if (await this.jobRepository.isActive(QueueName.Migration)) {
-      this.logger.log('Migration queue is already running, not queueing the storage-backend file migration');
+      this.logger.log('Migration queue is already running, not queueing the S3 file migration');
       return;
     }
 
-    await this.jobRepository.queue({ name: JobName.StorageBackendFileMigrationQueueAll });
+    await this.jobRepository.queue({ name: JobName.S3FileMigrationQueueAll });
   }
 
-  @OnJob({ name: JobName.StorageBackendFileMigrationQueueAll, queue: QueueName.Migration })
+  @OnJob({ name: JobName.S3FileMigrationQueueAll, queue: QueueName.Migration })
   async handleQueueFileMigration(): Promise<JobStatus> {
-    for await (const assets of batched(this.storageMigrationRepository.streamAssetsWithBackendDerivatives())) {
+    for await (const assets of batched(this.storageMigrationRepository.streamAssetsWithS3Derivatives())) {
       await this.jobRepository.queueAll(assets.map(({ id }) => ({ name: JobName.AssetFileMigration, data: { id } })));
     }
 
-    for await (const people of batched(this.storageMigrationRepository.streamPeopleWithBackendThumbnails())) {
+    for await (const people of batched(this.storageMigrationRepository.streamPeopleWithS3Thumbnails())) {
       await this.jobRepository.queueAll(
         people.map(({ ownerId, personGroupId }) => ({
           name: JobName.PersonFileMigration,

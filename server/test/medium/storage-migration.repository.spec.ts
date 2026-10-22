@@ -20,7 +20,7 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
-describe('StorageMigrationRepository.hasBackendOriginals', () => {
+describe('StorageMigrationRepository.hasS3Originals', () => {
   // the query looks at every asset in the database, so each case starts from an empty asset table
   beforeEach(async () => {
     await defaultDatabase.deleteFrom('asset_file').execute();
@@ -30,7 +30,7 @@ describe('StorageMigrationRepository.hasBackendOriginals', () => {
   it('is false without assets', async () => {
     const { sut } = setup();
 
-    await expect(sut.hasBackendOriginals()).resolves.toBe(false);
+    await expect(sut.hasS3Originals()).resolves.toBe(false);
   });
 
   it('is false when every original is a disk path', async () => {
@@ -39,16 +39,16 @@ describe('StorageMigrationRepository.hasBackendOriginals', () => {
     await ctx.newAsset({ ownerId: user.id, originalPath: `/data/upload/${user.id}/ab/cd/a.jpg` });
     await ctx.newAsset({ ownerId: user.id, originalPath: `/data/library/${user.id}/2026/b.jpg` });
 
-    await expect(sut.hasBackendOriginals()).resolves.toBe(false);
+    await expect(sut.hasS3Originals()).resolves.toBe(false);
   });
 
-  it('is true when an original is a storage-backend key', async () => {
+  it('is true when an original is an S3 key', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
     await ctx.newAsset({ ownerId: user.id, originalPath: `/data/upload/${user.id}/ab/cd/a.jpg` });
     await ctx.newAsset({ ownerId: user.id, originalPath: `upload/${user.id}/ab/cd/x.jpg` });
 
-    await expect(sut.hasBackendOriginals()).resolves.toBe(true);
+    await expect(sut.hasS3Originals()).resolves.toBe(true);
   });
 
   it('counts a trashed original stored as a key', async () => {
@@ -61,7 +61,7 @@ describe('StorageMigrationRepository.hasBackendOriginals', () => {
       status: AssetStatus.Trashed,
     });
 
-    await expect(sut.hasBackendOriginals()).resolves.toBe(true);
+    await expect(sut.hasS3Originals()).resolves.toBe(true);
   });
 
   it('ignores keys held only by asset files', async () => {
@@ -75,6 +75,6 @@ describe('StorageMigrationRepository.hasBackendOriginals', () => {
       isEdited: false,
     });
 
-    await expect(sut.hasBackendOriginals()).resolves.toBe(false);
+    await expect(sut.hasS3Originals()).resolves.toBe(false);
   });
 });

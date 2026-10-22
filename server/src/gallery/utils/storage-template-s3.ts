@@ -3,15 +3,16 @@ import type { StorageAsset } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { StorageFolder, SystemMetadataKey } from 'src/enum.js';
-import { toBackendKey } from 'src/gallery/utils/backend-file-move.js';
+import { toS3Key } from 'src/gallery/utils/s3-key.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 
 /**
  * The library folder a storage template renders into, in the namespace that holds the original: a disk file gets
- * upstream's `<mediaLocation>/library/<label>`, a storage-backend key (S3) gets the key `library/<label>`, the key a
- * storage migration gives that disk folder.
+ * upstream's `<mediaLocation>/library/<label>`, an S3 key gets the key `library/<label>`, the key a storage migration
+ * gives that disk folder.
  *
  * It ends in `/`, so upstream's `fullPath.startsWith(rootPath)` guard also refuses a sibling folder: a template that
  * renders `../admin2/…` (from EXIF make or model) must not escape `library/admin` into `library/admin2`, which
@@ -37,8 +38,8 @@ export const isManualOnlyTemplateMove = async (
   { originalPath, files }: StorageAsset,
   systemMetadataRepository: SystemMetadataRepository,
 ): Promise<boolean> => {
-  const hasBackendFile = !isDiskPath(originalPath) || (files ?? []).some(({ path }) => !isDiskPath(path));
-  if (!hasBackendFile) {
+  const hasS3File = !isDiskPath(originalPath) || (files ?? []).some(({ path }) => !isDiskPath(path));
+  if (!hasS3File) {
     return false;
   }
 
@@ -49,8 +50,8 @@ export const isManualOnlyTemplateMove = async (
 /**
  * Whether a storage template destination is taken. Without S3 this is upstream's disk check. With S3 configured a
  * destination is taken when either backend holds it (`<mediaLocation>/<key>` on disk, `<key>` in S3): a storage
- * migration maps the one onto the other, and its "target already exists" shortcut would point a second asset at
- * the first one's file.
+ * migration maps the one onto the other, and would fail the second asset's file as a size mismatch at that target
+ * or, when the sizes happen to match, point it at the first one's file.
  */
 export const isTemplateDestinationTaken = async (
   destination: string,
@@ -63,10 +64,8 @@ export const isTemplateDestinationTaken = async (
     return true;
   }
 
-  // lazy import to avoid a circular dependency (StorageService extends BaseService)
-  const { StorageService } = await import('../../services/storage.service.js');
-  const s3 = StorageService.getS3Backend();
-  const key = toBackendKey(destination, mediaLocation);
+  const s3 = storageBackends.s3Backend;
+  const key = toS3Key(destination, mediaLocation);
   if (!s3 || key === null) {
     return false;
   }

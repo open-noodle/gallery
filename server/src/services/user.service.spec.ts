@@ -4,8 +4,8 @@ import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { CacheControl, JobName, JobStatus, UserMetadataKey } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { UserService } from 'src/services/user.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
@@ -37,7 +37,7 @@ describe(UserService.name, () => {
   let mocks: ServiceMocks;
 
   beforeAll(() => {
-    (StorageService as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
+    (storageBackends as any).diskBackend = new DiskStorageBackend('/data', {} as StorageRepository);
   });
 
   beforeEach(() => {
@@ -368,13 +368,13 @@ describe(UserService.name, () => {
           put: vi.fn().mockResolvedValue(void 0),
           getServeStrategy: vi.fn(),
         };
-        (StorageService as any).s3Backend = mockS3Backend;
-        (StorageService as any).writeBackendType = 's3';
+        (storageBackends as any).s3Backend = mockS3Backend;
+        (storageBackends as any).writeBackendType = 's3';
       });
 
       afterEach(() => {
-        (StorageService as any).s3Backend = void 0;
-        (StorageService as any).writeBackendType = 'disk';
+        (storageBackends as any).s3Backend = void 0;
+        (storageBackends as any).writeBackendType = 'disk';
       });
 
       it('should upload profile image to S3 and store relative path', async () => {
@@ -856,12 +856,12 @@ describe(UserService.name, () => {
 
       beforeEach(() => {
         mockS3Backend = { deletePrefix: vi.fn().mockResolvedValue(void 0) };
-        (StorageService as any).s3Backend = mockS3Backend;
+        (storageBackends as any).s3Backend = mockS3Backend;
         mocks.storageMigration.hasOtherOwnerFilesUnderPrefix.mockResolvedValue(false);
       });
 
       afterEach(() => {
-        (StorageService as any).s3Backend = void 0;
+        (storageBackends as any).s3Backend = void 0;
       });
 
       it('should delete the five user-scoped S3 prefixes in addition to disk folders', async () => {
@@ -946,12 +946,12 @@ describe(UserService.name, () => {
     it('should not reach any S3 backend when S3 is not configured (regression guard)', async () => {
       const user = { id: 'disk-only-user', deletedAt: makeDeletedAt(10) } as UserAdmin;
       mocks.user.get.mockResolvedValue(user);
-      expect((StorageService as any).s3Backend).toBeUndefined();
+      expect((storageBackends as any).s3Backend).toBeUndefined();
 
       await sut.handleUserDelete({ id: user.id });
 
       expect(mocks.storage.unlinkDir).toHaveBeenCalledTimes(5);
-      expect((StorageService as any).s3Backend).toBeUndefined();
+      expect((storageBackends as any).s3Backend).toBeUndefined();
       expect(mocks.storageMigration.hasOtherOwnerFilesUnderPrefix).not.toHaveBeenCalled();
     });
 
@@ -1004,7 +1004,7 @@ describe(UserService.name, () => {
 
   describe('handleUserSyncUsage', () => {
     afterEach(() => {
-      (StorageService as any).s3Backend = undefined;
+      (storageBackends as any).s3Backend = undefined;
     });
 
     it('should sync usage from S3 prefixes and existing disk folders', async () => {
@@ -1018,7 +1018,7 @@ describe(UserService.name, () => {
           .mockResolvedValueOnce(400)
           .mockResolvedValueOnce(500),
       };
-      (StorageService as any).s3Backend = s3Backend;
+      (storageBackends as any).s3Backend = s3Backend;
       mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
