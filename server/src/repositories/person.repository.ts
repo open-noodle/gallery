@@ -1227,7 +1227,7 @@ export class PersonRepository {
       .where((eb) =>
         eb.or([
           eb('asset.ownerId', '=', asUuid(userId)),
-          inSharedAlbum(eb, userId),
+          inSharedAlbum(userId, 'asset.id'),
           ...(options.memberUserId
             ? spaceAssetPathBranches(eb, {
                 correlateAssetId: 'asset.id',
