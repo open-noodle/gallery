@@ -233,9 +233,12 @@ export const checkOverlay = () => {
   return problems;
 };
 
+// Compare real paths: a symlinked directory (macOS mktemp lives under /var -> /private/var) makes
+// path.resolve(argv[1]) differ from import.meta.url, and the CLI then exits 0 having done nothing.
 if (
   process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  fs.realpathSync(process.argv[1]) ===
+    fs.realpathSync(fileURLToPath(import.meta.url))
 ) {
   const args = process.argv.slice(2);
   if (args[0] === "--check") {
