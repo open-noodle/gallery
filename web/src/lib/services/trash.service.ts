@@ -2,6 +2,7 @@ import { emptyTrash, restoreTrash } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import { mdiDeleteForeverOutline, mdiHistory } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
+import { animateRemoval } from '$lib/gallery/motion';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 
@@ -33,6 +34,7 @@ const handleEmptyTrash = async () => {
 
   try {
     const { count } = await emptyTrash();
+    animateRemoval('visible', 'delete');
     toastManager.primary($t('assets_permanently_deleted_count', { values: { count } }));
   } catch (error) {
     handleError(error, $t('errors.unable_to_empty_trash'));
@@ -49,6 +51,7 @@ const handleRestoreTrash = async () => {
 
   try {
     const { count } = await restoreTrash();
+    animateRemoval('visible', 'restore');
     toastManager.primary($t('assets_restored_count', { values: { count } }));
   } catch (error) {
     handleError(error, $t('errors.unable_to_restore_trash'));

@@ -2,6 +2,7 @@ import { AssetVisibility, deleteAssets as deleteBulk, restoreAssets, type StackR
 import { toastManager } from '@immich/ui';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import { animateRemoval } from '$lib/gallery/motion';
 import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import { handleError } from './handle-error';
@@ -25,6 +26,7 @@ export const deleteAssets = async (
   try {
     const ids = assets.map((a) => a.id);
     await deleteBulk({ assetBulkDeleteDto: { ids, force } });
+    animateRemoval(ids, force ? 'delete' : 'trash');
     onAssetDelete(ids);
 
     toastManager.primary(

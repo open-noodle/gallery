@@ -52,6 +52,7 @@ import {
 import type { MessageFormatter } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 import { ProjectionType } from '$lib/constants';
+import { celebrate } from '$lib/gallery/motion';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -577,6 +578,7 @@ export const handleDownloadAsset = async (asset: AssetResponseDto, { edited }: {
 const handleFavorite = async (asset: AssetResponseDto) => {
   const $t = await getFormatter();
 
+  celebrate('favorite');
   try {
     await updateAssetFavorites({ assetFavoriteUpdateDto: { ids: [asset.id], isFavorite: true } });
     toastManager.primary($t('added_to_favorites'));

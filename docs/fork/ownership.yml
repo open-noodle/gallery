@@ -186,6 +186,7 @@ features:
       - typed-search-filters
       - rule-based-memories
       - historic-memories
+      - web-motion-language
     risk: high
     domains: [server, web, mobile, e2e]
     owned_paths:
@@ -196,6 +197,8 @@ features:
       - web/src/lib/managers/global-search*.ts
       - web/src/lib/managers/command*.ts
       - web/src/lib/utils/typed-search/**
+      # Motion language: specs/2026-10-23-web-motion-language-design.md
+      - web/src/lib/gallery/motion/**
       - web/src/lib/components/shared-components/side-bar/PurchaseInfo.svelte
       - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
