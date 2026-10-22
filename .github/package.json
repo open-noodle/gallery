@@ -2,7 +2,7 @@
   "scripts": {
     "format": "prettier --cache --check .",
     "format:fix": "prettier --cache --write --list-different .",
-    "test": "ruby actions/apply-branding/dependencies_test.rb"
+    "test": "ruby actions/apply-branding/dependencies_test.rb && node --test \"scripts/*.test.mjs\""
   },
   "devDependencies": {
     "prettier": "^3.7.4"

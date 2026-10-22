@@ -633,6 +633,14 @@ jobs:
             if [[ -n "$upstream_commits" ]]; then
               printf -v notes '%s\n\n<details>\n<summary>Upstream commits</summary>\n\n%s\n\n</details>' "$notes" "$upstream_commits"
             fi
+
+            # Credit the authors of the Gallery PRs in this release. gallery_all is already limited to our
+            # own PR numbers (see above), so upstream's never get looked up. The helper warns and prints
+            # nothing on any lookup problem, and `|| true` backs that up: thanks are not worth a failed release.
+            contributors=$(printf '%s\n' "$gallery_all" | node .github/scripts/release-contributors.mjs || true)
+            if [[ -n "$contributors" ]]; then
+              printf -v notes '%s\n\n%s' "$notes" "$contributors"
+            fi
           fi
 
           gh release create "$VERSION" \
