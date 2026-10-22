@@ -4,10 +4,10 @@ Gallery runs on your existing Immich database, media and configuration. You chan
 
 ## Check your Immich version first
 
-Gallery is built on top of a specific Immich release, its upstream base. The current base is **Immich v3.3.3**.
+Gallery is built on top of a specific Immich release, its upstream base. The current base is **Immich v3.3.5**.
 
 :::warning
-Switch only from Immich **v3.3.3 or older**. A database that a newer Immich has already migrated contains migrations Gallery does not ship yet, and Gallery refuses to start against it. If you already run a newer Immich, wait for a Gallery release based on that version. Downgrades are not supported.
+Switch only from Immich **v3.3.5 or older**. A database that a newer Immich has already migrated contains migrations Gallery does not ship yet, and Gallery refuses to start against it. If you already run a newer Immich, wait for a Gallery release based on that version. Downgrades are not supported.
 :::
 
 To see which version you run, check the server version in the Immich web app, or the image tag of `immich-server` in your `docker-compose.yml` and `.env`.

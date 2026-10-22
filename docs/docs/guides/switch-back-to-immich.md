@@ -36,7 +36,7 @@ Upstream Immich also starts on a Gallery database without the cleanup script. Yo
 
    Do not delete the plugin instead: that also deletes every workflow step that uses a Gallery action.
 
-4. Switch the image to Immich as in [step 5](#5-switch-your-compose-file-to-upstream-immich) and start the stack. Set `IMMICH_VERSION` to exactly the Immich release Gallery is built on, currently `v3.3.1` (`upstream.version` in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json)), not a floating tag such as `v3`. A newer Immich runs its own database migrations, and Gallery then refuses to start on that database until you restore the backup from step 1.
+4. Switch the image to Immich as in [step 5](#5-switch-your-compose-file-to-upstream-immich) and start the stack. Set `IMMICH_VERSION` to exactly the Immich release Gallery is built on, currently `v3.3.5` (`upstream.version` in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json)), not a floating tag such as `v3`. A newer Immich runs its own database migrations, and Gallery then refuses to start on that database until you restore the backup from step 1.
 
 Immich shows each user their own photos and videos, with their own favorites. A trimmed video plays at full length and shows its full duration, but its thumbnail is still taken from the trimmed part. Immich's schema check warns about Gallery's database functions and about Gallery's rows in `migration_overrides` (for functions, triggers and indexes); those warnings are expected here.
 
@@ -133,7 +133,7 @@ Notes:
 
 ## 5. Switch your compose file to upstream Immich
 
-Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin the Immich release Gallery is built on, currently `v3.3.1`. You can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`. After the cleanup script has run, a newer Immich release also works.
+Edit your `docker-compose.yml` and replace every reference to the Gallery image with the upstream `immich-server` image. Pin the Immich release Gallery is built on, currently `v3.3.5`. You can find it in [`branding/config.json`](https://github.com/open-noodle/gallery/blob/main/branding/config.json) in the Gallery repository, under `upstream.version`. After the cleanup script has run, a newer Immich release also works.
 
 ```yaml title="docker-compose.yml"
 services:
@@ -155,7 +155,7 @@ Remove any Gallery-only environment variables from your `.env` file, such as `IM
 ```yaml title=".env"
 #IMMICH_VERSION=v5
 // highlight-next-line
-IMMICH_VERSION=v3.3.1
+IMMICH_VERSION=v3.3.5
 ```
 
 ## 6. Start the stack
