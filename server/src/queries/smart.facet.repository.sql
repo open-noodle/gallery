@@ -829,2223 +829,6 @@ limit
 commit
 
 -- SmartFacetRepository.getSearchOptions
-select
-  1 as "search_options_probe"
-from
-  "asset"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $1
-  and (
-    "asset"."ownerId" = any ($2::uuid[])
-    or (
-      "asset"."visibility" in ($3, $4)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($5::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($6::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($7::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $8::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $11::uuid
-  )
-limit
-  $12
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and "asset"."type" = $17
-limit
-  $18
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($13)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $14
-        and "asset_exif"."rating" >= $15
-      )
-  )
-  and exists (
-    select
-    from
-      "tag_asset"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-  )
-limit
-  $16
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and NULLIF("facet_exif"."make", '') IS NOT NULL
-limit
-  $17
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and exists (
-    select
-    from
-      "album_asset"
-    where
-      "album_asset"."assetId" = "asset"."id"
-  )
-limit
-  $17
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-limit
-  $17
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and "asset_exif"."rating" >= $15
-  )
-  and NULLIF("facet_exif"."country", '') IS NOT NULL
-limit
-  $16
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and "asset"."type" = $17
-limit
-  $18
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and "asset_exif"."city" = $15
-  )
-  and "facet_exif"."rating" > 0
-limit
-  $16
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_face" as "facet_face" on "facet_face"."assetId" = "asset"."id"
-  inner join "face_identity_face" as "facet_fif" on "facet_fif"."assetFaceId" = "facet_face"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and "facet_face"."deletedAt" IS NULL
-  AND "facet_face"."isVisible"
-  and (
-    EXISTS (
-      SELECT
-        1
-      FROM
-        person
-      WHERE
-        person."ownerId" = $17
-        AND NOT person."isHidden"
-        AND (
-          SELECT
-            "person_identity"."identityId"
-          FROM
-            "person_identity"
-          WHERE
-            "person_identity"."personGroupId" = "person"."personGroupId"
-        ) = "facet_fif"."identityId"
-        AND NULLIF(person.name, '') IS NOT NULL
-    )
-    OR EXISTS (
-      SELECT
-        1
-      FROM
-        shared_space_person
-        LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-        AND shared_space_person_alias."userId" = $18
-      WHERE
-        shared_space_person."identityId" = "facet_fif"."identityId"
-        AND shared_space_person."spaceId" = any ($19::uuid[])
-        AND NOT shared_space_person."isHidden"
-        AND COALESCE(
-          NULLIF(shared_space_person_alias.alias, ''),
-          shared_space_person.name,
-          ''
-        ) <> ''
-        AND EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_person_face
-            INNER JOIN asset_face AS profile_face ON profile_face.id = shared_space_person_face."assetFaceId"
-          WHERE
-            shared_space_person_face."personId" = shared_space_person.id
-            AND profile_face."deletedAt" IS NULL
-            AND profile_face."isVisible"
-        )
-    )
-  )
-limit
-  $20
-select
-  1 as "search_options_probe"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and not exists (
-    select
-    from
-      "album_asset"
-    where
-      "album_asset"."assetId" = "asset"."id"
-  )
-limit
-  $17
-begin
-select
-  count(*) as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-select
-  (
-    date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AT TIME ZONE 'UTC'
-  )::date::text as "timeBucket",
-  count(*) as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-group by
-  (
-    date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AT TIME ZONE 'UTC'
-  )::date::text
-order by
-  (
-    date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AT TIME ZONE 'UTC'
-  )::date::text desc
-select
-  "asset"."type",
-  count(*) as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-group by
-  "asset"."type"
-order by
-  "asset"."type"
-select
-  "facet_exif"."rating",
-  count(*) as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and "asset_exif"."city" = $15
-  )
-  and "facet_exif"."rating" > $16
-group by
-  "facet_exif"."rating"
-order by
-  "facet_exif"."rating"
-select
-  "facet_exif"."country",
-  "facet_exif"."city",
-  count(*) as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and "asset_exif"."rating" >= $15
-  )
-  and "facet_exif"."country" is not null
-  and "facet_exif"."country" != $16
-group by
-  "facet_exif"."country",
-  "facet_exif"."city"
-select
-  "facet_exif"."make",
-  "facet_exif"."model",
-  count(*) as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and exists (
-    select
-    from
-      "tag_closure"
-      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
-    where
-      "tag_asset"."assetId" = "asset"."id"
-      and "tag_closure"."id_ancestor" = any ($13::uuid[])
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $15
-        and "asset_exif"."rating" >= $16
-      )
-  )
-  and "facet_exif"."make" is not null
-  and "facet_exif"."make" != $17
-group by
-  "facet_exif"."make",
-  "facet_exif"."model"
-select
-  "facet_tag"."id",
-  "facet_tag"."value",
-  count(DISTINCT "asset"."id") as "count"
-from
-  "asset"
-  inner join (
-    select
-      "asset_face"."assetId"
-    from
-      "asset_face"
-      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
-    where
-      "face_identity_face"."identityId" = any ($1::uuid[])
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."assetId"
-    having
-      count(distinct "face_identity_face"."identityId") = $2
-  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
-  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
-  inner join "tag_asset" as "facet_tag_asset" on "facet_tag_asset"."assetId" = "asset"."id"
-  inner join "tag_closure" as "facet_closure" on "facet_closure"."id_descendant" = "facet_tag_asset"."tagId"
-  inner join "tag" as "facet_tag" on "facet_tag"."id" = "facet_closure"."id_ancestor"
-where
-  "asset"."deletedAt" is null
-  and "asset"."visibility" = $3
-  and (
-    "asset"."ownerId" = any ($4::uuid[])
-    or (
-      "asset"."visibility" in ($5, $6)
-      and "asset"."deletedAt" is null
-      and (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_asset"
-          where
-            "shared_space_asset"."assetId" = "asset"."id"
-            and "shared_space_asset"."spaceId" = any ($7::uuid[])
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_library"
-          where
-            "shared_space_library"."libraryId" = "asset"."libraryId"
-            and "shared_space_library"."spaceId" = any ($8::uuid[])
-        )
-        or (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($9::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $10::uuid
-              )
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_album"
-              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
-              and "linked_album"."deletedAt" is null
-            where
-              "album_space_asset"."assetId" = "asset"."id"
-              and "shared_space_album"."spaceId" = any ($11::uuid[])
-              and not exists (
-                select
-                  1 as "exists"
-                from
-                  "shared_space_album_hidden"
-                where
-                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
-                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
-                  and "shared_space_album_hidden"."userId" = $12::uuid
-              )
-          )
-        )
-      )
-    )
-  )
-  and f_unaccent (ocr_search.text) %>> f_unaccent ($13)
-  and exists (
-    select
-    from
-      "asset_exif"
-    where
-      "asset_exif"."assetId" = "asset"."id"
-      and (
-        "asset_exif"."city" = $14
-        and "asset_exif"."rating" >= $15
-      )
-  )
-group by
-  "facet_tag"."id",
-  "facet_tag"."value"
 SET
   LOCAL work_mem = '64MB'
 WITH
@@ -3349,7 +1132,2224 @@ ORDER BY
     )
   ),
   primary_profiles."profileId"
+begin
 commit
+select
+  "asset"."type",
+  count(*) as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+group by
+  "asset"."type"
+order by
+  "asset"."type"
+select
+  "facet_exif"."country",
+  "facet_exif"."city",
+  count(*) as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and "asset_exif"."rating" >= $15
+  )
+  and "facet_exif"."country" is not null
+  and "facet_exif"."country" != $16
+group by
+  "facet_exif"."country",
+  "facet_exif"."city"
+select
+  "facet_exif"."make",
+  "facet_exif"."model",
+  count(*) as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and "facet_exif"."make" is not null
+  and "facet_exif"."make" != $17
+group by
+  "facet_exif"."make",
+  "facet_exif"."model"
+select
+  "facet_exif"."rating",
+  count(*) as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and "asset_exif"."city" = $15
+  )
+  and "facet_exif"."rating" > $16
+group by
+  "facet_exif"."rating"
+order by
+  "facet_exif"."rating"
+select
+  "facet_tag"."id",
+  "facet_tag"."value",
+  count(DISTINCT "asset"."id") as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "tag_asset" as "facet_tag_asset" on "facet_tag_asset"."assetId" = "asset"."id"
+  inner join "tag_closure" as "facet_closure" on "facet_closure"."id_descendant" = "facet_tag_asset"."tagId"
+  inner join "tag" as "facet_tag" on "facet_tag"."id" = "facet_closure"."id_ancestor"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($13)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $14
+        and "asset_exif"."rating" >= $15
+      )
+  )
+group by
+  "facet_tag"."id",
+  "facet_tag"."value"
+select
+  (
+    date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AT TIME ZONE 'UTC'
+  )::date::text as "timeBucket",
+  count(*) as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+group by
+  (
+    date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AT TIME ZONE 'UTC'
+  )::date::text
+order by
+  (
+    date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AT TIME ZONE 'UTC'
+  )::date::text desc
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and "asset_exif"."city" = $15
+  )
+  and "facet_exif"."rating" > 0
+limit
+  $16
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and "asset_exif"."rating" >= $15
+  )
+  and NULLIF("facet_exif"."country", '') IS NOT NULL
+limit
+  $16
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_exif" as "facet_exif" on "facet_exif"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and NULLIF("facet_exif"."make", '') IS NOT NULL
+limit
+  $17
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+  inner join "asset_face" as "facet_face" on "facet_face"."assetId" = "asset"."id"
+  inner join "face_identity_face" as "facet_fif" on "facet_fif"."assetFaceId" = "facet_face"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and "facet_face"."deletedAt" IS NULL
+  AND "facet_face"."isVisible"
+  and (
+    EXISTS (
+      SELECT
+        1
+      FROM
+        person
+      WHERE
+        person."ownerId" = $17
+        AND NOT person."isHidden"
+        AND (
+          SELECT
+            "person_identity"."identityId"
+          FROM
+            "person_identity"
+          WHERE
+            "person_identity"."personGroupId" = "person"."personGroupId"
+        ) = "facet_fif"."identityId"
+        AND NULLIF(person.name, '') IS NOT NULL
+    )
+    OR EXISTS (
+      SELECT
+        1
+      FROM
+        shared_space_person
+        LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
+        AND shared_space_person_alias."userId" = $18
+      WHERE
+        shared_space_person."identityId" = "facet_fif"."identityId"
+        AND shared_space_person."spaceId" = any ($19::uuid[])
+        AND NOT shared_space_person."isHidden"
+        AND COALESCE(
+          NULLIF(shared_space_person_alias.alias, ''),
+          shared_space_person.name,
+          ''
+        ) <> ''
+        AND EXISTS (
+          SELECT
+            1
+          FROM
+            shared_space_person_face
+            INNER JOIN asset_face AS profile_face ON profile_face.id = shared_space_person_face."assetFaceId"
+          WHERE
+            shared_space_person_face."personId" = shared_space_person.id
+            AND profile_face."deletedAt" IS NULL
+            AND profile_face."isVisible"
+        )
+    )
+  )
+limit
+  $20
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and "asset"."type" = $17
+limit
+  $18
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and "asset"."type" = $17
+limit
+  $18
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and exists (
+    select
+    from
+      "album_asset"
+    where
+      "album_asset"."assetId" = "asset"."id"
+  )
+limit
+  $17
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+  and not exists (
+    select
+    from
+      "album_asset"
+    where
+      "album_asset"."assetId" = "asset"."id"
+  )
+limit
+  $17
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
+limit
+  $17
+select
+  1 as "search_options_probe"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($13)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $14
+        and "asset_exif"."rating" >= $15
+      )
+  )
+  and exists (
+    select
+    from
+      "tag_asset"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+  )
+limit
+  $16
+select
+  1 as "search_options_probe"
+from
+  "asset"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $1
+  and (
+    "asset"."ownerId" = any ($2::uuid[])
+    or (
+      "asset"."visibility" in ($3, $4)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($5::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($6::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($7::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $8::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $11::uuid
+  )
+limit
+  $12
+select
+  count(*) as "count"
+from
+  "asset"
+  inner join (
+    select
+      "asset_face"."assetId"
+    from
+      "asset_face"
+      inner join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
+    where
+      "face_identity_face"."identityId" = any ($1::uuid[])
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+    group by
+      "asset_face"."assetId"
+    having
+      count(distinct "face_identity_face"."identityId") = $2
+  ) as "has_face_identities" on "has_face_identities"."assetId" = "asset"."id"
+  inner join "ocr_search" on "asset"."id" = "ocr_search"."assetId"
+where
+  "asset"."deletedAt" is null
+  and "asset"."visibility" = $3
+  and (
+    "asset"."ownerId" = any ($4::uuid[])
+    or (
+      "asset"."visibility" in ($5, $6)
+      and "asset"."deletedAt" is null
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($7::uuid[])
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($8::uuid[])
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($9::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $10::uuid
+              )
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+              and "linked_album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = any ($11::uuid[])
+              and not exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_album_hidden"
+                where
+                  "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+                  and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+                  and "shared_space_album_hidden"."userId" = $12::uuid
+              )
+          )
+        )
+      )
+    )
+  )
+  and exists (
+    select
+    from
+      "tag_closure"
+      inner join "tag_asset" on "tag_asset"."tagId" = "tag_closure"."id_descendant"
+    where
+      "tag_asset"."assetId" = "asset"."id"
+      and "tag_closure"."id_ancestor" = any ($13::uuid[])
+  )
+  and f_unaccent (ocr_search.text) %>> f_unaccent ($14)
+  and exists (
+    select
+    from
+      "asset_exif"
+    where
+      "asset_exif"."assetId" = "asset"."id"
+      and (
+        "asset_exif"."city" = $15
+        and "asset_exif"."rating" >= $16
+      )
+  )
 
 -- SmartFacetRepository.getSearchOptionsWatermark
 SELECT

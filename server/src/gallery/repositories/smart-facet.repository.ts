@@ -412,6 +412,8 @@ export class SmartFacetRepository {
         },
       },
     ],
+    // Browse mode runs its lists and probes concurrently on the pool, so they finish in no fixed order.
+    sortQueries: true,
   })
   async getSearchOptions(options: SearchOptionsQuery): Promise<SearchOptionsResult> {
     if (options.mode === 'browse') {
