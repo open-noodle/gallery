@@ -129,50 +129,14 @@ void main() {
     testWidgets('${screen.page.name}: the pill enters search mode, one filter, every request a recorded one', (
       tester,
     ) async {
-      // Real sockets: the test binding's HTTP stand-in would answer every request with a 400.
-      HttpOverrides.global = null;
-      final server = (await tester.runAsync(
-        () => SearchContractServer.start(include: (name) => !name.startsWith('older-') && !name.startsWith('stock-')),
-      ))!;
-      addTearDown(() => tester.runAsync(server.close));
+      final server = await _start(tester, (name) => !name.startsWith('older-') && !name.startsWith('stock-'));
 
       final client = ApiClient(basePath: server.endpoint);
       await database.setUp();
-      final container = scopedPagesContainer(
-        db: database.db,
-        user: me,
-        repository: GallerySearchRepository(
-          searchApi: SearchApi(client),
-          timelineApi: TimelineApi(client),
-          serverApi: ServerApi(client),
-        ),
-        realDebounce: true,
-      );
-
-      /// Fake time for timers and frames, real time for the sockets, until the server has been quiet for a while.
-      Future<void> sync() async {
-        var quiet = 0;
-        var seen = server.requests.length;
-        while (quiet < 6) {
-          await tester.pump(const Duration(milliseconds: 100));
-          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
-          if (server.requests.length == seen) {
-            quiet++;
-          } else {
-            quiet = 0;
-            seen = server.requests.length;
-          }
-        }
-      }
-
-      Future<void> tap(String key) async {
-        await tester.ensureVisible(find.byKey(Key(key)));
-        await tester.pump();
-        await tester.tap(find.byKey(Key(key)));
-        await sync();
-      }
-
-      String total() => tester.widget<Text>(find.byKey(const Key('search-mode-total'))).data!;
+      final container = _container(database, client);
+      Future<void> sync() => _sync(tester, server);
+      Future<void> tap(String key) => _tap(tester, server, key);
+      String total() => _total(tester);
       int bucketSum(String fixture) => (contractResponseBody(fixture)! as List).fold<int>(
         0,
         (sum, bucket) => sum + ((bucket as Map)['count'] as int),
@@ -232,6 +196,13 @@ void main() {
       if (screen.page == OtherScreen.favorites) {
         // An archived favourite.
         expect(shown, {contract['asset:archived-1']});
+        // Unfiltered, the screen's scope: my favourites (the archived one too) and a partner's and a space's, never
+        // a photo its owner archived.
+        final scope = (contractResponseBody(screen.unfilteredBuckets)! as List).fold<int>(
+          0,
+          (sum, bucket) => sum + ((bucket as Map)['count'] as int),
+        );
+        expect(scope, 4);
       }
 
       // ← : the screen comes back, nothing filtered.
@@ -249,4 +220,84 @@ void main() {
       await tester.pump(const Duration(seconds: 16));
     });
   }
+
+  testWidgets(
+    'favorites on a server without searchFavoritesAcrossSpaces: my own favourites only, no rejected request',
+    (tester) async {
+      // That server's features (older-favorites-server-features sorts before server-features, so it answers), and its
+      // answers to the own-favourites requests; everything else as recorded.
+      final server = await _start(
+        tester,
+        (name) => name.startsWith('older-favorites-') || (!name.startsWith('older-') && !name.startsWith('stock-')),
+      );
+      final client = ApiClient(basePath: server.endpoint);
+      await database.setUp();
+      final container = _container(database, client);
+
+      await pumpScopedPage(tester, container, otherScreenPage(OtherScreen.favorites));
+      await _sync(tester, server);
+      await _tap(tester, server, 'timeline-pill-search');
+
+      expect(server.served, contains('older-favorites-server-features'));
+      expect(
+        server.served,
+        containsAll([for (final d in _dimensions) 'older-favorites-scope-$d', 'older-favorites-timeline-buckets']),
+      );
+      expect(server.served.where((name) => name.startsWith('scope-favorites')), isEmpty);
+      final own = (contractResponseBody('older-favorites-scope-total')! as Map)['total'] as int;
+      expect(own, lessThan((contractResponseBody('scope-favorites-total')! as Map)['total'] as int));
+      expect(_total(tester), '$own ${own == 1 ? 'photo or video' : 'photos and videos'}');
+      expect(server.unmatched, isEmpty, reason: 'every request matched a recorded fixture');
+
+      await _tap(tester, server, 'search-mode-back');
+      await disposePhotosPage(tester, container);
+      client.client.close();
+      await tester.pump(const Duration(seconds: 16));
+    },
+  );
 }
+
+/// The strict contract server over the fixtures [include] accepts, on real sockets: the test binding's HTTP stand-in
+/// would answer every request with a 400.
+Future<SearchContractServer> _start(WidgetTester tester, bool Function(String name) include) async {
+  HttpOverrides.global = null;
+  final server = (await tester.runAsync(() => SearchContractServer.start(include: include)))!;
+  addTearDown(() => tester.runAsync(server.close));
+  return server;
+}
+
+ProviderContainer _container(SearchModeDatabase database, ApiClient client) => scopedPagesContainer(
+  db: database.db,
+  user: me,
+  repository: GallerySearchRepository(
+    searchApi: SearchApi(client),
+    timelineApi: TimelineApi(client),
+    serverApi: ServerApi(client),
+  ),
+  realDebounce: true,
+);
+
+/// Fake time for timers and frames, real time for the sockets, until the server has been quiet for a while.
+Future<void> _sync(WidgetTester tester, SearchContractServer server) async {
+  var quiet = 0;
+  var seen = server.requests.length;
+  while (quiet < 6) {
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    if (server.requests.length == seen) {
+      quiet++;
+    } else {
+      quiet = 0;
+      seen = server.requests.length;
+    }
+  }
+}
+
+Future<void> _tap(WidgetTester tester, SearchContractServer server, String key) async {
+  await tester.ensureVisible(find.byKey(Key(key)));
+  await tester.pump();
+  await tester.tap(find.byKey(Key(key)));
+  await _sync(tester, server);
+}
+
+String _total(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('search-mode-total'))).data!;

@@ -22,7 +22,17 @@ class ScopeCase {
   final Map<String, List<String>> timeline;
   final Map<String, Object?> smart;
 
-  const ScopeCase(this.name, this.scope, {required this.optionsBrowse, required this.timeline, required this.smart});
+  /// The server declares `searchFavoritesAcrossSpaces`.
+  final bool favoritesAcrossSpaces;
+
+  const ScopeCase(
+    this.name,
+    this.scope, {
+    required this.optionsBrowse,
+    required this.timeline,
+    required this.smart,
+    this.favoritesAcrossSpaces = false,
+  });
 }
 
 const photosBrowse = {'visibility': 'timeline', 'withSharedSpaces': true, 'withPartners': true};
@@ -116,7 +126,19 @@ final cases = [
     smart: {...photosQuery, 'city': 'Kyoto'},
   ),
   const ScopeCase(
-    'favorites: visibility unset (timeline + archive)',
+    'favorites: my favourites with partners and every member space, visibility unset (timeline + my archive)',
+    FavoritesSearchScope(),
+    favoritesAcrossSpaces: true,
+    optionsBrowse: {'isFavorite': true, 'withSharedSpaces': true, 'withPartners': true},
+    timeline: {
+      'isFavorite': ['true'],
+      'withSharedSpaces': ['true'],
+      'withPartners': ['true'],
+    },
+    smart: {'isFavorite': true, 'withSharedSpaces': true},
+  ),
+  const ScopeCase(
+    'favorites on a server without searchFavoritesAcrossSpaces: my own favourites, visibility unset',
     FavoritesSearchScope(),
     optionsBrowse: {'isFavorite': true},
     timeline: {
@@ -173,7 +195,13 @@ void main() {
     group(c.name, () {
       test('options (browse) send exactly the scope', () async {
         final api = RecordingApi();
-        final params = buildSearchParams(c.scope, const SearchState(), now: now, localTakenRange: true);
+        final params = buildSearchParams(
+          c.scope,
+          const SearchState(),
+          now: now,
+          localTakenRange: true,
+          favoritesAcrossSpaces: c.favoritesAcrossSpaces,
+        );
         await api.repository.options(params);
         expect(api.requests.single.path, '/api/search/options');
         expect(api.requests.single.body, {
@@ -184,7 +212,13 @@ void main() {
 
       test('/timeline/buckets sends exactly the scope', () async {
         final api = RecordingApi();
-        final params = buildSearchParams(c.scope, const SearchState(), now: now, localTakenRange: true);
+        final params = buildSearchParams(
+          c.scope,
+          const SearchState(),
+          now: now,
+          localTakenRange: true,
+          favoritesAcrossSpaces: c.favoritesAcrossSpaces,
+        );
         await api.repository.timeBuckets(
           params,
           sort: SearchSort.newest,
@@ -197,7 +231,13 @@ void main() {
       test('query mode: /search/smart and options send exactly the scope plus the query', () async {
         final api = RecordingApi();
         const state = SearchState(query: SearchQuery.text('beach'), sort: SearchSort.relevance);
-        final params = buildSearchParams(c.scope, state, now: now, localTakenRange: true);
+        final params = buildSearchParams(
+          c.scope,
+          state,
+          now: now,
+          localTakenRange: true,
+          favoritesAcrossSpaces: c.favoritesAcrossSpaces,
+        );
         await api.repository.smart(params, page: 1, sort: state.sort);
         await api.repository.options(params);
         expect(api.requests[0].path, '/api/search/smart');

@@ -276,6 +276,60 @@ const until = async (check: () => Promise<boolean>) => {
   return false;
 };
 
+// The Favorites screen: visibility unset with the timeline's partners and every member space. Archive is the
+// owner's private state, so only my own archived favourites come in.
+const seedFavoritesScreen = async (ctx: Ctx) => {
+  const { user: me } = await ctx.newUser();
+  const { user: partner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { user: otherMember } = await ctx.newUser();
+  await ctx.newPartner({ sharedById: partner.id, sharedWithId: me.id, inTimeline: true });
+  const spaceId = await newSpace(ctx, member.id, [{ userId: me.id }, { userId: otherMember.id }]);
+  const hiddenSpaceId = await newSpace(ctx, member.id, [{ userId: me.id, showInTimeline: false }]);
+
+  const myFavorite = await photo(ctx, { ownerId: me.id, isFavorite: true, country: 'Japan' });
+  const myArchivedFavorite = await photo(ctx, {
+    ownerId: me.id,
+    isFavorite: true,
+    visibility: AssetVisibility.Archive,
+    country: 'Japan',
+  });
+  await photo(ctx, { ownerId: me.id, visibility: AssetVisibility.Archive });
+  await photo(ctx, { ownerId: me.id });
+  await photo(ctx, { ownerId: me.id, isFavorite: true, visibility: AssetVisibility.Hidden });
+  const partnerFavorite = await photo(ctx, { ownerId: partner.id, country: 'Spain' });
+  const partnerArchivedFavorite = await photo(ctx, { ownerId: partner.id, visibility: AssetVisibility.Archive });
+  const spaceFavorite = await photo(ctx, { ownerId: member.id, country: 'France' });
+  const spaceArchivedFavorite = await photo(ctx, { ownerId: member.id, visibility: AssetVisibility.Archive });
+  // favourited by its owner and by another member, never by me
+  const othersFavorite = await photo(ctx, { ownerId: member.id, isFavorite: true });
+  const hiddenSpaceFavorite = await photo(ctx, { ownerId: member.id });
+  for (const assetId of [spaceFavorite, spaceArchivedFavorite, othersFavorite]) {
+    await ctx.newSharedSpaceAsset({ spaceId, assetId, addedById: member.id });
+  }
+  await ctx.newSharedSpaceAsset({ spaceId: hiddenSpaceId, assetId: hiddenSpaceFavorite, addedById: member.id });
+  await ctx.database
+    .insertInto('asset_favorite')
+    .values([
+      ...[partnerFavorite, partnerArchivedFavorite, spaceFavorite, spaceArchivedFavorite, hiddenSpaceFavorite].map(
+        (assetId) => ({ userId: me.id, assetId }),
+      ),
+      { userId: otherMember.id, assetId: othersFavorite },
+    ])
+    .execute();
+  return {
+    me,
+    myFavorite,
+    myArchivedFavorite,
+    partnerFavorite,
+    partnerArchivedFavorite,
+    spaceFavorite,
+    spaceArchivedFavorite,
+    othersFavorite,
+    hiddenSpaceFavorite,
+  };
+};
+
 beforeAll(async () => {
   database = await getKyselyDB();
 });
@@ -553,8 +607,14 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
           expected: [spaceAssets[0], spaceAssets[1]],
         },
         { name: 'place', options: { ...photosScope, city: 'Kyoto' }, expected: [...mine, myFavorite, ...spaceAssets] },
-        // the timeline takes withSharedSpaces only with a visibility, so the Favorites screen is my own favourites
+        // an older client's Favorites screen: my own favourites only
         { name: 'favorites', options: { isFavorite: true }, expected: [myFavorite] },
+        {
+          // the Favorites screen: partners and spaces as the timeline shows them, my own archive too
+          name: 'favorites across partners and spaces',
+          options: { isFavorite: true, withSharedSpaces: true, withPartners: true },
+          expected: [myFavorite, spaceAssets[0]],
+        },
         {
           name: 'favorites with spaces',
           options: { withSharedSpaces: true, visibility: AssetVisibility.Timeline, isFavorite: true },
@@ -636,6 +696,72 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
       expect(await resultIds(timeline, me.id, dto)).toEqual([own, inShown, inHidden].toSorted());
       expect(result.total).toBe(3);
       expect(result.availability!.hasFavorites).toBe(true);
+    });
+
+    it('the Favorites screen: my favourites with archived ones, and partners’ and member spaces’ as the timeline shows them', async () => {
+      const { sut, ctx, timeline } = setup();
+      const seeded = await seedFavoritesScreen(ctx);
+      const { me } = seeded;
+
+      const dto = { isFavorite: true, withSharedSpaces: true, withPartners: true };
+      const result = await optionsFor(sut, me.id, dto);
+      const results = await resultIds(timeline, me.id, dto);
+
+      expect(results).toEqual(
+        [
+          seeded.myFavorite,
+          seeded.myArchivedFavorite,
+          seeded.partnerFavorite,
+          seeded.spaceFavorite,
+          seeded.hiddenSpaceFavorite,
+        ].toSorted(),
+      );
+      expect(results).not.toContain(seeded.partnerArchivedFavorite);
+      expect(results).not.toContain(seeded.spaceArchivedFavorite);
+      expect(results).not.toContain(seeded.othersFavorite);
+      expect(result.total).toBe(results.length);
+      expect(await timelineCount(timeline, me.id, dto)).toBe(results.length);
+      expect(result.timeBuckets.reduce((sum, { count }) => sum + count, 0)).toBe(results.length);
+      expect(result.countries.map(({ country, count }) => `${country}:${count}`).toSorted()).toEqual([
+        'France:1',
+        'Japan:2',
+        'Spain:1',
+      ]);
+
+      // without partners: the same minus the partner's favourite
+      const withoutPartners = { isFavorite: true, withSharedSpaces: true };
+      const narrowed = await resultIds(timeline, me.id, withoutPartners);
+      expect(narrowed).toEqual(results.filter((id) => id !== seeded.partnerFavorite));
+      const narrowedOptions = await optionsFor(sut, me.id, withoutPartners);
+      expect(narrowedOptions.total).toBe(narrowed.length);
+    });
+
+    it('still refuses partners or shared spaces with visibility unset unless the request is for favourites', async () => {
+      const { sut, ctx, timeline } = setup();
+      const { me } = await seedFavoritesScreen(ctx);
+
+      const refused: SearchOptionsRequestDto[] = [
+        { withSharedSpaces: true },
+        { withPartners: true },
+        { withSharedSpaces: true, withPartners: true, isFavorite: false },
+        { withSharedSpaces: true, isFavorite: true, visibility: AssetVisibility.Archive },
+        { withPartners: true, isFavorite: true, visibility: AssetVisibility.Archive },
+      ];
+      for (const dto of refused) {
+        await expect(timeline.getTimeBuckets(auth(me.id), toTimelineDto(dto)), JSON.stringify(dto)).rejects.toThrow(
+          /only supported for non-archived/,
+        );
+        await expect(
+          timeline.getTimeBucket(auth(me.id), { ...toTimelineDto(dto), timeBucket: '2024-06-01' }),
+          JSON.stringify(dto),
+        ).rejects.toThrow(/only supported for non-archived/);
+        await expect(optionsFor(sut, me.id, dto), JSON.stringify(dto)).rejects.toThrow(
+          /only supported for non-archived/,
+        );
+      }
+      await expect(
+        timeline.getTimeBuckets(auth(me.id), { isFavorite: true, withSharedSpaces: true, isTrashed: true }),
+      ).rejects.toThrow(/only supported for non-archived/);
     });
   });
 

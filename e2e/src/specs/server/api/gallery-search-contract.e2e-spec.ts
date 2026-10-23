@@ -43,9 +43,11 @@ type ContractRequest = {
 /**
  * How a fallback fixture shows a server this one is not (see the README):
  * - `older-gallery`: a Gallery server from before `POST /search/options`: `/server/features` without `searchOptions`;
+ * - `own-favorites-only`: a Gallery server from before `searchFavoritesAcrossSpaces`, whose Favorites search is my own
+ *   favourites only;
  * - `stock-immich`: a stock Immich server at the base version: `/server/features` with upstream's keys only.
  */
-type ResponseView = 'older-gallery' | 'stock-immich';
+type ResponseView = 'older-gallery' | 'own-favorites-only' | 'stock-immich';
 
 type Fixture = {
   description: string;
@@ -367,6 +369,14 @@ const seed = async () => {
     // archived-1 too: the Favorites screen shows archived favourites, so its search must.
     .send({ ids: [id('asset:lisbon-1'), id('asset:space-kyoto-1'), id('asset:archived-1')], isFavorite: true })
     .expect(204);
+  // My favourites on other people's photos, straight into my overlay: a partner's timeline photo (on the Favorites
+  // screen), and two its owners archived that must never be: the partner's and the one in the space's linked album.
+  for (const label of ['partner-paris-1', 'partner-archived', 'space-album-archived']) {
+    await db.query('INSERT INTO "asset_favorite" ("userId", "assetId") VALUES ($1, $2)', [
+      me.userId,
+      id(`asset:${label}`),
+    ]);
+  }
 
   // Smart-search embeddings: three Kyoto photos and a space photo close to kyoto-1, each at its own distance so the
   // ranking has one order; Lisbon far from it.
@@ -561,7 +571,12 @@ const applyView = (view: ResponseView | undefined, path: string, body: Json): Js
     return body;
   }
   if (view === 'older-gallery') {
-    return Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'searchOptions'));
+    return Object.fromEntries(
+      Object.entries(body).filter(([key]) => key !== 'searchOptions' && key !== 'searchFavoritesAcrossSpaces'),
+    );
+  }
+  if (view === 'own-favorites-only') {
+    return Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'searchFavoritesAcrossSpaces'));
   }
   return Object.fromEntries(Object.entries(body).filter(([key]) => UPSTREAM_FEATURE_KEYS.has(key)));
 };
@@ -723,7 +738,13 @@ const placeFiltered = () => ({
   personIds: [`person:${id('person:anna')}`],
   make: 'Apple',
 });
-const favoritesFiltered = () => ({ isFavorite: true, personIds: [id('person:anna')], country: 'Portugal' });
+/** The Favorites screen in browse mode: my favourites, archived ones too, and partners' and spaces' as the timeline shows them. */
+const favoritesScreen = { isFavorite: true, withSharedSpaces: true, withPartners: true };
+const favoritesFiltered = () => ({
+  ...favoritesScreen,
+  personIds: [`person:${id('person:anna')}`],
+  country: 'Portugal',
+});
 const archive = () => ({ visibility: 'archive', ownerId: id('user:me') });
 const archiveFiltered = () => ({ ...archive(), country: 'Japan', city: 'Osaka', type: 'IMAGE' });
 const videosFiltered = {
@@ -799,7 +820,7 @@ const scopeFlows = (): ScopeFlow[] => [
   {
     name: 'favorites',
     description: 'Favorites screen, Anna in Portugal',
-    unfiltered: () => ({ isFavorite: true }),
+    unfiltered: () => favoritesScreen,
     filtered: favoritesFiltered,
     timeline: { query: () => asQuery(favoritesFiltered()), firstBucket: '2023-09-01' },
   },
@@ -893,6 +914,24 @@ const fallbackCases = (): FixtureCase[] => {
       olderCities('older-cities-photos-kyoto', country, { withSharedSpaces: 'true', rating: '3' }),
     ),
     {
+      name: 'older-favorites-server-features',
+      description: 'Gallery server before searchFavoritesAcrossSpaces: features without it',
+      actor: 'me',
+      responseView: 'own-favorites-only',
+      request: { method: 'GET', path: '/api/server/features' },
+    },
+    ...perDimension(
+      'older-favorites-scope',
+      'Gallery server before searchFavoritesAcrossSpaces, Favorites screen: my own favourites, archived ones too',
+      () => ({ isFavorite: true }),
+    ),
+    {
+      name: 'older-favorites-timeline-buckets',
+      description: 'Gallery server before searchFavoritesAcrossSpaces, Favorites screen search mode: browse results',
+      actor: 'me',
+      request: { method: 'GET', path: '/api/timeline/buckets', query: { isFavorite: 'true' } },
+    },
+    {
       name: 'stock-server-version',
       description: 'Stock Immich server: the base version a stock client sees (no x-gallery-app)',
       actor: 'me',
@@ -973,7 +1012,8 @@ const filtersSheetSteps = () => {
       name: 'mode-filters-favorites',
       description: 'Photos Filters sheet, favorites only',
       body: favorites,
-      months: ['2024-06-01', '2023-09-01'],
+      // 2024-05: my favourite of a partner's photo
+      months: ['2024-06-01', '2024-05-01', '2023-09-01'],
     },
     {
       name: 'mode-filters-favorites-rating',
@@ -1099,7 +1139,7 @@ const scopedScreenSteps = (): ScreenStep[] => {
  */
 const placeLisbon = () => ({ ...photos, city: 'Lisbon' });
 const placeAnna = () => ({ ...placeLisbon(), personIds: [`person:${id('person:anna')}`] });
-const favoritesOsaka = () => ({ isFavorite: true, country: 'Japan', city: 'Osaka' });
+const favoritesOsaka = () => ({ ...favoritesScreen, country: 'Japan', city: 'Osaka' });
 const archiveOsaka = () => ({ ...archive(), country: 'Japan', city: 'Osaka' });
 const videos2024 = () => ({
   ...photos,
@@ -1127,7 +1167,7 @@ const otherScreenSteps = (): ScreenStep[] => [
     body: favoritesOsaka,
     timeline: () => asQuery(favoritesOsaka()),
     months: ['2022-12-01'],
-    unfiltered: () => ({ isFavorite: 'true' }),
+    unfiltered: () => asQuery(favoritesScreen),
   },
   {
     name: 'screen-archive-osaka',
@@ -1294,7 +1334,14 @@ const fixtureCases = (): FixtureCase[] => [
     personIds: [id('person:anna')],
   })),
   options('options-place', 'Place screen: city within the Photos scope', () => ({ ...photos, city: 'Lisbon' })),
-  options('options-favorites', 'Favorites screen: my own favourites, timeline + archive', () => ({ isFavorite: true })),
+  options('options-favorites', 'Favorites screen on an older server: my own favourites, timeline + archive', () => ({
+    isFavorite: true,
+  })),
+  options(
+    'options-favorites-screen',
+    "Favorites screen: my favourites (archived ones too) and partners' and spaces' as the timeline shows them",
+    () => favoritesScreen,
+  ),
   options('options-favorites-with-spaces', 'My favourites from every member space, timeline visibility', () => ({
     ...photos,
     isFavorite: true,
@@ -1340,6 +1387,11 @@ const fixtureCases = (): FixtureCase[] => [
     () => ({
       withSharedSpaces: true,
     }),
+  ),
+  options(
+    'options-reject-partners-without-visibility',
+    'Rejected as on /timeline/buckets: withPartners, no visibility, not favourites',
+    () => ({ withPartners: true, isFavorite: false }),
   ),
   options('options-reject-partners-archive', 'Rejected as on /timeline/buckets: withPartners with archive', () => ({
     withPartners: true,
@@ -1392,6 +1444,12 @@ const fixtureCases = (): FixtureCase[] => [
     request: { method: 'GET', path: '/api/timeline/buckets', query: { withSharedSpaces: 'true' } },
   },
   {
+    name: 'timeline-buckets-reject-partners-without-visibility',
+    description: 'Rejected: withPartners without a visibility, not favourites',
+    actor: 'me',
+    request: { method: 'GET', path: '/api/timeline/buckets', query: { withPartners: 'true', isFavorite: 'false' } },
+  },
+  {
     name: 'timeline-buckets-photos-tags',
     description: 'Photos timeline buckets with two tags (ANY)',
     actor: 'me',
@@ -1436,7 +1494,7 @@ const fixtureCases = (): FixtureCase[] => [
   },
   {
     name: 'server-features',
-    description: 'Server features, including searchOptions',
+    description: 'Server features, including searchOptions and searchFavoritesAcrossSpaces',
     actor: 'me',
     request: { method: 'GET', path: '/api/server/features' },
   },
@@ -1502,7 +1560,10 @@ const browseScopes = (): Array<{ name: string; options: Record<string, Json>; ex
   { name: 'place', options: { ...photos, city: 'Kyoto' }, expected: 5 },
   // lisbon-1 and the archived archived-1
   { name: 'favorites', options: { isFavorite: true }, expected: 2 },
-  { name: 'favorites with spaces', options: { ...photos, isFavorite: true }, expected: 2 },
+  // lisbon-1, partner-paris-1, space-kyoto-1
+  { name: 'favorites with spaces', options: { ...photos, isFavorite: true }, expected: 3 },
+  // and archived-1; never partner-archived or space-album-archived, archived by their owners
+  { name: 'favorites screen', options: favoritesScreen, expected: 4 },
   { name: 'archive', options: { visibility: 'archive', ownerId: id('user:me') }, expected: 2 },
   { name: 'videos', options: { ...photos, type: 'VIDEO' }, expected: 1 },
   { name: 'owner only', options: { visibility: 'timeline', ownerId: id('user:me') }, expected: 6 },
@@ -1550,6 +1611,30 @@ describe('mobile search contract', () => {
           timeline: scope.expected,
         });
       }
+    });
+
+    it("the Favorites screen: my favourites with archived ones, partners' and spaces' as the timeline shows them", async () => {
+      const query = timelineQuery(favoritesScreen);
+      const { body: buckets } = await request(app)
+        .get('/timeline/buckets')
+        .query(query)
+        .set(asBearerAuth(world.logins.me.accessToken))
+        .expect(200);
+      const ids: string[] = [];
+      for (const { timeBucket } of buckets as Array<{ timeBucket: string }>) {
+        const { body: bucket } = await request(app)
+          .get('/timeline/bucket')
+          .query({ ...query, timeBucket })
+          .set(asBearerAuth(world.logins.me.accessToken))
+          .expect(200);
+        ids.push(...(bucket as { id: string[] }).id);
+      }
+      expect(ids.map((assetId) => world.labels.get(assetId) ?? assetId).toSorted(byCodeUnit)).toEqual([
+        'asset:archived-1',
+        'asset:lisbon-1',
+        'asset:partner-paris-1',
+        'asset:space-kyoto-1',
+      ]);
     });
 
     it('query mode: agrees with /search/smart (by reference photo)', async () => {

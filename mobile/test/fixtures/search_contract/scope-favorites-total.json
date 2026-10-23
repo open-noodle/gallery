@@ -7,7 +7,9 @@
       "dimensions": [
         "total"
       ],
-      "isFavorite": true
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
     },
     "headers": {
       "x-gallery-app": "search-contract"
@@ -17,7 +19,7 @@
   },
   "response": {
     "body": {
-      "total": 2
+      "total": 4
     },
     "status": 200
   }

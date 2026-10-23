@@ -102,6 +102,7 @@ final searchWarmUpProvider = FutureProvider<void>((ref) async {
       const SearchState(),
       now: ref.read(searchClockProvider)(),
       localTakenRange: capabilities.localTakenRange,
+      favoritesAcrossSpaces: capabilities.favoritesAcrossSpaces,
     );
     await repository.options(params);
     await Future.wait([
@@ -166,6 +167,7 @@ class SearchOptionsNotifier extends Notifier<SearchOptions> {
       ref.read(searchStateProvider),
       now: ref.read(searchClockProvider)(),
       localTakenRange: capabilities.localTakenRange,
+      favoritesAcrossSpaces: capabilities.favoritesAcrossSpaces,
     );
     final repository = ref.read(gallerySearchRepositoryProvider);
     if (!capabilities.searchOptions) {
@@ -345,6 +347,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
         searchState,
         now: ref.read(searchClockProvider)(),
         localTakenRange: capabilities.localTakenRange,
+        favoritesAcrossSpaces: capabilities.favoritesAcrossSpaces,
       );
       _stock = !capabilities.isGallery;
       if (_stock) {

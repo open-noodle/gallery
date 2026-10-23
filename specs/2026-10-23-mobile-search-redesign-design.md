@@ -161,6 +161,10 @@ Each section follows #910: it is hidden when empty for the scope and greyed when
 - **Grid:** grouped like the screen's normal timeline, honouring the grouping pill, and using the screen's own grid and asset viewer, so selection, opening a photo and multi-select actions work as they do outside search.
 - **No matches:** the filtered empty state (`timeline_empty_state.widget.dart`, rewired to the new state) says nothing matches all the filters, and to remove one.
 
+**Known limitations (Favorites).**
+- With a smart query, Favorites search keeps smart search's default visibility (everything but locked). A partner's or another space member's archived photo you favourited can therefore appear there. Partner archived favourites already did before this project. Closing it means adding `withOwnArchiveOnly` to smart search, a few lines in each of four upstream search files; deferred.
+- The Favorites page's own on-device query still shows another member's archived space photo you favourited. Search leaves it out, following the owner's rule that archive stays the owner's private state.
+
 **Known limitation (Slice 5).** Some results are not synced to the device, for example a timeline space's photo before its sync lands. Opening one fetches `GET /assets/{id}`, so viewing, sharing and downloading work. But the favourite heart does not refresh after tapping (the write succeeds), and the info sheet has no EXIF. Fixing either needs a hook in the upstream asset viewer, left for a follow-up.
 
 ### Similar photos
@@ -186,7 +190,7 @@ The same search mode, with the same field, chips and sheets, is available on eac
 | Person (`person.page.dart`), personal person | that person's faces, owner only | that person, owner only |
 | Person, space person (`person_timeline.provider.dart`) | that space person's assets | the space + that space person |
 | Place (`place_detail.page.dart`) | city name match, timeline | city |
-| Favorites (`favorite.page.dart`) | your favorites, timeline + archive | favorites, timeline + archive |
+| Favorites (`favorite.page.dart`) | your favorites: your own (timeline + archive), and those among timeline partners' and every member space's photos (timeline only) | the same: `isFavorite` + `withSharedSpaces` (+ `withPartners` in browse), visibility unset. On a server without `searchFavoritesAcrossSpaces`: your own favorites only, timeline + archive |
 | Archive (`archive.page.dart`) | own archived assets | archive visibility, owner only |
 | Videos (`video.page.dart`) | videos, timeline | type video, Photos scope |
 | Recently added (`recently_added.page.dart`) | own, timeline + archive, by upload date | same as today: own, timeline + archive. Sort Newest/Oldest by upload date; Relevance with a smart query. |
@@ -209,6 +213,7 @@ These rules come from the server's validation and from web's `filtered-timeline/
 - **Personal person page:** a bare `personIds: [id]` with no `withSharedSpaces`. A `person:` token or `withSharedSpaces` would widen it to every face of that identity (`server/src/gallery/repositories/face-identity.repository.ts:305-338`).
 - **Space person page:** `spaceId` + `spacePersonIds: [id]`.
 - **Owner-only scopes** (Archive, Recently added, Recently taken): `ownerId` set to the current user.
+- **Favorites:** `isFavorite: true` + `withSharedSpaces: true` (+ `withPartners: true` in browse; smart search always searches timeline partners), visibility unset. `withPartners` / `withSharedSpaces` with visibility unset is otherwise a 400 on `/timeline/*` and `/search/options` browse; the server accepts it only with `isFavorite: true` (`server/src/gallery/utils/favorites-scope.ts` `isFavoritesAcrossScope`). The result is my own favourites in timeline + archive, and my favourites (`asset_favorite` rows, never `asset.isFavorite`) among partners' and every member space's photos in timeline visibility only: `withOwnArchiveOnly` admits an archived photo only when the caller owns it, so another owner's archive never comes in. Every member space counts, including ones hidden from the timeline, as on the page. The server declares this with `searchFavoritesAcrossSpaces` in `/server/features`; without it the app sends `isFavorite: true` alone (my own favourites, timeline + archive). Query mode has no such gate: `/search/smart` with visibility unset keeps upstream's `not-locked` default, so a partner's or another member's archived favourite can come in there.
 - **Edits and thumbnails** for space people follow the existing mobile rules in `CLAUDE.md`.
 
 ### Where the data comes from
@@ -495,7 +500,7 @@ Each slice merges to `main` on its own. `main` must keep working between slices:
   - Space sends `spaceId`, with space people as `spacePersonIds` (results) and `personIds` (options).
   - Personal person sends a bare `personIds` without `withSharedSpaces`.
   - Archive sends `visibility: archive` and `ownerId: me`.
-  - Favorites, space album and Recently added leave visibility unset, so archived photos are included.
+  - Favorites, space album and Recently added leave visibility unset, so archived photos are included (Favorites: only my own archived ones).
 - **People ids.** In Photos and album scopes, people are sent as the token from `filterId` / `primaryProfile`, never the response `id`.
 - **Matcher.** Given options loaded for Kyoto:
   - `@a` returns only matching people from those options.
@@ -671,7 +676,8 @@ Each slice merges to `main` on its own. `main` must keep working between slices:
 - **Place.** The Places chip is hidden, and results stay in that city.
 - **Favorites.**
   - The Favorites switch is hidden.
-  - Results include archived favorites and favorites from every member space, as the page shows today.
+  - Results include my archived favorites, and my favorites among timeline partners' and every member space's photos as the timeline shows them, as the page does. Another owner's archived photo never appears in browse mode.
+  - On an older server (no `searchFavoritesAcrossSpaces`), my own favorites only.
   - Counts agree with results.
 - **Archive.**
   - The Archived switch is hidden.

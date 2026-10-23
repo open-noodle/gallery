@@ -168,7 +168,7 @@
             "id": "fe297055-5253-43cc-85b9-f265b63f4555",
             "isArchived": false,
             "isEdited": false,
-            "isFavorite": false,
+            "isFavorite": true,
             "isOffline": false,
             "isTrashed": false,
             "libraryId": null,

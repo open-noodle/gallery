@@ -7,7 +7,9 @@
       "dimensions": [
         "time"
       ],
-      "isFavorite": true
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
     },
     "headers": {
       "x-gallery-app": "search-contract"
@@ -18,6 +20,14 @@
   "response": {
     "body": {
       "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-06-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2024-05-01"
+        },
         {
           "count": 1,
           "timeBucket": "2023-09-01"

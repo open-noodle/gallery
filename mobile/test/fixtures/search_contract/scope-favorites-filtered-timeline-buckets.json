@@ -14,8 +14,10 @@
       "country": "Portugal",
       "isFavorite": "true",
       "personIds": [
-        "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
-      ]
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "withPartners": "true",
+      "withSharedSpaces": "true"
     }
   },
   "response": {

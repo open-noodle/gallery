@@ -9,7 +9,9 @@
       "dimensions": [
         "cameras"
       ],
-      "isFavorite": true
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
     },
     "headers": {
       "x-gallery-app": "search-contract"

@@ -24,6 +24,16 @@
         {
           "cities": [
             {
+              "city": "Paris",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "France"
+        },
+        {
+          "cities": [
+            {
               "city": "Kyoto",
               "count": 1
             }

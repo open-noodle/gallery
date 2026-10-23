@@ -57,6 +57,16 @@
         },
         {
           "count": 1,
+          "make": "Canon",
+          "models": [
+            {
+              "count": 1,
+              "model": "EOS R5"
+            }
+          ]
+        },
+        {
+          "count": 1,
           "make": "Sony",
           "models": [
             {
@@ -67,6 +77,16 @@
         }
       ],
       "countries": [
+        {
+          "cities": [
+            {
+              "city": "Paris",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "France"
+        },
         {
           "cities": [
             {
@@ -91,7 +111,7 @@
       "hasUnnamedPeople": false,
       "mediaTypes": [
         {
-          "count": 2,
+          "count": 3,
           "type": "IMAGE"
         }
       ],
@@ -133,10 +153,14 @@
         },
         {
           "count": 1,
+          "timeBucket": "2024-05-01"
+        },
+        {
+          "count": 1,
           "timeBucket": "2023-09-01"
         }
       ],
-      "total": 2
+      "total": 3
     },
     "status": 200
   }

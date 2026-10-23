@@ -33,6 +33,16 @@
         },
         {
           "count": 1,
+          "make": "Canon",
+          "models": [
+            {
+              "count": 1,
+              "model": "EOS R5"
+            }
+          ]
+        },
+        {
+          "count": 1,
           "make": "Sony",
           "models": [
             {

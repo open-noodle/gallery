@@ -19,7 +19,16 @@ class SearchServerCapabilities {
   /// Taken dates are wall-clock days with an exclusive end (`localTakenRange`).
   final bool localTakenRange;
 
-  const SearchServerCapabilities({required this.isGallery, required this.searchOptions, required this.localTakenRange});
+  /// A favourites search may add partners and shared spaces with visibility unset (`searchFavoritesAcrossSpaces`), so
+  /// the Favorites screen searches what it shows. An older server gets my own favourites only.
+  final bool favoritesAcrossSpaces;
+
+  const SearchServerCapabilities({
+    required this.isGallery,
+    required this.searchOptions,
+    required this.localTakenRange,
+    this.favoritesAcrossSpaces = false,
+  });
 
   static const stock = SearchServerCapabilities(isGallery: false, searchOptions: false, localTakenRange: false);
 }
@@ -65,6 +74,7 @@ class GallerySearchRepository {
       isGallery: isGallery,
       searchOptions: isGallery && features?.searchOptions.orElse(null) == true,
       localTakenRange: features?.localTakenRange.orElse(null) == true,
+      favoritesAcrossSpaces: isGallery && features?.searchFavoritesAcrossSpaces.orElse(null) == true,
     );
   }
 

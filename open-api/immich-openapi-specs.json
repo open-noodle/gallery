@@ -39884,6 +39884,10 @@
             "description": "Whether search is enabled",
             "type": "boolean"
           },
+          "searchFavoritesAcrossSpaces": {
+            "description": "Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers.",
+            "type": "boolean"
+          },
           "searchOptions": {
             "description": "Whether POST /search/options exists. Absent on older servers.",
             "type": "boolean"

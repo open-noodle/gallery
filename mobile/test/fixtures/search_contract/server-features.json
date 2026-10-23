@@ -1,6 +1,6 @@
 {
   "actor": "me",
-  "description": "Server features, including searchOptions",
+  "description": "Server features, including searchOptions and searchFavoritesAcrossSpaces",
   "ids": {},
   "request": {
     "headers": {
@@ -26,6 +26,7 @@
       "realtimeTranscoding": false,
       "reverseGeocoding": true,
       "search": true,
+      "searchFavoritesAcrossSpaces": true,
       "searchOptions": true,
       "sidecar": true,
       "smartSearch": false,

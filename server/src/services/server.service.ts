@@ -154,6 +154,7 @@ export class ServerService extends BaseService {
       // and keeps sending device-local instants to an older server that compares fileCreatedAt.
       localTakenRange: true,
       searchOptions: true,
+      searchFavoritesAcrossSpaces: true,
     };
   }
 

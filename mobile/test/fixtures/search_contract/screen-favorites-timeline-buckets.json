@@ -9,11 +9,21 @@
     "method": "GET",
     "path": "/api/timeline/buckets",
     "query": {
-      "isFavorite": "true"
+      "isFavorite": "true",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
     }
   },
   "response": {
     "body": [
+      {
+        "count": 1,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-05-01"
+      },
       {
         "count": 1,
         "timeBucket": "2023-09-01"

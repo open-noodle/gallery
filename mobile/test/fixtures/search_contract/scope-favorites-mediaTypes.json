@@ -7,7 +7,9 @@
       "dimensions": [
         "mediaTypes"
       ],
-      "isFavorite": true
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
     },
     "headers": {
       "x-gallery-app": "search-contract"
@@ -19,7 +21,7 @@
     "body": {
       "mediaTypes": [
         {
-          "count": 2,
+          "count": 4,
           "type": "IMAGE"
         }
       ]

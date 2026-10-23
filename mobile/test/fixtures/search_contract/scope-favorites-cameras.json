@@ -7,7 +7,9 @@
       "dimensions": [
         "cameras"
       ],
-      "isFavorite": true
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
     },
     "headers": {
       "x-gallery-app": "search-contract"
@@ -25,6 +27,26 @@
             {
               "count": 1,
               "model": "iPhone 15"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Canon",
+          "models": [
+            {
+              "count": 1,
+              "model": "EOS R5"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 1,
+              "model": "A7 IV"
             }
           ]
         }

@@ -6,7 +6,8 @@ import 'package:immich_mobile/gallery/search/search_state.model.dart';
 //
 // The rules every case follows, from the server's validation:
 // - `withSharedSpaces` / `withPartners` / `visibility` belong to the scope and are never hardcoded. The server rejects
-//   `spaceId` or an album with `withSharedSpaces`, and `withSharedSpaces` / `withPartners` without timeline visibility.
+//   `spaceId` or an album with `withSharedSpaces`, and `withSharedSpaces` / `withPartners` without a visibility unless
+//   the request is for favourites on a server with `searchFavoritesAcrossSpaces`.
 // - Album scopes send `albumIds: [id]` (`albumId` on /timeline/buckets), never `spaceId` or `withSharedSpaces`.
 // - Space scopes send space people as bare ids in `spacePersonIds`.
 // - A personal person is a bare `personIds: [id]` without `withSharedSpaces`, which would widen it to every face of
@@ -47,6 +48,10 @@ sealed class SearchScope {
 
   /// The scope's own parameters for a request in [mode].
   SearchParams baseParams(SearchMode mode);
+
+  /// [baseParams] on a server that declares `searchFavoritesAcrossSpaces` ([favoritesAcrossSpaces]). Only Favorites
+  /// differs.
+  SearchParams baseParamsFor(SearchMode mode, {required bool favoritesAcrossSpaces}) => baseParams(mode);
 
   /// An owner-only scope (Archive, Recently added, Recently taken) as the signed-in user's: its page names no user, so
   /// the route fills it in. Any other scope is unchanged.
@@ -220,7 +225,13 @@ class PlaceSearchScope extends SearchScope {
   int get hashCode => Object.hash(PlaceSearchScope, city);
 }
 
-/// Favorites: my favourites, timeline + archive (visibility unset).
+/// Favorites: what the page shows (`SharedSpaceTimelineRepository.favorite`): my favourites, timeline + archive, and my
+/// favourites among what my timeline partners and every space I belong to share with me, as the timeline shows them.
+/// Visibility stays unset; the server admits an archived photo only when it is mine (`searchFavoritesAcrossSpaces`).
+/// Smart search always searches timeline partners and takes no `withPartners`.
+///
+/// [baseParams] is the scope on a server without that capability: my own favourites, timeline + archive. The server
+/// rejects partners or shared spaces with visibility unset there.
 class FavoritesSearchScope extends SearchScope {
   const FavoritesSearchScope();
 
@@ -229,6 +240,11 @@ class FavoritesSearchScope extends SearchScope {
 
   @override
   SearchParams baseParams(SearchMode mode) => const SearchParams(isFavorite: true);
+
+  @override
+  SearchParams baseParamsFor(SearchMode mode, {required bool favoritesAcrossSpaces}) => favoritesAcrossSpaces
+      ? SearchParams(isFavorite: true, withSharedSpaces: true, withPartners: mode == SearchMode.browse ? true : null)
+      : baseParams(mode);
 
   @override
   bool operator ==(Object other) => other is FavoritesSearchScope;
@@ -503,9 +519,10 @@ SearchParams buildSearchParams(
   SearchState state, {
   required DateTime now,
   required bool localTakenRange,
+  bool favoritesAcrossSpaces = false,
 }) {
   final mode = state.isQueryMode ? SearchMode.query : SearchMode.browse;
-  final base = scope.baseParams(mode);
+  final base = scope.baseParamsFor(mode, favoritesAcrossSpaces: favoritesAcrossSpaces);
   final filters = state.filters;
   final fixed = scope.fixedSections;
   bool open(SearchSection section) => !fixed.contains(section);

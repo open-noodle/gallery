@@ -11,7 +11,9 @@
     "query": {
       "city": "Osaka",
       "country": "Japan",
-      "isFavorite": "true"
+      "isFavorite": "true",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
     }
   },
   "response": {

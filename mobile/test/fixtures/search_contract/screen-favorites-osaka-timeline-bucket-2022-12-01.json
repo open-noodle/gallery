@@ -15,7 +15,9 @@
       "city": "Osaka",
       "country": "Japan",
       "isFavorite": "true",
-      "timeBucket": "2022-12-01"
+      "timeBucket": "2022-12-01",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
     }
   },
   "response": {

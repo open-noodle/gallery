@@ -277,6 +277,11 @@ describe(GallerySearchService.name, () => {
     it.each([
       [{ withSharedSpaces: true }, 'withSharedSpaces is only supported for non-archived, non-trashed assets'],
       [
+        { withSharedSpaces: true, isFavorite: false },
+        'withSharedSpaces is only supported for non-archived, non-trashed assets',
+      ],
+      [{ withPartners: true }, 'withPartners is only supported for non-archived, non-trashed, non-locked assets'],
+      [
         { withSharedSpaces: true, visibility: AssetVisibility.Archive },
         'withSharedSpaces is only supported for non-archived, non-trashed assets',
       ],

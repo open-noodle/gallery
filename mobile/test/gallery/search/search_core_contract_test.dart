@@ -337,7 +337,10 @@ void main() {
 
   test('older Gallery server: suggestion lists without counts, cities per country, results unchanged', () async {
     final server = await SearchContractServer.start(
-      include: (name) => name.startsWith('older-') || name.startsWith('scope-photos-filtered-timeline'),
+      // older-favorites-* is a newer server than older-* (it has searchOptions): its features would answer first.
+      include: (name) =>
+          (name.startsWith('older-') && !name.startsWith('older-favorites-')) ||
+          name.startsWith('scope-photos-filtered-timeline'),
     );
     addTearDown(server.close);
     final container = containerFor(server, const PhotosSearchScope());

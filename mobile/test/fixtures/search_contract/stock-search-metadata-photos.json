@@ -3,7 +3,9 @@
   "description": "Stock Immich server: browse results through metadata search, upstream fields only",
   "ids": {
     "a7a026e9-9ca1-4960-8197-fb1adc269894": "asset:lisbon-1",
-    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+    "b6e1b361-f6d9-45f3-89c8-2d1b0dcffef9": "user:partner",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me",
+    "fe297055-5253-43cc-85b9-f265b63f4555": "asset:partner-paris-1"
   },
   "request": {
     "body": {
@@ -27,9 +29,39 @@
         "total": 0
       },
       "assets": {
-        "count": 1,
+        "count": 2,
         "facets": [],
         "items": [
+          {
+            "checksum": "checksum",
+            "createdAt": "2000-01-01T00:00:00.000Z",
+            "duplicateId": null,
+            "duration": null,
+            "fileCreatedAt": "2024-05-01T10:00:00.000Z",
+            "fileModifiedAt": "2024-05-01T10:00:00.000Z",
+            "hasMetadata": true,
+            "height": 1,
+            "id": "fe297055-5253-43cc-85b9-f265b63f4555",
+            "isArchived": false,
+            "isEdited": false,
+            "isFavorite": true,
+            "isOffline": false,
+            "isTrashed": false,
+            "libraryId": null,
+            "livePhotoVideoId": null,
+            "localDateTime": "2024-05-01T10:00:00.000Z",
+            "originalFileName": "partner-paris-1.png",
+            "originalMimeType": "image/png",
+            "originalPath": "originalPath",
+            "ownerId": "b6e1b361-f6d9-45f3-89c8-2d1b0dcffef9",
+            "people": [],
+            "resized": true,
+            "thumbhash": "thumbhash",
+            "type": "IMAGE",
+            "updatedAt": "2000-01-01T00:00:00.000Z",
+            "visibility": "timeline",
+            "width": 1
+          },
           {
             "checksum": "checksum",
             "createdAt": "2000-01-01T00:00:00.000Z",
@@ -63,7 +95,7 @@
         ],
         "nextCursor": null,
         "nextPage": null,
-        "total": 1
+        "total": 2
       }
     },
     "status": 200

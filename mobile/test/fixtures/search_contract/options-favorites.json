@@ -1,6 +1,6 @@
 {
   "actor": "me",
-  "description": "Favorites screen: my own favourites, timeline + archive",
+  "description": "Favorites screen on an older server: my own favourites, timeline + archive",
   "ids": {
     "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
     "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex"

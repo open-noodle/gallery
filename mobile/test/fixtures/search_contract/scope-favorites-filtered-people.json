@@ -13,8 +13,10 @@
       ],
       "isFavorite": true,
       "personIds": [
-        "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
-      ]
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "withPartners": true,
+      "withSharedSpaces": true
     },
     "headers": {
       "x-gallery-app": "search-contract"
@@ -28,8 +30,8 @@
       "people": [
         {
           "count": 1,
-          "filterId": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
-          "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
           "isSelected": true,
           "name": "Anna",
           "primaryProfile": {
@@ -39,8 +41,8 @@
         },
         {
           "count": 1,
-          "filterId": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
-          "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "filterId": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "id": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
           "isSelected": false,
           "name": "Rex",
           "primaryProfile": {

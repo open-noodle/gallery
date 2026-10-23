@@ -8,6 +8,7 @@ import {
   SearchOptionsResponseDto,
 } from 'src/gallery/dtos/search.dto.js';
 import { SearchOptionsQuery, SearchOptionsResult } from 'src/gallery/repositories/smart-facet.repository.js';
+import { isFavoritesAcrossScope } from 'src/gallery/utils/favorites-scope.js';
 import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -351,7 +352,9 @@ const checkBrowseRequest = (filters: SearchOptionsFilters, albumIds: string[] | 
   if ((spaceId || albumIds) && (visibility === AssetVisibility.Hidden || visibility === AssetVisibility.Locked)) {
     throw new BadRequestException('Hidden and locked assets are not available when browsing a shared space or album');
   }
-  const archiveOrUnset = visibility === AssetVisibility.Archive || visibility === undefined;
+  // the Favorites screen may leave visibility unset (see isFavoritesAcrossScope)
+  const archiveOrUnset =
+    visibility === AssetVisibility.Archive || (visibility === undefined && !isFavoritesAcrossScope(filters));
   if (withPartners && (archiveOrUnset || visibility === AssetVisibility.Locked)) {
     throw new BadRequestException('withPartners is only supported for non-archived, non-trashed, non-locked assets');
   }
