@@ -15007,6 +15007,62 @@
         "x-immich-state": "Stable"
       }
     },
+    "/search/options": {
+      "post": {
+        "description": "Returns the filter options (people, tags, places, cameras, ratings, media types, months) with the number of matching assets each would leave, for the same filters and scope the results call takes. Single-choice options ignore their own filter; people and tags keep it. Send `query` or `queryAssetId` to count over smart-search results.",
+        "operationId": "getSearchOptions",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchOptionsRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOptionsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Search filter options with counts",
+        "tags": [
+          "Search"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/search/person": {
       "get": {
         "description": "Search for people by name.",
@@ -38976,6 +39032,522 @@
         },
         "type": "object"
       },
+      "SearchOptionsAvailabilityDto": {
+        "properties": {
+          "hasAssets": {
+            "description": "Whether any asset matches every active filter",
+            "type": "boolean"
+          },
+          "hasAssetsInAlbum": {
+            "description": "Whether any matching asset belongs to an album, ignoring the album filters",
+            "type": "boolean"
+          },
+          "hasAssetsNotInAlbum": {
+            "description": "Whether any matching asset belongs to no album, ignoring the album filters",
+            "type": "boolean"
+          },
+          "hasCameras": {
+            "description": "Whether the camera list would have a make, ignoring the camera filter",
+            "type": "boolean"
+          },
+          "hasFavorites": {
+            "description": "Whether any of the caller's favourites match, ignoring isFavorite",
+            "type": "boolean"
+          },
+          "hasImages": {
+            "description": "Whether any image matches, ignoring the type filter",
+            "type": "boolean"
+          },
+          "hasPeople": {
+            "description": "Whether the people list would have a named person",
+            "type": "boolean"
+          },
+          "hasPlaces": {
+            "description": "Whether the place list would have a country, ignoring the place filter",
+            "type": "boolean"
+          },
+          "hasRatings": {
+            "description": "Whether any rated asset matches, ignoring the rating filter",
+            "type": "boolean"
+          },
+          "hasTags": {
+            "description": "Whether the tag list would have a tag",
+            "type": "boolean"
+          },
+          "hasVideos": {
+            "description": "Whether any video matches, ignoring the type filter",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hasAssets",
+          "hasAssetsInAlbum",
+          "hasAssetsNotInAlbum",
+          "hasCameras",
+          "hasFavorites",
+          "hasImages",
+          "hasPeople",
+          "hasPlaces",
+          "hasRatings",
+          "hasTags",
+          "hasVideos"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsCityDto": {
+        "properties": {
+          "city": {
+            "description": "City name",
+            "type": "string"
+          },
+          "count": {
+            "description": "Matching assets in this city",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "city",
+          "count"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsCountryDto": {
+        "properties": {
+          "cities": {
+            "description": "Cities of this country, most assets first",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsCityDto"
+            },
+            "type": "array"
+          },
+          "count": {
+            "description": "Matching assets in this country",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "country": {
+            "description": "Country name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cities",
+          "count",
+          "country"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsDimension": {
+        "enum": [
+          "availability",
+          "total",
+          "time",
+          "people",
+          "tags",
+          "places",
+          "cameras",
+          "ratings",
+          "mediaTypes"
+        ],
+        "type": "string"
+      },
+      "SearchOptionsMakeDto": {
+        "properties": {
+          "count": {
+            "description": "Matching assets taken with this make",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "make": {
+            "description": "Camera make",
+            "type": "string"
+          },
+          "models": {
+            "description": "Models of this make, most assets first",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsModelDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "count",
+          "make",
+          "models"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsMediaTypeDto": {
+        "properties": {
+          "count": {
+            "description": "Matching assets of this type",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/AssetTypeEnum"
+          }
+        },
+        "required": [
+          "count",
+          "type"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsModelDto": {
+        "properties": {
+          "count": {
+            "description": "Matching assets taken with this model",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "model": {
+            "description": "Camera model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "count",
+          "model"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsPersonDto": {
+        "properties": {
+          "count": {
+            "description": "Matching assets that show this person, with every active filter applied",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "filterId": {
+            "description": "The value to send in personIds (or spacePersonIds in a space scope): a person:/space-person: token when the scope shares people, else a bare id",
+            "type": "string"
+          },
+          "id": {
+            "description": "Person ID, the same value as filterId",
+            "type": "string"
+          },
+          "isSelected": {
+            "description": "Whether this person is one of the active people filters",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Person name",
+            "type": "string"
+          },
+          "primaryProfile": {
+            "$ref": "#/components/schemas/ScopedPrimaryProfile",
+            "description": "Accessible profile used for thumbnails"
+          }
+        },
+        "required": [
+          "count",
+          "filterId",
+          "id",
+          "isSelected",
+          "name"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsRatingDto": {
+        "properties": {
+          "count": {
+            "description": "Matching assets with exactly this rating",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rating": {
+            "description": "Star rating",
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "rating"
+        ],
+        "type": "object"
+      },
+      "SearchOptionsRequestDto": {
+        "properties": {
+          "albumIds": {
+            "description": "Scope to these albums (browse mode: at most one)",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "city": {
+            "description": "Filter by city",
+            "nullable": true,
+            "type": "string"
+          },
+          "country": {
+            "description": "Filter by country",
+            "nullable": true,
+            "type": "string"
+          },
+          "description": {
+            "description": "Filter by description text",
+            "type": "string"
+          },
+          "dimensions": {
+            "description": "What to compute: availability (the default, LIMIT 1 probes for the chip row) and/or option lists with counts. Ask for availability first, then fetch the lists in parallel",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsDimension"
+            },
+            "type": "array"
+          },
+          "isFavorite": {
+            "description": "Filter by the caller's favorites",
+            "type": "boolean"
+          },
+          "isInAlbum": {
+            "description": "Filter assets in at least one album",
+            "type": "boolean"
+          },
+          "isNotInAlbum": {
+            "description": "Filter assets not in any album",
+            "type": "boolean"
+          },
+          "language": {
+            "description": "Search language code for `query`",
+            "type": "string"
+          },
+          "lensModel": {
+            "description": "Filter by lens model",
+            "nullable": true,
+            "type": "string"
+          },
+          "make": {
+            "description": "Filter by camera make",
+            "nullable": true,
+            "type": "string"
+          },
+          "model": {
+            "description": "Filter by camera model",
+            "nullable": true,
+            "type": "string"
+          },
+          "ocr": {
+            "description": "Filter by OCR text content",
+            "type": "string"
+          },
+          "originalFileName": {
+            "description": "Filter by original file name",
+            "type": "string"
+          },
+          "ownerId": {
+            "description": "Filter by asset owner (contributor). Narrows within the current scope; never widens it.",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "personIds": {
+            "description": "Filter by people: all of them (AND), both modes",
+            "items": {
+              "description": "Legacy person ID or scoped identity filter token",
+              "pattern": "^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|person:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|space-person:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "query": {
+            "description": "Query mode: count over the smart-search results for this text",
+            "type": "string"
+          },
+          "queryAssetId": {
+            "description": "Query mode: count over the smart-search results similar to this asset",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "rating": {
+            "description": "Minimum star rating (>=), both modes; null for unrated",
+            "maximum": 5,
+            "minimum": 1,
+            "nullable": true,
+            "type": "integer"
+          },
+          "spaceId": {
+            "description": "Scope to a shared space",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "spacePersonIds": {
+            "description": "Filter by shared space people: all of them (AND)",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "state": {
+            "description": "Filter by state/province",
+            "nullable": true,
+            "type": "string"
+          },
+          "tagIds": {
+            "description": "Filter by tags: any of them in browse mode, all of them in query mode; null for untagged assets",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "takenAfter": {
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "takenBefore": {
+            "description": "Filter by taken date: before this local date and time (exclusive)",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/AssetTypeEnum",
+            "description": "Filter by asset type"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/AssetVisibility",
+            "description": "Filter by visibility. Unset: timeline + archive in browse mode, everything but locked in query mode"
+          },
+          "withPartners": {
+            "description": "Browse mode: include the partners shown in the timeline, as on /timeline/buckets",
+            "type": "boolean"
+          },
+          "withSharedSpaces": {
+            "description": "Include the shared spaces shown in the timeline",
+            "type": "boolean"
+          },
+          "withStacked": {
+            "description": "Browse mode: count only the primary asset of each stack, as on /timeline/buckets",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "SearchOptionsResponseDto": {
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/SearchOptionsAvailabilityDto",
+            "description": "The chip row: whether each list has any option (as the list itself, ignoring its own filter) and the #910 flags"
+          },
+          "cameraMakes": {
+            "description": "Camera makes and their models, ignoring the camera filter; most assets first",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsMakeDto"
+            },
+            "type": "array"
+          },
+          "countries": {
+            "description": "Countries and their cities, ignoring the place filter; most assets first",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsCountryDto"
+            },
+            "type": "array"
+          },
+          "hasUnnamedPeople": {
+            "description": "With people: whether unnamed people appear in the matching assets",
+            "type": "boolean"
+          },
+          "mediaTypes": {
+            "description": "Media types present, ignoring the type filter",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsMediaTypeDto"
+            },
+            "type": "array"
+          },
+          "people": {
+            "description": "Named people in the matching assets, active people filters included; most assets first",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsPersonDto"
+            },
+            "type": "array"
+          },
+          "ratings": {
+            "description": "Ratings present, ignoring the rating filter",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsRatingDto"
+            },
+            "type": "array"
+          },
+          "stale": {
+            "description": "True when served from the unfiltered cache after the library changed, while a refresh runs (at most 10 minutes old); a client may show it as is",
+            "type": "boolean"
+          },
+          "tags": {
+            "description": "Tags with the photos each would match. Browse (tags ANY): computed without the tag filter. Query (tags ALL): with it, so they co-occur with the selection. Untagged is ignored; most assets first",
+            "items": {
+              "$ref": "#/components/schemas/SearchOptionsTagDto"
+            },
+            "type": "array"
+          },
+          "timeBuckets": {
+            "description": "Monthly buckets (local taken time), ignoring the taken-date filter; newest first",
+            "items": {
+              "$ref": "#/components/schemas/TimeBucketsResponseDto"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Matching assets with every active filter applied",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "SearchOptionsTagDto": {
+        "properties": {
+          "count": {
+            "description": "Matching assets with this tag (or a child tag), with the other filters applied (see tags)",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "description": "Tag ID",
+            "type": "string"
+          },
+          "isSelected": {
+            "description": "Whether this tag is one of the active tag filters",
+            "type": "boolean"
+          },
+          "value": {
+            "description": "Tag value/name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "count",
+          "id",
+          "isSelected",
+          "value"
+        ],
+        "type": "object"
+      },
       "SearchOrder": {
         "properties": {
           "direction": {
@@ -39310,6 +39882,10 @@
           },
           "search": {
             "description": "Whether search is enabled",
+            "type": "boolean"
+          },
+          "searchOptions": {
+            "description": "Whether POST /search/options exists. Absent on older servers.",
             "type": "boolean"
           },
           "sidecar": {

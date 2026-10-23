@@ -1,0 +1,180 @@
+{
+  "actor": "me",
+  "description": "Photos with a person token: people co-occurring with Anna",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "personIds": [
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": false
+      },
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 2,
+              "model": "X-T5"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        }
+      ],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 3,
+          "type": "IMAGE"
+        }
+      ],
+      "people": [
+        {
+          "count": 3,
+          "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isSelected": true,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "id": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isSelected": false,
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "id": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "isSelected": false,
+          "name": "Rex",
+          "primaryProfile": {
+            "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+            "type": "user-person"
+          }
+        }
+      ],
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 3
+        },
+        {
+          "count": 1,
+          "rating": 4
+        },
+        {
+          "count": 1,
+          "rating": 5
+        }
+      ],
+      "tags": [
+        {
+          "count": 2,
+          "id": "7ef1e1f8-ec65-4488-8815-9f1e36421437",
+          "isSelected": false,
+          "value": "beach"
+        },
+        {
+          "count": 1,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ],
+      "timeBuckets": [
+        {
+          "count": 2,
+          "timeBucket": "2024-06-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2023-09-01"
+        }
+      ],
+      "total": 3
+    },
+    "status": 200
+  }
+}

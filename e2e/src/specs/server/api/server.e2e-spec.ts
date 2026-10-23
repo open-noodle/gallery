@@ -129,6 +129,7 @@ describe('/server', () => {
         ]),
         // Mobile sends wall-clock taken ranges only to a server that declares it reads them that way.
         localTakenRange: true,
+        searchOptions: true,
       });
     });
   });

@@ -3141,6 +3141,185 @@ export type SearchResponseDto = {
     albums: SearchAlbumResponseDto;
     assets: SearchAssetResponseDto;
 };
+export type SearchOptionsRequestDto = {
+    /** Scope to these albums (browse mode: at most one) */
+    albumIds?: string[];
+    /** Filter by city */
+    city?: string | null;
+    /** Filter by country */
+    country?: string | null;
+    /** Filter by description text */
+    description?: string;
+    /** What to compute: availability (the default, LIMIT 1 probes for the chip row) and/or option lists with counts. Ask for availability first, then fetch the lists in parallel */
+    dimensions?: SearchOptionsDimension[];
+    /** Filter by the caller's favorites */
+    isFavorite?: boolean;
+    /** Filter assets in at least one album */
+    isInAlbum?: boolean;
+    /** Filter assets not in any album */
+    isNotInAlbum?: boolean;
+    /** Search language code for `query` */
+    language?: string;
+    /** Filter by lens model */
+    lensModel?: string | null;
+    /** Filter by camera make */
+    make?: string | null;
+    /** Filter by camera model */
+    model?: string | null;
+    /** Filter by OCR text content */
+    ocr?: string;
+    /** Filter by original file name */
+    originalFileName?: string;
+    /** Filter by asset owner (contributor). Narrows within the current scope; never widens it. */
+    ownerId?: string;
+    /** Filter by people: all of them (AND), both modes */
+    personIds?: string[];
+    /** Query mode: count over the smart-search results for this text */
+    query?: string;
+    /** Query mode: count over the smart-search results similar to this asset */
+    queryAssetId?: string;
+    /** Minimum star rating (>=), both modes; null for unrated */
+    rating?: number | null;
+    /** Scope to a shared space */
+    spaceId?: string;
+    /** Filter by shared space people: all of them (AND) */
+    spacePersonIds?: string[];
+    /** Filter by state/province */
+    state?: string | null;
+    /** Filter by tags: any of them in browse mode, all of them in query mode; null for untagged assets */
+    tagIds?: string[] | null;
+    /** Filter by taken date: on or after this local date and time (inclusive) */
+    takenAfter?: string;
+    /** Filter by taken date: before this local date and time (exclusive) */
+    takenBefore?: string;
+    /** Filter by asset type */
+    "type"?: AssetTypeEnum;
+    /** Filter by visibility. Unset: timeline + archive in browse mode, everything but locked in query mode */
+    visibility?: AssetVisibility;
+    /** Browse mode: include the partners shown in the timeline, as on /timeline/buckets */
+    withPartners?: boolean;
+    /** Include the shared spaces shown in the timeline */
+    withSharedSpaces?: boolean;
+    /** Browse mode: count only the primary asset of each stack, as on /timeline/buckets */
+    withStacked?: boolean;
+};
+export type SearchOptionsAvailabilityDto = {
+    /** Whether any asset matches every active filter */
+    hasAssets: boolean;
+    /** Whether any matching asset belongs to an album, ignoring the album filters */
+    hasAssetsInAlbum: boolean;
+    /** Whether any matching asset belongs to no album, ignoring the album filters */
+    hasAssetsNotInAlbum: boolean;
+    /** Whether the camera list would have a make, ignoring the camera filter */
+    hasCameras: boolean;
+    /** Whether any of the caller's favourites match, ignoring isFavorite */
+    hasFavorites: boolean;
+    /** Whether any image matches, ignoring the type filter */
+    hasImages: boolean;
+    /** Whether the people list would have a named person */
+    hasPeople: boolean;
+    /** Whether the place list would have a country, ignoring the place filter */
+    hasPlaces: boolean;
+    /** Whether any rated asset matches, ignoring the rating filter */
+    hasRatings: boolean;
+    /** Whether the tag list would have a tag */
+    hasTags: boolean;
+    /** Whether any video matches, ignoring the type filter */
+    hasVideos: boolean;
+};
+export type SearchOptionsModelDto = {
+    /** Matching assets taken with this model */
+    count: number;
+    /** Camera model */
+    model: string;
+};
+export type SearchOptionsMakeDto = {
+    /** Matching assets taken with this make */
+    count: number;
+    /** Camera make */
+    make: string;
+    /** Models of this make, most assets first */
+    models: SearchOptionsModelDto[];
+};
+export type SearchOptionsCityDto = {
+    /** City name */
+    city: string;
+    /** Matching assets in this city */
+    count: number;
+};
+export type SearchOptionsCountryDto = {
+    /** Cities of this country, most assets first */
+    cities: SearchOptionsCityDto[];
+    /** Matching assets in this country */
+    count: number;
+    /** Country name */
+    country: string;
+};
+export type SearchOptionsMediaTypeDto = {
+    /** Matching assets of this type */
+    count: number;
+    "type": AssetTypeEnum;
+};
+export type SearchOptionsPersonDto = {
+    /** Matching assets that show this person, with every active filter applied */
+    count: number;
+    /** The value to send in personIds (or spacePersonIds in a space scope): a person:/space-person: token when the scope shares people, else a bare id */
+    filterId: string;
+    /** Person ID, the same value as filterId */
+    id: string;
+    /** Whether this person is one of the active people filters */
+    isSelected: boolean;
+    /** Person name */
+    name: string;
+    /** Accessible profile used for thumbnails */
+    primaryProfile?: ScopedPrimaryProfile;
+};
+export type SearchOptionsRatingDto = {
+    /** Matching assets with exactly this rating */
+    count: number;
+    /** Star rating */
+    rating: number;
+};
+export type SearchOptionsTagDto = {
+    /** Matching assets with this tag (or a child tag), with the other filters applied (see tags) */
+    count: number;
+    /** Tag ID */
+    id: string;
+    /** Whether this tag is one of the active tag filters */
+    isSelected: boolean;
+    /** Tag value/name */
+    value: string;
+};
+export type TimeBucketsResponseDto = {
+    /** Number of assets in this time bucket */
+    count: number;
+    /** Time bucket identifier in YYYY-MM-DD format representing the start of the time period */
+    timeBucket: string;
+};
+export type SearchOptionsResponseDto = {
+    /** The chip row: whether each list has any option (as the list itself, ignoring its own filter) and the #910 flags */
+    availability?: SearchOptionsAvailabilityDto;
+    /** Camera makes and their models, ignoring the camera filter; most assets first */
+    cameraMakes?: SearchOptionsMakeDto[];
+    /** Countries and their cities, ignoring the place filter; most assets first */
+    countries?: SearchOptionsCountryDto[];
+    /** With people: whether unnamed people appear in the matching assets */
+    hasUnnamedPeople?: boolean;
+    /** Media types present, ignoring the type filter */
+    mediaTypes?: SearchOptionsMediaTypeDto[];
+    /** Named people in the matching assets, active people filters included; most assets first */
+    people?: SearchOptionsPersonDto[];
+    /** Ratings present, ignoring the rating filter */
+    ratings?: SearchOptionsRatingDto[];
+    /** True when served from the unfiltered cache after the library changed, while a refresh runs (at most 10 minutes old); a client may show it as is */
+    stale?: boolean;
+    /** Tags with the photos each would match. Browse (tags ANY): computed without the tag filter. Query (tags ALL): with it, so they co-occur with the selection. Untagged is ignored; most assets first */
+    tags?: SearchOptionsTagDto[];
+    /** Monthly buckets (local taken time), ignoring the taken-date filter; newest first */
+    timeBuckets?: TimeBucketsResponseDto[];
+    /** Matching assets with every active filter applied */
+    total?: number;
+};
 export type PlacesResponseDto = {
     /** Administrative level 1 name (state/province) */
     admin1name?: string;
@@ -3363,12 +3542,6 @@ export type FilterSuggestionsTagDto = {
     id: string;
     /** Tag value/name */
     value: string;
-};
-export type TimeBucketsResponseDto = {
-    /** Number of assets in this time bucket */
-    count: number;
-    /** Time bucket identifier in YYYY-MM-DD format representing the start of the time period */
-    timeBucket: string;
 };
 export type SmartSearchFacetsResponseDto = {
     /** Available camera makes */
@@ -3616,6 +3789,8 @@ export type ServerFeaturesDto = {
     s3Storage: boolean;
     /** Whether search is enabled */
     search: boolean;
+    /** Whether POST /search/options exists. Absent on older servers. */
+    searchOptions?: boolean;
     /** Whether sidecar files are supported */
     sidecar: boolean;
     /** Whether smart search is enabled */
@@ -8644,6 +8819,21 @@ export function searchAssets({ key, slug, metadataSearchDto }: {
     })));
 }
 /**
+ * Search filter options with counts
+ */
+export function getSearchOptions({ searchOptionsRequestDto }: {
+    searchOptionsRequestDto: SearchOptionsRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SearchOptionsResponseDto;
+    }>("/search/options", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: searchOptionsRequestDto
+    })));
+}
+/**
  * Search people
  */
 export function searchPerson({ name, withHidden, withSharedSpaces }: {
@@ -11946,6 +12136,17 @@ export enum SearchOrderField {
     LocalDateTime = "localDateTime",
     FileSizeInBytes = "fileSizeInBytes",
     Rating = "rating"
+}
+export enum SearchOptionsDimension {
+    Availability = "availability",
+    Total = "total",
+    Time = "time",
+    People = "people",
+    Tags = "tags",
+    Places = "places",
+    Cameras = "cameras",
+    Ratings = "ratings",
+    MediaTypes = "mediaTypes"
 }
 export enum SearchSuggestionType {
     Country = "country",

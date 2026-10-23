@@ -227,6 +227,9 @@ features:
       - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
       - server/src/dtos/gallery-map.dto.ts
+      # Mobile search ↔ server contract (specs/2026-10-23-mobile-search-redesign-design.md).
+      - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
+      - mobile/test/fixtures/search_contract/**
     upstream_extension_paths:
       - server/src/controllers/search.controller.ts
       - server/src/services/search.service.ts

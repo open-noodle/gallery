@@ -1,0 +1,34 @@
+{
+  "actor": "me",
+  "description": "Space timeline buckets",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 2,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2023-08-01"
+      },
+      {
+        "count": 2,
+        "timeBucket": "2023-07-01"
+      }
+    ],
+    "status": 200
+  }
+}

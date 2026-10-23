@@ -169,6 +169,7 @@ const ServerFeaturesSchema = z
       .describe(
         'Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end.',
       ),
+    searchOptions: z.boolean().optional().describe('Whether POST /search/options exists. Absent on older servers.'),
   })
   .meta({ id: 'ServerFeaturesDto' });
 

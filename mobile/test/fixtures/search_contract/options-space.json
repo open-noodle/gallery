@@ -1,0 +1,142 @@
+{
+  "actor": "me",
+  "description": "Space screen: people are space people (bare ids)",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "6438d955-2a1c-4bd0-8150-4f3503d02fbe": "space-person:pia",
+    "896d137b-eeec-45b7-8af0-75610855e1ea": "space-person:quinn"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": false
+      },
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 2,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Madrid",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Spain"
+        },
+        {
+          "cities": [
+            {
+              "city": "Porto",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 5,
+          "type": "IMAGE"
+        }
+      ],
+      "people": [
+        {
+          "count": 2,
+          "filterId": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+          "id": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+          "isSelected": false,
+          "name": "Pia",
+          "primaryProfile": {
+            "id": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+            "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+            "type": "space-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "896d137b-eeec-45b7-8af0-75610855e1ea",
+          "id": "896d137b-eeec-45b7-8af0-75610855e1ea",
+          "isSelected": false,
+          "name": "Quinn",
+          "primaryProfile": {
+            "id": "896d137b-eeec-45b7-8af0-75610855e1ea",
+            "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+            "type": "space-person"
+          }
+        }
+      ],
+      "ratings": [],
+      "tags": [],
+      "timeBuckets": [
+        {
+          "count": 2,
+          "timeBucket": "2024-06-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2023-08-01"
+        },
+        {
+          "count": 2,
+          "timeBucket": "2023-07-01"
+        }
+      ],
+      "total": 5
+    },
+    "status": 200
+  }
+}

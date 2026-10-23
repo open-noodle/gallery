@@ -153,6 +153,7 @@ export class ServerService extends BaseService {
       // wall-clock range (src/utils/asset-filter.ts). A client sends that shape only when this is set,
       // and keeps sending device-local instants to an older server that compares fileCreatedAt.
       localTakenRange: true,
+      searchOptions: true,
     };
   }
 
