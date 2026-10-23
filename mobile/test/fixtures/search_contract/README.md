@@ -71,7 +71,9 @@ or `-smart` in query mode). Photos opens on the `dimension-photos-*` set.
 The `mode-photos-*` fixtures are Photos search mode as its end-to-end test walks it
 (`mobile/test/gallery/search/photos_search_mode_e2e_test.dart`): `@a` picks Anna, When picks 2024, Places picks Kyoto.
 Each step is the per-dimension options, `-timeline-buckets`, and one `-timeline-bucket-<month>` per month the grid
-opens.
+opens. The `mode-filters-*` fixtures are the same for the Filters sheet
+(`mobile/test/gallery/search/filters_sheet_e2e_test.dart`): Favorites only, then rating 3, then the iPhone 15, then
+"receipt" in the photo.
 
 Two fixture sets stand in for servers this stack is not:
 

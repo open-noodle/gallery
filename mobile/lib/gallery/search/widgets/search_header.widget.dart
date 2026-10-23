@@ -24,11 +24,34 @@ class SearchHeader extends StatelessWidget {
   static const double chipRowHeight = 48;
   static const double resultsRowHeight = 36;
 
+  /// How much taller than a toolbar the header is. The timeline keeps its scrubber below `padding.top +
+  /// kToolbarHeight`, room for the screen's app bar; in search mode the frame raises the timeline's top media padding by
+  /// this much (SearchHeaderInset), so the scrubber starts below the header instead of under it.
+  static const double extraTopPadding = fieldRowHeight + chipRowHeight + resultsRowHeight - kToolbarHeight;
+
+  /// The status bar above the header: the media padding without what the frame added for the scrubber.
+  static double statusBarInset(BuildContext context) =>
+      MediaQuery.paddingOf(context).top - SearchHeaderInset.extraOf(context);
+
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.paddingOf(context).top + fieldRowHeight + chipRowHeight + resultsRowHeight;
+    final height = statusBarInset(context) + fieldRowHeight + chipRowHeight + resultsRowHeight;
     return SliverPersistentHeader(pinned: true, delegate: _SearchHeaderDelegate(height));
   }
+}
+
+/// Marks the top media padding [extra] that search mode added below it for the timeline's scrubber (see
+/// SearchHeader.extraTopPadding).
+class SearchHeaderInset extends InheritedWidget {
+  final double extra;
+
+  const SearchHeaderInset({super.key, required this.extra, required super.child});
+
+  static double extraOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SearchHeaderInset>()?.extra ?? 0;
+
+  @override
+  bool updateShouldNotify(SearchHeaderInset oldWidget) => oldWidget.extra != extra;
 }
 
 class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
@@ -191,7 +214,7 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
       child: Material(
         color: theme.colorScheme.surface,
         child: Padding(
-          padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+          padding: EdgeInsets.only(top: SearchHeader.statusBarInset(context)),
           child: Column(
             children: [
               SizedBox(

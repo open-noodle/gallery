@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -71,4 +71,18 @@ String searchExtraLabel(BuildContext context, SearchExtraFilter filter, SearchFi
   SearchExtraFilter.dateRange => filters.date == null ? '' : searchDateLabel(context, filters.date!),
   SearchExtraFilter.archived => context.t.filter_sheet_archived,
   SearchExtraFilter.untagged => context.t.untagged,
+};
+
+/// An extra filter's chip icon ("♥ Favorites ✕").
+IconData searchExtraIcon(SearchExtraFilter filter, SearchFilters filters) => switch (filter) {
+  SearchExtraFilter.favorites => Icons.favorite_rounded,
+  SearchExtraFilter.mediaType =>
+    filters.mediaType == SearchMediaType.video ? Icons.videocam_outlined : Icons.photo_outlined,
+  SearchExtraFilter.rating => Icons.star_rounded,
+  SearchExtraFilter.camera => Icons.photo_camera_outlined,
+  SearchExtraFilter.album => Icons.photo_album_outlined,
+  SearchExtraFilter.text => Icons.text_fields_rounded,
+  SearchExtraFilter.dateRange => Icons.date_range_rounded,
+  SearchExtraFilter.archived => Icons.archive_outlined,
+  SearchExtraFilter.untagged => Icons.label_off_outlined,
 };

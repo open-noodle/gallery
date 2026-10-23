@@ -34,14 +34,21 @@ Future<void> showSearchChipSheet(BuildContext context, SearchMainChip chip) => s
 
 String _fold(String value) => removeDiacritics(value).toLowerCase().trim();
 
-class _SheetScaffold extends ConsumerWidget {
+class SearchSheetScaffold extends ConsumerWidget {
   final String title;
   final double heightFactor;
   final VoidCallback? onClear;
   final Widget? search;
   final Widget body;
 
-  const _SheetScaffold({required this.title, required this.body, this.heightFactor = 0.66, this.onClear, this.search});
+  const SearchSheetScaffold({
+    super.key,
+    required this.title,
+    required this.body,
+    this.heightFactor = 0.66,
+    this.onClear,
+    this.search,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -123,10 +130,10 @@ class _SheetSearchField extends StatelessWidget {
   }
 }
 
-class _Hint extends StatelessWidget {
+class SearchSheetHint extends StatelessWidget {
   final String text;
 
-  const _Hint(this.text);
+  const SearchSheetHint(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -139,10 +146,10 @@ class _Hint extends StatelessWidget {
 }
 
 /// Placeholder shapes while a list is still on its way: no spinner.
-class _Skeleton extends StatelessWidget {
+class SearchSheetSkeleton extends StatelessWidget {
   final bool round;
 
-  const _Skeleton({this.round = false});
+  const SearchSheetSkeleton({super.key, this.round = false});
 
   static const count = 8;
 
@@ -168,10 +175,10 @@ class _Skeleton extends StatelessWidget {
   }
 }
 
-class _Count extends StatelessWidget {
+class SearchOptionCount extends StatelessWidget {
   final int? count;
 
-  const _Count(this.count);
+  const SearchOptionCount(this.count, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +224,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
           ]
         : const <SearchPersonOption>[];
 
-    return _SheetScaffold(
+    return SearchSheetScaffold(
       title: context.t.people,
       onClear: selected.isEmpty ? null : notifier.clearPeople,
       search: _SheetSearchField(
@@ -227,7 +234,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
       body: CustomScrollView(
         slivers: [
           if (selected.isNotEmpty) ...[
-            SliverToBoxAdapter(child: _Hint(context.t.search_mode_people_selected_hint)),
+            SliverToBoxAdapter(child: SearchSheetHint(context.t.search_mode_people_selected_hint)),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               sliver: SliverGrid.count(
@@ -247,7 +254,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             ),
           ],
           if (recent.isNotEmpty) ...[
-            SliverToBoxAdapter(child: _Hint(context.t.recent)),
+            SliverToBoxAdapter(child: SearchSheetHint(context.t.recent)),
             SliverToBoxAdapter(
               child: SizedBox(
                 key: const Key('search-sheet-recent'),
@@ -273,7 +280,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             ),
           ],
           SliverToBoxAdapter(
-            child: _Hint(
+            child: SearchSheetHint(
               query.isNotEmpty
                   ? context.t.search_mode_matches
                   : selected.isNotEmpty
@@ -282,9 +289,9 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             ),
           ),
           if (people == null)
-            const SliverToBoxAdapter(child: _Skeleton(round: true))
+            const SliverToBoxAdapter(child: SearchSheetSkeleton(round: true))
           else if (matches.isEmpty)
-            SliverToBoxAdapter(child: _Hint(context.t.search_mode_people_none))
+            SliverToBoxAdapter(child: SearchSheetHint(context.t.search_mode_people_none))
           else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -355,7 +362,7 @@ class _PersonTile extends StatelessWidget {
               textAlign: TextAlign.center,
               style: theme.textTheme.labelMedium,
             ),
-            _Count(count),
+            SearchOptionCount(count),
           ],
         ),
       ),
@@ -405,7 +412,7 @@ class _WhenSheetState extends ConsumerState<_WhenSheet> {
     final newestFirst = years.keys.toList()..sort((a, b) => b.compareTo(a));
     void toggle(SearchDate value) => notifier.setDate(date == value ? null : value);
 
-    return _SheetScaffold(
+    return SearchSheetScaffold(
       title: context.t.when$,
       heightFactor: 0.88,
       onClear: date == null || date is SearchDateCustom ? null : () => notifier.setDate(null),
@@ -429,9 +436,9 @@ class _WhenSheetState extends ConsumerState<_WhenSheet> {
               ],
             ),
           ),
-          _Hint(context.t.search_mode_when_hint),
+          SearchSheetHint(context.t.search_mode_when_hint),
           if (months == null)
-            const _Skeleton()
+            const SearchSheetSkeleton()
           else
             for (final year in newestFirst) ...[
               Padding(
@@ -442,7 +449,7 @@ class _WhenSheetState extends ConsumerState<_WhenSheet> {
                       key: Key('search-when-year-$year'),
                       label: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [Text('$year'), const SizedBox(width: 6), _Count(years[year])],
+                        children: [Text('$year'), const SizedBox(width: 6), SearchOptionCount(years[year])],
                       ),
                       selected: date == SearchDate.year(year),
                       onSelected: (_) => toggle(SearchDate.year(year)),
@@ -595,7 +602,7 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
       }
     }
 
-    return _SheetScaffold(
+    return SearchSheetScaffold(
       title: context.t.places,
       onClear: place == null ? null : () => notifier.setPlace(null),
       search: _SheetSearchField(
@@ -603,9 +610,9 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
         onChanged: (value) => setState(() => _query = value),
       ),
       body: countries == null
-          ? const _Skeleton()
+          ? const SearchSheetSkeleton()
           : rows.isEmpty
-          ? _Hint(context.t.search_mode_places_none)
+          ? SearchSheetHint(context.t.search_mode_places_none)
           : ListView(children: rows),
     );
   }
@@ -642,7 +649,7 @@ class _PlaceRow extends StatelessWidget {
       leading: Icon(icon, size: 20),
       title: Text(title, style: indent ? null : const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: subtitle == null ? null : Text(subtitle!),
-      trailing: _Count(count),
+      trailing: SearchOptionCount(count),
       onTap: onTap,
     );
   }
@@ -675,7 +682,7 @@ class _TagsSheetState extends ConsumerState<_TagsSheet> {
         if (!selectedIds.contains(tag.id) && (query.isEmpty || _fold(tag.value).contains(query))) tag,
     ];
 
-    return _SheetScaffold(
+    return SearchSheetScaffold(
       title: context.t.tags,
       onClear: selected.isEmpty ? null : notifier.clearTags,
       search: _SheetSearchField(
@@ -685,7 +692,7 @@ class _TagsSheetState extends ConsumerState<_TagsSheet> {
       body: ListView(
         children: [
           // Browse results match any of the tags (/timeline/buckets), smart search all of them (/search/smart).
-          _Hint(queryMode ? context.t.search_mode_tags_all_hint : context.t.search_mode_tags_any_hint),
+          SearchSheetHint(queryMode ? context.t.search_mode_tags_all_hint : context.t.search_mode_tags_any_hint),
           if (selected.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -705,9 +712,9 @@ class _TagsSheetState extends ConsumerState<_TagsSheet> {
               ),
             ),
           if (tags == null)
-            const _Skeleton()
+            const SearchSheetSkeleton()
           else if (others.isEmpty)
-            _Hint(context.t.search_mode_tags_none)
+            SearchSheetHint(context.t.search_mode_tags_none)
           else
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -720,7 +727,7 @@ class _TagsSheetState extends ConsumerState<_TagsSheet> {
                       key: Key('search-tag-${tag.id}'),
                       label: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [Text('#${tag.value}'), const SizedBox(width: 6), _Count(tag.count)],
+                        children: [Text('#${tag.value}'), const SizedBox(width: 6), SearchOptionCount(tag.count)],
                       ),
                       onPressed: () => notifier.toggleTag(SearchTagRef(id: tag.id, value: tag.value)),
                     ),

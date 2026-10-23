@@ -1,0 +1,48 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "isFavorite": true,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

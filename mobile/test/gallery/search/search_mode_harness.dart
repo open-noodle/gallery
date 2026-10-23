@@ -81,6 +81,14 @@ class FakeAsset {
   final String? country;
   final String? city;
   final bool video;
+  final bool favorite;
+  final int? rating;
+  final String? make;
+  final String? model;
+  final bool inAlbum;
+  final String? ocr;
+  final String? description;
+  final bool archived;
 
   const FakeAsset(
     this.id,
@@ -90,7 +98,35 @@ class FakeAsset {
     this.country,
     this.city,
     this.video = false,
+    this.favorite = false,
+    this.rating,
+    this.make,
+    this.model,
+    this.inAlbum = false,
+    this.ocr,
+    this.description,
+    this.archived = false,
   });
+
+  String get fileName => '$id.jpg';
+
+  FakeAsset copyWith({List<String>? tags, int? Function()? rating, bool? video}) => FakeAsset(
+    id,
+    taken,
+    people: people,
+    tags: tags ?? this.tags,
+    country: country,
+    city: city,
+    video: video ?? this.video,
+    favorite: favorite,
+    rating: rating == null ? this.rating : rating(),
+    make: make,
+    model: model,
+    inAlbum: inAlbum,
+    ocr: ocr,
+    description: description,
+    archived: archived,
+  );
 }
 
 class FakePerson {
@@ -133,29 +169,61 @@ class FakeLibrary {
         tags: const ['beach', 'food'],
         country: 'Japan',
         city: 'Kyoto',
+        favorite: true,
+        rating: 5,
+        make: 'Fujifilm',
+        model: 'X-T5',
+        inAlbum: true,
+        ocr: 'lunch menu',
       ),
-      FakeAsset('kyoto-2', DateTime(2024, 6, 2, 10), people: const ['anna'], country: 'Japan', city: 'Kyoto'),
-      FakeAsset('kyoto-3', DateTime(2024, 6, 1, 10), people: const ['ben'], country: 'Japan', city: 'Kyoto'),
+      FakeAsset(
+        'kyoto-2',
+        DateTime(2024, 6, 2, 10),
+        people: const ['anna'],
+        country: 'Japan',
+        city: 'Kyoto',
+        rating: 3,
+        make: 'Fujifilm',
+        model: 'X-T5',
+        ocr: 'menu board',
+      ),
+      FakeAsset(
+        'kyoto-3',
+        DateTime(2024, 6, 1, 10),
+        people: const ['ben'],
+        country: 'Japan',
+        city: 'Kyoto',
+        make: 'Apple',
+        model: 'iPhone 15',
+      ),
       FakeAsset(
         'lisbon-1',
         DateTime(2023, 9, 10, 10),
         people: const ['anna', 'rex'],
         country: 'Portugal',
         city: 'Lisbon',
+        favorite: true,
+        rating: 4,
+        make: 'Apple',
+        model: 'iPhone 15',
+        ocr: 'cafe receipt',
+        description: 'dinner with friends',
       ),
       FakeAsset('porto-1', DateTime(2023, 8, 1, 10), tags: const ['food'], country: 'Portugal', city: 'Porto'),
       FakeAsset('berlin-1', DateTime(2024, 2, 14, 10), country: 'Germany', city: 'Berlin', video: true),
       FakeAsset('alex-1', DateTime(2022, 3, 5, 10), people: const ['alex'], country: 'Germany', city: 'Berlin'),
+      // Archived: outside every timeline-visibility result; only Archived only reaches it.
+      FakeAsset('osaka-1', DateTime(2022, 12, 1, 10), country: 'Japan', city: 'Osaka', archived: true),
     ],
   );
+
+  /// The same people and tags over other assets.
+  FakeLibrary withAssets(List<FakeAsset> assets) => FakeLibrary(people: people, tags: tags, assets: assets);
 
   /// The same library with no tags at all.
   FakeLibrary withoutTags() => FakeLibrary(
     people: people,
-    assets: [
-      for (final a in assets)
-        FakeAsset(a.id, a.taken, people: a.people, country: a.country, city: a.city, video: a.video),
-    ],
+    assets: [for (final a in assets) a.copyWith(tags: const [])],
   );
 
   String personName(String id) => people.firstWhere((p) => p.id == id).name;
@@ -170,6 +238,9 @@ class FakeSearchRepository implements GallerySearchRepository {
 
   /// One line per call: `options [dims]`, `buckets`, `bucket <month>`, `smart`.
   final calls = <String>[];
+
+  /// The parameters of every results call (buckets, smart, metadata), in order.
+  final resultParams = <SearchParams>[];
 
   FakeSearchRepository(
     this.library, {
@@ -190,7 +261,40 @@ class FakeSearchRepository implements GallerySearchRepository {
     bool place = true,
     bool time = true,
     bool untagged = true,
+    bool camera = true,
+    bool rating = true,
+    bool media = true,
   }) {
+    // Timeline visibility leaves archived photos out; archive visibility keeps only them; none keeps both.
+    if (p.visibility == SearchVisibility.timeline && a.archived) {
+      return false;
+    }
+    if (p.visibility == SearchVisibility.archive && !a.archived) {
+      return false;
+    }
+    if (p.isFavorite == true && !a.favorite) {
+      return false;
+    }
+    if (p.isInAlbum == true && !a.inAlbum) {
+      return false;
+    }
+    if (p.isNotInAlbum == true && a.inAlbum) {
+      return false;
+    }
+    bool contains(String? value, String? needle) =>
+        needle == null || (value ?? '').toLowerCase().contains(needle.toLowerCase());
+    if (!contains(a.ocr, p.ocr) ||
+        !contains(a.description, p.description) ||
+        !contains(a.fileName, p.originalFileName)) {
+      return false;
+    }
+    if (camera && (p.make != null && a.make != p.make || p.model != null && a.model != p.model)) {
+      return false;
+    }
+    // A minimum, as on every fork filter surface.
+    if (rating && p.minRating != null && (a.rating ?? 0) < p.minRating!) {
+      return false;
+    }
     if (people && p.personIds != null && !p.personIds!.map(_personId).every(a.people.contains)) {
       return false;
     }
@@ -224,10 +328,10 @@ class FakeSearchRepository implements GallerySearchRepository {
         return false;
       }
     }
-    if (p.type == SearchMediaType.video && !a.video) {
+    if (media && p.type == SearchMediaType.video && !a.video) {
       return false;
     }
-    if (p.type == SearchMediaType.image && a.video) {
+    if (media && p.type == SearchMediaType.image && a.video) {
       return false;
     }
     return true;
@@ -318,6 +422,46 @@ class FakeSearchRepository implements GallerySearchRepository {
         SearchMonthCount(year: month.year, month: month.month, count: monthCounts[month]!),
     ];
 
+    // Cameras, ratings and media types each ignore their own filter, as the server's lists do.
+    final forCameras = library.assets.where((a) => _matches(a, p, camera: false)).toList();
+    final makeCounts = <String, Map<String, int>>{};
+    for (final a in forCameras) {
+      if (a.make == null) {
+        continue;
+      }
+      final models = makeCounts.putIfAbsent(a.make!, () => {});
+      models[a.model ?? ''] = (models[a.model ?? ''] ?? 0) + 1;
+    }
+    final cameras = [
+      for (final make in makeCounts.keys.toList()..sort())
+        SearchCameraMakeOption(
+          make: make,
+          count: makeCounts[make]!.values.fold<int>(0, (sum, c) => sum + c),
+          models: [
+            for (final model in makeCounts[make]!.keys.toList()..sort())
+              SearchCameraModelOption(model: model, count: makeCounts[make]![model]),
+          ],
+        ),
+    ];
+    final forRatings = library.assets.where((a) => _matches(a, p, rating: false)).toList();
+    final ratingCounts = <int, int>{};
+    for (final a in forRatings) {
+      if (a.rating != null && a.rating! > 0) {
+        ratingCounts[a.rating!] = (ratingCounts[a.rating!] ?? 0) + 1;
+      }
+    }
+    final ratings = [
+      for (final rating in ratingCounts.keys.toList()..sort((a, b) => b.compareTo(a)))
+        SearchRatingOption(rating: rating, count: ratingCounts[rating]),
+    ];
+    final forMedia = library.assets.where((a) => _matches(a, p, media: false)).toList();
+    final images = forMedia.where((a) => !a.video).length;
+    final videos = forMedia.where((a) => a.video).length;
+    final mediaTypes = [
+      if (images > 0) SearchMediaTypeOption(type: 'IMAGE', count: images),
+      if (videos > 0) SearchMediaTypeOption(type: 'VIDEO', count: videos),
+    ];
+
     final wants = dimensions;
     return SearchOptionsPart(
       availability: wants.isEmpty
@@ -326,13 +470,13 @@ class FakeSearchRepository implements GallerySearchRepository {
               hasPeople: people.isNotEmpty,
               hasTags: tags.isNotEmpty,
               hasPlaces: countries.isNotEmpty,
-              hasCameras: false,
-              hasRatings: false,
-              hasImages: all.any((a) => !a.video),
-              hasVideos: all.any((a) => a.video),
-              hasFavorites: false,
-              hasAssetsInAlbum: false,
-              hasAssetsNotInAlbum: all.isNotEmpty,
+              hasCameras: cameras.isNotEmpty,
+              hasRatings: ratings.isNotEmpty,
+              hasImages: images > 0,
+              hasVideos: videos > 0,
+              hasFavorites: all.any((a) => a.favorite),
+              hasAssetsInAlbum: all.any((a) => a.inAlbum),
+              hasAssetsNotInAlbum: all.any((a) => !a.inAlbum),
             )
           : null,
       total: wants.contains(SearchDimension.total) ? all.length : null,
@@ -341,9 +485,9 @@ class FakeSearchRepository implements GallerySearchRepository {
       hasUnnamedPeople: wants.contains(SearchDimension.people) ? false : null,
       tags: wants.contains(SearchDimension.tags) ? tags : null,
       countries: wants.contains(SearchDimension.places) ? countries : null,
-      cameras: wants.contains(SearchDimension.cameras) ? const [] : null,
-      ratings: wants.contains(SearchDimension.ratings) ? const [] : null,
-      mediaTypes: wants.contains(SearchDimension.mediaTypes) ? const [] : null,
+      cameras: wants.contains(SearchDimension.cameras) ? cameras : null,
+      ratings: wants.contains(SearchDimension.ratings) ? ratings : null,
+      mediaTypes: wants.contains(SearchDimension.mediaTypes) ? mediaTypes : null,
     );
   }
 
@@ -356,6 +500,7 @@ class FakeSearchRepository implements GallerySearchRepository {
     bool byUploadDate = false,
   }) async {
     calls.add('buckets');
+    resultParams.add(p);
     final counts = <String, int>{};
     for (final a in results(p)) {
       final key = _monthKey(a.taken);
@@ -383,7 +528,7 @@ class FakeSearchRepository implements GallerySearchRepository {
       fileCreatedAt: [for (final a in assets) a.taken.toIso8601String()],
       createdAt: [for (final a in assets) a.taken.toIso8601String()],
       duration: [for (final _ in assets) null],
-      isFavorite: [for (final _ in assets) false],
+      isFavorite: [for (final a in assets) a.favorite],
       isImage: [for (final a in assets) !a.video],
       isTrashed: [for (final _ in assets) false],
       livePhotoVideoId: [for (final _ in assets) null],
@@ -391,7 +536,7 @@ class FakeSearchRepository implements GallerySearchRepository {
       projectionType: [for (final _ in assets) null],
       ratio: [for (final _ in assets) 1],
       thumbhash: [for (final _ in assets) null],
-      visibility: [for (final _ in assets) api.AssetVisibility.timeline],
+      visibility: [for (final a in assets) a.archived ? api.AssetVisibility.archive : api.AssetVisibility.timeline],
     );
   }
 
@@ -403,6 +548,7 @@ class FakeSearchRepository implements GallerySearchRepository {
     int size = 100,
   }) async {
     calls.add('smart');
+    resultParams.add(p);
     final assets = results(p);
     return api.SearchResponseDto(
       albums: api.SearchAlbumResponseDto(count: 0, facets: const [], items: const [], total: 0),

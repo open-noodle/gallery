@@ -120,6 +120,8 @@ const assetSeeds: Record<string, AssetSeed> = {
     make: 'Apple',
     model: 'iPhone 15',
     rating: 4,
+    // The Filters sheet end-to-end test ends on in-photo text: the one favourite left by then must have some.
+    ocr: 'cafe receipt',
   },
   'berlin-video': {
     owner: 'me',
@@ -948,8 +950,45 @@ const photosModeSteps = () => {
   ];
 };
 
+/**
+ * The Filters sheet as mobile/test/gallery/search/filters_sheet_e2e_test.dart walks it on Photos: Favorites only, then
+ * rating 3, then the camera model, then in-photo text. Same shape as `photosModeSteps`.
+ */
+const filtersSheetSteps = () => {
+  const favorites = { ...photos, isFavorite: true };
+  const rating = { ...favorites, rating: 3 };
+  const camera = { ...rating, make: 'Apple', model: 'iPhone 15' };
+  const text = { ...camera, ocr: 'receipt' };
+  return [
+    {
+      name: 'mode-filters-favorites',
+      description: 'Photos Filters sheet, favorites only',
+      body: favorites,
+      months: ['2024-06-01', '2023-09-01'],
+    },
+    {
+      name: 'mode-filters-favorites-rating',
+      description: 'Photos Filters sheet, favorites rated at least 3',
+      body: rating,
+      months: ['2023-09-01'],
+    },
+    {
+      name: 'mode-filters-favorites-rating-camera',
+      description: 'Photos Filters sheet, favorites rated at least 3 from an iPhone 15',
+      body: camera,
+      months: ['2023-09-01'],
+    },
+    {
+      name: 'mode-filters-favorites-rating-camera-text',
+      description: 'Photos Filters sheet, favorites rated at least 3 from an iPhone 15 with "receipt" in the photo',
+      body: text,
+      months: ['2023-09-01'],
+    },
+  ];
+};
+
 const photosModeCases = (): FixtureCase[] =>
-  photosModeSteps().flatMap(({ name, description, body, months }) => [
+  [...photosModeSteps(), ...filtersSheetSteps()].flatMap(({ name, description, body, months }) => [
     ...perDimension(name, description, () => body),
     {
       name: `${name}-timeline-buckets`,

@@ -1,0 +1,30 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites rated at least 3 from an iPhone 15: browse results",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "isFavorite": "true",
+      "make": "Apple",
+      "model": "iPhone 15",
+      "rating": "3",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2023-09-01"
+      }
+    ],
+    "status": 200
+  }
+}

@@ -129,3 +129,67 @@ int activeFilterCount(SearchState state, SearchScope scope) {
       ].where((active) => active).length +
       activeExtraFilters(filters, scope).length;
 }
+
+/// How the Filters sheet shows one section (#910, specs/2026-08-04-interdependent-filter-sections-910-design.md §4).
+enum SearchSectionState { available, greyed, hidden }
+
+/// The Filters sheet's #910 verdict for [section]:
+/// - hidden when the screen's scope fixes it, or when it is empty for the whole scope ([scopeAvailability]);
+/// - greyed when it is empty only because of the other active filters ([current]);
+/// - a section with an active filter is always available, so it can be changed or cleared (§4.4 rule 1).
+///
+/// Never per option: whenever Rating shows, all five stars show, and whenever Photo or video shows, all three options
+/// show, none greyed (§2.4). So Photo or video greys only when nothing matches at all: a result set of photos only
+/// still offers Videos as a live choice (Slice 4, "Photo or video"). Text and Archived only have no facet and never
+/// hide; Untagged only hides with Tags, when the scope has no tags at all.
+SearchSectionState searchSectionState(
+  SearchSection section, {
+  required SearchScope scope,
+  required SearchFilters filters,
+  required SearchAvailability? scopeAvailability,
+  required SearchAvailability? current,
+}) {
+  if (scope.fixedSections.contains(section)) {
+    return SearchSectionState.hidden;
+  }
+  final active = switch (section) {
+    SearchSection.favorites => filters.favoritesOnly,
+    SearchSection.mediaType => filters.mediaType != SearchMediaType.all,
+    SearchSection.rating => filters.minRating != null,
+    SearchSection.camera => filters.camera != null,
+    SearchSection.albums => filters.album != SearchAlbumFilter.any,
+    SearchSection.text => !filters.text.isEmpty,
+    SearchSection.archived => filters.archivedOnly,
+    SearchSection.untagged => filters.untagged,
+    SearchSection.people => filters.people.isNotEmpty,
+    SearchSection.when => filters.date != null,
+    SearchSection.places => filters.place != null,
+    SearchSection.tags => filters.tags.isNotEmpty,
+  };
+  if (active) {
+    return SearchSectionState.available;
+  }
+  if (scopeAvailability != null && !_sectionHasOptions(section, scopeAvailability, wholeScope: true)) {
+    return SearchSectionState.hidden;
+  }
+  if (current != null && !_sectionHasOptions(section, current, wholeScope: false)) {
+    return SearchSectionState.greyed;
+  }
+  return SearchSectionState.available;
+}
+
+bool _sectionHasOptions(SearchSection section, SearchAvailability a, {required bool wholeScope}) => switch (section) {
+  SearchSection.favorites => a.hasFavorites,
+  // #910 §4.3: the control discriminates only when the scope holds both types. Under the current filters it greys only
+  // when nothing is left at all (see searchSectionState).
+  SearchSection.mediaType => wholeScope ? a.hasImages && a.hasVideos : a.hasImages || a.hasVideos,
+  SearchSection.rating => a.hasRatings,
+  SearchSection.camera => a.hasCameras,
+  SearchSection.albums => a.hasAssetsInAlbum && a.hasAssetsNotInAlbum,
+  SearchSection.untagged => !wholeScope || a.hasTags,
+  SearchSection.people => a.hasPeople,
+  SearchSection.when => a.hasAssets,
+  SearchSection.places => a.hasPlaces,
+  SearchSection.tags => a.hasTags,
+  SearchSection.text || SearchSection.archived => true,
+};

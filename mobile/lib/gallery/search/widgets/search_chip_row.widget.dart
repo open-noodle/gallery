@@ -5,6 +5,7 @@ import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
+import 'package:immich_mobile/gallery/search/widgets/search_filters_sheet.widget.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_labels.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_sheets.widget.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -61,7 +62,10 @@ class SearchChipRow extends ConsumerWidget {
         return null;
       }
       final current = options.availability;
-      final possible = active || current == null || _has(chip, current);
+      // A date range (Filters sheet) is a When filter too: When stays tappable to replace it, even when the range
+      // leaves nothing (#910 §4.4 rule 1).
+      final dateFiltered = chip == SearchMainChip.when && filters.date != null;
+      final possible = active || dateFiltered || current == null || _has(chip, current);
       return _SearchChip(
         key: Key('search-chip-${chip.name}'),
         label: label,
@@ -79,17 +83,17 @@ class SearchChipRow extends ConsumerWidget {
           key: Key('search-extra-chip-${extra.name}'),
           label: searchExtraLabel(context, extra, filters),
           active: true,
+          leading: searchExtraIcon(extra, filters),
           trailing: Icons.close_rounded,
           semanticsLabel: context.t.filter_remove_chip(label: searchExtraLabel(context, extra, filters)),
           onTap: () => clearExtraFilter(ref, extra),
         ),
-      // The Filters sheet is Slice 4; the chip and its badge are in place.
       _SearchChip(
         key: const Key('search-chip-filters'),
         label: context.t.filters,
         leading: Icons.tune_rounded,
         badge: extras.isEmpty ? null : extras.length,
-        onTap: () {},
+        onTap: () => showSearchFiltersSheet(context),
       ),
       if (activeFilterCount(state, scope) >= 2)
         _SearchChip(

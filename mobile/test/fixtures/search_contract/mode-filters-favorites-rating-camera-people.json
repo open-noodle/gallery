@@ -1,0 +1,57 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites rated at least 3 from an iPhone 15: people only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "people"
+      ],
+      "isFavorite": true,
+      "make": "Apple",
+      "model": "iPhone 15",
+      "rating": 3,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": [
+        {
+          "count": 1,
+          "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isSelected": false,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "id": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "isSelected": false,
+          "name": "Rex",
+          "primaryProfile": {
+            "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+            "type": "user-person"
+          }
+        }
+      ]
+    },
+    "status": 200
+  }
+}
