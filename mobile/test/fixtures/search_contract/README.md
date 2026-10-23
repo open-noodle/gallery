@@ -32,6 +32,7 @@ appears depends on timing. A client shows a stale answer as it would any other a
   "actor": "me",                     // whose session sent it: me, partner or member (see the seed in the e2e spec)
   "description": "…",
   "setup": "smart-search",           // optional: smart search was switched on for this request (see below)
+  "responseView": "stock-immich",    // optional: the response as another server would give it (see "Scope flows")
   "request": {
     "method": "POST",
     "path": "/api/search/options",   // includes the /api prefix the app's base URL carries
@@ -55,7 +56,26 @@ name becomes `unknown-N`, numbered in order of first appearance in that file.
 
 Values the server sets on its own are fixed, keeping their JSON type so the generated Dart client still decodes them:
 `createdAt`, `updatedAt` and `profileChangedAt` become `2000-01-01T00:00:00.000Z`; `checksum`, `thumbhash` and
-`originalPath` become their own key name. Seeded values (taken dates, places, cameras, ratings, names) are real.
+`originalPath` become their own key name, also inside the column arrays of `/timeline/bucket`. Seeded values (taken
+dates, places, cameras, ratings, names) are real; the seed sets each asset's upload date (`createdAt`) to its taken date,
+so Recently added groups the same on every run. `/server/version` keeps only its `major` (the only part a client
+decides on, Gallery 5+ against stock Immich below 5): `minor` and `patch` become `0`.
+
+### Scope flows and fallbacks
+
+The `scope-<screen>-*` fixtures are one screen's search as the app runs it
+(`mobile/test/gallery/search/search_core_contract_test.dart`): the per-dimension options when search opens, the same
+after two filters (`scope-<screen>-filtered-*`), then the filtered results (`-timeline-buckets` and `-timeline-bucket`,
+or `-smart` in query mode). Photos opens on the `dimension-photos-*` set.
+
+Two fixture sets stand in for servers this stack is not:
+
+- **Older Gallery server** (`older-*`): `"responseView": "older-gallery"` drops `searchOptions` from `/server/features`;
+  options then come from `/search/suggestions/filters` and `/search/suggestions?type=city`.
+- **Stock Immich server** (`stock-*`): recorded without `x-gallery-app` (empty `headers`), so `/server/version` is the
+  Immich base a stock client sees, and `"responseView": "stock-immich"` keeps only upstream's `/server/features` keys.
+
+The view is applied to the real response both when recording and when verifying.
 
 ## Matching rule (for the mobile stand-in server)
 

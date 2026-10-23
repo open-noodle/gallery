@@ -40,11 +40,19 @@ type ContractRequest = {
   headers: Record<string, string>;
 };
 
+/**
+ * How a fallback fixture shows a server this one is not (see the README):
+ * - `older-gallery`: a Gallery server from before `POST /search/options`: `/server/features` without `searchOptions`;
+ * - `stock-immich`: a stock Immich server at the base version: `/server/features` with upstream's keys only.
+ */
+type ResponseView = 'older-gallery' | 'stock-immich';
+
 type Fixture = {
   description: string;
   actor: Actor;
   /** `smart-search`: smart search is switched on (and embeddings are seeded) while this request runs. */
   setup?: 'smart-search';
+  responseView?: ResponseView;
   request: ContractRequest;
   response: { status: number; body: Json };
   /** Legend: the stable fake UUID each fixture uses in place of a real id, and what it names. */
@@ -54,6 +62,8 @@ type Fixture = {
 type FixtureCase = Omit<Fixture, 'response' | 'ids' | 'request'> & {
   name: string;
   request: Omit<ContractRequest, 'headers'>;
+  /** Sent as a stock client sees the server: without `x-gallery-app`, so `/server/version` is the Immich base. */
+  stockClient?: boolean;
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -263,7 +273,9 @@ const seed = async () => {
   // Metadata straight into the database: the uploads are 1px PNGs with no EXIF, and no sidecar write may race it.
   for (const [label, seedValue] of Object.entries(assetSeeds)) {
     await db.query(
-      `UPDATE "asset" SET "fileCreatedAt" = $2, "localDateTime" = $2, "type" = $3, "visibility" = $4 WHERE "id" = $1`,
+      // createdAt too: Recently added groups by upload date, which would otherwise be the day of the run.
+      `UPDATE "asset" SET "fileCreatedAt" = $2, "localDateTime" = $2, "createdAt" = $2, "type" = $3, "visibility" = $4
+       WHERE "id" = $1`,
       [id(`asset:${label}`), seedValue.takenAt, seedValue.type ?? 'IMAGE', seedValue.visibility ?? 'timeline'],
     );
     await db.query(
@@ -453,7 +465,8 @@ class Normalizer {
       return this.string(value);
     }
     if (Array.isArray(value)) {
-      return value.map((item) => this.json(item));
+      // The key carries over, so a column array of /timeline/bucket (`createdAt`, `thumbhash`) is fixed per item.
+      return value.map((item) => this.json(item, key));
     }
     if (value && typeof value === 'object') {
       return Object.fromEntries(Object.entries(value).map(([entryKey, item]) => [entryKey, this.json(item, entryKey)]));
@@ -504,12 +517,48 @@ const send = async (actor: Actor, contract: ContractRequest) => {
   if (path === '/search/options' && body && typeof body === 'object') {
     delete (body as { stale?: boolean }).stale;
   }
+  // The version moves with every release (Gallery) and rebase (the Immich base a stock client sees); only the major
+  // decides anything in a client (Gallery 5+ against stock Immich below 5), so minor and patch are fixed.
+  if (path === '/server/version' && body && typeof body === 'object') {
+    Object.assign(body, { minor: 0, patch: 0 });
+  }
   return { status, body: body as Json };
 };
 
-const run = async (fixture: Pick<Fixture, 'actor' | 'setup' | 'request'>) => {
+/** `/server/features` of stock Immich at the base version: upstream's ServerFeaturesDto keys only. */
+const UPSTREAM_FEATURE_KEYS = new Set([
+  'configFile',
+  'duplicateDetection',
+  'email',
+  'facialRecognition',
+  'importFaces',
+  'map',
+  'oauth',
+  'oauthAutoLaunch',
+  'ocr',
+  'passwordLogin',
+  'realtimeTranscoding',
+  'reverseGeocoding',
+  'search',
+  'sidecar',
+  'smartSearch',
+  'trash',
+]);
+
+const applyView = (view: ResponseView | undefined, path: string, body: Json): Json => {
+  if (!view || path !== '/api/server/features' || !body || typeof body !== 'object' || Array.isArray(body)) {
+    return body;
+  }
+  if (view === 'older-gallery') {
+    return Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'searchOptions'));
+  }
+  return Object.fromEntries(Object.entries(body).filter(([key]) => UPSTREAM_FEATURE_KEYS.has(key)));
+};
+
+const run = async (fixture: Pick<Fixture, 'actor' | 'setup' | 'request' | 'responseView'>) => {
   const call = () => send(fixture.actor, fixture.request);
-  return fixture.setup === 'smart-search' ? withSmartSearch(call) : call();
+  const response = await (fixture.setup === 'smart-search' ? withSmartSearch(call) : call());
+  return { ...response, body: applyView(fixture.responseView, fixture.request.path, response.body) };
 };
 
 const toFixture = (
@@ -518,6 +567,7 @@ const toFixture = (
   setup: Fixture['setup'],
   realRequest: ContractRequest,
   response: { status: number; body: Json },
+  responseView?: ResponseView,
 ): Fixture => {
   const normalizer = new Normalizer();
   const normalizedRequest = normalizer.json(realRequest as unknown as Json) as unknown as ContractRequest;
@@ -526,6 +576,7 @@ const toFixture = (
     description,
     actor,
     ...(setup && { setup }),
+    ...(responseView && { responseView }),
     request: normalizedRequest as unknown as Json,
     response: { status: response.status, body: normalizedBody },
     ids: normalizer.legend,
@@ -569,7 +620,306 @@ const perDimension = (name: string, description: string, body: () => Record<stri
     })),
   );
 
+/**
+ * One screen's search as the mobile app runs it (mobile/test/gallery/search/search_core_contract_test.dart): options
+ * when search opens (availability, then one request per list), the same after two filters, then the results of the
+ * filtered state: `/timeline/buckets` and its first bucket in browse mode, the first `/search/smart` page in query mode.
+ * Each body is exactly what the app sends for that scope (mobile/lib/gallery/search/search_scope.dart).
+ */
+type ScopeFlow = {
+  name: string;
+  description: string;
+  setup?: 'smart-search';
+  /** The unfiltered options body; omitted when another fixture set already records it. */
+  unfiltered?: () => Record<string, Json>;
+  filtered: () => Record<string, Json>;
+  /** Browse: the filtered /timeline/buckets query and the bucket the app opens first. */
+  timeline?: { query: () => Query; firstBucket: string };
+  /** Query mode: the filtered /search/smart body. */
+  smart?: () => Record<string, Json>;
+};
+
+const scopeFlowCases = (flow: ScopeFlow): FixtureCase[] => {
+  const withSetup = (cases: FixtureCase[]) =>
+    cases.map((item) => ({ ...item, ...(flow.setup && { setup: flow.setup }) }));
+  const { timeline, smart } = flow;
+  return [
+    ...(flow.unfiltered ? withSetup(perDimension(`scope-${flow.name}`, flow.description, flow.unfiltered)) : []),
+    ...withSetup(perDimension(`scope-${flow.name}-filtered`, `${flow.description}, two filters`, flow.filtered)),
+    ...(timeline
+      ? [
+          {
+            name: `scope-${flow.name}-filtered-timeline-buckets`,
+            description: `${flow.description}, two filters: browse results`,
+            actor: 'me' as const,
+            get request(): FixtureCase['request'] {
+              return { method: 'GET', path: '/api/timeline/buckets', query: timeline.query() };
+            },
+          },
+          {
+            name: `scope-${flow.name}-filtered-timeline-bucket`,
+            description: `${flow.description}, two filters: the first month of the browse results`,
+            actor: 'me' as const,
+            get request(): FixtureCase['request'] {
+              return {
+                method: 'GET',
+                path: '/api/timeline/bucket',
+                query: { ...timeline.query(), timeBucket: timeline.firstBucket },
+              };
+            },
+          },
+        ]
+      : []),
+    ...(smart
+      ? withSetup([
+          {
+            name: `scope-${flow.name}-filtered-smart`,
+            description: `${flow.description}, two filters: the first page of query results`,
+            actor: 'me',
+            get request(): FixtureCase['request'] {
+              return { method: 'POST', path: '/api/search/smart', body: { ...smart(), page: 1, size: 100 } };
+            },
+          },
+        ])
+      : []),
+  ];
+};
+
+const asQuery = (body: Record<string, Json>): Query =>
+  Object.fromEntries(
+    Object.entries(body).map(([key, value]) => [key, Array.isArray(value) ? value.map(String) : String(value)]),
+  );
+
+// Request bodies of the scope flows below (called once the seed has named every id).
+const photosKyoto = { ...photos, country: 'Japan', city: 'Kyoto', rating: 3 };
+const spaceFiltered = () => ({
+  spaceId: id('space:family'),
+  spacePersonIds: [id('space-person:pia')],
+  country: 'Japan',
+  city: 'Kyoto',
+});
+const personFiltered = () => ({ personIds: [id('person:anna'), id('person:ben')], country: 'Japan' });
+const spacePersonFiltered = () => ({
+  spaceId: id('space:family'),
+  spacePersonIds: [id('space-person:pia')],
+  make: 'Sony',
+  model: 'A7 IV',
+  type: 'IMAGE',
+});
+const placeFiltered = () => ({
+  ...photos,
+  city: 'Lisbon',
+  personIds: [`person:${id('person:anna')}`],
+  make: 'Apple',
+});
+const favoritesFiltered = () => ({ isFavorite: true, personIds: [id('person:anna')], country: 'Portugal' });
+const archive = () => ({ visibility: 'archive', ownerId: id('user:me') });
+const archiveFiltered = () => ({ ...archive(), country: 'Japan', city: 'Osaka', type: 'IMAGE' });
+const videosFiltered = {
+  ...photos,
+  type: 'VIDEO',
+  country: 'Germany',
+  takenAfter: '2024-01-01T00:00:00.000Z',
+  takenBefore: '2025-01-01T00:00:00.000Z',
+};
+const recentlyAddedFiltered = () => ({ ownerId: id('user:me'), tagIds: [id('tag:beach')], rating: 5 });
+const recentlyTaken = () => ({ visibility: 'timeline', ownerId: id('user:me') });
+const recentlyTakenFiltered = () => ({ ...recentlyTaken(), ocr: 'menu', originalFileName: 'menu' });
+const similar = () => ({ ...smartPhotos, queryAssetId: id('asset:kyoto-1'), type: 'IMAGE' });
+const similarFiltered = () => ({ ...similar(), country: 'Japan', city: 'Kyoto', make: 'Fujifilm' });
+
+/** The scope table, each with two filters a user could pick there. */
+const scopeFlows = (): ScopeFlow[] => [
+  // Photos unfiltered is the dimension-photos-* set.
+  {
+    name: 'photos',
+    description: 'Photos, Kyoto rated at least 3',
+    filtered: () => photosKyoto,
+    timeline: { query: () => asQuery(photosKyoto), firstBucket: '2024-06-01' },
+  },
+  {
+    name: 'album',
+    description: 'Album screen, Japan photos',
+    unfiltered: () => ({ albumIds: [id('album:trip')] }),
+    filtered: () => ({ albumIds: [id('album:trip')], country: 'Japan', type: 'IMAGE' }),
+    timeline: {
+      query: () => ({ albumId: id('album:trip'), country: 'Japan', type: 'IMAGE' }),
+      firstBucket: '2024-06-01',
+    },
+  },
+  {
+    name: 'space-album',
+    description: 'Space album screen, Madrid photos',
+    unfiltered: () => ({ albumIds: [id('album:space-trip')] }),
+    filtered: () => ({ albumIds: [id('album:space-trip')], country: 'Spain', city: 'Madrid', type: 'IMAGE' }),
+    timeline: {
+      query: () => ({ albumId: id('album:space-trip'), country: 'Spain', city: 'Madrid', type: 'IMAGE' }),
+      firstBucket: '2023-07-01',
+    },
+  },
+  {
+    name: 'space',
+    description: 'Space screen, Pia in Kyoto',
+    unfiltered: () => ({ spaceId: id('space:family') }),
+    filtered: spaceFiltered,
+    timeline: { query: () => asQuery(spaceFiltered()), firstBucket: '2024-06-01' },
+  },
+  {
+    name: 'personal-person',
+    description: 'Personal person screen (Anna), with Ben, in Japan',
+    unfiltered: () => ({ personIds: [id('person:anna')] }),
+    filtered: personFiltered,
+    timeline: { query: () => asQuery(personFiltered()), firstBucket: '2024-06-01' },
+  },
+  {
+    name: 'space-person',
+    description: 'Space person screen (Pia), Sony photos',
+    unfiltered: () => ({ spaceId: id('space:family'), spacePersonIds: [id('space-person:pia')] }),
+    filtered: spacePersonFiltered,
+    timeline: { query: () => asQuery(spacePersonFiltered()), firstBucket: '2024-06-01' },
+  },
+  {
+    name: 'place',
+    description: 'Place screen (Lisbon), Anna with an Apple camera',
+    unfiltered: () => ({ ...photos, city: 'Lisbon' }),
+    filtered: placeFiltered,
+    timeline: { query: () => asQuery(placeFiltered()), firstBucket: '2023-09-01' },
+  },
+  {
+    name: 'favorites',
+    description: 'Favorites screen, Anna in Portugal',
+    unfiltered: () => ({ isFavorite: true }),
+    filtered: favoritesFiltered,
+    timeline: { query: () => asQuery(favoritesFiltered()), firstBucket: '2023-09-01' },
+  },
+  {
+    name: 'archive',
+    description: 'Archive screen, Osaka photos',
+    unfiltered: archive,
+    filtered: archiveFiltered,
+    timeline: { query: () => asQuery(archiveFiltered()), firstBucket: '2022-12-01' },
+  },
+  {
+    name: 'videos',
+    description: 'Videos screen, Germany in 2024',
+    unfiltered: () => ({ ...photos, type: 'VIDEO' }),
+    filtered: () => videosFiltered,
+    timeline: { query: () => asQuery(videosFiltered), firstBucket: '2024-02-01' },
+  },
+  {
+    name: 'recently-added',
+    description: 'Recently added screen, beach rated 5',
+    unfiltered: () => ({ ownerId: id('user:me') }),
+    filtered: recentlyAddedFiltered,
+    timeline: {
+      query: () => ({ ...asQuery(recentlyAddedFiltered()), orderBy: 'createdAt' }),
+      firstBucket: '2024-06-01',
+    },
+  },
+  {
+    name: 'recently-taken',
+    description: 'Recently taken screen, OCR and file name "menu"',
+    unfiltered: recentlyTaken,
+    filtered: recentlyTakenFiltered,
+    timeline: { query: () => asQuery(recentlyTakenFiltered()), firstBucket: '2024-01-01' },
+  },
+  {
+    name: 'similar',
+    description: 'Similar photos (query mode), Kyoto with a Fujifilm',
+    setup: 'smart-search',
+    unfiltered: similar,
+    filtered: similarFiltered,
+    smart: similarFiltered,
+  },
+];
+
+/**
+ * The compatibility fallbacks: an older Gallery server (no `searchOptions`) and a stock Immich server, as the new app
+ * meets them. The app asks `/server/version` and `/server/features` first.
+ */
+const fallbackCases = (): FixtureCase[] => {
+  const olderFilters = (name: string, description: string, query: Query): FixtureCase => ({
+    name,
+    description,
+    actor: 'me',
+    request: { method: 'GET', path: '/api/search/suggestions/filters', query },
+  });
+  const olderCities = (name: string, country: string, query: Query): FixtureCase => ({
+    name: `${name}-${country.toLowerCase()}`,
+    description: `Older Gallery server: the cities of ${country}, fetched after the countries`,
+    actor: 'me',
+    request: { method: 'GET', path: '/api/search/suggestions', query: { ...query, type: 'city', country } },
+  });
+  const stockMetadata = { visibility: 'timeline', type: 'IMAGE', isFavorite: true };
+  return [
+    {
+      name: 'older-server-version',
+      description: 'Older Gallery server: its version as the Gallery app sees it',
+      actor: 'me',
+      request: { method: 'GET', path: '/api/server/version' },
+    },
+    {
+      name: 'older-server-features',
+      description: 'Older Gallery server: features without searchOptions',
+      actor: 'me',
+      responseView: 'older-gallery',
+      request: { method: 'GET', path: '/api/server/features' },
+    },
+    olderFilters('older-filters-photos', 'Older Gallery server: Photos options, no counts', {
+      withSharedSpaces: 'true',
+    }),
+    ...['Japan', 'Portugal', 'France', 'Spain', 'Germany'].map((country) =>
+      olderCities('older-cities-photos', country, { withSharedSpaces: 'true' }),
+    ),
+    olderFilters('older-filters-photos-kyoto', 'Older Gallery server: Photos options, Kyoto rated at least 3', {
+      withSharedSpaces: 'true',
+      country: 'Japan',
+      city: 'Kyoto',
+      rating: '3',
+    }),
+    // The countries that answer lists (the suggestion endpoint does not ignore the place filter for countries).
+    ...['France', 'Japan', 'Portugal'].map((country) =>
+      olderCities('older-cities-photos-kyoto', country, { withSharedSpaces: 'true', rating: '3' }),
+    ),
+    {
+      name: 'stock-server-version',
+      description: 'Stock Immich server: the base version a stock client sees (no x-gallery-app)',
+      actor: 'me',
+      stockClient: true,
+      request: { method: 'GET', path: '/api/server/version' },
+    },
+    {
+      name: 'stock-server-features',
+      description: "Stock Immich server: upstream's feature keys only",
+      actor: 'me',
+      stockClient: true,
+      responseView: 'stock-immich',
+      request: { method: 'GET', path: '/api/server/features' },
+    },
+    {
+      name: 'stock-search-metadata-photos',
+      description: 'Stock Immich server: browse results through metadata search, upstream fields only',
+      actor: 'me',
+      stockClient: true,
+      request: {
+        method: 'POST',
+        path: '/api/search/metadata',
+        body: { ...stockMetadata, order: 'desc', page: 1, size: 100 },
+      },
+    },
+    {
+      name: 'stock-search-statistics-photos',
+      description: 'Stock Immich server: the exact total of that metadata search',
+      actor: 'me',
+      stockClient: true,
+      request: { method: 'POST', path: '/api/search/statistics', body: stockMetadata },
+    },
+  ];
+};
+
 const fixtureCases = (): FixtureCase[] => [
+  ...scopeFlows().flatMap((flow) => scopeFlowCases(flow)),
+  ...fallbackCases(),
   ...perDimension('dimension-photos', 'Photos, unfiltered', () => photos),
   ...perDimension('dimension-photos-kyoto', 'Photos with a city', () => ({ ...photos, city: 'Kyoto' })),
   options('options-photos', 'Photos: own + timeline partners + timeline spaces, timeline visibility', () => photos),
@@ -756,6 +1106,12 @@ const fixtureCases = (): FixtureCase[] => [
     request: { method: 'POST', path: '/api/search/smart', body: { ...smartPhotos, query: 'beach', size: 100 } },
   },
   {
+    name: 'server-version',
+    description: 'Server version, as the Gallery app sees it',
+    actor: 'me',
+    request: { method: 'GET', path: '/api/server/version' },
+  },
+  {
     name: 'server-features',
     description: 'Server features, including searchOptions',
     actor: 'me',
@@ -910,10 +1266,10 @@ describe('mobile search contract', () => {
       }
 
       mkdirSync(FIXTURE_DIR, { recursive: true });
-      for (const { name, description, actor, setup, request: base } of cases) {
-        const realRequest: ContractRequest = { ...base, headers: GALLERY_APP_HEADER };
-        const response = await run({ actor, setup, request: realRequest });
-        const fixture = toFixture(description, actor, setup, realRequest, response);
+      for (const { name, description, actor, setup, responseView, stockClient, request: base } of cases) {
+        const realRequest: ContractRequest = { ...base, headers: stockClient ? {} : GALLERY_APP_HEADER };
+        const response = await run({ actor, setup, request: realRequest, responseView });
+        const fixture = toFixture(description, actor, setup, realRequest, response, responseView);
         writeFileSync(fixturePath(name), `${JSON.stringify(fixture, null, 2)}\n`);
       }
     });
@@ -921,8 +1277,20 @@ describe('mobile search contract', () => {
     it.skipIf(RECORD)('every fixture matches the server', async () => {
       for (const { name, fixture } of readFixtures()) {
         const realRequest = denormalize(fixture.request as unknown as Json) as unknown as ContractRequest;
-        const response = await run({ actor: fixture.actor, setup: fixture.setup, request: realRequest });
-        const actual = toFixture(fixture.description, fixture.actor, fixture.setup, realRequest, response);
+        const response = await run({
+          actor: fixture.actor,
+          setup: fixture.setup,
+          request: realRequest,
+          responseView: fixture.responseView,
+        });
+        const actual = toFixture(
+          fixture.description,
+          fixture.actor,
+          fixture.setup,
+          realRequest,
+          response,
+          fixture.responseView,
+        );
         expect({ fixture: name, ...actual }).toEqual({ fixture: name, ...fixture });
       }
     });

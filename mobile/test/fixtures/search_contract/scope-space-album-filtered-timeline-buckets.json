@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Space album screen, Madrid photos, two filters: browse results",
+  "ids": {
+    "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec": "album:space-trip"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "albumId": "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec",
+      "city": "Madrid",
+      "country": "Spain",
+      "type": "IMAGE"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 2,
+        "timeBucket": "2023-07-01"
+      }
+    ],
+    "status": 200
+  }
+}

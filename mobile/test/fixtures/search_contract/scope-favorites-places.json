@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

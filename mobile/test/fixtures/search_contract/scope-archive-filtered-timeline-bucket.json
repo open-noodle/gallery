@@ -1,0 +1,97 @@
+{
+  "actor": "me",
+  "description": "Archive screen, Osaka photos, two filters: the first month of the browse results",
+  "ids": {
+    "a24ab78e-5402-4e88-8a12-332890ee66d7": "asset:archived-1",
+    "bb734221-a439-4274-8d56-033bc9944906": "asset:archived-2",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "city": "Osaka",
+      "country": "Japan",
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+      "timeBucket": "2022-12-01",
+      "type": "IMAGE",
+      "visibility": "archive"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Osaka",
+        "Osaka"
+      ],
+      "country": [
+        "Japan",
+        "Japan"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null,
+        null
+      ],
+      "fileCreatedAt": [
+        "2022-12-02T10:00:00",
+        "2022-12-01T10:00:00"
+      ],
+      "id": [
+        "bb734221-a439-4274-8d56-033bc9944906",
+        "a24ab78e-5402-4e88-8a12-332890ee66d7"
+      ],
+      "isFavorite": [
+        false,
+        false
+      ],
+      "isImage": [
+        true,
+        true
+      ],
+      "isTrashed": [
+        false,
+        false
+      ],
+      "livePhotoVideoId": [
+        null,
+        null
+      ],
+      "localOffsetHours": [
+        0,
+        0
+      ],
+      "ownerId": [
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+        "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+      ],
+      "projectionType": [
+        null,
+        null
+      ],
+      "ratio": [
+        1,
+        1
+      ],
+      "status": [
+        "active",
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash",
+        "thumbhash"
+      ],
+      "visibility": [
+        "archive",
+        "archive"
+      ]
+    },
+    "status": 200
+  }
+}

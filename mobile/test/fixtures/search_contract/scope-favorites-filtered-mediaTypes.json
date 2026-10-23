@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal, two filters: mediaTypes only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna"
+  },
+  "request": {
+    "body": {
+      "country": "Portugal",
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "isFavorite": true,
+      "personIds": [
+        "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 1,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

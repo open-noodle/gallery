@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal: cameras only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

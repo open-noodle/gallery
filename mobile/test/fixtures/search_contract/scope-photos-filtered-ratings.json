@@ -1,0 +1,38 @@
+{
+  "actor": "me",
+  "description": "Photos, Kyoto rated at least 3, two filters: ratings only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "dimensions": [
+        "ratings"
+      ],
+      "rating": 3,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 3
+        },
+        {
+          "count": 1,
+          "rating": 5
+        }
+      ]
+    },
+    "status": 200
+  }
+}

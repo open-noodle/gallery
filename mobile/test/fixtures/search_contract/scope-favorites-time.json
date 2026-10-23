@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal: time only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "time"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2023-09-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

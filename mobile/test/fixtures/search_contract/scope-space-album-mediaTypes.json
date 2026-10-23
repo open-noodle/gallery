@@ -1,0 +1,33 @@
+{
+  "actor": "me",
+  "description": "Space album screen, Madrid photos: mediaTypes only",
+  "ids": {
+    "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec": "album:space-trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec"
+      ],
+      "dimensions": [
+        "mediaTypes"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 2,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

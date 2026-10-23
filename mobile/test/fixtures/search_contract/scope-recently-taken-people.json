@@ -1,0 +1,65 @@
+{
+  "actor": "me",
+  "description": "Recently taken screen, OCR and file name \"menu\": people only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "people"
+      ],
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+      "visibility": "timeline"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": [
+        {
+          "count": 3,
+          "filterId": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isSelected": false,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "c360094e-5899-4aea-88e0-01a3aafd727b",
+          "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isSelected": false,
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "isSelected": false,
+          "name": "Rex",
+          "primaryProfile": {
+            "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+            "type": "user-person"
+          }
+        }
+      ]
+    },
+    "status": 200
+  }
+}

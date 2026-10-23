@@ -1,0 +1,97 @@
+{
+  "actor": "me",
+  "description": "Space album screen, Madrid photos, two filters: the first month of the browse results",
+  "ids": {
+    "08b4be8b-387c-43d7-8bcb-8caca60426b8": "asset:space-album-2",
+    "8fe25f55-7e1b-412b-8952-75af4d28b51c": "asset:space-album-1",
+    "ded86da4-c2dc-4fa2-8868-4242e72fd3c7": "user:member",
+    "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec": "album:space-trip"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "albumId": "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec",
+      "city": "Madrid",
+      "country": "Spain",
+      "timeBucket": "2023-07-01",
+      "type": "IMAGE"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Madrid",
+        "Madrid"
+      ],
+      "country": [
+        "Spain",
+        "Spain"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null,
+        null
+      ],
+      "fileCreatedAt": [
+        "2023-07-02T10:00:00",
+        "2023-07-01T10:00:00"
+      ],
+      "id": [
+        "08b4be8b-387c-43d7-8bcb-8caca60426b8",
+        "8fe25f55-7e1b-412b-8952-75af4d28b51c"
+      ],
+      "isFavorite": [
+        false,
+        false
+      ],
+      "isImage": [
+        true,
+        true
+      ],
+      "isTrashed": [
+        false,
+        false
+      ],
+      "livePhotoVideoId": [
+        null,
+        null
+      ],
+      "localOffsetHours": [
+        0,
+        0
+      ],
+      "ownerId": [
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7",
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7"
+      ],
+      "projectionType": [
+        null,
+        null
+      ],
+      "ratio": [
+        1,
+        1
+      ],
+      "status": [
+        "active",
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash",
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline",
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -508,6 +508,8 @@ Each slice merges to `main` on its own. `main` must keep working between slices:
   - Choosing a tag clears Untagged, and the reverse.
   - A reference photo sets Photos only and Relevance.
   - Query and reference photo replace each other.
+- **Warm-up.** Given the server reports `searchOptions`, when the Photos tab first shows, the app requests the unfiltered availability and every dimension for the Photos scope once, in the background. This fills the server's unfiltered cache, whose cold cost at 500k photos is about 5.8 s (`specs/research/2026-10-23-search-options-500k-benchmark.md`), before search opens. No warm-up is sent to an older or stock server, and a failed warm-up is silent.
+- **Loading order.** When search mode opens, availability is requested first. Every dimension is then requested in parallel, and a response marked `stale: true` is shown as-is.
 - **Race.** Given an options request for filter A is still in flight when filter B is applied, when A's response arrives after B's, then A's response is dropped.
 - **Older Gallery server** (no flag): options come from `/search/suggestions/filters` with no counts, and cities from `/search/suggestions?type=city` per country. Nothing throws.
 - **Stock Immich server:** facet options are unavailable (as `serverSupportsSpacesProvider` decides today). Results still work, and dates use the `localTakenRange` encoding when the server lacks it.

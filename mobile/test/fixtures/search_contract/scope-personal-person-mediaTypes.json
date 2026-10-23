@@ -1,0 +1,33 @@
+{
+  "actor": "me",
+  "description": "Personal person screen (Anna), with Ben, in Japan: mediaTypes only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "personIds": [
+        "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 3,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

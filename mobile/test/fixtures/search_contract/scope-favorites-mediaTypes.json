@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Favorites screen, Anna in Portugal: mediaTypes only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 1,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}
