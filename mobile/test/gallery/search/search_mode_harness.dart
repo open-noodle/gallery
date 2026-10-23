@@ -33,7 +33,6 @@ import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
-import 'package:immich_mobile/providers/photos_filter/filter_count.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -599,6 +598,13 @@ class FakeSearchRepository implements GallerySearchRepository {
   Future<int?> statistics(SearchParams p) async => results(p).length;
 
   @override
+  Future<api.AssetResponseDto?> assetInfo(String id) async {
+    calls.add('asset $id');
+    final asset = library.assets.where((a) => a.id == id).firstOrNull;
+    return asset == null ? null : _assetDto(asset);
+  }
+
+  @override
   Future<SearchOptionsPart> fallbackOptions(SearchParams p) => options(p, dimensions: SearchDimension.values.toSet());
 
   @override
@@ -670,7 +676,6 @@ class SearchModeDatabase {
 ProviderContainer searchModeContainer({
   required Drift db,
   required GallerySearchRepository repository,
-  bool preview = true,
   List<String> recentPersonIds = const [],
   bool memories = false,
   bool realDebounce = false,
@@ -686,11 +691,9 @@ ProviderContainer searchModeContainer({
       infra.userServiceProvider.overrideWithValue(users),
       currentUserProvider.overrideWith((ref) => _StubUser(users, testUser)),
       timelineUsersProvider.overrideWith((_) => Stream.value([testUserId])),
-      photosFilterCountProvider.overrideWith((ref) => 0),
       featureMessageServiceProvider.overrideWithValue(_StubFeatureMessages()),
       memoryLaneProvider.overrideWith((ref) async => memories ? [_memory()] : const <Memory>[]),
       gallerySearchRepositoryProvider.overrideWithValue(repository),
-      searchPreviewEnabledProvider.overrideWith(() => _FixedPreview(preview)),
       searchRecentPersonIdsProvider.overrideWith((ref) async => recentPersonIds),
       if (!realDebounce) ...[
         searchOptionsDebounceProvider.overrideWithValue(Duration.zero),
@@ -700,18 +703,6 @@ ProviderContainer searchModeContainer({
       ...extra,
     ],
   );
-}
-
-class _FixedPreview extends SearchPreviewNotifier {
-  final bool enabled;
-
-  _FixedPreview(this.enabled);
-
-  @override
-  bool build() => enabled;
-
-  @override
-  Future<void> set(bool enabled) async => state = enabled;
 }
 
 Memory _memory() => Memory(
@@ -758,7 +749,7 @@ Future<void> settleFrames(WidgetTester tester, {int frames = 20}) async {
   }
 }
 
-/// The search button's preview path: what openGallerySearch does once on the Photos tab.
+/// What the search button (openGallerySearch) does once on the Photos tab.
 Future<void> enterSearchMode(WidgetTester tester, ProviderContainer container) async {
   container.read(searchModeProvider.notifier).enter();
   await settleFrames(tester);

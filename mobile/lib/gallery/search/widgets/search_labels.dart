@@ -38,10 +38,17 @@ String searchDateLabel(BuildContext context, SearchDate date) => switch (date) {
     SearchQuickRange.thisMonth => context.t.filter_sheet_when_month,
     SearchQuickRange.thisYear => context.t.filter_sheet_when_year,
   },
-  SearchDateCustom(:final from, :final to) => context.t.search_filter_date_interval(
+  SearchDateCustom(:final from?, :final to?) => context.t.search_filter_date_interval(
     start: _format(context, DateFormat.yMMMd).format(from),
     end: _format(context, DateFormat.yMMMd).format(to),
   ),
+  SearchDateCustom(:final from?) => context.t.search_filter_date_since(
+    date: _format(context, DateFormat.yMMMd).format(from),
+  ),
+  SearchDateCustom(:final to?) => context.t.search_filter_date_until(
+    date: _format(context, DateFormat.yMMMd).format(to),
+  ),
+  SearchDateCustom() => '',
 };
 
 /// The People chip's value: first names, as the prototype shows them ("Anna, Ben").

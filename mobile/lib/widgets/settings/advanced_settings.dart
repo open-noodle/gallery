@@ -7,7 +7,6 @@ import 'package:flutter_hooks/flutter_hooks.dart' hide Store;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/log.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/gallery/search/widgets/search_preview_setting.widget.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
@@ -115,7 +114,6 @@ class AdvancedSettings extends HookConsumerWidget {
         title: context.t.advanced_settings_prefer_remote_title,
         subtitle: context.t.advanced_settings_prefer_remote_subtitle,
       ),
-      const SearchPreviewSetting(),
       const CustomProxyHeaderSettings(),
       const SslClientCertSettings(),
       SettingsSwitchListTile(

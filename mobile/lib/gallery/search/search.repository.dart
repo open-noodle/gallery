@@ -29,14 +29,21 @@ class GallerySearchRepository {
   final SearchApi _search;
   final TimelineApi _timeline;
   final ServerApi _server;
+  final AssetsApi? _assets;
 
   const GallerySearchRepository({
     required SearchApi searchApi,
     required TimelineApi timelineApi,
     required ServerApi serverApi,
+    AssetsApi? assetsApi,
   }) : _search = searchApi,
        _timeline = timelineApi,
-       _server = serverApi;
+       _server = serverApi,
+       _assets = assetsApi;
+
+  /// `GET /assets/{id}`: the whole asset behind a result built from /timeline/bucket columns, which carry no name,
+  /// checksum or edit flag (see completeSearchResultInViewer).
+  Future<AssetResponseDto?> assetInfo(String id) async => _assets?.getAssetInfo(id);
 
   Future<SearchServerCapabilities> capabilities() async {
     final version = await _server.getServerVersion();

@@ -14,7 +14,12 @@ import 'package:openapi/api.dart';
 
 final gallerySearchRepositoryProvider = Provider<GallerySearchRepository>((ref) {
   final api = ref.watch(apiServiceProvider);
-  return GallerySearchRepository(searchApi: api.searchApi, timelineApi: api.timelineApi, serverApi: api.serverInfoApi);
+  return GallerySearchRepository(
+    searchApi: api.searchApi,
+    timelineApi: api.timelineApi,
+    serverApi: api.serverInfoApi,
+    assetsApi: api.assetsApi,
+  );
 });
 
 /// Read once per session: which search calls the server answers.

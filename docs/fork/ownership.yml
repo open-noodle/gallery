@@ -227,7 +227,11 @@ features:
       - web/src/lib/components/shared-components/purchasing/PurchaseContent.svelte
       - server/src/controllers/gallery-map.controller.ts
       - server/src/dtos/gallery-map.dto.ts
-      # Mobile search ↔ server contract (specs/2026-10-23-mobile-search-redesign-design.md).
+      # Mobile search mode, which replaced the old photos filter sheet, and its contract with the server
+      # (specs/2026-10-23-mobile-search-redesign-design.md).
+      - mobile/lib/gallery/search/**
+      - mobile/lib/gallery/utils/retired_store_keys.dart
+      - mobile/test/gallery/search/**
       - e2e/src/specs/server/api/gallery-search-contract.e2e-spec.ts
       - mobile/test/fixtures/search_contract/**
     upstream_extension_paths:
@@ -306,9 +310,6 @@ features:
     risk: high
     domains: [mobile, web, ci, config]
     owned_paths:
-      - mobile/lib/providers/photos_filter/**
-      - mobile/lib/presentation/pages/photos_filter/**
-      - mobile/lib/presentation/widgets/filter_sheet/**
       - mobile/lib/providers/gallery_nav/**
       - mobile/lib/presentation/widgets/gallery_nav/**
       - mobile/ios/Runner/Info.plist

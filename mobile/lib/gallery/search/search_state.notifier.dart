@@ -41,10 +41,14 @@ class SearchStateNotifier extends Notifier<SearchState> {
     sort: SearchSort.relevance,
   );
 
-  /// Removing the query token. Relevance means nothing without a query, so it falls back to Newest.
+  /// Removing the query token. Relevance means nothing without a query, so it falls back to Newest. Removing a reference
+  /// photo also drops the Photos only it brought, so search is unfiltered again unless other chips were added.
   void clearQuery() => state = state.copyWith(
     query: const SearchQuery.none(),
     sort: state.sort == SearchSort.relevance ? SearchSort.newest : state.sort,
+    filters: state.query is SearchQuerySimilarTo && _filters.mediaType == SearchMediaType.image
+        ? _filters.copyWith(mediaType: SearchMediaType.all)
+        : _filters,
   );
 
   /// Relevance is only offered while a query is active.

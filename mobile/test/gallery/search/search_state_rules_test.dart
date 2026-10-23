@@ -87,7 +87,7 @@ void main() {
 
   test('one period at a time: a custom range replaces a year', () {
     notifier().setDate(const SearchDate.year(2024));
-    notifier().setDate(SearchDate.custom(DateTime(2023, 1, 5), DateTime(2023, 2, 1)));
+    notifier().setDate(SearchDate.custom(from: DateTime(2023, 1, 5), to: DateTime(2023, 2, 1)));
     expect(read().filters.date, isA<SearchDateCustom>());
   });
 
@@ -113,6 +113,33 @@ void main() {
       expect(params.takenAfter, DateTime(2024, 6));
       expect(params.takenBefore, DateTime(2024, 6, 30, 23, 59, 59, 999));
       expect(params.takenAfter!.isUtc, isFalse);
+    });
+
+    test('a custom range with one end set is open-ended on the other (Slice 5 fix)', () {
+      SearchState custom({DateTime? from, DateTime? to}) => const SearchState().copyWith(
+        filters: SearchFilters(
+          date: SearchDate.custom(from: from, to: to),
+        ),
+      );
+      for (final localTakenRange in [true, false]) {
+        final since = buildSearchParams(
+          const PhotosSearchScope(),
+          custom(from: DateTime(2024, 6, 5)),
+          now: now,
+          localTakenRange: localTakenRange,
+        );
+        expect(since.takenAfter, localTakenRange ? DateTime.utc(2024, 6, 5) : DateTime(2024, 6, 5));
+        expect(since.takenBefore, isNull, reason: 'from only: that date onward');
+
+        final until = buildSearchParams(
+          const PhotosSearchScope(),
+          custom(to: DateTime(2024, 6, 5)),
+          now: now,
+          localTakenRange: localTakenRange,
+        );
+        expect(until.takenAfter, isNull, reason: 'to only: everything up to that date');
+        expect(until.takenBefore, localTakenRange ? DateTime.utc(2024, 6, 6) : DateTime(2024, 6, 5, 23, 59, 59, 999));
+      }
     });
 
     test('quick ranges end today', () {

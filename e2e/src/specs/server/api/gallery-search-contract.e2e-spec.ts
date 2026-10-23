@@ -1004,10 +1004,47 @@ const photosModeCases = (): FixtureCase[] =>
     })),
   ]);
 
+/**
+ * Slice 5's switch-over as mobile/test/gallery/search/switch_over_e2e_test.dart walks it: Similar photos from the
+ * asset viewer opens Photos search mode on the reference photo (its options are the scope-similar-* set, its first
+ * results page is recorded here); on a stock Immich server, search mode opens with no filter yet, so its results are
+ * the unfiltered metadata search and its exact total.
+ */
+const switchOverCases = (): FixtureCase[] => [
+  {
+    name: 'scope-similar-smart',
+    description: 'Similar photos (query mode), no other filter: the first page of query results',
+    actor: 'me',
+    setup: 'smart-search',
+    get request(): FixtureCase['request'] {
+      return { method: 'POST', path: '/api/search/smart', body: { ...similar(), page: 1, size: 100 } };
+    },
+  },
+  {
+    name: 'stock-search-metadata-photos-unfiltered',
+    description: 'Stock Immich server: search mode opened with no filter, the unfiltered metadata search',
+    actor: 'me',
+    stockClient: true,
+    request: {
+      method: 'POST',
+      path: '/api/search/metadata',
+      body: { visibility: 'timeline', order: 'desc', page: 1, size: 100 },
+    },
+  },
+  {
+    name: 'stock-search-statistics-photos-unfiltered',
+    description: 'Stock Immich server: the exact total of that unfiltered metadata search',
+    actor: 'me',
+    stockClient: true,
+    request: { method: 'POST', path: '/api/search/statistics', body: { visibility: 'timeline' } },
+  },
+];
+
 const fixtureCases = (): FixtureCase[] => [
   ...scopeFlows().flatMap((flow) => scopeFlowCases(flow)),
   ...photosModeCases(),
   ...fallbackCases(),
+  ...switchOverCases(),
   ...perDimension('dimension-photos', 'Photos, unfiltered', () => photos),
   ...perDimension('dimension-photos-kyoto', 'Photos with a city', () => ({ ...photos, city: 'Kyoto' })),
   options('options-photos', 'Photos: own + timeline partners + timeline spaces, timeline visibility', () => photos),

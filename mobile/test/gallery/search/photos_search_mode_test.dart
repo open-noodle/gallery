@@ -4,15 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/nav_config.dart';
-import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
-import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_timeline.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_header.widget.dart';
-import 'package:immich_mobile/gallery/search/widgets/search_preview_setting.widget.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
@@ -24,8 +22,6 @@ import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart';
 
@@ -114,50 +110,42 @@ void main() {
       await disposePhotosPage(tester, container);
     });
 
-    testWidgets('with the preview on, the search button enters search mode and the bottom nav hides; with it off, '
-        'today\'s filter sheet opens', (tester) async {
-      for (final preview in [true, false]) {
-        final navContainer = ProviderContainer(
-          overrides: [
-            readonlyModeProvider.overrideWith(() => _FakeReadonly()),
-            hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
-            appConfigProvider.overrideWithValue(const AppConfig(nav: NavConfig(showSpaces: false))),
-            serverSupportsSpacesProvider.overrideWithValue(true),
-            searchPreviewEnabledProvider.overrideWith(() => _Preview(preview)),
-          ],
-        );
-        await tester.pumpWidget(
-          localizedForTest(
-            UncontrolledProviderScope(
-              container: navContainer,
-              child: MaterialApp(
-                home: MediaQuery(
-                  data: const MediaQueryData(size: Size(400, 900)),
-                  child: Material(
-                    child: GalleryBottomNav(tabsRouter: FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index)),
-                  ),
+    testWidgets('the search button always enters search mode and the bottom nav hides (no preview switch)', (
+      tester,
+    ) async {
+      final navContainer = ProviderContainer(
+        overrides: [
+          readonlyModeProvider.overrideWith(() => _FakeReadonly()),
+          hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+          appConfigProvider.overrideWithValue(const AppConfig(nav: NavConfig(showSpaces: false))),
+          serverSupportsSpacesProvider.overrideWithValue(true),
+        ],
+      );
+      await tester.pumpWidget(
+        localizedForTest(
+          UncontrolledProviderScope(
+            container: navContainer,
+            child: MaterialApp(
+              home: MediaQuery(
+                data: const MediaQueryData(size: Size(400, 900)),
+                child: Material(
+                  child: GalleryBottomNav(tabsRouter: FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index)),
                 ),
               ),
             ),
           ),
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.byType(GallerySearchBlob));
-        await tester.pumpAndSettle();
+      await tester.tap(find.byType(GallerySearchBlob));
+      await tester.pumpAndSettle();
 
-        final opacity = tester.widget<AnimatedOpacity>(find.byKey(const Key('gallery-bottom-nav-opacity')));
-        if (preview) {
-          expect(navContainer.read(searchModeProvider), isTrue);
-          expect(navContainer.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
-          expect(opacity.opacity, 0, reason: 'search mode hides the bottom nav');
-        } else {
-          expect(navContainer.read(searchModeProvider), isFalse);
-          expect(navContainer.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-        navContainer.dispose();
-      }
+      expect(navContainer.read(searchModeProvider), isTrue);
+      final opacity = tester.widget<AnimatedOpacity>(find.byKey(const Key('gallery-bottom-nav-opacity')));
+      expect(opacity.opacity, 0, reason: 'search mode hides the bottom nav');
+      await tester.pumpWidget(const SizedBox.shrink());
+      navContainer.dispose();
     });
   });
 
@@ -172,7 +160,7 @@ void main() {
         tester,
         container,
         page: const TimelineRouteScope(
-          timelineServiceBuilder: buildPhotosTimelineRouteService,
+          timelineServiceBuilder: buildPhotosTimelineService,
           child: Timeline(appBar: SliverAppBar(key: Key('album-app-bar')), bottomSheet: null),
         ),
       );
@@ -184,39 +172,15 @@ void main() {
     },
   );
 
-  group('preview gate', () {
-    testWidgets('the Advanced settings switch turns the preview on and stores it', (tester) async {
-      await database.setUp();
-      await tester.pumpConsumerWidget(const SearchPreviewSetting());
-      final settings = ProviderScope.containerOf(tester.element(find.byType(SearchPreviewSetting)));
-      expect(find.text('New search (preview)'), findsOneWidget);
-      expect(settings.read(searchPreviewEnabledProvider), isFalse);
-
-      await tester.tap(find.byKey(const Key('search-preview-setting')));
-      await tester.pumpAndSettle();
-
-      expect(settings.read(searchPreviewEnabledProvider), isTrue);
-      expect(Store.tryGet(StoreKey.searchPreview), isTrue);
-    });
-
-    testWidgets('the Photos tab warms the search cache once when it first shows, only with the preview on', (
-      tester,
-    ) async {
-      for (final preview in [false, true]) {
-        await database.setUp();
-        repository = FakeSearchRepository(FakeLibrary.standard);
-        container = searchModeContainer(db: database.db, repository: repository, preview: preview);
-        await pumpPhotosPage(tester, container);
-        if (preview) {
-          // Availability, then every list, before search opens.
-          expect(repository.calls.first, 'options ');
-          expect(repository.calls, hasLength(1 + 8));
-        } else {
-          expect(repository.calls, isEmpty);
-        }
-        await disposePhotosPage(tester, container);
-      }
-    });
+  testWidgets('the Photos tab warms the search cache once when it first shows', (tester) async {
+    await database.setUp();
+    repository = FakeSearchRepository(FakeLibrary.standard);
+    container = searchModeContainer(db: database.db, repository: repository);
+    await pumpPhotosPage(tester, container);
+    // Availability, then every list, before search opens.
+    expect(repository.calls.first, 'options ');
+    expect(repository.calls, hasLength(1 + 8));
+    await disposePhotosPage(tester, container);
   });
 
   group('leaving', () {
@@ -615,15 +579,6 @@ void main() {
 double _opacity(WidgetTester tester, String chip) => tester
     .widget<Opacity>(find.descendant(of: find.byKey(Key('search-chip-$chip')), matching: find.byType(Opacity)).first)
     .opacity;
-
-class _Preview extends SearchPreviewNotifier {
-  final bool enabled;
-
-  _Preview(this.enabled);
-
-  @override
-  bool build() => enabled;
-}
 
 class _FakeReadonly extends ReadOnlyModeNotifier {
   @override

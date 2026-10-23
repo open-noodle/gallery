@@ -54,22 +54,51 @@ String searchPersonProfileId(String filterId, String? profileId) {
 /// had. Once the header is gone the options and results are dropped, so nothing is requested for a screen that is no
 /// longer searching (their pending debounced round dies with them).
 void leaveSearchMode(BuildContext context, WidgetRef ref, {ScrollController? scrollController}) {
-  final container = ProviderScope.containerOf(context, listen: false);
-  final mode = ref.read(searchModeProvider.notifier);
-  final offset = mode.savedScrollOffset;
-  mode.leave();
-  ref.read(searchStateProvider.notifier).reset();
-  ref.read(searchFieldControllerProvider).clear();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!container.read(searchModeProvider)) {
-      container
-        ..invalidate(searchOptionsProvider)
-        ..invalidate(searchResultsProvider);
-    }
-  });
+  final offset = ref.read(searchModeProvider.notifier).savedScrollOffset;
+  ref.read(closeSearchModeProvider)();
   if (scrollController != null && offset != null) {
     restoreScrollOffset(scrollController, offset);
   }
+}
+
+/// Closes this screen's search mode from anywhere that can read its providers, the asset viewer's "View in timeline"
+/// included (see [leaveSearchMode]).
+final closeSearchModeProvider = Provider<void Function()>(
+  (ref) {
+    return () {
+      if (!ref.read(searchModeProvider) && ref.read(searchStateProvider).isEmpty) {
+        // Not searching: nothing to close (View in timeline from a memory, an album, ...).
+        return;
+      }
+      ref.read(searchModeProvider.notifier).leave();
+      ref.read(searchStateProvider.notifier).reset();
+      ref.read(searchFieldControllerProvider).clear();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!ref.read(searchModeProvider)) {
+          ref
+            ..invalidate(searchOptionsProvider)
+            ..invalidate(searchResultsProvider);
+        }
+      });
+    };
+  },
+  dependencies: [
+    searchModeProvider,
+    searchStateProvider,
+    searchFieldControllerProvider,
+    searchOptionsProvider,
+    searchResultsProvider,
+  ],
+);
+
+/// "View similar photos" (specs/2026-10-23-mobile-search-redesign-design.md, "Similar photos"): Photos search mode with
+/// the reference photo as its only query, Photos only and Relevance. Whatever search was open before is replaced.
+void openSimilarPhotosSearch(T Function<T>(ProviderListenable<T>) read, String assetId) {
+  read(searchFieldControllerProvider).clear();
+  read(searchStateProvider.notifier)
+    ..reset()
+    ..setReferencePhoto(assetId);
+  read(searchModeProvider.notifier).enter();
 }
 
 /// The filters beyond People, When, Places and Tags, shown as their own chips with ✕ (the Filters sheet sets them).

@@ -10,8 +10,8 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bo
 /// - the Years | Months | All pill while searching, in the place of the hidden bottom nav, so zoom works on results.
 ///   Outside search the Photos page keeps its app-bar chip and shows no pill. The pill sits beside the page rather than
 ///   inside the Timeline, so the timeline (and its scroll position) is untouched by entering and leaving;
-/// - the warm-up of the server's unfiltered search cache when the Photos tab first shows, while the preview is on
-///   (Slice 2's warm-up: once per session, silent on failure).
+/// - the warm-up of the server's unfiltered search cache when the Photos tab first shows (Slice 2's warm-up: once per
+///   session, silent on failure).
 class PhotosSearchFrame extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -26,7 +26,7 @@ class _PhotosSearchFrameState extends ConsumerState<PhotosSearchFrame> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && ref.read(searchPreviewEnabledProvider)) {
+      if (mounted) {
         ref.read(searchWarmUpProvider);
       }
     });

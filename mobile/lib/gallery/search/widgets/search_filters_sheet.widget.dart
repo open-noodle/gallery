@@ -576,14 +576,15 @@ class _DateRangeSection extends ConsumerWidget {
       lastDate: DateTime(now.year + 1, 12, 31),
     );
 
-    // One end alone is a one-day range; an end before the start moves the start with it.
+    // One end alone leaves the other open: From only is that day onward, To only is up to and including that day. An
+    // end on the wrong side of the other moves the other with it.
     Future<void> pickFrom() async {
       final from = await pick(custom?.from);
       if (from == null) {
         return;
       }
-      final to = custom == null || custom.to.isBefore(from) ? from : custom.to;
-      notifier.setDate(SearchDate.custom(from, to));
+      final to = custom?.to;
+      notifier.setDate(SearchDate.custom(from: from, to: to != null && to.isBefore(from) ? from : to));
     }
 
     Future<void> pickTo() async {
@@ -591,8 +592,8 @@ class _DateRangeSection extends ConsumerWidget {
       if (to == null) {
         return;
       }
-      final from = custom == null || custom.from.isAfter(to) ? to : custom.from;
-      notifier.setDate(SearchDate.custom(from, to));
+      final from = custom?.from;
+      notifier.setDate(SearchDate.custom(from: from != null && from.isAfter(to) ? to : from, to: to));
     }
 
     Widget button(String key, String label, DateTime? value, Future<void> Function() onPressed) => Expanded(

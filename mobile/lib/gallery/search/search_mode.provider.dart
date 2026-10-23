@@ -1,34 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/store.model.dart';
-import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 
 // Search mode on a timeline screen (specs/2026-10-23-mobile-search-redesign-design.md, "Entering and leaving search
 // mode"). The root instance is the Photos screen's, so the bottom nav and the memory lane can read it; other screens
 // get their own through TimelineRouteScope's `search:` argument (searchTimelineScopeOverrides).
-
-/// The temporary "New search (preview)" switch in Advanced settings. Slice 5 removes it and its StoreKey.
-class SearchPreviewNotifier extends Notifier<bool> {
-  @override
-  bool build() {
-    try {
-      return Store.tryGet(StoreKey.searchPreview) ?? false;
-    } catch (_) {
-      // No store (a widget test that never initialised it): the preview is off.
-      return false;
-    }
-  }
-
-  Future<void> set(bool enabled) async {
-    state = enabled;
-    await Store.put(StoreKey.searchPreview, enabled);
-  }
-}
-
-final searchPreviewEnabledProvider = NotifierProvider<SearchPreviewNotifier, bool>(SearchPreviewNotifier.new);
 
 /// Whether the screen is in search mode. Leaving clears every filter and the query (see leaveSearchMode).
 class SearchModeNotifier extends Notifier<bool> {

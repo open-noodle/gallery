@@ -75,6 +75,10 @@ opens. The `mode-filters-*` fixtures are the same for the Filters sheet
 (`mobile/test/gallery/search/filters_sheet_e2e_test.dart`): Favorites only, then rating 3, then the iPhone 15, then
 "receipt" in the photo.
 
+The switch-over end-to-end test (`mobile/test/gallery/search/switch_over_e2e_test.dart`) adds `scope-similar-smart`,
+the first results page of Similar photos with no other filter, and the stock server's unfiltered results
+(`stock-search-*-unfiltered`), which is what search mode asks a stock server for when it opens.
+
 Two fixture sets stand in for servers this stack is not:
 
 - **Older Gallery server** (`older-*`): `"responseView": "older-gallery"` drops `searchOptions` from `/server/features`;

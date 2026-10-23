@@ -106,6 +106,9 @@ class FakeSearchRepository implements GallerySearchRepository {
 
   @override
   Future<int?> statistics(SearchParams p) => _call('statistics');
+
+  @override
+  Future<AssetResponseDto?> assetInfo(String id) => _call('asset:$id');
 }
 
 Future<void> settle() async {

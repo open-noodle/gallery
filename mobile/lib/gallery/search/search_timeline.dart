@@ -16,6 +16,8 @@ import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
+import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:openapi/api.dart' as api;
 
 // The data swap (specs/2026-10-23-mobile-search-redesign-design.md, "Layering"): while search mode has a filter or a
@@ -97,8 +99,54 @@ final searchTimelineFeedProvider = Provider<SearchTimelineFeed?>((ref) {
     }
   });
   ref.onDispose(feed.dispose);
+  completeSearchResultInViewer(ref, feed.repository);
   return feed;
 }, dependencies: [searchTimelineResultsProvider, searchResultsProvider]);
+
+/// A result built from /timeline/bucket columns (searchBucketAssets) has no name, checksum, edit flag or size. The
+/// asset viewer replaces the asset it opens with the phone's synced row (AssetViewerStateNotifier watches it by id),
+/// which has them all. A result the phone has not synced (a space or partner photo not yet down, a sync still running)
+/// stays incomplete: download has no file name, share no extension, the info sheet no file name. So while results are
+/// on screen, opening such an asset in the viewer fetches it (`GET /assets/{id}`) and gives the viewer the whole asset.
+void completeSearchResultInViewer(Ref ref, GallerySearchRepository repository) {
+  var disposed = false;
+  ref.onDispose(() => disposed = true);
+  final completed = <String, RemoteAsset>{};
+
+  bool incomplete(BaseAsset? asset) => asset is RemoteAsset && isSearchBucketAsset(asset);
+
+  Future<void> complete(RemoteAsset asset) async {
+    var full = completed[asset.id];
+    if (full == null) {
+      if (await ref.read(assetServiceProvider).getRemoteAsset(asset.id) != null) {
+        // Synced: the viewer's own watch of the row completes it.
+        return;
+      }
+      try {
+        full = (await repository.assetInfo(asset.id))?.toDto();
+      } catch (_) {
+        full = null;
+      }
+      if (disposed || full == null) {
+        return;
+      }
+      completed[asset.id] = full;
+    }
+    final current = ref.read(assetViewerProvider).currentAsset;
+    if (current is RemoteAsset && current.id == asset.id && incomplete(current)) {
+      ref.read(assetViewerProvider.notifier).setAsset(full);
+    }
+  }
+
+  ref.listen<BaseAsset?>(assetViewerProvider.select((state) => state.currentAsset), (_, asset) {
+    if (incomplete(asset)) {
+      unawaited(complete(asset! as RemoteAsset));
+    }
+  });
+}
+
+/// An asset made from /timeline/bucket columns: no checksum and no name (see searchBucketAssets).
+bool isSearchBucketAsset(RemoteAsset asset) => asset.checksum == null && asset.name.isEmpty;
 
 /// TimelineRouteScope's `search:` argument: the screen's own builder while not searching, the results otherwise.
 TimelineRouteServiceBuilder searchTimelineServiceBuilder(TimelineRouteServiceBuilder screen) =>
@@ -190,6 +238,7 @@ List<Override> searchTimelineScopeOverrides(SearchScope scope) => [
     ...searchRouteOverrides(scope),
     searchModeProvider.overrideWith(SearchModeNotifier.new),
     searchFieldControllerProvider,
+    closeSearchModeProvider,
     searchTimelineResultsProvider.overrideWith(SearchTimelineResultsNotifier.new),
     searchTimelineFeedProvider,
   ],
@@ -437,7 +486,7 @@ class SearchTimelineSource {
 }
 
 /// The columns of one /timeline/bucket response as assets. The columns carry no checksum, name or size; the grid and
-/// the viewer address a remote asset by its id.
+/// the viewer address a remote asset by its id, and the viewer completes it (completeSearchResultInViewer).
 List<BaseAsset> searchBucketAssets(api.TimeBucketAssetResponseDto dto) => [
   for (var i = 0; i < dto.id.length; i++)
     RemoteAsset(

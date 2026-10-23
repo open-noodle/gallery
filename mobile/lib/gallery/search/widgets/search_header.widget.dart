@@ -11,6 +11,7 @@ import 'package:immich_mobile/gallery/search/widgets/search_avatar.widget.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_chip_row.widget.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_labels.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:intl/intl.dart';
 
 // The search header (specs/2026-10-23-mobile-search-redesign-design.md, "The design"): it takes the place of the
@@ -264,6 +265,21 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
           if (query case SearchQueryText(:final text)) ...[
             _QueryToken(label: text, onRemove: () => ref.read(searchStateProvider.notifier).clearQuery()),
             const SizedBox(width: 6),
+          ] else if (query case SearchQuerySimilarTo(:final assetId)) ...[
+            _QueryToken(
+              key: const Key('search-mode-similar-token'),
+              label: context.t.search_mode_similar_to,
+              removeLabel: context.t.search_mode_remove_similar,
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: Thumbnail.remote(remoteId: assetId, thumbhash: '', fit: BoxFit.cover),
+                ),
+              ),
+              onRemove: () => ref.read(searchStateProvider.notifier).clearQuery(),
+            ),
+            const SizedBox(width: 6),
           ] else
             Icon(Icons.search_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 4),
@@ -322,15 +338,19 @@ class _QueryToken extends StatelessWidget {
   final String label;
   final VoidCallback onRemove;
 
-  const _QueryToken({required this.label, required this.onRemove});
+  /// Before the label: a search icon for text, the reference photo's thumbnail for similar photos.
+  final Widget? leading;
+  final String? removeLabel;
+
+  const _QueryToken({super.key, required this.label, required this.onRemove, this.leading, this.removeLabel});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 160),
+      constraints: const BoxConstraints(maxWidth: 200),
       child: Material(
-        key: const Key('search-mode-query-token'),
+        key: key == null ? const Key('search-mode-query-token') : null,
         color: scheme.secondaryContainer,
         shape: const StadiumBorder(),
         child: InkWell(
@@ -341,7 +361,7 @@ class _QueryToken extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.search_rounded, size: 14, color: scheme.onSecondaryContainer),
+                leading ?? Icon(Icons.search_rounded, size: 14, color: scheme.onSecondaryContainer),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -355,7 +375,7 @@ class _QueryToken extends StatelessWidget {
                 ),
                 const SizedBox(width: 2),
                 Semantics(
-                  label: context.t.search_mode_remove_query,
+                  label: removeLabel ?? context.t.search_mode_remove_query,
                   button: true,
                   child: Icon(Icons.close_rounded, size: 14, color: scheme.onSecondaryContainer),
                 ),

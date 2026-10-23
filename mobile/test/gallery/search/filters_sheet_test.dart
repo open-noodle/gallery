@@ -260,6 +260,44 @@ void main() {
   });
 
   group('Date range', () {
+    testWidgets('one end alone is open-ended: From only means that day onward, To only up to and including that day', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openFilters(tester);
+
+      await tapKey(tester, 'search-filter-date-from');
+      await tester.tap(find.text('5'));
+      await tester.pump();
+      await tester.tap(find.text('OK'));
+      await settleFrames(tester);
+      expect(filters().date, SearchDate.custom(from: DateTime(2026, 10, 5)));
+      var params = repository.resultParams.last;
+      expect(params.takenAfter, DateTime.utc(2026, 10, 5));
+      expect(params.takenBefore, isNull, reason: 'From only sends no end');
+
+      await tapKey(tester, 'search-filter-date-clear');
+      await tapKey(tester, 'search-filter-date-to');
+      await tester.tap(find.text('20'));
+      await tester.pump();
+      await tester.tap(find.text('OK'));
+      await settleFrames(tester);
+      expect(filters().date, SearchDate.custom(to: DateTime(2026, 10, 20)));
+      params = repository.resultParams.last;
+      expect(params.takenAfter, isNull, reason: 'To only sends no start');
+      expect(params.takenBefore, DateTime.utc(2026, 10, 21), reason: 'the 20th is included');
+      await closeSheet(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('search-extra-chip-dateRange')),
+          matching: find.text('Until Oct 20, 2026'),
+        ),
+        findsOneWidget,
+      );
+
+      await disposePhotosPage(tester, container);
+    });
+
     testWidgets('a from/to range replaces a When selection, and the reverse', (tester) async {
       await pump(tester);
       final notifier = container.read(searchStateProvider.notifier)..setDate(const SearchDate.year(2024));
@@ -275,14 +313,14 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('OK'));
       await settleFrames(tester);
-      // The clock says 2026-10-23: one end alone is a one-day range.
-      expect(filters().date, SearchDate.custom(DateTime(2026, 10, 5), DateTime(2026, 10, 5)));
+      // The clock says 2026-10-23. From alone is open-ended: that day onward, not a one-day range.
+      expect(filters().date, SearchDate.custom(from: DateTime(2026, 10, 5)));
       await tapKey(tester, 'search-filter-date-to');
       await tester.tap(find.text('20'));
       await tester.pump();
       await tester.tap(find.text('OK'));
       await settleFrames(tester);
-      expect(filters().date, SearchDate.custom(DateTime(2026, 10, 5), DateTime(2026, 10, 20)));
+      expect(filters().date, SearchDate.custom(from: DateTime(2026, 10, 5), to: DateTime(2026, 10, 20)));
       await closeSheet(tester);
 
       expect(find.byKey(const Key('search-extra-chip-dateRange')), findsOneWidget);

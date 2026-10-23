@@ -161,6 +161,8 @@ Each section follows #910: it is hidden when empty for the scope and greyed when
 - **Grid:** grouped like the screen's normal timeline, honouring the grouping pill, and using the screen's own grid and asset viewer, so selection, opening a photo and multi-select actions work as they do outside search.
 - **No matches:** the filtered empty state (`timeline_empty_state.widget.dart`, rewired to the new state) says nothing matches all the filters, and to remove one.
 
+**Known limitation (Slice 5).** Some results are not synced to the device, for example a timeline space's photo before its sync lands. Opening one fetches `GET /assets/{id}`, so viewing, sharing and downloading work. But the favourite heart does not refresh after tapping (the write succeeds), and the info sheet has no EXIF. Fixing either needs a hook in the upstream asset viewer, left for a follow-up.
+
 ### Similar photos
 
 The existing "View similar photos" action (`presentation/actions/similar_photos.action.dart`) keeps working:

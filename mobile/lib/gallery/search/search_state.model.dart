@@ -61,14 +61,15 @@ abstract class SearchText with _$SearchText {
 
 bool _blank(String? value) => value == null || value.trim().isEmpty;
 
-/// One calendar day range, both ends inclusive, as the user chose it (no time of day).
+/// One calendar day range, both ends inclusive, as the user chose it (no time of day). A custom range may leave one end
+/// open: no first day means "up to and including the last day", no last day means "from the first day on".
 class SearchDayRange {
-  final DateTime firstDay;
-  final DateTime lastDay;
+  final DateTime? firstDay;
+  final DateTime? lastDay;
 
-  SearchDayRange(DateTime first, DateTime last)
-    : firstDay = DateTime(first.year, first.month, first.day),
-      lastDay = DateTime(last.year, last.month, last.day);
+  SearchDayRange(DateTime? first, DateTime? last) : firstDay = _day(first), lastDay = _day(last);
+
+  static DateTime? _day(DateTime? value) => value == null ? null : DateTime(value.year, value.month, value.day);
 
   @override
   bool operator ==(Object other) => other is SearchDayRange && other.firstDay == firstDay && other.lastDay == lastDay;
@@ -90,7 +91,9 @@ sealed class SearchDate with _$SearchDate {
   const factory SearchDate.month(int year, int month) = SearchDateMonth;
   const factory SearchDate.decade(int start) = SearchDateDecade;
   const factory SearchDate.quickRange(SearchQuickRange range) = SearchDateQuickRange;
-  const factory SearchDate.custom(DateTime from, DateTime to) = SearchDateCustom;
+
+  /// The Filters sheet's From/To. At least one end is set; the other may stay open.
+  const factory SearchDate.custom({DateTime? from, DateTime? to}) = SearchDateCustom;
 
   /// The calendar days this period covers. Quick ranges end today, as today's quick-range row does.
   SearchDayRange resolve(DateTime now) => switch (this) {

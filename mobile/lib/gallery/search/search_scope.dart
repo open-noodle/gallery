@@ -408,15 +408,21 @@ class SearchParams {
 /// How taken dates go out (search_filter.model.dart `SearchDateFilter`): a server that declares `localTakenRange`
 /// compares wall-clock time with an exclusive end, so it gets UTC midnight of the first day and of the day after the
 /// last. Any other server (older Gallery, stock Immich) compares the UTC instant with an inclusive end, so it gets the
-/// device-local start of the first day and end of the last.
+/// device-local start of the first day and end of the last. An open end sends nothing.
 class SearchDateEncoding {
-  static (DateTime, DateTime) encode(SearchDayRange range, {required bool localTakenRange}) {
+  static (DateTime?, DateTime?) encode(SearchDayRange range, {required bool localTakenRange}) {
     final first = range.firstDay;
     final last = range.lastDay;
     if (localTakenRange) {
-      return (DateTime.utc(first.year, first.month, first.day), DateTime.utc(last.year, last.month, last.day + 1));
+      return (
+        first == null ? null : DateTime.utc(first.year, first.month, first.day),
+        last == null ? null : DateTime.utc(last.year, last.month, last.day + 1),
+      );
     }
-    return (DateTime(first.year, first.month, first.day), DateTime(last.year, last.month, last.day, 23, 59, 59, 999));
+    return (
+      first == null ? null : DateTime(first.year, first.month, first.day),
+      last == null ? null : DateTime(last.year, last.month, last.day, 23, 59, 59, 999),
+    );
   }
 }
 
