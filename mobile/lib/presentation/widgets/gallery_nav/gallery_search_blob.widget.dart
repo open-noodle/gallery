@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/gallery/motion/pressable.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 
 class GallerySearchBlob extends StatefulWidget {
@@ -38,34 +39,37 @@ class _GallerySearchBlobState extends State<GallerySearchBlob> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: widget.onTap,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(_diameter / 2),
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                  child: Container(
-                    width: _diameter,
-                    height: _diameter,
-                    decoration: BoxDecoration(
-                      color: theme.brightness == Brightness.dark
-                          ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68)
-                          : theme.colorScheme.surface.withValues(alpha: 0.9),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55), width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          offset: const Offset(0, 20),
-                          blurRadius: 44,
-                          spreadRadius: -14,
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        ),
-                      ],
+              child: GalleryPressable(
+                pressedScale: 0.86,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_diameter / 2),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                    child: Container(
+                      width: _diameter,
+                      height: _diameter,
+                      decoration: BoxDecoration(
+                        color: theme.brightness == Brightness.dark
+                            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68)
+                            : theme.colorScheme.surface.withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55), width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            offset: const Offset(0, 20),
+                            blurRadius: 44,
+                            spreadRadius: -14,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            offset: const Offset(0, 4),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Center(child: Icon(Icons.search, size: 24, color: iconColor)),
                     ),
-                    child: Center(child: Icon(Icons.search, size: 24, color: iconColor)),
                   ),
                 ),
               ),
