@@ -370,7 +370,7 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
       children: [
         _Title(context.t.camera),
         if (makes == null && camera == null)
-          const SearchSheetSkeleton()
+          const SearchSheetPending(SearchDimension.cameras)
         else
           for (final make in rows) ...[
             ListTile(

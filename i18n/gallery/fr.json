@@ -942,6 +942,7 @@
   "search_mode_matches": "Correspondances",
   "search_mode_no_matches": "Aucune correspondance",
   "search_mode_nothing_matches": "Plus rien ne correspond",
+  "search_mode_options_failed": "Impossible de charger ces options",
   "search_mode_people_also_in": "Aussi sur ces photos",
   "search_mode_people_most_photographed": "Les plus photographiées",
   "search_mode_people_none": "Personne d’autre sur ces photos",

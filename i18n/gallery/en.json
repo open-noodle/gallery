@@ -945,6 +945,7 @@
   "search_mode_matches": "Matches",
   "search_mode_no_matches": "No matches",
   "search_mode_nothing_matches": "Nothing left that matches",
+  "search_mode_options_failed": "Couldn't load these options",
   "search_mode_people_also_in": "Also in these photos",
   "search_mode_people_most_photographed": "Most photographed",
   "search_mode_people_none": "No one else in these photos",

@@ -88,6 +88,12 @@ List<Override> searchRouteOverrides(SearchScope scope) => [
   ),
 ];
 
+/// Retry after a failed options request: the options again, and the results too when they failed as well.
+void retrySearch(WidgetRef ref) {
+  ref.read(searchOptionsProvider.notifier).retry();
+  ref.read(searchResultsProvider.notifier).retry();
+}
+
 /// Warms the server's unfiltered Photos cache (cold, about 5.8 s at 500k photos) before search opens: availability,
 /// then every dimension, once per session. Only on a server with `searchOptions`; a failure is silent.
 final searchWarmUpProvider = FutureProvider<void>((ref) async {
@@ -198,10 +204,22 @@ class SearchOptionsNotifier extends Notifier<SearchOptions> {
             })
             .catchError((Object error) {
               if (_current(generation)) {
-                state = state.withError(error);
+                state = state.withError(error, dimensions: {dimension});
               }
             }),
     ]);
+  }
+
+  /// The sheets' and the field's Retry after a failed request: the same state asked again, at once. A failed
+  /// capabilities read is cached by its provider, so it is read again too. A 401 needs nothing here: the auth guard
+  /// sends an invalid session to the login page on the next navigation, as for every other server call.
+  void retry() {
+    if (ref.read(searchCapabilitiesProvider).hasError) {
+      ref.invalidate(searchCapabilitiesProvider);
+    }
+    // Skeletons again while the new round is on its way.
+    state = state.restart(facetsSupported: state.facetsSupported, hasCounts: state.hasCounts);
+    _schedule(Duration.zero);
   }
 
   /// An older Gallery server: the suggestion lists without counts, then each country's cities without blocking.
@@ -321,6 +339,13 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
   bool _current(int generation) => generation == _generation;
 
   bool get _byUploadDate => ref.read(searchScopeProvider) is RecentlyAddedSearchScope;
+
+  /// Asks again after a failed request (SearchOptionsNotifier.retry); nothing to do otherwise.
+  void retry() {
+    if (state.error != null) {
+      _schedule(Duration.zero);
+    }
+  }
 
   Future<void> _load(int generation) async {
     state = SearchResults(

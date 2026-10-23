@@ -51,12 +51,21 @@ class SearchSuggestions {
   /// Plain text only; never for `@` / `#`.
   final SmartSearchSuggestion? smartSearch;
 
+  /// A list the text matches against is still on its way: more suggestions may come, so "nothing matches" is not
+  /// known yet.
+  final bool loading;
+
+  /// A list the text matches against failed to load (SearchOptions.hasFailed).
+  final bool failed;
+
   const SearchSuggestions({
     this.people = const [],
     this.tags = const [],
     this.places = const [],
     this.dates = const [],
     this.smartSearch,
+    this.loading = false,
+    this.failed = false,
   });
 
   static const empty = SearchSuggestions();
@@ -91,13 +100,33 @@ class SearchSuggestionMatcher {
 
   const SearchSuggestionMatcher({this.monthNames = englishMonthNames});
 
+  /// The lists plain text matches against.
+  static const _plainDimensions = [
+    SearchDimension.people,
+    SearchDimension.tags,
+    SearchDimension.places,
+    SearchDimension.time,
+  ];
+
   SearchSuggestions match(String raw, SearchOptions options) {
     final text = raw.trimLeft();
+    bool loading(List<SearchDimension> needed) => needed.any(options.isPending);
+    bool failed(List<SearchDimension> needed) => needed.any(options.hasFailed);
     if (text.startsWith('@')) {
-      return SearchSuggestions(people: _people(text.substring(1), options, prefixLimit));
+      const needed = [SearchDimension.people];
+      return SearchSuggestions(
+        people: _people(text.substring(1), options, prefixLimit),
+        loading: loading(needed),
+        failed: failed(needed),
+      );
     }
     if (text.startsWith('#')) {
-      return SearchSuggestions(tags: _tags(text.substring(1), options, prefixLimit));
+      const needed = [SearchDimension.tags];
+      return SearchSuggestions(
+        tags: _tags(text.substring(1), options, prefixLimit),
+        loading: loading(needed),
+        failed: failed(needed),
+      );
     }
     final query = text.trim();
     if (query.isEmpty) {
@@ -109,6 +138,8 @@ class SearchSuggestionMatcher {
       places: _places(query, options),
       dates: _dates(query, options),
       smartSearch: SmartSearchSuggestion(query),
+      loading: loading(_plainDimensions),
+      failed: failed(_plainDimensions),
     );
   }
 

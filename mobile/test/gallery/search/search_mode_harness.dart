@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -253,6 +255,18 @@ class FakeSearchRepository implements GallerySearchRepository {
   /// The parameters of every results call (buckets, smart, metadata), in order.
   final resultParams = <SearchParams>[];
 
+  /// Single-dimension options requests wait for their completer here: a dimension still on its way.
+  final held = <SearchDimension, Completer<void>>{};
+
+  /// Single-dimension options requests for these dimensions fail with [failure].
+  final failing = <SearchDimension>{};
+
+  /// The availability request (no dimensions) fails with [failure].
+  bool failAvailability = false;
+
+  /// What a failing options request throws: a session the server no longer accepts, by default.
+  Exception failure = api.ApiException(401, 'Unauthorized');
+
   FakeSearchRepository(
     this.library, {
     this.serverCapabilities = const SearchServerCapabilities(
@@ -365,6 +379,13 @@ class FakeSearchRepository implements GallerySearchRepository {
   @override
   Future<SearchOptionsPart> options(SearchParams p, {Set<SearchDimension> dimensions = const {}}) async {
     calls.add('options ${dimensions.map((d) => d.name).join(',')}');
+    final hold = dimensions.length == 1 ? held[dimensions.single] : null;
+    if (hold != null) {
+      await hold.future;
+    }
+    if (dimensions.isEmpty ? failAvailability : dimensions.length == 1 && failing.contains(dimensions.single)) {
+      throw failure;
+    }
     final all = results(p);
     final forPeople = all;
     // As the server: Untagged belongs to the tags dimension, so the tag list ignores it.

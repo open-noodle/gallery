@@ -958,6 +958,7 @@
   "search_mode_matches": "匹配项",
   "search_mode_no_matches": "没有匹配项",
   "search_mode_nothing_matches": "没有其他匹配项",
+  "search_mode_options_failed": "无法加载这些选项",
   "search_mode_people_also_in": "也出现在这些照片中",
   "search_mode_people_most_photographed": "拍摄最多",
   "search_mode_people_none": "这些照片中没有其他人",

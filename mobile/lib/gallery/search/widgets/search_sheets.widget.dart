@@ -215,6 +215,58 @@ class SearchSheetSkeleton extends StatelessWidget {
   }
 }
 
+/// Where a list's skeleton goes: the skeleton while [dimension] is on its way, an error with Retry once its request
+/// failed, so a failure never leaves an endless skeleton.
+class SearchSheetPending extends ConsumerWidget {
+  final SearchDimension dimension;
+  final bool round;
+
+  const SearchSheetPending(this.dimension, {super.key, this.round = false});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final failed = ref.watch(searchOptionsProvider.select((o) => o.hasFailed(dimension)));
+    if (failed) {
+      return SearchOptionsError(
+        key: const Key('search-sheet-error'),
+        retryKey: const Key('search-sheet-retry'),
+        onRetry: () => retrySearch(ref),
+      );
+    }
+    return SearchSheetSkeleton(round: round);
+  }
+}
+
+/// A short error row with Retry, for options that failed to load (the sheets and the field's suggestions).
+class SearchOptionsError extends StatelessWidget {
+  final Key retryKey;
+  final VoidCallback onRetry;
+
+  const SearchOptionsError({super.key, required this.retryKey, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, size: 20, color: muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              context.t.search_mode_options_failed,
+              style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+            ),
+          ),
+          TextButton(key: retryKey, onPressed: onRetry, child: Text(context.t.retry)),
+        ],
+      ),
+    );
+  }
+}
+
 class SearchOptionCount extends StatelessWidget {
   final int? count;
 
@@ -339,7 +391,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             ),
           ),
           if (people == null)
-            const SliverToBoxAdapter(child: SearchSheetSkeleton(round: true))
+            const SliverToBoxAdapter(child: SearchSheetPending(SearchDimension.people, round: true))
           else if (matches.isEmpty)
             SliverToBoxAdapter(child: SearchSheetHint(context.t.search_mode_people_none))
           else
@@ -503,7 +555,7 @@ class _WhenSheetState extends ConsumerState<_WhenSheet> {
           ),
           SearchSheetHint(context.t.search_mode_when_hint),
           if (months == null)
-            const SearchSheetSkeleton()
+            const SearchSheetPending(SearchDimension.time)
           else
             for (final year in newestFirst) ...[
               Padding(
@@ -675,7 +727,7 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
         onChanged: (value) => setState(() => _query = value),
       ),
       body: countries == null
-          ? const SearchSheetSkeleton()
+          ? const SearchSheetPending(SearchDimension.places)
           : rows.isEmpty
           ? SearchSheetHint(context.t.search_mode_places_none)
           : ListView(children: rows),
@@ -777,7 +829,7 @@ class _TagsSheetState extends ConsumerState<_TagsSheet> {
               ),
             ),
           if (tags == null)
-            const SearchSheetSkeleton()
+            const SearchSheetPending(SearchDimension.tags)
           else if (others.isEmpty)
             SearchSheetHint(context.t.search_mode_tags_none)
           else

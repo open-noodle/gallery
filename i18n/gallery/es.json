@@ -941,6 +941,7 @@
   "search_mode_matches": "Coincidencias",
   "search_mode_no_matches": "Sin coincidencias",
   "search_mode_nothing_matches": "No queda nada que coincida",
+  "search_mode_options_failed": "No se pudieron cargar estas opciones",
   "search_mode_people_also_in": "También en estas fotos",
   "search_mode_people_most_photographed": "Las más fotografiadas",
   "search_mode_people_none": "Nadie más en estas fotos",

@@ -10,6 +10,7 @@ import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_avatar.widget.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_chip_row.widget.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_labels.dart';
+import 'package:immich_mobile/gallery/search/widgets/search_sheets.widget.dart' show SearchOptionsError;
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:intl/intl.dart';
@@ -203,8 +204,6 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final query = ref.watch(searchStateProvider.select((s) => s.query));
-    // The dropdown matches against the options: rebuild it when they arrive.
-    ref.watch(searchOptionsProvider);
     return BackButtonListener(
       onBackButtonPressed: () async {
         // A sheet or the asset viewer on top handles back itself.
@@ -317,8 +316,7 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
     if (!_focus.hasFocus || text.trim().isEmpty) {
       return const SizedBox.shrink();
     }
-    final options = ref.read(searchOptionsProvider);
-    final suggestions = SearchSuggestionMatcher(monthNames: _monthNames(context)).match(text, options);
+    final matcher = SearchSuggestionMatcher(monthNames: _monthNames(context));
     return CompositedTransformFollower(
       link: _link,
       targetAnchor: Alignment.bottomLeft,
@@ -328,7 +326,14 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
         child: TextFieldTapRegion(
           child: SizedBox(
             width: _fieldWidth,
-            child: _SuggestionList(suggestions: suggestions, onPick: _pick),
+            // Watched here: the suggestions follow the lists as they arrive, without more typing.
+            child: Consumer(
+              builder: (context, ref, _) => _SuggestionList(
+                suggestions: matcher.match(text, ref.watch(searchOptionsProvider)),
+                onPick: _pick,
+                onRetry: () => retrySearch(ref),
+              ),
+            ),
           ),
         ),
       ),
@@ -393,8 +398,9 @@ class _QueryToken extends StatelessWidget {
 class _SuggestionList extends StatelessWidget {
   final SearchSuggestions suggestions;
   final void Function(SearchSuggestion) onPick;
+  final VoidCallback onRetry;
 
-  const _SuggestionList({required this.suggestions, required this.onPick});
+  const _SuggestionList({required this.suggestions, required this.onPick, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -466,6 +472,18 @@ class _SuggestionList extends StatelessWidget {
         );
       }
     }
+    // Where the lists still on their way will show; a failed list says so, with Retry.
+    if (suggestions.loading) {
+      rows.add(const _SuggestionSkeleton());
+    } else if (suggestions.failed) {
+      rows.add(
+        SearchOptionsError(
+          key: const Key('search-suggestions-error'),
+          retryKey: const Key('search-suggestions-retry'),
+          onRetry: onRetry,
+        ),
+      );
+    }
     if (suggestions.smartSearch case final smart?) {
       group(context.t.photos);
       rows.add(
@@ -499,6 +517,35 @@ class _SuggestionList extends StatelessWidget {
         constraints: const BoxConstraints(maxHeight: 360),
         child: ListView(shrinkWrap: true, padding: const EdgeInsets.only(bottom: 6), children: rows),
       ),
+    );
+  }
+}
+
+/// Placeholder rows while a list the text matches against is on its way: no spinner.
+class _SuggestionSkeleton extends StatelessWidget {
+  const _SuggestionSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget row(double width) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(radius: 15, backgroundColor: color),
+          const SizedBox(width: 12),
+          Container(
+            width: width,
+            height: 14,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(7)),
+          ),
+        ],
+      ),
+    );
+    return Semantics(
+      key: const Key('search-suggestions-loading'),
+      label: context.t.loading,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [row(120), row(88)]),
     );
   }
 }

@@ -943,6 +943,7 @@
   "search_mode_matches": "Treffer",
   "search_mode_no_matches": "Keine Treffer",
   "search_mode_nothing_matches": "Nichts mehr, das passt",
+  "search_mode_options_failed": "Optionen konnten nicht geladen werden",
   "search_mode_people_also_in": "Auch auf diesen Fotos",
   "search_mode_people_most_photographed": "Am häufigsten fotografiert",
   "search_mode_people_none": "Sonst niemand auf diesen Fotos",

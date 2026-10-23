@@ -185,7 +185,7 @@ class SearchOptionsPart {
 }
 
 /// The options of one search state, filled in as responses arrive. A null list is still loading (the sheet shows a
-/// skeleton); an empty list is empty.
+/// skeleton) unless its request [failed] (the sheet shows an error with Retry); an empty list is empty.
 class SearchOptions {
   /// False on a stock Immich server: no facet options at all.
   final bool facetsSupported;
@@ -207,6 +207,9 @@ class SearchOptions {
   final List<SearchMediaTypeOption>? mediaTypes;
   final Object? error;
 
+  /// The dimensions whose request failed this round (all of them when availability failed: none was asked for).
+  final Set<SearchDimension> failed;
+
   const SearchOptions({
     this.facetsSupported = true,
     this.hasCounts = true,
@@ -222,6 +225,7 @@ class SearchOptions {
     this.ratings,
     this.mediaTypes,
     this.error,
+    this.failed = const {},
   });
 
   static const unsupported = SearchOptions(facetsSupported: false, hasCounts: false);
@@ -242,6 +246,7 @@ class SearchOptions {
     ratings: part.ratings ?? ratings,
     mediaTypes: part.mediaTypes ?? mediaTypes,
     error: error,
+    failed: failed,
   );
 
   /// A new request round: the lists stay on screen until replaced (options never vanish while you pick), the stale
@@ -280,22 +285,45 @@ class SearchOptions {
     ratings: ratings,
     mediaTypes: mediaTypes,
     error: error,
+    failed: failed,
   );
 
-  SearchOptions withError(Object error) => SearchOptions(
-    facetsSupported: facetsSupported,
-    hasCounts: hasCounts,
-    stale: stale,
-    availability: availability,
-    total: total,
-    months: months,
-    people: people,
-    hasUnnamedPeople: hasUnnamedPeople,
-    tags: tags,
-    countries: countries,
-    cameras: cameras,
-    ratings: ratings,
-    mediaTypes: mediaTypes,
-    error: error,
-  );
+  /// A failed request: [dimensions] are marked [failed], their lists stay as they were.
+  SearchOptions withError(Object error, {Iterable<SearchDimension> dimensions = SearchDimension.values}) =>
+      SearchOptions(
+        facetsSupported: facetsSupported,
+        hasCounts: hasCounts,
+        stale: stale,
+        availability: availability,
+        total: total,
+        months: months,
+        people: people,
+        hasUnnamedPeople: hasUnnamedPeople,
+        tags: tags,
+        countries: countries,
+        cameras: cameras,
+        ratings: ratings,
+        mediaTypes: mediaTypes,
+        error: error,
+        failed: {...failed, ...dimensions},
+      );
+
+  /// The loaded list of [dimension] (the total for [SearchDimension.total]), null while on its way or failed.
+  Object? _list(SearchDimension dimension) => switch (dimension) {
+    SearchDimension.total => total,
+    SearchDimension.time => months,
+    SearchDimension.people => people,
+    SearchDimension.tags => tags,
+    SearchDimension.places => countries,
+    SearchDimension.cameras => cameras,
+    SearchDimension.ratings => ratings,
+    SearchDimension.mediaTypes => mediaTypes,
+  };
+
+  /// [dimension] is still on its way: not loaded, not failed, and the server has facet options at all.
+  bool isPending(SearchDimension dimension) =>
+      facetsSupported && _list(dimension) == null && !failed.contains(dimension);
+
+  /// [dimension] has nothing to show because its request failed.
+  bool hasFailed(SearchDimension dimension) => _list(dimension) == null && failed.contains(dimension);
 }

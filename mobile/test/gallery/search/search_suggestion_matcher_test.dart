@@ -115,4 +115,26 @@ void main() {
     expect(result.places.map((p) => p.city), ['Berlin']);
     expect(result.places.length, lessThanOrEqualTo(SearchSuggestionMatcher.groupLimit));
   });
+
+  test('a list still on its way marks the suggestions loading, a failed one failed; a stock server is neither', () {
+    const empty = SearchOptions();
+    expect(matcher.match('@', empty).loading, isTrue);
+    expect(matcher.match('#', empty).loading, isTrue);
+    expect(matcher.match('an', empty).loading, isTrue);
+    expect(matcher.match('an', empty).smartSearch?.text, 'an');
+
+    // Only the list the prefix needs counts.
+    const peopleOnly = SearchOptions(people: []);
+    expect(matcher.match('@zzz', peopleOnly).loading, isFalse);
+    expect(matcher.match('#zzz', peopleOnly).loading, isTrue);
+
+    final failed = const SearchOptions().withError(Exception('401'), dimensions: {SearchDimension.people});
+    expect(matcher.match('@', failed).failed, isTrue);
+    expect(matcher.match('@', failed).loading, isFalse);
+    expect(matcher.match('#', failed).failed, isFalse);
+
+    expect(matcher.match('@', SearchOptions.unsupported).loading, isFalse);
+    expect(matcher.match('@', SearchOptions.unsupported).failed, isFalse);
+    expect(matcher.match('@', kyoto).loading, isFalse);
+  });
 }
