@@ -21,6 +21,7 @@ describe(StorageMigrationService.name, () => {
     exists: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
     put: ReturnType<typeof vi.fn>;
+    stat: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     getServeStrategy: ReturnType<typeof vi.fn>;
     downloadToTemp: ReturnType<typeof vi.fn>;
@@ -30,6 +31,7 @@ describe(StorageMigrationService.name, () => {
     exists: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
     put: Mock<(key: string, source: Readable) => Promise<unknown>>;
+    stat: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     getServeStrategy: ReturnType<typeof vi.fn>;
     downloadToTemp: ReturnType<typeof vi.fn>;
@@ -42,6 +44,7 @@ describe(StorageMigrationService.name, () => {
       exists: vi.fn(),
       get: vi.fn(),
       put: vi.fn(),
+      stat: vi.fn(),
       delete: vi.fn(),
       getServeStrategy: vi.fn(),
       downloadToTemp: vi.fn(),
@@ -51,6 +54,7 @@ describe(StorageMigrationService.name, () => {
       exists: vi.fn(),
       get: vi.fn(),
       put: vi.fn(),
+      stat: vi.fn(),
       delete: vi.fn(),
       getServeStrategy: vi.fn(),
       downloadToTemp: vi.fn(),
@@ -381,6 +385,30 @@ describe(StorageMigrationService.name, () => {
       });
     });
 
+    it.each([
+      { label: 'an external library path', sourcePath: '/mnt/photos/2024/IMG_1.jpg' },
+      { label: 'a sibling of the media location', sourcePath: '/usr/src/app/upload2/library/user/file.jpg' },
+    ])(
+      'should key $label outside the media location by its whole path without the leading /',
+      async ({ sourcePath }) => {
+        const mockStream = Readable.from([]);
+        const key = sourcePath.slice(1);
+        mockDiskBackend.exists.mockResolvedValue(true);
+        mockS3Backend.exists.mockResolvedValue(false);
+        mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
+        mockS3Backend.put.mockResolvedValue(void 0);
+        mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
+        mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+        const result = await sut.handleMigration({ ...baseJob, sourcePath });
+
+        expect(result).toBe(JobStatus.Success);
+        expect(mockS3Backend.exists).toHaveBeenCalledWith(key);
+        expect(mockS3Backend.put).toHaveBeenCalledWith(key, mockStream);
+        expect(mocks.storageMigration.updateAssetOriginalPath).toHaveBeenCalledWith('asset-1', sourcePath, key);
+      },
+    );
+
     it('should skip when source file not found and return Skipped', async () => {
       mockDiskBackend.exists.mockResolvedValue(false);
 
@@ -419,21 +447,81 @@ describe(StorageMigrationService.name, () => {
       },
     );
 
-    it('should skip copy when target already exists (idempotency) but still update DB and log', async () => {
+    it('should skip copy when target already exists with the source size (idempotency) but still update DB and log', async () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(true); // target already exists
+      mockDiskBackend.stat.mockResolvedValue({ size: 1024 });
+      mockS3Backend.stat.mockResolvedValue({ size: 1024 });
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
       const result = await sut.handleMigration(baseJob);
 
       expect(result).toBe(JobStatus.Success);
+      expect(mockDiskBackend.stat).toHaveBeenCalledWith(baseJob.sourcePath);
+      expect(mockS3Backend.stat).toHaveBeenCalledWith('library/user/ab/cd/file.jpg');
       // Should NOT copy
       expect(mockDiskBackend.get).not.toHaveBeenCalled();
       expect(mockS3Backend.put).not.toHaveBeenCalled();
       // But should update DB and log
       expect(mocks.storageMigration.updateAssetOriginalPath).toHaveBeenCalled();
       expect(mocks.storageMigration.createLogEntry).toHaveBeenCalled();
+    });
+
+    it('should fail without touching the DB, the log or the source when the existing target has a different size', async () => {
+      // e.g. another asset's file already at this key: trusting it would re-point this asset at it and delete the
+      // only copy of this original
+      mockDiskBackend.exists.mockResolvedValue(true);
+      mockS3Backend.exists.mockResolvedValue(true);
+      mockDiskBackend.stat.mockResolvedValue({ size: 1024 });
+      mockS3Backend.stat.mockResolvedValue({ size: 512 });
+
+      const result = await sut.handleMigration({ ...baseJob, deleteSource: true });
+
+      expect(result).toBe(JobStatus.Failed);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        expect.stringContaining(`${baseJob.sourcePath} (1024 bytes) -> library/user/ab/cd/file.jpg (512 bytes)`),
+      );
+      expect(mockDiskBackend.get).not.toHaveBeenCalled();
+      expect(mockS3Backend.put).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.createLogEntry).not.toHaveBeenCalled();
+      expect(mockDiskBackend.delete).not.toHaveBeenCalled();
+    });
+
+    it('should compare an existing disk target with the S3 source on toDisk', async () => {
+      mockS3Backend.exists.mockResolvedValue(true);
+      mockDiskBackend.exists.mockResolvedValue(true);
+      mockS3Backend.stat.mockResolvedValue({ size: 2048 });
+      mockDiskBackend.stat.mockResolvedValue({ size: 100 }); // e.g. a partial file
+
+      const result = await sut.handleMigration({
+        ...baseJob,
+        sourcePath: 'library/user/ab/cd/file.jpg',
+        direction: 'toDisk',
+        deleteSource: true,
+      });
+
+      expect(result).toBe(JobStatus.Failed);
+      expect(mockS3Backend.stat).toHaveBeenCalledWith('library/user/ab/cd/file.jpg');
+      expect(mockDiskBackend.stat).toHaveBeenCalledWith('/usr/src/app/upload/library/user/ab/cd/file.jpg');
+      expect(mockDiskBackend.put).not.toHaveBeenCalled();
+      expect(mocks.storageMigration.updateAssetOriginalPath).not.toHaveBeenCalled();
+      expect(mockS3Backend.delete).not.toHaveBeenCalled();
+    });
+
+    it('should not stat when the target does not exist yet', async () => {
+      mockDiskBackend.exists.mockResolvedValue(true);
+      mockS3Backend.exists.mockResolvedValue(false);
+      mockDiskBackend.get.mockResolvedValue({ stream: Readable.from([]) });
+      mockS3Backend.put.mockResolvedValue(void 0);
+      mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
+      mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+      await expect(sut.handleMigration(baseJob)).resolves.toBe(JobStatus.Success);
+
+      expect(mockDiskBackend.stat).not.toHaveBeenCalled();
+      expect(mockS3Backend.stat).not.toHaveBeenCalled();
     });
 
     it('should skip on optimistic concurrency conflict (0 rows affected) and return Skipped', async () => {

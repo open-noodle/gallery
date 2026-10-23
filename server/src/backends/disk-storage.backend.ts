@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { constants, createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, opendir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, opendir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -14,7 +15,7 @@ import { StorageRepository } from 'src/repositories/storage.repository.js';
 export const isDiskPath = (key: string) => isAbsolute(key);
 
 /**
- * exists / readAll / delete go through StorageRepository: they replace direct StorageRepository
+ * exists / readAll / copy / stat / delete go through StorageRepository: they replace direct StorageRepository
  * calls in upstream code paths, which keeps those paths (and the specs that mock the repository)
  * unchanged for disk files.
  */
@@ -40,11 +41,24 @@ export class DiskStorageBackend implements StorageBackend {
     const fullPath = this.resolvePath(key);
     await mkdir(dirname(fullPath), { recursive: true });
 
-    if (Buffer.isBuffer(source)) {
-      await writeFile(fullPath, source);
-    } else {
-      const writeStream = createWriteStream(fullPath);
-      await pipeline(source, writeStream);
+    // written beside the target and renamed into place, so an interrupted write leaves no partial file at the target
+    // (which the storage migration would then refuse, on every run, as a target of the wrong size). A fixed-length
+    // name: one derived from the target's could exceed the 255-byte file name limit the target itself fits in.
+    const tempPath = join(dirname(fullPath), `.${randomUUID()}.tmp`);
+    try {
+      if (Buffer.isBuffer(source)) {
+        await writeFile(tempPath, source);
+      } else {
+        await pipeline(source, createWriteStream(tempPath));
+      }
+      await rename(tempPath, fullPath);
+    } catch (error) {
+      try {
+        await unlink(tempPath);
+      } catch {
+        // the write's own error is the one to report
+      }
+      throw error;
     }
   }
 
@@ -66,6 +80,27 @@ export class DiskStorageBackend implements StorageBackend {
       this.resolvePath(key),
       options?.readable ? constants.R_OK : constants.F_OK,
     );
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<void> {
+    const source = this.resolvePath(fromKey);
+    const target = this.resolvePath(toKey);
+    this.storageRepository.mkdirSync(dirname(target));
+    await this.storageRepository.copyFile(source, target);
+    try {
+      // keep the times, as upstream's disk move does (rename, or utimes after its cross-device copy)
+      const { atime, mtime } = await this.storageRepository.stat(source);
+      await this.storageRepository.utimes(target, atime, mtime);
+    } catch (error) {
+      // a failed copy leaves nothing behind, as on S3: a stray copy would take the destination's name on the next run
+      await this.storageRepository.unlink(target).catch(() => {});
+      throw error;
+    }
+  }
+
+  async stat(key: string): Promise<{ size: number }> {
+    const { size } = await this.storageRepository.stat(this.resolvePath(key));
+    return { size };
   }
 
   delete(key: string): Promise<void> {

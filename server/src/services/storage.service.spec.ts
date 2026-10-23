@@ -1,6 +1,7 @@
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
 import { JobStatus, SystemMetadataKey } from 'src/enum.js';
+import { storageBackends } from 'src/gallery/utils/storage-backends.js';
 import { StorageService } from 'src/services/storage.service.js';
 import { ImmichStartupError } from 'src/utils/misc.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
@@ -508,26 +509,26 @@ describe(StorageService.name, () => {
         presignedUrlExpiry: 60,
         serveMode: 'redirect',
       });
-      StorageService['diskBackend'] = disk;
+      storageBackends.diskBackend = disk;
     });
 
     afterEach(() => {
-      StorageService['s3Backend'] = undefined;
+      storageBackends.s3Backend = undefined;
     });
 
     it('reads a disk path from disk even when S3 is configured', () => {
-      StorageService['s3Backend'] = s3;
+      storageBackends.s3Backend = s3;
       expect(StorageService.backendFor('/data/upload/user/a.jpg')).toBe(disk);
     });
 
     it('reads a disk path through the backend the caller passes', () => {
-      StorageService['s3Backend'] = s3;
+      storageBackends.s3Backend = s3;
       const callerDisk = new DiskStorageBackend('', mocks.storage as any);
       expect(StorageService.backendFor('/data/upload/user/a.jpg', callerDisk)).toBe(callerDisk);
     });
 
     it('sends a relative key to S3 when S3 is configured', () => {
-      StorageService['s3Backend'] = s3;
+      storageBackends.s3Backend = s3;
       expect(StorageService.backendFor('upload/user/a.jpg')).toBe(s3);
     });
 

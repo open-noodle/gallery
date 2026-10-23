@@ -1,14 +1,23 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { CacheControl } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { automock } from 'test/utils.js';
+
+// a source that fails after its first chunk, like an S3 read cut off mid-object
+const failingStream = () =>
+  Readable.from(
+    (function* () {
+      yield Buffer.from('partial');
+      throw new Error('connection reset');
+    })(),
+  );
 
 describe('DiskStorageBackend', () => {
   let backend: DiskStorageBackend;
@@ -43,6 +52,73 @@ describe('DiskStorageBackend', () => {
 
       const written = await readFile(join(testDir, 'upload/user1/ab/cd/file.jpg'));
       expect(written.toString()).toBe('stream content');
+      // the temporary file it was written to is gone
+      await expect(readdir(join(testDir, 'upload/user1/ab/cd'))).resolves.toEqual(['file.jpg']);
+    });
+
+    it('should write to an absolute path', async () => {
+      const target = join(testDir, 'outside/nested/file.jpg');
+
+      await backend.put(target, Buffer.from('absolute'));
+
+      await expect(readFile(target, 'utf8')).resolves.toBe('absolute');
+      await expect(readdir(join(testDir, 'outside/nested'))).resolves.toEqual(['file.jpg']);
+    });
+
+    it.each([
+      ['a buffer', () => Buffer.from('new')],
+      ['a stream', () => Readable.from([Buffer.from('ne'), Buffer.from('w')])],
+    ])('should replace an existing target with %s', async (_, source) => {
+      await writeFile(join(testDir, 'existing.jpg'), 'stale content');
+
+      await backend.put('existing.jpg', source());
+
+      await expect(readFile(join(testDir, 'existing.jpg'), 'utf8')).resolves.toBe('new');
+      await expect(readdir(testDir)).resolves.toEqual(['existing.jpg']);
+    });
+
+    it.each([
+      ['a buffer', () => Buffer.from('long')],
+      ['a stream', () => Readable.from([Buffer.from('lo'), Buffer.from('ng')])],
+    ])('should write a file whose name is near the 255-byte limit from %s', async (_, source) => {
+      // 78 CJK characters are 234 bytes; with '.jpg' the name is 238 bytes, which fits, but a temp file named after
+      // it (plus a UUID) would not
+      const name = `${'写'.repeat(78)}.jpg`;
+      expect(Buffer.byteLength(name)).toBe(238);
+
+      await backend.put(`library/admin/${name}`, source());
+
+      await expect(readFile(join(testDir, 'library/admin', name), 'utf8')).resolves.toBe('long');
+      await expect(readdir(join(testDir, 'library/admin'))).resolves.toEqual([name]);
+    });
+
+    describe('when the write fails', () => {
+      it('should leave neither a partial target nor a temporary file', async () => {
+        await expect(backend.put('upload/user1/ab/cd/file.jpg', failingStream())).rejects.toThrow('connection reset');
+
+        // a partial target would fail the storage migration's size check on every later run
+        await expect(readdir(join(testDir, 'upload/user1/ab/cd'))).resolves.toEqual([]);
+      });
+
+      it('should leave an existing target as it was', async () => {
+        await writeFile(join(testDir, 'existing.jpg'), 'complete');
+
+        await expect(backend.put('existing.jpg', failingStream())).rejects.toThrow('connection reset');
+
+        await expect(readFile(join(testDir, 'existing.jpg'), 'utf8')).resolves.toBe('complete');
+        await expect(readdir(testDir)).resolves.toEqual(['existing.jpg']);
+      });
+
+      it('should remove its temporary file when the rename into place fails', async () => {
+        // a folder at the target: the data is written, the rename over it is refused
+        await mkdir(join(testDir, 'taken.jpg/inside'), { recursive: true });
+
+        await expect(backend.put('taken.jpg', Buffer.from('data'))).rejects.toMatchObject({
+          code: expect.stringMatching(/^(EISDIR|ENOTEMPTY|EEXIST)$/),
+        });
+
+        await expect(readdir(testDir)).resolves.toEqual(['taken.jpg']);
+      });
     });
   });
 
@@ -88,6 +164,140 @@ describe('DiskStorageBackend', () => {
       await expect(absoluteOnly.downloadToTemp('/data/file.jpg')).resolves.toMatchObject({
         tempPath: '/data/file.jpg',
       });
+    });
+
+    it('should refuse to copy or stat a relative key before touching the disk', async () => {
+      // an empty repository: any call into it would throw a TypeError instead
+      const absoluteOnly = new DiskStorageBackend('', {} as StorageRepository);
+
+      await expect(absoluteOnly.copy('upload/a.jpg', '/data/library/a.jpg')).rejects.toThrow(
+        'cannot resolve relative key upload/a.jpg',
+      );
+      await expect(absoluteOnly.copy('/data/upload/a.jpg', 'library/a.jpg')).rejects.toThrow(
+        'cannot resolve relative key library/a.jpg',
+      );
+      await expect(absoluteOnly.stat('upload/a.jpg')).rejects.toThrow('cannot resolve relative key upload/a.jpg');
+    });
+  });
+
+  describe('copy', () => {
+    it('should copy a relative key to a new key, creating its folders and keeping the source', async () => {
+      await mkdir(join(testDir, 'upload/user1/ab/cd'), { recursive: true });
+      await writeFile(join(testDir, 'upload/user1/ab/cd/file.jpg'), 'original');
+
+      await backend.copy('upload/user1/ab/cd/file.jpg', 'library/admin/2024/Café Trip/IMG_0001+1.jpg');
+
+      await expect(readFile(join(testDir, 'library/admin/2024/Café Trip/IMG_0001+1.jpg'), 'utf8')).resolves.toBe(
+        'original',
+      );
+      expect(existsSync(join(testDir, 'upload/user1/ab/cd/file.jpg'))).toBe(true);
+    });
+
+    it('should copy between absolute paths', async () => {
+      const source = join(testDir, 'outside/source.jpg');
+      const target = join(testDir, 'elsewhere/nested/target.jpg');
+      await mkdir(join(testDir, 'outside'), { recursive: true });
+      await writeFile(source, 'absolute');
+
+      await backend.copy(source, target);
+
+      await expect(readFile(target, 'utf8')).resolves.toBe('absolute');
+    });
+
+    it('should copy between an absolute path and a relative key', async () => {
+      const absolute = join(testDir, 'outside/source.jpg');
+      await mkdir(join(testDir, 'outside'), { recursive: true });
+      await writeFile(absolute, 'mixed');
+
+      await backend.copy(absolute, 'library/admin/copy.jpg');
+      await backend.copy('library/admin/copy.jpg', join(testDir, 'back/again.jpg'));
+
+      await expect(readFile(join(testDir, 'library/admin/copy.jpg'), 'utf8')).resolves.toBe('mixed');
+      await expect(readFile(join(testDir, 'back/again.jpg'), 'utf8')).resolves.toBe('mixed');
+    });
+
+    it('should overwrite an existing destination', async () => {
+      await writeFile(join(testDir, 'new.jpg'), 'new');
+      await writeFile(join(testDir, 'old.jpg'), 'stale content');
+
+      await backend.copy('new.jpg', 'old.jpg');
+
+      await expect(readFile(join(testDir, 'old.jpg'), 'utf8')).resolves.toBe('new');
+    });
+
+    it('should reject when the source does not exist', async () => {
+      await expect(backend.copy('missing.jpg', 'library/missing.jpg')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('should keep the access and modification times of the source, as a disk move does', async () => {
+      const source = join(testDir, 'old.jpg');
+      await writeFile(source, 'dated');
+      const atime = new Date('2019-03-04T05:06:07.000Z');
+      const mtime = new Date('2018-01-02T03:04:05.000Z');
+      await utimes(source, atime, mtime);
+
+      await backend.copy('old.jpg', 'library/admin/2018/old.jpg');
+
+      const copied = await stat(join(testDir, 'library/admin/2018/old.jpg'));
+      expect(copied.mtime).toEqual(mtime);
+      // the copy itself reads the source, which may advance its atime (relatime); the target takes whatever it is now
+      const original = await stat(source);
+      expect(copied.atime).toEqual(original.atime);
+    });
+
+    it('should go through the storage repository, so specs that mock it see the calls', async () => {
+      const atime = new Date('2019-03-04T05:06:07.000Z');
+      const mtime = new Date('2018-01-02T03:04:05.000Z');
+      const repository = {
+        mkdirSync: vi.fn(),
+        copyFile: vi.fn().mockResolvedValue(undefined),
+        stat: vi.fn().mockResolvedValue({ size: 7, mode: 0o644, atime, mtime }),
+        utimes: vi.fn().mockResolvedValue(undefined),
+      };
+      const mocked = new DiskStorageBackend('/data', repository as unknown as StorageRepository);
+
+      await mocked.copy('upload/a.jpg', 'library/admin/a.jpg');
+      await expect(mocked.stat('library/admin/a.jpg')).resolves.toEqual({ size: 7 });
+
+      expect(repository.mkdirSync).toHaveBeenCalledWith('/data/library/admin');
+      expect(repository.copyFile).toHaveBeenCalledWith('/data/upload/a.jpg', '/data/library/admin/a.jpg');
+      expect(repository.stat).toHaveBeenCalledWith('/data/upload/a.jpg');
+      expect(repository.utimes).toHaveBeenCalledWith('/data/library/admin/a.jpg', atime, mtime);
+      expect(repository.stat).toHaveBeenCalledWith('/data/library/admin/a.jpg');
+    });
+
+    it('should remove its copy when the times cannot be kept, so a failed copy leaves nothing behind', async () => {
+      const refused = Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+      const repository = {
+        mkdirSync: vi.fn(),
+        copyFile: vi.fn().mockResolvedValue(undefined),
+        stat: vi.fn().mockResolvedValue({ atime: new Date(), mtime: new Date() }),
+        utimes: vi.fn().mockRejectedValue(refused),
+        unlink: vi.fn().mockRejectedValue(new Error('cleanup failed too')),
+      };
+      const mocked = new DiskStorageBackend('/data', repository as unknown as StorageRepository);
+
+      await expect(mocked.copy('upload/a.jpg', 'library/admin/a.jpg')).rejects.toBe(refused);
+
+      expect(repository.unlink).toHaveBeenCalledWith('/data/library/admin/a.jpg');
+    });
+  });
+
+  describe('stat', () => {
+    it('should return the size of a relative key', async () => {
+      await writeFile(join(testDir, 'sized.jpg'), 'twelve bytes');
+
+      await expect(backend.stat('sized.jpg')).resolves.toEqual({ size: 12 });
+    });
+
+    it('should return the size of an absolute path', async () => {
+      await writeFile(join(testDir, 'sized.jpg'), 'five!');
+
+      await expect(backend.stat(join(testDir, 'sized.jpg'))).resolves.toEqual({ size: 5 });
+    });
+
+    it('should reject when nothing is stored at the key', async () => {
+      await expect(backend.stat('missing.jpg')).rejects.toMatchObject({ code: 'ENOENT' });
     });
   });
 

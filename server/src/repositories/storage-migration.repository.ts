@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely } from 'kysely';
+import { Insertable, Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { AssetFileType } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { StorageMigrationLogTable } from 'src/schema/tables/storage-migration-log.table.js';
+import { escapeLikePattern } from 'src/utils/database.js';
 
 export type StorageMigrationDirection = 'toS3' | 'toDisk';
 
@@ -73,6 +74,49 @@ export class StorageMigrationRepository {
       .$if(direction === 'toS3', (qb) => qb.where('profileImagePath', 'like', '/%'))
       .$if(direction === 'toDisk', (qb) => qb.where('profileImagePath', 'not like', '/%'))
       .stream();
+  }
+
+  /** whether any asset, trashed or not, has its original stored as an S3 key */
+  async hasS3Originals(): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.originalPath', 'not like', '/%')
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
+  /** whether an asset not owned by ownerId has its original, or a file of its own (a sidecar), under the key prefix */
+  async hasOtherOwnerFilesUnderPrefix(prefix: string, ownerId: string): Promise<boolean> {
+    // a storage label may contain the LIKE wildcards _ and %, which must match only themselves
+    const likePrefix = `${escapeLikePattern(prefix)}%`;
+    const pattern = sql<string>`${likePrefix} escape '\\'`;
+    const { found } = await this.db
+      .selectNoFrom((eb) =>
+        eb
+          .or([
+            eb.exists(
+              eb
+                .selectFrom('asset')
+                .select('asset.id')
+                .where('asset.ownerId', '!=', ownerId)
+                .where('asset.originalPath', 'like', pattern),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('asset_file')
+                .innerJoin('asset', 'asset.id', 'asset_file.assetId')
+                .select('asset_file.id')
+                .where('asset.ownerId', '!=', ownerId)
+                .where('asset_file.path', 'like', pattern),
+            ),
+          ])
+          .as('found'),
+      )
+      .executeTakeFirstOrThrow();
+
+    return !!found;
   }
 
   // --- Estimate queries ---
