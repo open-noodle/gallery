@@ -16,8 +16,14 @@ import 'package:immich_mobile/gallery/search/search.repository.dart';
 import 'package:immich_mobile/models/server_info/server_version.model.dart';
 import 'package:immich_mobile/pages/library/spaces/space_album_detail.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
+import 'package:immich_mobile/presentation/pages/archive.page.dart';
+import 'package:immich_mobile/presentation/pages/favorite.page.dart';
 import 'package:immich_mobile/presentation/pages/person.page.dart';
+import 'package:immich_mobile/presentation/pages/place_detail.page.dart';
+import 'package:immich_mobile/presentation/pages/recently_added.page.dart';
+import 'package:immich_mobile/presentation/pages/recently_taken.page.dart';
 import 'package:immich_mobile/presentation/pages/remote_album.page.dart';
+import 'package:immich_mobile/presentation/pages/video.page.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/person_timeline.provider.dart';
@@ -67,6 +73,18 @@ class ScopedPageIds {
 }
 
 enum ScopedPage { album, space, spaceAlbum, personalPerson, spacePerson }
+
+/// Slice 7's screens: their scope is fixed by the screen alone (Place by its city).
+enum OtherScreen { place, favorites, archive, videos, recentlyTaken, recentlyAdded }
+
+Widget otherScreenPage(OtherScreen screen, {String place = 'Lisbon'}) => switch (screen) {
+  OtherScreen.place => PlaceDetailPage(place: place),
+  OtherScreen.favorites => const FavoritePage(),
+  OtherScreen.archive => const ArchivePage(),
+  OtherScreen.videos => const VideoPage(),
+  OtherScreen.recentlyTaken => const RecentlyTakenPage(),
+  OtherScreen.recentlyAdded => const RecentlyAddedPage(),
+};
 
 Widget scopedPage(ScopedPage page, ScopedPageIds ids) => switch (page) {
   ScopedPage.album => RemoteAlbumPage(album: scopedAlbum(ids)),
@@ -164,6 +182,49 @@ class ScopedTimelineFactory implements TimelineFactory {
   }) => _service('sharedSpacePerson', TimelineOrigin.person);
 
   @override
+  TimelineService place(
+    String place,
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => _service('place $place', TimelineOrigin.place);
+
+  @override
+  TimelineService favorite(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => _service('favorite $userId', TimelineOrigin.favorite);
+
+  @override
+  TimelineService archive(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => _service('archive $userId', TimelineOrigin.archive);
+
+  @override
+  TimelineService video(
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => _service('video $currentUserId', TimelineOrigin.video);
+
+  @override
+  TimelineService remoteAssets(
+    String userId, {
+    GroupAssetsBy? groupBy,
+    TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
+  }) => _service('remoteAssets $userId', TimelineOrigin.remoteAssets);
+
+  /// The grouping the page asked for, so a test sees the pill's Years/Months reach the page's own timeline.
+  @override
+  TimelineService recentlyAdded(String userId, {GroupAssetsBy? groupBy}) =>
+      _service('recentlyAdded $userId ${groupBy?.name}', TimelineOrigin.recentlyAdded);
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -180,6 +241,7 @@ ProviderContainer scopedPagesContainer({
   ScopedPageIds ids = const ScopedPageIds(),
   ScopedTimelineFactory? timelines,
   bool realDebounce = false,
+  UserDto? user,
 }) {
   final albums = _MockRemoteAlbumService();
   final album = scopedAlbum(ids);
@@ -213,6 +275,7 @@ ProviderContainer scopedPagesContainer({
     db: db,
     repository: repository,
     realDebounce: realDebounce,
+    user: user,
     extra: [
       timelineFactoryProvider.overrideWithValue(timelines ?? ScopedTimelineFactory()),
       remoteAlbumServiceProvider.overrideWithValue(albums),

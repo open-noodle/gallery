@@ -19,7 +19,7 @@
     "body": {
       "availability": {
         "hasAssets": true,
-        "hasAssetsInAlbum": false,
+        "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasCameras": true,
         "hasFavorites": true,

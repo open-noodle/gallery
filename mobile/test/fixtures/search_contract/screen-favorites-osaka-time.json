@@ -1,0 +1,31 @@
+{
+  "actor": "me",
+  "description": "Favorites screen search mode, Places: Osaka (an archived favourite): time only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Osaka",
+      "country": "Japan",
+      "dimensions": [
+        "time"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2022-12-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

@@ -25,7 +25,7 @@
         "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasCameras": false,
-        "hasFavorites": false,
+        "hasFavorites": true,
         "hasImages": true,
         "hasPeople": false,
         "hasPlaces": true,

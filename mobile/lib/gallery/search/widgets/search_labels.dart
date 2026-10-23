@@ -53,11 +53,25 @@ String searchDateLabel(BuildContext context, SearchDate date) => switch (date) {
 };
 
 /// The People chip's value: first names, as the prototype shows them ("Anna, Ben").
-/// The search field's placeholder: where you are ("Search in Japan 2023", "Search Anna's photos"). Photos keeps the
+/// The search field's placeholder: where you are ("Search in Japan 2023", "Search Anna's photos", "Search favorites"). Photos keeps the
 /// field's syntax hint; a screen whose name has not loaded yet reads "Search".
 String searchFieldHint(BuildContext context, SearchScope scope, String? name) {
   if (scope is PhotosSearchScope) {
     return context.t.search_mode_field_hint;
+  }
+  switch (scope) {
+    case FavoritesSearchScope():
+      return context.t.search_mode_field_hint_favorites;
+    case ArchiveSearchScope():
+      return context.t.search_mode_field_hint_archive;
+    case VideosSearchScope():
+      return context.t.search_mode_field_hint_videos;
+    case RecentlyAddedSearchScope():
+      return context.t.search_mode_field_hint_recently_added;
+    case RecentlyTakenSearchScope():
+      return context.t.search_mode_field_hint_recently_taken;
+    default:
+      break;
   }
   final named = name?.trim() ?? '';
   if (scope is PersonalPersonSearchScope || scope is SpacePersonSearchScope) {

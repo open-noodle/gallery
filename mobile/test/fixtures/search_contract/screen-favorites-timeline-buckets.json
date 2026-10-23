@@ -1,0 +1,28 @@
+{
+  "actor": "me",
+  "description": "Favorites screen search mode: browse results",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "isFavorite": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2023-09-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2022-12-01"
+      }
+    ],
+    "status": 200
+  }
+}

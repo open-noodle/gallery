@@ -1,0 +1,47 @@
+{
+  "actor": "me",
+  "description": "Favorites screen search mode, Places: Osaka (an archived favourite): places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Osaka",
+      "country": "Japan",
+      "dimensions": [
+        "places"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

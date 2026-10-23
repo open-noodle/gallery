@@ -21,6 +21,16 @@
         {
           "cities": [
             {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
               "city": "Lisbon",
               "count": 1
             }

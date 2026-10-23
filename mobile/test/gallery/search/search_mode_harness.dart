@@ -89,6 +89,12 @@ class FakeAsset {
   final String? description;
   final bool archived;
 
+  /// Whose photo it is: mine unless said otherwise.
+  final String owner;
+
+  /// The upload date (Recently added's order); the taken date unless said otherwise.
+  final DateTime? uploadedAt;
+
   const FakeAsset(
     this.id,
     this.taken, {
@@ -105,9 +111,13 @@ class FakeAsset {
     this.ocr,
     this.description,
     this.archived = false,
+    this.owner = testUserId,
+    this.uploadedAt,
   });
 
   String get fileName => '$id.jpg';
+
+  DateTime get uploaded => uploadedAt ?? taken;
 
   FakeAsset copyWith({List<String>? tags, int? Function()? rating, bool? video}) => FakeAsset(
     id,
@@ -125,6 +135,8 @@ class FakeAsset {
     ocr: ocr,
     description: description,
     archived: archived,
+    owner: owner,
+    uploadedAt: uploadedAt,
   );
 }
 
@@ -272,6 +284,14 @@ class FakeSearchRepository implements GallerySearchRepository {
       return false;
     }
     if (p.isFavorite == true && !a.favorite) {
+      return false;
+    }
+    if (p.ownerId != null && a.owner != p.ownerId) {
+      return false;
+    }
+    // Someone else's photo only through a partner or a space: as on the server, a request that widens to neither
+    // (Favorites, the owner-only screens) stays with mine.
+    if (a.owner != testUserId && p.withSharedSpaces != true && p.withPartners != true) {
       return false;
     }
     if (p.isInAlbum == true && !a.inAlbum) {
@@ -502,7 +522,7 @@ class FakeSearchRepository implements GallerySearchRepository {
     resultParams.add(p);
     final counts = <String, int>{};
     for (final a in results(p)) {
-      final key = _monthKey(a.taken);
+      final key = _monthKey(byUploadDate ? a.uploaded : a.taken);
       counts[key] = (counts[key] ?? 0) + 1;
     }
     final keys = counts.keys.toList()..sort((a, b) => sort == SearchSort.oldest ? a.compareTo(b) : b.compareTo(a));
@@ -517,15 +537,14 @@ class FakeSearchRepository implements GallerySearchRepository {
     bool byUploadDate = false,
   }) async {
     calls.add('bucket $timeBucket');
-    final assets = results(p).where((a) => _monthKey(a.taken) == timeBucket).toList();
-    if (sort == SearchSort.oldest) {
-      assets.sort((a, b) => a.taken.compareTo(b.taken));
-    }
+    DateTime date(FakeAsset a) => byUploadDate ? a.uploaded : a.taken;
+    final assets = results(p).where((a) => _monthKey(date(a)) == timeBucket).toList()
+      ..sort((a, b) => sort == SearchSort.oldest ? date(a).compareTo(date(b)) : date(b).compareTo(date(a)));
     return api.TimeBucketAssetResponseDto(
       id: [for (final a in assets) a.id],
-      ownerId: [for (final _ in assets) testUserId],
+      ownerId: [for (final a in assets) a.owner],
       fileCreatedAt: [for (final a in assets) a.taken.toIso8601String()],
-      createdAt: [for (final a in assets) a.taken.toIso8601String()],
+      createdAt: [for (final a in assets) a.uploaded.toIso8601String()],
       duration: [for (final _ in assets) null],
       isFavorite: [for (final a in assets) a.favorite],
       isImage: [for (final a in assets) !a.video],
@@ -564,7 +583,7 @@ class FakeSearchRepository implements GallerySearchRepository {
   static api.AssetResponseDto _assetDto(FakeAsset a) => api.AssetResponseDto(
     id: a.id,
     checksum: 'checksum-${a.id}',
-    createdAt: a.taken,
+    createdAt: a.uploaded,
     duration: 0,
     fileCreatedAt: a.taken,
     fileModifiedAt: a.taken,
@@ -578,7 +597,7 @@ class FakeSearchRepository implements GallerySearchRepository {
     localDateTime: a.taken,
     originalFileName: '${a.id}.jpg',
     originalPath: '/${a.id}.jpg',
-    ownerId: testUserId,
+    ownerId: a.owner,
     thumbhash: null,
     type: a.video ? api.AssetTypeEnum.VIDEO : api.AssetTypeEnum.IMAGE,
     updatedAt: a.taken,
@@ -680,17 +699,19 @@ ProviderContainer searchModeContainer({
   bool memories = false,
   bool realDebounce = false,
   List<Override> extra = const [],
+  UserDto? user,
 }) {
+  final me = user ?? testUser;
   final users = _MockUserService();
-  when(() => users.tryGetMyUser()).thenReturn(testUser);
+  when(() => users.tryGetMyUser()).thenReturn(me);
   when(() => users.watchMyUser()).thenAnswer((_) => const Stream.empty());
   return ProviderContainer(
     overrides: [
       driftProvider.overrideWithValue(db),
       apiServiceProvider.overrideWithValue(_MockApiService()),
       infra.userServiceProvider.overrideWithValue(users),
-      currentUserProvider.overrideWith((ref) => _StubUser(users, testUser)),
-      timelineUsersProvider.overrideWith((_) => Stream.value([testUserId])),
+      currentUserProvider.overrideWith((ref) => _StubUser(users, me)),
+      timelineUsersProvider.overrideWith((_) => Stream.value([me.id])),
       featureMessageServiceProvider.overrideWithValue(_StubFeatureMessages()),
       memoryLaneProvider.overrideWith((ref) async => memories ? [_memory()] : const <Memory>[]),
       gallerySearchRepositoryProvider.overrideWithValue(repository),

@@ -7,6 +7,7 @@ import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_state.notifier.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:openapi/api.dart';
 
 // Search mode's providers. Each screen gets its own copy through searchRouteOverrides(scope), which Slice 3+ passes to
@@ -72,7 +73,11 @@ final searchTotalProvider = Provider<int?>(
 
 /// A screen's own search: its scope, and a fresh state, options and results.
 List<Override> searchRouteOverrides(SearchScope scope) => [
-  searchScopeProvider.overrideWithValue(scope),
+  // An owner-only scope is the signed-in user's (SearchScope.forUser).
+  if (scope.needsUser)
+    searchScopeProvider.overrideWith((ref) => scope.forUser(ref.watch(currentUserProvider.select((user) => user?.id))))
+  else
+    searchScopeProvider.overrideWithValue(scope),
   searchScopeNameProvider.overrideWithValue(scope.name),
   searchFixedPersonProvider,
   searchStateProvider.overrideWith(SearchStateNotifier.new),
@@ -359,6 +364,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
             previous: const [],
             params: params,
             sort: _sort,
+            byUploadDate: _byUploadDate,
             forState: searchState,
             round: generation,
           );
@@ -379,6 +385,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
             previous: const [],
             params: params,
             sort: _sort,
+            byUploadDate: _byUploadDate,
             forState: searchState,
             round: generation,
           );
@@ -412,6 +419,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
     required List<AssetResponseDto> previous,
     required SearchParams params,
     required SearchSort sort,
+    required bool byUploadDate,
     required SearchState? forState,
     required int round,
   }) => SearchResults(
@@ -421,6 +429,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
     nextPage: int.tryParse(page?.assets.nextPage ?? ''),
     params: params,
     sort: sort,
+    byUploadDate: byUploadDate,
     forState: forState,
     round: round,
   );
@@ -466,6 +475,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
         previous: state.assets ?? const [],
         params: params,
         sort: _sort,
+        byUploadDate: _byUploadDate,
         forState: state.forState,
         round: state.round,
       );

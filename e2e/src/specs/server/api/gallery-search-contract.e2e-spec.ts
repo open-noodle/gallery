@@ -364,7 +364,8 @@ const seed = async () => {
   await request(app)
     .put('/assets/favorites')
     .set(asBearerAuth(me.accessToken))
-    .send({ ids: [id('asset:lisbon-1'), id('asset:space-kyoto-1')], isFavorite: true })
+    // archived-1 too: the Favorites screen shows archived favourites, so its search must.
+    .send({ ids: [id('asset:lisbon-1'), id('asset:space-kyoto-1'), id('asset:archived-1')], isFavorite: true })
     .expect(204);
 
   // Smart-search embeddings: three Kyoto photos and a space photo close to kyoto-1, each at its own distance so the
@@ -1091,8 +1092,81 @@ const scopedScreenSteps = (): ScreenStep[] => {
   ];
 };
 
+/**
+ * Search mode on the place, favorites, archive, videos, recently taken and recently added pages as
+ * mobile/test/gallery/search/scoped_search_other_screens_e2e_test.dart walks it: the pill opens search mode on the
+ * `scope-<screen>-*` options and `screen-<screen>-timeline-buckets`, then one filter.
+ */
+const placeLisbon = () => ({ ...photos, city: 'Lisbon' });
+const placeAnna = () => ({ ...placeLisbon(), personIds: [`person:${id('person:anna')}`] });
+const favoritesOsaka = () => ({ isFavorite: true, country: 'Japan', city: 'Osaka' });
+const archiveOsaka = () => ({ ...archive(), country: 'Japan', city: 'Osaka' });
+const videos2024 = () => ({
+  ...photos,
+  type: 'VIDEO',
+  takenAfter: '2024-01-01T00:00:00.000Z',
+  takenBefore: '2025-01-01T00:00:00.000Z',
+});
+const recentlyTakenKyoto = () => ({ ...recentlyTaken(), country: 'Japan', city: 'Kyoto' });
+const recentlyAdded = () => ({ ownerId: id('user:me') });
+const recentlyAddedOsaka = () => ({ ...recentlyAdded(), country: 'Japan', city: 'Osaka' });
+const byUploadDate = (query: Query): Query => ({ ...query, orderBy: 'createdAt' });
+
+const otherScreenSteps = (): ScreenStep[] => [
+  {
+    name: 'screen-place-anna',
+    description: 'Place screen (Lisbon) search mode, People: Anna',
+    body: placeAnna,
+    timeline: () => asQuery(placeAnna()),
+    months: ['2023-09-01'],
+    unfiltered: () => asQuery(placeLisbon()),
+  },
+  {
+    name: 'screen-favorites-osaka',
+    description: 'Favorites screen search mode, Places: Osaka (an archived favourite)',
+    body: favoritesOsaka,
+    timeline: () => asQuery(favoritesOsaka()),
+    months: ['2022-12-01'],
+    unfiltered: () => ({ isFavorite: 'true' }),
+  },
+  {
+    name: 'screen-archive-osaka',
+    description: "Archive screen search mode, Places: Osaka (never the partner's archived photo)",
+    body: archiveOsaka,
+    timeline: () => asQuery(archiveOsaka()),
+    months: ['2022-12-01'],
+    unfiltered: () => asQuery(archive()),
+  },
+  {
+    name: 'screen-videos-2024',
+    description: 'Videos screen search mode, When: 2024',
+    body: videos2024,
+    timeline: () => asQuery(videos2024()),
+    months: ['2024-02-01'],
+    unfiltered: () => asQuery({ ...photos, type: 'VIDEO' }),
+  },
+  {
+    name: 'screen-recently-taken-kyoto',
+    description: 'Recently taken screen search mode, Places: Kyoto',
+    body: recentlyTakenKyoto,
+    timeline: () => asQuery(recentlyTakenKyoto()),
+    months: ['2024-06-01'],
+    unfiltered: () => asQuery(recentlyTaken()),
+  },
+  {
+    name: 'screen-recently-added-osaka',
+    description: 'Recently added screen search mode, Places: Osaka (archived photos stay in, by upload date)',
+    body: recentlyAddedOsaka,
+    timeline: () => byUploadDate(asQuery(recentlyAddedOsaka())),
+    months: ['2022-12-01'],
+    unfiltered: () => byUploadDate(asQuery(recentlyAdded())),
+  },
+];
+
+const screenSteps = () => [...scopedScreenSteps(), ...otherScreenSteps()];
+
 const scopedScreenCases = (): FixtureCase[] =>
-  scopedScreenSteps().flatMap(({ name, description, body, timeline, months, unfiltered }) => {
+  screenSteps().flatMap(({ name, description, body, timeline, months, unfiltered }) => {
     const screen = name.slice(0, name.lastIndexOf('-'));
     return [
       ...(unfiltered
@@ -1426,7 +1500,8 @@ const browseScopes = (): Array<{ name: string; options: Record<string, Json>; ex
     expected: 2,
   },
   { name: 'place', options: { ...photos, city: 'Kyoto' }, expected: 5 },
-  { name: 'favorites', options: { isFavorite: true }, expected: 1 },
+  // lisbon-1 and the archived archived-1
+  { name: 'favorites', options: { isFavorite: true }, expected: 2 },
   { name: 'favorites with spaces', options: { ...photos, isFavorite: true }, expected: 2 },
   { name: 'archive', options: { visibility: 'archive', ownerId: id('user:me') }, expected: 2 },
   { name: 'videos', options: { ...photos, type: 'VIDEO' }, expected: 1 },

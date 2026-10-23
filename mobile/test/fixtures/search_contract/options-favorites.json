@@ -30,7 +30,7 @@
     "body": {
       "availability": {
         "hasAssets": true,
-        "hasAssetsInAlbum": false,
+        "hasAssetsInAlbum": true,
         "hasAssetsNotInAlbum": true,
         "hasCameras": true,
         "hasFavorites": true,
@@ -57,6 +57,16 @@
         {
           "cities": [
             {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
               "city": "Lisbon",
               "count": 1
             }
@@ -68,7 +78,7 @@
       "hasUnnamedPeople": false,
       "mediaTypes": [
         {
-          "count": 1,
+          "count": 2,
           "type": "IMAGE"
         }
       ],
@@ -107,9 +117,13 @@
         {
           "count": 1,
           "timeBucket": "2023-09-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2022-12-01"
         }
       ],
-      "total": 1
+      "total": 2
     },
     "status": 200
   }

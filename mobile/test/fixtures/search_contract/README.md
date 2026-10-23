@@ -80,8 +80,13 @@ walks it (`mobile/test/gallery/search/scoped_search_albums_spaces_people_e2e_tes
 search mode on the `scope-<screen>-*` options (and `screen-<screen>-timeline-buckets`, the unfiltered results, where no
 other fixture records them), then one filter: People → Ben on the album, People → Quinn on the space, Places → Madrid on
 the space album (its archived photo stays in), Ben added on Anna's page, When → 2024 on Pia's page. Each step is the
-per-dimension options, `-timeline-buckets` and one `-timeline-bucket-<month>`. No two fixtures outside the `older-*` and
-`stock-*` views record the same request: the stand-in serves the first match, so a duplicate would hide the other.
+per-dimension options, `-timeline-buckets` and one `-timeline-bucket-<month>`. The place, favorites, archive, videos,
+recently taken and recently added pages follow the same pattern
+(`mobile/test/gallery/search/scoped_search_other_screens_e2e_test.dart`): People → Anna on Lisbon's place page, Places →
+Osaka on Favorites (an archived favourite), Archive (never the partner's archived photo in Nice) and Recently added (by
+upload date, `orderBy=createdAt`), When → 2024 on Videos, Places → Kyoto on Recently taken. No two fixtures outside the
+`older-*` and `stock-*` views record the same request: the stand-in serves the first match, so a duplicate would hide
+the other.
 
 The switch-over end-to-end test (`mobile/test/gallery/search/switch_over_e2e_test.dart`) adds `scope-similar-smart`,
 the first results page of Similar photos with no other filter, and the stock server's unfiltered results

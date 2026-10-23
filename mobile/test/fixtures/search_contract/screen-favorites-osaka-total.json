@@ -1,0 +1,26 @@
+{
+  "actor": "me",
+  "description": "Favorites screen search mode, Places: Osaka (an archived favourite): total only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Osaka",
+      "country": "Japan",
+      "dimensions": [
+        "total"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "total": 1
+    },
+    "status": 200
+  }
+}

@@ -47,6 +47,13 @@ sealed class SearchScope {
 
   /// The scope's own parameters for a request in [mode].
   SearchParams baseParams(SearchMode mode);
+
+  /// An owner-only scope (Archive, Recently added, Recently taken) as the signed-in user's: its page names no user, so
+  /// the route fills it in. Any other scope is unchanged.
+  SearchScope forUser(String? userId) => this;
+
+  /// Whether this is an owner-only scope that names no user yet, so the route fills in the signed-in one (forUser).
+  bool get needsUser => false;
 }
 
 /// Browse: no query; results from /timeline/buckets. Query: a text query or reference photo; results from
@@ -198,6 +205,9 @@ class PlaceSearchScope extends SearchScope {
   const PlaceSearchScope(this.city);
 
   @override
+  String get name => city;
+
+  @override
   Set<SearchSection> get fixedSections => const {SearchSection.places};
 
   @override
@@ -229,8 +239,15 @@ class FavoritesSearchScope extends SearchScope {
 
 /// Archive: my archived photos only.
 class ArchiveSearchScope extends SearchScope {
-  final String ownerId;
-  const ArchiveSearchScope(this.ownerId);
+  /// The signed-in user; null until the route fills it in (forUser).
+  final String? ownerId;
+  const ArchiveSearchScope([this.ownerId]);
+
+  @override
+  SearchScope forUser(String? userId) => ArchiveSearchScope(userId);
+
+  @override
+  bool get needsUser => ownerId == null;
 
   @override
   Set<SearchSection> get fixedSections => const {SearchSection.archived};
@@ -265,8 +282,15 @@ class VideosSearchScope extends SearchScope {
 
 /// Recently added: my own photos, timeline + archive (visibility unset), browse ordered by upload date.
 class RecentlyAddedSearchScope extends SearchScope {
-  final String ownerId;
-  const RecentlyAddedSearchScope(this.ownerId);
+  /// The signed-in user; null until the route fills it in (forUser).
+  final String? ownerId;
+  const RecentlyAddedSearchScope([this.ownerId]);
+
+  @override
+  SearchScope forUser(String? userId) => RecentlyAddedSearchScope(userId);
+
+  @override
+  bool get needsUser => ownerId == null;
 
   @override
   SearchParams baseParams(SearchMode mode) => SearchParams(ownerId: ownerId);
@@ -280,8 +304,15 @@ class RecentlyAddedSearchScope extends SearchScope {
 
 /// Recently taken: my own photos, timeline visibility.
 class RecentlyTakenSearchScope extends SearchScope {
-  final String ownerId;
-  const RecentlyTakenSearchScope(this.ownerId);
+  /// The signed-in user; null until the route fills it in (forUser).
+  final String? ownerId;
+  const RecentlyTakenSearchScope([this.ownerId]);
+
+  @override
+  SearchScope forUser(String? userId) => RecentlyTakenSearchScope(userId);
+
+  @override
+  bool get needsUser => ownerId == null;
 
   @override
   SearchParams baseParams(SearchMode mode) => SearchParams(visibility: SearchVisibility.timeline, ownerId: ownerId);

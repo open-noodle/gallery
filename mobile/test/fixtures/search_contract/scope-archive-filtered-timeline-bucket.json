@@ -49,7 +49,7 @@
       ],
       "isFavorite": [
         false,
-        false
+        true
       ],
       "isImage": [
         true,

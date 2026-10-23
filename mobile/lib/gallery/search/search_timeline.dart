@@ -305,17 +305,25 @@ class SearchTimelineSource {
     }
     final assets = [for (final asset in results.assets ?? const <api.AssetResponseDto>[]) asset.toDto()];
     _paged = [
-      for (final asset in _sorted(assets, results.sort))
+      for (final asset in _sorted(assets, results.sort, _dateOf))
         if (_inScope(temporalScope, asset.createdAt.toLocal())) asset,
     ];
   }
 
-  static List<BaseAsset> _sorted(List<BaseAsset> assets, SearchSort sort) => switch (sort) {
-    // Relevance keeps the server's order; pages append, so loaded assets never move.
-    SearchSort.relevance => assets,
-    SearchSort.newest => [...assets]..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
-    SearchSort.oldest => [...assets]..sort((a, b) => a.createdAt.compareTo(b.createdAt)),
+  /// The date the results are ordered and grouped by: the upload date on Recently added (SearchResults.byUploadDate),
+  /// the taken date everywhere else, each as the screen's own timeline groups it.
+  DateTime _dateOf(BaseAsset asset) => switch (asset) {
+    RemoteAsset(:final uploadedAt?) when _results.byUploadDate => uploadedAt.toLocal(),
+    _ => asset.createdAt.toLocal(),
   };
+
+  static List<BaseAsset> _sorted(List<BaseAsset> assets, SearchSort sort, DateTime Function(BaseAsset) dateOf) =>
+      switch (sort) {
+        // Relevance keeps the server's order; pages append, so loaded assets never move.
+        SearchSort.relevance => assets,
+        SearchSort.newest => [...assets]..sort((a, b) => dateOf(b).compareTo(dateOf(a))),
+        SearchSort.oldest => [...assets]..sort((a, b) => dateOf(a).compareTo(dateOf(b))),
+      };
 
   static bool _inScope(TimelineTemporalScope scope, DateTime date, {bool month = false}) {
     final start = scope.start;
@@ -385,10 +393,11 @@ class SearchTimelineSource {
     }
   }
 
-  static List<Bucket> _dayBuckets(List<BaseAsset> assets) {
+  List<Bucket> _dayBuckets(List<BaseAsset> assets) {
     final buckets = <TimeBucket>[];
     for (final asset in assets) {
-      final local = asset.createdAt;
+      // Taken: wall-clock time as taken (searchBucketAssets), as the timeline's own day headers read it.
+      final local = _results.byUploadDate ? _dateOf(asset) : asset.createdAt;
       final day = DateTime(local.year, local.month, local.day);
       if (buckets.isNotEmpty && buckets.last.date == day) {
         final last = buckets.removeLast();
@@ -410,7 +419,7 @@ class SearchTimelineSource {
     }
     final buckets = <TimeBucket>[];
     for (final asset in _paged) {
-      final local = asset.createdAt.toLocal();
+      final local = _dateOf(asset);
       final date = switch (groupBy) {
         GroupAssetsBy.year => DateTime(local.year),
         GroupAssetsBy.month => DateTime(local.year, local.month),
