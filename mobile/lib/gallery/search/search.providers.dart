@@ -236,6 +236,17 @@ class SearchResults {
   final int? nextPage;
   final Object? error;
 
+  /// The request these results answer: a month of [buckets] must be loaded with exactly these parameters, never with
+  /// those of a newer state still in flight.
+  final SearchParams? params;
+  final SearchSort sort;
+  final bool byUploadDate;
+
+  /// The search state these results answer, and the request round that produced them: a next page keeps the round,
+  /// any new request starts another.
+  final SearchState? forState;
+  final int round;
+
   const SearchResults({
     this.loading = false,
     this.source,
@@ -244,6 +255,11 @@ class SearchResults {
     this.assets,
     this.nextPage,
     this.error,
+    this.params,
+    this.sort = SearchSort.newest,
+    this.byUploadDate = false,
+    this.forState,
+    this.round = 0,
   });
 }
 
@@ -254,6 +270,7 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
   SearchParams? _params;
   SearchSort _sort = SearchSort.newest;
   bool _stock = false;
+  bool _paging = false;
 
   @override
   SearchResults build() {
@@ -288,6 +305,12 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
       total: state.total,
       buckets: state.buckets,
       assets: state.assets,
+      nextPage: state.nextPage,
+      params: state.params,
+      sort: state.sort,
+      byUploadDate: state.byUploadDate,
+      forState: state.forState,
+      round: state.round,
     );
     try {
       final capabilities = await ref.read(searchCapabilitiesProvider.future);
@@ -312,7 +335,16 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
       if (searchState.isQueryMode) {
         final page = await repository.smart(params, page: 1, sort: _sort);
         if (_current(generation)) {
-          state = _paged(SearchResultsSource.smart, page, total: null, previous: const []);
+          state = _paged(
+            SearchResultsSource.smart,
+            page,
+            total: null,
+            previous: const [],
+            params: params,
+            sort: _sort,
+            forState: searchState,
+            round: generation,
+          );
         }
         return;
       }
@@ -328,6 +360,10 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
             page,
             total: _stock ? results[1] as int? : null,
             previous: const [],
+            params: params,
+            sort: _sort,
+            forState: searchState,
+            round: generation,
           );
         }
         return;
@@ -338,6 +374,11 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
           source: SearchResultsSource.timeline,
           buckets: buckets,
           total: buckets.fold<int>(0, (sum, bucket) => sum + bucket.count),
+          params: params,
+          sort: _sort,
+          byUploadDate: _byUploadDate,
+          forState: searchState,
+          round: generation,
         );
       }
     } catch (error) {
@@ -352,11 +393,19 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
     SearchResponseDto? page, {
     required int? total,
     required List<AssetResponseDto> previous,
+    required SearchParams params,
+    required SearchSort sort,
+    required SearchState? forState,
+    required int round,
   }) => SearchResults(
     source: source,
     total: total,
     assets: [...previous, ...?page?.assets.items],
     nextPage: int.tryParse(page?.assets.nextPage ?? ''),
+    params: params,
+    sort: sort,
+    forState: forState,
+    round: round,
   );
 
   /// One month of a browse result (SearchResultsSource.timeline).
@@ -378,13 +427,31 @@ class SearchResultsNotifier extends Notifier<SearchResults> {
     if (params == null || page == null || source == null || source == SearchResultsSource.timeline) {
       return;
     }
+    if (_paging) {
+      return;
+    }
+    _paging = true;
     final generation = _generation;
     final repository = ref.read(gallerySearchRepositoryProvider);
-    final response = source == SearchResultsSource.smart
-        ? await repository.smart(params, page: page, sort: _sort)
-        : await repository.metadata(params, page: page, sort: _sort);
+    final SearchResponseDto? response;
+    try {
+      response = source == SearchResultsSource.smart
+          ? await repository.smart(params, page: page, sort: _sort)
+          : await repository.metadata(params, page: page, sort: _sort);
+    } finally {
+      _paging = false;
+    }
     if (_current(generation)) {
-      state = _paged(source, response, total: state.total, previous: state.assets ?? const []);
+      state = _paged(
+        source,
+        response,
+        total: state.total,
+        previous: state.assets ?? const [],
+        params: params,
+        sort: _sort,
+        forState: state.forState,
+        round: state.round,
+      );
     }
   }
 }

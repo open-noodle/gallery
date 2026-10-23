@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
@@ -22,6 +23,12 @@ Future<void> openGallerySearch(TabsRouter tabsRouter, ProviderReader read) async
   if (!onPhotos) {
     tabsRouter.setActiveIndex(kGalleryPhotosIndex);
     await Future<void>.delayed(kGalleryTabTransitionDelay);
+  }
+
+  // Preview (until Slice 5): search mode in place on Photos, keyboard closed.
+  if (read(searchPreviewEnabledProvider)) {
+    read(searchModeProvider.notifier).enter();
+    return;
   }
 
   read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;

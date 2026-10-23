@@ -3,6 +3,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
+import 'package:immich_mobile/gallery/search/search_timeline.dart';
+import 'package:immich_mobile/gallery/search/widgets/search_frame.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
 import 'package:immich_mobile/providers/timeline/overview_representative_cache.provider.dart';
@@ -20,7 +23,8 @@ class TimelineRouteScope extends StatelessWidget {
     this.timelineServiceBuilder,
     this.sharedGrouping = false,
     this.overrides = const [],
-  });
+    this.search,
+  }) : assert(search == null || timelineServiceBuilder != null, 'search needs the screen\'s own timeline builder');
 
   final Widget child;
   final TimelineRouteServiceBuilder? timelineServiceBuilder;
@@ -34,8 +38,16 @@ class TimelineRouteScope extends StatelessWidget {
   final bool sharedGrouping;
   final List<Override> overrides;
 
+  /// The screen's search scope: search mode shows its results through this screen's timeline
+  /// (lib/gallery/search/search_timeline.dart). Null: the screen has no search.
+  final SearchScope? search;
+
   @override
   Widget build(BuildContext context) {
+    final screenBuilder = timelineServiceBuilder;
+    final serviceBuilder = search != null && screenBuilder != null
+        ? searchTimelineServiceBuilder(screenBuilder)
+        : screenBuilder;
     return ProviderScope(
       overrides: [
         timelineTemporalScopeProvider.overrideWith(TimelineTemporalScopeNotifier.new),
@@ -43,19 +55,20 @@ class TimelineRouteScope extends StatelessWidget {
         if (!sharedGrouping) timelineOverviewModeProvider.overrideWith(TimelineOverviewModeNotifier.new),
         timelineOverviewDrilldownProvider.overrideWith((ref) => ref.watch(sharedTimelineOverviewDrilldownProvider)),
         timelineOverviewRepresentativeCacheProvider.overrideWith(TimelineOverviewRepresentativeCacheNotifier.new),
-        if (timelineServiceBuilder != null)
+        if (search != null) ...searchTimelineScopeOverrides(search!),
+        if (serviceBuilder != null)
           timelineServiceProvider.overrideWith((ref) {
             final temporalScope = ref.watch(timelineTemporalScopeProvider);
             // The bucket granularity, not the zoom level: on "All" the query must group by the
             // persisted "Group by" setting so month-only headers get month buckets.
             final groupBy = ref.watch(timelineGroupingSpecProvider).groupBy;
-            final service = timelineServiceBuilder!(ref, temporalScope, groupBy);
+            final service = serviceBuilder(ref, temporalScope, groupBy);
             ref.onDispose(service.dispose);
             return service;
           }),
         ...overrides,
       ],
-      child: child,
+      child: search is PhotosSearchScope ? PhotosSearchFrame(child: child) : child,
     );
   }
 }

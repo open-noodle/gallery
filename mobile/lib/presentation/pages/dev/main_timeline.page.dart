@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/feature_message/feature_message_dialog.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_sheet.widget.dart';
@@ -62,6 +63,7 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
     final showMemories = ref.watch(photosMemoryLaneVisibleProvider);
     return TimelineRouteScope(
       timelineServiceBuilder: buildPhotosTimelineRouteService,
+      search: const PhotosSearchScope(),
       // The main Photos timeline is the only route on the app-level grouping, so its
       // Years / Months / All choice survives navigating away and back; detail routes get
       // their own and keep grouping changes route-local. Neither is persisted — the

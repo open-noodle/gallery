@@ -1,4 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -11,5 +13,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 final photosMemoryLaneVisibleProvider = Provider<bool>((ref) {
   final hasMemories = ref.watch(memoryLaneProvider.select((memories) => memories.value?.isNotEmpty ?? false));
   final isFiltering = ref.watch(photosFilterProvider.select((filter) => !filter.isEmpty));
-  return hasMemories && !isFiltering;
+  // Search mode (preview): hidden while any filter or query is active.
+  final isSearching = ref.watch(searchModeProvider) && !ref.watch(searchStateProvider.select((s) => s.isEmpty));
+  return hasMemories && !isFiltering && !isSearching;
 });

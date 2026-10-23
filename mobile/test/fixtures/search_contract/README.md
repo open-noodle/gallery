@@ -68,6 +68,11 @@ The `scope-<screen>-*` fixtures are one screen's search as the app runs it
 after two filters (`scope-<screen>-filtered-*`), then the filtered results (`-timeline-buckets` and `-timeline-bucket`,
 or `-smart` in query mode). Photos opens on the `dimension-photos-*` set.
 
+The `mode-photos-*` fixtures are Photos search mode as its end-to-end test walks it
+(`mobile/test/gallery/search/photos_search_mode_e2e_test.dart`): `@a` picks Anna, When picks 2024, Places picks Kyoto.
+Each step is the per-dimension options, `-timeline-buckets`, and one `-timeline-bucket-<month>` per month the grid
+opens.
+
 Two fixture sets stand in for servers this stack is not:
 
 - **Older Gallery server** (`older-*`): `"responseView": "older-gallery"` drops `searchOptions` from `/server/features`;

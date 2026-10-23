@@ -1,0 +1,641 @@
+import 'package:drift/drift.dart' show DatabaseConnection, Value;
+import 'package:drift/native.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
+import 'package:immich_mobile/data/db/main/table/user/user.drift.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/memory.model.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/domain/services/feature_message.service.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/domain/services/user.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search.repository.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
+import 'package:immich_mobile/gallery/search/search_options.model.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
+import 'package:immich_mobile/gallery/search/search_state.model.dart';
+import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/feature_message.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
+import 'package:immich_mobile/providers/photos_filter/filter_count.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/services/api.service.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart' as api;
+// easy_localization initializes shared_preferences internally; tests need the mock initializer.
+// ignore: depend_on_referenced_packages
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../test_utils.dart';
+import '../../widget_tester_extensions.dart';
+
+// Widget-test harness for search mode on the real Photos page (MainTimelinePage): the real timeline, search providers
+// and widgets, over an in-memory database for the normal timeline and either a [FakeSearchRepository] (a small library
+// whose options and results narrow like the server's) or the strict contract server (the e2e test).
+
+const testUserId = 'user-me';
+
+final testUser = UserDto(id: testUserId, email: 'me@example.com', name: 'Me', profileChangedAt: DateTime(2024));
+
+class _MockApiService extends Mock implements ApiService {}
+
+class _MockUserService extends Mock implements UserService {}
+
+class _StubFeatureMessages implements FeatureMessageService {
+  @override
+  bool shouldShow() => false;
+
+  @override
+  Future<void> markSeen() async {}
+}
+
+class _StubUser extends CurrentUserProvider {
+  _StubUser(super.service, UserDto user) {
+    state = user;
+  }
+}
+
+/// One asset of the fake library.
+class FakeAsset {
+  final String id;
+  final DateTime taken;
+  final List<String> people;
+  final List<String> tags;
+  final String? country;
+  final String? city;
+  final bool video;
+
+  const FakeAsset(
+    this.id,
+    this.taken, {
+    this.people = const [],
+    this.tags = const [],
+    this.country,
+    this.city,
+    this.video = false,
+  });
+}
+
+class FakePerson {
+  final String id;
+  final String name;
+
+  const FakePerson(this.id, this.name);
+
+  String get filterId => 'person:$id';
+}
+
+class FakeTag {
+  final String id;
+  final String value;
+
+  const FakeTag(this.id, this.value);
+}
+
+/// The fake library most tests search: Anna and Ben in Kyoto, Anna and Rex in Lisbon, Berlin without people.
+class FakeLibrary {
+  final List<FakeAsset> assets;
+  final List<FakePerson> people;
+  final List<FakeTag> tags;
+
+  const FakeLibrary({required this.assets, this.people = const [], this.tags = const []});
+
+  static final standard = FakeLibrary(
+    people: const [
+      FakePerson('anna', 'Anna'),
+      FakePerson('ben', 'Ben'),
+      FakePerson('rex', 'Rex'),
+      FakePerson('alex', 'Alex'),
+    ],
+    tags: const [FakeTag('beach', 'beach'), FakeTag('food', 'food')],
+    assets: [
+      FakeAsset(
+        'kyoto-1',
+        DateTime(2024, 6, 3, 10),
+        people: const ['anna', 'ben'],
+        tags: const ['beach', 'food'],
+        country: 'Japan',
+        city: 'Kyoto',
+      ),
+      FakeAsset('kyoto-2', DateTime(2024, 6, 2, 10), people: const ['anna'], country: 'Japan', city: 'Kyoto'),
+      FakeAsset('kyoto-3', DateTime(2024, 6, 1, 10), people: const ['ben'], country: 'Japan', city: 'Kyoto'),
+      FakeAsset(
+        'lisbon-1',
+        DateTime(2023, 9, 10, 10),
+        people: const ['anna', 'rex'],
+        country: 'Portugal',
+        city: 'Lisbon',
+      ),
+      FakeAsset('porto-1', DateTime(2023, 8, 1, 10), tags: const ['food'], country: 'Portugal', city: 'Porto'),
+      FakeAsset('berlin-1', DateTime(2024, 2, 14, 10), country: 'Germany', city: 'Berlin', video: true),
+      FakeAsset('alex-1', DateTime(2022, 3, 5, 10), people: const ['alex'], country: 'Germany', city: 'Berlin'),
+    ],
+  );
+
+  /// The same library with no tags at all.
+  FakeLibrary withoutTags() => FakeLibrary(
+    people: people,
+    assets: [
+      for (final a in assets)
+        FakeAsset(a.id, a.taken, people: a.people, country: a.country, city: a.city, video: a.video),
+    ],
+  );
+
+  String personName(String id) => people.firstWhere((p) => p.id == id).name;
+  String tagValue(String id) => tags.firstWhere((t) => t.id == id).value;
+}
+
+/// A [GallerySearchRepository] over a [FakeLibrary], narrowing like the server: every dimension with every other
+/// filter applied, people and tags including their own filter, places and time excluding theirs.
+class FakeSearchRepository implements GallerySearchRepository {
+  FakeLibrary library;
+  SearchServerCapabilities serverCapabilities;
+
+  /// One line per call: `options [dims]`, `buckets`, `bucket <month>`, `smart`.
+  final calls = <String>[];
+
+  FakeSearchRepository(
+    this.library, {
+    this.serverCapabilities = const SearchServerCapabilities(
+      isGallery: true,
+      searchOptions: true,
+      localTakenRange: true,
+    ),
+  });
+
+  static String _personId(String filterId) => filterId.contains(':') ? filterId.split(':').last : filterId;
+
+  bool _matches(
+    FakeAsset a,
+    SearchParams p, {
+    bool people = true,
+    bool tags = true,
+    bool place = true,
+    bool time = true,
+    bool untagged = true,
+  }) {
+    if (people && p.personIds != null && !p.personIds!.map(_personId).every(a.people.contains)) {
+      return false;
+    }
+    if (tags) {
+      if (untagged && p.untagged && a.tags.isNotEmpty) {
+        return false;
+      }
+      final ids = p.tagIds;
+      if (ids != null && ids.isNotEmpty) {
+        // Browse matches any of the tags, a query all of them.
+        final any = p.query == null && p.queryAssetId == null;
+        if (any ? !ids.any(a.tags.contains) : !ids.every(a.tags.contains)) {
+          return false;
+        }
+      }
+    }
+    if (place) {
+      if (p.country != null && a.country != p.country) {
+        return false;
+      }
+      if (p.city != null && a.city != p.city) {
+        return false;
+      }
+    }
+    if (time) {
+      final taken = DateTime.utc(a.taken.year, a.taken.month, a.taken.day, a.taken.hour);
+      if (p.takenAfter != null && taken.isBefore(p.takenAfter!)) {
+        return false;
+      }
+      if (p.takenBefore != null && !taken.isBefore(p.takenBefore!)) {
+        return false;
+      }
+    }
+    if (p.type == SearchMediaType.video && !a.video) {
+      return false;
+    }
+    if (p.type == SearchMediaType.image && a.video) {
+      return false;
+    }
+    return true;
+  }
+
+  List<FakeAsset> results(SearchParams p) =>
+      [...library.assets.where((a) => _matches(a, p))]..sort((a, b) => b.taken.compareTo(a.taken));
+
+  @override
+  Future<SearchServerCapabilities> capabilities() async => serverCapabilities;
+
+  @override
+  Future<SearchOptionsPart> options(SearchParams p, {Set<SearchDimension> dimensions = const {}}) async {
+    calls.add('options ${dimensions.map((d) => d.name).join(',')}');
+    final all = results(p);
+    final forPeople = all;
+    // As the server: Untagged belongs to the tags dimension, so the tag list ignores it.
+    final forTags = library.assets.where((a) => _matches(a, p, untagged: false)).toList();
+    final forPlaces = library.assets.where((a) => _matches(a, p, place: false)).toList();
+    final forTime = library.assets.where((a) => _matches(a, p, time: false)).toList();
+
+    final selectedPeople = {...?p.personIds?.map(_personId)};
+    final peopleCounts = <String, int>{};
+    for (final a in forPeople) {
+      for (final person in a.people) {
+        peopleCounts[person] = (peopleCounts[person] ?? 0) + 1;
+      }
+    }
+    final people = [
+      for (final person in library.people)
+        if (peopleCounts[person.id] != null)
+          SearchPersonOption(
+            filterId: person.filterId,
+            name: person.name,
+            count: peopleCounts[person.id],
+            isSelected: selectedPeople.contains(person.id),
+            profileId: person.id,
+            profileType: 'user-person',
+          ),
+    ]..sort((a, b) => b.count!.compareTo(a.count!));
+
+    final tagCounts = <String, int>{};
+    for (final a in forTags) {
+      for (final tag in a.tags) {
+        tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+      }
+    }
+    final tags = [
+      for (final tag in library.tags)
+        if (tagCounts[tag.id] != null)
+          SearchTagOption(
+            id: tag.id,
+            value: tag.value,
+            count: tagCounts[tag.id],
+            isSelected: p.tagIds?.contains(tag.id) ?? false,
+          ),
+    ];
+
+    final countryCounts = <String, int>{};
+    final cityCounts = <String, Map<String, int>>{};
+    for (final a in forPlaces) {
+      if (a.country == null) {
+        continue;
+      }
+      countryCounts[a.country!] = (countryCounts[a.country!] ?? 0) + 1;
+      final cities = cityCounts.putIfAbsent(a.country!, () => {});
+      cities[a.city!] = (cities[a.city!] ?? 0) + 1;
+    }
+    final countries = [
+      for (final country in countryCounts.keys.toList()..sort())
+        SearchCountryOption(
+          country: country,
+          count: countryCounts[country],
+          cities: [
+            for (final city in cityCounts[country]!.keys.toList()..sort())
+              SearchCityOption(city: city, count: cityCounts[country]![city]),
+          ],
+        ),
+    ];
+
+    final monthCounts = <DateTime, int>{};
+    for (final a in forTime) {
+      final month = DateTime(a.taken.year, a.taken.month);
+      monthCounts[month] = (monthCounts[month] ?? 0) + 1;
+    }
+    final months = [
+      for (final month in monthCounts.keys.toList()..sort((a, b) => b.compareTo(a)))
+        SearchMonthCount(year: month.year, month: month.month, count: monthCounts[month]!),
+    ];
+
+    final wants = dimensions;
+    return SearchOptionsPart(
+      availability: wants.isEmpty
+          ? SearchAvailability(
+              hasAssets: all.isNotEmpty,
+              hasPeople: people.isNotEmpty,
+              hasTags: tags.isNotEmpty,
+              hasPlaces: countries.isNotEmpty,
+              hasCameras: false,
+              hasRatings: false,
+              hasImages: all.any((a) => !a.video),
+              hasVideos: all.any((a) => a.video),
+              hasFavorites: false,
+              hasAssetsInAlbum: false,
+              hasAssetsNotInAlbum: all.isNotEmpty,
+            )
+          : null,
+      total: wants.contains(SearchDimension.total) ? all.length : null,
+      months: wants.contains(SearchDimension.time) ? months : null,
+      people: wants.contains(SearchDimension.people) ? people : null,
+      hasUnnamedPeople: wants.contains(SearchDimension.people) ? false : null,
+      tags: wants.contains(SearchDimension.tags) ? tags : null,
+      countries: wants.contains(SearchDimension.places) ? countries : null,
+      cameras: wants.contains(SearchDimension.cameras) ? const [] : null,
+      ratings: wants.contains(SearchDimension.ratings) ? const [] : null,
+      mediaTypes: wants.contains(SearchDimension.mediaTypes) ? const [] : null,
+    );
+  }
+
+  static String _monthKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-01';
+
+  @override
+  Future<List<api.TimeBucketsResponseDto>> timeBuckets(
+    SearchParams p, {
+    required SearchSort sort,
+    bool byUploadDate = false,
+  }) async {
+    calls.add('buckets');
+    final counts = <String, int>{};
+    for (final a in results(p)) {
+      final key = _monthKey(a.taken);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    final keys = counts.keys.toList()..sort((a, b) => sort == SearchSort.oldest ? a.compareTo(b) : b.compareTo(a));
+    return [for (final key in keys) api.TimeBucketsResponseDto(count: counts[key]!, timeBucket: key)];
+  }
+
+  @override
+  Future<api.TimeBucketAssetResponseDto?> timeBucket(
+    SearchParams p,
+    String timeBucket, {
+    required SearchSort sort,
+    bool byUploadDate = false,
+  }) async {
+    calls.add('bucket $timeBucket');
+    final assets = results(p).where((a) => _monthKey(a.taken) == timeBucket).toList();
+    if (sort == SearchSort.oldest) {
+      assets.sort((a, b) => a.taken.compareTo(b.taken));
+    }
+    return api.TimeBucketAssetResponseDto(
+      id: [for (final a in assets) a.id],
+      ownerId: [for (final _ in assets) testUserId],
+      fileCreatedAt: [for (final a in assets) a.taken.toIso8601String()],
+      createdAt: [for (final a in assets) a.taken.toIso8601String()],
+      duration: [for (final _ in assets) null],
+      isFavorite: [for (final _ in assets) false],
+      isImage: [for (final a in assets) !a.video],
+      isTrashed: [for (final _ in assets) false],
+      livePhotoVideoId: [for (final _ in assets) null],
+      localOffsetHours: [for (final _ in assets) 0],
+      projectionType: [for (final _ in assets) null],
+      ratio: [for (final _ in assets) 1],
+      thumbhash: [for (final _ in assets) null],
+      visibility: [for (final _ in assets) api.AssetVisibility.timeline],
+    );
+  }
+
+  @override
+  Future<api.SearchResponseDto?> smart(
+    SearchParams p, {
+    required int page,
+    required SearchSort sort,
+    int size = 100,
+  }) async {
+    calls.add('smart');
+    final assets = results(p);
+    return api.SearchResponseDto(
+      albums: api.SearchAlbumResponseDto(count: 0, facets: const [], items: const [], total: 0),
+      assets: api.SearchAssetResponseDto(
+        count: assets.length,
+        facets: const [],
+        items: [for (final a in assets) _assetDto(a)],
+        nextPage: null,
+        total: assets.length,
+      ),
+    );
+  }
+
+  static api.AssetResponseDto _assetDto(FakeAsset a) => api.AssetResponseDto(
+    id: a.id,
+    checksum: 'checksum-${a.id}',
+    createdAt: a.taken,
+    duration: 0,
+    fileCreatedAt: a.taken,
+    fileModifiedAt: a.taken,
+    hasMetadata: true,
+    height: 100,
+    isArchived: false,
+    isEdited: false,
+    isFavorite: false,
+    isOffline: false,
+    isTrashed: false,
+    localDateTime: a.taken,
+    originalFileName: '${a.id}.jpg',
+    originalPath: '/${a.id}.jpg',
+    ownerId: testUserId,
+    thumbhash: null,
+    type: a.video ? api.AssetTypeEnum.VIDEO : api.AssetTypeEnum.IMAGE,
+    updatedAt: a.taken,
+    visibility: api.AssetVisibility.timeline,
+    width: 100,
+  );
+
+  @override
+  Future<api.SearchResponseDto?> metadata(
+    SearchParams p, {
+    required int page,
+    required SearchSort sort,
+    int size = 100,
+  }) => smart(p, page: page, sort: sort, size: size);
+
+  @override
+  Future<int?> statistics(SearchParams p) async => results(p).length;
+
+  @override
+  Future<SearchOptionsPart> fallbackOptions(SearchParams p) => options(p, dimensions: SearchDimension.values.toSet());
+
+  @override
+  Future<List<SearchCityOption>> fallbackCities(SearchParams p, String country) async => const [];
+}
+
+/// The in-memory database behind the normal Photos timeline.
+class SearchModeDatabase {
+  late final Drift db;
+
+  Future<void> setUpAll() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestUtils.init();
+    SharedPreferences.setMockInitialValues({});
+    await EasyLocalization.ensureInitialized();
+    await initializeDateFormatting();
+    db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
+    await SettingsRepository.ensureInitialized(db);
+  }
+
+  Future<void> setUp({int timelineAssets = 0}) async {
+    await Store.clear();
+    await SettingsRepository.instance.clear(SettingsKey.values);
+    await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
+    await db.delete(db.remoteAssetEntity).go();
+    await db
+        .into(db.userEntity)
+        .insertOnConflictUpdate(
+          UserEntityCompanion(
+            id: const Value(testUserId),
+            email: const Value('me@example.com'),
+            name: const Value('Me'),
+            avatarColor: const Value(AvatarColor.primary),
+            profileChangedAt: Value(DateTime(2024)),
+            hasProfileImage: const Value(false),
+          ),
+        );
+    // One asset a day going back from 2025-12-31, so the normal timeline is long enough to scroll.
+    for (var i = 0; i < timelineAssets; i++) {
+      final taken = DateTime.utc(2025, 12, 31).subtract(Duration(days: i));
+      await db
+          .into(db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion.insert(
+              id: 'local-$i',
+              name: 'local-$i.jpg',
+              type: AssetType.image,
+              checksum: 'checksum-local-$i',
+              ownerId: testUserId,
+              visibility: AssetVisibility.timeline,
+              createdAt: Value(taken),
+              updatedAt: Value(taken),
+              localDateTime: Value(taken),
+              width: const Value(100),
+              height: const Value(100),
+              durationMs: const Value(0),
+              isFavorite: const Value(false),
+              isEdited: const Value(false),
+            ),
+          );
+    }
+  }
+
+  Future<void> tearDownAll() => db.close();
+}
+
+/// Builds the container the Photos page runs in.
+ProviderContainer searchModeContainer({
+  required Drift db,
+  required GallerySearchRepository repository,
+  bool preview = true,
+  List<String> recentPersonIds = const [],
+  bool memories = false,
+  bool realDebounce = false,
+  List<Override> extra = const [],
+}) {
+  final users = _MockUserService();
+  when(() => users.tryGetMyUser()).thenReturn(testUser);
+  when(() => users.watchMyUser()).thenAnswer((_) => const Stream.empty());
+  return ProviderContainer(
+    overrides: [
+      driftProvider.overrideWithValue(db),
+      apiServiceProvider.overrideWithValue(_MockApiService()),
+      infra.userServiceProvider.overrideWithValue(users),
+      currentUserProvider.overrideWith((ref) => _StubUser(users, testUser)),
+      timelineUsersProvider.overrideWith((_) => Stream.value([testUserId])),
+      photosFilterCountProvider.overrideWith((ref) => 0),
+      featureMessageServiceProvider.overrideWithValue(_StubFeatureMessages()),
+      memoryLaneProvider.overrideWith((ref) async => memories ? [_memory()] : const <Memory>[]),
+      gallerySearchRepositoryProvider.overrideWithValue(repository),
+      searchPreviewEnabledProvider.overrideWith(() => _FixedPreview(preview)),
+      searchRecentPersonIdsProvider.overrideWith((ref) async => recentPersonIds),
+      if (!realDebounce) ...[
+        searchOptionsDebounceProvider.overrideWithValue(Duration.zero),
+        searchResultsDebounceProvider.overrideWithValue(Duration.zero),
+      ],
+      searchClockProvider.overrideWithValue(() => DateTime(2026, 10, 23)),
+      ...extra,
+    ],
+  );
+}
+
+class _FixedPreview extends SearchPreviewNotifier {
+  final bool enabled;
+
+  _FixedPreview(this.enabled);
+
+  @override
+  bool build() => enabled;
+
+  @override
+  Future<void> set(bool enabled) async => state = enabled;
+}
+
+Memory _memory() => Memory(
+  id: 'memory-1',
+  createdAt: DateTime(2024),
+  updatedAt: DateTime(2024),
+  ownerId: testUserId,
+  type: MemoryTypeEnum.onThisDay,
+  data: const MemoryData({'year': 2019}),
+  isSaved: false,
+  memoryAt: DateTime(2019, 8, 1),
+  assets: [TestUtils.createRemoteAsset(id: 'memory-asset-1')],
+);
+
+/// Pumps the real Photos page.
+Future<void> pumpPhotosPage(WidgetTester tester, ProviderContainer container, {ThemeData? theme, Widget? page}) async {
+  tester.view.physicalSize = const Size(1080, 2340);
+  tester.view.devicePixelRatio = 2.75;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    localizedForTest(
+      UncontrolledProviderScope(
+        container: container,
+        child: Builder(
+          builder: (context) => MaterialApp(
+            localizationsDelegates: context.localizationDelegates,
+            supportedLocales: context.supportedLocales,
+            locale: context.locale,
+            theme: theme,
+            home: withStubRouter(page ?? const MainTimelinePage()),
+          ),
+        ),
+      ),
+    ),
+  );
+  await settleFrames(tester);
+}
+
+/// Pumps frames until timers and streams settle (pumpAndSettle never settles while a spinner animates).
+Future<void> settleFrames(WidgetTester tester, {int frames = 20}) async {
+  for (var i = 0; i < frames; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
+/// The search button's preview path: what openGallerySearch does once on the Photos tab.
+Future<void> enterSearchMode(WidgetTester tester, ProviderContainer container) async {
+  container.read(searchModeProvider.notifier).enter();
+  await settleFrames(tester);
+}
+
+/// The scroll position of the timeline's grid.
+double timelineScrollOffset(WidgetTester tester) => timelineController(tester).offset;
+
+/// The timeline grid's controller: the outermost Scrollable under the page.
+ScrollController timelineController(WidgetTester tester) => tester
+    .widget<Scrollable>(find.descendant(of: find.byType(Timeline), matching: find.byType(Scrollable)).first)
+    .controller!;
+
+/// Disposes the page, then the container.
+Future<void> disposePhotosPage(WidgetTester tester, ProviderContainer container) async {
+  await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
+  await tester.pump(const Duration(seconds: 1));
+  container.dispose();
+}
+
+SearchState searchStateOf(ProviderContainer container) => container.read(searchStateProvider);
+
+Finder get timelineFinder => find.byType(Timeline);
+
+/// Fixed scope for tests that read it.
+const photosScope = PhotosSearchScope();

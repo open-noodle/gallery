@@ -917,8 +917,57 @@ const fallbackCases = (): FixtureCase[] => {
   ];
 };
 
+/**
+ * Photos search mode as mobile/test/gallery/search/photos_search_mode_e2e_test.dart walks it: `@a` picks Anna, When
+ * picks 2024, Places picks Kyoto. Each step is one options round (availability, then one request per list), the browse
+ * results, and every month the grid opens.
+ */
+const photosModeSteps = () => {
+  const anna = { ...photos, personIds: [`person:${id('person:anna')}`] };
+  const year = { ...anna, takenAfter: '2024-01-01T00:00:00.000Z', takenBefore: '2025-01-01T00:00:00.000Z' };
+  const kyoto = { ...year, country: 'Japan', city: 'Kyoto' };
+  return [
+    {
+      name: 'mode-photos-anna',
+      description: 'Photos search mode, Anna',
+      body: anna,
+      months: ['2024-06-01', '2023-09-01'],
+    },
+    {
+      name: 'mode-photos-anna-2024',
+      description: 'Photos search mode, Anna in 2024',
+      body: year,
+      months: ['2024-06-01'],
+    },
+    {
+      name: 'mode-photos-anna-2024-kyoto',
+      description: 'Photos search mode, Anna in Kyoto in 2024',
+      body: kyoto,
+      months: ['2024-06-01'],
+    },
+  ];
+};
+
+const photosModeCases = (): FixtureCase[] =>
+  photosModeSteps().flatMap(({ name, description, body, months }) => [
+    ...perDimension(name, description, () => body),
+    {
+      name: `${name}-timeline-buckets`,
+      description: `${description}: browse results`,
+      actor: 'me' as const,
+      request: { method: 'GET' as const, path: '/api/timeline/buckets', query: asQuery(body) },
+    },
+    ...months.map((month) => ({
+      name: `${name}-timeline-bucket-${month}`,
+      description: `${description}: the month ${month} of the browse results`,
+      actor: 'me' as const,
+      request: { method: 'GET' as const, path: '/api/timeline/bucket', query: { ...asQuery(body), timeBucket: month } },
+    })),
+  ]);
+
 const fixtureCases = (): FixtureCase[] => [
   ...scopeFlows().flatMap((flow) => scopeFlowCases(flow)),
+  ...photosModeCases(),
   ...fallbackCases(),
   ...perDimension('dimension-photos', 'Photos, unfiltered', () => photos),
   ...perDimension('dimension-photos-kyoto', 'Photos with a city', () => ({ ...photos, city: 'Kyoto' })),
