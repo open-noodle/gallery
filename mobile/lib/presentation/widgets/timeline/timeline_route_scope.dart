@@ -68,7 +68,11 @@ class TimelineRouteScope extends StatelessWidget {
           }),
         ...overrides,
       ],
-      child: search is PhotosSearchScope ? PhotosSearchFrame(child: child) : child,
+      child: switch (search) {
+        null => child,
+        PhotosSearchScope() => PhotosSearchFrame(child: child),
+        _ => SearchScreenFrame(child: child),
+      },
     );
   }
 }

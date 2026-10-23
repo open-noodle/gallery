@@ -1,0 +1,41 @@
+{
+  "actor": "me",
+  "description": "Space screen search mode, People: Quinn (a bare space-person id): places only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "896d137b-eeec-45b7-8af0-75610855e1ea": "space-person:quinn"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "896d137b-eeec-45b7-8af0-75610855e1ea"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Porto",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

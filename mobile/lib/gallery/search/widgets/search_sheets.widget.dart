@@ -17,20 +17,60 @@ import 'package:immich_mobile/generated/translations.g.dart';
 // "Show N photos" or a tap outside. Nothing here requests anything: the lists are the narrowed options, filtered on the
 // device as you type.
 
-/// Opens [chip]'s sheet. The sheet lives in the navigator's overlay, so it reads the root search providers: the Photos
-/// screen's. A screen with its own scoped search (Slice 6) must hand its scope to the sheet.
-Future<void> showSearchChipSheet(BuildContext context, SearchMainChip chip) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => switch (chip) {
+/// Opens [chip]'s sheet over the screen whose chip row [context] belongs to.
+Future<void> showSearchChipSheet(BuildContext context, SearchMainChip chip) => showSearchSheet(
+  context,
+  (_) => switch (chip) {
     SearchMainChip.people => const _PeopleSheet(),
     SearchMainChip.when => const _WhenSheet(),
     SearchMainChip.places => const _PlacesSheet(),
     SearchMainChip.tags => const _TagsSheet(),
   },
 );
+
+/// A search sheet reads the search of the screen it opened from. The sheet's route lives in the navigator's overlay,
+/// above the screen's own provider scope (TimelineRouteScope's `search:`), so it would otherwise read the root search:
+/// the Photos screen's.
+///
+/// So the sheet gets a child of the chip row's container: every search provider resolves to the screen's own. Not that
+/// container itself (UncontrolledProviderScope): the container would then refresh its providers while building the
+/// sheet, and mark the screen's timeline dirty from outside the screen's subtree, which Flutter rejects ("markNeedsBuild()
+/// called during build"). A child container refreshes only what it owns, which is nothing the screen reads; the
+/// screen's container keeps refreshing inside the screen's own subtree.
+Future<void> showSearchSheet(BuildContext context, WidgetBuilder builder) {
+  final container = ProviderScope.containerOf(context, listen: false);
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => _SheetScope(parent: container, child: builder(sheetContext)),
+  );
+}
+
+/// A child container of [parent] for one sheet, disposed with it.
+class _SheetScope extends StatefulWidget {
+  final ProviderContainer parent;
+  final Widget child;
+
+  const _SheetScope({required this.parent, required this.child});
+
+  @override
+  State<_SheetScope> createState() => _SheetScopeState();
+}
+
+class _SheetScopeState extends State<_SheetScope> {
+  late final _container = ProviderContainer(parent: widget.parent);
+
+  @override
+  void dispose() {
+    _container.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => UncontrolledProviderScope(container: _container, child: widget.child);
+}
 
 String _fold(String value) => removeDiacritics(value).toLowerCase().trim();
 
@@ -213,7 +253,9 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
     final people = ref.watch(searchOptionsProvider.select((o) => o.people));
     final recentIds = ref.watch(searchRecentPersonIdsProvider).valueOrNull ?? const <String>[];
     final notifier = ref.read(searchStateProvider.notifier);
-    final selectedIds = {for (final p in selected) p.filterId};
+    // A person page's person: shown first among the selected, and not removable.
+    final fixed = ref.watch(searchFixedPersonProvider);
+    final selectedIds = {for (final p in selected) p.filterId, ?fixed?.filterId};
     final others = (people ?? const <SearchPersonOption>[]).where((p) => !selectedIds.contains(p.filterId)).toList();
     final query = _fold(_query);
     final matches = query.isEmpty ? others : others.where((p) => _fold(p.name).contains(query)).toList();
@@ -233,7 +275,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
       ),
       body: CustomScrollView(
         slivers: [
-          if (selected.isNotEmpty) ...[
+          if (selected.isNotEmpty || fixed != null) ...[
             SliverToBoxAdapter(child: SearchSheetHint(context.t.search_mode_people_selected_hint)),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -241,7 +283,15 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
                 crossAxisCount: 4,
                 childAspectRatio: 0.78,
                 children: [
-                  for (final person in selected)
+                  if (fixed != null)
+                    _PersonTile(
+                      key: Key('search-sheet-fixed-${fixed.filterId}'),
+                      avatar: SearchPersonAvatar.selected(person: fixed),
+                      name: fixed.name,
+                      caption: context.t.search_mode_person_fixed,
+                      selected: true,
+                    ),
+                  for (final person in selected.where((p) => p.filterId != fixed?.filterId))
                     _PersonTile(
                       key: Key('search-sheet-selected-${person.filterId}'),
                       avatar: SearchPersonAvatar.selected(person: person),
@@ -283,7 +333,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             child: SearchSheetHint(
               query.isNotEmpty
                   ? context.t.search_mode_matches
-                  : selected.isNotEmpty
+                  : selected.isNotEmpty || fixed != null
                   ? context.t.search_mode_people_also_in
                   : context.t.search_mode_people_most_photographed,
             ),
@@ -324,16 +374,22 @@ class _PersonTile extends StatelessWidget {
   final Widget avatar;
   final String name;
   final int? count;
+
+  /// In place of the count: why the tile cannot be tapped (a person page's own person).
+  final String? caption;
   final bool selected;
-  final VoidCallback onTap;
+
+  /// Null: fixed, not removable.
+  final VoidCallback? onTap;
 
   const _PersonTile({
     super.key,
     required this.avatar,
     required this.name,
     this.count,
+    this.caption,
     this.selected = false,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -362,7 +418,16 @@ class _PersonTile extends StatelessWidget {
               textAlign: TextAlign.center,
               style: theme.textTheme.labelMedium,
             ),
-            SearchOptionCount(count),
+            if (caption != null)
+              Text(
+                caption!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              )
+            else
+              SearchOptionCount(count),
           ],
         ),
       ),

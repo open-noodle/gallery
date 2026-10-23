@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -52,6 +53,21 @@ String searchDateLabel(BuildContext context, SearchDate date) => switch (date) {
 };
 
 /// The People chip's value: first names, as the prototype shows them ("Anna, Ben").
+/// The search field's placeholder: where you are ("Search in Japan 2023", "Search Anna's photos"). Photos keeps the
+/// field's syntax hint; a screen whose name has not loaded yet reads "Search".
+String searchFieldHint(BuildContext context, SearchScope scope, String? name) {
+  if (scope is PhotosSearchScope) {
+    return context.t.search_mode_field_hint;
+  }
+  final named = name?.trim() ?? '';
+  if (scope is PersonalPersonSearchScope || scope is SpacePersonSearchScope) {
+    return named.isEmpty
+        ? context.t.search_mode_field_hint_person_unnamed
+        : context.t.search_mode_field_hint_person(name: named);
+  }
+  return named.isEmpty ? context.t.search : context.t.search_mode_field_hint_in(name: named);
+}
+
 String searchPeopleLabel(List<SearchPersonRef> people) =>
     people.map((p) => p.name.trim().split(RegExp(r'\s+')).first).join(', ');
 

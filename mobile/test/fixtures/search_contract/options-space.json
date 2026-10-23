@@ -58,22 +58,22 @@
         {
           "cities": [
             {
+              "city": "Madrid",
+              "count": 3
+            }
+          ],
+          "count": 3,
+          "country": "Spain"
+        },
+        {
+          "cities": [
+            {
               "city": "Kyoto",
               "count": 2
             }
           ],
           "count": 2,
           "country": "Japan"
-        },
-        {
-          "cities": [
-            {
-              "city": "Madrid",
-              "count": 2
-            }
-          ],
-          "count": 2,
-          "country": "Spain"
         },
         {
           "cities": [
@@ -89,7 +89,7 @@
       "hasUnnamedPeople": false,
       "mediaTypes": [
         {
-          "count": 5,
+          "count": 6,
           "type": "IMAGE"
         }
       ],
@@ -131,11 +131,11 @@
           "timeBucket": "2023-08-01"
         },
         {
-          "count": 2,
+          "count": 3,
           "timeBucket": "2023-07-01"
         }
       ],
-      "total": 5
+      "total": 6
     },
     "status": 200
   }

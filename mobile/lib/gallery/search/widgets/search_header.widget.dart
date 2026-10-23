@@ -167,9 +167,11 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
   void _pick(SearchSuggestion suggestion) {
     final notifier = ref.read(searchStateProvider.notifier);
     final filters = ref.read(searchStateProvider).filters;
+    final fixedPerson = ref.read(searchFixedPersonProvider);
     switch (suggestion) {
       case PersonSuggestion(:final person):
-        if (!filters.people.any((p) => p.filterId == person.filterId)) {
+        // A person page's own person is in every request already.
+        if (person.filterId != fixedPerson?.filterId && !filters.people.any((p) => p.filterId == person.filterId)) {
           notifier.togglePerson(personRefOf(person));
         }
       case TagSuggestion(:final tag):
@@ -291,7 +293,7 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
               textInputAction: TextInputAction.search,
               autocorrect: false,
               decoration: InputDecoration.collapsed(
-                hintText: context.t.search_mode_field_hint,
+                hintText: searchFieldHint(context, ref.watch(searchScopeProvider), ref.watch(searchScopeNameProvider)),
                 hintStyle: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               style: theme.textTheme.bodyLarge,

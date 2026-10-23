@@ -1,3 +1,4 @@
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 
 // Search on every timeline (specs/2026-10-23-mobile-search-redesign-design.md, "Search on every timeline" and "Scope
@@ -36,6 +37,14 @@ sealed class SearchScope {
   /// Whether selected people go out as `spacePersonIds` (space scopes) instead of `personIds`.
   bool get usesSpacePeople => false;
 
+  /// The screen's name for the field's placeholder ("Search in Japan 2023", "Search Anna's photos"). Display only: it
+  /// is not part of the scope's identity, so renaming an album does not restart its search.
+  String? get name => null;
+
+  /// A person page's person: always selected and not removable (Slice 6, "Personal person"). Its value is the one the
+  /// options list carries for that person in this scope: the bare person id, or the bare space-person id.
+  SearchPersonRef? fixedPerson(String? name) => null;
+
   /// The scope's own parameters for a request in [mode].
   SearchParams baseParams(SearchMode mode);
 }
@@ -66,7 +75,9 @@ class PhotosSearchScope extends SearchScope {
 /// An album page: the album only.
 class AlbumSearchScope extends SearchScope {
   final String albumId;
-  const AlbumSearchScope(this.albumId);
+  @override
+  final String? name;
+  const AlbumSearchScope(this.albumId, {this.name});
 
   @override
   Set<SearchSection> get fixedSections => const {SearchSection.albums};
@@ -85,7 +96,9 @@ class AlbumSearchScope extends SearchScope {
 /// linked into the album stay in, as the page shows them.
 class SpaceAlbumSearchScope extends SearchScope {
   final String albumId;
-  const SpaceAlbumSearchScope(this.albumId);
+  @override
+  final String? name;
+  const SpaceAlbumSearchScope(this.albumId, {this.name});
 
   @override
   Set<SearchSection> get fixedSections => const {SearchSection.albums};
@@ -103,7 +116,9 @@ class SpaceAlbumSearchScope extends SearchScope {
 /// A space: its people are space people.
 class SpaceSearchScope extends SearchScope {
   final String spaceId;
-  const SpaceSearchScope(this.spaceId);
+  @override
+  final String? name;
+  const SpaceSearchScope(this.spaceId, {this.name});
 
   @override
   bool get usesSpacePeople => true;
@@ -121,10 +136,16 @@ class SpaceSearchScope extends SearchScope {
 /// A personal person page: that person (fixed, still selected), owner only.
 class PersonalPersonSearchScope extends SearchScope {
   final String personId;
-  const PersonalPersonSearchScope(this.personId);
+  @override
+  final String? name;
+  const PersonalPersonSearchScope(this.personId, {this.name});
 
   @override
   SearchParams baseParams(SearchMode mode) => SearchParams(personIds: [personId]);
+
+  @override
+  SearchPersonRef fixedPerson(String? name) =>
+      SearchPersonRef(filterId: personId, name: name ?? '', profileId: personId, profileType: 'user-person');
 
   @override
   bool operator ==(Object other) => other is PersonalPersonSearchScope && other.personId == personId;
@@ -137,10 +158,21 @@ class PersonalPersonSearchScope extends SearchScope {
 class SpacePersonSearchScope extends SearchScope {
   final String spaceId;
   final String spacePersonId;
-  const SpacePersonSearchScope({required this.spaceId, required this.spacePersonId});
+  @override
+  final String? name;
+  const SpacePersonSearchScope({required this.spaceId, required this.spacePersonId, this.name});
 
   @override
   bool get usesSpacePeople => true;
+
+  @override
+  SearchPersonRef fixedPerson(String? name) => SearchPersonRef(
+    filterId: spacePersonId,
+    name: name ?? '',
+    profileId: spacePersonId,
+    profileType: 'space-person',
+    profileSpaceId: spaceId,
+  );
 
   @override
   SearchParams baseParams(SearchMode mode) => SearchParams(spaceId: spaceId, spacePersonIds: [spacePersonId]);
@@ -152,6 +184,13 @@ class SpacePersonSearchScope extends SearchScope {
   @override
   int get hashCode => Object.hash(SpacePersonSearchScope, spaceId, spacePersonId);
 }
+
+/// A person page's scope, routed like its timeline (buildPersonTimelineRouteService): a Space person (non-null
+/// `spaceId`, whose id is the space-person id) is that space and that space person; a personal person is that person.
+SearchScope personSearchScope(Person person) => switch (person.spaceId) {
+  final spaceId? => SpacePersonSearchScope(spaceId: spaceId, spacePersonId: person.id, name: person.name),
+  null => PersonalPersonSearchScope(person.id, name: person.name),
+};
 
 /// A place page: that city within the Photos scope.
 class PlaceSearchScope extends SearchScope {

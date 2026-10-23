@@ -195,6 +195,14 @@ const assetSeeds: Record<string, AssetSeed> = {
   'space-porto': { owner: 'member', takenAt: '2023-08-01T10:00:00.000Z', city: 'Porto', country: 'Portugal' },
   'space-album-1': { owner: 'member', takenAt: '2023-07-01T10:00:00.000Z', city: 'Madrid', country: 'Spain' },
   'space-album-2': { owner: 'member', takenAt: '2023-07-02T10:00:00.000Z', city: 'Madrid', country: 'Spain' },
+  // Archived, in the album linked into the space: the space album page shows it, so its search must too.
+  'space-album-archived': {
+    owner: 'member',
+    takenAt: '2023-07-03T10:00:00.000Z',
+    city: 'Madrid',
+    country: 'Spain',
+    visibility: 'archive',
+  },
 };
 
 const world = {
@@ -315,7 +323,7 @@ const seed = async () => {
   );
   const spaceAlbum = await utils.createAlbum(member.accessToken, {
     albumName: 'Space trip',
-    assetIds: [id('asset:space-album-1'), id('asset:space-album-2')],
+    assetIds: ['space-album-1', 'space-album-2', 'space-album-archived'].map((label) => id(`asset:${label}`)),
   });
   name('album:space-trip', spaceAlbum.id);
   await utils.linkSpaceAlbum(member.accessToken, spaceId, spaceAlbum.id);
@@ -1005,6 +1013,121 @@ const photosModeCases = (): FixtureCase[] =>
   ]);
 
 /**
+ * Search mode on the album, space, space album and person pages as
+ * mobile/test/gallery/search/scoped_search_albums_spaces_people_e2e_test.dart walks it: the grouping pill's search
+ * button opens search mode (the unfiltered options are the `scope-<screen>-*` set; the unfiltered browse results are
+ * recorded here as `screen-<screen>-timeline-buckets` where no other fixture has them), then one filter. Album scopes
+ * send `albumIds` to /search/options and `albumId` to /timeline/*.
+ */
+type ScreenStep = {
+  name: string;
+  description: string;
+  /** The options body of the filtered state. */
+  body: () => Record<string, Json>;
+  /** The /timeline/* query of the filtered state. */
+  timeline: () => Query;
+  months: string[];
+  /** The unfiltered /timeline/buckets query, when no other fixture records it. */
+  unfiltered?: () => Query;
+};
+
+const albumTimeline = ({ albumIds, ...rest }: Record<string, Json>): Query => ({
+  ...asQuery(rest),
+  albumId: String((albumIds as Json[])[0]),
+});
+
+// The filtered state of each screen step below (called once the seed has named every id).
+const album = () => ({ albumIds: [id('album:trip')], personIds: [id('person:ben')] });
+const space = () => ({ spaceId: id('space:family'), spacePersonIds: [id('space-person:quinn')] });
+const pia = () => ({ spaceId: id('space:family'), spacePersonIds: [id('space-person:pia')] });
+const spaceAlbum = () => ({ albumIds: [id('album:space-trip')], country: 'Spain', city: 'Madrid' });
+const person = () => ({ personIds: [id('person:anna'), id('person:ben')] });
+const spacePerson = () => ({
+  ...pia(),
+  takenAfter: '2024-01-01T00:00:00.000Z',
+  takenBefore: '2025-01-01T00:00:00.000Z',
+});
+
+const scopedScreenSteps = (): ScreenStep[] => {
+  return [
+    {
+      name: 'screen-album-ben',
+      description: 'Album screen search mode, People: Ben',
+      body: album,
+      timeline: () => albumTimeline(album()),
+      months: ['2024-06-01'],
+    },
+    {
+      name: 'screen-space-quinn',
+      description: 'Space screen search mode, People: Quinn (a bare space-person id)',
+      body: space,
+      timeline: () => asQuery(space()),
+      months: ['2023-08-01'],
+    },
+    {
+      name: 'screen-space-album-madrid',
+      description: 'Space album screen search mode, Places: Madrid (the archived photo stays in)',
+      body: spaceAlbum,
+      timeline: () => albumTimeline(spaceAlbum()),
+      months: ['2023-07-01'],
+      unfiltered: () => ({ albumId: id('album:space-trip') }),
+    },
+    {
+      name: 'screen-personal-person-ben',
+      description: 'Personal person screen (Anna) search mode, People: Ben added',
+      body: person,
+      timeline: () => asQuery(person()),
+      months: ['2024-06-01'],
+      unfiltered: () => ({ personIds: id('person:anna') }),
+    },
+    {
+      name: 'screen-space-person-2024',
+      description: 'Space person screen (Pia) search mode, When: 2024',
+      body: spacePerson,
+      timeline: () => asQuery(spacePerson()),
+      months: ['2024-06-01'],
+      unfiltered: () => asQuery(pia()),
+    },
+  ];
+};
+
+const scopedScreenCases = (): FixtureCase[] =>
+  scopedScreenSteps().flatMap(({ name, description, body, timeline, months, unfiltered }) => {
+    const screen = name.slice(0, name.lastIndexOf('-'));
+    return [
+      ...(unfiltered
+        ? [
+            {
+              name: `${screen}-timeline-buckets`,
+              description: `${description.slice(0, description.indexOf(' search mode'))} search mode: browse results`,
+              actor: 'me' as const,
+              get request(): FixtureCase['request'] {
+                return { method: 'GET', path: '/api/timeline/buckets', query: unfiltered() };
+              },
+            },
+          ]
+        : []),
+      ...perDimension(name, description, body),
+      {
+        name: `${name}-timeline-buckets`,
+        description: `${description}: browse results`,
+        actor: 'me' as const,
+        get request(): FixtureCase['request'] {
+          return { method: 'GET', path: '/api/timeline/buckets', query: timeline() };
+        },
+      },
+      ...months.map((month) => ({
+        name: `${name}-timeline-bucket-${month}`,
+        description: `${description}: the month ${month} of the browse results`,
+        actor: 'me' as const,
+        get request(): FixtureCase['request'] {
+          return { method: 'GET', path: '/api/timeline/bucket', query: { ...timeline(), timeBucket: month } };
+        },
+      })),
+    ];
+  });
+
+/**
  * Slice 5's switch-over as mobile/test/gallery/search/switch_over_e2e_test.dart walks it: Similar photos from the
  * asset viewer opens Photos search mode on the reference photo (its options are the scope-similar-* set, its first
  * results page is recorded here); on a stock Immich server, search mode opens with no filter yet, so its results are
@@ -1043,6 +1166,7 @@ const switchOverCases = (): FixtureCase[] => [
 const fixtureCases = (): FixtureCase[] => [
   ...scopeFlows().flatMap((flow) => scopeFlowCases(flow)),
   ...photosModeCases(),
+  ...scopedScreenCases(),
   ...fallbackCases(),
   ...switchOverCases(),
   ...perDimension('dimension-photos', 'Photos, unfiltered', () => photos),
@@ -1291,8 +1415,10 @@ const browseScopes = (): Array<{ name: string; options: Record<string, Json>; ex
   // kyoto ×3, lisbon, berlin video, menu, partner paris ×2, space kyoto ×2, porto, space album ×2
   { name: 'photos', options: photos, expected: 13 },
   { name: 'album', options: { albumIds: [id('album:trip')] }, expected: 3 },
-  { name: 'space album', options: { albumIds: [id('album:space-trip')] }, expected: 2 },
-  { name: 'space', options: { spaceId: id('space:family') }, expected: 5 },
+  // two Madrid photos and the archived one: the album scope sets no visibility
+  { name: 'space album', options: { albumIds: [id('album:space-trip')] }, expected: 3 },
+  // its three photos and the linked album's three, the archived one included
+  { name: 'space', options: { spaceId: id('space:family') }, expected: 6 },
   { name: 'personal person', options: { personIds: [id('person:anna')] }, expected: 3 },
   {
     name: 'space person',

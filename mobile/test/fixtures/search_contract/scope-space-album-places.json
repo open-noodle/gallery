@@ -26,10 +26,10 @@
           "cities": [
             {
               "city": "Madrid",
-              "count": 2
+              "count": 3
             }
           ],
-          "count": 2,
+          "count": 3,
           "country": "Spain"
         }
       ]

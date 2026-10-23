@@ -17,14 +17,9 @@ import 'package:intl/intl.dart';
 // #910 per section (searchSectionState): hidden when empty for the whole scope or fixed by the screen, greyed when empty
 // only because of the other filters. Never per option: all five stars and all three media options always show.
 
-/// Opens the Filters sheet. Like the chip sheets it reads the root search providers: the Photos screen's.
-Future<void> showSearchFiltersSheet(BuildContext context) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => const SearchFiltersSheet(),
-);
+/// Opens the Filters sheet over the screen whose chip row [context] belongs to (see showSearchSheet).
+Future<void> showSearchFiltersSheet(BuildContext context) =>
+    showSearchSheet(context, (_) => const SearchFiltersSheet());
 
 class SearchFiltersSheet extends ConsumerWidget {
   const SearchFiltersSheet({super.key});

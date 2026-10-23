@@ -64,3 +64,40 @@ class _PhotosSearchFrameState extends ConsumerState<PhotosSearchFrame> {
     );
   }
 }
+
+/// What search mode adds around any other timeline screen (album, space, person, ...): room at the top for the search
+/// header, as on Photos. These screens already show the grouping pill, whose search button enters search mode.
+class SearchScreenFrame extends ConsumerWidget {
+  final Widget child;
+
+  const SearchScreenFrame({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final searching = ref.watch(searchModeProvider);
+    final media = MediaQuery.of(context);
+    return SearchHeaderInset(
+      extra: searching ? SearchHeader.extraTopPadding : 0,
+      child: MediaQuery(
+        data: searching
+            ? media.copyWith(padding: media.padding.copyWith(top: media.padding.top + SearchHeader.extraTopPadding))
+            : media,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// A screen's own sliver above its timeline (a space's header and albums) steps aside while search mode shows results,
+/// as the Photos memory lane does: the results start right under the search header.
+class HiddenWhileSearching extends ConsumerWidget {
+  final Widget sliver;
+
+  const HiddenWhileSearching({super.key, required this.sliver});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filtering = ref.watch(searchModeProvider) && !ref.watch(searchStateProvider.select((s) => s.isEmpty));
+    return filtering ? const SliverToBoxAdapter(child: SizedBox.shrink()) : sliver;
+  }
+}

@@ -29,13 +29,16 @@ class SearchChipRow extends ConsumerWidget {
     final scopeAvailability = searchScopeAvailability(ref, state, options);
     final filters = state.filters;
     final extras = activeExtraFilters(filters, scope);
+    // A person page's person: always selected, so People always reads as active.
+    final fixedPerson = ref.watch(searchFixedPersonProvider);
+    final people = [?fixedPerson, ...filters.people.where((p) => p.filterId != fixedPerson?.filterId)];
 
     Widget? main(SearchMainChip chip) {
       final (section, active, label) = switch (chip) {
         SearchMainChip.people => (
           SearchSection.people,
-          filters.people.isNotEmpty,
-          filters.people.isEmpty ? context.t.people : searchPeopleLabel(filters.people),
+          people.isNotEmpty,
+          searchPeopleLabel(people).isEmpty ? context.t.people : searchPeopleLabel(people),
         ),
         SearchMainChip.when => (
           SearchSection.when,

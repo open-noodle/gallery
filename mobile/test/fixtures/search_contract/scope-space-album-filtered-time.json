@@ -26,7 +26,7 @@
     "body": {
       "timeBuckets": [
         {
-          "count": 2,
+          "count": 3,
           "timeBucket": "2023-07-01"
         }
       ]

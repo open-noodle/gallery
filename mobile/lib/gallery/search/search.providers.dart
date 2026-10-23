@@ -39,6 +39,16 @@ final searchClockProvider = Provider<DateTime Function()>((ref) => DateTime.now)
 /// The screen's scope. Overridden per route.
 final searchScopeProvider = Provider<SearchScope>((ref) => const PhotosSearchScope(), dependencies: const []);
 
+/// The screen's name (SearchScope.name), apart from the scope: a scope keeps its first instance while its ids are
+/// unchanged, so a rename or a name that loads late reaches the placeholder through here.
+final searchScopeNameProvider = Provider<String?>((ref) => null, dependencies: const []);
+
+/// A person page's fixed person (SearchScope.fixedPerson), named by the page.
+final searchFixedPersonProvider = Provider<SearchPersonRef?>(
+  (ref) => ref.watch(searchScopeProvider).fixedPerson(ref.watch(searchScopeNameProvider)),
+  dependencies: [searchScopeProvider, searchScopeNameProvider],
+);
+
 final searchStateProvider = NotifierProvider<SearchStateNotifier, SearchState>(
   SearchStateNotifier.new,
   dependencies: const [],
@@ -63,6 +73,8 @@ final searchTotalProvider = Provider<int?>(
 /// A screen's own search: its scope, and a fresh state, options and results.
 List<Override> searchRouteOverrides(SearchScope scope) => [
   searchScopeProvider.overrideWithValue(scope),
+  searchScopeNameProvider.overrideWithValue(scope.name),
+  searchFixedPersonProvider,
   searchStateProvider.overrideWith(SearchStateNotifier.new),
   searchOptionsProvider.overrideWith(SearchOptionsNotifier.new),
   searchResultsProvider.overrideWith(SearchResultsNotifier.new),

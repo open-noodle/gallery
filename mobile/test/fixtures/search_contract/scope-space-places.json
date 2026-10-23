@@ -23,22 +23,22 @@
         {
           "cities": [
             {
+              "city": "Madrid",
+              "count": 3
+            }
+          ],
+          "count": 3,
+          "country": "Spain"
+        },
+        {
+          "cities": [
+            {
               "city": "Kyoto",
               "count": 2
             }
           ],
           "count": 2,
           "country": "Japan"
-        },
-        {
-          "cities": [
-            {
-              "city": "Madrid",
-              "count": 2
-            }
-          ],
-          "count": 2,
-          "country": "Spain"
         },
         {
           "cities": [
