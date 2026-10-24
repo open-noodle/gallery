@@ -356,13 +356,15 @@ describe('/timeline', () => {
       expect((body as { message?: string }).message).toMatch(/withSharedSpaces/);
     });
 
-    it('withPartners=true without explicit visibility throws 400 with the right message', async () => {
-      // Same invariant, different flag.
+    it('withPartners=true without explicit visibility defaults to the timeline', async () => {
+      // Upstream (immich-32565) now defaults the visibility to timeline for a timeline that includes other
+      // users, instead of rejecting it; withSharedSpaces keeps the 400 above. Same total as the explicit
+      // visibility=timeline case.
       const { status, body } = await request(app)
         .get('/timeline/buckets?withPartners=true')
         .set(asBearerAuth(ctx.spaceOwner.token!));
-      expect(status).toBe(400);
-      expect((body as { message?: string }).message).toMatch(/withPartners/);
+      expect(status).toBe(200);
+      expect(total(body)).toBe(3);
     });
   });
 
