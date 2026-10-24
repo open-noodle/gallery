@@ -512,15 +512,18 @@ final sharedWithPartnerProvider = StreamProvider.autoDispose<Iterable<Partner>>(
   return ref.watch(partnerServiceProvider).search(currentUser.id, .sharedWith);
 });
 
-class _QuickAccessItem {
-  final Widget leading;
-  final String title;
-  final VoidCallback onTap;
-  final EdgeInsetsGeometry? contentPadding;
-
-  const _QuickAccessItem({required this.leading, required this.title, required this.onTap, this.contentPadding});
-class _AlbumsCollectionCard extends ConsumerWidget {
-  const _AlbumsCollectionCard();
+/// Albums entry point on the Library tab.
+///
+/// Public (unlike its sibling cards) so a widget test can pin the route it
+/// pushes: with Spaces occupying the middle nav slot by default
+/// (`SettingsKey.navShowSpaces`), the Library tab is where the albums list is
+/// reached from — this card and the `albums` tile in [_QuickAccessButtonList]
+/// are its only two entry points. Pumping the whole [DriftLibraryPage] to cover
+/// that would mean standing up the app bar's auth/server stack plus a maplibre
+/// platform view.
+@visibleForTesting
+class AlbumsCollectionCard extends ConsumerWidget {
+  const AlbumsCollectionCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -597,6 +600,15 @@ class _AlbumsCollectionCard extends ConsumerWidget {
   }
 }
 
+class _QuickAccessItem {
+  final Widget leading;
+  final String title;
+  final VoidCallback onTap;
+  final EdgeInsetsGeometry? contentPadding;
+
+  const _QuickAccessItem({required this.leading, required this.title, required this.onTap, this.contentPadding});
+}
+
 class _QuickAccessButtonList extends ConsumerWidget {
   const _QuickAccessButtonList();
 
@@ -607,16 +619,14 @@ class _QuickAccessButtonList extends ConsumerWidget {
     final partnerSharedWithAsync = ref.watch(sharedWithPartnerProvider);
     final partners = partnerSharedWithAsync.valueOrNull ?? [];
     final showSpaces = ref.watch(serverSupportsSpacesProvider);
-    const topShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-    );
 
     final items = [
-      _QuickAccessItem(
-        leading: const Icon(Icons.workspaces_outlined, size: 26),
-        title: context.t.spaces,
-        onTap: () => context.pushRoute(const SpacesRoute()),
-      ),
+      if (showSpaces)
+        _QuickAccessItem(
+          leading: const Icon(Icons.workspaces_outlined, size: 26),
+          title: context.t.spaces,
+          onTap: () => context.pushRoute(const SpacesRoute()),
+        ),
       _QuickAccessItem(
         leading: const Icon(Icons.folder_outlined, size: 26),
         title: context.t.folders,
