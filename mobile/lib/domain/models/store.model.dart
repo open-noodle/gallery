@@ -15,13 +15,13 @@ enum StoreKey<T> {
   advancedTroubleshooting<bool>._(114),
   enableHapticFeedback<bool>._(126),
   autoEndpointLocationDisclosureAccepted<bool>._(142),
-  // Gallery search mode's sheets (lib/gallery/search/search_filter_prefs.dart). Fork ids from 2000 up, clear of
-  // upstream's numbering, which grows one by one from the low hundreds.
-  searchFiltersCollapsedSections<String>._(2001),
-  searchFiltersHiddenSections<String>._(2002),
-  searchPeopleSort<String>._(2003),
-  searchPlacesSort<String>._(2004),
-  searchPeopleType<String>._(2005),
+  // Gallery search mode's sheets (lib/gallery/search/search_filter_prefs.dart). New fork ids go in the 90000 block,
+  // far from upstream's numbering, which grows one by one from the low hundreds.
+  searchFiltersCollapsedSections<String>._(90001),
+  searchFiltersHiddenSections<String>._(90002),
+  searchPeopleSort<String>._(90003),
+  searchPlacesSort<String>._(90004),
+  searchPeopleType<String>._(90005),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

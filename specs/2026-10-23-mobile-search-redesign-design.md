@@ -120,9 +120,9 @@ Each main chip opens a bottom sheet over the results, about two thirds of the sc
 - **People:**
   - Selected people on top, with a note that results show photos with all of them.
   - Then a short "Recent" row of the 7 most recently updated people, which replaces today's recent-people strip (`people_picker.provider.dart:75-81`).
-  - Then a 4-column grid of compact avatar tiles with names and counts: everyone with nothing typed, otherwise the matches. A sort selector above it orders them by most photographed (the default, the server's order) or A–Z (on the device, unnamed last). The choice is kept on the device (`StoreKey.searchPeopleSort` 2003), so the sheet opens with the one chosen last time.
+  - Then a 4-column grid of compact avatar tiles with names and counts: everyone with nothing typed, otherwise the matches. A sort selector above it orders them by most photographed (the default, the server's order) or A–Z (on the device, unnamed last). The choice is kept on the device (`StoreKey.searchPeopleSort` 90003), so the sheet opens with the one chosen last time.
   - Multi-select means AND.
-  - Pets appear like people, as today. An All / People / Pets toggle above the grid, as on the People page, narrows the list on the device; All is the default and the choice is kept (`StoreKey.searchPeopleType` 2005). Each person in `POST /search/options` carries `isPet` (personal people through `person_pet`, space people through `shared_space_person.type`, identity people through their primary profile). The field is optional: an older server sends none, and the app then shows no toggle and everyone. The toggle also hides while the list holds no pet and All is chosen.
+  - Pets appear like people, as today. An All / People / Pets toggle above the grid, as on the People page, narrows the list on the device; All is the default and the choice is kept (`StoreKey.searchPeopleType` 90005). Each person in `POST /search/options` carries `isPet` (personal people through `person_pet`, space people through `shared_space_person.type`, identity people through their primary profile). The field is optional: an older server sends none, and the app then shows no toggle and everyone. The toggle also hides while the list holds no pet and All is chosen.
   - The alphabet scrubber is dropped; the search box replaces it.
 - **When:**
   - A quick-range row on top: Today, This week, This month, This year (today's `quick_ranges_row.widget.dart`).
@@ -133,7 +133,7 @@ Each main chip opens a bottom sheet over the results, about two thirds of the sc
 - **Places:**
   - Countries with counts, folded. Each has a "Cities" caret beside it, like When's "months", that opens its cities from the options already loaded; the row itself selects the whole country. One large country no longer pushes the rest out of reach (owner's feedback after testing).
   - A search that matches cities opens their countries at those cities; one that matches only a country leaves it folded. A selected city's country opens with the sheet.
-  - A sort selector, as on People: most photos first (the default, the server's order) or A–Z, applied to the countries and to the cities in each. Kept on the device (`StoreKey.searchPlacesSort` 2004).
+  - A sort selector, as on People: most photos first (the default, the server's order) or A–Z, applied to the countries and to the cities in each. Kept on the device (`StoreKey.searchPlacesSort` 90004).
   - The search box matches city or country names.
   - Tapping a country selects the whole country; tapping a city selects that city. One place at a time.
   - State is optional.
@@ -157,7 +157,7 @@ One tall sheet (about 88% high). Sections, top to bottom, with live counts where
 
 Each section follows #910: it is hidden when empty for the scope and greyed when empty only because of the current filters. A section that is fixed by the screen's scope is hidden (see the scope table).
 
-Tapping a titled section's title collapses or expands it; collapsed with a filter set, the title shows a dot. A cog in the sheet's title row opens a checklist that hides sections; a hidden section still shows while it holds a filter, so it can be changed. Both choices are kept on the device (`StoreKey.searchFiltersCollapsedSections` 2001 and `searchFiltersHiddenSections` 2002, read by `lib/gallery/search/search_filter_prefs.dart`; 143-145 stay retired, and fork ids start at 2000, clear of upstream's numbering).
+Tapping a titled section's title collapses or expands it; collapsed with a filter set, the title shows a dot. A cog in the sheet's title row opens a checklist that hides sections; a hidden section still shows while it holds a filter, so it can be changed. Both choices are kept on the device (`StoreKey.searchFiltersCollapsedSections` 90001 and `searchFiltersHiddenSections` 90002, read by `lib/gallery/search/search_filter_prefs.dart`; 143-145 stay retired, and new fork ids go in the 90000 block, far from upstream's numbering).
 
 ### Results
 
