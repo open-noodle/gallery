@@ -34,7 +34,7 @@ describe('mapAsset — per-user favorite (#763)', () => {
     // isFavoriteForUser is never projected -> must never leak a favorite to an anonymous visitor.
     const asset = getForAsset(AssetFactory.create());
 
-    const result = mapAsset(asset, { stripMetadata: false });
+    const result = mapAsset(asset);
 
     expect(result.isFavorite).toBe(false);
   });
