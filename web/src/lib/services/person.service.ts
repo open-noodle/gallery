@@ -29,7 +29,7 @@ import {
 import type { MessageFormatter } from 'svelte-i18n';
 
 // The role is the viewer's own row in the spaces list (`getAllSpaces` embeds `members`, see
-// loadSpaces). The server enforces the role on every write, so this fails open: while the list is
+// getAllSpacesQuery). The server enforces the role on every write, so this fails open: while the list is
 // unknown (loading or failed), or when it lacks the space (joined since it was cached), the actions
 // stay offered rather than hidden from an editor.
 export const isSpaceEditor = (spaces: SharedSpaceResponseDto[] | undefined, spaceId: string, userId: string) => {

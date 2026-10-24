@@ -14,8 +14,9 @@ import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { spacesQueryKey } from '$lib/gallery/spaces/space.query';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { userInteraction } from '$lib/stores/user.svelte';
+import { queryClient } from '$lib/queries/client';
 import { isSuggestionSnoozed, snoozeSuggestions } from '$lib/utils/face-suggestion-snooze';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
@@ -232,7 +233,7 @@ function renderPage({
 describe('Person detail page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    userInteraction.recentSpaces = undefined;
+    queryClient.removeQueries({ queryKey: spacesQueryKey });
     gotoMock.mockResolvedValue(undefined);
     invalidateAllMock.mockResolvedValue(undefined);
     mockAssetMultiSelectManager.selectionActive = false;
@@ -527,7 +528,7 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
+    await waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
     await waitFor(() => expect(screen.queryByText('set_date_of_birth')).not.toBeInTheDocument());
     expect(screen.queryByText('hide_person')).not.toBeInTheDocument();
     expect(screen.queryByText('select_representative_face')).not.toBeInTheDocument();
@@ -542,7 +543,7 @@ describe('Person detail page', () => {
       }),
     });
 
-    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
+    await waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
     expect(screen.queryByText('merge_people')).not.toBeInTheDocument();
   });
 
@@ -715,7 +716,7 @@ describe('Person detail page', () => {
 describe('face suggestions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    userInteraction.recentSpaces = undefined;
+    queryClient.removeQueries({ queryKey: spacesQueryKey });
     gotoMock.mockResolvedValue(undefined);
     invalidateAllMock.mockResolvedValue(undefined);
     mockAssetMultiSelectManager.selectionActive = false;
@@ -828,7 +829,7 @@ describe('face suggestions', () => {
         primaryProfile: { type: Type.SpacePerson, id: 'space-person-1', spaceId: 'space-suggest-gate-viewer' },
       }),
     });
-    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
+    await waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
     await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
     viewerRender.unmount();
 
