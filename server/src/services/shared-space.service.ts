@@ -581,7 +581,22 @@ export class SharedSpaceService extends BaseService {
     spaceId: string,
     dto: SharedSpaceMemberCreateDto,
   ): Promise<SharedSpaceMemberResponseDto> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
+    const caller = await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    // The permission gate runs before the existing-member check, so an editor without permission cannot probe
+    // who is a member through the 400 below.
+    if (caller.role !== SharedSpaceRole.Owner) {
+      const management = await this.memberManagementForSpace(caller.role as SharedSpaceRole, spaceId);
+      if (!management.canAddMembers) {
+        throw new ForbiddenException('Not allowed to add members');
+      }
+      if (dto.role === SharedSpaceRole.Owner) {
+        throw new ForbiddenException('Only an owner can add an owner');
+      }
+      if (dto.role === SharedSpaceRole.Editor && !management.canChangeRoles) {
+        throw new ForbiddenException('Not allowed to add an editor');
+      }
+    }
 
     const existing = await this.sharedSpaceRepository.getMember(spaceId, dto.userId);
     if (existing) {
@@ -627,7 +642,15 @@ export class SharedSpaceService extends BaseService {
     userId: string,
     dto: SharedSpaceMemberUpdateDto,
   ): Promise<SharedSpaceMemberResponseDto> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
+    const caller = await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const callerIsOwner = caller.role === SharedSpaceRole.Owner;
+
+    if (!callerIsOwner) {
+      const management = await this.memberManagementForSpace(caller.role as SharedSpaceRole, spaceId);
+      if (!management.canChangeRoles) {
+        throw new ForbiddenException('Not allowed to change roles');
+      }
+    }
 
     if (auth.user.id === userId) {
       throw new BadRequestException('Cannot change your own role');
@@ -636,6 +659,16 @@ export class SharedSpaceService extends BaseService {
     const existingMember = await this.sharedSpaceRepository.getMember(spaceId, userId);
     if (!existingMember) {
       throw new BadRequestException('Member not found');
+    }
+
+    // Editors manage only viewers and editors: they can neither touch an owner nor make one.
+    if (!callerIsOwner) {
+      if (existingMember.role === SharedSpaceRole.Owner) {
+        throw new ForbiddenException("Cannot change an owner's role");
+      }
+      if (dto.role === SharedSpaceRole.Owner) {
+        throw new ForbiddenException('Only an owner can add an owner');
+      }
     }
 
     // rbac-4: a promoted co-Owner must not be able to demote the space creator.
@@ -4581,6 +4614,14 @@ export class SharedSpaceService extends BaseService {
       ({ server } = await this.getConfig({ withCache: false }));
     }
     return resolveSpaceMemberManagement(role, space, server);
+  }
+
+  private async memberManagementForSpace(role: SharedSpaceRole, spaceId: string) {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+    return this.memberManagementFor(role, space);
   }
 
   private mapMember(member: {
