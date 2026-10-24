@@ -22,13 +22,16 @@
   import { buildAlbumAssetPickerOptions, buildSpaceAlbumAssetPickerOptions } from '$lib/utils/album-filter-options';
   import { createAlbumPickerFilters, createAlbumTimeline } from '$lib/gallery/filtered-timeline/album-timeline';
   import { getTimelineManagerTimeBuckets } from '$lib/utils/timeline-zoom-navigation';
-  import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
+  import { getAlbumAssetsActions, handleDeleteAlbum } from '$lib/services/album.service';
+  import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album/album-add';
+  import { getAlbumInfoQuery, invalidateAlbum } from '$lib/queries/album.query';
+  import { queryClient } from '$lib/queries/client';
+  import { createQuery } from '@tanstack/svelte-query';
   import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
   import { lang } from '$lib/stores/preferences.store';
   import {
     AlbumUserRole,
-    getAlbumInfo,
     SharedSpaceRole,
     updateAlbumInfo,
     type AlbumResponseDto,
@@ -50,7 +53,30 @@
 
   const space: SharedSpaceResponseDto = $derived(data.space);
   const members: SharedSpaceMemberResponseDto[] = $derived(data.members);
-  let album = $state<AlbumResponseDto>(data.album);
+  // $state.raw: the album is only ever replaced, never mutated, and the query sync below compares
+  // object identity.
+  let album = $state.raw<AlbumResponseDto>(data.album);
+
+  // The route load fetches the album fresh: make that the query's current value, so a copy cached on
+  // an earlier visit never replaces it (the query client outlives the page).
+  queryClient.setQueryData(getAlbumInfoQuery(data.album.id).queryKey, data.album);
+  $effect.pre(() => {
+    queryClient.setQueryData(getAlbumInfoQuery(data.album.id).queryKey, data.album);
+  });
+
+  // AlbumTitle / AlbumDescription save through upstream's updateAlbumInfoMutation, which writes the
+  // saved album into the getAlbumInfoQuery cache (and invalidates it). Mirror that cache entry into
+  // this page's album so a rename or new description shows without a reload.
+  const albumQuery = createQuery(
+    () => ({ ...getAlbumInfoQuery(album.id), initialData: album }),
+    () => queryClient,
+  );
+  $effect(() => {
+    const updated = albumQuery.data;
+    if (updated && updated.id === album.id && updated !== album) {
+      album = updated;
+    }
+  });
 
   // Mode: 'browse' shows the album timeline; 'add' shows the asset picker
   let mode = $state<'browse' | 'add'>('browse');
@@ -128,9 +154,7 @@
     pickerSource = source;
   };
 
-  const refreshAlbum = async () => {
-    album = await getAlbumInfo({ id: album.id });
-  };
+  const refreshAlbum = () => invalidateAlbum(album.id);
 
   // RemoveFromAlbumAction already re-fetches the album via bind:album and clears the selection
   // before firing onRemove, so this only prunes the view and defensively clears.
@@ -363,20 +387,11 @@
                  album page and the server's Permission.AlbumUpdate; a Space role alone does not grant it. Unlike that
                  page, the header + period control already sit above, so it needs almost no top padding. -->
             <section class="pt-2">
-              <AlbumTitle
-                id={album.id}
-                albumName={album.albumName}
-                isEditor={isAlbumEditor}
-                onUpdate={(albumName) => (album = { ...album, albumName })}
-              />
+              <AlbumTitle id={album.id} albumName={album.albumName} isEditor={isAlbumEditor} />
               {#if album.assetCount > 0}
                 <AlbumSummary {album} />
               {/if}
-              <AlbumDescription
-                id={album.id}
-                isEditor={isAlbumEditor}
-                bind:description={() => album.description, (description) => (album = { ...album, description })}
-              />
+              <AlbumDescription id={album.id} isEditor={isAlbumEditor} description={album.description} />
             </section>
 
             {#snippet empty()}

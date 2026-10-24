@@ -4,8 +4,8 @@ import {
   type PickerCollection,
 } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
 import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
+import { addAssetsToAlbums } from '$lib/gallery/album/album-add';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { addAssetsToAlbums } from '$lib/services/album.service';
 import { addAssetsToSpace } from '$lib/services/space.service';
 import { getFormatter } from '$lib/utils/i18n';
 

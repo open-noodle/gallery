@@ -7,9 +7,9 @@ import {
   updateAsset,
   type AssetMediaResponseDto,
 } from '@immich/sdk';
+import { createAlbum } from '$lib/gallery/album/album-add';
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
 import { uploadRequest } from '$lib/utils';
-import { createAlbum } from '$lib/utils/album-utils';
 import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 
 export interface UploadResult {
