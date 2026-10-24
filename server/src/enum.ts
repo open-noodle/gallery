@@ -257,6 +257,7 @@ export enum Permission {
   PasskeyRead = 'passkey.read',
   PasskeyUpdate = 'passkey.update',
   PasskeyDelete = 'passkey.delete',
+
   PersonCreate = 'person.create',
   PersonRead = 'person.read',
   PersonUpdate = 'person.update',
