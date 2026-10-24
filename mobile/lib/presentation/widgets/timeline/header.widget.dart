@@ -36,7 +36,7 @@ class TimelineHeader extends HookWidget {
   }
 
   String _formatYear(BuildContext context, DateTime date) {
-    final formatter = DateFormat.y(context.locale.toLanguageTag());
+    final formatter = DateFormat.y(resolvedDateTimeLocale());
     return formatter.format(date);
   }
 
