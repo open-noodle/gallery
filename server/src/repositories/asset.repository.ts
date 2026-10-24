@@ -1437,14 +1437,12 @@ export class AssetRepository {
             .selectFrom('asset')
             .select('asset.id')
             .$if(options.orderBy === AssetOrderBy.CreatedAt, (qb) =>
-              qb
-                .where('asset.createdAt', '>=', sql<Date>`${bucket}::timestamp AT TIME ZONE 'UTC'`)
-                .where(
-                  'asset.createdAt',
-                  '<',
-                  // the bucket's own size (year / month / day), not upstream's fixed month (#625 grouping)
-                  sql<Date>`(${bucket}::timestamp + ${sql.lit(`1 ${dateTruncUnitForTimeBucketSize(bucketSize)}`)}::interval) AT TIME ZONE 'UTC'`,
-                ),
+              qb.where('asset.createdAt', '>=', sql<Date>`${bucket}::timestamp AT TIME ZONE 'UTC'`).where(
+                'asset.createdAt',
+                '<',
+                // the bucket's own size (year / month / day), not upstream's fixed month (#625 grouping)
+                sql<Date>`(${bucket}::timestamp + ${sql.lit(`1 ${dateTruncUnitForTimeBucketSize(bucketSize)}`)}::interval) AT TIME ZONE 'UTC'`,
+              ),
             )
             .$if(options.orderBy !== AssetOrderBy.CreatedAt, (qb) =>
               qb.where(truncatedDate(options.orderBy, bucketSize), '=', bucket),

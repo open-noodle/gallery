@@ -22,7 +22,8 @@ const stubActiveList = (queue: ReturnType<typeof setup>['queue'], activeIds: str
     lrange: vi.fn().mockResolvedValue(activeIds),
     lrem: vi.fn().mockResolvedValue(1),
   };
-  (queue as any).client = Promise.resolve(client);
+  // bullmq 6: the raw Redis client lives on the queue's backend
+  (queue as any).getBackend = () => ({ client: Promise.resolve(client) });
   (queue as any).toKey = vi.fn((type: string) => `immich_bull:facialRecognition:${type}`);
   return client;
 };
@@ -176,7 +177,6 @@ describe(QueueMaintenanceRepository.name, () => {
         active: [{ name: JobName.SharedSpaceFaceMatchPage }, { name: JobName.SharedSpaceFaceMatchPage }],
         waiting: [{ name: JobName.SharedSpaceFaceMatchPage }, { name: JobName.FacialRecognition }],
         delayed: [{ name: JobName.FacialRecognition }],
-        paused: [{ name: JobName.FaceIdentityBackfill }],
       } as Record<string, Array<{ name: JobName }>>;
 
       return Promise.resolve(jobs[status] ?? []);
@@ -187,30 +187,20 @@ describe(QueueMaintenanceRepository.name, () => {
     expect(result).toEqual([
       { name: JobName.SharedSpaceFaceMatchPage, active: 2, waiting: 1, delayed: 0, paused: 0 },
       { name: JobName.FacialRecognition, active: 0, waiting: 1, delayed: 1, paused: 0 },
-      { name: JobName.FaceIdentityBackfill, active: 0, waiting: 0, delayed: 0, paused: 1 },
     ]);
     expect(queue.getJobs).toHaveBeenCalledWith('active', 0, 1000, true);
     expect(queue.getJobs).toHaveBeenCalledWith('waiting', 0, 1000, true);
     expect(queue.getJobs).toHaveBeenCalledWith('delayed', 0, 1000, true);
-    expect(queue.getJobs).toHaveBeenCalledWith('paused', 0, 1000, true);
   });
 
-  it('does not double-count paused jobs that BullMQ also returns as waiting jobs', async () => {
+  it('counts the jobs of a paused queue as waiting and never asks bullmq 6 for a paused list', async () => {
     const { sut, queue } = setup();
-    const pausedJob = { id: 'paused-job-1', name: JobName.FaceIdentityBackfill };
-    queue.getJobs.mockImplementation((status) => {
-      const jobs = {
-        active: [],
-        waiting: [pausedJob],
-        delayed: [],
-        paused: [pausedJob],
-      } as Record<string, Array<typeof pausedJob>>;
-
-      return Promise.resolve(jobs[status] ?? []);
-    });
+    const pausedQueueJob = { id: 'paused-job-1', name: JobName.FaceIdentityBackfill };
+    queue.getJobs.mockImplementation((status) => Promise.resolve(status === 'waiting' ? [pausedQueueJob] : []));
 
     await expect(sut.getJobTypes(QueueName.FacialRecognition)).resolves.toEqual([
-      { name: JobName.FaceIdentityBackfill, active: 0, waiting: 0, delayed: 0, paused: 1 },
+      { name: JobName.FaceIdentityBackfill, active: 0, waiting: 1, delayed: 0, paused: 0 },
     ]);
+    expect(queue.getJobs).not.toHaveBeenCalledWith('paused', expect.anything(), expect.anything(), expect.anything());
   });
 });
