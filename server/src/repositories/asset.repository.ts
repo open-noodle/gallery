@@ -64,7 +64,6 @@ import {
   withSmartSearch,
   withTags,
 } from 'src/utils/database.js';
-import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { hasFaceIdentities, hasSpacePeople } from 'src/utils/people-filter.js';
 import {
@@ -77,6 +76,7 @@ import {
   spaceVisibilityGate,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
+import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 
 export type AssetStats = Record<AssetType, number>;
 
