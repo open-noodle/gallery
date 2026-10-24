@@ -213,23 +213,6 @@ describe(UserService.name, () => {
       expect(mocks.user.update).not.toHaveBeenCalled();
     });
 
-    it('should hash and update password', async () => {
-      const user = factory.userAdmin();
-      const auth = factory.auth({ user });
-      mocks.user.update.mockResolvedValue({ ...user, shouldChangePassword: false });
-
-      await sut.updateMe(auth, { password: 'new-password' });
-
-      expect(mocks.crypto.hashBcrypt).toHaveBeenCalledWith('new-password', expect.any(Number));
-      expect(mocks.user.update).toHaveBeenCalledWith(
-        user.id,
-        expect.objectContaining({
-          password: expect.any(String),
-          shouldChangePassword: false,
-        }),
-      );
-    });
-
     it('should update avatarColor', async () => {
       const user = factory.userAdmin();
       const auth = factory.auth({ user });

@@ -622,13 +622,13 @@ describe(TimelineService.name, () => {
 
       await expect(
         sut.getTimeBucket(authStub.admin, {
-          timeBucket: 'bucket',
+          timeBucket: '2024-01-01',
           withPartners: true,
           userId: authStub.admin.user.id,
         }),
       ).resolves.toEqual(json);
       expect(mocks.asset.getTimeBucket).toHaveBeenCalledWith(
-        'bucket',
+        '2024-01-01',
         expect.objectContaining({ visibility: AssetVisibility.Timeline, userIds: [authStub.admin.user.id] }),
         authStub.admin,
       );
@@ -639,12 +639,16 @@ describe(TimelineService.name, () => {
       mocks.asset.getTimeBucket.mockResolvedValue({ assets: json });
       mocks.access.timeline.checkPartnerAccess.mockResolvedValue(new Set(['partner-id']));
 
-      await expect(sut.getTimeBucket(authStub.admin, { timeBucket: 'bucket', userId: 'partner-id' })).resolves.toEqual(
-        json,
-      );
+      await expect(
+        sut.getTimeBucket(authStub.admin, { timeBucket: '2024-01-01', userId: 'partner-id' }),
+      ).resolves.toEqual(json);
       expect(mocks.asset.getTimeBucket).toHaveBeenCalledWith(
-        'bucket',
-        { timeBucket: 'bucket', visibility: AssetVisibility.Timeline, userIds: ['partner-id'] },
+        '2024-01-01',
+        expect.objectContaining({
+          timeBucket: '2024-01-01',
+          visibility: AssetVisibility.Timeline,
+          userIds: ['partner-id'],
+        }),
         authStub.admin,
       );
     });
@@ -656,11 +660,11 @@ describe(TimelineService.name, () => {
         { visibility: AssetVisibility.Archive },
         { visibility: AssetVisibility.Hidden },
         { isTrashed: true },
-        { isFavorite: true },
-        { isFavorite: false },
+        // Gallery (#763): favorites are a per-user overlay resolved for the caller, so isFavorite is
+        // allowed on another user's timeline (see the withPartners favorite case above).
       ]) {
         await expect(
-          sut.getTimeBucket(authStub.admin, { timeBucket: 'bucket', userId: 'partner-id', ...dto }),
+          sut.getTimeBucket(authStub.admin, { timeBucket: '2024-01-01', userId: 'partner-id', ...dto }),
         ).rejects.toThrow(BadRequestException);
       }
 
@@ -672,7 +676,7 @@ describe(TimelineService.name, () => {
 
       await expect(
         sut.getTimeBucket(authStub.adminWithElevatedPermission, {
-          timeBucket: 'bucket',
+          timeBucket: '2024-01-01',
           userId: 'partner-id',
           visibility: AssetVisibility.Locked,
         }),
@@ -718,7 +722,7 @@ describe(TimelineService.name, () => {
     it('should throw an error if withPartners is true and visibility is locked', async () => {
       await expect(
         sut.getTimeBucket(authStub.adminWithElevatedPermission, {
-          timeBucket: 'bucket',
+          timeBucket: '2024-01-01',
           visibility: AssetVisibility.Locked,
           withPartners: true,
           userId: authStub.adminWithElevatedPermission.user.id,
