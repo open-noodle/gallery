@@ -2920,7 +2920,7 @@ describe('People identity RBAC projection', () => {
     const jobs = ctx.getMock(JobRepository);
     jobs.waitForQueueCompletion.mockResolvedValue();
     jobs.empty.mockResolvedValue();
-    jobs.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, failed: 0, completed: 0 });
+    jobs.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0, completed: 0 });
     ctx.getMock(SystemMetadataRepository).set.mockResolvedValue();
     await ctx.database.deleteFrom('user').execute();
     const { user: owner } = await ctx.newUser();
