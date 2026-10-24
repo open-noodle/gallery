@@ -46,6 +46,18 @@ describe('DiskStorageBackend', () => {
     });
   });
 
+  describe('rename', () => {
+    it('should move a file within the backend', async () => {
+      await mkdir(join(testDir, 'backups'), { recursive: true });
+      await writeFile(join(testDir, 'backups/one.sql.gz.tmp'), 'dump');
+
+      await backend.rename('backups/one.sql.gz.tmp', 'backups/one.sql.gz');
+
+      expect(existsSync(join(testDir, 'backups/one.sql.gz.tmp'))).toBe(false);
+      await expect(readFile(join(testDir, 'backups/one.sql.gz'), 'utf8')).resolves.toBe('dump');
+    });
+  });
+
   describe('get', () => {
     it('should return a readable stream', async () => {
       const filePath = join(testDir, 'thumbs/user1/ab/cd/thumb.webp');
@@ -131,6 +143,43 @@ describe('DiskStorageBackend', () => {
       // cleanup should be a no-op (file still exists)
       await cleanup();
       expect(existsSync(filePath)).toBe(true);
+    });
+  });
+
+  describe('list', () => {
+    it('should return an empty array for a folder that does not exist', async () => {
+      await expect(backend.list('backups/')).resolves.toEqual([]);
+    });
+
+    it('should return each file as a key under the prefix with its size', async () => {
+      await mkdir(join(testDir, 'backups'), { recursive: true });
+      await writeFile(join(testDir, 'backups/immich-db-backup-1.sql.gz'), 'aaaa');
+      await writeFile(join(testDir, 'backups/immich-db-backup-2.sql.gz'), 'bb');
+
+      const result = await backend.list('backups/');
+
+      expect(result.toSorted((a, b) => a.key.localeCompare(b.key))).toEqual([
+        { key: 'backups/immich-db-backup-1.sql.gz', size: 4 },
+        { key: 'backups/immich-db-backup-2.sql.gz', size: 2 },
+      ]);
+    });
+
+    it('should return keys that round-trip back through get and delete', async () => {
+      await mkdir(join(testDir, 'backups'), { recursive: true });
+      await writeFile(join(testDir, 'backups/one.sql.gz'), 'payload');
+
+      const [{ key }] = await backend.list('backups/');
+      await expect(backend.readAll(key)).resolves.toEqual(Buffer.from('payload'));
+      await backend.delete(key);
+      expect(existsSync(join(testDir, 'backups/one.sql.gz'))).toBe(false);
+    });
+
+    it('should not descend into subdirectories', async () => {
+      await mkdir(join(testDir, 'backups/nested'), { recursive: true });
+      await writeFile(join(testDir, 'backups/top.sql.gz'), 'a');
+      await writeFile(join(testDir, 'backups/nested/deep.sql.gz'), 'b');
+
+      await expect(backend.list('backups/')).resolves.toEqual([{ key: 'backups/top.sql.gz', size: 1 }]);
     });
   });
 

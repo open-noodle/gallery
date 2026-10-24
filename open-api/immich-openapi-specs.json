@@ -27437,13 +27437,26 @@
             "maximum": 9007199254740991,
             "minimum": 1,
             "type": "integer"
+          },
+          "s3": {
+            "$ref": "#/components/schemas/AdminConfigDatabaseBackupS3Dto"
           }
         },
         "required": [
           "cronExpression",
           "enabled",
-          "keepLastAmount"
+          "keepLastAmount",
+          "s3"
         ],
+        "type": "object"
+      },
+      "AdminConfigDatabaseBackupS3Dto": {
+        "properties": {
+          "enabled": {
+            "description": "Upload scheduled database backups to S3",
+            "type": "boolean"
+          }
+        },
         "type": "object"
       },
       "AdminConfigDto": {
@@ -39291,6 +39304,10 @@
             "description": "Whether reverse geocoding is enabled",
             "type": "boolean"
           },
+          "s3Storage": {
+            "description": "Whether the server is running on the S3 storage backend",
+            "type": "boolean"
+          },
           "search": {
             "description": "Whether search is enabled",
             "type": "boolean"
@@ -39333,6 +39350,7 @@
           "peopleStatistics",
           "realtimeTranscoding",
           "reverseGeocoding",
+          "s3Storage",
           "search",
           "sidecar",
           "smartSearch",
