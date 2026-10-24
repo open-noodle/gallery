@@ -57,6 +57,19 @@ final searchTimelineResultsProvider = NotifierProvider<SearchTimelineResultsNoti
   dependencies: [searchModeProvider, searchStateProvider, searchResultsProvider],
 );
 
+/// True while the grid is out of date: search mode has a filter or a query, and the answer for it has not arrived
+/// (still debouncing or on its way). The grid meanwhile keeps the previous answer or the screen's own timeline, so the
+/// header says it is searching and the frame dims the grid. A failed request is not pending: its error shows instead.
+final searchResultsPendingProvider = Provider<bool>((ref) {
+  final active = ref.watch(searchModeProvider);
+  final state = ref.watch(searchStateProvider);
+  if (!active || state.isEmpty) {
+    return false;
+  }
+  final results = ref.watch(searchResultsProvider);
+  return results.error == null && (results.loading || results.forState != state);
+}, dependencies: [searchModeProvider, searchStateProvider, searchResultsProvider]);
+
 /// One answer the timeline shows. Each new answer gets its own feed, and so its own TimelineService; only the next
 /// pages of a paged answer arrive through [pages], and they only ever add assets, so the data under a running timeline
 /// never shrinks.
@@ -241,6 +254,7 @@ List<Override> searchTimelineScopeOverrides(SearchScope scope) => [
     closeSearchModeProvider,
     searchTimelineResultsProvider.overrideWith(SearchTimelineResultsNotifier.new),
     searchTimelineFeedProvider,
+    searchResultsPendingProvider,
   ],
 ];
 

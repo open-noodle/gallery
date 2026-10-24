@@ -258,6 +258,9 @@ class FakeSearchRepository implements GallerySearchRepository {
   /// Single-dimension options requests wait for their completer here: a dimension still on its way.
   final held = <SearchDimension, Completer<void>>{};
 
+  /// While set, every results request (buckets, smart, metadata) waits for it: a search still on its way.
+  Completer<void>? heldResults;
+
   /// Single-dimension options requests for these dimensions fail with [failure].
   final failing = <SearchDimension>{};
 
@@ -541,6 +544,7 @@ class FakeSearchRepository implements GallerySearchRepository {
   }) async {
     calls.add('buckets');
     resultParams.add(p);
+    await heldResults?.future;
     final counts = <String, int>{};
     for (final a in results(p)) {
       final key = _monthKey(byUploadDate ? a.uploaded : a.taken);
@@ -588,6 +592,7 @@ class FakeSearchRepository implements GallerySearchRepository {
   }) async {
     calls.add('smart');
     resultParams.add(p);
+    await heldResults?.future;
     final assets = results(p);
     return api.SearchResponseDto(
       albums: api.SearchAlbumResponseDto(count: 0, facets: const [], items: const [], total: 0),

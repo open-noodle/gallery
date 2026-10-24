@@ -952,6 +952,7 @@
   "search_mode_places_none": "Нет подходящих мест",
   "search_mode_remove_query": "Удалить текст поиска",
   "search_mode_remove_similar": "Удалить поиск похожих фото",
+  "search_mode_searching": "Поиск…",
   "search_mode_show_photos": "{count, plural, one {Показать # фото} few {Показать # фото} many {Показать # фото} other {Показать # фото}}",
   "search_mode_similar_to": "Похожие на это фото",
   "search_mode_smart_search": "Фото, похожие на «{query}»",

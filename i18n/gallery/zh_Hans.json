@@ -969,6 +969,7 @@
   "search_mode_places_none": "没有匹配的地点",
   "search_mode_remove_query": "移除搜索文字",
   "search_mode_remove_similar": "移除相似照片搜索",
+  "search_mode_searching": "正在搜索…",
   "search_mode_show_photos": "{count, plural, one {显示 # 张照片} other {显示 # 张照片}}",
   "search_mode_similar_to": "与此照片相似",
   "search_mode_smart_search": "看起来像“{query}”的照片",

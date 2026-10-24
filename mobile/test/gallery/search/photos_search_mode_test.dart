@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -258,6 +260,34 @@ void main() {
       expect(tester.widget<TextField>(find.byKey(const Key('search-mode-field'))).controller!.text, isEmpty);
       expect(find.byKey(const Key('search-mode-suggestions')), findsNothing);
       // Anna is in kyoto-1, kyoto-2 and lisbon-1.
+      expect(totalText(tester), '3 matches');
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('while a search is on its way the header says so and the old grid dims; the answer clears both', (
+      tester,
+    ) async {
+      await pump(tester, timelineAssets: 30);
+      await enterSearchMode(tester, container);
+      expect(find.byKey(const Key('search-mode-busy')), findsNothing);
+      expect(find.byKey(const Key('search-mode-stale-scrim')), findsNothing);
+
+      final held = repository.heldResults = Completer<void>();
+      await typeInField(tester, '@a');
+      await tapKey(tester, 'search-suggestion-person-person:anna');
+
+      // The grid still shows the unfiltered timeline, so the header must not claim its total, and the grid is dimmed.
+      expect(find.byKey(const Key('search-mode-busy')), findsOneWidget);
+      expect(find.byKey(const Key('search-mode-stale-scrim')), findsOneWidget);
+      expect(totalText(tester), 'Searching…');
+
+      held.complete();
+      repository.heldResults = null;
+      await settleFrames(tester);
+
+      expect(find.byKey(const Key('search-mode-busy')), findsNothing);
+      expect(find.byKey(const Key('search-mode-stale-scrim')), findsNothing);
       expect(totalText(tester), '3 matches');
 
       await disposePhotosPage(tester, container);

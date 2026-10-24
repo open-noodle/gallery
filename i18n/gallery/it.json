@@ -951,6 +951,7 @@
   "search_mode_places_none": "Nessun luogo corrisponde",
   "search_mode_remove_query": "Rimuovi il testo di ricerca",
   "search_mode_remove_similar": "Rimuovi la ricerca di foto simili",
+  "search_mode_searching": "Ricerca in corso…",
   "search_mode_show_photos": "{count, plural, one {Mostra # foto} other {Mostra # foto}}",
   "search_mode_similar_to": "Simili a questa foto",
   "search_mode_smart_search": "Foto che sembrano «{query}»",

@@ -951,6 +951,7 @@
   "search_mode_places_none": "Geen plaatsen gevonden",
   "search_mode_remove_query": "Zoektekst verwijderen",
   "search_mode_remove_similar": "Zoeken naar vergelijkbare foto's verwijderen",
+  "search_mode_searching": "Bezig met zoeken…",
   "search_mode_show_photos": "{count, plural, one {# foto tonen} other {# foto's tonen}}",
   "search_mode_similar_to": "Vergelijkbaar met deze foto",
   "search_mode_smart_search": "Foto's die eruitzien als ‘{query}’",

@@ -6,6 +6,7 @@ import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_suggestion_matcher.dart';
+import 'package:immich_mobile/gallery/search/search_timeline.dart' show searchResultsPendingProvider;
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_avatar.widget.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_chip_row.widget.dart';
@@ -248,7 +249,15 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
                 ),
               ),
               const SizedBox(height: SearchHeader.chipRowHeight, child: SearchChipRow()),
-              const SizedBox(height: SearchHeader.resultsRowHeight, child: _ResultsRow()),
+              const SizedBox(
+                height: SearchHeader.resultsRowHeight,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: _ResultsRow()),
+                    Positioned(left: 0, right: 0, bottom: 0, child: _BusyBar()),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -628,6 +637,8 @@ class _ResultsRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final state = ref.watch(searchStateProvider);
+    // The grid still shows the previous answer: its total would describe photos the new search may not keep.
+    final pending = ref.watch(searchResultsPendingProvider);
     final total =
         ref.watch(searchResultsProvider.select((r) => r.total)) ??
         ref.watch(searchOptionsProvider.select((o) => o.total));
@@ -638,7 +649,9 @@ class _ResultsRow extends ConsumerWidget {
         children: [
           Expanded(
             child: Text(
-              total == null
+              pending
+                  ? context.t.search_mode_searching
+                  : total == null
                   ? ''
                   : state.isEmpty
                   ? context.t.search_mode_total_all(count: total)
@@ -651,6 +664,19 @@ class _ResultsRow extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// A thin progress line along the header's bottom edge while a search is on its way.
+class _BusyBar extends ConsumerWidget {
+  const _BusyBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(searchResultsPendingProvider)) {
+      return const SizedBox.shrink();
+    }
+    return const LinearProgressIndicator(key: Key('search-mode-busy'), minHeight: 2);
   }
 }
 

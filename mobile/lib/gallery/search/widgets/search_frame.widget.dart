@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
+import 'package:immich_mobile/gallery/search/search_timeline.dart' show searchResultsPendingProvider;
 import 'package:immich_mobile/gallery/search/widgets/search_header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 
@@ -59,6 +60,7 @@ class _PhotosSearchFrameState extends ConsumerState<PhotosSearchFrame> {
             child: widget.child,
           ),
         ),
+        StaleResultsScrim(top: media.padding.top),
         if (searching) const TimelineGroupingBottomPill(),
       ],
     );
@@ -76,13 +78,48 @@ class SearchScreenFrame extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final searching = ref.watch(searchModeProvider);
     final media = MediaQuery.of(context);
-    return SearchHeaderInset(
-      extra: searching ? SearchHeader.extraTopPadding : 0,
-      child: MediaQuery(
-        data: searching
-            ? media.copyWith(padding: media.padding.copyWith(top: media.padding.top + SearchHeader.extraTopPadding))
-            : media,
-        child: child,
+    return Stack(
+      children: [
+        SearchHeaderInset(
+          extra: searching ? SearchHeader.extraTopPadding : 0,
+          child: MediaQuery(
+            data: searching
+                ? media.copyWith(padding: media.padding.copyWith(top: media.padding.top + SearchHeader.extraTopPadding))
+                : media,
+            child: child,
+          ),
+        ),
+        StaleResultsScrim(top: media.padding.top),
+      ],
+    );
+  }
+}
+
+/// Dims the grid below the search header while a search is on its way (searchResultsPendingProvider): the photos
+/// underneath are the previous answer, or the screen's own timeline, not what the filters now ask for. Touches pass
+/// through, so the grid still scrolls.
+class StaleResultsScrim extends ConsumerWidget {
+  /// The status bar height: the header sits right below it.
+  final double top;
+
+  const StaleResultsScrim({super.key, required this.top});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(searchResultsPendingProvider)) {
+      return const SizedBox.shrink();
+    }
+    const headerHeight = SearchHeader.fieldRowHeight + SearchHeader.chipRowHeight + SearchHeader.resultsRowHeight;
+    return Positioned.fill(
+      top: top + headerHeight,
+      child: IgnorePointer(
+        child: TweenAnimationBuilder<double>(
+          key: const Key('search-mode-stale-scrim'),
+          tween: Tween(begin: 0, end: 0.6),
+          duration: const Duration(milliseconds: 150),
+          builder: (context, opacity, _) =>
+              ColoredBox(color: Theme.of(context).colorScheme.surface.withValues(alpha: opacity)),
+        ),
       ),
     );
   }

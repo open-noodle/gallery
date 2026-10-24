@@ -955,6 +955,7 @@
   "search_mode_places_none": "Brak pasujących miejsc",
   "search_mode_remove_query": "Usuń tekst wyszukiwania",
   "search_mode_remove_similar": "Usuń wyszukiwanie podobnych zdjęć",
+  "search_mode_searching": "Wyszukiwanie…",
   "search_mode_show_photos": "{count, plural, one {Pokaż # zdjęcie} few {Pokaż # zdjęcia} many {Pokaż # zdjęć} other {Pokaż # zdjęcia}}",
   "search_mode_similar_to": "Podobne do tego zdjęcia",
   "search_mode_smart_search": "Zdjęcia wyglądające jak „{query}”",
