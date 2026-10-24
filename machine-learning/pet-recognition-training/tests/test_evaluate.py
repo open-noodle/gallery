@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from petid.evaluate import evaluate
@@ -61,9 +62,21 @@ def test_identity_projection_scores_exactly_like_zeroshot(synthetic_data_root, t
     result = evaluate(
         manifest, ckpt, str(tmp_path / "r.md"), device="cpu", cache=str(tmp_path / "eval.pt"), pretrained=False, batch=2
     )
+    # The claim itself: every pairwise score the projection produces equals the zeroshot one.
+    blob = torch.load(ckpt, map_location="cpu", weights_only=False)
+    proj = PetProjection(384, OUT_DIM, "identity")
+    proj.load_state_dict(blob["projection"])
+    cache = torch.load(tmp_path / "eval.pt", map_location="cpu", weights_only=False)
+    for feats, _ids in cache["splits"].values():
+        with torch.no_grad():
+            projected = proj(feats)
+        assert torch.allclose(projected @ projected.T, feats @ feats.T, atol=1e-6)
+    # The metrics then agree up to float rounding. Rounding can still move a score across one of the
+    # 1e-5-wide AUC/EER histogram bins on these near-tied synthetic scores (CI saw AUC 0.354 vs 0.333:
+    # one of 48 pairs), so allow a few pairs rather than exact equality.
     for split in result.values():
         for metric in ("eer", "auc", "top1", "map"):
-            assert split["projection"][metric] == split["zeroshot"][metric], metric
+            assert split["projection"][metric] == pytest.approx(split["zeroshot"][metric], abs=0.1), metric
 
 
 def test_evaluate_reuses_the_feature_cache(synthetic_data_root, tmp_path):
