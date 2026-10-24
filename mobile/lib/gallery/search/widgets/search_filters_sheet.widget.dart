@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
@@ -21,6 +22,27 @@ import 'package:intl/intl.dart';
 Future<void> showSearchFiltersSheet(BuildContext context) =>
     showSearchSheet(context, (_) => const SearchFiltersSheet());
 
+/// One section of the sheet. [title] makes it collapsible by tapping the title; the switch rows have none.
+class _SectionSpec {
+  final String name;
+  final String label;
+  final String? title;
+  final String? trailing;
+  final bool active;
+  final SearchSectionState state;
+  final Widget Function() body;
+
+  const _SectionSpec({
+    required this.name,
+    required this.label,
+    required this.active,
+    required this.state,
+    required this.body,
+    this.title,
+    this.trailing,
+  });
+}
+
 class SearchFiltersSheet extends ConsumerWidget {
   const SearchFiltersSheet({super.key});
 
@@ -29,6 +51,7 @@ class SearchFiltersSheet extends ConsumerWidget {
     final scope = ref.watch(searchScopeProvider);
     final state = ref.watch(searchStateProvider);
     final options = ref.watch(searchOptionsProvider);
+    final prefs = ref.watch(searchFilterSectionPrefsProvider);
     final scopeAvailability = searchScopeAvailability(ref, state, options);
     final filters = state.filters;
     final extras = activeExtraFilters(filters, scope);
@@ -41,19 +64,16 @@ class SearchFiltersSheet extends ConsumerWidget {
       current: options.availability,
     );
 
-    Widget? section(SearchSection section, Widget Function() build) {
-      final sectionState = stateOf(section);
-      if (sectionState == SearchSectionState.hidden) {
-        return null;
-      }
-      return _Section(key: Key('search-filter-section-${section.name}'), state: sectionState, child: build());
-    }
-
     final notifier = ref.read(searchStateProvider.notifier);
-    final sections = <Widget>[
-      ?section(
-        SearchSection.favorites,
-        () => _Switch(
+    final minRating = filters.minRating;
+    final text = filters.text;
+    final specs = <_SectionSpec>[
+      _SectionSpec(
+        name: SearchSection.favorites.name,
+        label: context.t.search_mode_favorites_only,
+        active: filters.favoritesOnly,
+        state: stateOf(SearchSection.favorites),
+        body: () => _Switch(
           key: const Key('search-filter-favorites'),
           icon: Icons.favorite_rounded,
           label: context.t.search_mode_favorites_only,
@@ -61,21 +81,65 @@ class SearchFiltersSheet extends ConsumerWidget {
           onChanged: notifier.setFavoritesOnly,
         ),
       ),
-      ?section(SearchSection.mediaType, () => _MediaSection(filters: filters, options: options)),
-      ?section(SearchSection.rating, () => _RatingSection(minRating: filters.minRating)),
-      ?section(SearchSection.camera, () => _CameraSection(camera: filters.camera, makes: options.cameras)),
-      ?section(SearchSection.albums, () => _AlbumSection(value: filters.album)),
-      ?section(SearchSection.text, () => _TextSection(text: filters.text, queryMode: state.isQueryMode)),
-      // A date range replaces a When selection and the reverse (one period at a time). Never hidden: the timeline's
-      // own section in #910 terms.
-      _Section(
-        key: const Key('search-filter-section-dateRange'),
-        state: SearchSectionState.available,
-        child: _DateRangeSection(date: filters.date),
+      _SectionSpec(
+        name: SearchSection.mediaType.name,
+        label: context.t.search_mode_photo_or_video,
+        title: context.t.search_mode_photo_or_video,
+        active: filters.mediaType != SearchMediaType.all,
+        state: stateOf(SearchSection.mediaType),
+        body: () => _MediaSection(filters: filters, options: options),
       ),
-      ?section(
-        SearchSection.archived,
-        () => _Switch(
+      _SectionSpec(
+        name: SearchSection.rating.name,
+        label: context.t.filter_sheet_deep_rating_section,
+        title: context.t.filter_sheet_deep_rating_section,
+        trailing: minRating == null
+            ? context.t.filter_sheet_deep_rating_any
+            : context.t.filter_chip_rating(rating: minRating),
+        active: minRating != null,
+        state: stateOf(SearchSection.rating),
+        body: () => _RatingSection(minRating: minRating),
+      ),
+      _SectionSpec(
+        name: SearchSection.camera.name,
+        label: context.t.camera,
+        title: context.t.camera,
+        active: filters.camera != null,
+        state: stateOf(SearchSection.camera),
+        body: () => _CameraSection(camera: filters.camera, makes: options.cameras),
+      ),
+      _SectionSpec(
+        name: SearchSection.albums.name,
+        label: context.t.albums,
+        title: context.t.albums,
+        active: filters.album != SearchAlbumFilter.any,
+        state: stateOf(SearchSection.albums),
+        body: () => _AlbumSection(value: filters.album),
+      ),
+      _SectionSpec(
+        name: SearchSection.text.name,
+        label: context.t.filter_text,
+        title: context.t.filter_text,
+        active: text.ocr != null || text.fileName != null || text.description != null,
+        state: stateOf(SearchSection.text),
+        body: () => _TextSection(text: text, queryMode: state.isQueryMode),
+      ),
+      // A date range replaces a When selection and the reverse (one period at a time). Never hidden by #910: the
+      // timeline's own section in #910 terms.
+      _SectionSpec(
+        name: 'dateRange',
+        label: context.t.date_range,
+        title: context.t.date_range,
+        active: filters.date is SearchDateCustom,
+        state: SearchSectionState.available,
+        body: () => _DateRangeSection(date: filters.date),
+      ),
+      _SectionSpec(
+        name: SearchSection.archived.name,
+        label: context.t.search_mode_archived_only,
+        active: filters.archivedOnly,
+        state: stateOf(SearchSection.archived),
+        body: () => _Switch(
           key: const Key('search-filter-archived'),
           icon: Icons.archive_outlined,
           label: context.t.search_mode_archived_only,
@@ -83,9 +147,12 @@ class SearchFiltersSheet extends ConsumerWidget {
           onChanged: notifier.setArchivedOnly,
         ),
       ),
-      ?section(
-        SearchSection.untagged,
-        () => _Switch(
+      _SectionSpec(
+        name: SearchSection.untagged.name,
+        label: context.t.search_mode_untagged_only,
+        active: filters.untagged && filters.tags.isEmpty,
+        state: stateOf(SearchSection.untagged),
+        body: () => _Switch(
           key: const Key('search-filter-untagged'),
           icon: Icons.label_off_outlined,
           label: context.t.search_mode_untagged_only,
@@ -94,10 +161,28 @@ class SearchFiltersSheet extends ConsumerWidget {
         ),
       ),
     ];
+    // #910 hides a section for the whole scope; the cog hides one by choice, except while it holds an active filter,
+    // which must stay reachable to be changed.
+    final offered = [
+      for (final spec in specs)
+        if (spec.state != SearchSectionState.hidden) spec,
+    ];
+    final shown = [
+      for (final spec in offered)
+        if (spec.active || !prefs.hidden.contains(spec.name)) spec,
+    ];
 
     return SearchSheetScaffold(
       title: context.t.filters,
       heightFactor: 0.88,
+      actions: [
+        IconButton(
+          key: const Key('search-filters-manage'),
+          tooltip: context.t.search_mode_manage_sections,
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () => _showManageSections(context, [for (final spec in offered) (spec.name, spec.label)]),
+        ),
+      ],
       onClear: extras.isEmpty
           ? null
           : () {
@@ -112,9 +197,14 @@ class SearchFiltersSheet extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final (index, child) in sections.indexed) ...[
+            for (final (index, spec) in shown.indexed) ...[
               if (index > 0) const Divider(height: 1, indent: 16, endIndent: 16),
-              child,
+              _Section(
+                key: Key('search-filter-section-${spec.name}'),
+                spec: spec,
+                collapsed: spec.title != null && prefs.collapsed.contains(spec.name),
+                onToggle: () => ref.read(searchFilterSectionPrefsProvider.notifier).toggleCollapsed(spec.name),
+              ),
             ],
           ],
         ),
@@ -123,22 +213,78 @@ class SearchFiltersSheet extends ConsumerWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  final SearchSectionState state;
-  final Widget child;
+/// The cog's list: a checkbox per section the screen offers, saved at once.
+Future<void> _showManageSections(BuildContext context, List<(String, String)> sections) => showDialog<void>(
+  context: context,
+  builder: (context) => Consumer(
+    builder: (context, ref, _) {
+      final hidden = ref.watch(searchFilterSectionPrefsProvider.select((prefs) => prefs.hidden));
+      return AlertDialog(
+        title: Text(context.t.search_mode_manage_sections),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (name, label) in sections)
+                CheckboxListTile(
+                  key: Key('search-filters-manage-$name'),
+                  title: Text(label),
+                  value: !hidden.contains(name),
+                  onChanged: (_) => ref.read(searchFilterSectionPrefsProvider.notifier).toggleHidden(name),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('search-filters-manage-done'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.t.done),
+          ),
+        ],
+      );
+    },
+  ),
+);
 
-  const _Section({super.key, required this.state, required this.child});
+class _Section extends StatelessWidget {
+  final _SectionSpec spec;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  const _Section({super.key, required this.spec, required this.collapsed, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
-    final greyed = state == SearchSectionState.greyed;
+    final greyed = spec.state == SearchSectionState.greyed;
+    final title = spec.title;
     return Semantics(
       enabled: !greyed,
       child: IgnorePointer(
         ignoring: greyed,
         child: Opacity(
           opacity: greyed ? 0.38 : 1,
-          child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: child),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: title == null
+                ? spec.body()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _Title(
+                        title,
+                        name: spec.name,
+                        trailing: spec.trailing,
+                        collapsed: collapsed,
+                        // Collapsed, the title still says a filter is set inside.
+                        active: collapsed && spec.active,
+                        onTap: onToggle,
+                      ),
+                      if (!collapsed) spec.body(),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
@@ -147,23 +293,52 @@ class _Section extends StatelessWidget {
 
 class _Title extends StatelessWidget {
   final String text;
+  final String name;
   final String? trailing;
+  final bool collapsed;
+  final bool active;
+  final VoidCallback onTap;
 
-  const _Title(this.text, {this.trailing});
+  const _Title(
+    this.text, {
+    required this.name,
+    required this.collapsed,
+    required this.active,
+    required this.onTap,
+    this.trailing,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(text, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Semantics(
+      button: true,
+      expanded: !collapsed,
+      child: InkWell(
+        key: Key('search-filter-toggle-$name'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(text, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              ),
+              if (active)
+                Container(
+                  key: Key('search-filter-active-$name'),
+                  margin: const EdgeInsets.only(left: 8),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
+                ),
+              const Spacer(),
+              if (trailing != null) Text(trailing!, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+              Icon(collapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded, size: 22, color: muted),
+            ],
           ),
-          if (trailing != null)
-            Text(trailing!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        ],
+        ),
       ),
     );
   }
@@ -270,7 +445,6 @@ class _MediaSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Title(context.t.search_mode_photo_or_video),
         _Segmented<SearchMediaType>(
           keyPrefix: 'search-filter-media',
           name: (value) => value.name,
@@ -299,12 +473,6 @@ class _RatingSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Title(
-          context.t.filter_sheet_deep_rating_section,
-          trailing: minRating == null
-              ? context.t.filter_sheet_deep_rating_any
-              : context.t.filter_chip_rating(rating: minRating!),
-        ),
         // Five stars meaning "at least N", by position: never filtered or greyed by the ratings the options report.
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -340,7 +508,11 @@ class _CameraSection extends ConsumerStatefulWidget {
 }
 
 class _CameraSectionState extends ConsumerState<_CameraSection> {
+  /// Makes listed before "Show N more": a library with hundreds of makes would otherwise bury every section below.
+  static const _folded = 5;
+
   final Set<String> _open = {};
+  bool _showAll = false;
 
   @override
   void initState() {
@@ -365,14 +537,20 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
           models: camera.model == null ? const [] : [SearchCameraModelOption(model: camera.model!)],
         ),
     ];
+    // Folded, the selected make still shows, so it can be seen and cleared.
+    final visible = _showAll || rows.length <= _folded
+        ? rows
+        : [
+            for (final (index, make) in rows.indexed)
+              if (index < _folded || make.make == camera?.make) make,
+          ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Title(context.t.camera),
         if (makes == null && camera == null)
           const SearchSheetPending(SearchDimension.cameras)
         else
-          for (final make in rows) ...[
+          for (final make in visible) ...[
             ListTile(
               key: Key('search-filter-make-${make.make}'),
               dense: true,
@@ -423,6 +601,20 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
                 ),
               ),
           ],
+        if (rows.length > _folded)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: TextButton(
+                key: const Key('search-filter-camera-more'),
+                onPressed: () => setState(() => _showAll = !_showAll),
+                child: Text(
+                  _showAll ? context.t.show_less : context.t.search_mode_show_more(count: rows.length - _folded),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -437,7 +629,6 @@ class _AlbumSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _Title(context.t.albums),
       _Segmented<SearchAlbumFilter>(
         keyPrefix: 'search-filter-album',
         name: (value) => value.name,
@@ -527,7 +718,6 @@ class _TextSectionState extends ConsumerState<_TextSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Title(context.t.filter_text),
         _field('ocr', context.t.search_mode_text_ocr, _ocr),
         _field('fileName', context.t.file_name_text, _fileName, enabled: browse),
         _field('description', context.t.description, _description, enabled: browse),
@@ -612,7 +802,6 @@ class _DateRangeSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Title(context.t.date_range),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(

@@ -81,6 +81,9 @@ class SearchSheetScaffold extends ConsumerWidget {
   final Widget? search;
   final Widget body;
 
+  /// Buttons before Clear in the title row (the Filters sheet's cog).
+  final List<Widget> actions;
+
   const SearchSheetScaffold({
     super.key,
     required this.title,
@@ -88,6 +91,7 @@ class SearchSheetScaffold extends ConsumerWidget {
     this.heightFactor = 0.66,
     this.onClear,
     this.search,
+    this.actions = const [],
   });
 
   @override
@@ -113,6 +117,7 @@ class SearchSheetScaffold extends ConsumerWidget {
                   Expanded(
                     child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                   ),
+                  ...actions,
                   TextButton(key: const Key('search-sheet-clear'), onPressed: onClear, child: Text(context.t.clear)),
                 ],
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/widgets/search_header.widget.dart';
@@ -450,6 +451,138 @@ void main() {
     expect(filters().minRating, isNull);
 
     await disposePhotosPage(tester, container);
+  });
+
+  group('collapsing and hiding sections', () {
+    // Reads the saved choices again, as the next app start would.
+    Future<void> reopen(WidgetTester tester) async {
+      await closeSheet(tester);
+      container.invalidate(searchFilterSectionPrefsProvider);
+      await openFilters(tester);
+    }
+
+    testWidgets('tapping a section title collapses it, and it stays collapsed the next time the sheet opens', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openFilters(tester);
+      expect(find.byKey(const Key('search-filter-make-Apple')), findsOneWidget);
+
+      await tapKey(tester, 'search-filter-toggle-camera');
+      expect(find.byKey(const Key('search-filter-make-Apple')), findsNothing);
+      expect(section('camera'), findsOneWidget, reason: 'the title stays, to expand it again');
+
+      await reopen(tester);
+      expect(find.byKey(const Key('search-filter-make-Apple')), findsNothing);
+
+      await tapKey(tester, 'search-filter-toggle-camera');
+      expect(find.byKey(const Key('search-filter-make-Apple')), findsOneWidget);
+      await reopen(tester);
+      expect(find.byKey(const Key('search-filter-make-Apple')), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a collapsed section with an active filter shows a dot on its title', (tester) async {
+      await pump(tester);
+      await openFilters(tester);
+      await tapKey(tester, 'search-filter-toggle-camera');
+      expect(find.byKey(const Key('search-filter-active-camera')), findsNothing);
+
+      container.read(searchStateProvider.notifier).setCamera(const SearchCamera(make: 'Apple'));
+      await settleFrames(tester);
+      expect(find.byKey(const Key('search-filter-active-camera')), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a long camera list shows the first five makes and "Show 4 more"; Show less folds it again', (
+      tester,
+    ) async {
+      final makes = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9'];
+      final library = FakeLibrary.standard.withAssets([
+        for (final (i, make) in makes.indexed)
+          // More photos for earlier makes, so the server's count order is the list order.
+          for (var n = 0; n < makes.length - i; n++)
+            FakeAsset('$make-$n', DateTime(2024, 1, 1 + n), make: make, model: 'M'),
+      ]);
+      await pump(tester, library: library);
+      await openFilters(tester);
+
+      for (final make in makes.take(5)) {
+        expect(find.byKey(Key('search-filter-make-$make')), findsOneWidget, reason: make);
+      }
+      for (final make in makes.skip(5)) {
+        expect(find.byKey(Key('search-filter-make-$make')), findsNothing, reason: make);
+      }
+      expect(find.text('Show 4 more'), findsOneWidget);
+
+      await tapKey(tester, 'search-filter-camera-more');
+      for (final make in makes) {
+        expect(find.byKey(Key('search-filter-make-$make')), findsOneWidget, reason: make);
+      }
+
+      await tapKey(tester, 'search-filter-camera-more');
+      expect(find.byKey(const Key('search-filter-make-A9')), findsNothing);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a selected camera past the first five still shows while folded', (tester) async {
+      final makes = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
+      final library = FakeLibrary.standard.withAssets([
+        for (final (i, make) in makes.indexed)
+          for (var n = 0; n < makes.length - i; n++)
+            FakeAsset('$make-$n', DateTime(2024, 1, 1 + n), make: make, model: 'M'),
+      ]);
+      await pump(tester, library: library);
+      container.read(searchStateProvider.notifier).setCamera(const SearchCamera(make: 'A7'));
+      await settleFrames(tester);
+      await openFilters(tester);
+
+      expect(find.byKey(const Key('search-filter-make-A7')), findsOneWidget);
+      expect(find.byKey(const Key('search-filter-make-A6')), findsNothing);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('the cog hides a section, and it stays hidden the next time; showing it again brings it back', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openFilters(tester);
+
+      await tapKey(tester, 'search-filters-manage');
+      await tapKey(tester, 'search-filters-manage-camera');
+      await tapKey(tester, 'search-filters-manage-done');
+      expect(section('camera'), findsNothing);
+      expect(section('rating'), findsOneWidget);
+
+      await reopen(tester);
+      expect(section('camera'), findsNothing);
+
+      await tapKey(tester, 'search-filters-manage');
+      await tapKey(tester, 'search-filters-manage-camera');
+      await tapKey(tester, 'search-filters-manage-done');
+      expect(section('camera'), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a hidden section with an active filter still shows, so the filter can be changed', (tester) async {
+      await pump(tester);
+      await openFilters(tester);
+      await tapKey(tester, 'search-filters-manage');
+      await tapKey(tester, 'search-filters-manage-camera');
+      await tapKey(tester, 'search-filters-manage-done');
+      expect(section('camera'), findsNothing);
+
+      container.read(searchStateProvider.notifier).setCamera(const SearchCamera(make: 'Apple'));
+      await settleFrames(tester);
+      expect(section('camera'), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
   });
 
   testWidgets('in search mode the timeline scrubber starts below the taller search header', (tester) async {
