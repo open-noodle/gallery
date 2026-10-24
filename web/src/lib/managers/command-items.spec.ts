@@ -44,7 +44,7 @@ vi.mock('@immich/sdk', async (orig) => ({
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('$lib/services/album.service', () => ({
-  handleDeleteAlbum: vi.fn().mockResolvedValue(true),
+  handleDeleteAlbum: vi.fn().mockResolvedValue(undefined),
   handleDownloadAlbum: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -585,7 +585,7 @@ describe('album-context commands', () => {
   let handleErrorSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     vi.mocked(modalManager.show).mockClear();
-    vi.mocked(albumService.handleDeleteAlbum).mockReset().mockResolvedValue(true);
+    vi.mocked(albumService.handleDeleteAlbum).mockReset().mockResolvedValue(undefined);
     vi.mocked(albumService.handleDownloadAlbum).mockReset().mockResolvedValue(undefined);
     vi.mocked(sdk.removeUserFromAlbum)
       .mockReset()
@@ -693,14 +693,9 @@ describe('album-context commands', () => {
     it('has destructive:true', () => {
       expect(cmd().destructive).toBe(true);
     });
-    it('handler calls handleDeleteAlbum({prompt:false}) + goto on success', async () => {
+    it('handler calls handleDeleteAlbum({prompt:false}), which leaves the album page on success', async () => {
       await cmd().handler(makeCtx());
       expect(albumService.handleDeleteAlbum).toHaveBeenCalledWith(baseAlbum, { prompt: false });
-      expect(goto).toHaveBeenCalledWith(Route.albums());
-    });
-    it('handler does NOT goto when handleDeleteAlbum returns falsy', async () => {
-      vi.mocked(albumService.handleDeleteAlbum).mockResolvedValueOnce(false);
-      await cmd().handler(makeCtx());
       expect(goto).not.toHaveBeenCalled();
     });
   });

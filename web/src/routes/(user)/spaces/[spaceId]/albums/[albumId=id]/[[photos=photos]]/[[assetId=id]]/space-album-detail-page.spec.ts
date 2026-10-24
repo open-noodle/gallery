@@ -16,8 +16,9 @@ import { init, register, waitLocale } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album/album-add';
 import { authManager } from '$lib/managers/auth-manager.svelte';
-import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions } from '$lib/services/album.service';
+import { getAlbumAssetsActions } from '$lib/services/album.service';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
@@ -178,10 +179,12 @@ vi.mock('$lib/services/album.service', async (importOriginal) => {
         onAction: vi.fn(),
       },
     }),
-    addAssetsToAlbums: vi.fn().mockResolvedValue(true),
-    addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
   };
 });
+
+vi.mock('$lib/gallery/album/album-add', () => ({
+  addAssetsToAlbumWithOutcome: vi.fn().mockResolvedValue({ ok: true, addedIds: [], deniedIds: [] }),
+}));
 
 const BASE_SPACE: SharedSpaceResponseDto = {
   id: 'space-1',
@@ -772,7 +775,7 @@ describe('Space album detail page', () => {
     // handleAddAssetsSuccess: calls AddAssets.onAction (which resolves), then refreshAlbum
     // (getAlbumInfo), then sets mode='browse'
     await waitFor(() => {
-      expect(getAlbumInfo).toHaveBeenCalledWith({ id: 'album-1' });
+      expect(getAlbumInfo).toHaveBeenCalledWith(expect.objectContaining({ id: 'album-1' }), expect.anything());
     });
     // After refresh, mode returns to browse (add-photos button reappears)
     await waitFor(() => {
@@ -995,7 +998,7 @@ describe('Space album detail page', () => {
 
     // handleAddAssetsSuccess runs: calls onAction, refreshes album, resets picker filters, returns to browse.
     await waitFor(() => {
-      expect(getAlbumInfo).toHaveBeenCalledWith({ id: 'album-1' });
+      expect(getAlbumInfo).toHaveBeenCalledWith(expect.objectContaining({ id: 'album-1' }), expect.anything());
     });
     // After returning to browse, the picker filters must be cleared → no active-filters-bar.
     await waitFor(() => expect(screen.queryByTestId('active-filters-bar')).not.toBeInTheDocument());

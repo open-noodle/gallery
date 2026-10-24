@@ -14,7 +14,7 @@
   import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
-  import { createAlbum } from '$lib/utils/album-utils';
+  import { createAlbum } from '$lib/gallery/album/album-add';
   import { canDrop, type DragPayload } from '$lib/utils/space-album-folder-dnd';
   import { getFolderPath } from '$lib/utils/space-album-folders';
   import {

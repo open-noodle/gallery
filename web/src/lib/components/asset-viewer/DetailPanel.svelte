@@ -1,6 +1,7 @@
 <script lang="ts">
   import { lazyComponent } from '#lib/utils/lazy-component.svelte.ts';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import DetailPanelDate from '#lib/components/asset-viewer/DetailPanelDate.svelte';
   import DetailPanelDescription from '#lib/components/asset-viewer/DetailPanelDescription.svelte';
   import DetailPanelLocation from '#lib/components/asset-viewer/DetailPanelLocation.svelte';
@@ -9,27 +10,40 @@
   import { timeToLoadTheMap } from '#lib/constants.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { refreshAssetPeople } from '#lib/utils/refresh-asset-people.ts';
   import { Route } from '#lib/route.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { getAssetMediaUrl } from '#lib/utils.ts';
+  import { canEditAsset, canEditSpacePeople as resolveCanEditSpacePeople } from '#lib/utils/asset-editability.ts';
   import { delay, getDimensions } from '#lib/utils/asset-utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
   import { getMapProviderLinks } from '#lib/utils/exif-utils.ts';
+  import { applyContextualFilter, buildContextualMapUrl, resolveFilterTarget } from '#lib/utils/filter-target.ts';
+  import { handleError } from '#lib/utils/handle-error.ts';
   import { getParentPath } from '#lib/utils/tree-utils.ts';
-  import { AssetMediaSize, getAssetInfo, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
+  import { AssetMediaSize, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
   import { createQuery } from '@tanstack/svelte-query';
   import { Icon, IconButton, Link, Text } from '@immich/ui';
-  import { mdiCamera, mdiCameraIris, mdiClose, mdiImageOutline, mdiInformationOutline } from '@mdi/js';
+  import {
+    mdiCamera,
+    mdiCameraIris,
+    mdiClose,
+    mdiFilterOutline,
+    mdiImageOutline,
+    mdiInformationOutline,
+    mdiMagnify,
+  } from '@mdi/js';
   import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import PersonSidePanel from '../faces-page/PersonSidePanel.svelte';
+  import SpacePersonSidePanel from './SpacePersonSidePanel.svelte';
   import UserAvatar from '../shared-components/UserAvatar.svelte';
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
   import DetailPanelPeople from '#lib/components/asset-viewer/DetailPanelPeople.svelte';
-  import { faceManager } from '#lib/stores/face.svelte.ts';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import { getAlbumsByAssetQuery } from '#lib/queries/album.query.ts';
+  import { queryClient } from '#lib/queries/client.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
 
@@ -46,6 +60,87 @@
   let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
+  // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
+  // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`). Tags is the one
+  // row that needs BOTH values: it widens only the "add tag" affordance to `canEdit`, but keeps
+  // per-tag remove on the real `isOwner` — tag removal resolves to tag ownership, which also has
+  // no space-edit arm (see `DetailPanelTags.svelte`).
+  let canEdit = $derived(canEditAsset(asset, { userId: authManager.authenticated ? authManager.user.id : undefined }));
+
+  // Slice 8: the People row's own sibling of `canEdit`, gating the space-flavoured face
+  // affordances (name/correct/draw) added by the shared-space face endpoints. `canEdit` is already
+  // true for the owner, so this is explicitly narrowed to `!isOwner` — the owner path keeps
+  // rendering the owner's own people through the owner components, unwidened, exactly like #734
+  // did for `DetailPanelTags`' `canEdit`. See `DetailPanelPeople.svelte`'s `canEditSpacePeople` doc.
+  //
+  // Unlike `canEdit`, this ALSO requires `effectiveSpaceId` explicitly (W-18 in detail-panel.spec.ts
+  // pins this): `canEdit` can be true with no space context at all (e.g. a partner/album share
+  // whose single-asset read still sets `asset.canEdit`), and the people affordances must stay
+  // read-only there — there is no space for the space-flavoured panels to write into.
+  //
+  // Factored into `resolveCanEditSpacePeople` (asset-editability.ts) so the side-panel swap below
+  // and the face-editor swap in PhotoViewer.svelte/VideoNativeViewer.svelte (Slice 8 gap closure)
+  // compute the SAME value for the SAME asset — they must never disagree about which endpoints a
+  // given viewer is allowed to hit.
+  let canEditSpacePeople = $derived(
+    resolveCanEditSpacePeople(asset, { userId: authManager.authenticated ? authManager.user.id : undefined, spaceId }),
+  );
+
+  // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
+  // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.
+  let canFilter = $derived(!authManager.isSharedLink);
+
+  let filterTarget = $derived(resolveFilterTarget(page.url));
+
+  // E5 — the 🔍 "search everywhere" icon is redundant (a no-op) when already on /photos.
+  let isOnPhotos = $derived(filterTarget?.kind === 'photos');
+
+  /**
+   * E9 — an album surface offers NO `albumId` filter affordance at all, for any album.
+   *
+   * buildAlbumTimelineOptions never forwards `albumId` (the route already scopes the query), while
+   * getActiveFilterCount counts it and a chip renders. So on /albums/A, filtering by album B would
+   * show a "1 filter" badge and a removable B chip over a grid that is still the whole of A — a
+   * filter the UI claims is active but the server never sees. Filtering album A by album B is not
+   * a query the album timeline can express, so we do not offer it.
+   */
+  let isOnAlbum = $derived(filterTarget?.kind === 'album');
+  // A space-scoped map cannot represent an album filter — space ∩ album is unsatisfiable and the
+  // server 400s it (hydrateMapFilters drops albumId there). Treat it like the album surface and
+  // withhold the album filter affordance, so we never offer a control that silently does nothing.
+  let albumFilterUnsupported = $derived(isOnAlbum || (filterTarget?.kind === 'map' && !!filterTarget.spaceId));
+
+  // R9/E6/E7 — a value that is empty or whitespace-only trims to nothing (filter-url.ts's
+  // setTrimmed), so it must not render as a clickable filter affordance: the click would close the
+  // viewer and apply no filter at all.
+  let cameraLabel = $derived(
+    [asset.exifInfo?.make, asset.exifInfo?.model]
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(' '),
+  );
+  let lensLabel = $derived(asset.exifInfo?.lensModel?.trim() ?? '');
+
+  const cameraFilterPatch = () => ({
+    make: asset.exifInfo?.make ?? undefined,
+    model: asset.exifInfo?.model ?? undefined,
+  });
+  const lensFilterPatch = () => ({ lensModel: asset.exifInfo?.lensModel ?? undefined });
+
+  /**
+   * The filename WITHOUT its extension — that is what surfaces a RAW/JPEG pair (IMG_1234.CR3 +
+   * IMG_1234.jpg) and edited variants of the same shot, which is the whole point of the filter.
+   *
+   * Only the LAST dot is an extension separator (`my.photo.v2.jpg` → `my.photo.v2`), and a
+   * leading-dot name (`.jpg`) has an EMPTY basename — R9: no affordance is rendered for it.
+   */
+  const getFilenameBasename = (filename: string) => {
+    const lastDot = filename.lastIndexOf('.');
+    return (lastDot === -1 ? filename : filename.slice(0, lastDot)).trim();
+  };
+
+  let filenameBasename = $derived(getFilenameBasename(asset.originalFileName));
+
   let latlng = $derived(
     (() => {
       const lat = asset.exifInfo?.latitude;
@@ -56,13 +151,21 @@
       }
     })(),
   );
+  /**
+   * #767 class — the embedded map's "open in map view" control used to call Route.map({...latlng})
+   * directly, dropping the Space scope AND every active filter (and it would have landed an album
+   * viewer on the global map). It reuses buildContextualMapUrl now, exactly like the location row's
+   * pin: null (→ no control at all) on an album, which has no map URL to be honest with.
+   */
+  let mapViewUrl = $derived(latlng && canFilter ? buildContextualMapUrl(page.url, { ...latlng, zoom: 12.5 }) : null);
+
   let previousId: string | undefined = $state();
   let previousRoute = $derived(currentAlbum?.id ? Route.viewAlbum(currentAlbum) : Route.photos());
 
-  const albumsQuery = createQuery(() => ({
-    ...getAlbumsByAssetQuery(asset.id),
-    enabled: !authManager.isSharedLink,
-  }));
+  const albumsQuery = createQuery(
+    () => ({ ...getAlbumsByAssetQuery(asset.id), enabled: !authManager.isSharedLink }),
+    () => queryClient,
+  );
   const albums = $derived(albumsQuery.data ?? []);
 
   $effect(() => {
@@ -90,10 +193,23 @@
   };
 
   const handleRefreshPeople = async () => {
-    asset = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
+    // Shared with the on-photo face editor (SpaceFaceEditor) so the two cannot drift on what
+    // "people changed" means -- see refreshAssetPeople for why both the asset and faceManager
+    // have to be refreshed, and why assigning `asset` here is not enough.
+    await refreshAssetPeople(asset.id, effectiveSpaceId);
     assetViewerManager.closeEditFacesPanel();
-    faceManager.clear();
-    await faceManager.getAssetFaces(asset.id);
+  };
+
+  // The space panel applies each action (name, detach, delete a box) as it happens, so it refreshes
+  // the People row after every one and stays open for the next -- unlike the owner panel, which
+  // batches its changes and refreshes once on "Done". The panel does not await this, so a failed
+  // refresh is reported here rather than left as an unhandled rejection.
+  const handleSpacePeopleChanged = async () => {
+    try {
+      await refreshAssetPeople(asset.id, effectiveSpaceId);
+    } catch (error) {
+      handleError(error, $t('errors.failed_to_load_people'));
+    }
   };
 
   const getAssetFolderHref = (asset: AssetResponseDto) => {
@@ -146,9 +262,9 @@
       </section>
     {/if}
 
-    <DetailPanelDescription {asset} {isOwner} />
-    <DetailPanelRating {asset} {isOwner} />
-    <DetailPanelPeople {asset} {isOwner} {previousRoute} spaceId={effectiveSpaceId} />
+    <DetailPanelDescription {asset} isOwner={canEdit} {canFilter} />
+    <DetailPanelRating {asset} isOwner={canEdit} {canFilter} />
+    <DetailPanelPeople {asset} {isOwner} {canEditSpacePeople} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
 
     <div class="p-4">
       {#if asset.exifInfo}
@@ -159,14 +275,25 @@
         <Text size="small" color="muted">{$t('no_exif_info_available')}</Text>
       {/if}
 
-      <DetailPanelDate {asset} />
+      <DetailPanelDate {asset} isOwner={canEdit} {canFilter} />
 
       <div class="flex gap-4 py-4" data-testid="detail-panel-filename">
         <div><Icon icon={mdiImageOutline} size="24" /></div>
 
         <div>
           <p class="flex place-items-center gap-2 break-all whitespace-pre-wrap">
-            {asset.originalFileName}
+            {#if canFilter && filenameBasename}
+              <button
+                type="button"
+                class="text-left break-all whitespace-pre-wrap hover:text-primary"
+                aria-label="{$t('filter_by_filename')}: {filenameBasename}"
+                onclick={() => applyContextualFilter({ originalFileName: filenameBasename })}
+              >
+                {asset.originalFileName}
+              </button>
+            {:else}
+              {asset.originalFileName}
+            {/if}
             {#if asset.originalPath}
               <IconButton
                 icon={mdiInformationOutline}
@@ -212,26 +339,31 @@
 
           <div>
             {#if asset.exifInfo?.make || asset.exifInfo?.model}
-              <!--
-                withSharedSpaces:true — /search is scoped to own + partner assets without it, so a
-                Space member clicking the camera of a photo another member shared into the Space got
-                zero results, not even the photo they clicked on (#732). Same omission the palette
-                had in #894. Safe unconditionally: the server rejects withSharedSpaces only when it
-                is combined with spaceId/albumId, which these links never send.
-              -->
-              <p>
-                <a
-                  href={Route.search({
-                    make: asset.exifInfo?.make ?? undefined,
-                    model: asset.exifInfo?.model ?? undefined,
-                    withSharedSpaces: true,
-                  })}
-                  title="{$t('search_for')} {asset.exifInfo.make || ''} {asset.exifInfo.model || ''}"
-                  class="hover:text-primary"
-                >
-                  {asset.exifInfo.make || ''}
-                  {asset.exifInfo.model || ''}
-                </a>
+              <p class="flex items-center gap-1">
+                {#if canFilter && cameraLabel}
+                  <button
+                    type="button"
+                    class="text-left hover:text-primary"
+                    aria-label="{$t('filter_by_camera')}: {cameraLabel}"
+                    onclick={() => applyContextualFilter(cameraFilterPatch())}
+                  >
+                    {asset.exifInfo.make || ''}
+                    {asset.exifInfo.model || ''}
+                  </button>
+                  {#if !isOnPhotos}
+                    <IconButton
+                      icon={mdiMagnify}
+                      aria-label="{$t('search_everywhere')}: {cameraLabel}"
+                      size="small"
+                      shape="round"
+                      color="secondary"
+                      variant="ghost"
+                      onclick={() => applyContextualFilter(cameraFilterPatch(), { global: true })}
+                    />
+                  {/if}
+                {:else}
+                  <span>{asset.exifInfo.make || ''} {asset.exifInfo.model || ''}</span>
+                {/if}
               </p>
             {/if}
 
@@ -254,14 +386,30 @@
 
           <div>
             {#if asset.exifInfo?.lensModel}
-              <p>
-                <a
-                  href={Route.search({ lensModel: asset.exifInfo.lensModel, withSharedSpaces: true })}
-                  title="{$t('search_for')} {asset.exifInfo.lensModel}"
-                  class="line-clamp-1 hover:text-primary"
-                >
-                  {asset.exifInfo.lensModel}
-                </a>
+              <p class="flex items-center gap-1">
+                {#if canFilter && lensLabel}
+                  <button
+                    type="button"
+                    class="line-clamp-1 text-left hover:text-primary"
+                    aria-label="{$t('filter_by_lens')}: {lensLabel}"
+                    onclick={() => applyContextualFilter(lensFilterPatch())}
+                  >
+                    {asset.exifInfo.lensModel}
+                  </button>
+                  {#if !isOnPhotos}
+                    <IconButton
+                      icon={mdiMagnify}
+                      aria-label="{$t('search_everywhere')}: {lensLabel}"
+                      size="small"
+                      shape="round"
+                      color="secondary"
+                      variant="ghost"
+                      onclick={() => applyContextualFilter(lensFilterPatch(), { global: true })}
+                    />
+                  {/if}
+                {:else}
+                  <span class="line-clamp-1">{asset.exifInfo.lensModel}</span>
+                {/if}
               </p>
             {/if}
 
@@ -278,7 +426,7 @@
         </div>
       {/if}
 
-      <DetailPanelLocation {isOwner} {asset} />
+      <DetailPanelLocation isOwner={canEdit} {canFilter} {asset} />
     </div>
   </section>
 
@@ -303,7 +451,7 @@
           simplified
           useLocationPin
           showSimpleControls={!assetViewerManager.isEditFacesPanelOpen}
-          onOpenInMapView={() => goto(Route.map({ ...latlng, zoom: 12.5 }))}
+          onOpenInMapView={mapViewUrl ? () => goto(mapViewUrl) : undefined}
         >
           {#snippet popup({ marker })}
             <div class="flex flex-col items-center gap-1">
@@ -340,9 +488,24 @@
         </div>
 
         <div class="my-auto">
-          <p>
-            {asset.owner.name}
-          </p>
+          <!--
+            E2 — unlike tags/people/rating/albums, this row is NOT shared-link-suppressed, so
+            `canFilter` is the gate that actually does the work here.
+          -->
+          {#if canFilter}
+            <button
+              type="button"
+              class="text-left hover:text-primary"
+              aria-label="{$t('filter_by_owner')}: {asset.owner.name}"
+              onclick={() => applyContextualFilter({ ownerId: asset.owner?.id })}
+            >
+              {asset.owner.name}
+            </button>
+          {:else}
+            <p>
+              {asset.owner.name}
+            </p>
+          {/if}
         </div>
       </div>
     </section>
@@ -354,44 +517,77 @@
         <Text size="small" color="muted">{$t('appears_in')}</Text>
       </div>
       {#each albums as album (album.id)}
-        <a href={Route.viewAlbum(album)}>
-          <div class="flex items-center gap-4 pt-2 hover:cursor-pointer">
-            <div>
-              <img
-                alt={album.albumName}
-                class="size-12.5 rounded-sm object-cover"
-                src={album.albumThumbnailAssetId &&
-                  getAssetMediaUrl({ id: album.albumThumbnailAssetId, size: AssetMediaSize.Preview })}
-                draggable="false"
-              />
-            </div>
+        <!--
+            R6 — the whole card is an <a> to the album, so the filter cannot live on the value (a
+            button nested inside an anchor is invalid HTML). The ⚗️ sits BESIDE the card.
+          -->
+        <div class="flex items-center gap-1">
+          <a href={Route.viewAlbum(album)} class="min-w-0 flex-1">
+            <div class="flex items-center gap-4 pt-2 hover:cursor-pointer">
+              <div>
+                <img
+                  alt={album.albumName}
+                  class="size-12.5 rounded-sm object-cover"
+                  src={album.albumThumbnailAssetId &&
+                    getAssetMediaUrl({ id: album.albumThumbnailAssetId, size: AssetMediaSize.Preview })}
+                  draggable="false"
+                />
+              </div>
 
-            <div class="my-auto">
-              <p class="dark:text-immich-dark-primary">{album.albumName}</p>
-              <div class="flex flex-col gap-0 text-sm">
-                <div>
-                  <AlbumListItemDetails {album} />
+              <div class="my-auto">
+                <p class="dark:text-immich-dark-primary">{album.albumName}</p>
+                <div class="flex flex-col gap-0 text-sm">
+                  <div>
+                    <AlbumListItemDetails {album} />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </a>
+          </a>
+          {#if canFilter && !albumFilterUnsupported}
+            <IconButton
+              icon={mdiFilterOutline}
+              aria-label="{$t('filter_by_album')}: {album.albumName}"
+              size="small"
+              shape="round"
+              color="secondary"
+              variant="ghost"
+              onclick={() => applyContextualFilter({ albumId: album.id })}
+            />
+          {/if}
+        </div>
       {/each}
     </section>
   {/if}
 
   {#if authManager.authenticated && authManager.preferences.tags.enabled}
     <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-      <DetailPanelTags {asset} {isOwner} spaceId={effectiveSpaceId} />
+      <DetailPanelTags {asset} {isOwner} {canEdit} {canFilter} spaceId={effectiveSpaceId} />
     </section>
   {/if}
 {/if}
 
 {#if assetViewerManager.isEditFacesPanelOpen}
-  <PersonSidePanel
-    assetId={asset.id}
-    assetType={asset.type}
-    onClose={() => assetViewerManager.closeEditFacesPanel()}
-    onRefresh={handleRefreshPeople}
-  />
+  <!--
+    Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
+    canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
+    endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
+    space-flavoured panel additionally needs a real space id to write into.
+  -->
+  {#if canEditSpacePeople && effectiveSpaceId}
+    <SpacePersonSidePanel
+      spaceId={effectiveSpaceId}
+      assetId={asset.id}
+      assetType={asset.type}
+      onClose={() => assetViewerManager.closeEditFacesPanel()}
+      onRefresh={() => void handleSpacePeopleChanged()}
+    />
+  {:else}
+    <PersonSidePanel
+      assetId={asset.id}
+      assetType={asset.type}
+      onClose={() => assetViewerManager.closeEditFacesPanel()}
+      onRefresh={handleRefreshPeople}
+    />
+  {/if}
 {/if}
