@@ -427,7 +427,10 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
                   key: const Key('album-edit-created-at'),
                   tileColor: context.colorScheme.surface,
                   shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                  title: Text(DateFormat.yMMMd(resolvedDateTimeLocale()).format(createdAt), style: context.textTheme.bodyMedium),
+                  title: Text(
+                    DateFormat.yMMMd(resolvedDateTimeLocale()).format(createdAt),
+                    style: context.textTheme.bodyMedium,
+                  ),
                   trailing: Icon(Icons.edit_outlined, size: 18, color: context.colorScheme.primary),
                   onTap: _pickCreatedAt,
                 ),
