@@ -76,13 +76,14 @@ const emptyPackets = {
   keyframeOwnDuration: [],
 };
 
-// Shape exiftool-vendored returns for a QuickTime video with no zone
-// (verified against a real file): the UTC zone is an assumption, not data.
+// Shape exiftool-vendored (39.x sets zoneSource and the deprecated tzSource together) returns for a
+// QuickTime video with no zone (verified against a real file): the UTC zone is an assumption, not data.
 const videoAssumedUtc = (exifDate: string): Partial<ImmichTags> => ({
   CreateDate: ExifDateTime.fromEXIF(exifDate, 'UTC'),
   zone: 'UTC',
   tz: 'UTC',
   tzSource: 'defaultVideosToUTC',
+  zoneSource: 'defaultVideosToUTC',
 });
 
 describe(MetadataService.name, () => {
@@ -586,7 +587,7 @@ describe(MetadataService.name, () => {
         mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
         mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
         mockFileTimes(instant);
-        mockReadTags({ zone: 'UTC', tz: 'UTC', tzSource: 'defaultVideosToUTC' });
+        mockReadTags({ zone: 'UTC', tz: 'UTC', tzSource: 'defaultVideosToUTC', zoneSource: 'defaultVideosToUTC' });
 
         await sut.handleMetadataExtraction({ id: asset.id });
 
@@ -600,25 +601,25 @@ describe(MetadataService.name, () => {
         );
       });
 
-      // exiftool-vendored's types mark tzSource deprecated in favour of
-      // zoneSource, but 35.x only sets tzSource at runtime. Accept either.
-      it('should show a video exiftool assumed to be UTC in the server time zone when it reports zoneSource', async () => {
+      // zoneSource decides; a leftover tzSource on its own (e.g. after MetadataService clears the
+      // zone fields for a sidecar date) must not.
+      it('should keep a video zone when only the deprecated tzSource reports the UTC assumption', async () => {
         process.env.TZ = 'America/Port_of_Spain';
         const asset = AssetFactory.create({ type: AssetType.Video });
         mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
         mocks.media.probe.mockResolvedValue(videoInfoStub.videoStreamH264);
-        const { tzSource, ...tags } = videoAssumedUtc('2026:09:24 20:57:57');
-        mockReadTags({ ...tags, zoneSource: tzSource });
+        const { zoneSource: _zoneSource, ...tags } = videoAssumedUtc('2026:09:24 20:57:57');
+        mockReadTags(tags);
 
         await sut.handleMetadataExtraction({ id: asset.id });
 
         expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
           expect.objectContaining({
-            exif: expect.objectContaining({ timeZone: 'America/Port_of_Spain' }),
+            exif: expect.objectContaining({ timeZone: 'UTC' }),
           }),
         );
         expect(mocks.asset.update).toHaveBeenCalledWith(
-          expect.objectContaining({ localDateTime: new Date('2026-09-24T16:57:57.000Z') }),
+          expect.objectContaining({ localDateTime: new Date('2026-09-24T20:57:57.000Z') }),
         );
       });
 
