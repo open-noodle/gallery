@@ -7,7 +7,7 @@ const addAssetsToAlbums = vi.fn();
 const addAssetsToSpace = vi.fn();
 const primary = vi.fn();
 
-vi.mock('$lib/services/album.service', () => ({ addAssetsToAlbums: (...a: unknown[]) => addAssetsToAlbums(...a) }));
+vi.mock('$lib/gallery/album/album-add', () => ({ addAssetsToAlbums: (...a: unknown[]) => addAssetsToAlbums(...a) }));
 vi.mock('$lib/services/space.service', () => ({ addAssetsToSpace: (...a: unknown[]) => addAssetsToSpace(...a) }));
 // #1041: the service resolves the caller's own member row to decide hiddenFromMyTimeline. Literal
 // rather than MY_USER_ID — vi.mock factories are hoisted above const declarations.
