@@ -9,6 +9,7 @@ import 'package:immich_mobile/gallery/search/widgets/search_header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
 
 import 'search_mode_harness.dart';
+import 'search_test_utils.dart';
 
 // Slice 4 behaviours (specs/2026-10-23-mobile-search-redesign-design.md, "Slice 4 — Mobile: the Filters sheet
 // (preview)"), on the real Photos page with the real search providers and widgets, over the fake library of
@@ -35,6 +36,7 @@ void main() {
   String totalText(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('search-mode-total'))).data!;
 
   Future<void> tapKey(WidgetTester tester, String key) async {
+    await revealPlaceCity(tester, key);
     await tester.ensureVisible(find.byKey(Key(key)));
     await tester.pump();
     await tester.tap(find.byKey(Key(key)));

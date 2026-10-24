@@ -18,6 +18,7 @@ import 'package:openapi/api.dart' as api;
 
 import 'scoped_pages_harness.dart';
 import 'search_mode_harness.dart';
+import 'search_test_utils.dart';
 
 // Slice 7 behaviours (specs/2026-10-23-mobile-search-redesign-design.md, "Slice 7 — Scoped search: place, favorites,
 // archive, videos, recently taken, recently added"), on the real pages: each screen's pill entry and placeholder, the
@@ -143,6 +144,7 @@ void main() {
   }
 
   Future<void> tapKey(WidgetTester tester, String key) async {
+    await revealPlaceCity(tester, key);
     await tester.ensureVisible(find.byKey(Key(key)));
     await tester.pump();
     await tester.tap(find.byKey(Key(key)));
@@ -261,6 +263,7 @@ void main() {
       await pump(tester, OtherScreen.archive);
       await tapPillSearch(tester);
       await tapKey(tester, 'search-chip-places');
+      await revealPlaceCity(tester, 'search-place-city-Osaka');
       expect(find.byKey(const Key('search-place-city-Osaka')), findsOneWidget);
       expect(find.byKey(const Key('search-place-city-Nice')), findsNothing, reason: "the partner's archived photo");
       expect(find.byKey(const Key('search-place-city-Kyoto')), findsNothing, reason: 'not archived');

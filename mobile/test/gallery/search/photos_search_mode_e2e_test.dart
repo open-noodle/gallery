@@ -68,6 +68,7 @@ void main() {
     }
 
     Future<void> tap(String key) async {
+      await revealPlaceCity(tester, key);
       await tester.ensureVisible(find.byKey(Key(key)));
       await tester.pump();
       await tester.tap(find.byKey(Key(key)));

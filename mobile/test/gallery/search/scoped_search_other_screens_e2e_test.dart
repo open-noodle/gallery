@@ -162,6 +162,7 @@ void main() {
       await tap('search-chip-${screen.chip}');
       if (screen.page == OtherScreen.archive) {
         // Only my archived photos: the partner's archived photo in Nice is not a place to pick.
+        await revealPlaceCity(tester, 'search-place-city-Nice');
         expect(find.byKey(const Key('search-place-city-Nice')), findsNothing);
       }
       await tap(screen.option);
@@ -294,6 +295,7 @@ Future<void> _sync(WidgetTester tester, SearchContractServer server) async {
 }
 
 Future<void> _tap(WidgetTester tester, SearchContractServer server, String key) async {
+  await revealPlaceCity(tester, key);
   await tester.ensureVisible(find.byKey(Key(key)));
   await tester.pump();
   await tester.tap(find.byKey(Key(key)));

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:immich_mobile/gallery/search/search.repository.dart';
@@ -107,4 +109,25 @@ Future<SearchOptions> loadDimensionOptions(String prefix) async {
     options = options.merge(await api.repository.options(const SearchParams()));
   }
   return options;
+}
+
+/// The Places sheet folds every country: a city row shows only under an open one. When [key] is a city row not on
+/// screen, opens the folded countries first, as a user would before picking a city.
+Future<void> revealPlaceCity(WidgetTester tester, String key) async {
+  if (!key.startsWith('search-place-city-') || find.byKey(Key(key)).evaluate().isNotEmpty) {
+    return;
+  }
+  final carets = find.byWidgetPredicate(
+    (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('search-place-cities-'),
+  );
+  for (final caret in carets.evaluate().map((e) => e.widget.key!).toList()) {
+    final folded = find.descendant(of: find.byKey(caret), matching: find.byIcon(Icons.arrow_drop_down_rounded));
+    if (folded.evaluate().isEmpty) {
+      continue;
+    }
+    await tester.ensureVisible(find.byKey(caret));
+    await tester.pump();
+    await tester.tap(find.byKey(caret));
+    await tester.pump();
+  }
 }

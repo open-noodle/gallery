@@ -30,6 +30,7 @@ import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart
 import '../../test_helpers/fake_tabs_router.dart';
 import '../../widget_tester_extensions.dart';
 import 'search_mode_harness.dart';
+import 'search_test_utils.dart';
 
 // Slice 3 behaviours (specs/2026-10-23-mobile-search-redesign-design.md, "Slice 3 — Mobile: search mode on Photos
 // (preview)"), on the real Photos page (MainTimelinePage) with the real timeline, search providers and widgets, over a
@@ -69,6 +70,7 @@ void main() {
   int? resultsTotal() => container.read(searchResultsProvider).total;
 
   Future<void> tapKey(WidgetTester tester, String key) async {
+    await revealPlaceCity(tester, key);
     // Chips past the right edge and rows further down a sheet scroll into view first, as a user would.
     await tester.ensureVisible(find.byKey(Key(key)));
     await tester.pump();
@@ -346,6 +348,49 @@ void main() {
       await disposePhotosPage(tester, container);
     });
 
+    testWidgets('sort by: most photographed first by default, alphabetical on request', (tester) async {
+      await pump(tester);
+      await enterSearchMode(tester, container);
+      await openChip(tester, 'people');
+
+      List<String> order() {
+        const prefix = 'search-sheet-person-person:';
+        final tiles = find
+            .byWidgetPredicate(
+              (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith(prefix),
+            )
+            .evaluate()
+            .toList();
+        Offset at(Element e) => tester.getTopLeft(find.byWidget(e.widget));
+        tiles.sort((a, b) => at(a).dy != at(b).dy ? at(a).dy.compareTo(at(b).dy) : at(a).dx.compareTo(at(b).dx));
+        return [for (final t in tiles) (t.widget.key! as ValueKey<String>).value.substring(prefix.length)];
+      }
+
+      expect(order().take(2), ['anna', 'ben'], reason: 'Anna has 3 photos, Ben 2');
+
+      await tapKey(tester, 'search-people-sort');
+      await tapKey(tester, 'search-people-sort-name');
+      expect(order(), ['alex', 'anna', 'ben', 'rex']);
+      expect(find.text('A–Z'), findsOneWidget);
+
+      await tapKey(tester, 'search-people-sort');
+      await tapKey(tester, 'search-people-sort-count');
+      expect(order().take(2), ['anna', 'ben']);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a person tile is compact: avatar, name and count, without spare room below', (tester) async {
+      await pump(tester);
+      await enterSearchMode(tester, container);
+      await openChip(tester, 'people');
+
+      final tile = find.byKey(const Key('search-sheet-person-person:anna'));
+      expect(tester.getSize(tile).height, lessThanOrEqualTo(104));
+
+      await disposePhotosPage(tester, container);
+    });
+
     testWidgets('search filters the list on the device, with no request per keystroke', (tester) async {
       await pump(tester);
       await enterSearchMode(tester, container);
@@ -428,17 +473,43 @@ void main() {
   });
 
   group('Places sheet', () {
-    testWidgets('countries and their cities show at once; "lis" leaves Lisbon under Portugal; a country selects all of '
-        'it', (tester) async {
+    testWidgets('countries show folded; the cities caret opens one country; a country selects all of it', (
+      tester,
+    ) async {
       await pump(tester);
       await enterSearchMode(tester, container);
       await openChip(tester, 'places');
 
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.byKey(const Key('search-sheet-skeleton')), findsNothing);
-      for (final row in ['country-Japan', 'city-Kyoto', 'country-Portugal', 'city-Lisbon', 'city-Porto']) {
-        expect(find.byKey(Key('search-place-$row')), findsOneWidget, reason: row);
+      for (final country in ['Japan', 'Portugal', 'Germany']) {
+        expect(find.byKey(Key('search-place-country-$country')), findsOneWidget, reason: country);
       }
+      for (final city in ['Kyoto', 'Lisbon', 'Porto', 'Berlin']) {
+        expect(find.byKey(Key('search-place-city-$city')), findsNothing, reason: '$city: its country is folded');
+      }
+
+      await tapKey(tester, 'search-place-cities-Japan');
+      expect(find.byKey(const Key('search-place-city-Kyoto')), findsOneWidget);
+      expect(find.byKey(const Key('search-place-city-Lisbon')), findsNothing);
+      expect(filters().place, isNull, reason: 'opening a country selects nothing');
+
+      await tapKey(tester, 'search-place-cities-Japan');
+      expect(find.byKey(const Key('search-place-city-Kyoto')), findsNothing);
+
+      await tapKey(tester, 'search-place-country-Portugal');
+      expect(filters().place, const SearchPlace(country: 'Portugal'));
+      expect(resultsTotal(), 2);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('"lis" leaves Portugal open at Lisbon; a search that names only the country leaves it folded', (
+      tester,
+    ) async {
+      await pump(tester);
+      await enterSearchMode(tester, container);
+      await openChip(tester, 'places');
 
       await tester.enterText(find.byKey(const Key('search-sheet-field')), 'lis');
       await settleFrames(tester, frames: 4);
@@ -447,9 +518,23 @@ void main() {
       expect(find.byKey(const Key('search-place-city-Porto')), findsNothing);
       expect(find.byKey(const Key('search-place-country-Japan')), findsNothing);
 
-      await tapKey(tester, 'search-place-country-Portugal');
-      expect(filters().place, const SearchPlace(country: 'Portugal'));
-      expect(resultsTotal(), 2);
+      await tester.enterText(find.byKey(const Key('search-sheet-field')), 'portu');
+      await settleFrames(tester, frames: 4);
+      expect(find.byKey(const Key('search-place-country-Portugal')), findsOneWidget);
+      expect(find.byKey(const Key('search-place-city-Lisbon')), findsNothing);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a selected city opens its country when the sheet opens', (tester) async {
+      await pump(tester);
+      await enterSearchMode(tester, container);
+      container.read(searchStateProvider.notifier).setPlace(const SearchPlace(country: 'Japan', city: 'Kyoto'));
+      await settleFrames(tester);
+      await openChip(tester, 'places');
+
+      expect(find.byKey(const Key('search-place-city-Kyoto')), findsOneWidget);
+      expect(find.byKey(const Key('search-place-city-Lisbon')), findsNothing);
 
       await disposePhotosPage(tester, container);
     });

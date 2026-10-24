@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 
 import 'search_mode_harness.dart';
+import 'search_test_utils.dart';
 
 // The field's suggestions and the chip sheets while an options list is still on its way, and after its request failed
 // (specs/2026-10-23-mobile-search-redesign-design.md, "The search field", "The chip sheets"): a list on its way shows
@@ -44,6 +45,7 @@ void main() {
   }
 
   Future<void> tapKey(WidgetTester tester, String key) async {
+    await revealPlaceCity(tester, key);
     await tester.ensureVisible(find.byKey(Key(key)));
     await tester.pump();
     await tester.tap(find.byKey(Key(key)));

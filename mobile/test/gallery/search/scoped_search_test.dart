@@ -15,6 +15,7 @@ import 'package:openapi/api.dart' as api;
 
 import 'scoped_pages_harness.dart';
 import 'search_mode_harness.dart';
+import 'search_test_utils.dart';
 
 // Slice 6 behaviours (specs/2026-10-23-mobile-search-redesign-design.md, "Slice 6 — Scoped search: albums, spaces,
 // people"), on the real album, space, space album and person pages: the grouping pill's search button, each screen's
@@ -199,6 +200,7 @@ void main() {
   }
 
   Future<void> tapKey(WidgetTester tester, String key) async {
+    await revealPlaceCity(tester, key);
     await tester.ensureVisible(find.byKey(Key(key)));
     await tester.pump();
     await tester.tap(find.byKey(Key(key)));

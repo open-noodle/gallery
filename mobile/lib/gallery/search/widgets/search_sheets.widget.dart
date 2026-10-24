@@ -301,8 +301,15 @@ class _PeopleSheet extends ConsumerStatefulWidget {
   ConsumerState<_PeopleSheet> createState() => _PeopleSheetState();
 }
 
+/// How the People sheet orders its list.
+enum _PeopleSort { count, name }
+
+/// A row of person tiles: avatar, name and count, with no spare room below.
+const double _personTileExtent = 100;
+
 class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
   String _query = '';
+  _PeopleSort _sort = _PeopleSort.count;
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +322,16 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
     final selectedIds = {for (final p in selected) p.filterId, ?fixed?.filterId};
     final others = (people ?? const <SearchPersonOption>[]).where((p) => !selectedIds.contains(p.filterId)).toList();
     final query = _fold(_query);
-    final matches = query.isEmpty ? others : others.where((p) => _fold(p.name).contains(query)).toList();
+    final filtered = query.isEmpty ? others : others.where((p) => _fold(p.name).contains(query)).toList();
+    // The server sends most photographed first; A–Z sorts on the device, people without a name last.
+    final matches = _sort == _PeopleSort.count
+        ? filtered
+        : ([...filtered]..sort((a, b) {
+            if (a.name.isEmpty != b.name.isEmpty) {
+              return a.name.isEmpty ? 1 : -1;
+            }
+            return _fold(a.name).compareTo(_fold(b.name));
+          }));
     final recent = query.isEmpty
         ? [
             for (final id in recentIds)
@@ -336,10 +352,12 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             SliverToBoxAdapter(child: SearchSheetHint(context.t.search_mode_people_selected_hint)),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              sliver: SliverGrid.count(
-                crossAxisCount: 4,
-                childAspectRatio: 0.78,
-                children: [
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisExtent: _personTileExtent,
+                ),
+                delegate: SliverChildListDelegate([
                   if (fixed != null)
                     _PersonTile(
                       key: Key('search-sheet-fixed-${fixed.filterId}'),
@@ -356,7 +374,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
                       selected: true,
                       onTap: () => notifier.togglePerson(person),
                     ),
-                ],
+                ]),
               ),
             ),
           ],
@@ -387,12 +405,19 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             ),
           ],
           SliverToBoxAdapter(
-            child: SearchSheetHint(
-              query.isNotEmpty
-                  ? context.t.search_mode_matches
-                  : selected.isNotEmpty || fixed != null
-                  ? context.t.search_mode_people_also_in
-                  : context.t.search_mode_people_most_photographed,
+            child: Row(
+              children: [
+                // With no search and nothing selected, the sort itself heads the list.
+                if (query.isNotEmpty || selected.isNotEmpty || fixed != null)
+                  Expanded(
+                    child: SearchSheetHint(
+                      query.isNotEmpty ? context.t.search_mode_matches : context.t.search_mode_people_also_in,
+                    ),
+                  )
+                else
+                  const Spacer(),
+                _PeopleSortButton(sort: _sort, onSelected: (sort) => setState(() => _sort = sort)),
+              ],
             ),
           ),
           if (people == null)
@@ -405,7 +430,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
               sliver: SliverGrid.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
-                  childAspectRatio: 0.72,
+                  mainAxisExtent: _personTileExtent,
                 ),
                 itemCount: matches.length,
                 itemBuilder: (_, index) {
@@ -422,6 +447,44 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
             ),
           const SliverPadding(padding: EdgeInsets.only(bottom: 12)),
         ],
+      ),
+    );
+  }
+}
+
+class _PeopleSortButton extends StatelessWidget {
+  final _PeopleSort sort;
+  final ValueChanged<_PeopleSort> onSelected;
+
+  const _PeopleSortButton({required this.sort, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    String label(_PeopleSort value) => switch (value) {
+      _PeopleSort.count => context.t.search_mode_people_most_photographed,
+      _PeopleSort.name => context.t.search_mode_people_sort_name,
+    };
+    return PopupMenuButton<_PeopleSort>(
+      key: const Key('search-people-sort'),
+      tooltip: context.t.search_sort_title,
+      initialValue: sort,
+      onSelected: onSelected,
+      itemBuilder: (_) => [
+        for (final value in _PeopleSort.values)
+          PopupMenuItem(key: Key('search-people-sort-${value.name}'), value: value, child: Text(label(value))),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sort_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(label(sort), style: theme.textTheme.labelLarge),
+            Icon(Icons.arrow_drop_down_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }
@@ -456,18 +519,18 @@ class _PersonTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: selected ? theme.colorScheme.primary : Colors.transparent, width: 3),
+                border: Border.all(color: selected ? theme.colorScheme.primary : Colors.transparent, width: 2),
               ),
               child: Padding(padding: const EdgeInsets.all(2), child: avatar),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               name,
               maxLines: 1,
@@ -677,6 +740,20 @@ class _PlacesSheet extends ConsumerStatefulWidget {
 class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
   String _query = '';
 
+  /// Countries showing their cities. Folded by default, so one large country does not push the rest out of reach;
+  /// the selected city's country opens with the sheet.
+  final Set<String> _open = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final place = ref.read(searchStateProvider).filters.place;
+    final country = place?.country;
+    if (country != null && place?.city != null) {
+      _open.add(country);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final place = ref.watch(searchStateProvider.select((s) => s.filters.place));
@@ -688,25 +765,45 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
     final rows = <Widget>[];
     for (final country in countries ?? const <SearchCountryOption>[]) {
       final wholeCountry = hit(country.country);
-      final cities = [
-        for (final city in country.cities ?? const <SearchCityOption>[])
-          if (wholeCountry || hit(city.city)) city,
-      ];
-      if (!wholeCountry && cities.isEmpty) {
+      final allCities = country.cities ?? const <SearchCityOption>[];
+      // A search that matches cities opens their country at those cities; otherwise the country's own fold applies.
+      final cityHits = query.isEmpty
+          ? const <SearchCityOption>[]
+          : [
+              for (final city in allCities)
+                if (hit(city.city)) city,
+            ];
+      if (!wholeCountry && cityHits.isEmpty) {
         continue;
       }
+      final open = cityHits.isNotEmpty || _open.contains(country.country);
+      final cities = cityHits.isNotEmpty ? cityHits : allCities;
       final countrySelected = place?.country == country.country && place?.city == null;
       rows.add(
         _PlaceRow(
           key: Key('search-place-country-${country.country}'),
           icon: Icons.public_rounded,
           title: country.country,
-          subtitle: context.t.search_mode_place_all_of(country: country.country),
           count: country.count,
           selected: countrySelected,
           onTap: () => notifier.setPlace(countrySelected ? null : SearchPlace(country: country.country)),
+          // Like the When sheet's Months: the row selects the country, the caret beside it opens its cities.
+          expand: allCities.isEmpty
+              ? null
+              : TextButton.icon(
+                  key: Key('search-place-cities-${country.country}'),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  onPressed: () => setState(
+                    () => _open.contains(country.country) ? _open.remove(country.country) : _open.add(country.country),
+                  ),
+                  icon: Icon(open ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded),
+                  label: Text(context.t.search_mode_place_cities),
+                ),
         ),
       );
+      if (!open) {
+        continue;
+      }
       for (final city in cities) {
         final citySelected = place?.country == country.country && place?.city == city.city;
         rows.add(
@@ -743,21 +840,23 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
 class _PlaceRow extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String? subtitle;
   final int? count;
   final bool indent;
   final bool selected;
   final VoidCallback onTap;
 
+  /// The country's caret that opens its cities.
+  final Widget? expand;
+
   const _PlaceRow({
     super.key,
     required this.icon,
     required this.title,
-    this.subtitle,
     this.count,
     this.indent = false,
     required this.selected,
     required this.onTap,
+    this.expand,
   });
 
   @override
@@ -770,8 +869,12 @@ class _PlaceRow extends StatelessWidget {
       contentPadding: EdgeInsets.only(left: indent ? 40 : 20, right: 20),
       leading: Icon(icon, size: 20),
       title: Text(title, style: indent ? null : const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: subtitle == null ? null : Text(subtitle!),
-      trailing: SearchOptionCount(count),
+      trailing: expand == null
+          ? SearchOptionCount(count)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [SearchOptionCount(count), const SizedBox(width: 4), expand!],
+            ),
       onTap: onTap,
     );
   }
