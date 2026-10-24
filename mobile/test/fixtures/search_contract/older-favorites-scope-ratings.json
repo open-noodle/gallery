@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Gallery server before searchFavoritesAcrossSpaces, Favorites screen: my own favourites, archived ones too: ratings only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "ratings"
+      ],
+      "isFavorite": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 4
+        }
+      ]
+    },
+    "status": 200
+  }
+}

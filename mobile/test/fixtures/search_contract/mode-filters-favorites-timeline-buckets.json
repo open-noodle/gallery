@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: browse results",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "isFavorite": "true",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-05-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2023-09-01"
+      }
+    ],
+    "status": 200
+  }
+}

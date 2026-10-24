@@ -1,0 +1,42 @@
+{
+  "actor": "me",
+  "description": "Personal person screen (Anna) search mode, People: Ben added: availability only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability"
+      ],
+      "personIds": [
+        "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+        "c360094e-5899-4aea-88e0-01a3aafd727b"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": true,
+        "hasFavorites": false,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  }
+}

@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/server_capability.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/album/pending_uploads_banner.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/remote_album_bottom_sheet.widget.dart';
@@ -232,6 +233,7 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
       timelineServiceBuilder: (ref, scope, groupBy) =>
           ref.watch(timelineFactoryProvider).remoteAlbum(albumId: _album.id, groupBy: groupBy, temporalScope: scope),
       overrides: [currentRemoteAlbumScopedProvider.overrideWithValue(_album)],
+      search: AlbumSearchScope(_album.id, name: _album.name),
       child: Timeline(
         withGroupingPill: true,
         topSliverWidget: PendingUploadsBanner(albumId: _album.id),

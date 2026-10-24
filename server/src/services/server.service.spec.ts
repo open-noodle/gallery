@@ -158,6 +158,8 @@ describe(ServerService.name, () => {
         peopleStatistics: false,
         syncRequestTypes: Object.values(SyncRequestType),
         localTakenRange: true,
+        searchOptions: true,
+        searchFavoritesAcrossSpaces: true,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });

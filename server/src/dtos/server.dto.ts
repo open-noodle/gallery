@@ -166,6 +166,13 @@ const ServerFeaturesSchema = z
       .describe(
         'Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end.',
       ),
+    searchOptions: z.boolean().optional().describe('Whether POST /search/options exists. Absent on older servers.'),
+    searchFavoritesAcrossSpaces: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers.',
+      ),
   })
   .meta({ id: 'ServerFeaturesDto' });
 

@@ -1,0 +1,39 @@
+{
+  "actor": "me",
+  "description": "Rejected: spacePersonIds without spaceId",
+  "ids": {
+    "6438d955-2a1c-4bd0-8150-4f3503d02fbe": "space-person:pia"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ],
+      "spacePersonIds": [
+        "6438d955-2a1c-4bd0-8150-4f3503d02fbe"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "message": "spacePersonIds requires spaceId"
+    },
+    "status": 400
+  }
+}

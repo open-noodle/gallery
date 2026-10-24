@@ -1,0 +1,19 @@
+{
+  "actor": "me",
+  "description": "Stock Immich server: the exact total of that unfiltered metadata search",
+  "ids": {},
+  "request": {
+    "body": {
+      "visibility": "timeline"
+    },
+    "headers": {},
+    "method": "POST",
+    "path": "/api/search/statistics"
+  },
+  "response": {
+    "body": {
+      "total": 8
+    },
+    "status": 200
+  }
+}

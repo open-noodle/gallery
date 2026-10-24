@@ -15,13 +15,13 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
-import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -189,7 +189,7 @@ Future<void> _pumpTimeline(WidgetTester tester, {required bool withGroupingPill,
         child: withStubRouter(
           MaterialApp(
             home: TimelineRouteScope(
-              timelineServiceBuilder: buildPhotosTimelineRouteService,
+              timelineServiceBuilder: buildPhotosTimelineService,
               child: Timeline(
                 appBar: null,
                 bottomSheet: bottomSheet,

@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Place screen (Lisbon), Anna with an Apple camera: mediaTypes only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Lisbon",
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 2,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}
