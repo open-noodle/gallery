@@ -4,9 +4,10 @@ import { tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
+import { spacesQueryKey } from '$lib/gallery/spaces/space.query';
+import { queryClient } from '$lib/queries/client';
 import { recentSpaceAlbumsExpanded } from '$lib/stores/preferences.store';
 import { pinnedSpaceIds } from '$lib/stores/space-view.store';
-import { userInteraction } from '$lib/stores/user.svelte';
 import { handleError } from '$lib/utils/handle-error';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import { sharedSpaceLinkedAlbumFactory } from '@test-data/factories/shared-space-linked-album-factory';
@@ -41,10 +42,10 @@ describe('RecentSpaces component', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    userInteraction.recentSpaces = undefined;
+    queryClient.removeQueries({ queryKey: spacesQueryKey });
     pinnedSpaceIds.set([]);
     recentSpaceAlbumsExpanded.set({});
-    userInteraction.spaceAlbums = undefined;
+    queryClient.removeQueries({ queryKey: spacesQueryKey });
     mockPage.url = new URL('https://gallery.test/photos');
     sidebarMocks.sidebarModeStore.layout = 'expanded';
     sidebarMocks.sidebarModeStore.hoverExpanded = false;
@@ -65,7 +66,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('does not call getAllSpaces when cache is populated', async () => {
-      userInteraction.recentSpaces = [sharedSpaceFactory.build()];
+      queryClient.setQueryData(spacesQueryKey, [sharedSpaceFactory.build()]);
       await renderAndFlush();
       expect(sdkMock.getAllSpaces).not.toHaveBeenCalled();
     });
@@ -398,7 +399,7 @@ describe('RecentSpaces component', () => {
       await tick();
       await tick();
       expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledTimes(1);
-      expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-a' });
+      expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-a' }, expect.anything());
 
       // collapse then expand again — served from cache, no second call
       await fireEvent.click(screen.getByTestId('sidebar-space-chevron-space-a'));
@@ -509,7 +510,7 @@ describe('RecentSpaces component', () => {
       await tick();
 
       expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledTimes(1);
-      expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-a' });
+      expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 'space-a' }, expect.anything());
       expect(screen.getAllByTestId(/^sidebar-space-album-/)).toHaveLength(2);
     });
 
