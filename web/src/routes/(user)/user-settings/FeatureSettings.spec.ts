@@ -2,6 +2,8 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryClient } from '$lib/queries/client';
+import { getServerConfigQuery } from '$lib/queries/server.query';
 import FeatureSettings from './FeatureSettings.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -17,14 +19,6 @@ vi.mock(import('$lib/managers/auth-manager.svelte'), () => ({
       return mocks.preferences;
     },
     setPreferences: mocks.setPreferences,
-  } as never,
-}));
-
-vi.mock(import('$lib/managers/server-config-manager.svelte'), () => ({
-  serverConfigManager: {
-    get value() {
-      return mocks.serverConfig;
-    },
   } as never,
 }));
 
@@ -50,6 +44,9 @@ describe('FeatureSettings memory types', () => {
       memories: { enabled: true, duration: 5, types: { on_this_day: true, birthday: false, recent_trip: true } },
     };
     mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday', 'recent_trip'] };
+    // FeatureSettings reads the server config through createPreloadedQuery (the user config comes
+    // from gallery-setup's defaults).
+    queryClient.setQueryData(getServerConfigQuery().queryKey, mocks.serverConfig as never);
     mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
   });
 
@@ -82,6 +79,7 @@ describe('FeatureSettings memory types', () => {
 
   it('does not render a toggle for an unavailable memory type', () => {
     mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday'] };
+    queryClient.setQueryData(getServerConfigQuery().queryKey, mocks.serverConfig as never);
     render(FeatureSettings);
 
     expect(screen.getByRole('switch', { name: 'memory_type_on_this_day' })).toBeInTheDocument();
@@ -102,6 +100,7 @@ describe('memories preference payload', () => {
       memories: { enabled: true, duration: 5, types: { on_this_day: true, birthday: false } },
     };
     mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday'] };
+    queryClient.setQueryData(getServerConfigQuery().queryKey, mocks.serverConfig as never);
     mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
 
     const user = userEvent.setup();

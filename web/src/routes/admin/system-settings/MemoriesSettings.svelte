@@ -5,7 +5,7 @@
   import { SettingInputFieldType } from '$lib/constants';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { createPreloadedQuery } from '$lib/queries/client';
-  import { getConfigQuery } from '$lib/queries/system-config.query';
+  import { getAdminConfigQuery } from '$lib/queries/config-admin.query';
   import { cloneDeep } from 'lodash-es';
   import { t, type Translations } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -26,7 +26,7 @@
     'person_throwback',
   ];
 
-  const query = createPreloadedQuery(getConfigQuery);
+  const query = createPreloadedQuery(getAdminConfigQuery);
   const config = $derived(query.data);
 
   const disabled = $derived(featureFlagsManager.value.configFile);
