@@ -449,6 +449,10 @@ export type AdminConfigServerDto = {
     mergePeopleAcrossOwners?: boolean;
     /** Public users */
     publicUsers: boolean;
+    /** Let editors of a shared space add members (as viewers). A space owner can override this per space. */
+    spaceEditorsCanAddMembers?: boolean;
+    /** Let editors of a shared space switch members between viewer and editor. A space owner can override this per space. */
+    spaceEditorsCanChangeRoles?: boolean;
 };
 export type AdminConfigStorageTemplateDto = {
     /** Enabled */
@@ -4109,6 +4113,20 @@ export type SharedSpaceLinkedLibraryDto = {
     libraryId: string;
     libraryName: string;
 };
+export type SharedSpaceMemberManagementDto = {
+    /** Whether the current user can add members */
+    canAddMembers: boolean;
+    /** Whether the current user can change member roles */
+    canChangeRoles: boolean;
+    /** Space setting for editors adding members (null follows the server) */
+    editorsCanAddMembers: boolean | null;
+    /** Space setting for editors changing roles (null follows the server) */
+    editorsCanChangeRoles: boolean | null;
+    /** Server default for editors adding members */
+    serverEditorsCanAddMembers: boolean;
+    /** Server default for editors changing roles */
+    serverEditorsCanChangeRoles: boolean;
+};
 export type SharedSpaceMemberResponseDto = {
     /** Avatar color */
     avatarColor?: string;
@@ -4168,6 +4186,8 @@ export type SharedSpaceResponseDto = {
     linkedLibraries?: SharedSpaceLinkedLibraryDto[];
     /** Number of members */
     memberCount?: number;
+    /** Member management permissions for the current user */
+    memberManagement?: SharedSpaceMemberManagementDto;
     /** Space members (summary) */
     members?: SharedSpaceMemberResponseDto[];
     /** Space name */
@@ -4200,6 +4220,10 @@ export type SharedSpaceUpdateDto = {
     color?: UserAvatarColor;
     /** Space description */
     description?: string;
+    /** Let editors add members (null follows the server setting) */
+    editorsCanAddMembers?: boolean | null;
+    /** Let editors change viewer and editor roles (null follows the server setting) */
+    editorsCanChangeRoles?: boolean | null;
     /** Enable face recognition for this space */
     faceRecognitionEnabled?: boolean;
     /** Space name */
