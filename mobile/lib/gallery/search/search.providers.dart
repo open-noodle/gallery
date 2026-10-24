@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search.repository.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
@@ -31,9 +32,12 @@ final searchCapabilitiesProvider = FutureProvider<SearchServerCapabilities>(
 /// One options request per filter change, after this pause.
 final searchOptionsDebounceProvider = Provider<Duration>((ref) => const Duration(milliseconds: 150));
 
-/// How long after a stale options answer (served from the server's cache while it refreshes) the options are asked
-/// again.
+/// How long after a stale options answer (served from the server's cache while it refreshes) the options are first
+/// asked again. Each further stale answer doubles the wait, up to [searchOptionsStaleRetryMax].
 final searchOptionsStaleRetryProvider = Provider<Duration>((ref) => const Duration(seconds: 2));
+
+/// The longest wait between two requests while the answers stay stale.
+const searchOptionsStaleRetryMax = Duration(seconds: 30);
 
 /// Results are debounced separately.
 final searchResultsDebounceProvider = Provider<Duration>((ref) => const Duration(milliseconds: 300));
@@ -61,7 +65,7 @@ final searchStateProvider = NotifierProvider<SearchStateNotifier, SearchState>(
 
 final searchOptionsProvider = NotifierProvider<SearchOptionsNotifier, SearchOptions>(
   SearchOptionsNotifier.new,
-  dependencies: [searchScopeProvider, searchStateProvider],
+  dependencies: [searchScopeProvider, searchStateProvider, searchModeProvider],
 );
 
 final searchResultsProvider = NotifierProvider<SearchResultsNotifier, SearchResults>(
@@ -126,8 +130,6 @@ final searchWarmUpProvider = FutureProvider<void>((ref) async {
 /// Options for the current scope and state. Loading order: availability first (the chip row renders from it), then
 /// every dimension in parallel. A response for an older state is dropped, so a newer answer is never overwritten.
 class SearchOptionsNotifier extends Notifier<SearchOptions> {
-  static const _maxStaleRetries = 5;
-
   int _generation = 0;
   Timer? _timer;
   int _staleRetries = 0;
@@ -187,6 +189,7 @@ class SearchOptionsNotifier extends Notifier<SearchOptions> {
     if (!capabilities.searchOptions) {
       return _loadFallback(generation, repository, params);
     }
+    final mode = ref.read(searchModeProvider.notifier);
 
     state = state.restart(facetsSupported: true, hasCounts: true);
     try {
@@ -216,11 +219,43 @@ class SearchOptionsNotifier extends Notifier<SearchOptions> {
               }
             }),
     ]);
-    // The server answered from its cache while it refreshes after a change (a new favourite, an upload): ask again
-    // shortly, so the fresh answer replaces it without the user leaving search. A few times at most per state.
-    if (_current(generation) && state.stale && _staleRetries < _maxStaleRetries) {
+    if (!_current(generation)) {
+      return;
+    }
+    // The whole screen's availability (#910's "hide", searchScopeAvailability) is remembered from the unfiltered
+    // answer. If that answer was stale and a filter has been picked since, this round did not refresh it: ask for it.
+    if (mode.scopeAvailabilityStale && !ref.read(searchStateProvider).isEmpty) {
+      final unfiltered = buildSearchParams(
+        ref.read(searchScopeProvider),
+        const SearchState(),
+        now: ref.read(searchClockProvider)(),
+        localTakenRange: capabilities.localTakenRange,
+        favoritesAcrossSpaces: capabilities.favoritesAcrossSpaces,
+      );
+      try {
+        final part = await repository.options(unfiltered);
+        if (!_current(generation)) {
+          return;
+        }
+        mode
+          ..scopeAvailability = part.availability ?? mode.scopeAvailability
+          ..scopeAvailabilityStale = part.stale;
+        // A new options object, so the chip row and the Filters sheet read the refreshed answer.
+        state = state.merge(const SearchOptionsPart());
+      } catch (_) {
+        // Keep the remembered answer; the next round tries again.
+      }
+    }
+    // The server answered from its cache while it refreshes after a change (a new favourite, an upload): ask again,
+    // so the fresh answer replaces it without the user leaving search. For as long as the answers stay stale, each
+    // wait twice the last, up to searchOptionsStaleRetryMax; the provider (and its timer) goes when search mode closes.
+    if (_current(generation) && (state.stale || mode.scopeAvailabilityStale)) {
+      final first = ref.read(searchOptionsStaleRetryProvider);
+      final wait = first * (1 << _staleRetries.clamp(0, 10));
       _staleRetries++;
-      _schedule(ref.read(searchOptionsStaleRetryProvider));
+      _schedule(wait > searchOptionsStaleRetryMax ? searchOptionsStaleRetryMax : wait);
+    } else {
+      _staleRetries = 0;
     }
   }
 

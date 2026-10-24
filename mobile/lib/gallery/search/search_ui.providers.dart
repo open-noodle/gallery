@@ -28,6 +28,7 @@ SearchAvailability? searchScopeAvailability(WidgetRef ref, SearchState state, Se
   final availability = options.availability;
   if (availability != null && state.isEmpty) {
     mode.scopeAvailability = availability;
+    mode.scopeAvailabilityStale = options.stale;
   }
   return mode.scopeAvailability;
 }

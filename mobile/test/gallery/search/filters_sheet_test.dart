@@ -455,9 +455,7 @@ void main() {
     await disposePhotosPage(tester, container);
   });
 
-  testWidgets('a stale answer is asked again: a favourite added since the last search shows without reopening', (
-    tester,
-  ) async {
+  group('stale answers', () {
     // The server's cached options still predate the only favourites (stale), and refresh in the background.
     final before = FakeLibrary.standard.withAssets([
       for (final a in FakeLibrary.standard.assets)
@@ -478,21 +476,69 @@ void main() {
           archived: a.archived,
         ),
     ]);
-    await database.setUp(timelineAssets: 0);
-    repository = FakeSearchRepository(FakeLibrary.standard)..staleLibrary = before;
-    container = searchModeContainer(db: database.db, repository: repository);
-    await pumpPhotosPage(tester, container);
-    await enterSearchMode(tester, container);
-    await openFilters(tester);
-    expect(section('favorites'), findsNothing, reason: 'the stale answer has no favourites');
 
-    // The refresh lands; the app asks again on its own.
-    repository.staleLibrary = null;
-    await tester.pump(const Duration(seconds: 3));
-    await settleFrames(tester);
-    expect(section('favorites'), findsOneWidget);
+    Future<void> pumpStale(WidgetTester tester) async {
+      await database.setUp(timelineAssets: 0);
+      repository = FakeSearchRepository(FakeLibrary.standard)..staleLibrary = before;
+      container = searchModeContainer(db: database.db, repository: repository);
+      await pumpPhotosPage(tester, container);
+      await enterSearchMode(tester, container);
+    }
 
-    await disposePhotosPage(tester, container);
+    testWidgets('a stale answer is asked again: a favourite added since the last search shows without reopening', (
+      tester,
+    ) async {
+      await pumpStale(tester);
+      await openFilters(tester);
+      expect(section('favorites'), findsNothing, reason: 'the stale answer has no favourites');
+
+      // The refresh lands; the app asks again on its own.
+      repository.staleLibrary = null;
+      await tester.pump(const Duration(seconds: 3));
+      await settleFrames(tester);
+      expect(section('favorites'), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('the app keeps asking for as long as the answers stay stale', (tester) async {
+      await pumpStale(tester);
+      await openFilters(tester);
+
+      // A busy library: the server keeps answering stale for a while, through many rounds.
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(seconds: 10));
+      }
+      await settleFrames(tester);
+      expect(section('favorites'), findsNothing);
+
+      repository.staleLibrary = null;
+      await tester.pump(const Duration(seconds: 31));
+      await settleFrames(tester);
+      expect(section('favorites'), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('a filter picked before the refresh lands still gets the fresh answer for the whole screen', (
+      tester,
+    ) async {
+      await pumpStale(tester);
+      // A filter at once: the stale unfiltered answer is the one remembered as "the whole screen".
+      container.read(searchStateProvider.notifier).setPlace(const SearchPlace(country: 'Japan', city: 'Kyoto'));
+      await settleFrames(tester);
+      await openFilters(tester);
+      expect(section('favorites'), findsNothing, reason: 'hidden as empty for the whole screen, from the stale answer');
+
+      repository.staleLibrary = null;
+      await tester.pump(const Duration(seconds: 3));
+      await settleFrames(tester);
+      // Kyoto holds a favourite (kyoto-1), so the section shows, filter still set.
+      expect(filters().place, const SearchPlace(country: 'Japan', city: 'Kyoto'));
+      expect(section('favorites'), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
   });
 
   group('collapsing and hiding sections', () {

@@ -15,6 +15,9 @@ class SearchModeNotifier extends Notifier<bool> {
   /// searchScopeAvailability).
   SearchAvailability? scopeAvailability;
 
+  /// Whether [scopeAvailability] came from a stale server answer: the options notifier asks for it again until fresh.
+  bool scopeAvailabilityStale = false;
+
   @override
   bool build() => false;
 
@@ -24,6 +27,7 @@ class SearchModeNotifier extends Notifier<bool> {
     }
     savedScrollOffset = null;
     scopeAvailability = null;
+    scopeAvailabilityStale = false;
     state = true;
   }
 
