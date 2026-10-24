@@ -2,13 +2,11 @@
 import { AlbumUserRole, BulkIdErrorReason, type AlbumResponseDto } from '@immich/sdk';
 import type { BulkIdResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { addAssetsToAlbumWithOutcome } from '$lib/gallery/album/album-add';
+import { handleLinkAlbumToSpace } from '$lib/gallery/album/link-album-to-space';
+import { notifyAddToAlbum } from '$lib/gallery/album/notify-add-to-album';
 import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
-import {
-  addAssetsToAlbumWithOutcome,
-  getAlbumActions,
-  handleLinkAlbumToSpace,
-  notifyAddToAlbum,
-} from './album.service';
+import { getAlbumActions } from './album.service';
 
 const linkAlbum = vi.fn();
 const showModal = vi.fn();
