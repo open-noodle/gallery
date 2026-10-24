@@ -18,6 +18,7 @@ enum StoreKey<T> {
   // Gallery search mode's Filters sheet (lib/gallery/search/search_filter_prefs.dart). 143-145 are retired.
   searchFiltersCollapsedSections<String>._(146),
   searchFiltersHiddenSections<String>._(147),
+  searchPeopleSort<String>._(148),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

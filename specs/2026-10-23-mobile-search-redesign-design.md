@@ -120,7 +120,7 @@ Each main chip opens a bottom sheet over the results, about two thirds of the sc
 - **People:**
   - Selected people on top, with a note that results show photos with all of them.
   - Then a short "Recent" row of the 7 most recently updated people, which replaces today's recent-people strip (`people_picker.provider.dart:75-81`).
-  - Then a 4-column grid of compact avatar tiles with names and counts: everyone with nothing typed, otherwise the matches. A sort selector above it orders them by most photographed (the default, the server's order) or A–Z (on the device, unnamed last). The choice lasts while the sheet is open.
+  - Then a 4-column grid of compact avatar tiles with names and counts: everyone with nothing typed, otherwise the matches. A sort selector above it orders them by most photographed (the default, the server's order) or A–Z (on the device, unnamed last). The choice is kept on the device (`StoreKey.searchPeopleSort` 148), so the sheet opens with the one chosen last time.
   - Multi-select means AND.
   - Pets appear like people, as today.
   - The alphabet scrubber is dropped; the search box replaces it.

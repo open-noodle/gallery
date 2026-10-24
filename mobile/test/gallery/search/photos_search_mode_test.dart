@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_timeline.dart';
@@ -376,6 +377,23 @@ void main() {
       await tapKey(tester, 'search-people-sort');
       await tapKey(tester, 'search-people-sort-count');
       expect(order().take(2), ['anna', 'ben']);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets('the sort chosen last time is the one the sheet opens with next time', (tester) async {
+      await pump(tester);
+      await enterSearchMode(tester, container);
+      await openChip(tester, 'people');
+      await tapKey(tester, 'search-people-sort');
+      await tapKey(tester, 'search-people-sort-name');
+      await closeSheet(tester);
+
+      // Read the saved choice again, as the next app start would.
+      container.invalidate(searchPeopleSortProvider);
+      await openChip(tester, 'people');
+      expect(find.text('A–Z'), findsOneWidget);
+      expect(find.text('Most photographed'), findsNothing);
 
       await disposePhotosPage(tester, container);
     });

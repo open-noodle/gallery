@@ -3,6 +3,7 @@ import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_state.model.dart';
 import 'package:immich_mobile/gallery/search/search_ui.providers.dart';
@@ -301,15 +302,11 @@ class _PeopleSheet extends ConsumerStatefulWidget {
   ConsumerState<_PeopleSheet> createState() => _PeopleSheetState();
 }
 
-/// How the People sheet orders its list.
-enum _PeopleSort { count, name }
-
 /// A row of person tiles: avatar, name and count, with no spare room below.
 const double _personTileExtent = 100;
 
 class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
   String _query = '';
-  _PeopleSort _sort = _PeopleSort.count;
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +321,8 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
     final query = _fold(_query);
     final filtered = query.isEmpty ? others : others.where((p) => _fold(p.name).contains(query)).toList();
     // The server sends most photographed first; A–Z sorts on the device, people without a name last.
-    final matches = _sort == _PeopleSort.count
+    final sort = ref.watch(searchPeopleSortProvider);
+    final matches = sort == SearchPeopleSort.count
         ? filtered
         : ([...filtered]..sort((a, b) {
             if (a.name.isEmpty != b.name.isEmpty) {
@@ -416,7 +414,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
                   )
                 else
                   const Spacer(),
-                _PeopleSortButton(sort: _sort, onSelected: (sort) => setState(() => _sort = sort)),
+                _PeopleSortButton(sort: sort, onSelected: ref.read(searchPeopleSortProvider.notifier).set),
               ],
             ),
           ),
@@ -453,25 +451,25 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
 }
 
 class _PeopleSortButton extends StatelessWidget {
-  final _PeopleSort sort;
-  final ValueChanged<_PeopleSort> onSelected;
+  final SearchPeopleSort sort;
+  final ValueChanged<SearchPeopleSort> onSelected;
 
   const _PeopleSortButton({required this.sort, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    String label(_PeopleSort value) => switch (value) {
-      _PeopleSort.count => context.t.search_mode_people_most_photographed,
-      _PeopleSort.name => context.t.search_mode_people_sort_name,
+    String label(SearchPeopleSort value) => switch (value) {
+      SearchPeopleSort.count => context.t.search_mode_people_most_photographed,
+      SearchPeopleSort.name => context.t.search_mode_people_sort_name,
     };
-    return PopupMenuButton<_PeopleSort>(
+    return PopupMenuButton<SearchPeopleSort>(
       key: const Key('search-people-sort'),
       tooltip: context.t.search_sort_title,
       initialValue: sort,
       onSelected: onSelected,
       itemBuilder: (_) => [
-        for (final value in _PeopleSort.values)
+        for (final value in SearchPeopleSort.values)
           PopupMenuItem(key: Key('search-people-sort-${value.name}'), value: value, child: Text(label(value))),
       ],
       child: Padding(
