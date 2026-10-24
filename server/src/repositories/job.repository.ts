@@ -244,17 +244,17 @@ export class JobRepository {
 
   private async removeDanglingActiveJobs(name: QueueName): Promise<void> {
     const queue = this.getQueue(name);
-    const client = await queue.client;
+    // bullmq 6 moved the raw Redis client onto the queue's backend.
+    const client = await queue.getBackend().client;
+    // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself issues; EXISTS, LRANGE,
+    // LREM and SREM are not among them. The concrete client is ioredis, so cast to reach them — the same
+    // approach QueueMaintenanceRepository.removeOrphanedActiveJobs takes.
+    const redis = client as unknown as Pick<Redis, 'exists' | 'lrange' | 'lrem' | 'srem'>;
     const activeKey = queue.toKey('active');
-    const activeJobIds = [...new Set(await client.lrange(activeKey, 0, -1))];
+    const activeJobIds = [...new Set(await redis.lrange(activeKey, 0, -1))];
     if (activeJobIds.length === 0) {
       return;
     }
-
-    // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself issues; EXISTS, LREM
-    // and SREM are not among them. The concrete client is ioredis, so cast to reach them — the same
-    // approach QueueMaintenanceRepository.removeOrphanedActiveJobs takes for LREM.
-    const redis = client as unknown as Pick<Redis, 'exists' | 'lrem' | 'srem'>;
 
     const removedIds: string[] = [];
     let removedCount = 0;
@@ -357,7 +357,7 @@ export class JobRepository {
           // a dangling active entry with no backing job hash (the bug getJobCountsWithRepair fixes) would
           // otherwise read as perpetually "still active" — see the comment on getJobCountsWithRepair.
           const [counts, paused] = await Promise.all([this.getJobCountsWithRepair(name), this.isPaused(name)]);
-          const pending = counts.active + counts.waiting + counts.delayed + counts.paused;
+          const pending = counts.active + counts.waiting + counts.delayed;
           return { counts, name, paused, pending };
         }),
       );
@@ -380,8 +380,7 @@ export class JobRepository {
       const blocked = pending[0];
       const message =
         `Waiting for ${blocked.name} queue to finish ` +
-        `(${blocked.counts.active} active, ${blocked.counts.waiting} waiting, ` +
-        `${blocked.counts.delayed} delayed, ${blocked.counts.paused} paused)`;
+        `(${blocked.counts.active} active, ${blocked.counts.waiting} waiting, ${blocked.counts.delayed} delayed)`;
 
       if (blocked.paused) {
         this.logger.warn(`${message}; queue is paused`);
@@ -579,8 +578,9 @@ export class JobRepository {
       return;
     }
 
+    // bullmq 6 has no 'paused' state: a job in a paused queue reports 'waiting'.
     const state = (await existingJob.getState()) as string;
-    if (state === 'paused') {
+    if (state === 'waiting' && (await queue.isPaused())) {
       await existingJob.remove();
     }
   }
@@ -628,7 +628,7 @@ export class JobRepository {
       return { add: true, options };
     }
 
-    if (['waiting', 'delayed', 'paused'].includes(state)) {
+    if (['waiting', 'delayed'].includes(state)) {
       await existingJob.remove();
       await queue.drain(true);
       return { add: true, options };
