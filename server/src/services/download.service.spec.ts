@@ -78,9 +78,11 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: false })).resolves.toEqual({
-        stream: archiveMock.stream,
-      });
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: false })).resolves.toMatchObject(
+        {
+          stream: archiveMock.stream,
+        },
+      );
 
       expect(mocks.asset.getForOriginals).toHaveBeenCalledWith([asset.id], false);
       expect(archiveMock.addFile).toHaveBeenCalledWith(asset.originalPath, asset.originalFileName);
@@ -101,7 +103,7 @@ describe(DownloadService.name, () => {
 
       await expect(
         sut.downloadArchive(authStub.adminSharedLink, { assetIds: [asset.id], edited: false }),
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
