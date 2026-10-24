@@ -2,11 +2,13 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { queryClient } from '$lib/queries/client';
+import { getUniqueOriginalPathsQuery } from '$lib/queries/view.query';
 import { TreeNode } from '$lib/utils/tree-utils';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import FoldersPage from './+page.svelte';
 
-const { mockAfterNavigate, mockAssetMultiSelectManager, mockAuthManager, mockFoldersStore } = vi.hoisted(() => ({
+const { mockAfterNavigate, mockAssetMultiSelectManager, mockAuthManager } = vi.hoisted(() => ({
   mockAfterNavigate: vi.fn(),
   mockAssetMultiSelectManager: {
     selectionActive: false,
@@ -19,10 +21,6 @@ const { mockAfterNavigate, mockAssetMultiSelectManager, mockAuthManager, mockFol
   },
   mockAuthManager: {
     preferences: { tags: { enabled: true } },
-  },
-  mockFoldersStore: {
-    folders: undefined as unknown,
-    refreshAssetsByPath: vi.fn(),
   },
 }));
 
@@ -148,18 +146,14 @@ vi.mock('$lib/services/asset.service', () => ({
   getAssetBulkActions: vi.fn(() => ({})),
 }));
 
-vi.mock('$lib/stores/folders.svelte', () => ({
-  foldersStore: mockFoldersStore,
-}));
-
 vi.mock('$lib/utils/timeline-util', () => ({
   toTimelineAsset: vi.fn((asset) => asset),
 }));
 
 function renderPage() {
-  const root = TreeNode.fromPaths(['Trips']);
-  const tree = root.traverse('Trips');
-  mockFoldersStore.folders = root;
+  // The folder tree is a preloaded query since immich-32667 (getFolderTreeQuery).
+  queryClient.setQueryData(getUniqueOriginalPathsQuery().queryKey, ['Trips']);
+  const tree = TreeNode.fromPaths(['Trips']).traverse('Trips');
 
   const props = {
     data: {
