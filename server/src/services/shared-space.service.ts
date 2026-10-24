@@ -1586,6 +1586,9 @@ export class SharedSpaceService extends BaseService {
         ) {
           data.albumName = albumNames.get(data.albumId);
         }
+        if (a.type === SharedSpaceActivityType.MemberJoin && a.invitedByName) {
+          data.invitedByName = a.invitedByName;
+        }
         return {
           id: a.id,
           type: a.type,

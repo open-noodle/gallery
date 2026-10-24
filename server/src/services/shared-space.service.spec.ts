@@ -369,6 +369,19 @@ const setupEditorManagement = (mocks: ServiceMocks, opts: EditorSetupOptions) =>
   return { auth, spaceId, targetId };
 };
 
+const inviterActivityRow = (type: string, invitedByName: string | null) => ({
+  id: newUuid(),
+  type,
+  data: { role: 'viewer', invitedById: newUuid() },
+  createdAt: new Date('2026-03-10T12:00:00Z'),
+  userId: newUuid(),
+  name: 'Ben',
+  email: 'ben@example.com',
+  profileImagePath: '',
+  avatarColor: null,
+  invitedByName,
+});
+
 describe(SharedSpaceService.name, () => {
   let sut: SharedSpaceService;
   let mocks: ServiceMocks;
@@ -3887,6 +3900,7 @@ describe(SharedSpaceService.name, () => {
           email: 'pierre@test.com',
           profileImagePath: '/path/to/img',
           avatarColor: UserAvatarColor.Primary,
+          invitedByName: null,
         },
       ]);
 
@@ -3920,6 +3934,7 @@ describe(SharedSpaceService.name, () => {
           email: 'w@test.com',
           profileImagePath: null,
           avatarColor: UserAvatarColor.Primary,
+          invitedByName: null,
         },
       ]);
       mocks.sharedSpace.getAlbumNamesByIds.mockResolvedValue([{ id: 'album-1', albumName: 'USA Trip' }]);
@@ -3943,6 +3958,7 @@ describe(SharedSpaceService.name, () => {
           email: 'w@test.com',
           profileImagePath: null,
           avatarColor: UserAvatarColor.Primary,
+          invitedByName: null,
         },
       ]);
       mocks.sharedSpace.getAlbumNamesByIds.mockResolvedValue([]); // album no longer exists
@@ -3959,6 +3975,34 @@ describe(SharedSpaceService.name, () => {
       await sut.getActivities(factory.auth(), 'space-1', { limit: 10, offset: 20 });
 
       expect(mocks.sharedSpace.getActivities).toHaveBeenCalledWith('space-1', 10, 20);
+    });
+  });
+
+  describe('getActivities inviter name', () => {
+    it('copies invitedByName into data for member_join', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ userId: auth.user.id }));
+      mocks.sharedSpace.getActivities.mockResolvedValue([
+        inviterActivityRow(SharedSpaceActivityType.MemberJoin, 'Anna'),
+      ] as any);
+
+      const [activity] = await sut.getActivities(auth, newUuid(), {});
+
+      expect(activity.data.invitedByName).toBe('Anna');
+    });
+
+    it('adds nothing when the name is null or the type is not member_join', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ userId: auth.user.id }));
+      mocks.sharedSpace.getActivities.mockResolvedValue([
+        inviterActivityRow(SharedSpaceActivityType.MemberJoin, null),
+        inviterActivityRow(SharedSpaceActivityType.MemberRoleChange, 'Anna'),
+      ] as any);
+
+      const result = await sut.getActivities(auth, newUuid(), {});
+
+      expect(result[0].data).not.toHaveProperty('invitedByName');
+      expect(result[1].data).not.toHaveProperty('invitedByName');
     });
   });
 
