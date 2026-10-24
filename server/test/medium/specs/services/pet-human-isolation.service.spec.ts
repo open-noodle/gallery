@@ -64,7 +64,6 @@ const setup = (db?: Kysely<DB>) => {
     active: 1,
     waiting: 0,
     delayed: 0,
-    paused: 0,
     completed: 0,
     failed: 0,
   });

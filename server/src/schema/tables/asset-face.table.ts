@@ -109,4 +109,5 @@ export class AssetFaceTable {
   assetVisibility!: Generated<AssetVisibility>;
 
   @Column({ type: 'timestamp with time zone', nullable: true })
-  assetDeletedAt!: Timestamp | null;}
+  assetDeletedAt!: Timestamp | null;
+}
