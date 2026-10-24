@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
 import NavigationBar from '$lib/components/shared-components/navigation-bar/NavigationBar.svelte';
+import TestWrapper from '$lib/gallery/components/query-test-wrapper.svelte';
 
 const mocks = vi.hoisted(() => ({
   sidebarModeStore: {
