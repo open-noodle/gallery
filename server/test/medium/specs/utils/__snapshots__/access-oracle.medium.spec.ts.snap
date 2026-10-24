@@ -679,6 +679,12 @@ exports[`checkAccess oracle > partner.update 1`] = `
 }
 `;
 
+exports[`checkAccess oracle > passkey.delete 1`] = `{}`;
+
+exports[`checkAccess oracle > passkey.read 1`] = `{}`;
+
+exports[`checkAccess oracle > passkey.update 1`] = `{}`;
+
 exports[`checkAccess oracle > person.create 1`] = `
 {
   "owner": [
