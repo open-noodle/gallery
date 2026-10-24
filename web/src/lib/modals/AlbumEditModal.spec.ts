@@ -4,10 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import userEvent from '@testing-library/user-event';
 import { Settings } from 'luxon';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import AlbumEditModal from './AlbumEditModal.svelte';
 
-const handleUpdateAlbumMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/services/album.service', () => ({ handleUpdateAlbum: handleUpdateAlbumMock }));
+// The modal saves through upstream's updateAlbumInfoMutation (immich-32668): assert on the SDK call.
+const updateAlbumInfoMock = sdkMock.updateAlbumInfo;
 
 const originalZone = Settings.defaultZone;
 
@@ -38,7 +39,8 @@ beforeEach(() => {
   // rather than via TZ makes the local <-> UTC conversion observable under the
   // config's TZ: 'UTC'.
   Settings.defaultZone = 'Europe/Berlin';
-  handleUpdateAlbumMock.mockResolvedValue(true);
+  updateAlbumInfoMock.mockReset();
+  updateAlbumInfoMock.mockResolvedValue({ id: 'a1' } as never);
 });
 
 // `FormModal` mounts a bits-ui dialog, which takes a body scroll lock and releases it on a
@@ -89,8 +91,8 @@ describe('AlbumEditModal', () => {
     await setDate('1996-06-15T09:00:00.000');
     await userEvent.click(saveButton());
 
-    await waitFor(() => expect(handleUpdateAlbumMock).toHaveBeenCalled());
-    const [, dto] = handleUpdateAlbumMock.mock.calls[0];
+    await waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
+    const [{ updateAlbumDto: dto }] = updateAlbumInfoMock.mock.calls[0];
     expect(dto.createdAt).toBe('1996-06-15T09:00:00.000+02:00');
     expect(onClose).toHaveBeenCalled();
   });
@@ -100,8 +102,8 @@ describe('AlbumEditModal', () => {
 
     await userEvent.click(saveButton());
 
-    await waitFor(() => expect(handleUpdateAlbumMock).toHaveBeenCalled());
-    const [, dto] = handleUpdateAlbumMock.mock.calls[0];
+    await waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
+    const [{ updateAlbumDto: dto }] = updateAlbumInfoMock.mock.calls[0];
     expect(dto).not.toHaveProperty('createdAt');
     expect(dto.albumName).toBe('Summer');
   });
@@ -112,8 +114,8 @@ describe('AlbumEditModal', () => {
     await setDate('');
     await userEvent.click(saveButton());
 
-    await waitFor(() => expect(handleUpdateAlbumMock).toHaveBeenCalled());
-    const [, dto] = handleUpdateAlbumMock.mock.calls[0];
+    await waitFor(() => expect(updateAlbumInfoMock).toHaveBeenCalled());
+    const [{ updateAlbumDto: dto }] = updateAlbumInfoMock.mock.calls[0];
     expect(dto).not.toHaveProperty('createdAt');
     expect(dto.albumName).toBe('Summer');
   });

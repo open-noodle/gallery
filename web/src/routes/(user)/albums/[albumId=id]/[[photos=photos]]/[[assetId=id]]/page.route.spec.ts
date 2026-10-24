@@ -9,10 +9,14 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { getAlbumInfoQuery } from '$lib/queries/album.query';
+import { queryClient } from '$lib/queries/client';
+import { getUserConfigQuery } from '$lib/queries/config-user.query';
 import { albumFactory } from '@test-data/factories/album-factory';
 import { timelineAssetFactory } from '@test-data/factories/asset-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
+import { defaultUserConfig } from '@test-data/gallery-config-defaults';
 import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
 import AlbumPage from './+page.svelte';
 
@@ -138,16 +142,11 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
 
   sdkMock.getSearchSuggestions.mockImplementation((() => Promise.resolve([] as string[])) as never);
 
+  // The page reads its album from getAlbumInfoQuery (immich-32668), which +page.ts preloads.
+  queryClient.setQueryData(getAlbumInfoQuery(album.id).queryKey, album);
   return render(TestWrapper, {
     component: AlbumPage,
-    componentProps: {
-      data: {
-        album,
-        asset: undefined,
-        error: undefined,
-        meta: { title: album.albumName },
-      },
-    },
+    componentProps: { params: { albumId: album.id } },
   });
 }
 
@@ -168,6 +167,11 @@ describe('album detail filter panel route', () => {
     assetMultiSelectManager.clear();
     Element.prototype.animate = getAnimateMock();
     mockFeatureFlagsManager.value.map = false;
+    // The map button follows the user config now (immich-32498), not the feature flags.
+    queryClient.setQueryData(getUserConfigQuery().queryKey, {
+      ...defaultUserConfig,
+      map: { ...defaultUserConfig.map, enabled: false },
+    });
   });
 
   afterAll(() => {
@@ -512,17 +516,8 @@ describe('album detail filter panel route', () => {
       params: { albumId: 'album-2' },
     });
 
-    await view.rerender({
-      component: AlbumPage,
-      componentProps: {
-        data: {
-          album: secondAlbum,
-          asset: undefined,
-          error: undefined,
-          meta: { title: secondAlbum.albumName },
-        },
-      },
-    });
+    queryClient.setQueryData(getAlbumInfoQuery(secondAlbum.id).queryKey, secondAlbum);
+    await view.rerender({ component: AlbumPage, componentProps: { params: { albumId: secondAlbum.id } } });
 
     await waitFor(() => expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument());
     expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
@@ -781,7 +776,7 @@ describe('album detail filter panel route', () => {
     });
 
     it('passes the album filters to the album map', async () => {
-      mockFeatureFlagsManager.value.map = true;
+      queryClient.setQueryData(getUserConfigQuery().queryKey, defaultUserConfig);
       sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
       mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
 
