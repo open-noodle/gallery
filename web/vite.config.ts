@@ -90,7 +90,7 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,ts}'],
     globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./src/test-data/setup.ts'],
+    setupFiles: ['./src/test-data/setup.ts', './src/test-data/gallery-setup.ts'],
     sequence: {
       hooks: 'list',
     },
