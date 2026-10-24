@@ -10,7 +10,7 @@ export type SettingsSection = { key: string; title: string; subtitle: string };
  * searchable by the translated text of every `$t('…')` key its component renders, so a query like "merge",
  * "delete" or "cache" finds the setting inside a section whose title does not mention it (#1112).
  */
-const SECTION_SOURCES: Record<string, string> = {
+const SECTION_SOURCES: Record<string, string | string[]> = {
   authentication: '/src/routes/admin/system-settings/AuthSettings.svelte',
   backup: '/src/routes/admin/system-settings/BackupSettings.svelte',
   image: '/src/routes/admin/system-settings/ImageSettings.svelte',
@@ -25,7 +25,10 @@ const SECTION_SOURCES: Record<string, string> = {
   'nightly-tasks': '/src/routes/admin/system-settings/NightlyTasksSettings.svelte',
   memories: '/src/routes/admin/system-settings/MemoriesSettings.svelte',
   notifications: '/src/routes/admin/system-settings/NotificationSettings.svelte',
-  server: '/src/routes/admin/system-settings/ServerSettings.svelte',
+  server: [
+    '/src/routes/admin/system-settings/ServerSettings.svelte',
+    '/src/lib/gallery/components/admin/space-member-management-settings.svelte',
+  ],
   'storage-template': '/src/lib/components/admin-settings/StorageTemplateSettings.svelte',
   'storage-usage': '/src/routes/admin/system-settings/StorageUsageSettings.svelte',
   theme: '/src/routes/admin/system-settings/ThemeSettings.svelte',
@@ -37,7 +40,11 @@ const SECTION_SOURCES: Record<string, string> = {
 
 // Raw sources, fetched only when someone first searches the settings page.
 const sourceLoaders = import.meta.glob<string>(
-  ['/src/routes/admin/system-settings/*.svelte', '/src/lib/components/admin-settings/StorageTemplateSettings.svelte'],
+  [
+    '/src/routes/admin/system-settings/*.svelte',
+    '/src/lib/components/admin-settings/StorageTemplateSettings.svelte',
+    '/src/lib/gallery/components/admin/*.svelte',
+  ],
   { query: '?raw', import: 'default' },
 );
 
@@ -67,13 +74,16 @@ class AdminSettingsSearch {
       return;
     }
     this.#loadStarted = true;
-    for (const [sectionKey, path] of Object.entries(SECTION_SOURCES)) {
-      const load = sourceLoaders[path];
-      if (!load) {
+    for (const [sectionKey, paths] of Object.entries(SECTION_SOURCES)) {
+      const loads = [paths]
+        .flat()
+        .map((path) => sourceLoaders[path])
+        .filter(Boolean);
+      if (loads.length === 0) {
         continue;
       }
-      void load()
-        .then((source) => this.#keysBySection.set(sectionKey, extractTranslationKeys(source)))
+      void Promise.all(loads.map((load) => load()))
+        .then((sources) => this.#keysBySection.set(sectionKey, extractTranslationKeys(sources.join('\n'))))
         // A section that fails to load stays searchable by its title and description.
         .catch(() => {});
     }
