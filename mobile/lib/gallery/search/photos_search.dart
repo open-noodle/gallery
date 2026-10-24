@@ -2,7 +2,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
-import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -21,10 +20,9 @@ TimelineService buildPhotosTimelineService(Ref ref, TimelineTemporalScope tempor
 }
 
 /// Whether the Photos timeline shows the memories strip above the grid. Memories are a browse affordance: web mounts
-/// its carousel only while nothing is searched or filtered, so results start at the top of the viewport (#902). Search
-/// mode with no filter yet still shows the whole timeline, memories included.
+/// its carousel only while nothing is searched or filtered (#902). On mobile the strip goes as soon as search mode
+/// opens, so the grid starts right under the search header.
 final photosMemoryLaneVisibleProvider = Provider<bool>((ref) {
   final hasMemories = ref.watch(memoryLaneProvider.select((memories) => memories.value?.isNotEmpty ?? false));
-  final filtering = ref.watch(searchModeProvider) && !ref.watch(searchStateProvider.select((s) => s.isEmpty));
-  return hasMemories && !filtering;
+  return hasMemories && !ref.watch(searchModeProvider);
 });

@@ -54,7 +54,7 @@ Success means a user who knows roughly what they want (a person, a time, a tag, 
   - The map sheet's timeline is "photos in the visible map area", which no search endpoint can express.
 
   Each needs its own server work, so both are excluded from this project.
-- Hiding and reordering filter sections (today's "manage sections" sheet). The chip layout is fixed, so there is nothing to hide; the persisted section settings are removed (see "Removing the old filter sheet").
+- Reordering filter sections. (Collapsing and hiding Filters-sheet sections came back after testing; see "The Filters sheet". The old sheet's stored settings are still removed, and the new ones use new store ids.)
 - Any change to the web app.
 
 ## Anti-goals (fails even if it works)
@@ -78,7 +78,7 @@ The prototype is the visual reference. Where this text and the prototype disagre
   - The screen's top app bar and, on Photos, the bottom nav are hidden.
   - In their place, at the top: a back arrow, the search field, and the chip row under them.
   - The grouping pill stays, so Years/Months zoom works on results as it does today.
-  - The memory lane is hidden while any filter is active, as today.
+  - The memory lane is hidden for as long as search mode is open, filters or not (owner's feedback after testing: the grid starts right under the search header).
 - **Keyboard:** entering search mode does **not** open the keyboard. Filters and photos show first; tapping the field starts typing. *(Builder's call, matching the prototype.)*
 - **Leaving:** ← (and Android back) leaves search mode, clears every filter and the query, and restores the screen and its scroll position. *(Builder's call.)*
 - **"View in timeline"** on a search result leaves search mode and jumps to that photo in the screen's normal timeline, as `view_in_timeline_action.dart` does today.
@@ -120,7 +120,7 @@ Each main chip opens a bottom sheet over the results, about two thirds of the sc
 - **People:**
   - Selected people on top, with a note that results show photos with all of them.
   - Then a short "Recent" row of the 7 most recently updated people, which replaces today's recent-people strip (`people_picker.provider.dart:75-81`).
-  - Then a 4-column grid of avatars with names and counts: the most photographed with nothing typed, otherwise the matches.
+  - Then a 4-column grid of compact avatar tiles with names and counts: everyone with nothing typed, otherwise the matches. A sort selector above it orders them by most photographed (the default, the server's order) or A–Z (on the device, unnamed last). The choice lasts while the sheet is open.
   - Multi-select means AND.
   - Pets appear like people, as today.
   - The alphabet scrubber is dropped; the search box replaces it.
@@ -131,7 +131,8 @@ Each main chip opens a bottom sheet over the results, about two thirds of the sc
   - Tapping a year selects the year; tapping a month selects the month. One period at a time, and a custom range (Filters sheet) replaces it.
   - This sheet opens taller than the others.
 - **Places:**
-  - Countries, each followed directly by its cities, with counts, all visible at once.
+  - Countries with counts, folded. Each has a "Cities" caret beside it, like When's "months", that opens its cities from the options already loaded; the row itself selects the whole country. One large country no longer pushes the rest out of reach (owner's feedback after testing).
+  - A search that matches cities opens their countries at those cities; one that matches only a country leaves it folded. A selected city's country opens with the sheet.
   - The search box matches city or country names.
   - Tapping a country selects the whole country; tapping a city selects that city. One place at a time.
   - State is optional.
@@ -147,7 +148,7 @@ One tall sheet (about 88% high). Sections, top to bottom, with live counts where
 1. **Favorites only:** a switch.
 2. **Photo or video:** All / Photos / Videos.
 3. **Rating:** five stars meaning "at least N". All five always show.
-4. **Camera:** makes with counts. Tapping a make opens its models at once, plus "Any <make>".
+4. **Camera:** makes with counts, the first five, then "Show N more" (a selected make past five still shows). Tapping a make opens its models at once, plus "Any <make>".
 5. **Albums:** Any / In an album / Not in one.
 6. **Text:** three inputs that can all be filled at once, as on web (`text-filter.svelte`): In the photo (OCR), File name, Description. The top field's free text stays smart search.
 7. **Date range:** from and to dates (web's custom range in `temporal-picker.svelte`). The builder lays it out in the same style.
@@ -155,9 +156,12 @@ One tall sheet (about 88% high). Sections, top to bottom, with live counts where
 
 Each section follows #910: it is hidden when empty for the scope and greyed when empty only because of the current filters. A section that is fixed by the screen's scope is hidden (see the scope table).
 
+Tapping a titled section's title collapses or expands it; collapsed with a filter set, the title shows a dot. A cog in the sheet's title row opens a checklist that hides sections; a hidden section still shows while it holds a filter, so it can be changed. Both choices are kept on the device (`StoreKey.searchFiltersCollapsedSections` 146 and `searchFiltersHiddenSections` 147, read by `lib/gallery/search/search_filter_prefs.dart`; 143-145 stay retired).
+
 ### Results
 
 - **Header row:** the exact total ("1,204 match") and the sort: Newest, Oldest, plus Relevance while a smart query or similar-photo search is active.
+- **Busy state:** until the answer for the current filters arrives, the grid keeps the previous answer (or the screen's own timeline). Meanwhile the header shows a thin progress line and "Searching…" in place of the total, and the grid below the header is dimmed (`searchResultsPendingProvider`). A failed request is not busy: its error shows instead.
 - **Grid:** grouped like the screen's normal timeline, honouring the grouping pill, and using the screen's own grid and asset viewer, so selection, opening a photo and multi-select actions work as they do outside search.
 - **No matches:** the filtered empty state (`timeline_empty_state.widget.dart`, rewired to the new state) says nothing matches all the filters, and to remove one.
 
@@ -278,7 +282,7 @@ One new fork endpoint returns the narrowed options **with per-option counts**. T
 | Rating, Media type, Favorites, Not in album, Archive | Filters sheet |
 | Sort Relevance / Newest / Oldest, Relevance reset on new query | results header |
 | Active-filter chips with clear all (`filter_subheader.widget.dart`) | chip row + Clear all |
-| Hide/collapse sections | dropped (see Non-goals) |
+| Hide/collapse sections | kept: collapse by title, hide with the cog, both remembered on the device |
 | Years/Months zoom on results | kept (grouping pill stays) |
 | Memories hidden while filtering | kept |
 | View in timeline from results | kept (leaves search mode) |
@@ -556,7 +560,7 @@ Each slice merges to `main` on its own. `main` must keep working between slices:
   - Quick ranges select Today, This week, This month and This year.
   - A year selects the year. "▾ months" opens months at once, with empty months greyed.
 - **Places sheet.**
-  - Countries with their cities show at once, with no spinner.
+  - Countries show folded with no spinner; the "Cities" caret opens one country, and a city search opens its country at the matches.
   - Typing "lis" leaves Lisbon under Portugal.
   - A country selects the whole country.
 - **Tags sheet:** multi-select AND, and choosing a tag turns Untagged off.
@@ -565,7 +569,7 @@ Each slice merges to `main` on its own. `main` must keep working between slices:
   - Given the library has no tags, the Tags chip is hidden.
   - Given Kyoto has no tagged photos, with Kyoto active the Tags chip is greyed and can't be tapped.
 - **Clear all** appears with two or more filters, and clears them while staying in search mode.
-- **Memories and grouping.** While a filter is active the memory lane is hidden. The grouping pill stays, and Years zoom works on results.
+- **Memories and grouping.** While search mode is open the memory lane is hidden. The grouping pill stays, and Years zoom works on results.
 
 **End-to-end test:** `mobile/test/gallery/search/photos_search_mode_e2e_test.dart`:
 - Pumps the real Photos page with the preview on, against the contract server.

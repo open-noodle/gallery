@@ -6,8 +6,8 @@ import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 
-// The memory lane moves to search mode's state (specs/2026-10-23-mobile-search-redesign-design.md, "Removing the old
-// filter sheet"): hidden while search mode filters (#902), shown otherwise.
+// The memory lane follows search mode (specs/2026-10-23-mobile-search-redesign-design.md, "Removing the old filter
+// sheet"): hidden as soon as search mode opens, shown otherwise.
 
 Memory _memory() => Memory(
   id: 'memory-1',
@@ -28,12 +28,12 @@ ProviderContainer _container({required List<Memory> memories}) {
 }
 
 void main() {
-  test('the strip shows while browsing, and in search mode before any filter is set', () async {
+  test('the strip shows while browsing and hides as soon as search mode opens, before any filter', () async {
     final c = _container(memories: [_memory()]);
     await c.read(memoryLaneProvider.future);
     expect(c.read(photosMemoryLaneVisibleProvider), isTrue);
     c.read(searchModeProvider.notifier).enter();
-    expect(c.read(photosMemoryLaneVisibleProvider), isTrue);
+    expect(c.read(photosMemoryLaneVisibleProvider), isFalse);
   });
 
   test('the strip hides once search mode has a query', () async {
@@ -52,14 +52,14 @@ void main() {
     expect(c.read(photosMemoryLaneVisibleProvider), isFalse);
   });
 
-  test('the strip comes back when the filters are cleared or search mode closes', () async {
+  test('the strip stays hidden when the filters are cleared, and comes back when search mode closes', () async {
     final c = _container(memories: [_memory()]);
     await c.read(memoryLaneProvider.future);
     c.read(searchModeProvider.notifier).enter();
-    final state = c.read(searchStateProvider.notifier)..submitText('beach');
-    state.reset();
-    expect(c.read(photosMemoryLaneVisibleProvider), isTrue);
-    state.submitText('beach');
+    c.read(searchStateProvider.notifier)
+      ..submitText('beach')
+      ..reset();
+    expect(c.read(photosMemoryLaneVisibleProvider), isFalse);
     c.read(searchModeProvider.notifier).leave();
     expect(c.read(photosMemoryLaneVisibleProvider), isTrue);
   });
