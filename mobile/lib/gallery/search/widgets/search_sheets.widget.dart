@@ -322,7 +322,7 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
     final filtered = query.isEmpty ? others : others.where((p) => _fold(p.name).contains(query)).toList();
     // The server sends most photographed first; A–Z sorts on the device, people without a name last.
     final sort = ref.watch(searchPeopleSortProvider);
-    final matches = sort == SearchPeopleSort.count
+    final matches = sort == SearchListSort.count
         ? filtered
         : ([...filtered]..sort((a, b) {
             if (a.name.isEmpty != b.name.isEmpty) {
@@ -414,7 +414,11 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
                   )
                 else
                   const Spacer(),
-                _PeopleSortButton(sort: sort, onSelected: ref.read(searchPeopleSortProvider.notifier).set),
+                _SortButton(
+                  keyPrefix: 'search-people-sort',
+                  sort: sort,
+                  onSelected: ref.read(searchPeopleSortProvider.notifier).set,
+                ),
               ],
             ),
           ),
@@ -450,27 +454,29 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
   }
 }
 
-class _PeopleSortButton extends StatelessWidget {
-  final SearchPeopleSort sort;
-  final ValueChanged<SearchPeopleSort> onSelected;
+/// The People and Places sheets' sort: most photos first, or A–Z.
+class _SortButton extends StatelessWidget {
+  final String keyPrefix;
+  final SearchListSort sort;
+  final ValueChanged<SearchListSort> onSelected;
 
-  const _PeopleSortButton({required this.sort, required this.onSelected});
+  const _SortButton({required this.keyPrefix, required this.sort, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    String label(SearchPeopleSort value) => switch (value) {
-      SearchPeopleSort.count => context.t.search_mode_people_most_photographed,
-      SearchPeopleSort.name => context.t.search_mode_people_sort_name,
+    String label(SearchListSort value) => switch (value) {
+      SearchListSort.count => context.t.search_mode_people_most_photographed,
+      SearchListSort.name => context.t.search_mode_people_sort_name,
     };
-    return PopupMenuButton<SearchPeopleSort>(
-      key: const Key('search-people-sort'),
+    return PopupMenuButton<SearchListSort>(
+      key: Key(keyPrefix),
       tooltip: context.t.search_sort_title,
       initialValue: sort,
       onSelected: onSelected,
       itemBuilder: (_) => [
-        for (final value in SearchPeopleSort.values)
-          PopupMenuItem(key: Key('search-people-sort-${value.name}'), value: value, child: Text(label(value))),
+        for (final value in SearchListSort.values)
+          PopupMenuItem(key: Key('$keyPrefix-${value.name}'), value: value, child: Text(label(value))),
       ],
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
@@ -760,10 +766,20 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
     final query = _fold(_query);
     bool hit(String name) => query.isEmpty || _fold(name).contains(query);
 
+    // The server sends most photos first; A–Z sorts countries, and the cities in each, on the device.
+    final sort = ref.watch(searchPlacesSortProvider);
+    final byName = sort == SearchListSort.name;
+    final ordered = byName
+        ? ([...?countries]..sort((a, b) => _fold(a.country).compareTo(_fold(b.country))))
+        : countries ?? const <SearchCountryOption>[];
+
     final rows = <Widget>[];
-    for (final country in countries ?? const <SearchCountryOption>[]) {
+    for (final country in ordered) {
       final wholeCountry = hit(country.country);
-      final allCities = country.cities ?? const <SearchCityOption>[];
+      final serverCities = country.cities ?? const <SearchCityOption>[];
+      final allCities = byName
+          ? ([...serverCities]..sort((a, b) => _fold(a.city).compareTo(_fold(b.city))))
+          : serverCities;
       // A search that matches cities opens their country at those cities; otherwise the country's own fold applies.
       final cityHits = query.isEmpty
           ? const <SearchCityOption>[]
@@ -830,7 +846,19 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
           ? const SearchSheetPending(SearchDimension.places)
           : rows.isEmpty
           ? SearchSheetHint(context.t.search_mode_places_none)
-          : ListView(children: rows),
+          : ListView(
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _SortButton(
+                    keyPrefix: 'search-places-sort',
+                    sort: sort,
+                    onSelected: ref.read(searchPlacesSortProvider.notifier).set,
+                  ),
+                ),
+                ...rows,
+              ],
+            ),
     );
   }
 }

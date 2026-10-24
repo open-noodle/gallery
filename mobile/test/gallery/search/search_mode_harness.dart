@@ -443,13 +443,16 @@ class FakeSearchRepository implements GallerySearchRepository {
       final cities = cityCounts.putIfAbsent(a.country!, () => {});
       cities[a.city!] = (cities[a.city!] ?? 0) + 1;
     }
+    // Most photos first, then by name: the server's order (byKeyCount in smart-facet.repository.ts).
+    List<String> byCount(Map<String, int> counts) =>
+        counts.keys.toList()..sort((a, b) => counts[b]! != counts[a]! ? counts[b]! - counts[a]! : a.compareTo(b));
     final countries = [
-      for (final country in countryCounts.keys.toList()..sort())
+      for (final country in byCount(countryCounts))
         SearchCountryOption(
           country: country,
           count: countryCounts[country],
           cities: [
-            for (final city in cityCounts[country]!.keys.toList()..sort())
+            for (final city in byCount(cityCounts[country]!))
               SearchCityOption(city: city, count: cityCounts[country]![city]),
           ],
         ),

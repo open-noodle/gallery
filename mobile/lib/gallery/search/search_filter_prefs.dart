@@ -4,7 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 
-// Search sheet choices kept on the device: the Filters sheet's collapsed and hidden sections, and the People sort.
+// Search sheet choices kept on the device: the Filters sheet's collapsed and hidden sections, and the People and Places sorts.
 // A section is named by its key in the sheet (`search-filter-section-<name>`): the SearchSection names plus
 // `dateRange`. Names the sheet no longer has are ignored.
 
@@ -48,23 +48,29 @@ final searchFilterSectionPrefsProvider = NotifierProvider<SearchFilterSectionPre
   SearchFilterSectionPrefsNotifier.new,
 );
 
-/// How the People sheet orders its list: most photographed (the server's order) or A–Z.
-enum SearchPeopleSort { count, name }
+/// How the People and Places sheets order their lists: most photos first (the server's order) or A–Z.
+enum SearchListSort { count, name }
 
-/// The People sheet's sort, kept on the device so the sheet opens with the one chosen last time.
-class SearchPeopleSortNotifier extends Notifier<SearchPeopleSort> {
+/// One sheet's sort, kept on the device so the sheet opens with the one chosen last time.
+class SearchListSortNotifier extends Notifier<SearchListSort> {
+  final StoreKey<String> _key;
+
+  SearchListSortNotifier(this._key);
+
   @override
-  SearchPeopleSort build() => SearchPeopleSort.values.firstWhere(
-    (sort) => sort.name == Store.tryGet(StoreKey.searchPeopleSort),
-    orElse: () => SearchPeopleSort.count,
-  );
+  SearchListSort build() =>
+      SearchListSort.values.firstWhere((sort) => sort.name == Store.tryGet(_key), orElse: () => SearchListSort.count);
 
-  void set(SearchPeopleSort sort) {
+  void set(SearchListSort sort) {
     state = sort;
-    unawaited(Store.put(StoreKey.searchPeopleSort, sort.name));
+    unawaited(Store.put(_key, sort.name));
   }
 }
 
-final searchPeopleSortProvider = NotifierProvider<SearchPeopleSortNotifier, SearchPeopleSort>(
-  SearchPeopleSortNotifier.new,
+final searchPeopleSortProvider = NotifierProvider<SearchListSortNotifier, SearchListSort>(
+  () => SearchListSortNotifier(StoreKey.searchPeopleSort),
+);
+
+final searchPlacesSortProvider = NotifierProvider<SearchListSortNotifier, SearchListSort>(
+  () => SearchListSortNotifier(StoreKey.searchPlacesSort),
 );

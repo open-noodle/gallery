@@ -133,6 +133,7 @@ Each main chip opens a bottom sheet over the results, about two thirds of the sc
 - **Places:**
   - Countries with counts, folded. Each has a "Cities" caret beside it, like When's "months", that opens its cities from the options already loaded; the row itself selects the whole country. One large country no longer pushes the rest out of reach (owner's feedback after testing).
   - A search that matches cities opens their countries at those cities; one that matches only a country leaves it folded. A selected city's country opens with the sheet.
+  - A sort selector, as on People: most photos first (the default, the server's order) or A–Z, applied to the countries and to the cities in each. Kept on the device (`StoreKey.searchPlacesSort` 149).
   - The search box matches city or country names.
   - Tapping a country selects the whole country; tapping a city selects that city. One place at a time.
   - State is optional.

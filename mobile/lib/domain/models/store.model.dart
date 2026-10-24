@@ -15,10 +15,11 @@ enum StoreKey<T> {
   advancedTroubleshooting<bool>._(114),
   enableHapticFeedback<bool>._(126),
   autoEndpointLocationDisclosureAccepted<bool>._(142),
-  // Gallery search mode's Filters sheet (lib/gallery/search/search_filter_prefs.dart). 143-145 are retired.
+  // Gallery search mode's sheets (lib/gallery/search/search_filter_prefs.dart). 143-145 are retired.
   searchFiltersCollapsedSections<String>._(146),
   searchFiltersHiddenSections<String>._(147),
   searchPeopleSort<String>._(148),
+  searchPlacesSort<String>._(149),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

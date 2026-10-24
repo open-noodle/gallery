@@ -544,6 +544,41 @@ void main() {
       await disposePhotosPage(tester, container);
     });
 
+    testWidgets('sort by: most photos first by default, A–Z on request, and the sheet remembers it', (tester) async {
+      await pump(tester);
+      await enterSearchMode(tester, container);
+      await openChip(tester, 'places');
+
+      List<String> countries() {
+        const prefix = 'search-place-country-';
+        final rows = find
+            .byWidgetPredicate(
+              (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith(prefix),
+            )
+            .evaluate()
+            .toList();
+        double top(Element e) => tester.getTopLeft(find.byWidget(e.widget)).dy;
+        rows.sort((a, b) => top(a).compareTo(top(b)));
+        return [for (final r in rows) (r.widget.key! as ValueKey<String>).value.substring(prefix.length)];
+      }
+
+      // Japan has 3 photos on the timeline (Kyoto), Portugal and Germany 2 each.
+      expect(countries().first, 'Japan');
+
+      await tapKey(tester, 'search-places-sort');
+      await tapKey(tester, 'search-places-sort-name');
+      expect(countries(), ['Germany', 'Japan', 'Portugal']);
+      await closeSheet(tester);
+
+      // Read the saved choice again, as the next app start would.
+      container.invalidate(searchPlacesSortProvider);
+      await openChip(tester, 'places');
+      expect(countries(), ['Germany', 'Japan', 'Portugal']);
+      expect(find.text('A–Z'), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
     testWidgets('a selected city opens its country when the sheet opens', (tester) async {
       await pump(tester);
       await enterSearchMode(tester, container);
