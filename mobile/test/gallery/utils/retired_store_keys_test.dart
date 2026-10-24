@@ -20,6 +20,9 @@ const _collapsedSections = 143;
 const _hiddenSections = 144;
 const _searchPreview = 145;
 
+/// Where the location disclosure was stored before it moved to the fork block (upstream's next id).
+const _oldDisclosure = 142;
+
 void main() {
   late Drift db;
   late StoreService storeService;
@@ -56,6 +59,48 @@ void main() {
     expect(ids, isNot(contains(_searchPreview)));
     expect(ids, containsAll([StoreKey.version.id, StoreKey.serverEndpoint.id]));
     expect(Store.tryGet(StoreKey.serverEndpoint), 'https://gallery.example');
+  });
+
+  group('the location disclosure moves from 142 to the fork block', () {
+    setUp(() async {
+      await db.storeEntity.deleteAll();
+      await Store.delete(StoreKey.autoEndpointLocationDisclosureAccepted);
+      await Store.put(StoreKey.version, targetVersion);
+    });
+
+    test('an accepted disclosure stays accepted after the upgrade, and 142 is freed', () async {
+      await seed(_oldDisclosure, intValue: 1);
+
+      await migrateDatabaseIfNeeded(db, NativeSyncApi(), PermissionApi());
+
+      expect(Store.get(StoreKey.autoEndpointLocationDisclosureAccepted, false), isTrue);
+      expect(await storedIds(), isNot(contains(_oldDisclosure)));
+      expect(await storedIds(), contains(StoreKey.autoEndpointLocationDisclosureAccepted.id));
+    });
+
+    test('a value already at the new id is kept, and the old row still goes', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
+      await seed(_oldDisclosure, intValue: 0);
+
+      await moveForkStoreValues(db);
+
+      expect(Store.get(StoreKey.autoEndpointLocationDisclosureAccepted, false), isTrue);
+      expect(await storedIds(), isNot(contains(_oldDisclosure)));
+    });
+
+    test('once upstream claims 142 for a key of its own, its row is left alone', () async {
+      await seed(_oldDisclosure, intValue: 1);
+
+      await moveForkStoreValues(db, claimedIds: {_oldDisclosure});
+
+      expect(await storedIds(), contains(_oldDisclosure));
+      expect(Store.tryGet(StoreKey.autoEndpointLocationDisclosureAccepted), isNull);
+    });
+
+    test('no StoreKey uses 142 any more, and the disclosure has a fork-block id', () {
+      expect(StoreKey.values.map((key) => key.id), isNot(contains(_oldDisclosure)));
+      expect(StoreKey.autoEndpointLocationDisclosureAccepted.id, greaterThanOrEqualTo(90000));
+    });
   });
 
   test('nothing reads them: no StoreKey has a retired id, so none can be reused', () {

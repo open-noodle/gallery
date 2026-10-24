@@ -48,7 +48,7 @@ Future<void> migrateDatabaseIfNeeded(Drift drift, NativeSyncApi nativeSyncApi, P
     await _migrateTo27(drift, nativeSyncApi, permissionApi);
   }
 
-  await deleteRetiredStoreValues(drift);
+  await migrateForkStoreValues(drift);
 
   if (storedVersion == null) {
     await FeatureMessageService(SettingsRepository.instance).markSeen();
