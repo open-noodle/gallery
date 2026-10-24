@@ -34,17 +34,18 @@ export const getServerTimeZone = (): string | null => {
  * exiftool assumes UTC only to parse a zone-less QuickTime timestamp: the instant is right but the
  * zone is unknown, so use the server's TZ, as the docs describe (#1147). exiftool reports the same
  * source when the date says +00:00 or Z outright (e.g. an iPhone video recorded in Lisbon); that UTC
- * came from the file, so it stays. exiftool-vendored's types deprecate tzSource for zoneSource, but
- * 35.x only sets tzSource.
+ * came from the file, so it stays. Reads zoneSource only: exiftool-vendored 39 sets it alongside the
+ * deprecated tzSource, and MetadataService clears zone/tz/zoneSource (not tzSource) when a sidecar
+ * date replaces the file's, so a stale tzSource must not count.
  */
 export const resolveAssumedUtcVideoZone = (
-  tags: Pick<Tags, 'zoneSource' | 'tzSource'>,
+  tags: Pick<Tags, 'zoneSource'>,
   rawDateTime: string | undefined,
   timeZone: string | null,
 ): string | null => {
   const hasExplicitUtcOffset = rawDateTime?.endsWith('Z') || rawDateTime?.endsWith('+00:00');
   const serverTimeZone = getServerTimeZone();
-  if ((tags.zoneSource ?? tags.tzSource) === defaultVideosToUTC && !hasExplicitUtcOffset && serverTimeZone) {
+  if (tags.zoneSource === defaultVideosToUTC && !hasExplicitUtcOffset && serverTimeZone) {
     return serverTimeZone;
   }
   return timeZone;

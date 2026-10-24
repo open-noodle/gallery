@@ -49,25 +49,31 @@ describe('getServerTimeZone', () => {
 });
 
 describe('resolveAssumedUtcVideoZone', () => {
-  it.each(['tzSource', 'zoneSource'] as const)('should use the server zone for an assumed UTC (%s)', (key) => {
+  it('should use the server zone for an assumed UTC', () => {
     process.env.TZ = 'America/New_York';
-    expect(resolveAssumedUtcVideoZone({ [key]: 'defaultVideosToUTC' }, '2024:06:01 01:07:00', 'UTC')).toBe(
+    expect(resolveAssumedUtcVideoZone({ zoneSource: 'defaultVideosToUTC' }, '2024:06:01 01:07:00', 'UTC')).toBe(
       'America/New_York',
     );
   });
 
+  it('should ignore a leftover deprecated tzSource without zoneSource', () => {
+    process.env.TZ = 'America/New_York';
+    const tags = { tzSource: 'defaultVideosToUTC' } as Parameters<typeof resolveAssumedUtcVideoZone>[0];
+    expect(resolveAssumedUtcVideoZone(tags, '2024:06:01 01:07:00', 'UTC')).toBe('UTC');
+  });
+
   it.each(['2024:06:01 01:07:00Z', '2024:06:01 01:07:00+00:00'])('should keep a UTC the file states: %s', (raw) => {
     process.env.TZ = 'America/New_York';
-    expect(resolveAssumedUtcVideoZone({ tzSource: 'defaultVideosToUTC' }, raw, 'UTC+0')).toBe('UTC+0');
+    expect(resolveAssumedUtcVideoZone({ zoneSource: 'defaultVideosToUTC' }, raw, 'UTC+0')).toBe('UTC+0');
   });
 
   it('should keep the zone on a UTC server', () => {
-    expect(resolveAssumedUtcVideoZone({ tzSource: 'defaultVideosToUTC' }, '2024:06:01 01:07:00', 'UTC')).toBe('UTC');
+    expect(resolveAssumedUtcVideoZone({ zoneSource: 'defaultVideosToUTC' }, '2024:06:01 01:07:00', 'UTC')).toBe('UTC');
   });
 
   it('should keep a zone that came from the metadata', () => {
     process.env.TZ = 'America/New_York';
-    expect(resolveAssumedUtcVideoZone({ tzSource: 'GPSLatitude/GPSLongitude' }, undefined, 'Europe/Paris')).toBe(
+    expect(resolveAssumedUtcVideoZone({ zoneSource: 'GPSLatitude/GPSLongitude' }, undefined, 'Europe/Paris')).toBe(
       'Europe/Paris',
     );
   });
