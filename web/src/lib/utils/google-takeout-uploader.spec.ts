@@ -16,7 +16,7 @@ vi.mock('$lib/utils', () => ({
   uploadRequest: vi.fn(),
 }));
 
-vi.mock('$lib/utils/album-utils', () => ({
+vi.mock('$lib/gallery/album/album-add', () => ({
   createAlbum: vi.fn(),
 }));
 
@@ -359,8 +359,8 @@ describe('createImportAlbums', () => {
     vi.resetAllMocks();
     const mod = await import('$lib/utils/google-takeout-uploader');
     createImportAlbums = mod.createImportAlbums;
-    const albumUtils = await import('$lib/utils/album-utils');
-    createAlbumMock = vi.mocked(albumUtils.createAlbum);
+    const albumAdd = await import('$lib/gallery/album/album-add');
+    createAlbumMock = vi.mocked(albumAdd.createAlbum);
   });
 
   it('creates albums for selected album names', async () => {

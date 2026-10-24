@@ -1,7 +1,7 @@
+import { notifyAddToAlbum } from '#lib/gallery/album/notify-add-to-album.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { asMutation, queryClient } from '#lib/queries/client.ts';
-import { Route } from '#lib/route.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import {
   addAssetsToAlbum,
@@ -26,7 +26,6 @@ import {
 import { toastManager } from '@immich/ui';
 import { mutationOptions, queryOptions, type MutationMeta } from '@tanstack/svelte-query';
 import type { MessageFormatter } from 'svelte-i18n';
-import { goto } from '$app/navigation';
 
 type AlbumsFilter = { isOwned?: boolean; isShared?: boolean };
 
@@ -127,31 +126,6 @@ export const deleteAlbumMutation = (meta?: MutationMeta) =>
     },
     meta: meta ?? { error: { toast: 'errors.unable_to_delete_album' } },
   });
-
-const notifyAddToAlbum = ($t: MessageFormatter, albumId: string, assetIds: string[], results: BulkIdResponseDto[]) => {
-  const successCount = results.filter(({ success }) => success).length;
-  const duplicateCount = results.filter(({ error }) => error === 'duplicate').length;
-  let description: string | undefined;
-
-  if (duplicateCount === assetIds.length) {
-    description = $t('assets_were_part_of_album_count', { values: { count: duplicateCount } });
-  } else if (successCount === assetIds.length) {
-    description = $t('assets_added_to_album_count', { values: { count: successCount } });
-  } else if (successCount > 0) {
-    description = $t('assets_added_to_album_partial_count', { values: { successCount, totalCount: assetIds.length } });
-  }
-
-  const button = { label: $t('view_album'), onclick: () => goto(Route.viewAlbum({ id: albumId })) };
-  if (description) {
-    toastManager.primary({ description, button }, { timeout: 5000 });
-    return;
-  }
-
-  toastManager.danger(
-    { description: $t('assets_cannot_be_added_to_album_count', { values: { count: assetIds.length } }), button },
-    { timeout: 5000 },
-  );
-};
 
 const notifyAddToAlbums = (
   $t: MessageFormatter,
