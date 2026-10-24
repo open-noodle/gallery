@@ -25,28 +25,29 @@ Gallery checks the caller's role on every endpoint. The three roles (Owner, Edit
 
 ## Roles and Permissions
 
-| Permission                  | Owner | Editor | Viewer |
-| --------------------------- | ----- | ------ | ------ |
-| View assets in space        | Yes   | Yes    | Yes    |
-| Download assets             | Yes   | Yes    | Yes    |
-| Add own assets to space     | Yes   | Yes    | No     |
-| Remove assets from space    | Yes   | Yes    | No     |
-| Set cover photo             | Yes   | Yes    | No     |
-| Rename / edit space details | Yes   | Yes    | No     |
-| Invite/remove members       | Yes   | No     | No     |
-| Change member roles         | Yes   | No     | No     |
-| Toggle face recognition     | Yes   | No     | No     |
-| Change space color          | Yes   | Yes    | No     |
-| Delete the space            | Yes   | No     | No     |
-| Leave the space             | No    | Yes    | Yes    |
-| Search within space         | Yes   | Yes    | Yes    |
-| Create a public share link  | Yes   | Yes    | No\*   |
-| View activity log           | Yes   | Yes    | Yes    |
-| View space on map           | Yes   | Yes    | Yes    |
-| Manage people (name, merge) | Yes   | Yes    | No     |
-| Show/hide people            | Yes   | Yes    | No     |
-| Toggle timeline integration | Yes   | Yes    | Yes    |
-| Link/unlink libraries\*     | Yes   | Yes    | No     |
+| Permission                  | Owner | Editor            | Viewer |
+| --------------------------- | ----- | ----------------- | ------ |
+| View assets in space        | Yes   | Yes               | Yes    |
+| Download assets             | Yes   | Yes               | Yes    |
+| Add own assets to space     | Yes   | Yes               | No     |
+| Remove assets from space    | Yes   | Yes               | No     |
+| Set cover photo             | Yes   | Yes               | No     |
+| Rename / edit space details | Yes   | Yes               | No     |
+| Add members                 | Yes   | When allowed [^1] | No     |
+| Change viewer/editor roles  | Yes   | When allowed [^1] | No     |
+| Remove members              | Yes   | No                | No     |
+| Toggle face recognition     | Yes   | No                | No     |
+| Change space color          | Yes   | Yes               | No     |
+| Delete the space            | Yes   | No                | No     |
+| Leave the space             | No    | Yes               | Yes    |
+| Search within space         | Yes   | Yes               | Yes    |
+| Create a public share link  | Yes   | Yes               | No\*   |
+| View activity log           | Yes   | Yes               | Yes    |
+| View space on map           | Yes   | Yes               | Yes    |
+| Manage people (name, merge) | Yes   | Yes               | No     |
+| Show/hide people            | Yes   | Yes               | No     |
+| Toggle timeline integration | Yes   | Yes               | Yes    |
+| Link/unlink libraries\*     | Yes   | Yes               | No     |
 
 \* Requires server admin privileges in addition to the space role.
 
@@ -84,7 +85,7 @@ The banner carries a progress bar and disappears once all three steps are done. 
 
 ## Adding Members
 
-From the space detail page, the Owner can invite other users:
+From the space detail page, the Owner can add other users. Editors can too, when the server or the space allows it (see [Editors managing members](#editors-managing-members)).
 
 ### Web
 
@@ -228,6 +229,26 @@ Hiding asks for confirmation and states how many photos it will actually remove 
 That is the usual surprise: a photo can be in a linked album _and_ in a linked external library, or added to the space directly as well. Hiding the album alone changes nothing for those photos until the other path is hidden too, so hide the whole space (or unlink the library) if you want them all gone.
 
 > Timeline integration cannot be combined with archive, favorites, or trash filters.
+
+## Editors Managing Members
+
+By default only Owners manage membership. Two opt-in permissions let Editors help, and both start off:
+
+- **Editors can add members.** An Editor can add people to the space. They are added as **Viewers**.
+- **Editors can switch members between viewer and editor.** An Editor can promote a Viewer to Editor or set an Editor back to Viewer. Adding someone directly as an Editor needs this permission as well as the first one.
+
+A server administrator sets the default for every space under **Administration → Settings → Server** (_Let space editors add members_ and _Let space editors change member roles_). Each space's Owner can override the default for that space on the **Members** page, with a choice of **Server default**, **On** or **Off** for each permission. The page shows what the server default currently is.
+
+An Editor can never:
+
+- make someone an Owner, or change an Owner's role
+- change their own role
+- remove members
+- change these two permissions
+
+Those stay with the Owner, and a server administrator who is not a member of the space gets no extra access. Activity entries for new members record who added them.
+
+[^1]: Off by default. See [Editors managing members](#editors-managing-members).
 
 ## Renaming and Editing Space Details
 

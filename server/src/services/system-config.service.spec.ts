@@ -241,6 +241,8 @@ const updatedConfig = Object.freeze<SystemConfig>({
     loginPageMessage: '',
     publicUsers: true,
     mergePeopleAcrossOwners: false,
+    spaceEditorsCanAddMembers: false,
+    spaceEditorsCanChangeRoles: false,
   },
   storageTemplate: {
     enabled: false,

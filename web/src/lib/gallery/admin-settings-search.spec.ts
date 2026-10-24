@@ -4,6 +4,7 @@ import { adminSettingsSearch, extractTranslationKeys } from '$lib/gallery/admin-
 const server = { key: 'server', title: 'Server Settings', subtitle: 'Manage server settings' };
 const english: Record<string, string> = {
   'admin.server_merge_people_across_owners': 'Allow merging people across owners',
+  'admin.server_space_editors_can_add_members': 'Let space editors add members',
 };
 const translate = (key: Translations) => english[key as string] ?? (key as string);
 
@@ -26,6 +27,11 @@ describe('adminSettingsSearch (#1112)', () => {
   it('matches a section by a setting inside it once the section sources load', async () => {
     adminSettingsSearch.matches(server, 'merging', translate);
     await vi.waitFor(() => expect(adminSettingsSearch.matches(server, 'merging', translate)).toBe(true));
+  });
+
+  it('matches the server section by a setting rendered in a fork component', async () => {
+    adminSettingsSearch.matches(server, 'space editors', translate);
+    await vi.waitFor(() => expect(adminSettingsSearch.matches(server, 'space editors', translate)).toBe(true));
   });
 
   it('does not match an unrelated query', async () => {

@@ -2,6 +2,10 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Kysely, Transaction } from 'kysely';
 import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto.js';
 import type { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
+import type {
+  ServerMemberPermissionSettings,
+  SpaceMemberPermissionSettings,
+} from 'src/gallery/utils/space-member-management.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository.js';
 import type { JobOf } from 'src/types.js';
@@ -71,6 +75,7 @@ import {
   SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum.js';
+import { resolveSpaceMemberManagement } from 'src/gallery/utils/space-member-management.js';
 import { AlbumAssetCount } from 'src/repositories/album.repository.js';
 import {
   SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH,
@@ -260,11 +265,16 @@ export class SharedSpaceService extends BaseService {
       role: SharedSpaceRole.Owner,
     });
 
-    return this.mapSpace(space);
+    return {
+      ...this.mapSpace(space),
+      memberManagement: await this.memberManagementFor(SharedSpaceRole.Owner, space),
+    };
   }
 
   async getAll(auth: AuthDto): Promise<SharedSpaceResponseDto[]> {
     const spaces = await this.sharedSpaceRepository.getAllByUserId(auth.user.id);
+    // One config read per call, not per space.
+    const { server } = await this.getConfig({ withCache: false });
 
     const results: SharedSpaceResponseDto[] = [];
     // Spaces stay one at a time so a user in many spaces does not take over the connection pool; the reads for
@@ -322,6 +332,11 @@ export class SharedSpaceService extends BaseService {
 
       results.push({
         ...this.mapSpace(space),
+        memberManagement: await this.memberManagementFor(
+          membership?.role as SharedSpaceRole | undefined,
+          space,
+          server,
+        ),
         memberCount: members.length,
         assetCount,
         albumCount,
@@ -395,6 +410,7 @@ export class SharedSpaceService extends BaseService {
 
     return {
       ...this.mapSpace(space),
+      memberManagement: await this.memberManagementFor(membership.role as SharedSpaceRole, space),
       thumbnailAssetId,
       memberCount: members.length,
       assetCount,
@@ -414,9 +430,15 @@ export class SharedSpaceService extends BaseService {
     // changes the whole space's people list. Naming/appearance (name, description, color) and the
     // cover are editor-level. The check runs against the WHOLE dto before any write, so a mixed
     // payload from an editor is rejected outright rather than partially applied.
-    const isOwnerOnlySettingsUpdate = dto.faceRecognitionEnabled !== undefined || dto.petsEnabled !== undefined;
+    // The member-management switches are owner-only too, including a reset to null: an editor must not be
+    // able to undo an owner's choice.
+    const isOwnerOnlySettingsUpdate =
+      dto.faceRecognitionEnabled !== undefined ||
+      dto.petsEnabled !== undefined ||
+      dto.editorsCanAddMembers !== undefined ||
+      dto.editorsCanChangeRoles !== undefined;
     const minimumRole = isOwnerOnlySettingsUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
-    await this.requireRole(auth, id, minimumRole);
+    const callerMembership = await this.requireRole(auth, id, minimumRole);
 
     // Validate thumbnail asset belongs to the space
     if (dto.thumbnailAssetId !== undefined && dto.thumbnailAssetId !== null) {
@@ -454,6 +476,12 @@ export class SharedSpaceService extends BaseService {
     }
     if (dto.petsEnabled !== undefined) {
       updatePayload.petsEnabled = dto.petsEnabled;
+    }
+    if (dto.editorsCanAddMembers !== undefined) {
+      updatePayload.editorsCanAddMembers = dto.editorsCanAddMembers;
+    }
+    if (dto.editorsCanChangeRoles !== undefined) {
+      updatePayload.editorsCanChangeRoles = dto.editorsCanChangeRoles;
     }
 
     const space =
@@ -500,7 +528,10 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
-    return this.mapSpace(space);
+    return {
+      ...this.mapSpace(space),
+      memberManagement: await this.memberManagementFor(callerMembership.role as SharedSpaceRole, space),
+    };
   }
 
   async remove(auth: AuthDto, id: string): Promise<void> {
@@ -550,7 +581,22 @@ export class SharedSpaceService extends BaseService {
     spaceId: string,
     dto: SharedSpaceMemberCreateDto,
   ): Promise<SharedSpaceMemberResponseDto> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
+    const caller = await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    // The permission gate runs before the existing-member check, so an editor without permission cannot probe
+    // who is a member through the 400 below.
+    if (caller.role !== SharedSpaceRole.Owner) {
+      const management = await this.memberManagementForSpace(caller.role as SharedSpaceRole, spaceId);
+      if (!management.canAddMembers) {
+        throw new ForbiddenException('Not allowed to add members');
+      }
+      if (dto.role === SharedSpaceRole.Owner) {
+        throw new ForbiddenException('Only an owner can add an owner');
+      }
+      if (dto.role === SharedSpaceRole.Editor && !management.canChangeRoles) {
+        throw new ForbiddenException('Not allowed to add an editor');
+      }
+    }
 
     const existing = await this.sharedSpaceRepository.getMember(spaceId, dto.userId);
     if (existing) {
@@ -596,7 +642,15 @@ export class SharedSpaceService extends BaseService {
     userId: string,
     dto: SharedSpaceMemberUpdateDto,
   ): Promise<SharedSpaceMemberResponseDto> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
+    const caller = await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const callerIsOwner = caller.role === SharedSpaceRole.Owner;
+
+    if (!callerIsOwner) {
+      const management = await this.memberManagementForSpace(caller.role as SharedSpaceRole, spaceId);
+      if (!management.canChangeRoles) {
+        throw new ForbiddenException('Not allowed to change roles');
+      }
+    }
 
     if (auth.user.id === userId) {
       throw new BadRequestException('Cannot change your own role');
@@ -605,6 +659,16 @@ export class SharedSpaceService extends BaseService {
     const existingMember = await this.sharedSpaceRepository.getMember(spaceId, userId);
     if (!existingMember) {
       throw new BadRequestException('Member not found');
+    }
+
+    // Editors manage only viewers and editors: they can neither touch an owner nor make one.
+    if (!callerIsOwner) {
+      if (existingMember.role === SharedSpaceRole.Owner) {
+        throw new ForbiddenException("Cannot change an owner's role");
+      }
+      if (dto.role === SharedSpaceRole.Owner) {
+        throw new ForbiddenException('Only an owner can add an owner');
+      }
     }
 
     // rbac-4: a promoted co-Owner must not be able to demote the space creator.
@@ -1521,6 +1585,9 @@ export class SharedSpaceService extends BaseService {
           albumNames.has(data.albumId)
         ) {
           data.albumName = albumNames.get(data.albumId);
+        }
+        if (a.type === SharedSpaceActivityType.MemberJoin && a.invitedByName) {
+          data.invitedByName = a.invitedByName;
         }
         return {
           id: a.id,
@@ -4539,6 +4606,25 @@ export class SharedSpaceService extends BaseService {
       maxDistance: machineLearning.facialRecognition.maxDistance,
       suggestionMaxDistance: machineLearning.facialRecognition.suggestions.maxDistance,
     };
+  }
+
+  private async memberManagementFor(
+    role: SharedSpaceRole | undefined,
+    space: SpaceMemberPermissionSettings,
+    server?: ServerMemberPermissionSettings,
+  ) {
+    if (!server) {
+      ({ server } = await this.getConfig({ withCache: false }));
+    }
+    return resolveSpaceMemberManagement(role, space, server);
+  }
+
+  private async memberManagementForSpace(role: SharedSpaceRole, spaceId: string) {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+    return this.memberManagementFor(role, space);
   }
 
   private mapMember(member: {
