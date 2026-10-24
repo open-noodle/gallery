@@ -16,7 +16,12 @@ import {
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum.js';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums.js';
-import { asset_delete_audit, asset_face_update_asset_state, asset_is_favorite_after_write, asset_library_delete_audit } from 'src/schema/functions.js';
+import {
+  asset_delete_audit,
+  asset_face_update_asset_state,
+  asset_is_favorite_after_write,
+  asset_library_delete_audit,
+} from 'src/schema/functions.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
 import { StackTable } from 'src/schema/tables/stack.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';

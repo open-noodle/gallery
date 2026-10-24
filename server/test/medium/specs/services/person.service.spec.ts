@@ -238,7 +238,6 @@ const setupFaceRecognition = (db?: Kysely<DB>) => {
     active: 1,
     waiting: 0,
     delayed: 0,
-    paused: 0,
     completed: 0,
     failed: 0,
   });
@@ -1210,7 +1209,7 @@ describe(PersonService.name, () => {
       const jobRepo = ctx.getMock(JobRepository);
       ctx.getMock(StorageRepository).unlink.mockResolvedValue();
       jobRepo.waitForQueueCompletion.mockResolvedValue();
-      jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0, paused: 0 });
+      jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0 });
       jobRepo.queueAll.mockResolvedValue();
       // removeAllPersonGroups queues a FileDelete job per chunk of deleted people; this test doesn't
       // assert on it, so it only needs a resolved value the way setupFaceRecognition() does above.
@@ -1252,7 +1251,7 @@ describe(PersonService.name, () => {
       const jobRepo = ctx.getMock(JobRepository);
       ctx.getMock(StorageRepository).unlink.mockResolvedValue();
       jobRepo.waitForQueueCompletion.mockResolvedValue();
-      jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0, paused: 0 });
+      jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0 });
       jobRepo.queueAll.mockResolvedValue();
       // removeAllPersonGroups queues a FileDelete job per chunk of deleted people; this test doesn't
       // assert on it, so it only needs a resolved value the way setupFaceRecognition() does above.

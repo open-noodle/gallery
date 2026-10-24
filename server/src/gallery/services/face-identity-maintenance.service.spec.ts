@@ -14,7 +14,6 @@ const recognitionCounts = (overrides: Partial<QueueStatisticsDto> = {}) =>
     active: 1,
     waiting: 0,
     delayed: 0,
-    paused: 0,
     completed: 0,
     failed: 0,
     ...overrides,
@@ -182,14 +181,10 @@ describe(FaceIdentityMaintenanceService.name, () => {
       await sut.onBootstrap();
 
       expect(mocks.job.searchJobs).toHaveBeenCalledWith(QueueName.PeopleBackfill, {
-        status: expect.arrayContaining([
-          QueueJobStatus.Active,
-          QueueJobStatus.Delayed,
-          QueueJobStatus.Paused,
-          QueueJobStatus.Waiting,
-        ]),
+        status: expect.arrayContaining([QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting]),
       });
-      expect(mocks.job.searchJobs.mock.calls[0][1]?.status).toHaveLength(4);
+      // bullmq 6 has no paused list: a paused queue reports its jobs as waiting
+      expect(mocks.job.searchJobs.mock.calls[0][1]?.status).toHaveLength(3);
       expect(mocks.job.queue).not.toHaveBeenCalled();
     });
 
@@ -272,7 +267,6 @@ describe(FaceIdentityMaintenanceService.name, () => {
       mocks.job.getJobCounts.mockResolvedValue({
         active: 1,
         waiting: 0,
-        paused: 0,
         completed: 0,
         failed: 0,
         delayed: 0,
@@ -292,7 +286,6 @@ describe(FaceIdentityMaintenanceService.name, () => {
       mocks.job.getJobCounts.mockResolvedValue({
         active: 1,
         waiting: 5,
-        paused: 0,
         completed: 0,
         failed: 0,
         delayed: 0,
@@ -307,8 +300,9 @@ describe(FaceIdentityMaintenanceService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
     });
 
-    it('requeues itself with a delay when FacialRecognition has paused jobs', async () => {
-      mocks.job.getJobCounts.mockResolvedValue(recognitionCounts({ active: 1, paused: 2 }));
+    it('requeues itself with a delay when a paused FacialRecognition queue still holds jobs', async () => {
+      // bullmq 6 reports the jobs of a paused queue as waiting
+      mocks.job.getJobCounts.mockResolvedValue(recognitionCounts({ active: 1, waiting: 2 }));
 
       await expect(sut.handleFaceIdentityMaintenanceAfterRecognition({})).resolves.toBe(JobStatus.Success);
 
@@ -324,7 +318,6 @@ describe(FaceIdentityMaintenanceService.name, () => {
       mocks.job.getJobCounts.mockResolvedValue({
         active: 1,
         waiting: 0,
-        paused: 0,
         completed: 0,
         failed: 0,
         delayed: 3,
@@ -343,7 +336,6 @@ describe(FaceIdentityMaintenanceService.name, () => {
       mocks.job.getJobCounts.mockResolvedValue({
         active: 3,
         waiting: 0,
-        paused: 0,
         completed: 0,
         failed: 0,
         delayed: 0,
@@ -378,7 +370,7 @@ describe(FaceIdentityMaintenanceService.name, () => {
       await expect(sut.handleFaceIdentityMaintenanceAfterRecognition({})).resolves.toBe(JobStatus.Skipped);
 
       expect(mocks.job.searchJobs).toHaveBeenCalledWith(QueueName.PeopleBackfill, {
-        status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+        status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting],
       });
       expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
     });

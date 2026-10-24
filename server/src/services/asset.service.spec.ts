@@ -185,7 +185,7 @@ describe(AssetService.name, () => {
         asset.id,
       );
 
-      expect(result).not.toHaveProperty('owner');
+      expect(result).toMatchObject({ owner: undefined });
     });
 
     it('should clear people for non-owner access', async () => {
