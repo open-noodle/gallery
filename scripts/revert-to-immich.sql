@@ -301,7 +301,9 @@ UPDATE "api_key" k
                 'sharedSpaceAlbum.create', 'sharedSpaceAlbum.update', 'sharedSpaceAlbum.delete',
                 'sharedSpaceAlbumFolder.create', 'sharedSpaceAlbumFolder.update', 'sharedSpaceAlbumFolder.delete',
                 'sharedSpaceLibrary.create', 'sharedSpaceLibrary.delete',
-                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete'
+                'userGroup.create', 'userGroup.read', 'userGroup.update', 'userGroup.delete',
+                -- Post-tag upstream values (passkeys, immich-32194): the tagged release cannot decode them.
+                'passkey.read', 'passkey.update', 'passkey.delete'
               ]::character varying[])
            )::character varying[] AS "permissions"
       FROM "api_key"
@@ -691,10 +693,23 @@ DROP INDEX IF EXISTS "asset_localDateTime_range_idx";
 -- planner tuning.
 ALTER ROLE CURRENT_USER RESET jit;
 
--- No post-tag upstream migration needs reversing right now. `upstream.version` is
--- 3.3.1 and this branch's `server/src/schema/migrations/` is identical to upstream
--- v3.3.1's (same 100 files, unchanged from v3.3.0), so every upstream migration Gallery
--- carries is one the tagged release also ships. The 3.3.0 -> 3.3.1 bump removed nothing.
+-- Post-tag upstream migrations this branch carries (`upstream.version` is 3.3.5; v3.3.5
+-- ships everything up to 1792213725597-AddAssetFaceAssetState):
+
+-- 1792511451454-AddPasskeyTable (immich-32194): passkey + auth_challenge tables, the passkey
+-- updatedAt trigger and its migration_overrides row.
+DROP TRIGGER IF EXISTS "passkey_updatedAt" ON "passkey";
+DELETE FROM "migration_overrides" WHERE "name" = 'trigger_passkey_updatedAt';
+DROP TABLE IF EXISTS "passkey";
+DROP TABLE IF EXISTS "auth_challenge";
+
+-- 1792517020180-AddUpdateIdIndexes (immich-32432): updateId indexes on stack, asset_face, workflow.
+DROP INDEX IF EXISTS "stack_updateId_idx";
+DROP INDEX IF EXISTS "workflow_updateId_idx";
+DROP INDEX IF EXISTS "asset_face_updateId_idx";
+
+-- Before 3.3.5 none needed reversing: on 3.3.1 this branch's upstream migrations were identical to
+-- the tag's. The 3.3.0 -> 3.3.1 bump removed nothing.
 -- The 3.2.4 -> 3.3.0 bump removed four more entries, for the
 -- same reason as below: 1789419229196-ConvertUserOAuthIdEmptyStringToNull,
 -- 1790587508209-RenameGeoNamesCountries, 1790616293884-PersonSharing and
@@ -856,12 +871,12 @@ DELETE FROM "kysely_migrations"
    -- "corrupted migrations: previously executed migration
    -- 1776735180298-ChangeDurationToInteger is missing". The 1777667825574 row matches
    -- the upstream file, so it stays.
-   '1776735180298-ChangeDurationToInteger'
+   '1776735180298-ChangeDurationToInteger',
 
-   -- Post-tag upstream migrations pulled in by rebase would follow here, paired with
-   -- schema rollbacks in step 7 and kept timestamp-sorted. None right now:
-   -- `upstream.version` is 3.3.1 and every upstream migration this branch carries ships
-   -- in that tag (see step 7).
+   -- Post-tag upstream migrations pulled in by rebase, paired with schema rollbacks in step 7
+   -- and kept timestamp-sorted (`upstream.version` is 3.3.5).
+   '1792511451454-AddPasskeyTable',
+   '1792517020180-AddUpdateIdIndexes'
  );
 
 -- Gallery builds since the ledger split record fork migrations in their own table instead. The
