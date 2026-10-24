@@ -144,10 +144,51 @@ Everything else stopped for a hand resolution.
 
 ## Remote CI verification
 
-Recorded in a follow-up commit once the dispatched runs finish.
+| Workflow                            | Run         | Commit        | Notes                                                     |
+| ----------------------------------- | ----------- | ------------- | --------------------------------------------------------- |
+| Test                                | 40099000792 | `7d568e00985` | green after the fixes below                               |
+| Static Code Analysis                | 40090801392 | `1c910524acc` |                                                           |
+| Docker                              | 40090803582 | `1c910524acc` |                                                           |
+| Gallery Build Mobile                | 40090814701 | `1c910524acc` |                                                           |
+| Gallery Rebase Smoke                | 40090816746 | `1c910524acc` |                                                           |
+| Storage Migration Tests             | 40090818855 | `1c910524acc` |                                                           |
+| Storage Migration E2E               | 40090820823 | `1c910524acc` |                                                           |
+| Gallery ML Smoke                    | 40090822720 | `1c910524acc` |                                                           |
+| Gallery Mobile Smoke                | 40090824532 | `1c910524acc` |                                                           |
+| Release Candidate Build             | 40090797379 | `1c910524acc` | `gallery-server:rolling-v34-rc2`                          |
+| Gallery Revert-to-Immich Validation | 40091927421 | `5110d564057` | RC image above, stock `immich-server:commit-cf719e733e6…` |
+
+After `1c910524acc` only tests, the revert workflow and one comment line changed, so the runs on it still
+cover the shipped tree.
+
+What the first Test run found, and the fixes:
+
+- **Revert gate on a branch past the last Immich tag.** The gate booted stock Immich at the
+  `upstream.version` tag (3.3.5), which refuses a database carrying upstream's passkey migration.
+  The last cycle's run passed only because it tested `main`'s image. The workflow now takes an
+  optional `upstream_image` input; this run booted upstream's image for `cf719e733e6` and passed
+  every step (stock round trip, revert, no schema drift, data read back).
+- **Medium `face-repair.resolve` F12 timeout, on two runs.** Upstream's `AddUpdateIdIndexes`
+  (immich-32432) creates an index on the empty `asset_face`, so the medium template now records it
+  as known-empty (`reltuples = 0`). A flagged-face plan cached on a pooled connection by an earlier
+  test kept assuming an empty table and scanned it once per face: about 4 s per resolve locally and
+  past the 30 s timeout on CI. Found by dumping `pg_stat_activity` and the plans from CI. The bulk
+  seed now runs `ANALYZE`, as autovacuum would. Production tables are analyzed, so this only affects
+  tests, but any other medium test that bulk-seeds `asset_face` after smaller tests can hit it.
+- **Fork tests behind upstream changes**: `mapAsset` lost `stripMetadata`; `withPartners` without a
+  visibility now defaults to the timeline (immich-32565) rather than returning 400; the client header
+  spec mocked `serverConfigManager`, which upstream's `init()` no longer reads. Plus two lint/format
+  findings in resolved files.
+- **ML training flake.** `test_identity_projection_scores_exactly_like_zeroshot` compared metrics for
+  exact equality on near-tied synthetic scores and failed once (AUC 0.354 vs 0.333) on a tree that
+  had passed twice. It now checks the projected scores directly and the metrics with a tolerance.
+  The test is unchanged from `main`, which has the same flake.
+- **Local gaps**: `pnpm build` skips specs (use `pnpm check`), and the changed-files web lint missed
+  `asset.service.spec.ts`.
 
 ## Before landing on a v3.4 tag
 
 - Validate the pet models under ML v2 (still the landing blocker).
 - Bump the base to the v3.4 tag, and drop the carried v3.3 version commits and release cherry-picks.
 - Move the rest of the Spaces data layer onto query modules (follow-up above).
+- Port the ML training test fix to `main` (same flake there).
