@@ -1,4 +1,6 @@
 import { defaults } from '@immich/sdk';
+import { queryClient } from '$lib/queries/client';
+import { getServerConfigQuery } from '$lib/queries/server.query';
 import '$lib/stores/websocket';
 import { init } from '$lib/utils/server';
 import { version } from '../../../package.json';
@@ -14,14 +16,13 @@ vi.mock('socket.io-client', () => {
     },
   };
 });
-vi.mock('$lib/managers/server-config-manager.svelte', () => ({
-  serverConfigManager: { init: vi.fn(), value: { maintenanceMode: true } },
-}));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({ authManager: { load: vi.fn() } }));
 vi.mock('$lib/utils', () => ({ initLanguage: vi.fn() }));
 
 describe('Gallery client header', () => {
   it('is sent on every SDK request', async () => {
+    // init() reads the server config through the query client; maintenance mode skips the other loads.
+    queryClient.setQueryData(getServerConfigQuery().queryKey, { maintenanceMode: true } as never);
     await init(fetch);
     expect(defaults.headers).toMatchObject({ 'x-gallery-app': version });
   });
