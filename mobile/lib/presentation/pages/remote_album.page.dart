@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/server_capability.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/extensions/datetime_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/album/pending_uploads_banner.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/remote_album_bottom_sheet.widget.dart';
@@ -426,7 +427,7 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
                   key: const Key('album-edit-created-at'),
                   tileColor: context.colorScheme.surface,
                   shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                  title: Text(DateFormat.yMMMd().format(createdAt), style: context.textTheme.bodyMedium),
+                  title: Text(DateFormat.yMMMd(resolvedDateTimeLocale()).format(createdAt), style: context.textTheme.bodyMedium),
                   trailing: Icon(Icons.edit_outlined, size: 18, color: context.colorScheme.primary),
                   onTap: _pickCreatedAt,
                 ),
