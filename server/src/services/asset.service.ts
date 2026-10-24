@@ -2,7 +2,6 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import type { AssetFile } from 'src/database.js';
-import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { OnJob } from 'src/decorators.js';
@@ -22,6 +21,7 @@ import {
   UpdateAssetDto,
   mapStats,
 } from 'src/dtos/asset.dto.js';
+import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import {
   AssetEditAction,
   type AssetEditActionItem,
@@ -97,9 +97,6 @@ export class AssetService extends BaseService {
 
     if (isMetadataHidden(auth)) {
       return data;
-    }
-
-    if (auth.sharedLink) {
     }
 
     await applyAssetResponseOverlay(
