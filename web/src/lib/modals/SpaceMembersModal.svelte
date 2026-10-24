@@ -18,11 +18,20 @@
     spaceId: string;
     members: SharedSpaceMemberResponseDto[];
     isOwner: boolean;
+    /** Whether the viewer may switch members between viewer and editor; owners always may. */
+    canChangeRoles?: boolean;
     spaceColor?: string | null;
     onClose: (updatedMembers?: SharedSpaceMemberResponseDto[]) => void;
   }
 
-  let { spaceId, members: initialMembers, isOwner, spaceColor = 'primary', onClose }: Props = $props();
+  let {
+    spaceId,
+    members: initialMembers,
+    isOwner,
+    canChangeRoles = isOwner,
+    spaceColor = 'primary',
+    onClose,
+  }: Props = $props();
   let members = $state([...initialMembers]);
 
   const toAvatarUser = (member: SharedSpaceMemberResponseDto) => ({
@@ -103,14 +112,14 @@
         </div>
         {#if isOwner && member.role === 'owner'}
           <RoleBadge role="owner" {spaceColor} />
-        {:else if isOwner}
+        {:else if canChangeRoles}
           <Field class="w-32 shrink-0">
             <Select
               value={member.role as string as SharedSpaceRole}
               options={[
                 { label: $t('role_editor'), value: SharedSpaceRole.Editor },
                 { label: $t('role_viewer'), value: SharedSpaceRole.Viewer },
-                { label: $t('remove'), value: 'remove' },
+                ...(isOwner ? [{ label: $t('remove'), value: 'remove' }] : []),
               ] as SelectOption<SharedSpaceRole | 'remove'>[]}
               onChange={(value) => handleRoleChange(member, value)}
             />
