@@ -49,7 +49,6 @@ describe('MaintenanceBackupEntry', () => {
       timezone: 'Asia/Tokyo',
     });
 
-    // @ts-expect-error pending a type fix: https://github.com/testing-library/jest-dom/pull/742/changes
     expect(screen.getByText(expectedRelativeTime!)).toBeInTheDocument();
   });
 });
