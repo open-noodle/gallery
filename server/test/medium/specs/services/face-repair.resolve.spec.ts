@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { vi } from 'vitest';
 import { JobName, SourceType } from 'src/enum.js';
@@ -159,6 +159,11 @@ const seedFacesBulk = async (ctx: Ctx, ownerId: string, personId: string, count:
       .values(searchRows.slice(index, index + 1000))
       .execute();
   }
+  // Refresh the planner's statistics, as autovacuum would after a bulk load. The template database records
+  // asset_face as known-empty (reltuples = 0, left by an index created on the empty table), so a plan
+  // cached on a pooled connection by an earlier test assumes it is still empty and scans it once per
+  // flagged face: about 4 s locally and past the 30 s timeout on CI. ANALYZE also invalidates those plans.
+  await sql`analyze asset, asset_face, face_search`.execute(db);
   return faces.map((face) => face.id);
 };
 
