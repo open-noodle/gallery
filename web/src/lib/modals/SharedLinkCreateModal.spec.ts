@@ -1,16 +1,15 @@
 import '@testing-library/jest-dom';
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import SharedLinkCreateModal from './SharedLinkCreateModal.svelte';
 
-const handleCreateSharedLinkMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/services/shared-link.service', () => ({ handleCreateSharedLink: handleCreateSharedLinkMock }));
-
 beforeEach(() => {
-  // Not clearMocks: this project's vitest config leaves mock history to leak across a file.
-  handleCreateSharedLinkMock.mockReset();
-  handleCreateSharedLinkMock.mockResolvedValue(true);
+  // The modal saves through upstream's createSharedLinkMutation (immich-32666), so assert on the SDK
+  // call it makes. Not clearMocks: this project's vitest config leaves mock history to leak.
+  sdkMock.createSharedLink.mockReset();
+  sdkMock.createSharedLink.mockResolvedValue({ id: 'link-1', key: 'key-1' } as never);
 });
 
 // `FormModal` mounts a bits-ui dialog whose body scroll lock releases on a 24ms timer; if the
@@ -63,7 +62,11 @@ describe('SharedLinkCreateModal', () => {
 
       await submit();
 
-      expect(handleCreateSharedLinkMock).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-1' }));
+      await waitFor(() =>
+        expect(sdkMock.createSharedLink).toHaveBeenCalledWith({
+          sharedLinkCreateDto: expect.objectContaining({ spaceId: 'space-1' }),
+        }),
+      );
     });
   });
 
@@ -73,7 +76,11 @@ describe('SharedLinkCreateModal', () => {
 
       await submit();
 
-      expect(handleCreateSharedLinkMock).toHaveBeenCalledWith(expect.objectContaining({ spaceId: undefined }));
+      await waitFor(() =>
+        expect(sdkMock.createSharedLink).toHaveBeenCalledWith({
+          sharedLinkCreateDto: expect.objectContaining({ spaceId: undefined }),
+        }),
+      );
     });
 
     it('keeps reporting assets narrowed out of the selection', () => {

@@ -326,10 +326,8 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
       if (!ctx?.album) {
         return;
       }
-      const ok = await handleDeleteAlbum(ctx.album.raw, { prompt: false });
-      if (ok) {
-        await goto(Route.albums());
-      }
+      // handleDeleteAlbum leaves the album page itself once the delete succeeds (immich-32668).
+      await handleDeleteAlbum(ctx.album.raw, { prompt: false });
     },
   },
 
