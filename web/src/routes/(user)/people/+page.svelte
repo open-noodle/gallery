@@ -20,7 +20,9 @@
   import { getPersonActions, isSpaceEditor, updatePersonName } from '#lib/services/person.service.ts';
   import Dropdown from '#lib/elements/Dropdown.svelte';
   import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '#lib/stores/preferences.store.ts';
-  import { loadSpaces, userInteraction } from '#lib/stores/user.svelte.ts';
+  import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
+  import { queryClient } from '#lib/queries/client.ts';
+  import { createQuery } from '@tanstack/svelte-query';
   import { websocketEvents } from '#lib/stores/websocket.ts';
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { handlePromiseError } from '#lib/utils.ts';
@@ -334,14 +336,13 @@
 
   // Space-person renames need the owner/editor role, read from the spaces list; rows stay editable
   // until it says otherwise (the server enforces the role regardless).
-  $effect(() => {
-    if (people.some((person) => isSpacePrimary(person))) {
-      loadSpaces();
-    }
-  });
+  const spacesQuery = createQuery(
+    () => ({ ...getAllSpacesQuery(), enabled: people.some((person) => isSpacePrimary(person)) }),
+    () => queryClient,
+  );
   const canEditSpacePerson = (person: PersonResponseDto) => {
     const spaceId = person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined;
-    return !spaceId || isSpaceEditor(userInteraction.recentSpaces, spaceId, authManager.user.id);
+    return !spaceId || isSpaceEditor(spacesQuery.data, spaceId, authManager.user.id);
   };
   const canEditName = (person: PersonResponseDto) =>
     isPersonalPrimary(person) || (isSpacePrimary(person) && canEditSpacePerson(person));

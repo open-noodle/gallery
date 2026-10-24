@@ -46,7 +46,9 @@
     updatePersonRepresentativeFace,
   } from '#lib/services/person.service.ts';
   import { lang, locale } from '#lib/stores/preferences.store.ts';
-  import { loadSpaces, userInteraction } from '#lib/stores/user.svelte.ts';
+  import { getAllSpacesQuery } from '#lib/gallery/spaces/space.query.ts';
+  import { queryClient } from '#lib/queries/client.ts';
+  import { createQuery } from '@tanstack/svelte-query';
   import { websocketEvents } from '#lib/stores/websocket.ts';
   import { getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import {
@@ -428,13 +430,12 @@
   const personSpaceId = $derived(
     person.primaryProfile?.type === 'space-person' ? person.primaryProfile.spaceId : undefined,
   );
-  $effect(() => {
-    if (personSpaceId) {
-      loadSpaces();
-    }
-  });
+  const spacesQuery = createQuery(
+    () => ({ ...getAllSpacesQuery(), enabled: !!personSpaceId }),
+    () => queryClient,
+  );
   const canEditSpacePerson = $derived(
-    !personSpaceId || isSpaceEditor(userInteraction.recentSpaces, personSpaceId, authManager.user.id),
+    !personSpaceId || isSpaceEditor(spacesQuery.data, personSpaceId, authManager.user.id),
   );
 
   let suggestionTotal = $state(0);

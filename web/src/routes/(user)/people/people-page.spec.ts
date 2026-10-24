@@ -19,9 +19,10 @@ import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observe
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
 import { PEOPLE_PAGE_SIZE } from '$lib/constants';
+import { spacesQueryKey } from '$lib/gallery/spaces/space.query';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { queryClient } from '$lib/queries/client';
 import { PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
-import { userInteraction } from '$lib/stores/user.svelte';
 import { personFactory } from '@test-data/factories/person-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
@@ -209,7 +210,7 @@ function renderPaginatedPage() {
 describe('Global people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    userInteraction.recentSpaces = undefined;
+    queryClient.removeQueries({ queryKey: spacesQueryKey });
     peopleViewSettings.set({ sortBy: PeopleSortBy.PhotoCount, filterBy: PeopleFilterBy.All });
     clearPeopleFaceStatisticsInfoCache();
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
@@ -794,7 +795,7 @@ describe('Global people page', () => {
       }),
     ]);
 
-    await waitFor(() => expect(userInteraction.recentSpaces).toBeDefined());
+    await waitFor(() => expect(queryClient.getQueryData(spacesQueryKey)).toBeDefined());
     expect(screen.queryByDisplayValue('Shared Alice')).toBeNull();
     expect(screen.getByText('Shared Alice')).toBeInTheDocument();
     expect(sdkMock.getAllSpaces).toHaveBeenCalledOnce();
