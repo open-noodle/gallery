@@ -1,7 +1,6 @@
 <script lang="ts">
   import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { serverConfigManager } from '#lib/managers/server-config-manager.svelte';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { AssetOrder, updateMyPreferences } from '@immich/sdk';
   import { Button, Field, NumberInput, Select, Switch, toastManager } from '@immich/ui';
@@ -9,9 +8,11 @@
   import { fade } from 'svelte/transition';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
+  import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
 
   const query = createPreloadedQuery(getUserConfigQuery);
   const config = $derived(query.data);
+  const serverConfigQuery = createPreloadedQuery(getServerConfigQuery);
 
   // Albums
   let defaultAssetOrder = $state(authManager.preferences.albums?.defaultAssetOrder ?? AssetOrder.Desc);
@@ -24,10 +25,10 @@
   let memoriesEnabled = $state(authManager.preferences.memories?.enabled ?? true);
   let memoriesDuration = $state(authManager.preferences.memories?.duration ?? 5);
   let memoriesSidebar = $state(authManager.preferences.memories?.sidebarWeb ?? true);
-  const availableMemoryTypes = $derived(serverConfigManager.value.availableMemoryTypes ?? []);
+  const availableMemoryTypes = $derived(serverConfigQuery.data.availableMemoryTypes ?? []);
   let memoryTypes = $state<Record<string, boolean>>(
     Object.fromEntries(
-      (serverConfigManager.value.availableMemoryTypes ?? []).map((key) => [
+      (serverConfigQuery.data.availableMemoryTypes ?? []).map((key) => [
         key,
         authManager.preferences.memories?.types?.[key] ?? true,
       ]),
