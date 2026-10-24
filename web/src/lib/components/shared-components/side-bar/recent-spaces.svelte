@@ -8,13 +8,14 @@
   } from '$lib/stores/preferences.store';
   import { sidebarModeStore } from '$lib/stores/sidebar-mode.svelte';
   import { pinnedSpaceIds } from '$lib/stores/space-view.store';
-  import { loadSpaces, userInteraction } from '$lib/stores/user.svelte';
+  import { getAllSpacesQuery, getSpaceAlbumsQuery } from '$lib/gallery/spaces/space.query';
+  import { queryClient } from '$lib/queries/client';
   import { getAssetMediaUrl } from '$lib/utils';
   import { splitPinnedSpaces } from '$lib/utils/space-utils';
   import { handleError } from '$lib/utils/handle-error';
-  import { getSharedSpaceAlbums } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiChevronDown, mdiChevronRight, mdiDotsHorizontal } from '@mdi/js';
+  import { createQueries, createQuery } from '@tanstack/svelte-query';
   import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
@@ -24,7 +25,10 @@
     return aTime > bTime ? -1 : aTime < bTime ? 1 : 0;
   };
 
-  let allSpaces = $state(userInteraction.recentSpaces);
+  // Shares the People pages' spaces list (space.query.ts); the last list stays on screen while an
+  // invalidation refetches it.
+  const spacesQuery = createQuery(getAllSpacesQuery, () => queryClient);
+  const allSpaces = $derived(spacesQuery.data);
 
   let spaces = $derived.by(() => {
     if (!allSpaces) {
@@ -36,59 +40,41 @@
 
   const topSpaceIds = $derived(spaces.map((s) => s.id));
 
-  // Spaces with a fetch currently in flight — guards against a duplicate `getSharedSpaceAlbums`
-  // call when the mount/refresh effect below re-runs while the cache is still unset.
-  const inFlightSpaceAlbumFetches = new SvelteSet<string>();
+  // One albums query per shown space, enabled while its row is expanded — including an expansion
+  // persisted from a prior session. The cache outlives collapse/expand; linking or unlinking an album
+  // invalidates it (space.query.ts).
+  const albumQueries = createQueries(
+    () => ({
+      queries: spaces.map((space) => ({
+        ...getSpaceAlbumsQuery(space.id),
+        enabled: isSpaceAlbumsExpanded($recentSpaceAlbumsExpanded, space.id),
+      })),
+    }),
+    () => queryClient,
+  );
+  const spaceAlbums = $derived(Object.fromEntries(spaces.map((space, index) => [space.id, albumQueries[index]?.data])));
 
-  const loadAlbums = async (spaceId: string) => {
-    const cachedAlbums = userInteraction.spaceAlbums?.[spaceId];
-    if (cachedAlbums || inFlightSpaceAlbumFetches.has(spaceId)) {
-      return; // already fetched (possibly an empty list), or a fetch is already in flight — never refetch
+  // A failed load collapses the row again; its cache stays unset, so the next expand retries.
+  const reportedErrors = new SvelteSet<string>();
+  $effect(() => {
+    for (const [index, space] of spaces.entries()) {
+      const result = albumQueries[index];
+      if (!result?.isError) {
+        continue;
+      }
+      const key = `${space.id}:${result.errorUpdatedAt}`;
+      if (reportedErrors.has(key)) {
+        continue;
+      }
+      reportedErrors.add(key);
+      handleError(result.error, $t('failed_to_load_albums'));
+      setSpaceAlbumsExpanded(space.id, false, topSpaceIds);
     }
-    inFlightSpaceAlbumFetches.add(spaceId);
-    try {
-      const albums = await getSharedSpaceAlbums({ id: spaceId });
-      const sorted = [...albums].sort((a, b) => b.linkedAt.localeCompare(a.linkedAt));
-      userInteraction.spaceAlbums = { ...userInteraction.spaceAlbums, [spaceId]: sorted };
-    } catch (error) {
-      handleError(error, $t('failed_to_load_albums'));
-      setSpaceAlbumsExpanded(spaceId, false, topSpaceIds); // cache stays unset → retry on next expand
-    } finally {
-      inFlightSpaceAlbumFetches.delete(spaceId);
-    }
-  };
+  });
 
   const toggleAlbums = (spaceId: string) => {
-    const nowExpanded = !isSpaceAlbumsExpanded($recentSpaceAlbumsExpanded, spaceId);
-    setSpaceAlbumsExpanded(spaceId, nowExpanded, topSpaceIds);
-    if (nowExpanded) {
-      void loadAlbums(spaceId);
-    }
+    setSpaceAlbumsExpanded(spaceId, !isSpaceAlbumsExpanded($recentSpaceAlbumsExpanded, spaceId), topSpaceIds);
   };
-
-  // Re-fetch albums for any currently-shown space whose expansion state was persisted as `true`
-  // (e.g. from a prior session) but whose in-memory album cache hasn't been populated yet — covers
-  // both a fresh page load (cache always starts undefined) and an in-session cache eviction after
-  // a link/unlink while the space is still marked expanded.
-  $effect(() => {
-    for (const space of spaces) {
-      if (
-        isSpaceAlbumsExpanded($recentSpaceAlbumsExpanded, space.id) &&
-        userInteraction.spaceAlbums?.[space.id] === undefined
-      ) {
-        void loadAlbums(space.id);
-      }
-    }
-  });
-
-  // Shares the People pages' fetch of the spaces list. The last list stays on screen while a
-  // cache reset refetches it.
-  $effect(() => {
-    if (userInteraction.recentSpaces) {
-      allSpaces = userInteraction.recentSpaces;
-    }
-    loadSpaces();
-  });
 
   // These rows stay rendered in the rail so it keeps the sidebar's vertical rhythm; collapsed
   // they show only their thumbnail, centred, the way Google Photos' rail does.
@@ -103,7 +89,7 @@
        *list* page (`/albums`, no trailing id), which has no row of its own to hand it to. -->
   {@const active = page.url.pathname.startsWith(spacePath) && !page.url.pathname.startsWith(openAlbumPath)}
   {@const hasAlbums = (space.albumCount ?? 0) > 0}
-  {@const cachedAlbums = userInteraction.spaceAlbums?.[space.id]}
+  {@const cachedAlbums = spaceAlbums[space.id]}
   {@const expanded =
     isSpaceAlbumsExpanded($recentSpaceAlbumsExpanded, space.id) &&
     (cachedAlbums === undefined || cachedAlbums.length > 0)}
