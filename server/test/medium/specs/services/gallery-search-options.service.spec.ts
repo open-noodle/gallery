@@ -173,9 +173,25 @@ const optionsFor = (sut: GallerySearchService, userId: string, dto: SearchOption
 const names = (people: Required<SearchOptionsResponseDto>['people']) =>
   people.map(({ name, count, isSelected }) => `${name}:${count}${isSelected ? '*' : ''}`);
 
+/** Each listed person's name and whether it is a pet. */
+const pets = ({ people }: Required<SearchOptionsResponseDto>) =>
+  Object.fromEntries(people.map(({ name, isPet }) => [name, isPet]));
+
 /** A personal person on each of `assetIds`, optionally linked to a face identity like production's backfill. */
-const personOn = async (ctx: Ctx, ownerId: string, name: string, assetIds: string[], identityId?: string) => {
-  const { person } = await ctx.newPerson({ ownerId, name, ...(identityId && { identityId }) });
+const personOn = async (
+  ctx: Ctx,
+  ownerId: string,
+  name: string,
+  assetIds: string[],
+  identityId?: string,
+  { pet = false } = {},
+) => {
+  const { person } = await ctx.newPerson({
+    ownerId,
+    name,
+    ...(identityId && { identityId }),
+    ...(pet && { type: 'pet' }),
+  });
   for (const assetId of assetIds) {
     const { assetFace } = await ctx.newAssetFace({ assetId, personGroupId: person.personGroupId });
     if (identityId) {
@@ -198,7 +214,14 @@ const newIdentity = async (ctx: Ctx) => {
 };
 
 /** A space person with one visible face on each of `assetIds`. */
-const spacePersonOn = async (ctx: Ctx, spaceId: string, name: string, assetIds: string[], identityId?: string) => {
+const spacePersonOn = async (
+  ctx: Ctx,
+  spaceId: string,
+  name: string,
+  assetIds: string[],
+  identityId?: string,
+  { pet = false } = {},
+) => {
   const faceIds: string[] = [];
   for (const assetId of assetIds) {
     const { assetFace } = await ctx.newAssetFace({ assetId });
@@ -212,7 +235,14 @@ const spacePersonOn = async (ctx: Ctx, spaceId: string, name: string, assetIds: 
   }
   const person = await ctx.database
     .insertInto('shared_space_person')
-    .values({ spaceId, name, representativeFaceId: faceIds[0], isHidden: false, ...(identityId && { identityId }) })
+    .values({
+      spaceId,
+      name,
+      representativeFaceId: faceIds[0],
+      isHidden: false,
+      ...(identityId && { identityId }),
+      ...(pet && { type: 'pet' }),
+    })
     .returning('id')
     .executeTakeFirstOrThrow();
   await ctx.database
@@ -809,6 +839,39 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
     });
   });
 
+  describe('pets', () => {
+    it('marks each person or pet, in every people branch: personal, identity (Photos) and space', async () => {
+      const { sut, ctx } = setup();
+      const { user: me } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const spaceId = await newSpace(ctx, member.id, [{ userId: me.id }]);
+      const [p1, p2] = await photos(ctx, 2, { ownerId: me.id });
+      const [s1, s2] = await photos(ctx, 2, { ownerId: member.id });
+      for (const assetId of [s1, s2]) {
+        await ctx.newSharedSpaceAsset({ spaceId, assetId, addedById: member.id });
+      }
+      const annaIdentity = await newIdentity(ctx);
+      const rexIdentity = await newIdentity(ctx);
+      await personOn(ctx, me.id, 'Anna', [p1], annaIdentity);
+      await personOn(ctx, me.id, 'Rex', [p2], rexIdentity, { pet: true });
+      await spacePersonOn(ctx, spaceId, 'Pia', [s1]);
+      await spacePersonOn(ctx, spaceId, 'Milo', [s2], undefined, { pet: true });
+
+      // personal: no shared spaces in the request
+      const personal = await optionsFor(sut, me.id, {});
+      expect(pets(personal)).toEqual({ Anna: false, Rex: true });
+      // identity: the Photos scope with timeline spaces
+      const photosScope = await optionsFor(sut, me.id, {
+        withSharedSpaces: true,
+        visibility: AssetVisibility.Timeline,
+      });
+      expect(pets(photosScope)).toMatchObject({ Anna: false, Rex: true });
+      // space
+      const space = await optionsFor(sut, me.id, { spaceId });
+      expect(pets(space)).toEqual({ Pia: false, Milo: true });
+    });
+  });
+
   describe('space people', () => {
     it('lists space people by bare id with counts inside the space', async () => {
       const { sut, ctx, timeline } = setup();
@@ -838,6 +901,7 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
           primaryProfile: { type: 'space-person', id: p, spaceId },
           count: 2,
           isSelected: true,
+          isPet: false,
         },
         {
           id: q,
@@ -846,6 +910,7 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
           primaryProfile: { type: 'space-person', id: q, spaceId },
           count: 1,
           isSelected: false,
+          isPet: false,
         },
       ]);
     });

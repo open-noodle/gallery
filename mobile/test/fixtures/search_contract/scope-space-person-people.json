@@ -29,6 +29,7 @@
           "count": 2,
           "filterId": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
           "id": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+          "isPet": false,
           "isSelected": true,
           "name": "Pia",
           "primaryProfile": {

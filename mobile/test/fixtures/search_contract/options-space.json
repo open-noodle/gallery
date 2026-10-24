@@ -98,6 +98,7 @@
           "count": 2,
           "filterId": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
           "id": "6438d955-2a1c-4bd0-8150-4f3503d02fbe",
+          "isPet": false,
           "isSelected": false,
           "name": "Pia",
           "primaryProfile": {
@@ -110,6 +111,7 @@
           "count": 1,
           "filterId": "896d137b-eeec-45b7-8af0-75610855e1ea",
           "id": "896d137b-eeec-45b7-8af0-75610855e1ea",
+          "isPet": false,
           "isSelected": false,
           "name": "Quinn",
           "primaryProfile": {

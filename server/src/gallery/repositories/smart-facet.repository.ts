@@ -11,7 +11,7 @@ import {
   getFilteredIdentityPeople,
   getFilteredIdentityPeopleWithCounts,
 } from 'src/gallery/repositories/filter-suggestion.repository.js';
-import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
+import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { SEARCH_OPTIONS_PROBE, isSearchOptionsProbeTimeout } from 'src/gallery/utils/search-options-probe.js';
 import { TimeBucketOptions, withTimeBucketAssetFilters } from 'src/repositories/asset.repository.js';
 import { probes } from 'src/repositories/database.repository.js';
@@ -120,7 +120,12 @@ const queryExcludes: Record<Facet, (options: SearchOptionsSmartQuery) => (keyof 
   albums: () => ['isInAlbum', 'isNotInAlbum'],
 };
 
-export type SearchOptionsPerson = FilterSuggestionPerson & { filterId: string; count: number; isSelected: boolean };
+export type SearchOptionsPerson = FilterSuggestionPerson & {
+  filterId: string;
+  count: number;
+  isSelected: boolean;
+  isPet: boolean;
+};
 
 export interface SearchOptionsAvailability {
   hasAssets: boolean;
@@ -837,12 +842,12 @@ export class SmartFacetRepository {
         .innerJoin('asset_face as facet_face', 'facet_face.assetId', 'asset.id')
         .innerJoin('shared_space_person_face as facet_spf', 'facet_spf.assetFaceId', 'facet_face.id')
         .innerJoin('shared_space_person as facet_person', 'facet_person.id', 'facet_spf.personId')
-        .select(['facet_person.id', 'facet_person.name'])
+        .select(['facet_person.id', 'facet_person.name', 'facet_person.type'])
         .select(count)
         .where('facet_person.spaceId', '=', asUuid(scope.spaceId))
         .where('facet_person.isHidden', '=', false)
         .where(liveFace('facet_face'))
-        .groupBy(['facet_person.id', 'facet_person.name'])
+        .groupBy(['facet_person.id', 'facet_person.name', 'facet_person.type'])
         .execute();
       return {
         people: rows
@@ -854,6 +859,7 @@ export class SmartFacetRepository {
             primaryProfile: { type: 'space-person' as const, id: row.id, spaceId: scope.spaceId },
             count: Number(row.count),
             isSelected: spacePersonIds.has(row.id),
+            isPet: row.type === 'pet',
           }))
           .toSorted(byPersonCount),
         hasUnnamedPeople: rows.some((row) => !row.name),
@@ -888,6 +894,7 @@ export class SmartFacetRepository {
       .innerJoin('asset_face as facet_face', 'facet_face.assetId', 'asset.id')
       .innerJoin('person as facet_person', 'facet_person.personGroupId', 'facet_face.personGroupId')
       .select(['facet_person.personGroupId as id', 'facet_person.name'])
+      .select(personIsPet('facet_person').as('isPet'))
       .select(count)
       .where('facet_person.isHidden', '=', false)
       .where(liveFace('facet_face'))
@@ -903,6 +910,7 @@ export class SmartFacetRepository {
           primaryProfile: { type: 'user-person' as const, id: row.id },
           count: Number(row.count),
           isSelected: personIds.has(row.id),
+          isPet: !!row.isPet,
         }))
         .toSorted(byPersonCount),
       hasUnnamedPeople: rows.some((row) => !row.name),

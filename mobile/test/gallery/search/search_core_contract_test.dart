@@ -213,8 +213,9 @@ void expectOptionsEqualFixtures(SearchOptions options, String prefix) {
     reason: '$prefix availability',
   );
   expect(options.total, body('$prefix-total')['total'], reason: '$prefix total');
-  expect(options.people!.map((p) => [p.filterId, p.name, p.count, p.isSelected]).toList(), [
-    for (final p in body('$prefix-people')['people'] as List) [p['filterId'], p['name'], p['count'], p['isSelected']],
+  expect(options.people!.map((p) => [p.filterId, p.name, p.count, p.isSelected, p.isPet]).toList(), [
+    for (final p in body('$prefix-people')['people'] as List)
+      [p['filterId'], p['name'], p['count'], p['isSelected'], p['isPet']],
   ], reason: '$prefix people');
   expect(options.tags!.map((t) => [t.id, t.value, t.count]).toList(), [
     for (final t in body('$prefix-tags')['tags'] as List) [t['id'], t['value'], t['count']],

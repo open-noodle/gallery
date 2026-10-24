@@ -123,6 +123,7 @@
           "count": 2,
           "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
           "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
           "isSelected": false,
           "name": "Anna",
           "primaryProfile": {
@@ -134,6 +135,7 @@
           "count": 1,
           "filterId": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
           "id": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isPet": false,
           "isSelected": false,
           "name": "Ben",
           "primaryProfile": {
@@ -145,6 +147,7 @@
           "count": 1,
           "filterId": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
           "id": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "isPet": true,
           "isSelected": false,
           "name": "Rex",
           "primaryProfile": {

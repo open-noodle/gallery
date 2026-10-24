@@ -481,7 +481,14 @@ WITH
       person.name,
       person."isHidden",
       person."updatedAt",
-      0 AS "profileRank"
+      0 AS "profileRank",
+      EXISTS (
+        SELECT
+        FROM
+          "person_pet"
+        WHERE
+          "person_pet"."personGroupId" = "person"."personGroupId"
+      ) AS "isPet"
     FROM
       person
     WHERE
@@ -525,7 +532,8 @@ WITH
       CASE
         WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2
         ELSE 1
-      END AS "profileRank"
+      END AS "profileRank",
+      shared_space_person.type = 'pet' AS "isPet"
     FROM
       shared_space_person
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
@@ -990,7 +998,14 @@ WITH
       person.name,
       person."isHidden",
       person."updatedAt",
-      0 AS "profileRank"
+      0 AS "profileRank",
+      EXISTS (
+        SELECT
+        FROM
+          "person_pet"
+        WHERE
+          "person_pet"."personGroupId" = "person"."personGroupId"
+      ) AS "isPet"
     FROM
       person
     WHERE
@@ -1034,7 +1049,8 @@ WITH
       CASE
         WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2
         ELSE 1
-      END AS "profileRank"
+      END AS "profileRank",
+      shared_space_person.type = 'pet' AS "isPet"
     FROM
       shared_space_person
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
@@ -1107,6 +1123,7 @@ SELECT
   primary_profiles."profileId",
   primary_profiles."spaceId",
   primary_profiles."identityId",
+  primary_profiles."isPet",
   counted."assetCount" AS count
 FROM
   ranked_profiles AS primary_profiles

@@ -20,6 +20,7 @@ enum StoreKey<T> {
   searchFiltersHiddenSections<String>._(147),
   searchPeopleSort<String>._(148),
   searchPlacesSort<String>._(149),
+  searchPeopleType<String>._(150),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),

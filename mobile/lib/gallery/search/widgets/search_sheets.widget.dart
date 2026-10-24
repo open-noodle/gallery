@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
@@ -317,7 +318,19 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
     // A person page's person: shown first among the selected, and not removable.
     final fixed = ref.watch(searchFixedPersonProvider);
     final selectedIds = {for (final p in selected) p.filterId, ?fixed?.filterId};
-    final others = (people ?? const <SearchPersonOption>[]).where((p) => !selectedIds.contains(p.filterId)).toList();
+    // All / People / Pets, from the server's `isPet`. An older server says nothing: no toggle, everyone shows. Shown
+    // while the list holds a pet, or while a type other than All is chosen (so it can be set back).
+    final type = ref.watch(searchPeopleTypeProvider);
+    final typed = people?.any((p) => p.isPet != null) ?? false;
+    final showType = typed && (type != PeopleFilterBy.all || people!.any((p) => p.isPet == true));
+    bool ofType(SearchPersonOption p) => switch (typed ? type : PeopleFilterBy.all) {
+      PeopleFilterBy.all => true,
+      PeopleFilterBy.people => p.isPet != true,
+      PeopleFilterBy.pets => p.isPet == true,
+    };
+    final others = (people ?? const <SearchPersonOption>[])
+        .where((p) => !selectedIds.contains(p.filterId) && ofType(p))
+        .toList();
     final query = _fold(_query);
     final filtered = query.isEmpty ? others : others.where((p) => _fold(p.name).contains(query)).toList();
     // The server sends most photographed first; A–Z sorts on the device, people without a name last.
@@ -402,6 +415,33 @@ class _PeopleSheetState extends ConsumerState<_PeopleSheet> {
               ),
             ),
           ],
+          if (showType)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: SegmentedButton<PeopleFilterBy>(
+                  key: const Key('search-people-type'),
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                  segments: [
+                    ButtonSegment(
+                      value: PeopleFilterBy.all,
+                      label: Text(context.t.all, key: const Key('search-people-type-all')),
+                    ),
+                    ButtonSegment(
+                      value: PeopleFilterBy.people,
+                      label: Text(context.t.people, key: const Key('search-people-type-people')),
+                    ),
+                    ButtonSegment(
+                      value: PeopleFilterBy.pets,
+                      label: Text(context.t.pets, key: const Key('search-people-type-pets')),
+                    ),
+                  ],
+                  selected: {type},
+                  onSelectionChanged: (value) => ref.read(searchPeopleTypeProvider.notifier).set(value.single),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Row(
               children: [

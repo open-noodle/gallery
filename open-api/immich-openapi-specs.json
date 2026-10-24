@@ -39234,6 +39234,10 @@
             "description": "Person ID, the same value as filterId",
             "type": "string"
           },
+          "isPet": {
+            "description": "Whether this is a pet rather than a person (the People / Pets toggle); absent from older servers",
+            "type": "boolean"
+          },
           "isSelected": {
             "description": "Whether this person is one of the active people filters",
             "type": "boolean"

@@ -29,6 +29,7 @@
           "count": 1,
           "filterId": "896d137b-eeec-45b7-8af0-75610855e1ea",
           "id": "896d137b-eeec-45b7-8af0-75610855e1ea",
+          "isPet": false,
           "isSelected": true,
           "name": "Quinn",
           "primaryProfile": {

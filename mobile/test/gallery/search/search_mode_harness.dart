@@ -145,8 +145,9 @@ class FakeAsset {
 class FakePerson {
   final String id;
   final String name;
+  final bool pet;
 
-  const FakePerson(this.id, this.name);
+  const FakePerson(this.id, this.name, {this.pet = false});
 
   String get filterId => 'person:$id';
 }
@@ -170,7 +171,7 @@ class FakeLibrary {
     people: const [
       FakePerson('anna', 'Anna'),
       FakePerson('ben', 'Ben'),
-      FakePerson('rex', 'Rex'),
+      FakePerson('rex', 'Rex', pet: true),
       FakePerson('alex', 'Alex'),
     ],
     tags: const [FakeTag('beach', 'beach'), FakeTag('food', 'food')],
@@ -264,6 +265,9 @@ class FakeSearchRepository implements GallerySearchRepository {
 
   /// While set, every results request (buckets, smart, metadata) waits for it: a search still on its way.
   Completer<void>? heldResults;
+
+  /// False: an older server, whose people carry no `isPet`.
+  bool sendsPersonTypes = true;
 
   /// Single-dimension options requests for these dimensions fail with [failure].
   final failing = <SearchDimension>{};
@@ -442,6 +446,7 @@ class FakeSearchRepository implements GallerySearchRepository {
             isSelected: selectedPeople.contains(person.id),
             profileId: person.id,
             profileType: 'user-person',
+            isPet: sendsPersonTypes ? person.pet : null,
           ),
     ]..sort((a, b) => b.count!.compareTo(a.count!));
 

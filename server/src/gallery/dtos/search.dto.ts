@@ -349,6 +349,10 @@ const SearchOptionsPersonSchema = z
     primaryProfile: ScopedPrimaryProfileSchema.optional().describe('Accessible profile used for thumbnails'),
     count: z.int().nonnegative().describe('Matching assets that show this person, with every active filter applied'),
     isSelected: z.boolean().describe('Whether this person is one of the active people filters'),
+    isPet: z
+      .boolean()
+      .optional()
+      .describe('Whether this is a pet rather than a person (the People / Pets toggle); absent from older servers'),
   })
   .meta({ id: 'SearchOptionsPersonDto' });
 

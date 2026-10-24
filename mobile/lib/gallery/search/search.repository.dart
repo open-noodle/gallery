@@ -170,6 +170,7 @@ class GallerySearchRepository {
           profileId: profile?.id,
           profileType: profile?.type.toJson(),
           profileSpaceId: profile?.spaceId.orElse(null),
+          isPet: p.isPet.orElse(null),
         );
       }).toList(),
       hasUnnamedPeople: r.hasUnnamedPeople.orElse(null),

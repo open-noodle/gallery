@@ -77,6 +77,9 @@ class SearchPersonOption {
   final String? profileType;
   final String? profileSpaceId;
 
+  /// Whether this is a pet (the People sheet's All / People / Pets toggle). Null from a server that does not say.
+  final bool? isPet;
+
   const SearchPersonOption({
     required this.filterId,
     required this.name,
@@ -85,6 +88,7 @@ class SearchPersonOption {
     this.profileId,
     this.profileType,
     this.profileSpaceId,
+    this.isPet,
   });
 }
 

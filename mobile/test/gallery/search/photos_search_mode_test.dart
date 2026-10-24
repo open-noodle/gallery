@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/nav_config.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
@@ -396,6 +397,67 @@ void main() {
       expect(find.text('Most photographed'), findsNothing);
 
       await disposePhotosPage(tester, container);
+    });
+
+    group('person type', () {
+      Finder tile(String id) => find.byKey(Key('search-sheet-person-person:$id'));
+
+      testWidgets('All by default; Pets shows only pets and People only people', (tester) async {
+        await pump(tester);
+        await enterSearchMode(tester, container);
+        await openChip(tester, 'people');
+
+        for (final id in ['anna', 'ben', 'rex', 'alex']) {
+          expect(tile(id), findsOneWidget, reason: id);
+        }
+
+        await tapKey(tester, 'search-people-type-pets');
+        expect(tile('rex'), findsOneWidget);
+        for (final id in ['anna', 'ben', 'alex']) {
+          expect(tile(id), findsNothing, reason: id);
+        }
+
+        await tapKey(tester, 'search-people-type-people');
+        expect(tile('rex'), findsNothing);
+        expect(tile('anna'), findsOneWidget);
+
+        await disposePhotosPage(tester, container);
+      });
+
+      testWidgets('the sheet opens with the type chosen last time', (tester) async {
+        await pump(tester);
+        await enterSearchMode(tester, container);
+        await openChip(tester, 'people');
+        await tapKey(tester, 'search-people-type-pets');
+        await closeSheet(tester);
+
+        // Read the saved choice again, as the next app start would.
+        container.invalidate(searchPeopleTypeProvider);
+        await openChip(tester, 'people');
+        expect(tile('rex'), findsOneWidget);
+        expect(tile('anna'), findsNothing);
+
+        await disposePhotosPage(tester, container);
+      });
+
+      testWidgets('a server that does not say who is a pet shows no toggle and everyone, even with Pets saved', (
+        tester,
+      ) async {
+        await database.setUp();
+        repository = FakeSearchRepository(FakeLibrary.standard)..sendsPersonTypes = false;
+        container = searchModeContainer(db: database.db, repository: repository);
+        // Pets chosen earlier, against a newer server.
+        container.read(searchPeopleTypeProvider.notifier).set(PeopleFilterBy.pets);
+        await pumpPhotosPage(tester, container);
+        await enterSearchMode(tester, container);
+        await openChip(tester, 'people');
+
+        expect(find.byKey(const Key('search-people-type-pets')), findsNothing);
+        expect(tile('rex'), findsOneWidget);
+        expect(tile('anna'), findsOneWidget);
+
+        await disposePhotosPage(tester, container);
+      });
     });
 
     testWidgets('a person tile is compact: avatar, name and count, without spare room below', (tester) async {
