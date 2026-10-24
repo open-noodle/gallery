@@ -31,6 +31,10 @@ final searchCapabilitiesProvider = FutureProvider<SearchServerCapabilities>(
 /// One options request per filter change, after this pause.
 final searchOptionsDebounceProvider = Provider<Duration>((ref) => const Duration(milliseconds: 150));
 
+/// How long after a stale options answer (served from the server's cache while it refreshes) the options are asked
+/// again.
+final searchOptionsStaleRetryProvider = Provider<Duration>((ref) => const Duration(seconds: 2));
+
 /// Results are debounced separately.
 final searchResultsDebounceProvider = Provider<Duration>((ref) => const Duration(milliseconds: 300));
 
@@ -122,14 +126,18 @@ final searchWarmUpProvider = FutureProvider<void>((ref) async {
 /// Options for the current scope and state. Loading order: availability first (the chip row renders from it), then
 /// every dimension in parallel. A response for an older state is dropped, so a newer answer is never overwritten.
 class SearchOptionsNotifier extends Notifier<SearchOptions> {
+  static const _maxStaleRetries = 5;
+
   int _generation = 0;
   Timer? _timer;
+  int _staleRetries = 0;
 
   @override
   SearchOptions build() {
     ref.watch(searchScopeProvider);
     ref.listen<SearchState>(searchStateProvider, (previous, next) {
       if (previous != next) {
+        _staleRetries = 0;
         _schedule(ref.read(searchOptionsDebounceProvider));
       }
     });
@@ -208,6 +216,12 @@ class SearchOptionsNotifier extends Notifier<SearchOptions> {
               }
             }),
     ]);
+    // The server answered from its cache while it refreshes after a change (a new favourite, an upload): ask again
+    // shortly, so the fresh answer replaces it without the user leaving search. A few times at most per state.
+    if (_current(generation) && state.stale && _staleRetries < _maxStaleRetries) {
+      _staleRetries++;
+      _schedule(ref.read(searchOptionsStaleRetryProvider));
+    }
   }
 
   /// The sheets' and the field's Retry after a failed request: the same state asked again, at once. A failed

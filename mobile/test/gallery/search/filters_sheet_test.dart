@@ -455,6 +455,46 @@ void main() {
     await disposePhotosPage(tester, container);
   });
 
+  testWidgets('a stale answer is asked again: a favourite added since the last search shows without reopening', (
+    tester,
+  ) async {
+    // The server's cached options still predate the only favourites (stale), and refresh in the background.
+    final before = FakeLibrary.standard.withAssets([
+      for (final a in FakeLibrary.standard.assets)
+        FakeAsset(
+          a.id,
+          a.taken,
+          people: a.people,
+          tags: a.tags,
+          country: a.country,
+          city: a.city,
+          video: a.video,
+          rating: a.rating,
+          make: a.make,
+          model: a.model,
+          inAlbum: a.inAlbum,
+          ocr: a.ocr,
+          description: a.description,
+          archived: a.archived,
+        ),
+    ]);
+    await database.setUp(timelineAssets: 0);
+    repository = FakeSearchRepository(FakeLibrary.standard)..staleLibrary = before;
+    container = searchModeContainer(db: database.db, repository: repository);
+    await pumpPhotosPage(tester, container);
+    await enterSearchMode(tester, container);
+    await openFilters(tester);
+    expect(section('favorites'), findsNothing, reason: 'the stale answer has no favourites');
+
+    // The refresh lands; the app asks again on its own.
+    repository.staleLibrary = null;
+    await tester.pump(const Duration(seconds: 3));
+    await settleFrames(tester);
+    expect(section('favorites'), findsOneWidget);
+
+    await disposePhotosPage(tester, container);
+  });
+
   group('collapsing and hiding sections', () {
     // Reads the saved choices again, as the next app start would.
     Future<void> reopen(WidgetTester tester) async {
@@ -481,6 +521,20 @@ void main() {
       expect(find.byKey(const Key('search-filter-make-Apple')), findsOneWidget);
       await reopen(tester);
       expect(find.byKey(const Key('search-filter-make-Apple')), findsOneWidget);
+
+      await disposePhotosPage(tester, container);
+    });
+
+    testWidgets("each title's arrow sits at the right edge of the sheet", (tester) async {
+      await pump(tester);
+      await openFilters(tester);
+
+      final width = tester.getSize(find.byKey(const Key('search-filters-list'))).width;
+      for (final name in ['mediaType', 'camera', 'albums']) {
+        final toggle = find.byKey(Key('search-filter-toggle-$name'));
+        final arrow = find.descendant(of: toggle, matching: find.byIcon(Icons.expand_less_rounded));
+        expect(tester.getTopRight(arrow).dx, greaterThan(width - 40), reason: name);
+      }
 
       await disposePhotosPage(tester, container);
     });

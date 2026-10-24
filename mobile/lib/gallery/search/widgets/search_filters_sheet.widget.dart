@@ -322,18 +322,24 @@ class _Title extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
           child: Row(
             children: [
-              Flexible(
-                child: Text(text, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-              ),
-              if (active)
-                Container(
-                  key: Key('search-filter-active-$name'),
-                  margin: const EdgeInsets.only(left: 8),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
+              // The title and its dot take the free width, so the count and the arrow sit at the right edge.
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(text, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    ),
+                    if (active)
+                      Container(
+                        key: Key('search-filter-active-$name'),
+                        margin: const EdgeInsets.only(left: 8),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
+                      ),
+                  ],
                 ),
-              const Spacer(),
+              ),
               if (trailing != null) Text(trailing!, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
               Icon(collapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded, size: 22, color: muted),
             ],

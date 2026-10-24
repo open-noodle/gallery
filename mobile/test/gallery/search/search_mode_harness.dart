@@ -258,6 +258,10 @@ class FakeSearchRepository implements GallerySearchRepository {
   /// Single-dimension options requests wait for their completer here: a dimension still on its way.
   final held = <SearchDimension, Completer<void>>{};
 
+  /// While set, options answers come from this older library, marked stale: the server's cache after a change (a new
+  /// favourite, an upload), served while it refreshes.
+  FakeLibrary? staleLibrary;
+
   /// While set, every results request (buckets, smart, metadata) waits for it: a search still on its way.
   Completer<void>? heldResults;
 
@@ -381,6 +385,31 @@ class FakeSearchRepository implements GallerySearchRepository {
 
   @override
   Future<SearchOptionsPart> options(SearchParams p, {Set<SearchDimension> dimensions = const {}}) async {
+    final old = staleLibrary;
+    if (old != null) {
+      final current = library;
+      staleLibrary = null;
+      library = old;
+      try {
+        final part = await options(p, dimensions: dimensions);
+        return SearchOptionsPart(
+          stale: true,
+          availability: part.availability,
+          total: part.total,
+          months: part.months,
+          people: part.people,
+          hasUnnamedPeople: part.hasUnnamedPeople,
+          tags: part.tags,
+          countries: part.countries,
+          cameras: part.cameras,
+          ratings: part.ratings,
+          mediaTypes: part.mediaTypes,
+        );
+      } finally {
+        library = current;
+        staleLibrary = old;
+      }
+    }
     calls.add('options ${dimensions.map((d) => d.name).join(',')}');
     final hold = dimensions.length == 1 ? held[dimensions.single] : null;
     if (hold != null) {
