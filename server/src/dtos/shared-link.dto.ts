@@ -145,7 +145,7 @@ export function mapSharedLink(
       }
       return mapped;
     }),
-    album: sharedLink.album ? mapAlbum(sharedLink.album, { auth }) : undefined,
+    album: sharedLink.album ? mapAlbum(sharedLink.album, { auth: options.auth }) : undefined,
     allowUpload: sharedLink.allowUpload,
     allowDownload: sharedLink.allowDownload,
     showMetadata: sharedLink.showExif,

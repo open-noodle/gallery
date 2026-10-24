@@ -697,9 +697,9 @@ export class PersonService extends BaseService {
         await this.jobRepository.empty(QueueName.FacialRecognition, true);
       }
 
-      const { active, delayed, paused, waiting } = await this.jobRepository.getJobCounts(QueueName.FacialRecognition);
+      const { active, delayed, waiting } = await this.jobRepository.getJobCounts(QueueName.FacialRecognition);
       const hasOtherActiveRecognitionWork = active > 1;
-      const hasPendingRecognitionWork = waiting > 0 || delayed > 0 || paused > 0 || hasOtherActiveRecognitionWork;
+      const hasPendingRecognitionWork = waiting > 0 || delayed > 0 || hasOtherActiveRecognitionWork;
 
       if (force) {
         // excludePetFaces / excludePets throughout: pet faces share the machine-learning sourceType
@@ -732,7 +732,7 @@ export class PersonService extends BaseService {
       } else if (hasPendingRecognitionWork) {
         this.logger.debug(
           `Skipping facial recognition queueing because recognition work is already pending ` +
-            `(${active} active, ${waiting} waiting, ${delayed} delayed, ${paused} paused)`,
+            `(${active} active, ${waiting} waiting, ${delayed} delayed)`,
         );
         return JobStatus.Skipped;
       }
