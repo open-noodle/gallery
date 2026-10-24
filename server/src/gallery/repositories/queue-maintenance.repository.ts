@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
-import type { JobCounts, JobTypeCounts } from 'src/types.js';
+import type { JobTypeCounts } from 'src/types.js';
 import { JobName, QueueName } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 
@@ -58,7 +58,9 @@ export class QueueMaintenanceRepository {
   async removeOrphanedActiveJobs(name: QueueName): Promise<string[]> {
     const queue = this.getQueue(name);
     const activeKey = queue.toKey('active');
-    const client = await queue.client;
+    // bullmq 6 moved the raw Redis client onto the queue's backend; its narrowed `IRedisClient` lacks
+    // LRANGE and LREM, so cast to the concrete ioredis client.
+    const client = (await queue.getBackend().client) as unknown as Pick<Redis, 'lrange' | 'lrem'>;
     const activeIds = await client.lrange(activeKey, 0, -1);
 
     const removed: string[] = [];
@@ -71,7 +73,7 @@ export class QueueMaintenanceRepository {
       // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself
       // issues, and LREM is not among them. The concrete client is ioredis, so
       // cast to reach it rather than reimplementing LREM via a Lua script.
-      await (client as unknown as Pick<Redis, 'lrem'>).lrem(activeKey, 0, jobId);
+      await client.lrem(activeKey, 0, jobId);
       removed.push(jobId);
     }
     return removed;
@@ -117,7 +119,7 @@ export class QueueMaintenanceRepository {
   async hasInFlightDedupChain(spaceId: string): Promise<boolean> {
     const prefix = `space-dedup-${spaceId}-pass-`;
     const jobs = await this.getQueue(QueueName.FacialRecognition).getJobs(
-      ['active', 'waiting', 'delayed', 'paused'],
+      ['active', 'waiting', 'delayed'],
       0,
       1000,
       true,
@@ -126,9 +128,9 @@ export class QueueMaintenanceRepository {
   }
 
   async getJobTypes(name: QueueName): Promise<JobTypeCounts[]> {
-    // Process 'paused' before 'waiting': BullMQ may include the same job in both lists
-    // when a queue is paused. ID-based dedup then correctly attributes it to 'paused'.
-    const statusOrder = ['active', 'delayed', 'paused', 'waiting'] as const;
+    // bullmq 6 has no 'paused' list: a paused queue reports its jobs as 'waiting' (the API keeps
+    // `paused: 0`, as upstream's queue statistics do).
+    const statusOrder = ['active', 'delayed', 'waiting'] as const;
     type Status = (typeof statusOrder)[number];
 
     const results = await Promise.all(
@@ -161,6 +163,8 @@ export class QueueMaintenanceRepository {
   }
 
   async getTelemetryMetrics(now = Date.now()): Promise<QueueTelemetryMetrics> {
+    // 'paused' is still emitted (always 0 since bullmq 6, which reports a paused queue's jobs as waiting)
+    // so existing dashboards keep their series.
     const countStatuses: QueueTelemetryStatus[] = ['active', 'completed', 'failed', 'delayed', 'waiting', 'paused'];
     const stalenessStatuses: QueueTelemetryStalenessStatus[] = ['waiting', 'delayed', 'failed'];
     const counts: QueueTelemetryJobCount[] = [];
@@ -173,8 +177,7 @@ export class QueueMaintenanceRepository {
         'failed',
         'delayed',
         'waiting',
-        'paused',
-      )) as unknown as JobCounts;
+      )) as unknown as Partial<Record<QueueTelemetryStatus, number>>;
       for (const status of countStatuses) {
         counts.push({ queue, status, count: Number(queueCounts[status] ?? 0) });
       }

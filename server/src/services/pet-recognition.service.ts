@@ -97,14 +97,14 @@ export class PetRecognitionService extends BaseService {
       // racing the scheduled nightly, or two nightly firings racing a slow run) don't duplicate
       // the fan-out. Placed after the drift check and nightly date-skip above — it must never gate
       // the drift check (F9's non-force half).
-      const { active, delayed, paused, waiting } = await this.jobRepository.getJobCounts(QueueName.PetRecognition);
+      const { active, delayed, waiting } = await this.jobRepository.getJobCounts(QueueName.PetRecognition);
       const hasOtherActivePetRecognitionWork = active > 1;
-      const hasPendingPetRecognitionWork = waiting > 0 || delayed > 0 || paused > 0 || hasOtherActivePetRecognitionWork;
+      const hasPendingPetRecognitionWork = waiting > 0 || delayed > 0 || hasOtherActivePetRecognitionWork;
 
       if (hasPendingPetRecognitionWork) {
         this.logger.debug(
           `Skipping pet recognition queueing because recognition work is already pending ` +
-            `(${active} active, ${waiting} waiting, ${delayed} delayed, ${paused} paused)`,
+            `(${active} active, ${waiting} waiting, ${delayed} delayed)`,
         );
         return JobStatus.Skipped;
       }

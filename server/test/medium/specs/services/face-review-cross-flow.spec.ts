@@ -399,7 +399,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // executed.
       const jobMock = ctx.getMock(JobRepository);
       jobMock.waitForQueueCompletion.mockResolvedValue();
-      jobMock.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, completed: 0, failed: 0 });
+      jobMock.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, completed: 0, failed: 0 });
       const metadata = ctx.getMock(SystemMetadataRepository);
       metadata.set.mockResolvedValue();
 
@@ -1137,7 +1137,6 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         active: 0,
         waiting: 0,
         delayed: 0,
-        paused: 0,
         completed: 0,
         failed: 0,
       });
