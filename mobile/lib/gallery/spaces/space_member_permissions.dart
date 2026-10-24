@@ -49,7 +49,7 @@ class SpaceMemberPermissionSettings extends ConsumerWidget {
         ref.invalidate(sharedSpaceProvider(spaceId));
       } catch (_) {
         if (context.mounted) {
-          ImmichToast.show(context: context, msg: 'Failed to update setting', toastType: ToastType.error);
+          ImmichToast.show(context: context, msg: context.t.errors.unable_to_update_space, toastType: ToastType.error);
         }
       }
     }
