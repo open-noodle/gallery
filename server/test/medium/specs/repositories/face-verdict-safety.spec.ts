@@ -221,7 +221,7 @@ const setupReset = () => {
   jobMock.empty.mockResolvedValue();
   jobMock.queue.mockResolvedValue();
   jobMock.queueAll.mockResolvedValue();
-  jobMock.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, completed: 0, failed: 0 });
+  jobMock.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, completed: 0, failed: 0 });
 
   const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockImplementation((key) => {

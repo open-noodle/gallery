@@ -30,7 +30,7 @@ export class FaceIdentityMaintenanceService extends BaseService {
     }
 
     const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
-      status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+      status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting],
     });
     if (activeBackfills.some((job) => job.name === JobName.FaceIdentityBackfill)) {
       return;
@@ -262,7 +262,7 @@ export class FaceIdentityMaintenanceService extends BaseService {
   ): Promise<JobStatus> {
     const counts = await this.jobRepository.getJobCounts(QueueName.FacialRecognition);
 
-    if (counts.waiting > 0 || counts.delayed > 0 || counts.paused > 0) {
+    if (counts.waiting > 0 || counts.delayed > 0) {
       await this.jobRepository.queue({
         name: JobName.FaceIdentityMaintenanceAfterRecognition,
         data: { delay: 10_000 },
@@ -280,7 +280,7 @@ export class FaceIdentityMaintenanceService extends BaseService {
     }
 
     const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
-      status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+      status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Waiting],
     });
     if (activeBackfills.some((job) => job.name === JobName.FaceIdentityBackfill)) {
       return JobStatus.Skipped;
