@@ -20,6 +20,9 @@ on:
       gallery_image:
         description: 'Gallery server image tag to test (default: ghcr.io/open-noodle/immich-server:main)'
         required: false
+      upstream_image:
+        description: 'Stock Immich image to boot (default: the upstream.version tag). The rolling branch runs ahead of any Immich tag, so pass the commit image it sits on, e.g. ghcr.io/immich-app/immich-server:commit-<sha>.'
+        required: false
   pull_request:
     # Only run on PRs that actually change something this workflow validates,
     # so unrelated PRs don't pay the ~10min boot/pull cost on every push.
@@ -87,6 +90,7 @@ jobs:
       # the ':main' fallback; manual dispatches can override via input; pull
       # requests test their own server build (see "Build the PR's server").
       GALLERY_IMAGE: ${{ inputs.gallery_image || (github.event_name == 'pull_request' && 'localhost/gallery-pr:ci') || 'ghcr.io/open-noodle/immich-server:main' }}
+      UPSTREAM_IMAGE: ${{ inputs.upstream_image || '' }}
 
     steps:
       - name: Checkout
@@ -318,7 +322,10 @@ jobs:
           ############################################################
 
           UPSTREAM_TAG=v$(jq -r '.upstream.version' branding/config.json)
+          # The coverage checks above stay on UPSTREAM_TAG; only the booted image can be overridden.
+          STOCK_IMAGE=${UPSTREAM_IMAGE:-ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}}
           echo "Testing revert against upstream Immich ${UPSTREAM_TAG} (from branding/config.json)"
+          echo "Stock image: ${STOCK_IMAGE}"
           echo "Gallery image: ${GALLERY_IMAGE}"
 
           ############################################################
@@ -394,7 +401,7 @@ jobs:
           # and only fails on drift items that are NEW after the revert.
           ############################################################
 
-          boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" pre
+          boot_server "$STOCK_IMAGE" pre
           if ! wait_for_geodata_init pre; then exit 1; fi
           extract_drift > /tmp/drift-baseline.txt
           echo "Pre-phase baseline drift ($(wc -l < /tmp/drift-baseline.txt) item(s)):"
@@ -444,7 +451,7 @@ jobs:
           # A failed round-trip check is reported after the revert assertions, so one night shows both.
           roundtrip=0
           .github/scripts/revert-to-immich-data.sh stock-prepare
-          boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" stock
+          boot_server "$STOCK_IMAGE" stock
           if ! wait_for_geodata_init stock; then exit 1; fi
           extract_drift > /tmp/drift-stock.txt
           .github/scripts/revert-to-immich-data.sh stock-assert /tmp/drift-stock.txt /tmp/drift-baseline.txt \
@@ -503,7 +510,7 @@ jobs:
           # Step 12: boot upstream Immich post-revert (the real test)
           ############################################################
 
-          boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" post
+          boot_server "$STOCK_IMAGE" post
 
           ############################################################
           # Step 13: schema drift check
