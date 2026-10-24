@@ -77,7 +77,7 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
 vi.mock(import('$lib/queries/client'), () => ({
   createPreloadedQuery: ((optionsFn: () => { queryKey: readonly unknown[] }) => ({
     get data() {
-      return optionsFn().queryKey[1] === 'defaults' ? mocks.defaultSystemConfig : mocks.systemConfig;
+      return optionsFn().queryKey.includes('defaults') ? mocks.defaultSystemConfig : mocks.systemConfig;
     },
   })) as never,
 }));

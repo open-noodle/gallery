@@ -3,14 +3,14 @@
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { createPreloadedQuery } from '$lib/queries/client';
-  import { getConfigQuery } from '$lib/queries/system-config.query';
+  import { getAdminConfigQuery } from '$lib/queries/config-admin.query';
   import { Icon } from '@immich/ui';
   import { mdiHelpCircleOutline } from '@mdi/js';
   import { cloneDeep } from 'lodash-es';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
-  const query = createPreloadedQuery(getConfigQuery);
+  const query = createPreloadedQuery(getAdminConfigQuery);
 
   const disabled = $derived(featureFlagsManager.value.configFile);
   let configToEdit = $state(cloneDeep(query.data));
