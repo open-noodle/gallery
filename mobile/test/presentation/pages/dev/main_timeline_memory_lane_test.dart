@@ -12,9 +12,9 @@ void main() {
   tearDownAll(database.tearDownAll);
 
   // #902 — web's photos page renders the memories carousel only while browsing
-  // (`!hasActiveFilters`), so search results start at the top of the viewport
-  // instead of being pushed down by a strip that is irrelevant to the query.
-  testWidgets('the memories strip drops out of the timeline while a search is active', (tester) async {
+  // (`!hasActiveFilters`). Mobile goes further: the strip leaves as soon as search mode opens,
+  // so the grid starts right under the search header, and comes back when search mode closes.
+  testWidgets('the memories strip drops out of the timeline while search mode is open', (tester) async {
     await database.setUp(timelineAssets: 20);
     final container = searchModeContainer(
       db: database.db,
@@ -26,7 +26,7 @@ void main() {
 
     container.read(searchModeProvider.notifier).enter();
     await settleFrames(tester);
-    expect(find.byType(MemoryLane), findsOneWidget, reason: 'search mode with no filter yet still shows the timeline');
+    expect(find.byType(MemoryLane), findsNothing, reason: 'search mode hides memories before any filter');
 
     container.read(searchStateProvider.notifier).submitText('beach');
     await settleFrames(tester);
@@ -34,7 +34,11 @@ void main() {
 
     container.read(searchStateProvider.notifier).reset();
     await settleFrames(tester);
-    expect(find.byType(MemoryLane), findsOneWidget, reason: 'clearing the search restores the strip');
+    expect(find.byType(MemoryLane), findsNothing, reason: 'still in search mode with the filters cleared');
+
+    container.read(searchModeProvider.notifier).leave();
+    await settleFrames(tester);
+    expect(find.byType(MemoryLane), findsOneWidget, reason: 'leaving search mode restores the strip');
 
     await disposePhotosPage(tester, container);
   });
