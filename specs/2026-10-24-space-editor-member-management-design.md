@@ -49,7 +49,7 @@ They sit next to the fork's existing `server.mergePeopleAcrossOwners` policy swi
 `GalleryServerExtension` / `galleryServerDefaults` (`server/src/gallery/dtos/config.dto.ts`). Upstream's
 `config.dto.ts` already spreads both, so **the server config needs no change to any upstream file**.
 No `visibility` meta (admin-only), like `mergePeopleAcrossOwners`. The service reads them with
-`this.getConfig({ withCache: true })` at request time.
+`this.getConfig({ withCache: false })` at request time.
 
 ### Space level (owner)
 
