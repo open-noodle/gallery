@@ -1288,6 +1288,7 @@
   "space_link_album_page_title": "关联相簿",
   "spaces": "Spaces",
   "spaces_activity": "动态",
+  "spaces_activity_added_member_as": "{inviter} 将 {name} 添加为{role}",
   "spaces_activity_added_photos": "{name} 添加了 {count} 张照片",
   "spaces_activity_assigned_faces": "{name} 标记了 {count, plural, one {# 张人脸} other {# 张人脸}}",
   "spaces_activity_changed_role": "{name} 将角色更改为 {role}",

@@ -1272,6 +1272,7 @@
   "space_link_album_page_title": "Lier des albums",
   "spaces": "Espaces",
   "spaces_activity": "Activité",
+  "spaces_activity_added_member_as": "{inviter} a ajouté {name} en tant que {role}",
   "spaces_activity_added_photos": "{name} a ajouté {count} photos",
   "spaces_activity_assigned_faces": "{name} a identifié {count, plural, one {# visage} other {# visages}}",
   "spaces_activity_changed_role": "{name} a changé de rôle pour {role}",

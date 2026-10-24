@@ -1273,6 +1273,7 @@
   "space_link_album_page_title": "Alben verknüpfen",
   "spaces": "Spaces",
   "spaces_activity": "Aktivität",
+  "spaces_activity_added_member_as": "{inviter} hat {name} als {role} hinzugefügt",
   "spaces_activity_added_photos": "{name} hat {count} Fotos hinzugefügt",
   "spaces_activity_assigned_faces": "{name} hat {count, plural, one {# Gesicht} other {# Gesichter}} getaggt",
   "spaces_activity_changed_role": "{name} hat die Rolle zu {role} geändert",

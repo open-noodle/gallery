@@ -1271,6 +1271,7 @@
   "space_link_album_page_title": "Vincular álbumes",
   "spaces": "Spaces",
   "spaces_activity": "Actividad",
+  "spaces_activity_added_member_as": "{inviter} añadió a {name} como {role}",
   "spaces_activity_added_photos": "{name} añadió {count} fotos",
   "spaces_activity_assigned_faces": "{name} etiquetó {count, plural, one {# cara} other {# caras}}",
   "spaces_activity_changed_role": "{name} cambió el rol a {role}",

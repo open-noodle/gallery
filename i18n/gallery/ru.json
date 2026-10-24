@@ -1271,6 +1271,7 @@
   "space_link_album_page_title": "Привязка альбомов",
   "spaces": "Spaces",
   "spaces_activity": "Активность",
+  "spaces_activity_added_member_as": "{inviter} добавил(а) {name} как {role}",
   "spaces_activity_added_photos": "{name} добавил(а) фото: {count}",
   "spaces_activity_assigned_faces": "{name} отметил(а) {count, plural, one {# лицо} few {# лица} many {# лиц} other {# лица}}",
   "spaces_activity_changed_role": "{name} изменил(а) роль на «{role}»",

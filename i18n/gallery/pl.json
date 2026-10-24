@@ -1274,6 +1274,7 @@
   "space_link_album_page_title": "Połącz albumy",
   "spaces": "Spaces",
   "spaces_activity": "Aktywność",
+  "spaces_activity_added_member_as": "{inviter} dodał(a) {name} jako {role}",
   "spaces_activity_added_photos": "Użytkownik {name} dodał {count} zdjęć",
   "spaces_activity_assigned_faces": "Użytkownik {name} oznaczył {count, plural, one {# twarz} few {# twarze} many {# twarzy} other {# twarzy}}",
   "spaces_activity_changed_role": "Użytkownik {name} zmienił rolę na {role}",

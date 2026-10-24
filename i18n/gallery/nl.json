@@ -1270,6 +1270,7 @@
   "space_link_album_page_title": "Albums koppelen",
   "spaces": "Spaces",
   "spaces_activity": "Activiteit",
+  "spaces_activity_added_member_as": "{inviter} heeft {name} toegevoegd als {role}",
   "spaces_activity_added_photos": "{name} heeft {count} foto's toegevoegd",
   "spaces_activity_assigned_faces": "{name} heeft {count, plural, one {# gezicht} other {# gezichten}} getagd",
   "spaces_activity_changed_role": "{name} heeft de rol gewijzigd naar {role}",

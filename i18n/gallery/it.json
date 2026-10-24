@@ -1270,6 +1270,7 @@
   "space_link_album_page_title": "Collega album",
   "spaces": "Space",
   "spaces_activity": "Attività",
+  "spaces_activity_added_member_as": "{inviter} ha aggiunto {name} come {role}",
   "spaces_activity_added_photos": "{name} ha aggiunto {count} foto",
   "spaces_activity_assigned_faces": "{name} ha taggato {count, plural, one {# volto} other {# volti}}",
   "spaces_activity_changed_role": "{name} ha cambiato ruolo in {role}",
