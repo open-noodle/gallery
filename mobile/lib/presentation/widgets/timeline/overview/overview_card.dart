@@ -4,6 +4,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/extensions/datetime_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 
@@ -27,7 +28,7 @@ class TimelineOverviewCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   String _label(BuildContext context) {
-    final locale = context.locale.toLanguageTag();
+    final locale = resolvedDateTimeLocale();
     return switch (mode) {
       TimelineOverviewMode.years => DateFormat.y(locale).format(bucket.date),
       TimelineOverviewMode.months => DateFormat.yMMM(locale).format(bucket.date),
@@ -36,7 +37,7 @@ class TimelineOverviewCard extends StatelessWidget {
   }
 
   String _semanticsPeriod(BuildContext context) {
-    final locale = context.locale.toLanguageTag();
+    final locale = resolvedDateTimeLocale();
     return switch (mode) {
       TimelineOverviewMode.years => DateFormat.y(locale).format(bucket.date),
       TimelineOverviewMode.months => DateFormat.yMMMM(locale).format(bucket.date),
