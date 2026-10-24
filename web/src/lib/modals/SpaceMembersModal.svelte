@@ -20,6 +20,8 @@
     isOwner: boolean;
     /** Whether the viewer may switch members between viewer and editor; owners always may. */
     canChangeRoles?: boolean;
+    /** The viewer's own user id: their row never gets a role control. */
+    currentUserId?: string;
     spaceColor?: string | null;
     onClose: (updatedMembers?: SharedSpaceMemberResponseDto[]) => void;
   }
@@ -29,6 +31,7 @@
     members: initialMembers,
     isOwner,
     canChangeRoles = isOwner,
+    currentUserId,
     spaceColor = 'primary',
     onClose,
   }: Props = $props();
@@ -110,9 +113,9 @@
           <Text fontWeight="medium">{member.name}</Text>
           <Text size="tiny" color="muted">{member.email}</Text>
         </div>
-        {#if isOwner && member.role === 'owner'}
+        {#if member.role === 'owner'}
           <RoleBadge role="owner" {spaceColor} />
-        {:else if canChangeRoles}
+        {:else if canChangeRoles && member.userId !== currentUserId}
           <Field class="w-32 shrink-0">
             <Select
               value={member.role as string as SharedSpaceRole}

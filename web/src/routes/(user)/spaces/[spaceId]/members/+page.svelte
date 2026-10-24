@@ -28,7 +28,7 @@
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
   const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
 
-  // An absent memberManagement block (older server) means no permissions and no owner controls.
+  // An absent memberManagement block (older server) falls back to today's rule: owners only, no owner controls.
   const canAddMembers = $derived(space.memberManagement?.canAddMembers ?? isOwner);
   const canChangeRoles = $derived(space.memberManagement?.canChangeRoles ?? isOwner);
 

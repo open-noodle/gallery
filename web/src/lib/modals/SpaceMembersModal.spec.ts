@@ -117,6 +117,33 @@ describe('SpaceMembersModal', () => {
     expect(screen.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
   });
 
+  it('should show a badge, never a role select, on owner rows for a non-owner with canChangeRoles', () => {
+    render(SpaceMembersModal, {
+      spaceId,
+      members: [ownerMember, viewerMember],
+      isOwner: false,
+      canChangeRoles: true,
+      onClose,
+    });
+
+    expect(screen.getByTestId('role-badge-owner')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^role_/ })).toHaveLength(1);
+  });
+
+  it("should not show a role select on the viewer's own row", () => {
+    render(SpaceMembersModal, {
+      spaceId,
+      members: [ownerMember, editorMember, viewerMember],
+      isOwner: false,
+      canChangeRoles: true,
+      currentUserId: editorMember.userId,
+      onClose,
+    });
+
+    expect(screen.queryByRole('button', { name: 'role_editor' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'role_viewer' })).toBeInTheDocument();
+  });
+
   it('should keep static roles for a non-owner when canChangeRoles is not set', () => {
     render(SpaceMembersModal, { spaceId, members: [ownerMember, viewerMember], isOwner: false, onClose });
 
