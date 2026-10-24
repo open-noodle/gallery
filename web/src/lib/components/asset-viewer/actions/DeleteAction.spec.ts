@@ -23,7 +23,6 @@ describe('DeleteAction component', () => {
         onAction: vi.fn(),
         preAction: vi.fn(),
       });
-      // @ts-expect-error pending a type fix: https://github.com/testing-library/jest-dom/pull/742/changes
       expect(getByLabelText('delete')).toBeInTheDocument();
       expect(queryByTitle('deletePermanently')).toBeNull();
     });
@@ -40,7 +39,6 @@ describe('DeleteAction component', () => {
         onAction: vi.fn(),
         preAction: vi.fn(),
       });
-      // @ts-expect-error pending a type fix: https://github.com/testing-library/jest-dom/pull/742/changes
       expect(getByLabelText('permanently_delete')).toBeInTheDocument();
       expect(queryByTitle('delete')).toBeNull();
     });
