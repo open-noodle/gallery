@@ -11,7 +11,7 @@
  *   server     spaceEditorsCanAddMembers {false,true} × spaceEditorsCanChangeRoles {false,true}, written to the
  *              real system-config row and flipped MID-SPEC (the service reads it with `withCache: false`)
  *   space      editorsCanAddMembers {null,true,false} × editorsCanChangeRoles {null,true,false}
- *   operations addMember, updateMember, removeMember, update (the two settings), get
+ *   operations addMember, updateMember, removeMember, update (the two settings), get, getAll
  *
  * The expected outcome comes from `expectedOutcome` below, a truth table that restates the design's rules and
  * today's owner rules. It deliberately does NOT import `resolveSpaceMemberManagement`, so a bug in that helper
@@ -106,9 +106,10 @@ type Op =
   | { kind: 'updateMember'; target: UpdateTarget; role: SharedSpaceRole }
   | { kind: 'removeMember' }
   | { kind: 'update'; field: SettingField; value: Tri; withName: boolean }
-  | { kind: 'get' };
+  | { kind: 'get' }
+  | { kind: 'getAll' };
 
-const ROLES = [SharedSpaceRole.Owner, SharedSpaceRole.Editor, SharedSpaceRole.Viewer];
+const ROLES = Object.values(SharedSpaceRole);
 
 const OPS: Op[] = [
   ...[undefined, ...ROLES].flatMap((role) =>
@@ -120,6 +121,7 @@ const OPS: Op[] = [
     TRIS.flatMap((value) => BOOLS.map((withName): Op => ({ kind: 'update', field, value, withName }))),
   ),
   { kind: 'get' },
+  { kind: 'getAll' },
 ];
 
 const opLabel = (op: Op): string => {
@@ -139,6 +141,9 @@ const opLabel = (op: Op): string => {
     case 'get': {
       return 'get';
     }
+    case 'getAll': {
+      return 'getAll';
+    }
   }
 };
 
@@ -150,7 +155,14 @@ const settingsLabel = (s: Settings) =>
 // ---------------------------------------------------------------------------------------------------------------
 
 type Expected =
-  { outcome: 403 | 400 } | { outcome: 'ok'; role?: SharedSpaceRole; canAddMembers?: boolean; canChangeRoles?: boolean };
+  | { outcome: 403 | 400 }
+  | {
+      outcome: 'ok';
+      role?: SharedSpaceRole;
+      canAddMembers?: boolean;
+      canChangeRoles?: boolean;
+      absent?: boolean;
+    };
 
 const roleOf = (actor: Actor): SharedSpaceRole | undefined => {
   switch (actor) {
@@ -265,6 +277,14 @@ const expectedOutcome = (actor: Actor, s: Settings, op: Op): Expected => {
       }
       return { outcome: 'ok', canAddMembers: add, canChangeRoles: change };
     }
+
+    case 'getAll': {
+      // getAll lists only the caller's own spaces: a non-member (including a server admin) never sees this one.
+      if (!role) {
+        return { outcome: 'ok', absent: true };
+      }
+      return { outcome: 'ok', canAddMembers: add, canChangeRoles: change };
+    }
   }
 };
 
@@ -358,6 +378,15 @@ const spaceRowOf = (db: Kysely<DB>, spaceId: string) =>
     .where('id', '=', spaceId)
     .executeTakeFirstOrThrow();
 
+const activityCountOf = async (db: Kysely<DB>, spaceId: string) => {
+  const row = await db
+    .selectFrom('shared_space_activity')
+    .select((eb) => eb.fn.countAll().as('count'))
+    .where('spaceId', '=', spaceId)
+    .executeTakeFirstOrThrow();
+  return Number(row.count);
+};
+
 /** Put a space back to its baseline membership and settings. */
 const restore = async (
   db: Kysely<DB>,
@@ -413,6 +442,7 @@ describe('shared space member management role matrix', () => {
   test('every actor × setting × operation matches the truth table', { timeout: 600_000 }, async () => {
     const { sut, ctx } = setup();
     const db = ctx.database;
+    const jobQueue = ctx.getMock(JobRepository);
     const { users, spaces } = await buildWorld(ctx);
 
     const grid: Record<string, string> = {};
@@ -453,11 +483,15 @@ describe('shared space member management role matrix', () => {
               throw new Error(`case ${key} did not start from the baseline`);
             }
             const before = await membersOf(db, space.id);
+            const activityBefore = await activityCountOf(db, space.id);
+            jobQueue.queue.mockClear();
+            jobQueue.queueAll.mockClear();
 
             const expected = expectedOutcome(actor, settings, op);
             let actual: 403 | 400 | 'ok';
             let detail = '';
             let result: Awaited<ReturnType<SharedSpaceService['get']>> | undefined;
+            let listed: Awaited<ReturnType<SharedSpaceService['getAll']>> | undefined;
             try {
               switch (op.kind) {
                 case 'addMember': {
@@ -483,6 +517,10 @@ describe('shared space member management role matrix', () => {
                 }
                 case 'get': {
                   result = await sut.get(auth, space.id);
+                  break;
+                }
+                case 'getAll': {
+                  listed = await sut.getAll(auth);
                   break;
                 }
               }
@@ -571,6 +609,39 @@ describe('shared space member management role matrix', () => {
                   }
                   break;
                 }
+                case 'getAll': {
+                  const entry = listed?.find((s) => s.id === space.id);
+                  const mm = entry?.memberManagement;
+                  detail = entry ? `:add=${mm?.canAddMembers},change=${mm?.canChangeRoles}` : ':absent';
+                  if (expected.outcome === 'ok' && expected.absent) {
+                    if (entry) {
+                      fail('a non-member sees the space in getAll');
+                    }
+                  } else if (expected.outcome === 'ok') {
+                    if (!entry) {
+                      fail('a member does not see the space in getAll');
+                    }
+                    if (mm?.canAddMembers !== expected.canAddMembers) {
+                      fail(`canAddMembers ${mm?.canAddMembers}, expected ${expected.canAddMembers}`);
+                    }
+                    if (mm?.canChangeRoles !== expected.canChangeRoles) {
+                      fail(`canChangeRoles ${mm?.canChangeRoles}, expected ${expected.canChangeRoles}`);
+                    }
+                    if (
+                      entry &&
+                      (mm?.editorsCanAddMembers !== space.spaceAdd ||
+                        mm?.editorsCanChangeRoles !== space.spaceChange ||
+                        mm?.serverEditorsCanAddMembers !== serverAdd ||
+                        mm?.serverEditorsCanChangeRoles !== serverChange)
+                    ) {
+                      fail(`reported settings ${JSON.stringify(mm)} do not match the stored ones`);
+                    }
+                  }
+                  if (after !== before) {
+                    fail('membership changed on a read');
+                  }
+                  break;
+                }
               }
             } else {
               // No partial write on any rejection.
@@ -579,6 +650,12 @@ describe('shared space member management role matrix', () => {
               }
               if (JSON.stringify(afterSpace) !== JSON.stringify(startSpace)) {
                 fail('space settings changed on a rejected call');
+              }
+              if ((await activityCountOf(db, space.id)) !== activityBefore) {
+                fail('activity was logged on a rejected call');
+              }
+              if (jobQueue.queue.mock.calls.length > 0 || jobQueue.queueAll.mock.calls.length > 0) {
+                fail('jobs were queued on a rejected call');
               }
             }
 
