@@ -11,7 +11,6 @@ const petRecognitionCounts = (
     active: number;
     waiting: number;
     delayed: number;
-    paused: number;
     completed: number;
     failed: number;
   }> = {},
@@ -19,7 +18,6 @@ const petRecognitionCounts = (
   active: 1,
   waiting: 0,
   delayed: 0,
-  paused: 0,
   completed: 0,
   failed: 0,
   ...overrides,
@@ -514,7 +512,6 @@ describe(PetRecognitionService.name, () => {
       it.each([
         ['waiting jobs', { waiting: 5 }],
         ['delayed jobs', { delayed: 3 }],
-        ['paused jobs', { paused: 2 }],
         ['another active job besides the coordinator', { active: 2 }],
       ] as const)('R6.16 skips non-force pet recognition queueing when the queue has %s', async (_label, counts) => {
         mocks.job.getJobCounts.mockResolvedValue(petRecognitionCounts(counts));
