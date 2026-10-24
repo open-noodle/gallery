@@ -1,6 +1,6 @@
-import { SharedSpaceRole } from 'src/enum';
-import { resolveSpaceMemberManagement } from 'src/gallery/utils/space-member-management';
 import { describe, expect, it } from 'vitest';
+import { SharedSpaceRole } from 'src/enum.js';
+import { resolveSpaceMemberManagement } from 'src/gallery/utils/space-member-management.js';
 
 const bools = [true, false];
 const nullable = [true, false, null];

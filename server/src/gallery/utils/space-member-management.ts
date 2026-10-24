@@ -1,5 +1,5 @@
-import type { SharedSpaceMemberManagementDto } from 'src/dtos/shared-space.dto';
-import { SharedSpaceRole } from 'src/enum';
+import type { SharedSpaceMemberManagementDto } from 'src/dtos/shared-space.dto.js';
+import { SharedSpaceRole } from 'src/enum.js';
 
 export type SpaceMemberPermissionSettings = {
   editorsCanAddMembers: boolean | null;
