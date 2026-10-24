@@ -45,7 +45,7 @@ const SWAPPED_SET = [
   // StorageTemplateSettings left the set: immich-31531's rework renders no spinner at all.
   'routes/admin/system-settings/TemplateSettings.svelte',
   'routes/admin/queues/[name]/QueueGraph.svelte',
-  'routes/(user)/user-settings/OauthSettings.svelte',
+  'routes/(user)/user-settings/OAuthSettings.svelte',
   'routes/(user)/search/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   'routes/(user)/utilities/geolocation/+page.svelte',
   'routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte',
