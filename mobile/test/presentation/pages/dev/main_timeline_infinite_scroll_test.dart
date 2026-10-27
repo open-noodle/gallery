@@ -1,200 +1,115 @@
-import 'dart:io';
-
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/data/db/main/database.dart';
-import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/search_result.model.dart';
-import 'package:immich_mobile/domain/models/store.model.dart';
-import 'package:immich_mobile/domain/models/user.model.dart';
-import 'package:immich_mobile/domain/services/feature_message.service.dart';
-import 'package:immich_mobile/domain/services/search.service.dart';
-import 'package:immich_mobile/domain/services/store.service.dart';
-import 'package:immich_mobile/domain/services/user.service.dart';
-import 'package:immich_mobile/entities/store.entity.dart';
-import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
-import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:immich_mobile/models/search/search_filter.model.dart';
-import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
-import 'package:immich_mobile/providers/api.provider.dart';
-import 'package:immich_mobile/providers/feature_message.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/search.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
-import 'package:immich_mobile/providers/photos_filter/filter_count.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
-import 'package:immich_mobile/providers/user.provider.dart';
-import 'package:immich_mobile/services/api.service.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:immich_mobile/gallery/search/search.providers.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
+import 'package:immich_mobile/gallery/search/search_state.model.dart';
+import 'package:openapi/api.dart' as api;
 
-import '../../../mock_http_override.dart';
-import '../../../test_utils.dart';
-import '../../../widget_tester_extensions.dart';
+import '../../../gallery/search/search_mode_harness.dart';
 
-class _MockSearch extends Mock implements SearchService {}
+/// Smart search answered in pages of 100, 100 and 40 assets.
+class _PagedRepository extends FakeSearchRepository {
+  _PagedRepository() : super(FakeLibrary.standard);
 
-class _MockApiService extends Mock implements ApiService {}
+  final pages = <int>[];
 
-class _MockUserService extends Mock implements UserService {}
-
-class _FakeFilter extends Fake implements SearchFilter {}
-
-// Upstream #29388 shows a "what's new" dialog from MainTimelinePage.initState when
-// FeatureMessageService.shouldShow() is true. Stub it off so the dialog does not
-// fire (and throw on unmocked deps) during these fork timeline widget tests.
-class _StubFeatureMessageService implements FeatureMessageService {
-  @override
-  bool shouldShow() => false;
+  static const _sizes = [100, 100, 40];
 
   @override
-  Future<void> markSeen() async {}
-}
-
-class _StubUserNotifier extends CurrentUserProvider {
-  _StubUserNotifier(super.service, UserDto? initial) {
-    state = initial;
+  Future<api.SearchResponseDto?> smart(
+    SearchParams p, {
+    required int page,
+    required SearchSort sort,
+    int size = 100,
+  }) async {
+    calls.add('smart');
+    pages.add(page);
+    final count = page <= _sizes.length ? _sizes[page - 1] : 0;
+    final taken = DateTime.utc(2024, 6, 1);
+    return api.SearchResponseDto(
+      albums: api.SearchAlbumResponseDto(count: 0, facets: const [], items: const [], total: 0),
+      assets: api.SearchAssetResponseDto(
+        count: count,
+        facets: const [],
+        items: [
+          for (var i = 0; i < count; i++)
+            api.AssetResponseDto(
+              id: 'p$page-$i',
+              checksum: 'checksum-p$page-$i',
+              createdAt: taken,
+              duration: 0,
+              fileCreatedAt: taken,
+              fileModifiedAt: taken,
+              hasMetadata: true,
+              height: 100,
+              isArchived: false,
+              isEdited: false,
+              isFavorite: false,
+              isOffline: false,
+              isTrashed: false,
+              localDateTime: taken,
+              originalFileName: 'p$page-$i.jpg',
+              originalPath: '/p$page-$i.jpg',
+              ownerId: testUserId,
+              thumbhash: null,
+              type: api.AssetTypeEnum.IMAGE,
+              updatedAt: taken,
+              visibility: api.AssetVisibility.timeline,
+              width: 100,
+            ),
+        ],
+        nextPage: page < _sizes.length ? '${page + 1}' : null,
+        total: count,
+      ),
+    );
   }
 }
 
-final _testUser = UserDto(
-  id: 'test-user-1',
-  email: 'test@example.com',
-  name: 'Test User',
-  profileChangedAt: DateTime(2024, 1, 1),
-);
-
-List<BaseAsset> _assets(int n, String tag) =>
-    List<BaseAsset>.generate(n, (i) => TestUtils.createRemoteAsset(id: '$tag-$i'));
-
-ProviderContainer _makeContainer({required SearchService search, required Drift db, UserDto? user}) {
-  final mockUserSvc = _MockUserService();
-  when(() => mockUserSvc.tryGetMyUser()).thenReturn(user);
-  when(() => mockUserSvc.watchMyUser()).thenAnswer((_) => const Stream.empty());
-  return ProviderContainer(
-    overrides: [
-      driftProvider.overrideWithValue(db),
-      searchServiceProvider.overrideWithValue(search),
-      apiServiceProvider.overrideWithValue(_MockApiService()),
-      infra.userServiceProvider.overrideWithValue(mockUserSvc),
-      currentUserProvider.overrideWith((ref) => _StubUserNotifier(mockUserSvc, user)),
-      timelineUsersProvider.overrideWith((_) => user == null ? const Stream.empty() : Stream.value([user.id])),
-      photosFilterCountProvider.overrideWith((ref) => 0),
-      featureMessageServiceProvider.overrideWithValue(_StubFeatureMessageService()),
-    ],
-  );
-}
-
+// The Photos page pages smart-search results as the grid reaches their end (search mode's results source,
+// lib/gallery/search/search_timeline.dart), and searches nothing while search mode is closed.
 void main() {
-  late Drift db;
-  setUpAll(() async {
-    HttpOverrides.global = MockHttpOverrides();
-    registerFallbackValue(_FakeFilter());
-    db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: StoreRepository(db));
-    await SettingsRepository.ensureInitialized(db);
-    await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
-  });
-  tearDownAll(() => db.close());
+  final database = SearchModeDatabase();
+
+  setUpAll(database.setUpAll);
+  tearDownAll(database.tearDownAll);
 
   testWidgets('scrolling the search results loads the next page', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2340);
-    tester.view.devicePixelRatio = 2.75;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    await database.setUp();
+    final repository = _PagedRepository();
+    final container = searchModeContainer(db: database.db, repository: repository);
+    await pumpPhotosPage(tester, container);
 
-    // In tests without EasyLocalization the match-count label renders the
-    // raw i18n key string which overflows the filter-subheader Row. Suppress
-    // that known layout-overflow exception so the scroll assertion can run.
-    final prevOnError = FlutterError.onError;
-    FlutterError.onError = (details) {
-      if (details.exception.toString().contains('overflowed')) {
-        return;
-      }
-      prevOnError?.call(details);
-    };
-    addTearDown(() => FlutterError.onError = prevOnError);
-
-    final search = _MockSearch();
-    when(() => search.search(any(), 1)).thenAnswer((_) async => SearchResult(assets: _assets(100, 'p1'), nextPage: 2));
-    when(() => search.search(any(), 2)).thenAnswer((_) async => SearchResult(assets: _assets(100, 'p2'), nextPage: 3));
-    when(
-      () => search.search(any(), 3),
-    ).thenAnswer((_) async => SearchResult(assets: _assets(40, 'p3'), nextPage: null));
-
-    final container = _makeContainer(search: search, db: db, user: _testUser);
-    // NB: disposed explicitly at the end of the body (not via addTearDown) so the
-    // memory provider's midnight-refresh Timer (upstream #28983) is cancelled before
-    // testWidgets' pending-timer check, which runs before tearDowns.
-
-    await tester.pumpWidget(
-      localizedForTest(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(home: withStubRouter(const MainTimelinePage())),
-        ),
-      ),
-    );
-    await tester.pump();
-    container.read(photosFilterProvider.notifier).setText('nature');
-    for (var i = 0; i < 30; i++) {
-      await tester.pump(const Duration(milliseconds: 40));
-    }
-    // The Photos timeline drives its live search through the route-scoped
-    // photosFilterSearchProvider (TimelineRouteScope), so observe the same scoped
-    // instance the page renders rather than the root container's.
-    ProviderContainer scoped() =>
-        ProviderScope.containerOf(tester.element(find.byType(CustomScrollView).last), listen: false);
-    expect(scoped().read(photosFilterSearchProvider).assets.length, 100);
+    container.read(searchModeProvider.notifier).enter();
+    container.read(searchStateProvider.notifier).submitText('nature');
+    await settleFrames(tester);
+    // The grid's first load asks past the end of page 1, so page 2 may come right away; page 3 needs a scroll.
+    expect(repository.pages, isNot(contains(3)));
 
     for (var c = 0; c < 4; c++) {
       await tester.fling(find.byType(CustomScrollView).last, const Offset(0, -3000), 4000);
-      for (var i = 0; i < 12; i++) {
-        await tester.pump(const Duration(milliseconds: 40));
-      }
+      await settleFrames(tester, frames: 12);
     }
-    expect(scoped().read(photosFilterSearchProvider).assets.length, greaterThan(100));
-    verify(() => search.search(any(), 2)).called(greaterThanOrEqualTo(1));
+    expect(repository.pages, [1, 2, 3]);
+    expect(container.read(searchResultsProvider).assets, hasLength(240));
 
-    // Tear the tree down inside the test so the route ProviderScope's autoDispose
-    // scheduler timer (the search lives in TimelineRouteScope now) fires here rather
-    // than outliving the widget tree. Advance fake time so the 0-duration timer runs.
-    await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
-    await tester.pump(const Duration(seconds: 1));
-    // Dispose the container so provider timers — incl. the memory provider's
-    // midnight-refresh Timer (upstream #28983) — are cancelled before the
-    // pending-timer check rather than outliving the test via addTearDown.
-    container.dispose();
+    await disposePhotosPage(tester, container);
   });
 
-  testWidgets('empty filter (library timeline) fires no search on scroll', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2340);
-    tester.view.devicePixelRatio = 2.75;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('with search mode closed, scrolling the library timeline searches nothing', (tester) async {
+    await database.setUp(timelineAssets: 200);
+    final repository = FakeSearchRepository(FakeLibrary.standard);
+    final container = searchModeContainer(db: database.db, repository: repository);
+    await pumpPhotosPage(tester, container);
 
-    final search = _MockSearch();
-    final container = _makeContainer(search: search, db: db);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      localizedForTest(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(home: withStubRouter(const MainTimelinePage())),
-        ),
-      ),
-    );
     for (var c = 0; c < 3; c++) {
       await tester.fling(find.byType(CustomScrollView).last, const Offset(0, -3000), 4000);
-      for (var i = 0; i < 8; i++) {
-        await tester.pump(const Duration(milliseconds: 40));
-      }
+      await settleFrames(tester, frames: 8);
     }
-    verifyNever(() => search.search(any(), any()));
+    // Only the warm-up's options requests: no results request of any kind.
+    expect(repository.calls.where((call) => !call.startsWith('options')), isEmpty);
+    expect(repository.resultParams, isEmpty);
+
+    await disposePhotosPage(tester, container);
   });
 }

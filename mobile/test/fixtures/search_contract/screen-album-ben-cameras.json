@@ -1,0 +1,43 @@
+{
+  "actor": "me",
+  "description": "Album screen search mode, People: Ben: cameras only",
+  "ids": {
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+      ],
+      "dimensions": [
+        "cameras"
+      ],
+      "personIds": [
+        "c360094e-5899-4aea-88e0-01a3aafd727b"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 1,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 1,
+              "model": "X-T5"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

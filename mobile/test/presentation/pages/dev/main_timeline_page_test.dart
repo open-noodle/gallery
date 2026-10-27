@@ -9,7 +9,6 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
-import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 
 import '../../../test_utils.dart';
@@ -39,14 +38,13 @@ void main() {
 
   group('PhotosTimelineAppBar', () {
     test('carries only the compact grouping selector', () {
-      // The filter/search entry point lives in the bottom-nav search button, and sort moved to
-      // the filter subheader (#1030) because it appeared and disappeared with the search: as an
-      // app-bar action it changed the width offered to the title slot and resized the logo.
-      // What is left is permanent, which is what keeps the logo one size.
+      // The search entry point lives in the bottom-nav search button, and sort lives in search
+      // mode (#1030): as an app-bar action it appeared and disappeared with the search, changing
+      // the width offered to the title slot and resizing the logo. What is left is permanent,
+      // which is what keeps the logo one size.
       expect(PhotosTimelineAppBar.actions, hasLength(1));
       expect(PhotosTimelineAppBar.actions.first, isA<TimelineGroupingSelector>());
       expect((PhotosTimelineAppBar.actions.first as TimelineGroupingSelector).compact, isTrue);
-      expect(PhotosTimelineAppBar.actions.whereType<SortIconButton>(), isEmpty);
       expect(MainTimelinePage.timelineOverviewControlsEnabled, isTrue);
     });
 
@@ -64,7 +62,7 @@ void main() {
       // The chip shows one localized initial, so it stays inside a single tap target's width
       // instead of the 98px the spelled-out label needed.
       expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(48));
-      expect(find.byType(SortIconButton), findsNothing);
+      expect(find.byIcon(Icons.sort_rounded), findsNothing);
     });
   });
 }

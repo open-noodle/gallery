@@ -12,6 +12,7 @@ import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/gallery/motion/timeline_skeleton.dart';
+import 'package:immich_mobile/gallery/search/search_timeline_hooks.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_status_floating_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/asset_scan.dart';
@@ -719,6 +720,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
         widget.bottomSheet != null && (isMultiSelectStatusVisible || widget.persistentBottomBar);
     final smoothScrubbing = ref.watch(appConfigProvider.select((config) => config.timeline.smoothScrubbing));
     final snapToMonth = widget.snapToMonth && !smoothScrubbing;
+    final appBar = searchAwareAppBar(ref, widget.appBar);
 
     return PopScope(
       canPop: !isMultiSelectEnabled,
@@ -750,7 +752,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     // Not primary: attaching to [_scrollController] while segments reload (e.g. on
                     // rotation) would fire [_restoreAssetPosition] early and drop the saved position.
                     primary: false,
-                    slivers: [if (widget.appBar != null) widget.appBar!, const GalleryTimelineSkeleton()],
+                    slivers: [?appBar, const GalleryTimelineSkeleton()],
                   ),
               onData: (segments) {
                 _lastRenderedSegments = segments;
@@ -768,7 +770,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                 if (childCount == 0 && widget.emptyWidget != null && !isSelectionMode) {
                   return CustomScrollView(
                     slivers: [
-                      if (widget.appBar != null) widget.appBar!,
+                      ?appBar,
                       if (widget.topSliverWidget != null) widget.topSliverWidget!,
                       SliverFillRemaining(hasScrollBody: false, child: widget.emptyWidget),
                     ],
@@ -801,10 +803,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                         physics: physics,
                         scrollCacheExtent: .pixels(maxHeight * 2),
                         slivers: [
-                          if (isSelectionMode)
-                            const SelectionSliverAppBar()
-                          else if (widget.appBar != null)
-                            widget.appBar!,
+                          if (isSelectionMode) const SelectionSliverAppBar() else ?appBar,
                           if (widget.topSliverWidget != null) widget.topSliverWidget!,
                           SliverSegmentedList(
                             segments: segments,

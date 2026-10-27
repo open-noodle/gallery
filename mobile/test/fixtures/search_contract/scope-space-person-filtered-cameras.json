@@ -1,0 +1,44 @@
+{
+  "actor": "me",
+  "description": "Space person screen (Pia), Sony photos, two filters: cameras only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "6438d955-2a1c-4bd0-8150-4f3503d02fbe": "space-person:pia"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "make": "Sony",
+      "model": "A7 IV",
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "6438d955-2a1c-4bd0-8150-4f3503d02fbe"
+      ],
+      "type": "IMAGE"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 2,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

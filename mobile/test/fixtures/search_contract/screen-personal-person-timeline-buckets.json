@@ -1,0 +1,30 @@
+{
+  "actor": "me",
+  "description": "Personal person screen (Anna) search mode: browse results",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "personIds": "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 2,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2023-09-01"
+      }
+    ],
+    "status": 200
+  }
+}
