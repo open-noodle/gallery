@@ -11,6 +11,7 @@ import 'package:immich_mobile/domain/models/timeline_zoom_anchor.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/motion/timeline_skeleton.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_status_floating_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/asset_scan.dart';
@@ -36,7 +37,6 @@ import 'package:immich_mobile/providers/timeline/timeline_grouping.provider.dart
 import 'package:immich_mobile/providers/timeline/zoom_anchor.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/utils/debounce.dart';
-import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
@@ -750,10 +750,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     // Not primary: attaching to [_scrollController] while segments reload (e.g. on
                     // rotation) would fire [_restoreAssetPosition] early and drop the saved position.
                     primary: false,
-                    slivers: [
-                      if (widget.appBar != null) widget.appBar!,
-                      const SliverFillRemaining(hasScrollBody: false, child: Center(child: ImmichLoadingIndicator())),
-                    ],
+                    slivers: [if (widget.appBar != null) widget.appBar!, const GalleryTimelineSkeleton()],
                   ),
               onData: (segments) {
                 _lastRenderedSegments = segments;
