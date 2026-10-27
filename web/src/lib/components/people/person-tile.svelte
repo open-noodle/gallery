@@ -34,12 +34,13 @@
   bind:this={groupElement}
   class="relative"
   role="group"
+  data-motion-lift-group
   onmouseenter={() => (showActions = true)}
   onmouseleave={hideActionsUnlessFocused}
   use:focusOutside={{ onFocusOut: () => (showActions = false) }}
 >
   <a href={person.href} draggable="false" aria-label={person.displayName} onfocus={() => (showActions = true)}>
-    <div class="size-full rounded-xl brightness-95 filter">
+    <div class="size-full rounded-xl brightness-95 filter" data-motion-lift="flat">
       {#if deferThumbnail && thumbnailQueue}
         <DeferredPersonThumbnail
           queue={thumbnailQueue}
