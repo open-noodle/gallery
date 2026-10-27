@@ -10,6 +10,7 @@
 
 @import '@fontsource-variable/dm-sans';
 @import '@fontsource-variable/bricolage-grotesque';
+@import '../lib/gallery/motion/motion.css';
 
 :root,
 .light {

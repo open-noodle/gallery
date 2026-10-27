@@ -1,4 +1,5 @@
 import { ProjectionType } from '#lib/constants.ts';
+import { celebrate } from '#lib/gallery/motion/index.ts';
 import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
 import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -581,6 +582,7 @@ export const handleDownloadAsset = async (asset: AssetResponseDto, { edited }: {
 const handleFavorite = async (asset: AssetResponseDto) => {
   const $t = await getFormatter();
 
+  celebrate('favorite');
   try {
     await updateAssetFavorites({ assetFavoriteUpdateDto: { ids: [asset.id], isFavorite: true } });
     toastManager.primary($t('added_to_favorites'));
