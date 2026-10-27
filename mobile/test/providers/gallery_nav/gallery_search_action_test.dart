@@ -2,11 +2,10 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
 
 import '../../test_helpers/fake_tabs_router.dart';
 
@@ -23,115 +22,62 @@ class _HapticSpy extends HapticNotifier {
   }
 }
 
-ProviderContainer _container({required FilterSheetVisibility sheet, _HapticSpy? haptic}) {
-  final c = ProviderContainer(
-    overrides: [
-      hapticFeedbackProvider.overrideWith((ref) => haptic ?? _HapticSpy(ref)),
-      photosFilterSheetProvider.overrideWith((_) => sheet),
-    ],
-  );
-  return c;
-}
+ProviderContainer _container() =>
+    ProviderContainer(overrides: [hapticFeedbackProvider.overrideWith((ref) => _HapticSpy(ref))]);
 
+// The search button always opens Photos search mode (specs/2026-10-23-mobile-search-redesign-design.md, Slice 5
+// "Entry"); there is no preview switch and no filter sheet any more.
 void main() {
-  test('already on Photos: no tab switch, no delay, sheet→visible, focus++', () async {
+  test('already on Photos: no tab switch, no delay, search mode opens', () async {
     final router = FakeTabsRouter(initialIndex: kGalleryPhotosIndex);
-    final c = _container(sheet: FilterSheetVisibility.hidden);
+    final c = _container();
     addTearDown(c.dispose);
     final haptic = c.read(hapticFeedbackProvider.notifier) as _HapticSpy;
 
     await openGallerySearch(router, c.read);
 
     expect(router.setCalls, isEmpty);
-    expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-    expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+    expect(c.read(searchModeProvider), isTrue);
     expect(haptic.selectionClicks, 1);
   });
 
-  test('from Albums: setActiveIndex(photos), 620ms delay, then sheet+focus', () {
+  test('from Albums: setActiveIndex(photos), 620ms delay, then search mode', () {
     fakeAsync((async) {
       final router = FakeTabsRouter(initialIndex: kGalleryCollectionIndex);
-      final c = _container(sheet: FilterSheetVisibility.hidden);
+      final c = _container();
       addTearDown(c.dispose);
 
       unawaited(openGallerySearch(router, c.read));
       async.flushMicrotasks();
 
       expect(router.setCalls, [kGalleryPhotosIndex]);
-      expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.hidden, reason: 'sheet waits for delay');
-      expect(c.read(photosFilterSearchFocusRequestProvider), 0, reason: 'focus waits for delay');
+      expect(c.read(searchModeProvider), isFalse, reason: 'search mode waits for the tab transition');
 
       async.elapse(const Duration(milliseconds: 619));
-      expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.hidden, reason: 'still under 620ms');
+      expect(c.read(searchModeProvider), isFalse, reason: 'still under 620ms');
 
       async.elapse(const Duration(milliseconds: 2));
-      expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-      expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+      expect(c.read(searchModeProvider), isTrue);
     });
   });
 
-  test('sheet already visible: write is no-op, focus still increments', () async {
+  test('search mode already open: it stays open, and the haptic fires once per tap', () async {
     final router = FakeTabsRouter(initialIndex: kGalleryPhotosIndex);
-    final c = _container(sheet: FilterSheetVisibility.visible);
+    final c = _container();
     addTearDown(c.dispose);
+    final haptic = c.read(hapticFeedbackProvider.notifier) as _HapticSpy;
 
     await openGallerySearch(router, c.read);
-    expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-    expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+    await openGallerySearch(router, c.read);
+
+    expect(c.read(searchModeProvider), isTrue);
+    expect(haptic.selectionClicks, 2);
   });
 
-  test('from Library: same behavior as Albums', () {
-    fakeAsync((async) {
-      final router = FakeTabsRouter(initialIndex: kGalleryLibraryIndex);
-      final c = _container(sheet: FilterSheetVisibility.hidden);
-      addTearDown(c.dispose);
-
-      unawaited(openGallerySearch(router, c.read));
-      async.elapse(const Duration(milliseconds: 620));
-      async.flushMicrotasks();
-
-      expect(router.setCalls, [kGalleryPhotosIndex]);
-      expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-      expect(c.read(photosFilterSearchFocusRequestProvider), 1);
-    });
-  });
-
-  test('haptic fires exactly once per call regardless of sheet state', () async {
-    for (final initial in [
-      FilterSheetVisibility.hidden,
-      FilterSheetVisibility.visible,
-      FilterSheetVisibility.visible,
-    ]) {
-      final router = FakeTabsRouter(initialIndex: kGalleryPhotosIndex);
-      final c = _container(sheet: initial);
-      final haptic = c.read(hapticFeedbackProvider.notifier) as _HapticSpy;
-
-      await openGallerySearch(router, c.read);
-      expect(haptic.selectionClicks, 1, reason: 'starting from $initial, haptic must fire exactly once');
-      c.dispose();
-    }
-  });
-
-  test('rapid second openGallerySearch mid-delay: +2 counter, no crash', () {
+  test('user taps a different tab mid-delay: no crash, deferred open accepted', () {
     fakeAsync((async) {
       final router = FakeTabsRouter(initialIndex: kGalleryCollectionIndex);
-      final c = _container(sheet: FilterSheetVisibility.hidden);
-      addTearDown(c.dispose);
-
-      unawaited(openGallerySearch(router, c.read));
-      async.elapse(const Duration(milliseconds: 300));
-      unawaited(openGallerySearch(router, c.read));
-      async.elapse(const Duration(milliseconds: 700));
-
-      expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-      expect(c.read(photosFilterSearchFocusRequestProvider), 2);
-    });
-  });
-
-  test('user taps different tab mid-delay: no crash, deferred-open accepted', () {
-    fakeAsync((async) {
-      final router = FakeTabsRouter(initialIndex: kGalleryCollectionIndex);
-      final c = _container(sheet: FilterSheetVisibility.hidden);
+      final c = _container();
       addTearDown(c.dispose);
 
       unawaited(openGallerySearch(router, c.read));
@@ -139,8 +85,7 @@ void main() {
       router.setActiveIndex(kGalleryLibraryIndex);
       async.elapse(const Duration(milliseconds: 700));
 
-      expect(c.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
-      expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+      expect(c.read(searchModeProvider), isTrue);
       expect(router.activeIndex, kGalleryLibraryIndex);
     });
   });

@@ -1,0 +1,19 @@
+{
+  "actor": "me",
+  "description": "Stock Immich server: the base version a stock client sees (no x-gallery-app)",
+  "ids": {},
+  "request": {
+    "headers": {},
+    "method": "GET",
+    "path": "/api/server/version"
+  },
+  "response": {
+    "body": {
+      "major": 3,
+      "minor": 0,
+      "patch": 0,
+      "prerelease": null
+    },
+    "status": 200
+  }
+}

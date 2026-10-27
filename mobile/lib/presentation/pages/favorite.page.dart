@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/favorite_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -26,6 +27,7 @@ class FavoritePage extends StatelessWidget {
 
         return ref.watch(timelineFactoryProvider).favorite(user.id, groupBy: groupBy, temporalScope: scope);
       },
+      search: const FavoritesSearchScope(),
       child: Timeline(
         withGroupingPill: true,
         appBar: MesmerizingSliverAppBar(title: context.t.favorites),

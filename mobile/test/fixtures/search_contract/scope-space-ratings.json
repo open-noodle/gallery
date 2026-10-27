@@ -1,0 +1,26 @@
+{
+  "actor": "me",
+  "description": "Space screen, Pia in Kyoto: ratings only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "ratings"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "ratings": []
+    },
+    "status": 200
+  }
+}

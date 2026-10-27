@@ -1,0 +1,45 @@
+{
+  "actor": "me",
+  "description": "Similar photos (query mode), Kyoto with a Fujifilm, two filters: availability only",
+  "ids": {
+    "b041dd6b-85ba-4171-8260-52366fcc95af": "asset:kyoto-1"
+  },
+  "request": {
+    "body": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "dimensions": [
+        "availability"
+      ],
+      "make": "Fujifilm",
+      "queryAssetId": "b041dd6b-85ba-4171-8260-52366fcc95af",
+      "type": "IMAGE",
+      "visibility": "timeline",
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": false,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  },
+  "setup": "smart-search"
+}

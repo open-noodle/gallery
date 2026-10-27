@@ -97,7 +97,8 @@ class TimelineFactory {
     TimelineTemporalScope temporalScope = const TimelineTemporalScope.none(),
   }) => TimelineService(_timelineRepository.remote(userId, groupBy ?? this.groupBy, temporalScope: temporalScope));
 
-  TimelineService recentlyAdded(String userId) => TimelineService(_timelineRepository.recentlyAdded(userId, groupBy));
+  TimelineService recentlyAdded(String userId, {GroupAssetsBy? groupBy}) =>
+      TimelineService(_timelineRepository.recentlyAdded(userId, groupBy ?? this.groupBy));
 
   TimelineService favorite(
     String userId, {

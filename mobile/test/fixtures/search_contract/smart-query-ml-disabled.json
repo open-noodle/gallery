@@ -1,0 +1,24 @@
+{
+  "actor": "me",
+  "description": "A text query on a server with smart search off: the real 400",
+  "ids": {},
+  "request": {
+    "body": {
+      "query": "beach",
+      "size": 100,
+      "visibility": "timeline",
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/smart"
+  },
+  "response": {
+    "body": {
+      "message": "Smart search is not enabled"
+    },
+    "status": 400
+  }
+}

@@ -4,6 +4,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
+import 'package:immich_mobile/gallery/search/widgets/search_frame.widget.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_detail_kebab.widget.dart';
@@ -456,28 +458,31 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       timelineServiceBuilder: (ref, scope, groupBy) => ref
           .watch(timelineFactoryProvider)
           .sharedSpace(spaceId: widget.spaceId, groupBy: groupBy, temporalScope: scope),
+      search: SpaceSearchScope(widget.spaceId, name: _space!.name),
       child: Timeline(
         withGroupingPill: true,
         // Claims "view in timeline" requests addressed to this space, and leaves the
         // main timeline underneath alone (#1047).
         spaceId: widget.spaceId,
-        topSliverWidget: SpaceTopSliver(
-          spaceId: widget.spaceId,
-          canEdit: _canEdit,
-          // Opens the link picker.
-          onLinkTap: () => _openLinkPicker(),
-          // Tapping an album tile pushes the detail page.
-          onAlbumTap: (albumId) =>
-              context.pushRoute(SpaceAlbumDetailRoute(spaceId: widget.spaceId, albumId: albumId, canEdit: _canEdit)),
-          // "See all ▸" pushes the list/manage page, carrying the same link and
-          // mutation callbacks this page owns.
-          onSeeAll: () => context.pushRoute(
-            SpaceAlbumsRoute(
-              spaceId: widget.spaceId,
-              canEdit: _canEdit,
-              onLink: _openLinkPicker,
-              onToggle: _onToggleAlbumTimeline,
-              onUnlink: _onUnlinkAlbum,
+        topSliverWidget: HiddenWhileSearching(
+          sliver: SpaceTopSliver(
+            spaceId: widget.spaceId,
+            canEdit: _canEdit,
+            // Opens the link picker.
+            onLinkTap: () => _openLinkPicker(),
+            // Tapping an album tile pushes the detail page.
+            onAlbumTap: (albumId) =>
+                context.pushRoute(SpaceAlbumDetailRoute(spaceId: widget.spaceId, albumId: albumId, canEdit: _canEdit)),
+            // "See all ▸" pushes the list/manage page, carrying the same link and
+            // mutation callbacks this page owns.
+            onSeeAll: () => context.pushRoute(
+              SpaceAlbumsRoute(
+                spaceId: widget.spaceId,
+                canEdit: _canEdit,
+                onLink: _openLinkPicker,
+                onToggle: _onToggleAlbumTimeline,
+                onUnlink: _onUnlinkAlbum,
+              ),
             ),
           ),
         ),

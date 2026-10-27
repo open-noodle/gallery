@@ -3,7 +3,7 @@ import { type Kysely, type SelectQueryBuilder, type SqlBool, sql } from 'kysely'
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { AssetType, AssetVisibility } from 'src/enum.js';
-import { personIdentityId } from 'src/gallery/utils/person-sidecar.js';
+import { personIdentityId, personIsPet } from 'src/gallery/utils/person-sidecar.js';
 import { DB } from 'src/schema/index.js';
 import { withAssetFilter } from 'src/utils/asset-filter.js';
 import { anyUuid, asUuid, hasPeople } from 'src/utils/database.js';
@@ -109,30 +109,102 @@ export interface FilterSuggestionsResult {
   hasAssetsNotInAlbum: boolean;
 }
 
+type IdentityPersonRow = {
+  id: string;
+  name: string | null;
+  profileType: 'user-person' | 'space-person';
+  profileId: string;
+  spaceId: string | null;
+  identityId: string;
+  /** Only with `withCounts`: the filtered assets that show this identity. */
+  count?: number | null;
+  /** Only with `withCounts`: whether the identity's primary profile is a pet. */
+  isPet?: boolean | null;
+};
+
+const toFilterSuggestionPerson = (row: IdentityPersonRow): FilterSuggestionPerson => ({
+  id: row.id,
+  name: row.name ?? '',
+  primaryProfile:
+    row.profileType === 'space-person'
+      ? { type: row.profileType, id: row.profileId, spaceId: row.spaceId ?? undefined }
+      : { type: row.profileType, id: row.profileId },
+});
+
 export async function getFilteredIdentityPeople(
   filteredIds: SelectQueryBuilder<DB, 'asset', { id: string }>,
   userId: string,
   timelineSpaceIds: string[],
   db: Kysely<DB>,
 ): Promise<{ people: FilterSuggestionPerson[]; hasUnnamedPeople: boolean }> {
-  const result = await sql<{
-    id: string;
-    name: string | null;
-    profileType: 'user-person' | 'space-person';
-    profileId: string;
-    spaceId: string | null;
-  }>`
+  const rows = await getFilteredIdentityPeopleRows(filteredIds, userId, timelineSpaceIds, db, false);
+  return {
+    people: rows.map((row) => toFilterSuggestionPerson(row)).filter((person) => person.name !== ''),
+    hasUnnamedPeople: rows.some((row) => !row.name),
+  };
+}
+
+/**
+ * {@link getFilteredIdentityPeople} plus, per person, the number of filtered assets that show the identity and the
+ * identity id (to mark the selected ones). The count runs through `face_identity_face`, the join a `person:` /
+ * `space-person:` filter token resolves to, so it is the result count that adding this person would leave.
+ */
+export async function getFilteredIdentityPeopleWithCounts(
+  filteredIds: SelectQueryBuilder<DB, 'asset', { id: string }>,
+  userId: string,
+  timelineSpaceIds: string[],
+  db: Kysely<DB>,
+): Promise<{
+  people: Array<FilterSuggestionPerson & { count: number; identityId: string; isPet: boolean }>;
+  hasUnnamedPeople: boolean;
+}> {
+  const rows = await getFilteredIdentityPeopleRows(filteredIds, userId, timelineSpaceIds, db, true);
+  return {
+    people: rows
+      .map((row) => ({
+        ...toFilterSuggestionPerson(row),
+        count: Number(row.count ?? 0),
+        identityId: row.identityId,
+        isPet: !!row.isPet,
+      }))
+      .filter((person) => person.name !== ''),
+    hasUnnamedPeople: rows.some((row) => !row.name),
+  };
+}
+
+async function getFilteredIdentityPeopleRows(
+  filteredIds: SelectQueryBuilder<DB, 'asset', { id: string }>,
+  userId: string,
+  timelineSpaceIds: string[],
+  db: Kysely<DB>,
+  withCounts: boolean,
+): Promise<IdentityPersonRow[]> {
+  const result = await sql<IdentityPersonRow>`
     WITH filtered_assets AS (
       ${filteredIds}
     ),
     identity_faces AS (
-      SELECT DISTINCT
+      ${
+        withCounts
+          ? // (identity, asset) pairs deduplicated by hash first: count(DISTINCT ...) would sort every face instead.
+            sql`SELECT pairs."identityId", count(*)::int AS "assetCount"
+      FROM (
+        SELECT DISTINCT face_identity_face."identityId", asset_face."assetId"
+        FROM face_identity_face
+        INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
+        INNER JOIN filtered_assets ON filtered_assets.id = asset_face."assetId"
+        WHERE asset_face."deletedAt" IS NULL
+          AND asset_face."isVisible" = true
+      ) AS pairs
+      GROUP BY pairs."identityId"`
+          : sql`SELECT DISTINCT
         face_identity_face."identityId"
       FROM face_identity_face
       INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
       INNER JOIN filtered_assets ON filtered_assets.id = asset_face."assetId"
       WHERE asset_face."deletedAt" IS NULL
-        AND asset_face."isVisible" = true
+        AND asset_face."isVisible" = true`
+      }
     ),
     profiles AS (
       SELECT
@@ -143,7 +215,8 @@ export async function getFilteredIdentityPeople(
         person.name,
         person."isHidden",
         person."updatedAt",
-        0 AS "profileRank"
+        0 AS "profileRank",
+        ${personIsPet()} AS "isPet"
       FROM person
       WHERE person."ownerId" = ${userId}
         AND ${personIdentityId()} IS NOT NULL
@@ -157,7 +230,8 @@ export async function getFilteredIdentityPeople(
         COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name,
         shared_space_person."isHidden",
         shared_space_person."updatedAt",
-        CASE WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2 ELSE 1 END AS "profileRank"
+        CASE WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2 ELSE 1 END AS "profileRank",
+        shared_space_person.type = 'pet' AS "isPet"
       FROM shared_space_person
       LEFT JOIN shared_space_person_alias
         ON shared_space_person_alias."personId" = shared_space_person.id
@@ -212,11 +286,19 @@ export async function getFilteredIdentityPeople(
       COALESCE(NULLIF(display_profiles.name, ''), primary_profiles.name, '') AS name,
       primary_profiles."profileType",
       primary_profiles."profileId",
-      primary_profiles."spaceId"
+      primary_profiles."spaceId"${
+        withCounts
+          ? sql`,
+      primary_profiles."identityId",
+      primary_profiles."isPet",
+      counted."assetCount" AS count`
+          : sql``
+      }
     FROM ranked_profiles AS primary_profiles
     INNER JOIN ranked_profiles AS display_profiles
       ON display_profiles."identityId" = primary_profiles."identityId"
       AND display_profiles.display_rn = 1
+    ${withCounts ? sql`LEFT JOIN identity_faces AS counted ON counted."identityId" = primary_profiles."identityId"` : sql``}
     WHERE primary_profiles.primary_rn = 1
     ORDER BY
       NULLIF(COALESCE(NULLIF(display_profiles.name, ''), primary_profiles.name, ''), '') IS NULL,
@@ -224,19 +306,7 @@ export async function getFilteredIdentityPeople(
       primary_profiles."profileId"
   `.execute(db);
 
-  return {
-    people: result.rows
-      .map((row) => ({
-        id: row.id,
-        name: row.name ?? '',
-        primaryProfile:
-          row.profileType === 'space-person'
-            ? { type: row.profileType, id: row.profileId, spaceId: row.spaceId ?? undefined }
-            : { type: row.profileType, id: row.profileId },
-      }))
-      .filter((person) => person.name !== ''),
-    hasUnnamedPeople: result.rows.some((row) => !row.name),
-  };
+  return result.rows;
 }
 
 @Injectable()

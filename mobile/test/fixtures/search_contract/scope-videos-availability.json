@@ -1,0 +1,39 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024: availability only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability"
+      ],
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": false,
+        "hasFavorites": false,
+        "hasImages": true,
+        "hasPeople": false,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": true
+      }
+    },
+    "status": 200
+  }
+}
