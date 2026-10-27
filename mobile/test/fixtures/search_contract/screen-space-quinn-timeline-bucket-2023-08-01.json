@@ -1,0 +1,80 @@
+{
+  "actor": "me",
+  "description": "Space screen search mode, People: Quinn (a bare space-person id): the month 2023-08-01 of the browse results",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "896d137b-eeec-45b7-8af0-75610855e1ea": "space-person:quinn",
+    "d29fc93c-1dac-4b06-8bd0-0092306a07eb": "asset:space-porto",
+    "ded86da4-c2dc-4fa2-8868-4242e72fd3c7": "user:member"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "896d137b-eeec-45b7-8af0-75610855e1ea"
+      ],
+      "timeBucket": "2023-08-01"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Porto"
+      ],
+      "country": [
+        "Portugal"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null
+      ],
+      "fileCreatedAt": [
+        "2023-08-01T10:00:00"
+      ],
+      "id": [
+        "d29fc93c-1dac-4b06-8bd0-0092306a07eb"
+      ],
+      "isFavorite": [
+        false
+      ],
+      "isImage": [
+        true
+      ],
+      "isTrashed": [
+        false
+      ],
+      "livePhotoVideoId": [
+        null
+      ],
+      "localOffsetHours": [
+        0
+      ],
+      "ownerId": [
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7"
+      ],
+      "projectionType": [
+        null
+      ],
+      "ratio": [
+        1
+      ],
+      "status": [
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash"
+      ],
+      "visibility": [
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

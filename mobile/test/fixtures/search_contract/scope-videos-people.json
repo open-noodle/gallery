@@ -1,0 +1,28 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024: people only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "people"
+      ],
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": []
+    },
+    "status": 200
+  }
+}

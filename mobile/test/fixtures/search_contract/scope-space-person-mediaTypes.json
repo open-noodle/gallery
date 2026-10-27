@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Space person screen (Pia), Sony photos: mediaTypes only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family",
+    "6438d955-2a1c-4bd0-8150-4f3503d02fbe": "space-person:pia"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "mediaTypes"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38",
+      "spacePersonIds": [
+        "6438d955-2a1c-4bd0-8150-4f3503d02fbe"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "mediaTypes": [
+        {
+          "count": 2,
+          "type": "IMAGE"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

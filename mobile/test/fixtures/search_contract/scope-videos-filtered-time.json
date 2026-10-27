@@ -1,0 +1,35 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024, two filters: time only",
+  "ids": {},
+  "request": {
+    "body": {
+      "country": "Germany",
+      "dimensions": [
+        "time"
+      ],
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-02-01"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

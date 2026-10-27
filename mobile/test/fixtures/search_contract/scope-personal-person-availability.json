@@ -1,0 +1,40 @@
+{
+  "actor": "me",
+  "description": "Personal person screen (Anna), with Ben, in Japan: availability only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability"
+      ],
+      "personIds": [
+        "6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  }
+}

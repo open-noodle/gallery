@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Videos screen search mode, When: 2024: total only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "total"
+      ],
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "total": 1
+    },
+    "status": 200
+  }
+}

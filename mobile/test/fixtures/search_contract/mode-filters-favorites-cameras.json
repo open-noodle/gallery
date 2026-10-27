@@ -1,0 +1,58 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: cameras only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "isFavorite": true,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Canon",
+          "models": [
+            {
+              "count": 1,
+              "model": "EOS R5"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 1,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}
