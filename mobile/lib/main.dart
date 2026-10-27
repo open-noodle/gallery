@@ -17,6 +17,7 @@ import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/data/store.dart';
 import 'package:immich_mobile/domain/services/background_worker.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/motion/hero_scope.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
@@ -297,7 +298,10 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
             password: context.t.password,
             undo: context.t.undo,
           ),
-          child: ImmichThemeProvider(colorScheme: context.colorScheme, child: child!),
+          child: ImmichThemeProvider(
+            colorScheme: context.colorScheme,
+            child: GalleryHeroScope(child: child!),
+          ),
         ),
         routerConfig: router.config(
           deepLinkBuilder: _deepLinkBuilder,
