@@ -130,6 +130,7 @@ features:
       - checksum-tombstone
       - switch-back-to-immich
       - storage-usage-accounting
+      - database-backups-to-s3
     risk: high
     domains: [server, web, database, ci, e2e]
     owned_paths:
@@ -138,6 +139,11 @@ features:
       - server/src/backends/s3-storage.backend.ts
       - server/src/gallery/services/storage-usage.service*.ts
       - server/src/gallery/utils/storage-usage*.ts
+      - server/src/gallery/utils/backup-store*.ts
+      # fork-created, so owned rather than an upstream extension: the survival audit should hold them
+      - web/src/routes/admin/system-settings/BackupSettings.spec.ts
+      - docs/docs/features/s3-storage.md
+      - docs/docs/administration/remote-database-backups.md
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
       - web/src/lib/managers/import-manager.svelte.ts
@@ -160,9 +166,27 @@ features:
       - web/src/routes/admin/system-settings/+page.svelte
       - server/Dockerfile
       - e2e/docker-compose.yml
+      # database backups to S3: the backup service stops doing its own file IO and works through
+      # the same StorageBackend interface the fork already uses for media
+      - server/src/interfaces/storage-backend.interface.ts
+      - server/src/backends/disk-storage.backend.ts
+      - server/src/services/database-backup.service.ts
+      - server/src/services/database-backup.service.spec.ts
+      - server/src/dtos/server.dto.ts
+      - server/src/services/server.service.ts
+      - server/src/services/server.service.spec.ts
+      - server/src/app.module.ts
+      - web/src/routes/admin/system-settings/BackupSettings.svelte
+      - mobile/lib/utils/openapi_patching.dart
     expected_symbols:
       server/src/services/integrity.service.ts:
         - skipIfS3Configured
+      server/src/interfaces/storage-backend.interface.ts:
+        - list
+      server/src/services/database-backup.service.ts:
+        - promoteToRemote
+      server/src/dtos/server.dto.ts:
+        - s3Storage
     optional_paths:
       - e2e/**
       - server/src/backends/**

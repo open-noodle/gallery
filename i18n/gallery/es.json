@@ -12,6 +12,9 @@
   "added_to_collections_count": "Añadido a {count, plural, one {# colección} other {# colecciones}}",
   "added_to_space_count": "{count, plural, one {# recurso añadido} other {# recursos añadidos}} al Space",
   "admin": {
+    "backup_s3_credentials_hint": "Las copias de seguridad se escriben en el mismo bucket que tus archivos multimedia, dentro de backups/, usando las credenciales de S3 que el servidor ya tiene configuradas. Mientras esto esté activado, cada nueva copia se sube y después se elimina del disco local.",
+    "backup_s3_enabled": "Subir las copias de seguridad a S3",
+    "backup_s3_enabled_description": "Guardar las copias de seguridad programadas de la base de datos en el almacenamiento de objetos en lugar de en el disco del servidor",
     "birthday_memories_setting": "Recuerdos de cumpleaños",
     "birthday_memories_setting_description": "Crear recuerdos generados para las personas en su cumpleaños",
     "classification_action_tag": "Solo etiquetar",
