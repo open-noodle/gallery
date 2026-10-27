@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/duration_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
+import 'package:immich_mobile/gallery/motion/gallery_tile.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
@@ -110,7 +111,10 @@ class _ThumbnailTileState extends ConsumerState<ThumbnailTile> {
                     // but other solutions have failed thus far.
                     key: ValueKey(isCurrentAsset),
                     tag: '${asset?.heroTag}_$heroIndex',
-                    child: Thumbnail.fromAsset(asset: asset, size: widget.size, remoteSize: widget.remoteSize),
+                    child: GalleryTile(
+                      asset: asset,
+                      child: Thumbnail.fromAsset(asset: asset, size: widget.size, remoteSize: widget.remoteSize),
+                    ),
                     // Placeholderbuilder used to hide indicators on first hero animation, since flightShuttleBuilder isn't called until both source and destination hero exist in widget tree.
                     placeholderBuilder: (context, heroSize, child) {
                       if (!_hideIndicators) {
