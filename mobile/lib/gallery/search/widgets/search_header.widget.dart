@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/motion/entrance.dart';
+import 'package:immich_mobile/gallery/motion/swap.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
@@ -90,9 +92,13 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
 
   late final TextEditingController _text;
 
+  /// Search mode just opened (not a rebuild while it stays open): the rows settle in, the chips cascade.
+  late final bool _entering;
+
   @override
   void initState() {
     super.initState();
+    _entering = ref.read(searchModeProvider.notifier).claimEntrance();
     _text = ref.read(searchFieldControllerProvider);
     _focus
       ..addListener(_refresh)
@@ -220,42 +226,54 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
           padding: EdgeInsets.only(top: SearchHeader.statusBarInset(context)),
           child: Column(
             children: [
-              SizedBox(
-                height: SearchHeader.fieldRowHeight,
-                child: Row(
-                  children: [
-                    IconButton(
-                      key: const Key('search-mode-back'),
-                      tooltip: context.t.back,
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      onPressed: _leave,
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            _fieldWidth = constraints.maxWidth;
-                            return OverlayPortal(
-                              controller: _dropdown,
-                              overlayChildBuilder: _buildDropdown,
-                              child: CompositedTransformTarget(link: _link, child: _buildField(theme, query)),
-                            );
-                          },
+              GalleryEntrance(
+                enabled: _entering,
+                offset: const Offset(0, -6),
+                child: SizedBox(
+                  height: SearchHeader.fieldRowHeight,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        key: const Key('search-mode-back'),
+                        tooltip: context.t.back,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        onPressed: _leave,
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              _fieldWidth = constraints.maxWidth;
+                              return OverlayPortal(
+                                controller: _dropdown,
+                                overlayChildBuilder: _buildDropdown,
+                                child: CompositedTransformTarget(link: _link, child: _buildField(theme, query)),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: SearchHeader.chipRowHeight, child: SearchChipRow()),
-              const SizedBox(
-                height: SearchHeader.resultsRowHeight,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _ResultsRow()),
-                    Positioned(left: 0, right: 0, bottom: 0, child: _BusyBar()),
-                  ],
+              SizedBox(
+                height: SearchHeader.chipRowHeight,
+                child: SearchChipRow(entering: _entering),
+              ),
+              GalleryEntrance(
+                enabled: _entering,
+                delay: const Duration(milliseconds: 120),
+                offset: const Offset(0, -4),
+                child: const SizedBox(
+                  height: SearchHeader.resultsRowHeight,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _ResultsRow()),
+                      Positioned(left: 0, right: 0, bottom: 0, child: _BusyBar()),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -265,6 +283,34 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
     );
   }
 
+  /// The start of the field: the query token for text or similar photos, the search icon otherwise.
+  Widget _queryLeading(ThemeData theme, SearchQuery query) {
+    void clear() => ref.read(searchStateProvider.notifier).clearQuery();
+    return switch (query) {
+      SearchQueryText(:final text) => Padding(
+        padding: const EdgeInsetsDirectional.only(end: 6),
+        child: _QueryToken(label: text, onRemove: clear),
+      ),
+      SearchQuerySimilarTo(:final assetId) => Padding(
+        padding: const EdgeInsetsDirectional.only(end: 6),
+        child: _QueryToken(
+          key: const Key('search-mode-similar-token'),
+          label: context.t.search_mode_similar_to,
+          removeLabel: context.t.search_mode_remove_similar,
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox.square(
+              dimension: 20,
+              child: Thumbnail.remote(remoteId: assetId, thumbhash: '', fit: BoxFit.cover),
+            ),
+          ),
+          onRemove: clear,
+        ),
+      ),
+      _ => Icon(Icons.search_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+    };
+  }
+
   Widget _buildField(ThemeData theme, SearchQuery query) {
     return Container(
       height: 44,
@@ -272,26 +318,17 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
       decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
       child: Row(
         children: [
-          if (query case SearchQueryText(:final text)) ...[
-            _QueryToken(label: text, onRemove: () => ref.read(searchStateProvider.notifier).clearQuery()),
-            const SizedBox(width: 6),
-          ] else if (query case SearchQuerySimilarTo(:final assetId)) ...[
-            _QueryToken(
-              key: const Key('search-mode-similar-token'),
-              label: context.t.search_mode_similar_to,
-              removeLabel: context.t.search_mode_remove_similar,
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: SizedBox.square(
-                  dimension: 20,
-                  child: Thumbnail.remote(remoteId: assetId, thumbhash: '', fit: BoxFit.cover),
-                ),
-              ),
-              onRemove: () => ref.read(searchStateProvider.notifier).clearQuery(),
-            ),
-            const SizedBox(width: 6),
-          ] else
-            Icon(Icons.search_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+          // A submitted query pops in as a token; removing it shrinks it back to the search icon.
+          GallerySwap(
+            value: switch (query) {
+              SearchQueryText(:final text) => 'text:$text',
+              SearchQuerySimilarTo(:final assetId) => 'similar:$assetId',
+              _ => null,
+            },
+            popFrom: 0.6,
+            sized: true,
+            child: _queryLeading(theme, query),
+          ),
           const SizedBox(width: 4),
           Expanded(
             child: TextField(
@@ -333,14 +370,18 @@ class _SearchHeaderBodyState extends ConsumerState<_SearchHeaderBody> {
       child: Align(
         alignment: Alignment.topLeft,
         child: TextFieldTapRegion(
-          child: SizedBox(
-            width: _fieldWidth,
-            // Watched here: the suggestions follow the lists as they arrive, without more typing.
-            child: Consumer(
-              builder: (context, ref, _) => _SuggestionList(
-                suggestions: matcher.match(text, ref.watch(searchOptionsProvider)),
-                onPick: _pick,
-                onRetry: () => retrySearch(ref),
+          // Drops in from the field when the first letter is typed; stays put while the suggestions change.
+          child: GalleryEntrance(
+            offset: const Offset(0, -6),
+            child: SizedBox(
+              width: _fieldWidth,
+              // Watched here: the suggestions follow the lists as they arrive, without more typing.
+              child: Consumer(
+                builder: (context, ref, _) => _SuggestionList(
+                  suggestions: matcher.match(text, ref.watch(searchOptionsProvider)),
+                  onPick: _pick,
+                  onRetry: () => retrySearch(ref),
+                ),
               ),
             ),
           ),
@@ -643,21 +684,26 @@ class _ResultsRow extends ConsumerWidget {
         ref.watch(searchResultsProvider.select((r) => r.total)) ??
         ref.watch(searchOptionsProvider.select((o) => o.total));
     final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final text = pending
+        ? context.t.search_mode_searching
+        : total == null
+        ? ''
+        : state.isEmpty
+        ? context.t.search_mode_total_all(count: total)
+        : context.t.search_mode_total_matches(count: total);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              pending
-                  ? context.t.search_mode_searching
-                  : total == null
-                  ? ''
-                  : state.isEmpty
-                  ? context.t.search_mode_total_all(count: total)
-                  : context.t.search_mode_total_matches(count: total),
-              key: const Key('search-mode-total'),
-              style: muted?.copyWith(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
+            // The total rolls to its new value: "Searching…" rises out, the count rises in.
+            child: GallerySwap(
+              value: text,
+              child: Text(
+                text,
+                key: const Key('search-mode-total'),
+                style: muted?.copyWith(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
           _SortButton(sort: state.sort, queryMode: state.isQueryMode),
@@ -673,10 +719,15 @@ class _BusyBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(searchResultsPendingProvider)) {
-      return const SizedBox.shrink();
-    }
-    return const LinearProgressIndicator(key: Key('search-mode-busy'), minHeight: 2);
+    final pending = ref.watch(searchResultsPendingProvider);
+    // Fades in and out rather than blinking.
+    return GallerySwap(
+      value: pending,
+      rise: 0,
+      child: pending
+          ? const LinearProgressIndicator(key: Key('search-mode-busy'), minHeight: 2)
+          : const SizedBox(height: 2, width: double.infinity),
+    );
   }
 }
 

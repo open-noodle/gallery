@@ -120,14 +120,26 @@ Future<void> revealPlaceCity(WidgetTester tester, String key) async {
   final carets = find.byWidgetPredicate(
     (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('search-place-cities-'),
   );
-  for (final caret in carets.evaluate().map((e) => e.widget.key!).toList()) {
-    final folded = find.descendant(of: find.byKey(caret), matching: find.byIcon(Icons.arrow_drop_down_rounded));
-    if (folded.evaluate().isEmpty) {
+  for (final caret in carets.evaluate().map((e) => e.widget.key! as ValueKey<String>).toList()) {
+    // A folded country's fold holds no city rows.
+    final country = caret.value.substring('search-place-cities-'.length);
+    final cities = find.descendant(
+      of: find.byKey(Key('search-place-fold-$country')),
+      matching: find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('search-place-city-'),
+      ),
+    );
+    if (cities.evaluate().isNotEmpty) {
       continue;
     }
     await tester.ensureVisible(find.byKey(caret));
     await tester.pump();
     await tester.tap(find.byKey(caret));
+    // Let the cities finish folding open before anything taps them.
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    if (find.byKey(Key(key)).evaluate().isNotEmpty) {
+      return;
+    }
   }
 }

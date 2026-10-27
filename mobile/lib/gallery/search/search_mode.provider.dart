@@ -18,8 +18,18 @@ class SearchModeNotifier extends Notifier<bool> {
   /// Whether [scopeAvailability] came from a stale server answer: the options notifier asks for it again until fresh.
   bool scopeAvailabilityStale = false;
 
+  bool _entrancePending = false;
+
   @override
   bool build() => false;
+
+  /// True once per opening: the search header plays its entrance the first time it is built after [enter], and not
+  /// again when the timeline rebuilds it while search mode stays open.
+  bool claimEntrance() {
+    final pending = _entrancePending;
+    _entrancePending = false;
+    return pending;
+  }
 
   void enter() {
     if (state) {
@@ -28,6 +38,7 @@ class SearchModeNotifier extends Notifier<bool> {
     savedScrollOffset = null;
     scopeAvailability = null;
     scopeAvailabilityStale = false;
+    _entrancePending = true;
     state = true;
   }
 

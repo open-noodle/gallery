@@ -578,7 +578,7 @@ void main() {
       final width = tester.getSize(find.byKey(const Key('search-filters-list'))).width;
       for (final name in ['mediaType', 'camera', 'albums']) {
         final toggle = find.byKey(Key('search-filter-toggle-$name'));
-        final arrow = find.descendant(of: toggle, matching: find.byIcon(Icons.expand_less_rounded));
+        final arrow = find.descendant(of: toggle, matching: find.byIcon(Icons.expand_more_rounded));
         expect(tester.getTopRight(arrow).dx, greaterThan(width - 40), reason: name);
       }
 

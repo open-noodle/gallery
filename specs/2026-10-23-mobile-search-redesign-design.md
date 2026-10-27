@@ -170,6 +170,26 @@ Tapping a titled section's title collapses or expands it; collapsed with a filte
 - With a smart query, Favorites search keeps smart search's default visibility (everything but locked). A partner's or another space member's archived photo you favourited can therefore appear there. Partner archived favourites already did before this project. Closing it means adding `withOwnArchiveOnly` to smart search, a few lines in each of four upstream search files; deferred.
 - The Favorites page's own on-device query still shows another member's archived space photo you favourited. Search leaves it out, following the owner's rule that archive stays the owner's private state.
 
+### Motion
+
+Search uses the app's motion language (`specs/2026-10-23-mobile-motion-language-design.md`, #1236): the same tokens, reduced motion as plain fades, and nothing that blocks a touch. The pieces are generic and live in `lib/gallery/motion/` (`entrance.dart`, `animated_row.dart`, `swap.dart`, `pop.dart`, `fold.dart`); search only places them.
+
+| Moment | Motion |
+| --- | --- |
+| Opening search mode | The field row fades in while settling down from 6px above. The chips cascade in from the left, 35ms apart, and the results row follows at 120ms. Plays once per opening: `SearchModeNotifier.claimEntrance()`, so a header rebuilt while search stays open does not replay it. Leaving swaps the app bar back at once. |
+| A chip comes or goes (an extra filter, Clear all, a #910 chip) | It grows in (width, fade, 85%→100% scale) or shrinks out while the chips beside it slide over (`GalleryAnimatedRow`, matched by key). A leaving chip ignores taps. |
+| A chip's label changes ("People" → "Anna") | Cross-fades with a 6px rise, and the chip eases to its new width. |
+| The Filters badge count changes | Pops on the bouncy spring. |
+| Pressing a chip, a person tile | Squish (94%, 93%) with the 70ms scrolling delay (`GalleryPressable.scrollingDelay`). |
+| A search on its way | The dim over the old photos fades in, with a slow diagonal sheen like the timeline skeleton's; the busy line fades in and out. |
+| The answer lands | The dim wipes away in the skeleton's diagonal wave from the top-left (520ms), so the new photos ripple in; the total rolls ("Searching…" rises out, the count rises in). Leaving search mode while waiting just drops the dim. |
+| Submitting a query, removing it | The token pops into the field on the bouncy spring; removed, it shrinks back into the search icon. |
+| Suggestions | The dropdown fades in while dropping 6px from the field; it stays put while the suggestions change. |
+| Filters sections, the camera models, When's months, Places' cities | Open down from their title and fold back up (`GalleryFold`); the arrow turns half a turn. "Show more" cameras ease the list longer. |
+| Selecting a person | The ring fades in and a tick pops onto the face. |
+
+Reduced motion: no movement or scaling (fades stay), no sheen, the wipe becomes a fade, and sizes change at once. Tests: `test/gallery/search/search_motion_test.dart` looks at a frame mid-movement and at the settled frame for each moment.
+
 **Known limitation (Slice 5).** Some results are not synced to the device, for example a timeline space's photo before its sync lands. Opening one fetches `GET /assets/{id}`, so viewing, sharing and downloading work. But the favourite heart does not refresh after tapping (the write succeeds), and the info sheet has no EXIF. Fixing either needs a hook in the upstream asset viewer, left for a follow-up.
 
 ### Similar photos

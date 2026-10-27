@@ -3,6 +3,10 @@ import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/gallery/motion/fold.dart';
+import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
+import 'package:immich_mobile/gallery/motion/pop.dart';
+import 'package:immich_mobile/gallery/motion/pressable.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
@@ -559,40 +563,74 @@ class _PersonTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: selected ? theme.colorScheme.primary : Colors.transparent, width: 2),
+    final scheme = theme.colorScheme;
+    // In a scrolling grid: the press waits a moment and lets go when the finger starts scrolling.
+    return GalleryPressable(
+      pressedScale: 0.93,
+      pressDelay: GalleryPressable.scrollingDelay,
+      enabled: onTap != null,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedContainer(
+                    duration: GalleryMotion.quick,
+                    curve: GalleryMotion.standard,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: selected ? scheme.primary : Colors.transparent, width: 2),
+                    ),
+                    child: Padding(padding: const EdgeInsets.all(2), child: avatar),
+                  ),
+                  // A tick pops onto the selected face.
+                  if (selected)
+                    PositionedDirectional(
+                      end: -2,
+                      bottom: -2,
+                      child: GalleryPop(
+                        onMount: true,
+                        from: 0.3,
+                        child: Container(
+                          key: const Key('search-person-selected-tick'),
+                          decoration: BoxDecoration(
+                            color: scheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: scheme.surface, width: 2),
+                          ),
+                          padding: const EdgeInsets.all(1),
+                          child: Icon(Icons.check_rounded, size: 12, color: scheme.onPrimary),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              child: Padding(padding: const EdgeInsets.all(2), child: avatar),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelMedium,
-            ),
-            if (caption != null)
+              const SizedBox(height: 2),
               Text(
-                caption!,
+                name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              )
-            else
-              SearchOptionCount(count),
-          ],
+                style: theme.textTheme.labelMedium,
+              ),
+              if (caption != null)
+                Text(
+                  caption!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                )
+              else
+                SearchOptionCount(count),
+            ],
+          ),
         ),
       ),
     );
@@ -688,16 +726,19 @@ class _WhenSheetState extends ConsumerState<_WhenSheet> {
                       key: Key('search-when-months-$year'),
                       onPressed: () =>
                           setState(() => _expanded.contains(year) ? _expanded.remove(year) : _expanded.add(year)),
-                      icon: Icon(
-                        _expanded.contains(year) ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+                      icon: GalleryTurn(
+                        open: _expanded.contains(year),
+                        child: const Icon(Icons.arrow_drop_down_rounded),
                       ),
                       label: Text(context.t.search_mode_when_months),
                     ),
                   ],
                 ),
               ),
-              if (_expanded.contains(year))
-                Padding(
+              GalleryFold(
+                key: Key('search-when-months-fold-$year'),
+                open: _expanded.contains(year),
+                child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: GridView.count(
                     crossAxisCount: 6,
@@ -719,6 +760,7 @@ class _WhenSheetState extends ConsumerState<_WhenSheet> {
                     ],
                   ),
                 ),
+              ),
             ],
           const SizedBox(height: 12),
         ],
@@ -850,29 +892,39 @@ class _PlacesSheetState extends ConsumerState<_PlacesSheet> {
                   onPressed: () => setState(
                     () => _open.contains(country.country) ? _open.remove(country.country) : _open.add(country.country),
                   ),
-                  icon: Icon(open ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded),
+                  icon: GalleryTurn(open: open, child: const Icon(Icons.arrow_drop_down_rounded)),
                   label: Text(context.t.search_mode_place_cities),
                 ),
         ),
       );
-      if (!open) {
-        continue;
-      }
-      for (final city in cities) {
-        final citySelected = place?.country == country.country && place?.city == city.city;
-        rows.add(
-          _PlaceRow(
-            key: Key('search-place-city-${city.city}'),
-            icon: Icons.place_outlined,
-            title: city.city,
-            count: city.count,
-            indent: true,
-            selected: citySelected,
-            onTap: () =>
-                notifier.setPlace(citySelected ? null : SearchPlace(country: country.country, city: city.city)),
-          ),
-        );
-      }
+      // The country's cities open down from it and fold back up.
+      rows.add(
+        GalleryFold(
+          key: Key('search-place-fold-${country.country}'),
+          open: open,
+          child: !open
+              ? const SizedBox.shrink()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final city in cities)
+                      _PlaceRow(
+                        key: Key('search-place-city-${city.city}'),
+                        icon: Icons.place_outlined,
+                        title: city.city,
+                        count: city.count,
+                        indent: true,
+                        selected: place?.country == country.country && place?.city == city.city,
+                        onTap: () => notifier.setPlace(
+                          place?.country == country.country && place?.city == city.city
+                              ? null
+                              : SearchPlace(country: country.country, city: city.city),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      );
     }
 
     return SearchSheetScaffold(

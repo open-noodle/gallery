@@ -1,6 +1,8 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/motion/fold.dart';
+import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_filter_prefs.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
@@ -281,7 +283,8 @@ class _Section extends StatelessWidget {
                         active: collapsed && spec.active,
                         onTap: onToggle,
                       ),
-                      if (!collapsed) spec.body(),
+                      // Opens down from its title and folds back up, so the sections below slide.
+                      GalleryFold(open: !collapsed, child: collapsed ? const SizedBox.shrink() : spec.body()),
                     ],
                   ),
           ),
@@ -341,7 +344,10 @@ class _Title extends StatelessWidget {
                 ),
               ),
               if (trailing != null) Text(trailing!, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
-              Icon(collapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded, size: 22, color: muted),
+              GalleryTurn(
+                open: !collapsed,
+                child: Icon(Icons.expand_more_rounded, size: 22, color: muted),
+              ),
             ],
           ),
         ),
@@ -550,7 +556,9 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
             for (final (index, make) in rows.indexed)
               if (index < _folded || make.make == camera?.make) make,
           ];
-    return Column(
+    // "Show more" eases the list open rather than snapping it longer. Reduced motion: at once (an AnimatedSize with a
+    // zero duration trips Flutter's own layout assertion).
+    final list = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (makes == null && camera == null)
@@ -568,14 +576,16 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SearchOptionCount(make.count),
-                  Icon(_open.contains(make.make) ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded),
+                  GalleryTurn(open: _open.contains(make.make), child: const Icon(Icons.arrow_drop_down_rounded)),
                 ],
               ),
               // A make opens its models at once, from the options already loaded.
               onTap: () => setState(() => _open.contains(make.make) ? _open.remove(make.make) : _open.add(make.make)),
             ),
-            if (_open.contains(make.make))
-              Padding(
+            GalleryFold(
+              key: Key('search-filter-models-fold-${make.make}'),
+              open: _open.contains(make.make),
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(56, 0, 16, 8),
                 child: Wrap(
                   spacing: 8,
@@ -606,6 +616,7 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
                   ],
                 ),
               ),
+            ),
           ],
         if (rows.length > _folded)
           Align(
@@ -623,6 +634,14 @@ class _CameraSectionState extends ConsumerState<_CameraSection> {
           ),
       ],
     );
+    return GalleryMotion.reduced(context)
+        ? list
+        : AnimatedSize(
+            duration: GalleryMotion.base,
+            curve: GalleryMotion.standard,
+            alignment: Alignment.topCenter,
+            child: list,
+          );
   }
 }
 

@@ -599,7 +599,8 @@ void main() {
       expect(find.byKey(const Key('search-place-country-Japan')), findsNothing);
 
       await tester.enterText(find.byKey(const Key('search-sheet-field')), 'portu');
-      await settleFrames(tester, frames: 4);
+      // Long enough for Portugal's cities to fold away.
+      await settleFrames(tester, frames: 8);
       expect(find.byKey(const Key('search-place-country-Portugal')), findsOneWidget);
       expect(find.byKey(const Key('search-place-city-Lisbon')), findsNothing);
 
@@ -806,8 +807,11 @@ void main() {
   );
 }
 
+/// The chip's dimming: a greyed chip fades to less than full opacity.
 double _opacity(WidgetTester tester, String chip) => tester
-    .widget<Opacity>(find.descendant(of: find.byKey(Key('search-chip-$chip')), matching: find.byType(Opacity)).first)
+    .widget<AnimatedOpacity>(
+      find.descendant(of: find.byKey(Key('search-chip-$chip')), matching: find.byType(AnimatedOpacity)).first,
+    )
     .opacity;
 
 class _FakeReadonly extends ReadOnlyModeNotifier {

@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/gallery/motion/animated_row.dart';
+import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
+import 'package:immich_mobile/gallery/motion/pop.dart';
+import 'package:immich_mobile/gallery/motion/pressable.dart';
+import 'package:immich_mobile/gallery/motion/swap.dart';
 import 'package:immich_mobile/gallery/search/search.providers.dart';
 import 'package:immich_mobile/gallery/search/search_options.model.dart';
 import 'package:immich_mobile/gallery/search/search_scope.dart';
@@ -19,7 +24,13 @@ import 'package:immich_mobile/generated/translations.g.dart';
 enum SearchMainChip { people, when, places, tags }
 
 class SearchChipRow extends ConsumerWidget {
-  const SearchChipRow({super.key});
+  /// Search mode just opened: the chips cascade in.
+  final bool entering;
+
+  const SearchChipRow({super.key, this.entering = false});
+
+  /// The pause between one chip's entrance and the next's.
+  static const entranceStagger = Duration(milliseconds: 35);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -107,16 +118,14 @@ class SearchChipRow extends ConsumerWidget {
         ),
     ];
 
-    // Few chips: all are built, so one past the right edge is there to scroll to.
+    // Few chips: all are built, so one past the right edge is there to scroll to. A chip that comes or goes (an extra
+    // filter, Clear all, a chip #910 hides) grows in or shrinks out, so the others slide over.
     return SingleChildScrollView(
       key: const Key('search-chip-row'),
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          for (final (index, chip) in chips.indexed) ...[if (index > 0) const SizedBox(width: 8), chip],
-        ],
-      ),
+      // Every chip carries an 8px gap after it, so the end padding is that much less.
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 4, 6),
+      child: GalleryAnimatedRow(staggerOnMount: entering ? entranceStagger : null, children: chips),
     );
   }
 
@@ -175,23 +184,33 @@ class _SearchChip extends StatelessWidget {
               if (leading != null) ...[Icon(leading, size: 18, color: foreground), const SizedBox(width: 6)],
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 180),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: foreground,
-                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                // "People" becoming "Anna": the label cross-fades and the chip eases to its new width.
+                child: GallerySwap(
+                  value: label,
+                  sized: true,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
               if (badge != null) ...[
                 const SizedBox(width: 6),
-                Container(
-                  key: const Key('search-chip-filters-badge'),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(999)),
-                  child: Text('$badge', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onPrimary)),
+                // Pops when it appears and whenever the count changes.
+                GalleryPop(
+                  trigger: badge,
+                  onMount: true,
+                  child: Container(
+                    key: const Key('search-chip-filters-badge'),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(999)),
+                    child: Text('$badge', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onPrimary)),
+                  ),
                 ),
               ],
               if (trailing != null) ...[const SizedBox(width: 2), Icon(trailing, size: 18, color: foreground)],
@@ -204,7 +223,18 @@ class _SearchChip extends StatelessWidget {
       button: true,
       enabled: enabled,
       label: semanticsLabel,
-      child: Opacity(opacity: enabled ? 1 : 0.38, child: chip),
+      // In a scrolling row: the press waits a moment and lets go when the finger starts scrolling.
+      child: GalleryPressable(
+        pressedScale: 0.94,
+        pressDelay: GalleryPressable.scrollingDelay,
+        enabled: enabled,
+        child: AnimatedOpacity(
+          opacity: enabled ? 1 : 0.38,
+          duration: GalleryMotion.quick,
+          curve: GalleryMotion.standard,
+          child: chip,
+        ),
+      ),
     );
   }
 }
