@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/gallery/motion/pressable.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_segment.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 
@@ -200,11 +201,14 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
                             opacity: widget.disabledTabs.contains(tab) ? 0.3 : 1.0,
                             child: IgnorePointer(
                               ignoring: widget.disabledTabs.contains(tab),
-                              child: GalleryNavSegment(
-                                key: Key('gallery-nav-segment-${tab.name}'),
-                                tab: tab,
-                                active: widget.activeTab == tab,
-                                onTap: () => widget.onTabTap(tab),
+                              child: GalleryPressable(
+                                pressedScale: 0.88,
+                                child: GalleryNavSegment(
+                                  key: Key('gallery-nav-segment-${tab.name}'),
+                                  tab: tab,
+                                  active: widget.activeTab == tab,
+                                  onTap: () => widget.onTabTap(tab),
+                                ),
                               ),
                             ),
                           ),
