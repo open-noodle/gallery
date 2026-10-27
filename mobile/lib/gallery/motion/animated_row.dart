@@ -22,10 +22,15 @@ class _Entry {
   final Key key;
   Widget widget;
   final AnimationController controller;
-  late Animation<double> animation = CurvedAnimation(parent: controller, curve: GalleryMotion.standard);
+  late final CurvedAnimation animation = CurvedAnimation(parent: controller, curve: GalleryMotion.standard);
   bool leaving = false;
 
   _Entry(this.key, this.widget, this.controller);
+
+  void dispose() {
+    animation.dispose();
+    controller.dispose();
+  }
 }
 
 class _GalleryAnimatedRowState extends State<GalleryAnimatedRow> with TickerProviderStateMixin {
@@ -50,16 +55,14 @@ class _GalleryAnimatedRowState extends State<GalleryAnimatedRow> with TickerProv
     final total = delay + GalleryMotion.base;
     entry
       ..controller.duration = total
-      ..animation = CurvedAnimation(
-        parent: entry.controller,
-        curve: Interval(delay.inMicroseconds / total.inMicroseconds, 1, curve: GalleryMotion.settle),
-      );
+      ..animation.curve = Interval(delay.inMicroseconds / total.inMicroseconds, 1, curve: GalleryMotion.settle);
     entry.controller.forward().whenCompleteOrCancel(() {
       if (!mounted) {
         return;
       }
-      entry.controller.duration = GalleryMotion.base;
-      entry.animation = CurvedAnimation(parent: entry.controller, curve: GalleryMotion.standard);
+      entry
+        ..controller.duration = GalleryMotion.base
+        ..animation.curve = GalleryMotion.standard;
       setState(() {});
     });
   }
@@ -136,13 +139,13 @@ class _GalleryAnimatedRowState extends State<GalleryAnimatedRow> with TickerProv
       return;
     }
     setState(() => _entries.remove(entry));
-    entry.controller.dispose();
+    entry.dispose();
   }
 
   @override
   void dispose() {
     for (final entry in _entries) {
-      entry.controller.dispose();
+      entry.dispose();
     }
     super.dispose();
   }
