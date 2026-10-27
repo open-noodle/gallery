@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/motion/pressable.dart';
 import 'package:immich_mobile/widgets/spaces/space_collage.dart';
 import 'package:openapi/api.dart';
 
@@ -18,93 +19,100 @@ class SpaceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasNewAssets = (space.newAssetCount.value ?? 0) > 0;
 
-    return GestureDetector(
-      onTap: onTap,
-      // Always register a long-press recognizer, even when the caller has no
-      // long-press handler of its own. Without one, GestureDetector only
-      // arms a tap recognizer, so a held-then-released touch (no onLongPress
-      // competing in the gesture arena) resolves as a plain tap -- a "fat
-      // finger" long hold would then navigate just like a quick tap.
-      onLongPress: onLongPress ?? () {},
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              return Stack(
-                children: [
-                  SpaceCollage(
-                    recentAssetIds: space.recentAssetIds.value ?? const [],
-                    recentAssetThumbhashes: space.recentAssetThumbhashes.value ?? const [],
-                    color: space.color.value,
-                    size: width,
-                  ),
-                  // Activity dot
-                  if (hasNewAssets)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: context.primaryColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: context.primaryColor.withValues(alpha: 0.4),
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            ),
-                          ],
+    return GalleryPressable(
+      pressedScale: 0.96,
+      pressDelay: const Duration(milliseconds: 70),
+      child: GestureDetector(
+        onTap: onTap,
+        // Always register a long-press recognizer, even when the caller has no
+        // long-press handler of its own. Without one, GestureDetector only
+        // arms a tap recognizer, so a held-then-released touch (no onLongPress
+        // competing in the gesture arena) resolves as a plain tap -- a "fat
+        // finger" long hold would then navigate just like a quick tap.
+        onLongPress: onLongPress ?? () {},
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                return Stack(
+                  children: [
+                    SpaceCollage(
+                      recentAssetIds: space.recentAssetIds.value ?? const [],
+                      recentAssetThumbhashes: space.recentAssetThumbhashes.value ?? const [],
+                      color: space.color.value,
+                      size: width,
+                    ),
+                    // Activity dot
+                    if (hasNewAssets)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: context.primaryColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: context.primaryColor.withValues(alpha: 0.4),
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  // Member avatar stack
-                  if ((space.members.value ?? const []).isNotEmpty)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: _MemberAvatarStack(members: space.members.value ?? const []),
-                    ),
-                ],
-              );
-            },
-          ),
-          // Space name
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              space.name,
-              style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                    // Member avatar stack
+                    if ((space.members.value ?? const []).isNotEmpty)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: _MemberAvatarStack(members: space.members.value ?? const []),
+                      ),
+                  ],
+                );
+              },
             ),
-          ),
-          // Activity text
-          if (hasNewAssets)
+            // Space name
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                space.name,
+                style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // Activity text
+            if (hasNewAssets)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  _activityText(),
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: context.primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            // Details row
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                _activityText(),
-                style: context.textTheme.bodySmall?.copyWith(color: context.primaryColor, fontWeight: FontWeight.w500),
+                _detailsText(),
+                style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-          // Details row
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              _detailsText(),
-              style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

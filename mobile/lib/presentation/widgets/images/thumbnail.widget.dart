@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
+import 'package:immich_mobile/gallery/motion/motion_tokens.dart';
 import 'package:immich_mobile/presentation/widgets/images/image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumb_hash_provider.dart';
@@ -70,7 +71,7 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(duration: const Duration(milliseconds: 100), vsync: this);
+    _fadeController = AnimationController(duration: GalleryMotion.quick, vsync: this);
     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
     _fadeController.addStatusListener(_onAnimationStatusChanged);
     _loadImage();

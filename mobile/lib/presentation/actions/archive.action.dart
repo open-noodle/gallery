@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
+import 'package:immich_mobile/gallery/motion/removal.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
@@ -56,6 +57,7 @@ class ArchiveAction extends AssetActionBuilder {
     final clearSelection = ref.read(clearSelectionProvider(source));
 
     try {
+      GalleryRemoval.send(assetIds);
       await assetService.update(assetIds, visibility: .some(shouldArchive ? .archive : .timeline));
       Future<void> undo() => assetService.update(assetIds, visibility: .some(shouldArchive ? .timeline : .archive));
       toastService.success(message, toast: .new(onUndo: undo));

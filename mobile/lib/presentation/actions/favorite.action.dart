@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
+import 'package:immich_mobile/gallery/motion/celebrate.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
@@ -59,6 +60,7 @@ class FavoriteAction extends AssetActionBuilder {
       // #763: the per-user overlay route (PUT /assets/favorites), NOT the owner-only bulk update.
       await assetService.updateFavorite(assetIds, shouldFavorite);
       toastService.success(message);
+      GalleryCelebrate.favorite(when: shouldFavorite);
       clearSelection();
     } catch (error, stack) {
       handleError(error, stack: stack, description: "Failed to update favorite status for assets");
