@@ -531,12 +531,17 @@ export class DatabaseBackupService {
     const store = await this.backupStore.resolve();
     const { remote } = store;
 
-    // Delete from wherever it is. The local copy is normally already gone once promoted, and
-    // `delete` is a no-op on a missing disk file, so both sides are safe to attempt.
+    // Delete from wherever it is. With S3 on, the local copy is normally already gone once promoted, so
+    // it is only deleted when present: deleting a missing disk file logs a "does not exist" warning.
     await Promise.all(
-      files.flatMap((filename) => {
+      files.map(async (filename) => {
         const key = store.key(filename);
-        return [store.staging.delete(key), ...(remote ? [remote.backend.delete(key)] : [])];
+        const deleteLocal = async () => {
+          if (!remote || (await store.staging.exists(key))) {
+            await store.staging.delete(key);
+          }
+        };
+        await Promise.all([deleteLocal(), ...(remote ? [remote.backend.delete(key)] : [])]);
       }),
     );
   }
@@ -606,11 +611,13 @@ export class DatabaseBackupService {
     }
 
     // Retention applies to every routine backup the admin can see, across both backends, so
-    // `keepLastAmount` bounds the total however the uploads are faring. Deleting by filename hits both
-    // sides; `delete` is a no-op where the backup is not present.
+    // `keepLastAmount` bounds the total however the uploads are faring. Each expired backup is deleted
+    // from the side(s) that hold it: once backups go to S3 they are normally S3-only, and deleting a
+    // missing disk file logs a "does not exist" warning on every run.
     // The remote half of the union is re-read, since promoting changed it. A failure here is tolerated
     // the same way: prune what is known rather than nothing at all.
-    const routine = [...new Set([...(await localNames()), ...((await remoteNamesOrNone()) ?? [])])]
+    const localBeforePrune = new Set(await localNames());
+    const routine = [...new Set([...localBeforePrune, ...((await remoteNamesOrNone()) ?? [])])]
       .filter((filename) => isValidDatabaseRoutineBackupName(filename))
       .toSorted()
       .toReversed();
@@ -619,7 +626,9 @@ export class DatabaseBackupService {
     for (const filename of toDelete) {
       // One backup that refuses to delete must not stop the rest being pruned.
       try {
-        await store.staging.delete(store.key(filename));
+        if (!remote || localBeforePrune.has(filename)) {
+          await store.staging.delete(store.key(filename));
+        }
         if (remote) {
           await remote.backend.delete(store.key(filename));
         }

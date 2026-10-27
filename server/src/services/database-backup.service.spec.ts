@@ -603,6 +603,19 @@ describe(DatabaseBackupService.name, () => {
         expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz.tmp');
       });
 
+      // Found live on personal: every nightly prune of an S3-only backup also deleted it from the staging
+      // disk, where it was missing, and the storage repository logged "File ... does not exist." each night.
+      it('should prune an S3-only backup from S3 alone', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled); // keepLastAmount: 1
+        remote.seed('backups/immich-db-backup-1.sql.gz', 'backups/immich-db-backup-2.sql.gz');
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+        expect(remote.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-2.sql.gz');
+        expect(staging.delete).not.toHaveBeenCalled();
+      });
+
       // Regression (review, high): retention used to apply only to the canonical set, which was S3 when
       // enabled. While uploads failed, local stragglers were never counted or pruned, so one full dump
       // accumulated per cron tick until the media volume filled.
@@ -1317,10 +1330,19 @@ describe(DatabaseBackupService.name, () => {
       expect(staging.delete).toHaveBeenCalledWith('backups/filename.sql');
     });
 
-    it('should delete from both backends, wherever the backup actually is', async () => {
+    it('should delete from both backends when the backup is on both', async () => {
       enableRemote();
+      staging.seed('backups/filename.sql');
       await sut.deleteBackup(['filename.sql']);
       expect(staging.delete).toHaveBeenCalledWith('backups/filename.sql');
+      expect(remote.delete).toHaveBeenCalledWith('backups/filename.sql');
+    });
+
+    // Deleting a missing disk file logs a "does not exist" warning, and with S3 on most backups are S3-only.
+    it('should not touch the staging disk for a backup that is only in S3', async () => {
+      enableRemote();
+      await sut.deleteBackup(['filename.sql']);
+      expect(staging.delete).not.toHaveBeenCalled();
       expect(remote.delete).toHaveBeenCalledWith('backups/filename.sql');
     });
   });
