@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
+import 'package:immich_mobile/gallery/motion/removal.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
@@ -129,6 +130,7 @@ class DeleteAction extends AssetActionBuilder {
       }
     }
 
+    GalleryRemoval.send(remoteIds);
     await assetService.trash(remoteIds);
     return message;
   }
@@ -154,6 +156,7 @@ class DeleteAction extends AssetActionBuilder {
 
     final message = context.t.delete_permanently_action_prompt(count: remoteIds.length);
     // Server first, so a failed request will not remove the local copy
+    GalleryRemoval.dissolve(remoteIds);
     await assetService.delete(remoteIds);
     if (localIds.isNotEmpty && context.mounted) {
       await _cleanupLocalAssets(context, ref, localIds, requestCustomPrompt: false);
