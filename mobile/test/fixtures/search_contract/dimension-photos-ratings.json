@@ -1,0 +1,39 @@
+{
+  "actor": "me",
+  "description": "Photos, unfiltered: ratings only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "ratings"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 3
+        },
+        {
+          "count": 1,
+          "rating": 4
+        },
+        {
+          "count": 2,
+          "rating": 5
+        }
+      ]
+    },
+    "status": 200
+  }
+}

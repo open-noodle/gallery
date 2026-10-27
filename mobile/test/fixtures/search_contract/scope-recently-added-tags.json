@@ -1,0 +1,41 @@
+{
+  "actor": "me",
+  "description": "Recently added screen, beach rated 5: tags only",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "tags"
+      ],
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "tags": [
+        {
+          "count": 2,
+          "id": "7ef1e1f8-ec65-4488-8815-9f1e36421437",
+          "isSelected": false,
+          "value": "beach"
+        },
+        {
+          "count": 2,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

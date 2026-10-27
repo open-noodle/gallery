@@ -160,6 +160,8 @@ describe(ServerService.name, () => {
         s3Storage: false,
         syncRequestTypes: Object.values(SyncRequestType),
         localTakenRange: true,
+        searchOptions: true,
+        searchFavoritesAcrossSpaces: true,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });

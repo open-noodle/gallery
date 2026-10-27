@@ -1,0 +1,88 @@
+{
+  "actor": "me",
+  "description": "Older Gallery server: Photos options, no counts",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "d29213ae-d1d6-46ab-847d-d856fec75fd8": "person:rex"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/search/suggestions/filters",
+    "query": {
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        "Apple",
+        "Canon",
+        "Fujifilm",
+        "Sony"
+      ],
+      "countries": [
+        "France",
+        "Germany",
+        "Japan",
+        "Portugal",
+        "Spain"
+      ],
+      "hasAssetsInAlbum": true,
+      "hasAssetsNotInAlbum": true,
+      "hasFavorites": true,
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        "IMAGE",
+        "VIDEO"
+      ],
+      "people": [
+        {
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "id": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        },
+        {
+          "id": "person:d29213ae-d1d6-46ab-847d-d856fec75fd8",
+          "name": "Rex",
+          "primaryProfile": {
+            "id": "d29213ae-d1d6-46ab-847d-d856fec75fd8",
+            "type": "user-person"
+          }
+        }
+      ],
+      "ratings": [
+        3,
+        4,
+        5
+      ],
+      "tags": [
+        {
+          "id": "7ef1e1f8-ec65-4488-8815-9f1e36421437",
+          "value": "beach"
+        },
+        {
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "value": "food"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

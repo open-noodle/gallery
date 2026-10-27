@@ -1,0 +1,27 @@
+{
+  "actor": "me",
+  "description": "Photos timeline buckets with a city",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "city": "Kyoto",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 5,
+        "timeBucket": "2024-06-01"
+      }
+    ],
+    "status": 200
+  }
+}

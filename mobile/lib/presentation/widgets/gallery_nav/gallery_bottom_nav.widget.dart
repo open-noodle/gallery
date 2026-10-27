@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
@@ -18,7 +19,6 @@ import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 class GalleryBottomNav extends ConsumerStatefulWidget {
@@ -77,10 +77,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       return _landscapeRail(isReadonly, slots);
     }
 
-    // Hide the pill while the FilterSheet is visible — it would otherwise
-    // overlap the sheet's bottom content (e.g. the Done button).
-    final sheetVisible = ref.watch(photosFilterSheetProvider) != FilterSheetVisibility.hidden;
-    final hiding = _hiddenForMultiSelect || keyboardUp || sheetVisible;
+    // Photos search mode takes the screen's chrome, the nav included (← brings it back).
+    final searching = ref.watch(searchModeProvider);
+    final hiding = _hiddenForMultiSelect || keyboardUp || searching;
     final bottomInset = mq.padding.bottom > _bottomFloat ? mq.padding.bottom : _bottomFloat;
     final pillVisibleHeight = bottomInset + _pillHeight;
 

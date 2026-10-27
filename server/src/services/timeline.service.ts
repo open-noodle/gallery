@@ -8,6 +8,7 @@ import {
   TimeBucketsResponseDto,
 } from 'src/dtos/time-bucket.dto.js';
 import { AssetVisibility, Permission, TimeBucketSize } from 'src/enum.js';
+import { isFavoritesAcrossScope } from 'src/gallery/utils/favorites-scope.js';
 import { TimeBucketOptions } from 'src/repositories/asset.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -178,7 +179,8 @@ export class TimelineService extends BaseService {
 
     // eslint-disable-next-line unicorn/prefer-early-return
     if (dto.withSharedSpaces) {
-      const requestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;
+      const requestedArchived =
+        dto.visibility === AssetVisibility.Archive || (dto.visibility === undefined && !isFavoritesAcrossScope(dto));
       const requestedTrash = dto.isTrashed === true;
 
       if (requestedArchived || requestedTrash) {
