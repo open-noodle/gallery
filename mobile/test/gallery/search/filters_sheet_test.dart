@@ -222,6 +222,22 @@ void main() {
   });
 
   group('Text', () {
+    testWidgets("a filled field's floating label is not cut off by the section", (tester) async {
+      await pump(tester);
+      await openFilters(tester);
+      final field = find.byKey(const Key('search-filter-text-ocr'));
+      await tester.ensureVisible(field);
+      await tester.enterText(field, 'menu');
+      await settleFrames(tester);
+
+      // The label is the field's only Text (what is typed is an EditableText); filled, it floats over the border.
+      final label = tester.getRect(find.descendant(of: field, matching: find.byType(Text)).first);
+      final clip = tester.getRect(find.ancestor(of: field, matching: find.byType(SizeTransition)).first);
+      expect(label.top, greaterThanOrEqualTo(clip.top), reason: 'the label sits inside the clip of its section');
+
+      await disposePhotosPage(tester, container);
+    });
+
     testWidgets('OCR and file name together send both and narrow to photos matching both', (tester) async {
       await pump(tester);
       await openFilters(tester);

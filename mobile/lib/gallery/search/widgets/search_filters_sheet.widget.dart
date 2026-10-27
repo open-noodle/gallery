@@ -717,8 +717,10 @@ class _TextSectionState extends ConsumerState<_TextSection> {
         SearchText(ocr: _value(_ocr.text), fileName: _value(_fileName.text), description: _value(_description.text)),
       );
 
+  // Room above each field: an outlined field's label floats over its top border, and the section's fold clips to its
+  // own box, so the first label would be cut off.
   Widget _field(String key, String label, TextEditingController controller, {bool enabled = true}) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
     child: TextField(
       key: Key('search-filter-text-$key'),
       controller: controller,
