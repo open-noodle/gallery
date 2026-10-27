@@ -156,6 +156,7 @@ describe(ServerService.name, () => {
         email: false,
         realtimeTranscoding: false,
         peopleStatistics: false,
+        s3Storage: false,
         syncRequestTypes: Object.values(SyncRequestType),
         localTakenRange: true,
       });
@@ -166,6 +167,14 @@ describe(ServerService.name, () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ peopleStatistics: true }));
       const features = await sut.getFeatures();
       expect(features.peopleStatistics).toBe(true);
+    });
+
+    // Gallery-fork: the admin UI hides the database-backup S3 group entirely when this is false, so
+    // it has to follow the env storage backend rather than anything in the saved config.
+    it('should report s3Storage enabled when the storage backend is s3', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
+      const features = await sut.getFeatures();
+      expect(features.s3Storage).toBe(true);
     });
 
     // Regression guard: getFeatures is called on every web-app page load; must

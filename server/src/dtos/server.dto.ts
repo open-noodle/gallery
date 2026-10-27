@@ -158,6 +158,9 @@ const ServerFeaturesSchema = z
     ocr: z.boolean().describe('Whether OCR is enabled'),
     realtimeTranscoding: z.boolean().describe('Whether real-time transcoding is enabled'),
     peopleStatistics: z.boolean().describe('Whether the people face statistics UI is enabled'),
+    // Gallery-fork: the admin UI hides config that only applies on the S3 storage backend (database
+    // backups to S3), and the client has no other signal for which backend the server is running on.
+    s3Storage: z.boolean().describe('Whether the server is running on the S3 storage backend'),
     // Deliberately plain strings, not the SyncRequestType enum: a client must be able to
     // parse a newer server's list without choking on values its own enum doesn't know yet.
     syncRequestTypes: z

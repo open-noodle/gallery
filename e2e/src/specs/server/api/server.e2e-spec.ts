@@ -112,6 +112,9 @@ describe('/server', () => {
         trash: true,
         email: false,
         peopleStatistics: false,
+        // false on the e2e stack, which runs the disk storage backend. The admin UI uses this to hide
+        // the database-backup S3 options, which cannot apply without an S3 backend.
+        s3Storage: false,
         // The full list mirrors the SyncRequestType enum; pin the fork's space-album types,
         // which mobile's sync gate opens on (capability signalling).
         syncRequestTypes: expect.arrayContaining([

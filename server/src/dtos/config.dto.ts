@@ -33,6 +33,7 @@ import {
   VideoContainerSchema,
 } from 'src/enum.js';
 import {
+  GalleryBackupS3Schema,
   GalleryClassificationSchema,
   GalleryClipExtension,
   GalleryFaceSuggestionSchema,
@@ -41,6 +42,7 @@ import {
   GalleryPetRecognitionSchema,
   GalleryServerExtension,
   GalleryStorageUsageSchema,
+  galleryBackupDatabaseDefaults,
   galleryJobDefaults,
   galleryMachineLearningDefaults,
   galleryServerDefaults,
@@ -182,6 +184,7 @@ const AdminConfigSchemaWithVisibility = z
             enabled: configBool.describe('Enabled'),
             cronExpression: cronExpressionSchema,
             keepLastAmount: z.int().min(1).describe('Keep last amount'),
+            s3: GalleryBackupS3Schema,
           })
           .meta({ id: 'AdminConfigDatabaseBackupDto' }),
       })
@@ -613,6 +616,7 @@ export const defaults = Object.freeze<SystemConfig>({
       enabled: true,
       cronExpression: CronExpression.EVERY_DAY_AT_2AM,
       keepLastAmount: 14,
+      ...galleryBackupDatabaseDefaults,
     },
   },
   ffmpeg: {

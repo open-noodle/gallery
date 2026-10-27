@@ -12,6 +12,9 @@
   "added_to_collections_count": "已添加到 {count, plural, one {# 个收藏集} other {# 个收藏集}}",
   "added_to_space_count": "已将 {count, plural, one {# 个资源} other {# 个资源}} 添加到 Space",
   "admin": {
+    "backup_s3_credentials_hint": "备份会使用服务器已配置的 S3 凭据，写入与媒体文件相同的存储桶，位于 backups/ 下。启用后，每个新备份都会上传，随后从本地磁盘删除。",
+    "backup_s3_enabled": "将备份上传到 S3",
+    "backup_s3_enabled_description": "将计划的数据库备份保存在对象存储中，而不是服务器磁盘上",
     "birthday_memories_setting": "生日回忆",
     "birthday_memories_setting_description": "在人物生日当天为其生成回忆",
     "classification_action_tag": "仅添加标签",
