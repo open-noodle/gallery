@@ -119,6 +119,47 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
     expect(strategy.url).toContain('X-Amz');
   });
 
+  it('should list objects under a prefix with their real sizes', async () => {
+    const prefix = 'list-sizes/';
+    await backend.put(`${prefix}small.txt`, Buffer.from('ab'));
+    await backend.put(`${prefix}large.txt`, Buffer.from('abcdefgh'));
+    await backend.put('list-sizes-other/outside.txt', Buffer.from('zz'));
+
+    const listed = await backend.list(prefix);
+
+    expect(listed.toSorted((a, b) => a.key.localeCompare(b.key))).toEqual([
+      { key: `${prefix}large.txt`, size: 8 },
+      { key: `${prefix}small.txt`, size: 2 },
+    ]);
+  });
+
+  it('should return an empty listing for a prefix with no objects', async () => {
+    await expect(backend.list('list-nothing-here/')).resolves.toEqual([]);
+  });
+
+  it('list pages past the 1000-key ListObjectsV2 cap', async () => {
+    // Same cap as deletePrefix below, on the read path: a bucket holding more than one page of
+    // backups must still list completely, or retention would prune against a partial set.
+    const prefix = 'list-pagination/';
+    const totalKeys = 1100;
+    const body = Buffer.from('x');
+    const concurrency = 100;
+    for (let offset = 0; offset < totalKeys; offset += concurrency) {
+      const batch: Promise<unknown>[] = [];
+      for (let i = 0; i < concurrency && offset + i < totalKeys; i++) {
+        batch.push(backend.put(`${prefix}object-${offset + i}.txt`, body));
+      }
+      await Promise.all(batch);
+    }
+
+    const listed = await backend.list(prefix);
+
+    expect(listed).toHaveLength(totalKeys);
+    expect(new Set(listed.map(({ key }) => key)).size).toBe(totalKeys);
+
+    await backend.deletePrefix(prefix);
+  }, 120_000);
+
   it('deletePrefix sweeps objects across list-pagination and delete-batch boundaries', async () => {
     // 2500 keys exercises both SDK caps in one test: ListObjectsV2 returns 1000 per page,
     // DeleteObjects takes 1000 per call. Three pages in, three batches out.

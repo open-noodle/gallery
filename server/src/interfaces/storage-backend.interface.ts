@@ -63,6 +63,15 @@ export interface StorageBackend {
   /** Delete all objects/files under the given key prefix. Idempotent. No-op if nothing matches. */
   deletePrefix(prefix: string): Promise<void>;
 
+  /**
+   * List the objects/files directly under the given key prefix, newest-agnostic and unsorted.
+   * Each `key` is returned in the form this same backend accepts for `get`/`delete`, so a listing
+   * round-trips without the caller rebuilding paths. Not recursive: the disk backend returns only
+   * the files directly inside the folder, which is all the flat key spaces that use this need.
+   * Returns an empty array when the prefix holds nothing (a missing disk folder included).
+   */
+  list(prefix: string): Promise<Array<{ key: string; size: number }>>;
+
   /** Return the total size in bytes for all objects/files under the given key prefix. */
   getPrefixUsage(prefix: string, shouldCount?: (filename: string) => boolean): Promise<number>;
 

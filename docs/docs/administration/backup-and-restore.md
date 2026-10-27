@@ -21,6 +21,8 @@ Gallery automatically creates database backups for disaster-recovery purposes. T
 
 You can adjust the backup schedule and retention settings in **Administration > Settings > Database Dump Settings** (default: keep last 14 backups, create daily at 2:00 AM).
 
+If Gallery is running on the [S3-compatible storage backend](/features/s3-storage), it can upload each backup to object storage and keep nothing on the server's disk. See [Remote Database Backups](/administration/remote-database-backups).
+
 :::caution
 Database backups do **not** contain photos or videos — only metadata. They must be used together with a copy of the files in `UPLOAD_LOCATION` as outlined below.
 :::

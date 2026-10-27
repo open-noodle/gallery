@@ -12,6 +12,9 @@
   "added_to_collections_count": "Aggiunto a {count, plural, one {# raccolta} other {# raccolte}}",
   "added_to_space_count": "{count, plural, one {# risorsa aggiunta} other {# risorse aggiunte}} allo Space",
   "admin": {
+    "backup_s3_credentials_hint": "I backup vengono scritti nello stesso bucket dei tuoi media, sotto backups/, usando le credenziali S3 già configurate sul server. Mentre questa opzione è attiva, ogni nuovo backup viene caricato e poi rimosso dal disco locale.",
+    "backup_s3_enabled": "Carica i backup su S3",
+    "backup_s3_enabled_description": "Conserva i backup pianificati del database nello storage a oggetti invece che sul disco del server",
     "birthday_memories_setting": "Ricordi di compleanno",
     "birthday_memories_setting_description": "Crea ricordi generati per le persone nel giorno del loro compleanno",
     "classification_action_tag": "Solo tag",

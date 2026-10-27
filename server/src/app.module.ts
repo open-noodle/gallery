@@ -15,6 +15,7 @@ import { IWorker } from 'src/constants.js';
 import { controllers } from 'src/controllers/index.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { ApiTag, ImmichEnvironment, ImmichWorker } from 'src/enum.js';
+import { BackupStoreResolver } from 'src/gallery/utils/backup-store.js';
 import { MaintenanceAuthGuard } from 'src/maintenance/maintenance-auth.guard.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository.js';
@@ -183,6 +184,10 @@ export class ApiModule extends BaseModule {}
     AppRepository,
     MaintenanceHealthRepository,
     MaintenanceWebsocketRepository,
+    // gallery-fork: DatabaseBackupService resolves its storage backends through this. The other
+    // workers get it from `galleryServices`; this module's provider list is explicit, so it is
+    // named here too, or the maintenance worker cannot construct the backup service.
+    BackupStoreResolver,
     DatabaseBackupService,
     MaintenanceWorkerService,
     ...commonMiddleware,
