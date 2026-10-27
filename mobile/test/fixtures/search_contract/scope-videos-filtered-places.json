@@ -1,0 +1,41 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024, two filters: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "country": "Germany",
+      "dimensions": [
+        "places"
+      ],
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Berlin",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Germany"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

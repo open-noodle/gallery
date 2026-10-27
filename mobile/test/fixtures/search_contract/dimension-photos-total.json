@@ -1,0 +1,26 @@
+{
+  "actor": "me",
+  "description": "Photos, unfiltered: total only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "total"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "total": 13
+    },
+    "status": 200
+  }
+}

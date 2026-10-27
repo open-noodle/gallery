@@ -1,0 +1,114 @@
+{
+  "actor": "me",
+  "description": "Space album screen search mode, Places: Madrid (the archived photo stays in): the month 2023-07-01 of the browse results",
+  "ids": {
+    "08b4be8b-387c-43d7-8bcb-8caca60426b8": "asset:space-album-2",
+    "8fe25f55-7e1b-412b-8952-75af4d28b51c": "asset:space-album-1",
+    "94a21db1-7114-4f07-86f6-4e4970d77466": "asset:space-album-archived",
+    "ded86da4-c2dc-4fa2-8868-4242e72fd3c7": "user:member",
+    "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec": "album:space-trip"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/bucket",
+    "query": {
+      "albumId": "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec",
+      "city": "Madrid",
+      "country": "Spain",
+      "timeBucket": "2023-07-01"
+    }
+  },
+  "response": {
+    "body": {
+      "city": [
+        "Madrid",
+        "Madrid",
+        "Madrid"
+      ],
+      "country": [
+        "Spain",
+        "Spain",
+        "Spain"
+      ],
+      "createdAt": [
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z"
+      ],
+      "duration": [
+        null,
+        null,
+        null
+      ],
+      "fileCreatedAt": [
+        "2023-07-03T10:00:00",
+        "2023-07-02T10:00:00",
+        "2023-07-01T10:00:00"
+      ],
+      "id": [
+        "94a21db1-7114-4f07-86f6-4e4970d77466",
+        "08b4be8b-387c-43d7-8bcb-8caca60426b8",
+        "8fe25f55-7e1b-412b-8952-75af4d28b51c"
+      ],
+      "isFavorite": [
+        true,
+        false,
+        false
+      ],
+      "isImage": [
+        true,
+        true,
+        true
+      ],
+      "isTrashed": [
+        false,
+        false,
+        false
+      ],
+      "livePhotoVideoId": [
+        null,
+        null,
+        null
+      ],
+      "localOffsetHours": [
+        0,
+        0,
+        0
+      ],
+      "ownerId": [
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7",
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7",
+        "ded86da4-c2dc-4fa2-8868-4242e72fd3c7"
+      ],
+      "projectionType": [
+        null,
+        null,
+        null
+      ],
+      "ratio": [
+        1,
+        1,
+        1
+      ],
+      "status": [
+        "active",
+        "active",
+        "active"
+      ],
+      "thumbhash": [
+        "thumbhash",
+        "thumbhash",
+        "thumbhash"
+      ],
+      "visibility": [
+        "archive",
+        "timeline",
+        "timeline"
+      ]
+    },
+    "status": 200
+  }
+}

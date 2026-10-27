@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/search/search_scope.dart';
 import 'package:immich_mobile/presentation/widgets/people/person_option_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
@@ -89,6 +90,7 @@ class _PersonPageState extends ConsumerState<PersonPage> {
       // the server-resolved Space assets (the local owner-scoped join is empty for a person the
       // viewer does not own). See buildPersonTimelineRouteService.
       timelineServiceBuilder: (ref, scope, groupBy) => buildPersonTimelineRouteService(ref, _person, scope, groupBy),
+      search: personSearchScope(_person),
       child: Timeline(
         withGroupingPill: true,
         appBar: PersonSliverAppBar(

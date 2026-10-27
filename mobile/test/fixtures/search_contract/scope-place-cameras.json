@@ -1,0 +1,38 @@
+{
+  "actor": "me",
+  "description": "Place screen (Lisbon), Anna with an Apple camera: cameras only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Lisbon",
+      "dimensions": [
+        "cameras"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

@@ -12,8 +12,11 @@ import { MapMarkerDto } from 'src/dtos/map.dto.js';
 import { MetadataSearchDto, SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
 import { AlbumUserRole, AssetStatus, AssetVisibility, SharedLinkType, TimeBucketSize } from 'src/enum.js';
+import { SearchOptionsRequestDto, searchOptionsDimensions } from 'src/gallery/dtos/search.dto.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { GallerySearchService } from 'src/gallery/services/gallery-search.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -91,6 +94,7 @@ const seed = async () => {
       SharedLinkAssetRepository,
       SharedLinkRepository,
       SharedSpaceRepository,
+      SmartFacetRepository,
       SpaceAlbumRepository,
       StackRepository,
       SystemMetadataRepository,
@@ -568,6 +572,66 @@ describe('viewer-scope RBAC oracle', () => {
           }),
       ),
     }));
+    expect(result).toMatchSnapshot();
+  });
+
+  it('search options with counts', async () => {
+    const sut = world.ctx.getService(GallerySearchService);
+    const { owner, space, ownAlbum, spaceAlbum } = world.ids;
+    const variants: Record<string, (auth: Auth) => SearchOptionsRequestDto> = {
+      photos: () => ({ withSharedSpaces: true, withPartners: true, visibility: AssetVisibility.Timeline }),
+      // refused by /timeline/buckets (withSharedSpaces needs a visibility), so refused here too
+      shared: () => ({ withSharedSpaces: true }),
+      sharedFavorites: () => ({ withSharedSpaces: true, visibility: AssetVisibility.Timeline, isFavorite: true }),
+      favorites: () => ({ isFavorite: true }),
+      space: () => ({ spaceId: space }),
+      ownAlbum: () => ({ albumIds: [ownAlbum] }),
+      spaceAlbum: () => ({ albumIds: [spaceAlbum] }),
+      archive: (auth: Auth) => ({ visibility: AssetVisibility.Archive, ownerId: me(auth) }),
+      ownerArchive: () => ({ visibility: AssetVisibility.Archive, ownerId: owner }),
+    };
+
+    // The invariant the endpoint exists for: in browse mode every total is the count /timeline/buckets returns for the
+    // same request (albumIds[0] as its albumId), and a request one refuses the other refuses too.
+    const timeline = world.ctx.getService(TimelineService);
+    const totals = await matrix(variants, async (auth, dto) => {
+      const { albumIds, ...rest } = dto;
+      return {
+        options: await attempt(
+          () => sut.getSearchOptions(auth, { ...dto, dimensions: ['total'] }),
+          ({ total }) => total,
+        ),
+        results: await attempt(
+          () => timeline.getTimeBuckets(auth, { ...(rest as Partial<TimeBucketDto>), albumId: albumIds?.[0] }),
+          (buckets) => buckets.reduce((sum, { count }) => sum + count, 0),
+        ),
+      };
+    });
+    for (const [actor, byVariant] of Object.entries(totals)) {
+      for (const [variant, { options, results }] of Object.entries(
+        byVariant as Record<string, Record<string, unknown>>,
+      )) {
+        // a shared link may browse the timeline but never reaches this route (it is not `sharedLink: true`)
+        if (!world.actors[actor as keyof typeof world.actors].sharedLink) {
+          expect({ actor, variant, total: options }).toEqual({ actor, variant, total: results });
+        }
+      }
+    }
+
+    const result = await matrix(variants, async (auth, dto) =>
+      attempt(
+        () => sut.getSearchOptions(auth, { ...dto, dimensions: [...searchOptionsDimensions] }),
+        (options) =>
+          relabel({
+            total: options.total,
+            people: options.people!.map(({ id, count }) => `${name(id)}:${count}`),
+            tags: options.tags!.map(({ id, count }) => `${name(id)}:${count}`),
+            countries: sorted(options.countries!.map(({ country, count }) => `${fromFixture(country)}:${count}`)),
+            cameraMakes: sorted(options.cameraMakes!.map(({ make, count }) => `${fromFixture(make)}:${count}`)),
+            availability: options.availability,
+          }),
+      ),
+    );
     expect(result).toMatchSnapshot();
   });
 

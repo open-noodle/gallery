@@ -1,0 +1,45 @@
+{
+  "actor": "me",
+  "description": "Album screen, Japan photos, two filters: places only",
+  "ids": {
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+      ],
+      "country": "Japan",
+      "dimensions": [
+        "places"
+      ],
+      "type": "IMAGE"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 1
+            },
+            {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

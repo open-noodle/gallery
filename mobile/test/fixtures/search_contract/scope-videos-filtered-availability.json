@@ -1,0 +1,42 @@
+{
+  "actor": "me",
+  "description": "Videos screen, Germany in 2024, two filters: availability only",
+  "ids": {},
+  "request": {
+    "body": {
+      "country": "Germany",
+      "dimensions": [
+        "availability"
+      ],
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": false,
+        "hasFavorites": false,
+        "hasImages": false,
+        "hasPeople": false,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": true
+      }
+    },
+    "status": 200
+  }
+}

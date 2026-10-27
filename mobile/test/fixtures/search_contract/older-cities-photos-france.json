@@ -1,0 +1,24 @@
+{
+  "actor": "me",
+  "description": "Older Gallery server: the cities of France, fetched after the countries",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/search/suggestions",
+    "query": {
+      "country": "France",
+      "type": "city",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      "Nice",
+      "Paris"
+    ],
+    "status": 200
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Space album screen, Madrid photos, two filters: people only",
+  "ids": {
+    "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec": "album:space-trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "fdf02fc0-9f3b-46b1-8156-65f1bc2be8ec"
+      ],
+      "city": "Madrid",
+      "country": "Spain",
+      "dimensions": [
+        "people"
+      ],
+      "type": "IMAGE"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": []
+    },
+    "status": 200
+  }
+}

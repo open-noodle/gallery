@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
+import 'package:immich_mobile/gallery/search/search_mode.provider.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
@@ -16,7 +17,6 @@ import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 import '../../../test_helpers/fake_tabs_router.dart';
@@ -389,7 +389,7 @@ void main() {
     await tester.tap(find.byType(GallerySearchBlob));
     await tester.pumpAndSettle();
 
-    expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
+    expect(container.read(searchModeProvider), isTrue);
   });
 
   testWidgets('re-tap Photos (already active): emits ScrollToTopEvent', (tester) async {

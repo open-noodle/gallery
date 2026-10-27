@@ -1,0 +1,40 @@
+{
+  "actor": "me",
+  "description": "Album screen, Japan photos: availability only",
+  "ids": {
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+      ],
+      "dimensions": [
+        "availability"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": true
+      }
+    },
+    "status": 200
+  }
+}

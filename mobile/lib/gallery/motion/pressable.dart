@@ -25,6 +25,9 @@ class GalleryPressable extends StatefulWidget {
 
   final bool enabled;
 
+  /// The [pressDelay] for items inside scrolling content.
+  static const scrollingDelay = Duration(milliseconds: 70);
+
   const GalleryPressable({
     super.key,
     required this.child,

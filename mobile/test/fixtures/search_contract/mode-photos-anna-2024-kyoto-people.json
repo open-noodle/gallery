@@ -1,0 +1,62 @@
+{
+  "actor": "me",
+  "description": "Photos search mode, Anna in Kyoto in 2024: people only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben"
+  },
+  "request": {
+    "body": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "dimensions": [
+        "people"
+      ],
+      "personIds": [
+        "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682"
+      ],
+      "takenAfter": "2024-01-01T00:00:00.000Z",
+      "takenBefore": "2025-01-01T00:00:00.000Z",
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": [
+        {
+          "count": 2,
+          "filterId": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "person:6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
+          "isSelected": true,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "id": "person:c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        }
+      ]
+    },
+    "status": 200
+  }
+}

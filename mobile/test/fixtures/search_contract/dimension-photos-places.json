@@ -1,0 +1,81 @@
+{
+  "actor": "me",
+  "description": "Photos, unfiltered: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 5
+            }
+          ],
+          "count": 5,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 2
+            },
+            {
+              "city": "Porto",
+              "count": 1
+            }
+          ],
+          "count": 3,
+          "country": "Portugal"
+        },
+        {
+          "cities": [
+            {
+              "city": "Paris",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "France"
+        },
+        {
+          "cities": [
+            {
+              "city": "Madrid",
+              "count": 2
+            }
+          ],
+          "count": 2,
+          "country": "Spain"
+        },
+        {
+          "cities": [
+            {
+              "city": "Berlin",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Germany"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

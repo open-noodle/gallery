@@ -1,0 +1,50 @@
+{
+  "actor": "me",
+  "description": "Photos timeline buckets: own + partners + timeline spaces",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 5,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 2,
+        "timeBucket": "2024-05-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-02-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2024-01-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2023-09-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2023-08-01"
+      },
+      {
+        "count": 2,
+        "timeBucket": "2023-07-01"
+      }
+    ],
+    "status": 200
+  }
+}

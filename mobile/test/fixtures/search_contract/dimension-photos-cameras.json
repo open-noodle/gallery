@@ -1,0 +1,67 @@
+{
+  "actor": "me",
+  "description": "Photos, unfiltered: cameras only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 2,
+              "model": "iPhone 15"
+            }
+          ]
+        },
+        {
+          "count": 2,
+          "make": "Canon",
+          "models": [
+            {
+              "count": 2,
+              "model": "EOS R5"
+            }
+          ]
+        },
+        {
+          "count": 2,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 2,
+              "model": "X-T5"
+            }
+          ]
+        },
+        {
+          "count": 2,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 2,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

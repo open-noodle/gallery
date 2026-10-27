@@ -1,0 +1,40 @@
+{
+  "actor": "me",
+  "description": "Favorites screen search mode, Places: Osaka (an archived favourite): availability only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Osaka",
+      "country": "Japan",
+      "dimensions": [
+        "availability"
+      ],
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": false,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": false,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "actor": "me",
+  "description": "Space screen, Pia in Kyoto: availability only",
+  "ids": {
+    "59b9238d-6305-40d3-82f4-88e547cadc38": "space:family"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "availability"
+      ],
+      "spaceId": "59b9238d-6305-40d3-82f4-88e547cadc38"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": true,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": false,
+        "hasTags": false,
+        "hasVideos": false
+      }
+    },
+    "status": 200
+  }
+}

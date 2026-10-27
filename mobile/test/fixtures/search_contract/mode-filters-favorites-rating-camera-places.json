@@ -1,0 +1,41 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites rated at least 3 from an iPhone 15: places only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "places"
+      ],
+      "isFavorite": true,
+      "make": "Apple",
+      "model": "iPhone 15",
+      "rating": 3,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Lisbon",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Portugal"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

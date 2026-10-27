@@ -1,0 +1,27 @@
+{
+  "actor": "me",
+  "description": "Photos Filters sheet, favorites only: tags only",
+  "ids": {},
+  "request": {
+    "body": {
+      "dimensions": [
+        "tags"
+      ],
+      "isFavorite": true,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "tags": []
+    },
+    "status": 200
+  }
+}

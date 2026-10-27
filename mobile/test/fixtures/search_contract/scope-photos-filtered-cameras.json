@@ -1,0 +1,40 @@
+{
+  "actor": "me",
+  "description": "Photos, Kyoto rated at least 3, two filters: cameras only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "dimensions": [
+        "cameras"
+      ],
+      "rating": 3,
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 2,
+              "model": "X-T5"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  }
+}

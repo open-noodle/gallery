@@ -498,9 +498,18 @@ describe('/timeline', () => {
       }
     });
 
-    it('withSharedSpaces + isFavorite WITHOUT explicit visibility still 400s (archive arm untouched)', async () => {
+    // Favorites search across spaces (specs/2026-10-23-mobile-search-redesign-design.md): visibility may be unset
+    // only together with isFavorite=true; other owners' archived photos stay out (server/src/gallery/utils/favorites-scope.ts).
+    it('withSharedSpaces + isFavorite WITHOUT explicit visibility is accepted', async () => {
       const { status } = await request(app)
         .get('/timeline/buckets?withSharedSpaces=true&isFavorite=true')
+        .set(asBearerAuth(ctx.spaceViewer.token!));
+      expect(status).toBe(200);
+    });
+
+    it('withSharedSpaces WITHOUT explicit visibility and without isFavorite still 400s', async () => {
+      const { status } = await request(app)
+        .get('/timeline/buckets?withSharedSpaces=true')
         .set(asBearerAuth(ctx.spaceViewer.token!));
       expect(status).toBe(400);
     });

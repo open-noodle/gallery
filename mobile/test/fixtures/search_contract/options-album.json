@@ -1,0 +1,162 @@
+{
+  "actor": "me",
+  "description": "Album screen: albumIds only",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+      ],
+      "dimensions": [
+        "availability",
+        "total",
+        "time",
+        "people",
+        "tags",
+        "places",
+        "cameras",
+        "ratings",
+        "mediaTypes"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "availability": {
+        "hasAssets": true,
+        "hasAssetsInAlbum": true,
+        "hasAssetsNotInAlbum": false,
+        "hasCameras": true,
+        "hasFavorites": true,
+        "hasImages": true,
+        "hasPeople": true,
+        "hasPlaces": true,
+        "hasRatings": true,
+        "hasTags": true,
+        "hasVideos": true
+      },
+      "cameraMakes": [
+        {
+          "count": 1,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 1,
+              "model": "X-T5"
+            }
+          ]
+        }
+      ],
+      "countries": [
+        {
+          "cities": [
+            {
+              "city": "Kyoto",
+              "count": 1
+            },
+            {
+              "city": "Osaka",
+              "count": 1
+            }
+          ],
+          "count": 2,
+          "country": "Japan"
+        },
+        {
+          "cities": [
+            {
+              "city": "Berlin",
+              "count": 1
+            }
+          ],
+          "count": 1,
+          "country": "Germany"
+        }
+      ],
+      "hasUnnamedPeople": false,
+      "mediaTypes": [
+        {
+          "count": 2,
+          "type": "IMAGE"
+        },
+        {
+          "count": 1,
+          "type": "VIDEO"
+        }
+      ],
+      "people": [
+        {
+          "count": 1,
+          "filterId": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "c360094e-5899-4aea-88e0-01a3aafd727b",
+          "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        }
+      ],
+      "ratings": [
+        {
+          "count": 1,
+          "rating": 5
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "id": "7ef1e1f8-ec65-4488-8815-9f1e36421437",
+          "isSelected": false,
+          "value": "beach"
+        },
+        {
+          "count": 1,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ],
+      "timeBuckets": [
+        {
+          "count": 1,
+          "timeBucket": "2024-06-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2024-02-01"
+        },
+        {
+          "count": 1,
+          "timeBucket": "2022-12-01"
+        }
+      ],
+      "total": 3
+    },
+    "status": 200
+  }
+}

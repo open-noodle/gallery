@@ -1,0 +1,23 @@
+{
+  "actor": "me",
+  "description": "Older Gallery server: the cities of Germany, fetched after the countries",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/search/suggestions",
+    "query": {
+      "country": "Germany",
+      "type": "city",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      "Berlin"
+    ],
+    "status": 200
+  }
+}

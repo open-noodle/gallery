@@ -1,0 +1,27 @@
+{
+  "actor": "me",
+  "description": "Videos screen search mode: browse results",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "type": "VIDEO",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2024-02-01"
+      }
+    ],
+    "status": 200
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "actor": "me",
+  "description": "Album screen, Japan photos: people only",
+  "ids": {
+    "6a85a407-28b8-47f4-8bc6-c627d9cf4682": "person:anna",
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "body": {
+      "albumIds": [
+        "e96f3561-a5de-46e0-87bb-8eedbcc306b8"
+      ],
+      "dimensions": [
+        "people"
+      ]
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": [
+        {
+          "count": 1,
+          "filterId": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Anna",
+          "primaryProfile": {
+            "id": "6a85a407-28b8-47f4-8bc6-c627d9cf4682",
+            "type": "user-person"
+          }
+        },
+        {
+          "count": 1,
+          "filterId": "c360094e-5899-4aea-88e0-01a3aafd727b",
+          "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+          "isPet": false,
+          "isSelected": false,
+          "name": "Ben",
+          "primaryProfile": {
+            "id": "c360094e-5899-4aea-88e0-01a3aafd727b",
+            "type": "user-person"
+          }
+        }
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Favorites screen search mode, Places: Osaka (an archived favourite): people only",
+  "ids": {},
+  "request": {
+    "body": {
+      "city": "Osaka",
+      "country": "Japan",
+      "dimensions": [
+        "people"
+      ],
+      "isFavorite": true,
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "hasUnnamedPeople": false,
+      "people": []
+    },
+    "status": 200
+  }
+}

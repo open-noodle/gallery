@@ -14,12 +14,18 @@ enum StoreKey<T> {
   serverEndpoint<String>._(12),
   advancedTroubleshooting<bool>._(114),
   enableHapticFeedback<bool>._(126),
-  autoEndpointLocationDisclosureAccepted<bool>._(142),
+  // Fork key, moved from 142 (upstream's next id) on startup by moveForkStoreValues.
+  autoEndpointLocationDisclosureAccepted<bool>._(90006),
+  // Gallery search mode's sheets (lib/gallery/search/search_filter_prefs.dart). New fork ids go in the 90000 block,
+  // far from upstream's numbering, which grows one by one from the low hundreds.
+  searchFiltersCollapsedSections<String>._(90001),
+  searchFiltersHiddenSections<String>._(90002),
+  searchPeopleSort<String>._(90003),
+  searchPlacesSort<String>._(90004),
+  searchPeopleType<String>._(90005),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
-  filterSheetCollapsedSections<String>._(143),
-  filterSheetHiddenSections<String>._(144),
 
   syncMigrationStatus<String>._(1013),
 

@@ -1,0 +1,30 @@
+{
+  "actor": "me",
+  "description": "Album screen search mode, People: Ben: browse results",
+  "ids": {
+    "c360094e-5899-4aea-88e0-01a3aafd727b": "person:ben",
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "albumId": "e96f3561-a5de-46e0-87bb-8eedbcc306b8",
+      "personIds": [
+        "c360094e-5899-4aea-88e0-01a3aafd727b"
+      ]
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2024-06-01"
+      }
+    ],
+    "status": 200
+  }
+}

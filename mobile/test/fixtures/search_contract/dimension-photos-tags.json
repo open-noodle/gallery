@@ -1,0 +1,42 @@
+{
+  "actor": "me",
+  "description": "Photos, unfiltered: tags only",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "7ef1e1f8-ec65-4488-8815-9f1e36421437": "tag:beach"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "tags"
+      ],
+      "visibility": "timeline",
+      "withPartners": true,
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "tags": [
+        {
+          "count": 2,
+          "id": "7ef1e1f8-ec65-4488-8815-9f1e36421437",
+          "isSelected": false,
+          "value": "beach"
+        },
+        {
+          "count": 2,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

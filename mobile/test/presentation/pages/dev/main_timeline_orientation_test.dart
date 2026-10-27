@@ -15,6 +15,7 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/gallery/search/photos_search.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
@@ -23,7 +24,6 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart' as infra;
-import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
@@ -198,7 +198,7 @@ Future<void> _pumpPhotosTimeline(
         child: withStubRouter(
           const MaterialApp(
             home: TimelineRouteScope(
-              timelineServiceBuilder: buildPhotosTimelineRouteService,
+              timelineServiceBuilder: buildPhotosTimelineService,
               sharedGrouping: true,
               child: Timeline(appBar: null, bottomSheet: null, withScrubber: false),
             ),

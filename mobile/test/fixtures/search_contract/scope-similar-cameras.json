@@ -1,0 +1,61 @@
+{
+  "actor": "me",
+  "description": "Similar photos (query mode), Kyoto with a Fujifilm: cameras only",
+  "ids": {
+    "b041dd6b-85ba-4171-8260-52366fcc95af": "asset:kyoto-1"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "cameras"
+      ],
+      "queryAssetId": "b041dd6b-85ba-4171-8260-52366fcc95af",
+      "type": "IMAGE",
+      "visibility": "timeline",
+      "withSharedSpaces": true
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "cameraMakes": [
+        {
+          "count": 2,
+          "make": "Fujifilm",
+          "models": [
+            {
+              "count": 2,
+              "model": "X-T5"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Apple",
+          "models": [
+            {
+              "count": 1,
+              "model": "iPhone 15"
+            }
+          ]
+        },
+        {
+          "count": 1,
+          "make": "Sony",
+          "models": [
+            {
+              "count": 1,
+              "model": "A7 IV"
+            }
+          ]
+        }
+      ]
+    },
+    "status": 200
+  },
+  "setup": "smart-search"
+}

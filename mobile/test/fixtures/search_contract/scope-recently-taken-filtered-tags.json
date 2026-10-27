@@ -1,0 +1,37 @@
+{
+  "actor": "me",
+  "description": "Recently taken screen, OCR and file name \"menu\", two filters: tags only",
+  "ids": {
+    "0be3d47c-436c-473c-8e17-d152838e231d": "tag:food",
+    "fd5da66e-5b01-424b-844a-19c2c6cb252b": "user:me"
+  },
+  "request": {
+    "body": {
+      "dimensions": [
+        "tags"
+      ],
+      "ocr": "menu",
+      "originalFileName": "menu",
+      "ownerId": "fd5da66e-5b01-424b-844a-19c2c6cb252b",
+      "visibility": "timeline"
+    },
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "POST",
+    "path": "/api/search/options"
+  },
+  "response": {
+    "body": {
+      "tags": [
+        {
+          "count": 1,
+          "id": "0be3d47c-436c-473c-8e17-d152838e231d",
+          "isSelected": false,
+          "value": "food"
+        }
+      ]
+    },
+    "status": 200
+  }
+}

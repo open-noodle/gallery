@@ -1,0 +1,32 @@
+{
+  "actor": "me",
+  "description": "Album screen, Japan photos, two filters: browse results",
+  "ids": {
+    "e96f3561-a5de-46e0-87bb-8eedbcc306b8": "album:trip"
+  },
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "albumId": "e96f3561-a5de-46e0-87bb-8eedbcc306b8",
+      "country": "Japan",
+      "type": "IMAGE"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 1,
+        "timeBucket": "2024-06-01"
+      },
+      {
+        "count": 1,
+        "timeBucket": "2022-12-01"
+      }
+    ],
+    "status": 200
+  }
+}

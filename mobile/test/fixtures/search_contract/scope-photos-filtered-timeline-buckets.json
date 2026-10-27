@@ -1,0 +1,29 @@
+{
+  "actor": "me",
+  "description": "Photos, Kyoto rated at least 3, two filters: browse results",
+  "ids": {},
+  "request": {
+    "headers": {
+      "x-gallery-app": "search-contract"
+    },
+    "method": "GET",
+    "path": "/api/timeline/buckets",
+    "query": {
+      "city": "Kyoto",
+      "country": "Japan",
+      "rating": "3",
+      "visibility": "timeline",
+      "withPartners": "true",
+      "withSharedSpaces": "true"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "count": 2,
+        "timeBucket": "2024-06-01"
+      }
+    ],
+    "status": 200
+  }
+}
