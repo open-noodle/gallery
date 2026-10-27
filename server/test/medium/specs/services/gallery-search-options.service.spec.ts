@@ -500,6 +500,66 @@ describe('POST /search/options (GallerySearchService.getSearchOptions)', () => {
     });
   });
 
+  describe("a space member's photos in my timeline", () => {
+    it('every list counts them, and each option it lists finds them through /timeline/buckets', async () => {
+      const { sut, ctx, timeline } = setup();
+      const { user: me } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const spaceId = await newSpace(ctx, member.id, [{ userId: me.id }]);
+      await photo(ctx, { ownerId: me.id, city: 'Paris', country: 'France', make: 'Canon', model: 'R5', rating: 2 });
+      const theirs = await photo(ctx, {
+        ownerId: member.id,
+        city: 'Kyoto',
+        country: 'Japan',
+        make: 'Fujifilm',
+        model: 'X-T5',
+        rating: 4,
+        type: AssetType.Video,
+        takenAt: new Date('2023-04-10T12:00:00.000Z'),
+      });
+      await ctx.newSharedSpaceAsset({ spaceId, assetId: theirs, addedById: member.id });
+      // the member's own tag, on the member's photo: tags belong to whoever made them
+      const { tag } = await ctx.newTag({ userId: member.id, value: 'temple' });
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [theirs] });
+
+      const photosScope = { withSharedSpaces: true, visibility: AssetVisibility.Timeline } as const;
+      const result = await optionsFor(sut, me.id, photosScope);
+
+      expect(result.total).toBe(2);
+      expect(result.availability).toMatchObject({ hasTags: true, hasCameras: true, hasRatings: true, hasVideos: true });
+      expect(result.tags).toEqual([{ id: tag.id, value: 'temple', count: 1, isSelected: false }]);
+      expect(result.countries.find((c) => c.country === 'Japan')).toEqual({
+        country: 'Japan',
+        count: 1,
+        cities: [{ city: 'Kyoto', count: 1 }],
+      });
+      expect(result.cameraMakes.find((m) => m.make === 'Fujifilm')).toEqual({
+        make: 'Fujifilm',
+        count: 1,
+        models: [{ model: 'X-T5', count: 1 }],
+      });
+      expect(result.ratings).toContainEqual({ rating: 4, count: 1 });
+      expect(result.mediaTypes).toContainEqual({ type: AssetType.Video, count: 1 });
+      expect(result.timeBuckets).toContainEqual({ timeBucket: '2023-04-01', count: 1 });
+
+      // Picking each of those options narrows to the member's photo, in the options and in the results alike.
+      const picks: SearchOptionsRequestDto[] = [
+        { tagIds: [tag.id] },
+        { country: 'Japan', city: 'Kyoto' },
+        { make: 'Fujifilm', model: 'X-T5' },
+        { rating: 4 },
+        { type: AssetType.Video },
+        { takenAfter: new Date('2023-04-01T00:00:00.000Z'), takenBefore: new Date('2023-05-01T00:00:00.000Z') },
+      ];
+      for (const pick of picks) {
+        const dto = { ...photosScope, ...pick };
+        const narrowed = await optionsFor(sut, me.id, dto);
+        expect({ pick, total: narrowed.total }).toEqual({ pick, total: 1 });
+        expect({ pick, results: await resultIds(timeline, me.id, dto) }).toEqual({ pick, results: [theirs] });
+      }
+    });
+  });
+
   describe('tags', () => {
     it('browse: tags match ANY, as /timeline/buckets does, and each tag counts the photos it would add', async () => {
       const { sut, ctx, timeline } = setup();
